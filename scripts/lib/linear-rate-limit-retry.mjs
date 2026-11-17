@@ -22,23 +22,26 @@ export function isLinearRateLimited(result) {
  * monitored surface healthy and never resolves a Linear issue: the verdict is
  * `unknown` on the record, surfaced as a warning annotation plus a job-summary
  * section so the deferred state cannot hide in green.
- * @param {{ label?: string, resetAt?: number | null }} [options]
+ * @param {{ label?: string, resetAt?: number | null, issue?: { id: string, identifier?: string, url?: string, action?: string } }} [options]
  */
-export function deferLinearRateLimited({ label, resetAt } = {}) {
+export function deferLinearRateLimited({ label, resetAt, issue } = {}) {
   const resetMs = Number(resetAt);
   const resetIso =
     Number.isFinite(resetMs) && resetMs > 0
       ? new Date(resetMs).toISOString()
       : 'unknown';
+  const progress = issue
+    ? `Linear issue ${issue.identifier ?? issue.id} was ${issue.action ?? 'recorded'}; remaining intake work is deferred`
+    : 'No Linear issue was filed or resolved';
   console.warn(
-    `::warning title=Linear rate limited::${label} deferred: Linear API rate limited until ${resetIso}. No Linear issue was filed or resolved; the signal is unknown, not healthy. The next scheduled run retries.`
+    `::warning title=Linear rate limited::${label} deferred: Linear API rate limited until ${resetIso}. ${progress}; the signal is unknown, not healthy. The next scheduled run retries.`
   );
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) {
     try {
       appendFileSync(
         summary,
-        `## Linear rate limited\n\n${label} was **deferred**, not failed: Linear API rate limited until ${resetIso}. No Linear issue was filed or resolved; the signal is unknown until the next scheduled run.\n`
+        `## Linear rate limited\n\n${label} was **deferred**, not failed: Linear API rate limited until ${resetIso}. ${progress}; the signal is unknown until the next scheduled run.\n`
       );
     } catch {
       // The step summary is best-effort; the warning annotation already surfaced.
@@ -49,6 +52,14 @@ export function deferLinearRateLimited({ label, resetAt } = {}) {
     action: 'defer',
     reason: 'linear_rate_limited',
     resetAt: Number.isFinite(resetMs) && resetMs > 0 ? resetMs : null,
+    ...(issue
+      ? {
+          id: issue.id,
+          identifier: issue.identifier,
+          url: issue.url,
+          completedAction: issue.action,
+        }
+      : {}),
   };
 }
 
@@ -70,11 +81,13 @@ export async function withLinearRateLimitRetry(
   } = {}
 ) {
   let attempt = 0;
+  let issue;
   for (;;) {
     const result = await run();
     if (!isLinearRateLimited(result)) return result;
+    issue = result.issue ?? issue;
     if (attempt >= retries) {
-      return deferLinearRateLimited({ label, resetAt: result.resetAt });
+      return deferLinearRateLimited({ label, resetAt: result.resetAt, issue });
     }
     attempt += 1;
     const resetMs = Number(result.resetAt);
@@ -83,7 +96,7 @@ export async function withLinearRateLimitRetry(
     if (Number.isFinite(wait) && wait > maxWaitMs) {
       // A retry inside the still-published cooldown is rejected locally
       // without reaching Linear. Defer instead of burning the wait budget.
-      return deferLinearRateLimited({ label, resetAt: resetMs });
+      return deferLinearRateLimited({ label, resetAt: resetMs, issue });
     }
     await sleep(Number.isFinite(wait) && wait > 0 ? wait : fallbackWaitMs);
   }

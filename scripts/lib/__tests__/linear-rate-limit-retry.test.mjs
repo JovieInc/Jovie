@@ -1,7 +1,7 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { basename, join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runBillingHealthPublicIntake } from '../../billing-health-public-intake.mjs';
 import { runBillingSyncIntake } from '../../billing-sync-intake.mjs';
 import { intakeDocsDeploy } from '../../docs-deploy-intake.mjs';
@@ -12,7 +12,25 @@ import {
 import { runSyntheticMonitoringIntake } from '../../synthetic-monitoring-intake.mjs';
 import { runWebAiHealthIntake } from '../../web-ai-health-intake.mjs';
 
-const FAR_RESET = Date.now() + 60 * 60 * 1000;
+const NOW = 1_795_000_000_000;
+const FAR_RESET = NOW + 60 * 60 * 1000;
+let testDirectory;
+
+beforeEach(() => {
+  testDirectory = mkdtempSync(join(tmpdir(), 'linear-rate-limit-retry-'));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
+  vi.stubEnv('LINEAR_API_KEY', `lin_api_fixture_${basename(testDirectory)}`);
+  vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
+  vi.stubEnv('LINEAR_COOLDOWN_STATE_DIR', join(testDirectory, 'cooldown'));
+  vi.stubEnv('LINEAR_COOLDOWN_FALLBACK_DIR', join(testDirectory, 'fallback'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+  rmSync(testDirectory, { recursive: true, force: true });
+});
 const RATE_LIMITED = resetAt => ({
   ok: false,
   reason: 'linear_rate_limited',
@@ -39,7 +57,7 @@ function fetchImpl(routes) {
 }
 
 function withSummaryEnv(run) {
-  const summaryPath = join(tmpdir(), `linear-rl-${Date.now()}.md`);
+  const summaryPath = join(testDirectory, 'summary.md');
   vi.stubEnv('GITHUB_STEP_SUMMARY', summaryPath);
   return Promise.resolve(run()).finally(() => {
     vi.unstubAllEnvs();
@@ -182,7 +200,7 @@ describe('docs deploy intake under Linear rate limiting', () => {
   }
 
   it('defers a rate-limited filing instead of failing the probe verdict', async () => {
-    const resetAt = Date.now() + 60 * 60 * 1000;
+    const resetAt = FAR_RESET;
     let applied = 0;
     const { result, warnings } = await captureWarnings(() =>
       intakeDocsDeploy({
@@ -209,7 +227,7 @@ describe('docs deploy intake under Linear rate limiting', () => {
   });
 
   it('retries a rate-limited filing once and still files when the reset passes', async () => {
-    const resetAt = Date.now() + 1_000;
+    const resetAt = NOW + 1_000;
     let applied = 0;
     const result = await intakeDocsDeploy({
       token: 'token',
@@ -238,16 +256,6 @@ describe('docs deploy intake under Linear rate limiting', () => {
 
 describe('sibling scheduled monitors share the deferred-not-failed behavior', () => {
   it('billing sync stale probe defers on a real 429 and fails on a real filing error', async () => {
-    vi.stubEnv('LINEAR_API_KEY', 'lin_api_test');
-    vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_STATE_DIR',
-      join(tmpdir(), `linear-cd-${Date.now()}`)
-    );
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_FALLBACK_DIR',
-      join(tmpdir(), `linear-cd-fb-${Date.now()}`)
-    );
     try {
       const { result, warnings } = await captureWarnings(() =>
         runBillingSyncIntake({
@@ -278,7 +286,10 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
 
       // A different credential scope so the 429's published cooldown above
       // cannot short-circuit this call before it reaches the transport.
-      vi.stubEnv('LINEAR_API_KEY', 'lin_api_error_probe');
+      vi.stubEnv(
+        'LINEAR_API_KEY',
+        `lin_api_error_probe_${basename(testDirectory)}`
+      );
       await expect(
         runBillingSyncIntake({
           env: {
@@ -298,19 +309,8 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
   });
 
   it('billing health public probe defers on a real 429', async () => {
-    vi.stubEnv('LINEAR_API_KEY', 'lin_api_test');
-    vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_STATE_DIR',
-      join(tmpdir(), `linear-cd-${Date.now()}`)
-    );
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_FALLBACK_DIR',
-      join(tmpdir(), `linear-cd-fb-${Date.now()}`)
-    );
-    const responseFile = join(tmpdir(), `billing-health-${Date.now()}.json`);
+    const responseFile = join(testDirectory, 'billing-health.json');
     rmSync(responseFile, { force: true });
-    const { writeFileSync } = await import('node:fs');
     writeFileSync(responseFile, JSON.stringify({ checks: {} }));
     try {
       const { result } = await captureWarnings(() =>
@@ -342,16 +342,6 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
   });
 
   it('synthetic monitoring: a real comment failure after filing stays best-effort', async () => {
-    vi.stubEnv('LINEAR_API_KEY', 'lin_api_test');
-    vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_STATE_DIR',
-      join(tmpdir(), `linear-cd-${Date.now()}`)
-    );
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_FALLBACK_DIR',
-      join(tmpdir(), `linear-cd-fb-${Date.now()}`)
-    );
     try {
       const fetchByQuery = async (url, init) => {
         const query = String(JSON.parse(init?.body ?? '{}')?.query ?? '');
@@ -413,17 +403,7 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
   });
 
   it('web AI health intake defers on a real 429', async () => {
-    vi.stubEnv('LINEAR_API_KEY', 'lin_api_test');
-    vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_STATE_DIR',
-      join(tmpdir(), `linear-cd-${Date.now()}`)
-    );
-    vi.stubEnv(
-      'LINEAR_COOLDOWN_FALLBACK_DIR',
-      join(tmpdir(), `linear-cd-fb-${Date.now()}`)
-    );
-    const receiptFile = join(tmpdir(), `web-ai-receipt-${Date.now()}.json`);
+    const receiptFile = join(testDirectory, 'web-ai-receipt.json');
     writeFileSync(
       receiptFile,
       JSON.stringify({

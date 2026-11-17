@@ -188,7 +188,9 @@ export async function runSyntheticMonitoringIntake({
           body: `Failed tests (${env.GITHUB_RUN_ID ?? 'unknown'}):\n\n\`\`\`\n${failedTests || 'unknown'}\n\`\`\`\n${env.RUN_URL ?? ''}`,
           fetchImpl,
         });
-        if (!commented.ok && isLinearRateLimited(commented)) return commented;
+        if (!commented.ok && isLinearRateLimited(commented)) {
+          return { ...commented, issue: filed };
+        }
       }
       return filed;
     },
