@@ -57,12 +57,29 @@ export function promotionCaptureSql(profileId: string, releaseId: string) {
       from target_document where target_document.created
       returning subject_id
     )`,
-    confirmed: drizzleSql`where exists (select 1 from linked where subject_id = target_document.id::text)
-      or exists (
-        select 1 from ${libraryRelationships} r where r.creator_profile_id = ${profileId}
-          and r.kind = 'release_context' and r.subject_type = 'creator_document'
-          and r.subject_id = target_document.id::text and r.object_type = 'release'
-          and r.object_id = ${releaseId} and r.status = 'active'
-      )`,
   };
+}
+
+export async function hasCapturedPromotion(
+  profileId: string,
+  documentId: string,
+  releaseId: string
+): Promise<boolean> {
+  const links = libraryRelationships;
+  const [match] = await db
+    .select({ id: links.subjectId })
+    .from(links)
+    .where(
+      and(
+        eq(links.creatorProfileId, profileId),
+        eq(links.kind, 'release_context'),
+        eq(links.subjectType, 'creator_document'),
+        eq(links.subjectId, documentId),
+        eq(links.objectType, 'release'),
+        eq(links.objectId, releaseId),
+        eq(links.status, 'active')
+      )
+    )
+    .limit(1);
+  return Boolean(match);
 }
