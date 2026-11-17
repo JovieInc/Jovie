@@ -170,6 +170,8 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+                  # The installed Design gate self-test imports immutable Git evidence fixtures.
+                  "scripts/tests/design_gate_git_evidence.py",
                   # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
                   "apps/web/lib/ai/routing.json",
                   # Shared client layer (budgeted gh) used by the throughput sentinel.

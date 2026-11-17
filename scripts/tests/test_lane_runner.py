@@ -13774,6 +13774,36 @@ class NoHumanHoldTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_every_shipped_python_test_imports_from_only_declared_release_files(self):
+        # Import all self-test modules in the installed tree. Importing only
+        # lane_runner misses helpers used by tests such as the Design gate's
+        # immutable-Git evidence suite.
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp).resolve()
+            shutil.copytree(ROOT / "scripts/lanes", bundle / "scripts/lanes",
+                            ignore=shutil.ignore_patterns("__pycache__", ".mesh-runtime"))
+            for name in [*lane.RELEASE_EXTRAS, *lane.LANE_TESTS]:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            driver = r"""
+import importlib
+import json
+import sys
+from pathlib import Path
+bundle = Path(sys.argv[1])
+sys.path[:0] = [str(bundle), str(bundle / "scripts/lanes")]
+paths = json.loads(sys.argv[2])
+for relative in paths:
+    importlib.import_module(relative[:-3].replace("/", "."))
+print(json.dumps({"imported": len(paths)}))
+"""
+            result = subprocess.run(
+                [sys.executable, "-I", "-B", "-c", driver, str(bundle), json.dumps(lane.LANE_TESTS)],
+                cwd=bundle, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {"imported": len(lane.LANE_TESTS)})
+
     def test_backlog_fleet_policy_loads_from_only_declared_release_files(self):
         # A checkout or inherited PYTHONPATH must not hide missing installed extras.
         with tempfile.TemporaryDirectory() as tmp:
