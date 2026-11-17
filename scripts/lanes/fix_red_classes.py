@@ -36,6 +36,7 @@ from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_biome import BIOME_FORMAT_TEXT
+from fix_red_conflict_resolvers import merge_additive_quoted_entries
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_route,
@@ -132,7 +133,6 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
-_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
@@ -596,40 +596,6 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
         return None
     return resolved
 
-
-def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
-    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
-
-    def rows(side: str) -> list[str] | None:
-        if not str(side or "").endswith("\n"):
-            return None
-        lines = side[:-1].split("\n")
-        # Only JS test-list rows may carry a trailing line comment. Other code,
-        # JSON comments, and unfamiliar syntax remain unresolved.
-        commented_test = re.compile(r"[ \t]*'scripts/[\w./-]+\.test\.(?:mjs|mts|js|ts)',[ \t]+// [\w .-]+")
-        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None and
-                            commented_test.fullmatch(line) is None for line in lines):
-            return None
-        return lines
-
-    ours_rows = rows(ours)
-    theirs_rows = rows(theirs)
-    if ours_rows is None or theirs_rows is None:
-        return None
-    seen: list[str] = []
-    entries: dict[str, str] = {}
-    for line in theirs_rows + ours_rows:
-        entry = line.split(",", 1)[0].strip()
-        if entry in entries and entries[entry] != line:
-            return None  # Different comments or formatting need review.
-        entries[entry] = line
-        if line not in seen:
-            seen.append(line)
-    # Double-quoted rows are JSON path registries. Those files must stay sorted.
-    if seen and all(line.strip().startswith('"') for line in seen):
-        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
-        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
-    return "\n".join(seen) + "\n"
 
 
 def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
