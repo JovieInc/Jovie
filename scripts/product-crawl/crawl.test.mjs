@@ -17,6 +17,8 @@ import assert from 'node:assert/strict';
 import { appendFileSync } from 'node:fs';
 import { appendFile } from 'node:fs/promises';
 const fixture = process.env.CRAWL_TEST_FIXTURE;
+if (fixture === 'signal-exit')
+  process.on('exit', () => process.kill(process.pid, 'SIGTERM'));
 const mkCtx = () => {
   const routeHandlers = [];
   let current = '${origin}/';
@@ -149,11 +151,7 @@ async function crawl(t, fixture, opts) {
   const root = await buildTree();
   t.after(() => rm(root, { recursive: true, force: true }));
   const { error, stderr } = await runCrawl(root, fixture, opts);
-  assert.equal(
-    error?.code ?? 0,
-    0,
-    `crawl died before writing receipts: ${stderr}`
-  );
+  assert.equal(error, null, `crawl died before writing receipts: ${stderr}`);
   const receipt = JSON.parse(
     await readFile(join(root, 'out/receipt.json'), 'utf8')
   );
@@ -237,4 +235,13 @@ test('a rejected continuation preserves the original stranger-only receipt asser
   assert.deepEqual(verdict.reasons, ['not crawled signed in']);
   assert.equal(verdict.findings.length, 0);
   assert.match(summary, /^## Product crawl: not ready/m);
+});
+
+test('receipt files do not hide a signal-terminated crawl', async t => {
+  await assert.rejects(crawl(t, 'signal-exit'), error => {
+    assert.equal(error.code, 'ERR_ASSERTION');
+    assert.equal(error.actual?.code, null);
+    assert.equal(error.actual?.signal, 'SIGTERM');
+    return true;
+  });
 });
