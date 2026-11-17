@@ -44,10 +44,6 @@ import {
   MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
 } from './content-contract';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
-import {
-  MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER,
-  readOptionMockupStatus,
-} from './generation-contract';
 import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
 import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import {
@@ -62,7 +58,11 @@ import {
   MERCH_DEFAULT_MARGIN_PRESET,
   type MerchSellabilityResult,
 } from './pricing';
-import { getMerchCardSellability } from './safety';
+import {
+  getMerchCardPublishBlockers,
+  getMerchCardSellability,
+  getMerchMockupPublishBlocker,
+} from './safety';
 import { hasHumanSafeMerchContract } from './source-candidates';
 import type {
   LibraryMerchCard,
@@ -403,9 +403,11 @@ function getDesignOptionSellability(
   if (option.productionWarnings.length > 0) {
     reasons.push('Unresolved production warnings.');
   }
-  // JOV-4743: a terminal mockup failure is user-visible and blocks publish.
-  if (readOptionMockupStatus(option.qualityReview) === 'mockup_failed') {
-    reasons.push(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER);
+  // JOV-4743: the truthful-mockup lifecycle gates publish — pending until the
+  // real Printful mockup is attached, terminal failure blocks outright.
+  const mockupBlocker = getMerchMockupPublishBlocker(option.qualityReview);
+  if (mockupBlocker) {
+    reasons.push(mockupBlocker);
   }
   return { sellable: reasons.length === 0, reasons };
 }
@@ -414,14 +416,9 @@ function validateMerchCardForPublishing(
   card: MerchCard,
   qualityReview?: Record<string, unknown> | null
 ): void {
-  const result = getMerchCardSellability({
-    ...card,
-    qualityReview: qualityReview ?? undefined,
-  });
-  if (!result.sellable) {
-    throw new Error(
-      `Merch card cannot be published: ${result.reasons.join(' ')}`
-    );
+  const reasons = getMerchCardPublishBlockers(card, qualityReview);
+  if (reasons.length > 0) {
+    throw new Error(`Merch card cannot be published: ${reasons.join(' ')}`);
   }
 }
 
@@ -1194,19 +1191,12 @@ export async function selectMerchDesign(params: {
     revalidatePublicProfile(profile.usernameNormalized);
   }
 
-  const cardSellability = getMerchCardSellability({
-    ...card,
-    qualityReview: selected.qualityReview,
-  });
-  // JOV-4743: a terminal mockup failure on the selected option is a
+  // JOV-4743: the selected option's truthful-mockup lifecycle is a
   // user-visible publish blocker even when the card's own economics pass.
-  const publishBlockers = [...cardSellability.reasons];
-  if (
-    readOptionMockupStatus(selected.qualityReview) === 'mockup_failed' &&
-    !publishBlockers.includes(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER)
-  ) {
-    publishBlockers.push(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER);
-  }
+  const publishBlockers = getMerchCardPublishBlockers(
+    card,
+    selected.qualityReview
+  );
   const displayMockupUrl =
     card.mockupUrls.find(isPrintfulMockupUrl) ??
     selected.mockupUrls.find(isPrintfulMockupUrl) ??
