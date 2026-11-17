@@ -185,6 +185,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Validate current-week invariant stewardship state
+        shell: bash
         # Pure node + checked-in evidence. No external API calls, database,
         # queue, credentials, or package install.
         run: node scripts/invariant-stewardship/audit.mjs | tee invariant-stewardship-audit.json

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { regenerateStewardshipAudit } from '../../apps/web/lib/ovie/invariant-stewardship.js';
 import {
@@ -283,6 +286,73 @@ test('stewardship composes the existing event-driven workflow and adds no schedu
   );
   assert.match(workflow, /group: governance-/);
   assert.doesNotMatch(workflow, /^\s+schedule:/m);
+});
+
+test('workflow preserves the receipt and propagates rejected evidence through tee', () => {
+  const workflow = fs.readFileSync(
+    '.github/workflows/design-governance.yml',
+    'utf8'
+  );
+  const step = workflow
+    .split('      - name: Validate current-week invariant stewardship state')[1]
+    ?.split('\n      - name:')[0];
+  assert.ok(step, 'existing stewardship consumer must remain present');
+  const command = step.match(
+    /run: (node scripts\/invariant-stewardship\/audit\.mjs \| tee \S+)/
+  )?.[1];
+  assert.ok(command, 'execute the actual workflow audit pipeline');
+  // GitHub's explicit bash uses pipefail; its unspecified shell uses only -e.
+  const shell = /\n\s+shell: bash\s*\n/.test(step)
+    ? ['--noprofile', '--norc', '-eo', 'pipefail']
+    : ['-e'];
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'stewardship-pipeline-')
+  );
+  try {
+    const receiptPath = path.join(
+      directory,
+      'invariant-stewardship-audit.json'
+    );
+    const pipeline = command.replace(
+      /tee \S+$/,
+      'tee "$STEWARDSHIP_PIPELINE_OUTPUT"'
+    );
+    /** @type {import('node:child_process').SpawnSyncOptionsWithStringEncoding} */
+    const options = {
+      cwd: path.resolve('.'),
+      encoding: 'utf8',
+      env: { ...process.env, STEWARDSHIP_PIPELINE_OUTPUT: receiptPath },
+    };
+    const rejected = spawnSync('bash', [...shell, '-c', pipeline], options);
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+    assert.equal(receipt.evidence.state, 'historical');
+    assert.equal(receipt.summary.actionableExceptions, 0);
+    assert.equal(rejected.status, 1, 'tee must not hide the audit rejection');
+    const input = path.join(directory, 'verified.json');
+    fs.writeFileSync(input, JSON.stringify(sourceBoundAudit()));
+    const verified = spawnSync(
+      'bash',
+      [
+        ...shell,
+        '-c',
+        pipeline.replace(
+          'audit.mjs |',
+          'audit.mjs --input "$STEWARDSHIP_PIPELINE_INPUT" |'
+        ),
+      ],
+      {
+        ...options,
+        env: { ...options.env, STEWARDSHIP_PIPELINE_INPUT: input },
+      }
+    );
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.equal(
+      JSON.parse(fs.readFileSync(receiptPath, 'utf8')).evidence.state,
+      'verified'
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('generated audit artifact remains evidence-only beside executable authority', () => {
