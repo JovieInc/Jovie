@@ -9,6 +9,7 @@ CREATE TABLE "capability_wants" (
 	"source" text NOT NULL,
 	"source_turn_id" text,
 	"question_variant" text,
+	"resolved_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

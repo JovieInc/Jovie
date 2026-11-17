@@ -199,6 +199,7 @@ export const capabilityWants = pgTable(
     source: text('source').notNull(),
     sourceTurnId: text('source_turn_id'),
     questionVariant: text('question_variant'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
