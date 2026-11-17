@@ -148,3 +148,48 @@ print(e.repair_evidence_body(pr, sys.argv[1], customer_decision={"releaseWorthy"
   const absent = generate('## Summary\nRepair', '');
   assert.ok(check(absent).some(e => e.startsWith('win:')));
 });
+
+test('certifier repairs fill explicit locking placeholders and measured wins together', () => {
+  const title = 'fix(ci): stop the certifier burning the commits API';
+  const original =
+    '## Summary\nBound certification history reads.\n\n## Locked areas\nNone.\n\nGenerated with Claude Code\n';
+  const win = [
+    '## Win',
+    '',
+    '- Claim: Complete measured repair evidence without a second repair loop.',
+    '- Area: ci',
+    '- Theme: merge-throughput',
+    '- Metric: missing required Fleet receipts | count | lower | 2 | 0 | canonical Fleet guard | node --test scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
+    '- Verify: https://github.com/JovieInc/Jovie/pull/23381',
+  ].join('\n');
+  const check = body =>
+    evaluateFleetRules({
+      pr: { title, body },
+      files: [
+        {
+          filename: 'scripts/lib/external-api-guard.ratchet.gen.json',
+          status: 'modified',
+        },
+      ],
+    }).errors.filter(error => /^(?:win|locked-areas):/.test(error));
+  assert.equal(check(original).length, 2);
+  const script = `import sys
+sys.path.insert(0,'scripts/lanes')
+import pr_events as e
+print(e.repair_evidence_body({}, sys.argv[1], customer_decision={"releaseWorthy":False}, locking_pr=22331, win_section=sys.argv[2]))`;
+  const repaired = execFileSync('python3', ['-c', script, original, win], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  assert.deepEqual(check(repaired), []);
+  assert.equal(repaired.split('## Locked areas').length - 1, 1);
+  assert.equal(repaired.split('customer-changelog/v1').length - 1, 1);
+  assert.equal(
+    evaluateCustomerNoteContract({
+      files: ['apps/web/scripts/certify-canonical-artist-site.ts'],
+      body: repaired,
+      createdAt: '2026-11-10T00:00:00Z',
+    }).passed,
+    true
+  );
+});
