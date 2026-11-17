@@ -646,26 +646,22 @@ async function requiredGreenAt(
   repo,
   sha,
   checks,
-  { fetchImpl, token, apiUrl }
+  { fetchImpl, token, apiUrl, nowMs }
 ) {
   const runs = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/check-runs?filter=latest&per_page=100`,
-    { fetchImpl, token }
+    { fetchImpl, token, apiUrl, nowMs }
   );
   const statuses = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
-    { fetchImpl, token }
+    { fetchImpl, token, apiUrl, nowMs }
   );
-  if (!runs.ok || !statuses.ok)
-    return {
-      ok: false,
-      // A quota-deferred leg (JOV-9993) is not unreadable evidence.
-      reason: [runs, statuses].some(
-        read => !read.ok && read.reason === 'quota-deferred'
-      )
-        ? 'github-quota-deferred'
-        : null,
-    };
+  if (!runs.ok || !statuses.ok) {
+    const quota = [runs, statuses].find(
+      read => !read.ok && read.reason === 'quota-deferred'
+    );
+    return quota ? githubReadFailure(quota) : { ok: false, reason: null };
+  }
   let greenAt = -Infinity;
   for (const check of checks) {
     const times = [
@@ -782,10 +778,11 @@ export async function observeGreenToEnqueue(
       fetchImpl,
       token,
       apiUrl,
+      nowMs,
     });
     if (!timing.ok)
       return {
-        ok: false,
+        ...timing,
         reason: timing.reason ?? 'green-enqueue-checks-unreadable',
       };
     if (timing.greenAt === null) continue;

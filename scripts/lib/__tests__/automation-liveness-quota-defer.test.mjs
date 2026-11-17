@@ -257,6 +257,55 @@ describe('quota provenance and GraphQL error envelopes', () => {
         },
       }
     );
+  it('retains quota proof from required checks after a readable GraphQL list', async () => {
+    const observed = await observeGreenToEnqueue(
+      { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+      {
+        token: 'actions-token',
+        nowMs: NOW,
+        fetchImpl: async (url, init) =>
+          String(url).endsWith('/graphql')
+            ? new Response(
+                JSON.stringify({
+                  data: {
+                    repository: {
+                      pullRequests: {
+                        nodes: [
+                          {
+                            number: 25378,
+                            isDraft: false,
+                            isInMergeQueue: false,
+                            baseRefName: 'main',
+                            headRefOid: 'a'.repeat(40),
+                            mergeStateStatus: 'CLEAN',
+                            labels: {
+                              nodes: [],
+                              pageInfo: { hasNextPage: false },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                }),
+                { status: 200 }
+              )
+            : init?.headers?.Authorization
+              ? quotaDenied()
+              : new Response('{}', { status: 404 }),
+      }
+    );
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'github-quota-deferred',
+      quotaEvidence: {
+        status: 403,
+        observedAt: new Date(NOW).toISOString(),
+        retryAtMs: NOW + 1_801_000,
+      },
+      recoveryEvidence: { status: 404, credentialLeg: 'public' },
+    });
+  });
   it.each([403, 404, 500])(
     'retains primary quota proof after a public %s without inventing a verdict',
     async status => {
@@ -270,6 +319,7 @@ describe('quota provenance and GraphQL error envelopes', () => {
         fetchImpl,
         token: 'actions-token',
       });
+
       const report = evaluateLiveness(
         only('lanes-clock:spend-guard'),
         new Map([['lanes-clock:spend-guard', observed]]),
