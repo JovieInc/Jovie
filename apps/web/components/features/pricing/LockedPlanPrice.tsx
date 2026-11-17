@@ -30,19 +30,12 @@ export function LockedPlanPrice({
 
   const locked = lockedMonthlyLabel(lock);
   const note = lockDisclosure(lock);
-  if (!locked) {
-    return (
-      <>
-        {price}
-        {cadence ? <span>{cadence}</span> : null}
-      </>
-    );
-  }
   // lockedMonthlyLabel already carries the cadence (for example "/mo" is part of the label).
   return (
     <>
-      <span data-testid='locked-plan-price'>{locked}</span>
-      {note ? (
+      {locked ? <span data-testid='locked-plan-price'>{locked}</span> : price}
+      {!locked && cadence ? <span>{cadence}</span> : null}
+      {locked && note ? (
         <span
           data-testid='price-lock-note'
           className='mt-1 block text-xs font-normal text-secondary-token'

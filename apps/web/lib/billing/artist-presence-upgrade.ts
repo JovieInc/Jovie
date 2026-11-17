@@ -1,20 +1,29 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { PricingOption } from '@/lib/queries/usePricingOptionsQuery';
+import type { PriceLockView } from './price-lock-view';
+import { resolveLockedPrice } from './price-versions';
 
-/** Query options already carry the person's lock; select by plan, not list amount. */
+/** Only use a validated, unambiguous price for the current monthly offer. */
 export function getArtistPresenceMonthlyPrice(
-  options: readonly PricingOption[]
+  options: readonly PricingOption[],
+  lock?: PriceLockView | null
 ): string | undefined {
+  const locked = lock?.month;
+  if (locked && !locked.priceId) return undefined;
+  const expected =
+    locked ?? resolveLockedPrice({ lock: null, interval: 'month' });
+  if (!expected) return undefined;
   const matches = new Set(
     options
       .filter(
         option =>
           option.plan === 'pro' &&
-          Number.isSafeInteger(option.amount) &&
-          option.amount > 0 &&
-          option.currency.toLowerCase() === 'usd' &&
-          (option.interval === 'month' || option.interval === 'monthly') &&
+          (!locked || option.priceId === locked.priceId) &&
+          option.amount === expected.amountCents &&
+          option.currency.toLowerCase() === expected.currency &&
+          (option.interval === expected.interval ||
+            option.interval === 'monthly') &&
           option.priceId.trim().length > 0
       )
       .map(option => option.priceId)

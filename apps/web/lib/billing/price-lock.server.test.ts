@@ -4,6 +4,7 @@ vi.mock('server-only', () => ({}));
 
 const hoisted = vi.hoisted(() => ({
   selectQueue: [] as unknown[][],
+  subscriber: null as { subscriptionId: string; priceId: string | null } | null,
   inserted: [] as Record<string, unknown>[],
   captureError: vi.fn().mockResolvedValue(undefined),
   mapping: vi.fn(),
@@ -22,7 +23,14 @@ function makeClient() {
     return node;
   };
   return {
-    select: () => chain(() => hoisted.selectQueue.shift() ?? []),
+    select: (fields?: Record<string, unknown>) =>
+      chain(() =>
+        fields && 'subscriptionId' in fields
+          ? hoisted.subscriber
+            ? [hoisted.subscriber]
+            : []
+          : (hoisted.selectQueue.shift() ?? [])
+      ),
     insert: () => ({
       values: (v: Record<string, unknown>) => {
         hoisted.inserted.push(v);
@@ -80,6 +88,7 @@ const ROW = {
 beforeEach(() => {
   hoisted.selectQueue.length = 0;
   hoisted.inserted.length = 0;
+  hoisted.subscriber = null;
   hoisted.captureError.mockClear();
   hoisted.mapping.mockReset();
 });
@@ -112,6 +121,74 @@ describe('ensurePriceLockForUser', () => {
       source: 'signup',
     });
     expect(lock.monthlyAmountCents).toBe(1200);
+  });
+
+  it('preserves a subscriber price on first access before daily backfill', async () => {
+    hoisted.subscriber = { subscriptionId: 'sub_199', priceId: 'price_199' };
+    hoisted.mapping.mockReturnValue({
+      plan: 'pro',
+      amount: 19900,
+      interval: 'month',
+      currency: 'usd',
+    });
+    hoisted.selectQueue.push(
+      [],
+      [
+        {
+          ...ROW,
+          source: 'backfill_subscription',
+          monthlyAmountCents: 19900,
+          stripePriceIdMonthly: 'price_199',
+        },
+      ]
+    );
+    const lock = await ensurePriceLockForUser('user_1', 'first_view');
+    expect(hoisted.inserted[0]).toMatchObject({
+      userId: 'user_1',
+      source: 'backfill_subscription',
+      monthlyAmountCents: 19900,
+      stripePriceIdMonthly: 'price_199',
+    });
+    expect(lock.monthlyAmountCents).toBe(19900);
+  });
+
+  it('does not overwrite an unknown subscriber price with the current list', async () => {
+    hoisted.subscriber = {
+      subscriptionId: 'sub_unknown',
+      priceId: 'price_unknown',
+    };
+    hoisted.mapping.mockReturnValue(null);
+    hoisted.selectQueue.push([]);
+    await expect(ensurePriceLockForUser('user_1', 'checkout')).rejects.toThrow(
+      /subscriber price/
+    );
+    expect(hoisted.inserted).toEqual([]);
+  });
+
+  it('returns the concurrent first writer instead of replacing their signup snapshot', async () => {
+    hoisted.selectQueue.push(
+      [],
+      [{ ...ROW, monthlyAmountCents: 900, stripePriceIdMonthly: 'price_9' }]
+    );
+    const lock = await ensurePriceLockForUser('user_1', 'checkout');
+    expect(lock.monthlyAmountCents).toBe(900);
+    expect(lock.stripePriceIdMonthly).toBe('price_9');
+    expect(hoisted.inserted).toHaveLength(1);
+  });
+
+  it('does not substitute a legacy product alias for the current offer', async () => {
+    hoisted.selectQueue.push([ROW]);
+    hoisted.mapping.mockReturnValue({
+      plan: 'pro',
+      amount: 2900,
+      interval: 'month',
+      legacy: true,
+    });
+    const { decision } = await resolveCheckoutPriceForUser(
+      'user_1',
+      'price_thumbnail'
+    );
+    expect(decision).toEqual({ kind: 'list', priceId: 'price_thumbnail' });
   });
 
   it('throws when the insert did not persist (checkout then fails closed)', async () => {

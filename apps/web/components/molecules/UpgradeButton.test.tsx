@@ -1,6 +1,8 @@
 import { Button } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PriceLockView } from '@/lib/billing/price-lock-view';
+import type { PricingOption } from '@/lib/queries/usePricingOptionsQuery';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { UpgradeButton } from './UpgradeButton';
 
@@ -21,7 +23,7 @@ const mocks = vi.hoisted(() => ({
             description: 'Artist Presence',
           },
         ],
-      },
+      } as { options: PricingOption[]; priceLock?: PriceLockView | null },
       isPending: false,
       error: null as unknown,
     },
@@ -121,6 +123,51 @@ describe('UpgradeButton', () => {
       expect.any(Object)
     );
   });
+
+  it.each(['month', 'year'] as const)(
+    'selects the %s lock without blocking an uncovered interval',
+    interval => {
+      mocks.directUpgrade.current = true;
+      const month = {
+        amountCents: 900,
+        currency: 'usd',
+        interval: 'month' as const,
+        priceId: 'price_locked',
+      };
+      mocks.pricing.current.data.priceLock = {
+        locked: true,
+        priceVersionId: 'locked',
+        lockedAt: '2026-10-29T00:00:00Z',
+        month: interval === 'month' ? month : null,
+        year:
+          interval === 'year'
+            ? {
+                ...month,
+                interval: 'year',
+                amountCents: 19200,
+                priceId: 'price_yearly',
+              }
+            : null,
+      };
+      if (interval === 'month')
+        mocks.pricing.current.data.options = [
+          {
+            ...mocks.pricing.current.data.options[0],
+            priceId: 'price_locked',
+            amount: 900,
+          },
+        ];
+      render(<UpgradeButton />);
+      expect(screen.getByRole('button')).toBeEnabled();
+      fireEvent.click(screen.getByRole('button'));
+      expect(mocks.mutation.current.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priceId: interval === 'month' ? 'price_locked' : 'price_presence',
+        }),
+        expect.any(Object)
+      );
+    }
+  );
 
   it('starts direct checkout for the price when direct upgrade is on', () => {
     mocks.directUpgrade.current = true;

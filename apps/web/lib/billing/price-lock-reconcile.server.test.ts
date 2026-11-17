@@ -6,6 +6,7 @@ vi.mock('server-only', () => ({}));
 const hoisted = vi.hoisted(() => ({
   selectQueue: [] as unknown[][],
   updates: [] as Record<string, unknown>[],
+  updateFailure: null as Error | null,
   spine: vi.fn(),
   critical: vi.fn().mockResolvedValue(undefined),
 }));
@@ -24,7 +25,9 @@ function makeClient() {
       set: (v: Record<string, unknown>) => ({
         where: () => {
           hoisted.updates.push(v);
-          return Promise.resolve();
+          return hoisted.updateFailure
+            ? Promise.reject(hoisted.updateFailure)
+            : Promise.resolve();
         },
       }),
     }),
@@ -49,9 +52,11 @@ vi.mock('@/lib/stripe/price-ids', () => ({
 }));
 vi.mock('@/lib/stripe/config', () => ({
   getPriceMappingDetails: (id: string) =>
-    ['price_12', 'price_19'].includes(id)
-      ? { plan: 'pro', amount: 1200, interval: 'month', currency: 'usd' }
-      : null,
+    id === 'price_max'
+      ? { plan: 'max', amount: 14900, interval: 'month', currency: 'usd' }
+      : ['price_12', 'price_19'].includes(id)
+        ? { plan: 'pro', amount: 1200, interval: 'month', currency: 'usd' }
+        : null,
 }));
 
 const { runPriceLockReconcile, toReconcileSubscription } = await import(
@@ -105,6 +110,7 @@ async function* iterate(subs: Stripe.Subscription[]) {
 beforeEach(() => {
   hoisted.selectQueue.length = 0;
   hoisted.updates.length = 0;
+  hoisted.updateFailure = null;
   hoisted.spine.mockClear();
   hoisted.critical.mockClear();
 });
@@ -170,6 +176,101 @@ describe('runPriceLockReconcile on test data', () => {
     ]);
   });
 
+  it('reports detected overcharges even when verdict persistence fails', async () => {
+    const failure = new Error('fixture verdict write failed');
+    hoisted.updateFailure = failure;
+    hoisted.selectQueue.push(
+      [],
+      [
+        {
+          userId: 'leak',
+          subscriptionId: 'sub_leak',
+          lock: lockRow('leak', 'price_12', 1200),
+        },
+      ]
+    );
+    await expect(
+      runPriceLockReconcile({
+        listSubscriptions: () =>
+          iterate([stripeSub('sub_leak', 'price_19', 1900)]),
+        now: new Date('2026-10-29T12:00:00.000Z'),
+      })
+    ).rejects.toBe(failure);
+    expect(hoisted.spine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'blocked',
+        userId: 'leak',
+      })
+    );
+    expect(hoisted.critical).toHaveBeenCalledWith(
+      'Price lock reconcile found mismatches',
+      expect.any(Error),
+      expect.objectContaining({
+        counts: expect.objectContaining({ overcharged: 1 }),
+      })
+    );
+  });
+
+  it('prioritizes blocked overcharge alarms before applying the individual cap', async () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({
+      userId: `under-${i}`,
+      subscriptionId: `sub_under_${i}`,
+      lock: lockRow(`under-${i}`, 'price_19', 1900),
+    }));
+    rows.push({
+      userId: 'over',
+      subscriptionId: 'sub_over',
+      lock: lockRow('over', 'price_12', 1200),
+    });
+    hoisted.selectQueue.push([], rows);
+    const result = await runPriceLockReconcile({
+      listSubscriptions: () =>
+        iterate([
+          ...rows
+            .slice(0, 20)
+            .map(row => stripeSub(row.subscriptionId, 'price_12', 1200)),
+          stripeSub('sub_over', 'price_19', 1900),
+        ]),
+      now: new Date('2026-10-29T12:00:00.000Z'),
+    });
+    expect(result.alarmed).toBe(20);
+    expect(hoisted.spine).toHaveBeenCalledTimes(20);
+    expect(hoisted.spine).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        severity: 'blocked',
+        userId: 'over',
+      })
+    );
+    expect(hoisted.critical.mock.calls[0][2].sample[0].userId).toBe('over');
+    expect(result.summary.counts).toMatchObject({
+      undercharged: 20,
+      overcharged: 1,
+    });
+  });
+
+  it('does not alarm for a Max subscription outside Pro lock coverage', async () => {
+    hoisted.selectQueue.push(
+      [],
+      [
+        {
+          userId: 'max',
+          subscriptionId: 'sub_max',
+          lock: null,
+        },
+      ]
+    );
+    const result = await runPriceLockReconcile({
+      listSubscriptions: () =>
+        iterate([stripeSub('sub_max', 'price_max', 14900)]),
+      now: new Date('2026-10-29T12:00:00.000Z'),
+    });
+    expect(result.summary.checked).toBe(0);
+    expect(hoisted.spine).not.toHaveBeenCalled();
+    expect(hoisted.critical).not.toHaveBeenCalled();
+    expect(hoisted.updates).toEqual([]);
+  });
+
   it('raises nothing when every subscriber is on their locked price', async () => {
     hoisted.selectQueue.push(
       [],
@@ -183,6 +284,7 @@ describe('runPriceLockReconcile on test data', () => {
     );
     const result = await runPriceLockReconcile({
       listSubscriptions: () => iterate([stripeSub('sub_a', 'price_12', 1200)]),
+      now: new Date('2026-10-29T12:00:00.000Z'),
     });
     expect(result.summary.alarms).toEqual([]);
     expect(hoisted.spine).not.toHaveBeenCalled();
@@ -198,6 +300,7 @@ describe('toReconcileSubscription', () => {
       subscriptionId: 'sub_1',
       status: 'active',
       priceId: 'price_12',
+      mappedPlan: 'pro',
       unitAmountCents: 1200,
       currency: 'usd',
       interval: 'month',

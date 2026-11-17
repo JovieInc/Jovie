@@ -84,6 +84,15 @@ describe('applyPriceLockToOptions', () => {
     ]);
   });
 
+  it('does not expose a list option when the covered lock has no Stripe ID', () => {
+    expect(
+      applyPriceLockToOptions(
+        LIST,
+        buildPriceLockView({ ...LOCK_12, stripePriceIdMonthly: null })
+      )
+    ).toEqual([LIST[1]]);
+  });
+
   it('is the identity without a lock', () => {
     expect(applyPriceLockToOptions(LIST, null)).toEqual(LIST);
   });

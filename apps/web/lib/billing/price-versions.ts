@@ -1,4 +1,4 @@
-import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 export type PriceLockPlan = 'pro';
 export type PriceInterval = 'month' | 'year';
 export interface PriceVersion {
@@ -39,12 +39,9 @@ export interface PriceLockSnapshot {
   readonly source: PriceLockSource;
   readonly lockedAt: string;
 }
-export function usdToCents(dollars: number): number {
-  return Math.round(dollars * 100);
-}
 export function assertPriceVersionsValid(
   versions: readonly PriceVersion[] = PRICE_VERSIONS,
-  currentId: string = CURRENT_PRICE_VERSION_ID,
+  currentId?: string,
   listMonthlyUsd: number = ARTIST_VISIBILITY_OFFER.pro.monthlyUsd
 ): void {
   const seen = new Set<string>();
@@ -60,13 +57,10 @@ export function assertPriceVersionsValid(
       throw new Error(`price version ${v.id}: introducedOn date required`);
     }
   }
-  const current = versions.find(v => v.id === currentId);
-  if (!current) {
-    throw new Error(`current price version ${currentId} is not registered`);
-  }
+  const current = getCurrentPriceVersion(versions, currentId);
   if (current.monthlyUsd !== listMonthlyUsd) {
     throw new Error(
-      `price version mismatch: current version ${currentId} is ${current.monthlyUsd} USD (interval=month), list price is ${listMonthlyUsd} USD (interval=month) (a new version must be registered and made current)`
+      `price version mismatch: current version ${current.id} is ${current.monthlyUsd} USD (interval=month), list price is ${listMonthlyUsd} USD (interval=month) (a new version must be registered and made current)`
     );
   }
 }
@@ -96,9 +90,9 @@ export function buildPriceLockSnapshot(input: {
     plan: version.plan,
     priceVersionId: version.id,
     currency: version.currency,
-    monthlyAmountCents: usdToCents(version.monthlyUsd),
+    monthlyAmountCents: toCents(version.monthlyUsd),
     yearlyAmountCents:
-      version.yearlyUsd === null ? null : usdToCents(version.yearlyUsd),
+      version.yearlyUsd === null ? null : toCents(version.yearlyUsd),
     stripePriceIdMonthly: input.stripePriceIds.monthly,
     stripePriceIdYearly:
       version.yearlyUsd === null ? null : input.stripePriceIds.yearly,
@@ -120,7 +114,7 @@ export function buildPriceLockFromSubscriptionPrice(input: {
   const match = versions.find(
     v =>
       v.plan === input.plan &&
-      usdToCents(monthly ? v.monthlyUsd : (v.yearlyUsd ?? -1)) ===
+      toCents(monthly ? v.monthlyUsd : (v.yearlyUsd ?? -1)) ===
         input.amountCents
   );
   return {
@@ -151,34 +145,31 @@ export function resolveLockedPrice(input: {
   readonly currentId?: string;
 }): ResolvedLockedPrice | null {
   const { lock, interval } = input;
+  const monthly = interval === 'month';
   if (lock) {
-    const amount =
-      interval === 'month' ? lock.monthlyAmountCents : lock.yearlyAmountCents;
+    const amount = monthly ? lock.monthlyAmountCents : lock.yearlyAmountCents;
     if (amount !== null) {
       return {
         amountCents: amount,
         currency: lock.currency,
         interval,
-        stripePriceId:
-          interval === 'month'
-            ? lock.stripePriceIdMonthly
-            : lock.stripePriceIdYearly,
+        stripePriceId: monthly
+          ? lock.stripePriceIdMonthly
+          : lock.stripePriceIdYearly,
         priceVersionId: lock.priceVersionId,
         locked: true,
       };
     }
   }
   const version = getCurrentPriceVersion(input.versions, input.currentId);
-  const listUsd = interval === 'month' ? version.monthlyUsd : version.yearlyUsd;
+  const listUsd = monthly ? version.monthlyUsd : version.yearlyUsd;
   if (listUsd === null) return null;
   return {
-    amountCents: usdToCents(listUsd),
+    amountCents: toCents(listUsd),
     currency: version.currency,
     interval,
     stripePriceId:
-      (interval === 'month'
-        ? input.listStripePriceIds?.monthly
-        : input.listStripePriceIds?.yearly) ?? null,
+      input.listStripePriceIds?.[monthly ? 'monthly' : 'yearly'] ?? null,
     priceVersionId: version.id,
     locked: false,
   };

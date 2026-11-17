@@ -80,7 +80,7 @@ describe('judgeCandidate', () => {
     expect(alarmSeverity('undercharged')).toBe('degraded');
   });
 
-  it('overcharged when the subscription interval is not covered by the lock', () => {
+  it('ignores an interval the lock never promised', () => {
     const finding = judgeCandidate(
       cand(
         'u',
@@ -89,13 +89,39 @@ describe('judgeCandidate', () => {
       ),
       isMapped
     );
-    expect(finding?.verdict).toBe('overcharged');
+    expect(finding).toBeNull();
+  });
+
+  it('ignores Max subscriptions that have no Pro price-lock promise', () => {
+    const max = { ...sub(), mappedPlan: 'max', priceId: 'price_max' };
+    expect(judgeCandidate(cand('max', null, max), isMapped)).toBeNull();
+    expect(judgeCandidate(cand('max', LOCK_12, max), isMapped)).toBeNull();
+  });
+
+  it('does not declare an overcharge without the current amount or interval', () => {
+    for (const missing of [{ unitAmountCents: null }, { interval: null }]) {
+      const finding = judgeCandidate(
+        cand('u', LOCK_12, sub({ ...missing, priceId: 'price_unknown' })),
+        isMapped
+      );
+      expect(finding?.verdict).toBe('unmapped_locked_price');
+      expect(alarmSeverity(finding!.verdict)).toBe('degraded');
+    }
   });
 
   it('missing_lock for a paying subscriber without a lock', () => {
     expect(judgeCandidate(cand('u', null, sub()), isMapped)?.verdict).toBe(
       'missing_lock'
     );
+  });
+
+  it('does not silently exclude a charging subscription with an unknown plan', () => {
+    const finding = judgeCandidate(
+      cand('unknown', null, sub({ mappedPlan: null })),
+      isMapped
+    );
+    expect(finding?.verdict).toBe('missing_lock');
+    expect(alarmSeverity(finding!.verdict)).toBe('degraded');
   });
 
   it('unmapped_locked_price when the app cannot map the locked price', () => {
@@ -109,9 +135,17 @@ describe('judgeCandidate', () => {
   });
 
   it('ignores subscriptions that are not charging, and missing subscriptions', () => {
-    expect(
-      judgeCandidate(cand('u', LOCK_12, sub({ status: 'canceled' })), isMapped)
-    ).toBeNull();
+    for (const status of [
+      'canceled',
+      'unpaid',
+      'incomplete',
+      'incomplete_expired',
+      'paused',
+    ]) {
+      expect(
+        judgeCandidate(cand('u', LOCK_12, sub({ status })), isMapped)
+      ).toBeNull();
+    }
     expect(judgeCandidate(cand('u', LOCK_12, null), isMapped)).toBeNull();
   });
 

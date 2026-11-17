@@ -20,7 +20,6 @@ const {
   mockDbInsert,
   mockIsWaitlistGateEnabled,
   mockCheckUserStatus,
-  mockNormalizeEmail,
   mockCaptureError,
   mockCaptureCriticalError,
 } = vi.hoisted(() => ({
@@ -30,7 +29,6 @@ const {
   mockDbInsert: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
   mockCheckUserStatus: vi.fn(),
-  mockNormalizeEmail: vi.fn((e: string) => e?.toLowerCase().trim() ?? e),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
   mockCaptureCriticalError: vi.fn().mockResolvedValue(undefined),
 }));
@@ -110,12 +108,6 @@ vi.mock('@/lib/db/schema/waitlist', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
   captureCriticalError: mockCaptureCriticalError,
-}));
-
-vi.mock('@/lib/utils/email', () => ({
-  normalizeEmail: mockNormalizeEmail,
-  isInternalOrTestAccountEmail: () => false,
-  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN: '$^',
 }));
 
 vi.mock('@/lib/auth/status-checker', () => ({
