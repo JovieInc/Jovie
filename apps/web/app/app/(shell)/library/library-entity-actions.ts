@@ -1,3 +1,4 @@
+import { defaultCopyText, defaultOpenUrl } from './library-browser-actions';
 import { buildPrivatePromotionAction } from './library-promotion-action';
 import { buildLibraryAskJovieDraft } from './library-chat-context';
 
@@ -184,14 +185,6 @@ function buildProfileVisibilityAction({
       } satisfies LibraryEntityAction;
     }),
   };
-}
-
-function defaultOpenUrl(url: string): void {
-  globalThis.open(url, '_blank', 'noopener,noreferrer');
-}
-
-function defaultCopyText(value: string): void {
-  void globalThis.navigator?.clipboard?.writeText(value);
 }
 
 function buildApprovalActions({
