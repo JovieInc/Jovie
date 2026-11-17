@@ -1,8 +1,7 @@
 diff --git a/dist/build/templates/app-page-runtime.js b/dist/build/templates/app-page-runtime.js
-index fc5eef172bc3e2567ab414416590f85fb49e4ef1..92355b885193c71635c552d98a8afe664cc8fb4d 100644
 --- a/dist/build/templates/app-page-runtime.js
 +++ b/dist/build/templates/app-page-runtime.js
-@@ -1366,6 +1366,14 @@ function createAppPageEntrypoint({ tree, page, pathname, require: __next_app_req
+@@ -1393,6 +1393,14 @@
                      }
                      for (let [key, value] of Object.entries(headers)){
                          if (typeof value === 'undefined') continue;
@@ -18,10 +17,9 @@ index fc5eef172bc3e2567ab414416590f85fb49e4ef1..92355b885193c71635c552d98a8afe66
                              for (const v of value){
                                  res.appendHeader(key, v);
 diff --git a/dist/esm/build/templates/app-page-runtime.js b/dist/esm/build/templates/app-page-runtime.js
-index 96beb1b9bd89e6eb55e9d0cfbed49fa3aa9c42ea..bf330b04afa19dc92bd3abe8141e635724bb9b3a 100644
 --- a/dist/esm/build/templates/app-page-runtime.js
 +++ b/dist/esm/build/templates/app-page-runtime.js
-@@ -1385,6 +1385,14 @@ export function createAppPageEntrypoint({ tree, page, pathname, require: __next_
+@@ -1416,6 +1416,14 @@
                      }
                      for (let [key, value] of Object.entries(headers)){
                          if (typeof value === 'undefined') continue;
@@ -37,10 +35,9 @@ index 96beb1b9bd89e6eb55e9d0cfbed49fa3aa9c42ea..bf330b04afa19dc92bd3abe8141e6357
                              for (const v of value){
                                  res.appendHeader(key, v);
 diff --git a/dist/esm/server/lib/router-utils/resolve-routes.js b/dist/esm/server/lib/router-utils/resolve-routes.js
-index dd35af4e070b3795f18fb14cf50bbf5b7e80c097..bed8da0f1c3c593d93759d151b6c3c8e88982df2 100644
 --- a/dist/esm/server/lib/router-utils/resolve-routes.js
 +++ b/dist/esm/server/lib/router-utils/resolve-routes.js
-@@ -22,6 +22,42 @@ import { addRequestMeta } from '../../request-meta';
+@@ -22,6 +22,42 @@
  import { isRSCRequestHeader } from '../is-rsc-request';
  import { compileNonPath, matchHas, prepareDestination } from '../../../shared/lib/router/utils/prepare-destination';
  import { NEXT_REWRITTEN_PATH_HEADER, NEXT_REWRITTEN_QUERY_HEADER, RSC_HEADER } from '../../../client/components/app-router-headers';
@@ -83,7 +80,7 @@ index dd35af4e070b3795f18fb14cf50bbf5b7e80c097..bed8da0f1c3c593d93759d151b6c3c8e
  const debug = setupDebug('next:router-server:resolve-routes');
  export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
      let clientHashes = undefined;
-@@ -518,7 +554,7 @@ export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, render
+@@ -518,7 +554,7 @@
                      });
                      const { query } = parsedDestination;
                      delete parsedDestination.query;
@@ -93,13 +90,14 @@ index dd35af4e070b3795f18fb14cf50bbf5b7e80c097..bed8da0f1c3c593d93759d151b6c3c8e
                      return {
                          finished: true,
 diff --git a/dist/server/lib/router-utils/resolve-routes.js b/dist/server/lib/router-utils/resolve-routes.js
-index bfd79032122f9c193c2352744d58e7999eb62730..9b1d6290b5ac59c38d2a72dc37e9f64976759133 100644
 --- a/dist/server/lib/router-utils/resolve-routes.js
 +++ b/dist/server/lib/router-utils/resolve-routes.js
-@@ -37,6 +37,42 @@ function _interop_require_default(obj) {
+@@ -35,6 +35,42 @@
+ function _interop_require_default(obj) {
+     return obj && obj.__esModule ? obj : {
          default: obj
-     };
- }
++    };
++}
 +const PROFILE_ALIAS_REDIRECT_MODES = new Set([
 +    'listen',
 +    'pay',
@@ -134,12 +132,10 @@ index bfd79032122f9c193c2352744d58e7999eb62730..9b1d6290b5ac59c38d2a72dc37e9f649
 +        mode,
 +        source,
 +        ...rest
-+    };
-+}
+     };
+ }
  const debug = (0, _debug.default)('next:router-server:resolve-routes');
- function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
-     let clientHashes = undefined;
-@@ -533,7 +569,7 @@ function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer,
+@@ -533,7 +569,7 @@
                      });
                      const { query } = parsedDestination;
                      delete parsedDestination.query;
@@ -149,10 +145,9 @@ index bfd79032122f9c193c2352744d58e7999eb62730..9b1d6290b5ac59c38d2a72dc37e9f649
                      return {
                          finished: true,
 diff --git a/dist/telemetry/storage.js b/dist/telemetry/storage.js
-index ba404888c825ff94c670869a87a830a19c3fea86..6523d75f9d88638ef609f61906e6443e0098edf4 100644
 --- a/dist/telemetry/storage.js
 +++ b/dist/telemetry/storage.js
-@@ -171,6 +171,7 @@ class Telemetry {
+@@ -171,6 +171,7 @@
                      }
                  });
              }

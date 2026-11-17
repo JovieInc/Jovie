@@ -28,6 +28,13 @@ describe('investor brief source contract', () => {
     expect(component).toContain('data-pitch-demo-video');
   });
 
+  it('frames the demo video on the fixed-black ink-on-media token', () => {
+    const component = read('components/features/pitch/InvestorBrief.tsx');
+
+    expect(component).toContain('bg-ink-on-media shadow-card');
+    expect(component).not.toMatch(/\bbg-black\b/);
+  });
+
   it('keeps the YC deck order behind an off-by-default flag', () => {
     const component = read('components/features/pitch/InvestorBrief.tsx');
     const flags = read('lib/flags/code-flags.ts');

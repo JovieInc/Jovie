@@ -66,7 +66,7 @@ describe('Mutation Diff Gem contract', () => {
   it('is event-driven: no cron, self-chains through workflow_dispatch only', () => {
     expect(workflow).not.toMatch(/^\s*schedule:/mu);
     expect(workflow).toMatch(
-      /cli\.ts gh --priority default -- workflow run mutation-diff\.yml --ref main/u
+      /node \.github\/scripts\/mutation-next-target-cli\.mjs dispatch/u
     );
     expect(workflow).toContain('actions: write');
   });
