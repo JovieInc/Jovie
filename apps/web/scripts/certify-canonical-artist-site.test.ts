@@ -340,6 +340,20 @@ describe('revenue checks read their own spec, not the whole journey step', () =>
     expect(failing(certificate)).not.toContain('payment_entitlement');
     expect(failing(certificate)).not.toContain('free_state_value');
     expect(failing(certificate)).not.toContain('immediate_value');
+    expect(
+      certificate.checks.find(check => check.id === 'free_state_value')
+    ).toMatchObject({
+      status: 'passed',
+      detail: 'Prebuilt claim, home-welcome, and golden-path specs passed.',
+    });
+    expect(
+      certificate.checks.find(check => check.id === 'payment_entitlement')
+    ).toMatchObject({
+      status: 'passed',
+      detail:
+        'Golden-path billing spec and revenue-path Pro checkout and activation passed.',
+    });
+    expect(failing(certificate)).toContain('profile_hierarchy');
   });
 
   it('a failing billing journey spec flips payment_entitlement', () => {

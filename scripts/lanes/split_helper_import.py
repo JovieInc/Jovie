@@ -189,7 +189,9 @@ def _strip_and_import(source: str, pairs: list[tuple[str, str]]) -> str | None:
         return None
     groups: dict[str, list[str]] = {}
     for name, mod in pairs:
-        if name in loaded and name not in groups.get(mod, []):
+        # The module's callers may import a shared name even when its own
+        # implementation does not load it. Preserve that public re-export.
+        if name not in groups.get(mod, []):
             groups.setdefault(mod, []).append(name)
     if not groups:
         return stripped
@@ -218,7 +220,8 @@ def _delete(source: str, remove: list[str]) -> str | None:
     for stmt in chosen:
         if stmt.end_lineno is None:
             return None
-        drop.update(range(stmt.lineno, stmt.end_lineno + 1))
+        start = min([stmt.lineno, *[decorator.lineno for decorator in getattr(stmt, "decorator_list", [])]])
+        drop.update(range(start, stmt.end_lineno + 1))
     kept = [line for number, line in enumerate(source.splitlines(keepends=True), start=1) if number not in drop]
     text = re.sub(r"\n{3,}", "\n\n", "".join(kept))
     try:

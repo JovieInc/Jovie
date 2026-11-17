@@ -1,4 +1,5 @@
 """Split-helper merge conflicts keep main's identical definitions and the head-only names."""
+import ast
 import os
 import subprocess
 import sys
@@ -9,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_source_edits as edits  # noqa: E402
-from split_helper_import import resolve_split_helper_conflict  # noqa: E402
+from split_helper_import import _delete, _strip_and_import, resolve_split_helper_conflict  # noqa: E402
 
 REST = "LABEL = 'kept'\n\ndef run():\n    return SHARED + only_head() + ONLY_MAIN + len(LABEL)\n"
 HEAD_IMPORT = "from head_mod import SHARED, only_head, UNUSED, ONLY_MAIN, SHARED_UNUSED\n"
@@ -37,7 +38,7 @@ EXPECTED_CONSUMER = (
     + REST)
 EXPECTED_HEAD = '''"""head helpers."""
 import re
-from main_mod import SHARED
+from main_mod import SHARED, SHARED_UNUSED
 
 UNUSED = 2
 
@@ -96,6 +97,21 @@ def _prepare(root, *, head_src=HEAD_SRC, main_src=MAIN_SRC, head_import=HEAD_IMP
 
 
 class SplitHelperImportTest(unittest.TestCase):
+    def test_removing_a_decorated_helper_never_decorates_the_next_definition(self):
+        source = "@decorate(\n    'fixture'\n)\ndef removed():\n    return 1\n\ndef retained():\n    return 2\n"
+        result = _delete(source, ["removed"])
+        self.assertIsNotNone(result)
+        tree = ast.parse(result)
+        self.assertEqual([stmt.name for stmt in tree.body], ["retained"])
+        self.assertEqual(tree.body[0].decorator_list, [])
+        self.assertNotIn("decorate", result)
+
+    def test_preserves_an_externally_imported_helper_without_an_internal_load(self):
+        result = _strip_and_import("SHARED_UNUSED = 4\n\ndef retained():\n    return 2\n", [("SHARED_UNUSED", "main_mod")])
+        self.assertIsNotNone(result)
+        self.assertIn("from main_mod import SHARED_UNUSED", result)
+        self.assertNotIn("SHARED_UNUSED =", result)
+
     def test_rejects_alias_same_module_and_prose_without_git(self):
         with tempfile.TemporaryDirectory() as scratch:
             root = Path(scratch)

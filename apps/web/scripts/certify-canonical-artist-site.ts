@@ -370,7 +370,9 @@ export function certifyCanonicalArtistSite(
       'free_state_value',
       freeStateOk,
       freeStateOk
-        ? journeyDetail
+        ? journeyReportRequested
+          ? 'Prebuilt claim, home-welcome, and golden-path specs passed.'
+          : journeyDetail
         : 'Free-state specs (claim-prebuilt, home-welcome, golden-path) did not all pass.',
       goldenEvidence
     ),
@@ -380,7 +382,9 @@ export function certifyCanonicalArtistSite(
         (journeyReportRequested ? proPassed && activationPassed : true),
       billingJourneyOk &&
         (journeyReportRequested ? proPassed && activationPassed : true)
-        ? journeyDetail
+        ? journeyReportRequested
+          ? 'Golden-path billing spec and revenue-path Pro checkout and activation passed.'
+          : journeyDetail
         : 'Checkout, entitlement or activation proof failed (golden-path billing spec or revenue-path steps).',
       [...goldenEvidence, ...m2Evidence]
     ),
