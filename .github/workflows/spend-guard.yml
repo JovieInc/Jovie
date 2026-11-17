@@ -59,18 +59,22 @@ jobs:
           fail_spend() {
             local message="$1"
             jq -n --arg message "$message" '{schema:"jovie.spend-guard/v1",readStatus:"unavailable",spentUsd:null,alert:true,message:$message}' > spend-report.json
-            echo "read_status=unavailable" >> "$GITHUB_OUTPUT"
-            echo "alert=true" >> "$GITHUB_OUTPUT"
-            echo "message=$message" >> "$GITHUB_OUTPUT"
+            {
+              echo "read_status=unavailable"
+              echo "alert=true"
+              echo "message=$message"
+            } >> "$GITHUB_OUTPUT"
             echo "::error::$message"
             exit 1
           }
           test -n "$VERCEL_TOKEN" || fail_spend "VERCEL_READONLY_TOKEN is unavailable; spend protection is blind. Usage and forecast are unknown."
           node scripts/spend-guard.mjs > spend-report.json || fail_spend "Vercel usage read or evaluation failed; spend protection is blind. Usage and forecast are unknown."
           jq -e '(.alert | type == "boolean") and (.message | type == "string" and length > 0)' spend-report.json >/dev/null || fail_spend "Vercel spend report is malformed; spend protection is blind. Usage and forecast are unknown."
-          echo "read_status=success" >> "$GITHUB_OUTPUT"
-          echo "alert=$(jq -r .alert spend-report.json)" >> "$GITHUB_OUTPUT"
-          echo "message=$(jq -r .message spend-report.json)" >> "$GITHUB_OUTPUT"
+          {
+            echo "read_status=success"
+            echo "alert=$(jq -r .alert spend-report.json)"
+            echo "message=$(jq -r .message spend-report.json)"
+          } >> "$GITHUB_OUTPUT"
           jq -r .message spend-report.json
 
       - name: Collect runtime log signatures
