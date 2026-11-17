@@ -97,11 +97,14 @@ export async function assembleAppModeSystemPrompt(
     identity,
   } = input;
 
-  const beyondSlice = await resolveOwnedReleaseTokensForHydration(
-    releases,
-    userTexts,
-    profileId
-  );
+  const beyondSlice =
+    input.releaseCatalog?.status === 'unavailable'
+      ? []
+      : await resolveOwnedReleaseTokensForHydration(
+          releases,
+          userTexts,
+          profileId
+        );
   const namedReleases = await namedReleasesForTurn(
     releases,
     userTexts,

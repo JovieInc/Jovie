@@ -108,6 +108,53 @@ describe('assembleAppModeSystemPrompt catalog threading', () => {
     expect(parts.stable).not.toContain('- **Total Releases:** 0');
   });
 
+  it('keeps repeated stale tokens unsupported when the catalog read was denied', async () => {
+    selectMock.mockImplementation(() => {
+      throw new Error('owned catalog read denied');
+    });
+    const { assembleAppModeSystemPrompt } = await import(
+      '@/lib/chat/turn-app-prompt'
+    );
+    const input = {
+      ...baseInput,
+      releases: [],
+      releaseCatalog: { status: 'unavailable' as const, total: null },
+      userTexts: [
+        'Promote @release:99999999-2222-3333-4444-555555555555[Stale release]',
+      ],
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const parts = await assembleAppModeSystemPrompt(input);
+      expect(parts.stable).toContain(
+        '- **Total Releases:** unknown (catalog temporarily unavailable)'
+      );
+      expect(parts.stable).not.toContain(
+        'No releases found in the connected discography yet.'
+      );
+      expect(parts.dynamic).not.toContain("in THIS artist's own catalog");
+    }
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates a denied owned-token lookup when catalog availability was reported', async () => {
+    selectMock.mockImplementation(() => {
+      throw new Error('owned catalog read denied');
+    });
+    const { assembleAppModeSystemPrompt } = await import(
+      '@/lib/chat/turn-app-prompt'
+    );
+    await expect(
+      assembleAppModeSystemPrompt({
+        ...baseInput,
+        releaseCatalog: { status: 'ok', total: 100 },
+        userTexts: [
+          'Promote @release:99999999-2222-3333-4444-555555555555[Stale release]',
+        ],
+      })
+    ).rejects.toThrow('owned catalog read denied');
+    expect(selectMock).toHaveBeenCalledOnce();
+  });
+
   it('defaults to the loaded-slice total when no catalog meta is supplied', async () => {
     const { assembleAppModeSystemPrompt } = await import(
       '@/lib/chat/turn-app-prompt'
