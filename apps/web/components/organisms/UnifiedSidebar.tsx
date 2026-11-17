@@ -403,7 +403,7 @@ export function UnifiedSidebar({
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
+      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         <SidebarDockBridge
           userId={user?.id ?? ''}
           userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
@@ -413,6 +413,7 @@ export function UnifiedSidebar({
             <SidebarIdentityGroup
               calm={!isRouteSidebar}
               profileHref={section === 'ov' ? undefined : profileHref}
+              showAccountMenu={!isInSettings}
               dockStatus={dockStatus}
               label={section === 'ov' ? 'Account' : undefined}
             />

@@ -13,6 +13,12 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SettingsNavigation } from './SettingsSidebarNav';
 
+const signOutMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('@/hooks/useJovieAuth', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useJovieAuth')>()),
+  useAuthSafe: () => ({ signOut: signOutMock }),
+}));
+
 vi.mock('next/link', () => ({
   default: forwardRef<
     HTMLAnchorElement,
@@ -85,6 +91,19 @@ function renderNav({
 }
 
 describe('SettingsNavigation', () => {
+  it('keeps logout reachable by keyboard even when search has no matching settings', async () => {
+    signOutMock.mockClear();
+    renderNav();
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search Settings' }),
+      'zzz'
+    );
+    const signOut = screen.getByRole('button', { name: 'Sign Out' });
+    signOut.focus();
+    await user.keyboard('{Enter}');
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+  });
   it('lists Personal first, then the artist area, with one active item', async () => {
     const { container } = renderNav();
     const nav = screen.getByRole('navigation', { name: 'settings navigation' });

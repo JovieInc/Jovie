@@ -1,10 +1,11 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
+import { LogOut } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { matchesSettingsSearchQuery } from '@/components/features/settings/settings-decision-admission';
-import { SidebarMenu } from '@/components/organisms/sidebar';
+import { SidebarMenu, useSidebar } from '@/components/organisms/sidebar';
 import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -105,6 +107,9 @@ export function SettingsNavigation({
   const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   const artistName = useArtistDisplayName();
   const [query, setQuery] = useState('');
+  const { signOut } = useAuthSafe();
+  const [signingOut, setSigningOut] = useState(false);
+  const { state, isMobile } = useSidebar();
 
   const groups = useMemo(() => {
     const personal = [...userSettingsNavigation];
@@ -155,6 +160,26 @@ export function SettingsNavigation({
           No settings match
         </p>
       )}
+      <Button
+        type='button'
+        variant='ghost'
+        size={state === 'closed' && !isMobile ? 'icon-sm' : 'sm'}
+        aria-label={signingOut ? 'Signing Out…' : 'Sign Out'}
+        className='justify-start group-data-[collapsible=icon]:justify-center'
+        disabled={signingOut}
+        onClick={() => {
+          setSigningOut(true);
+          void signOut().finally(() => setSigningOut(false));
+        }}
+      >
+        <LogOut
+          aria-hidden='true'
+          className='size-(--app-shell-sidebar-icon-size) shrink-0'
+        />
+        <span className={SHELL_RAIL_LABEL}>
+          {signingOut ? 'Signing Out…' : 'Sign Out'}
+        </span>
+      </Button>
     </nav>
   );
 }

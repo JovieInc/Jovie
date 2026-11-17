@@ -366,14 +366,19 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('keeps the unified user panel available on settings routes', () => {
+  it('removes only the duplicate Settings account menu while preserving dock and profile access', () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.SETTINGS,
       section: 'settings',
     });
 
     const panel = screen.getByTestId('sidebar-user-panel');
-    expect(panel).toContainElement(screen.getByTestId('user-button'));
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-whats-new')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('sidebar-now-playing-bridge')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
