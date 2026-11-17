@@ -113,11 +113,13 @@ class ReasonOwnershipTest(unittest.TestCase):
 
     def test_accepted_execution_has_a_live_lease_and_local_reason_claim_until_settled(self):
         observed = []
+        original = reason.one_job
+        run = reason_fixtures.Runner(hyperagent=reason_fixtures.done(json.dumps({"text": "Verified memo"})),
+                                    gbrain=reason_fixtures.StoringGbrain())
         def complete(*args, **kwargs):
             observed.append((lane.ownership.run_lease(self.state, self.issue["id"]),
                              lane.linear_sync._claims(self.state).get(self.issue["id"])))
-            self.linear.states[self.issue["id"]] = "Done"
-            return {"confidence": "research", "publication": {"status": "published"}}
+            return original(*args, **{**kwargs, "run": run})
         with patch.object(reason, "one_job", side_effect=complete):
             result = reason.drain(self.host, lane, CONFIG)
         self.assertEqual(observed[0][0], "live")
@@ -245,6 +247,86 @@ class ReasonOwnershipTest(unittest.TestCase):
             self.assertTrue(lane.linear_sync.claim(self.state, "id-2", "JOV-2", "codex"))
         self.assertEqual(lane.linear_sync._claims(self.state)[self.issue["id"]], row)
         self.assert_unknown_cannot_execute()
+
+    def corrupt_saved_result_keeps_outcome_unknown(self, existing_unknown):
+        if existing_unknown:
+            self.supersede_unknown_attempt()
+        path = reason.publication_path(self.state, self.issue)
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        original = b'{"schema":"jovie.reason-publication/v1","outcome":'
+        path.write_bytes(original)
+        path.chmod(0o600)
+        with patch.object(reason, "execute", side_effect=AssertionError("corrupt result must not run models")) as model:
+            code, receipt = self.cli()
+        model.assert_not_called()
+        self.assertEqual(code, 75)
+        blocked = receipt.get("publication", receipt)
+        self.assertEqual((blocked["status"], blocked["owner"]), ("blocked", "reason-lane"))
+        self.assertTrue(blocked["nextAction"])
+        self.assertNotIn((self.issue["id"], "Done"), self.linear.moves)
+        self.assertEqual(path.read_bytes(), original)
+        claim = lane.linear_sync._claims(self.state)[self.issue["id"]]
+        self.assertNotEqual(claim.get("reason"), "reason:returned")
+        self.assertTrue(lane.linear_sync.reason_outcome_pending(claim))
+        self.assertFalse(lane.linear_sync.clear_superseded(self.state, self.issue["id"]))
+        self.assertFalse(lane.linear_sync.claim(self.state, self.issue["id"], "JOV-1", "reason"))
+        self.assert_unknown_cannot_execute()
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_corrupt_saved_artifact_cannot_clear_an_existing_unknown_attempt(self):
+        self.corrupt_saved_result_keeps_outcome_unknown(existing_unknown=True)
+
+    def test_corrupt_saved_artifact_cannot_settle_a_fresh_claim_as_known(self):
+        self.corrupt_saved_result_keeps_outcome_unknown(existing_unknown=False)
+
+    def retained_result_must_qualify_before_unknown_recovery(self, changed_input, existing_unknown=True):
+        publication = importlib.import_module("reason_publication")
+        run = reason_fixtures.Runner(hyperagent=reason_fixtures.done(json.dumps({"text": "Original retained memo"})),
+                                    gbrain=reason_fixtures.done("ok"))
+        record = reason.one_job(self.linear, self.issue, CONFIG, self.state, run=run)
+        self.assertEqual(record["publication"]["status"], "blocked")
+        self.mirror()
+        if existing_unknown:
+            self.assertTrue(lane.linear_sync.claim(self.state, self.issue["id"], "JOV-1", "reason"))
+            self.lease().close()
+        path = reason.publication_path(self.state, self.issue)
+        saved = json.loads(path.read_text())
+        self.assertTrue(publication._valid_publication(saved, self.issue))
+        if changed_input:
+            self.issue = {**self.issue, "description": self.issue["description"] + "Changed current instructions.\n"}
+            self.linear.issues["JOV-1"] = self.issue
+            self.linear.jobs = [self.issue]
+        else:
+            saved["outcome"]["record"]["provenance"]["backend"] = {"status": "blocked"}
+            saved["outcomeDigest"] = publication._digest(saved["outcome"])
+            saved["payloadDigest"] = publication._digest({key: saved[key] for key in publication.PUBLICATION_FIELDS})
+            publication._save_publication(path, saved)
+            self.assertTrue(publication._valid_publication(saved, self.issue), "payload remains hash-valid")
+        original = path.read_bytes()
+        moves = list(self.linear.moves)
+        with patch.object(reason, "execute", side_effect=AssertionError("unqualified artifact cannot run models")) as model, \
+                patch.object(reason, "one_job", side_effect=AssertionError("unqualified artifact cannot start a job")) as job, \
+                patch.object(publication, "write_gbrain", side_effect=AssertionError("unqualified artifact cannot publish")) as writer:
+            code, receipt = self.cli()
+        model.assert_not_called()
+        job.assert_not_called()
+        writer.assert_not_called()
+        self.assertEqual(self.linear.moves, moves)
+        self.assertNotIn((self.issue["id"], "Done"), self.linear.moves)
+        self.assertEqual(code, 75)
+        self.assert_blocked(receipt, "reason-attempt-outcome-unknown")
+        self.assertEqual(path.read_bytes(), original)
+        self.assertTrue(lane.linear_sync.reason_outcome_pending(lane.linear_sync._claims(self.state)[self.issue["id"]]))
+        self.assert_unknown_cannot_execute()
+
+    def test_changed_input_cannot_requalify_a_valid_retained_unknown_result(self):
+        self.retained_result_must_qualify_before_unknown_recovery(changed_input=True)
+
+    def test_blocked_backend_cannot_requalify_a_hash_valid_retained_unknown_result(self):
+        self.retained_result_must_qualify_before_unknown_recovery(changed_input=False)
+
+    def test_fresh_blocked_backend_artifact_refuses_before_job_or_publication(self):
+        self.retained_result_must_qualify_before_unknown_recovery(changed_input=False, existing_unknown=False)
 
     def test_direct_unknown_outcome_returns_blocked_and_keeps_its_reason_claim(self):
         with patch.object(reason, "one_job", side_effect=RuntimeError("unknown remote outcome")):

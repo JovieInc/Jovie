@@ -96,8 +96,8 @@ class ReasonRunHeld(RuntimeError):
 
 
 def _reason_result(state: Path, issue: dict) -> bool:
-    from reason_publication import pending_publication
-    return pending_publication(state, issue)
+    from reason_publication import verified_saved_result
+    return verified_saved_result(state, issue)
 
 
 def _lost_reason(claim, lease) -> bool:
@@ -106,6 +106,7 @@ def _lost_reason(claim, lease) -> bool:
 
 def begin_reason_run(state: Path, issue: dict):
     """Reuse the local claim and live lease; neither is a cross-host claim."""
+    from reason_publication import pending_publication
     previous = linear_sync._claims(state).get(issue["id"])
     retained = _reason_result(state, issue)
     if _lost_reason(previous, run_lease(state, issue["id"])) and not retained:
@@ -120,6 +121,8 @@ def begin_reason_run(state: Path, issue: dict):
             raise ReasonRunHeld("reason-run-already-owned")
         elif not linear_sync.claim(state, issue["id"], issue["identifier"], "reason"):
             raise ReasonRunHeld("reason-run-already-owned")
+        if pending_publication(state, issue) and not retained:
+            raise ReasonRunHeld("reason-attempt-outcome-unknown")
         return lease
     except BaseException:
         lease.close()
@@ -317,6 +320,7 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
         previous = {}
     since = previous.get("ownerlessSince") if isinstance(previous.get("ownerlessSince"), dict) else {}
     rows = list((linear_sync.read_mirror(state, team).get("issues") or {}).values())
+    by_id = {row["id"]: row for row in rows}
     pending = linear_sync._pending_moves(state)
     claims = linear_sync._claims(state)
     merged = merged_identifiers(repo, run)
@@ -408,7 +412,7 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
             lease = binding_lease(state, ident) or lease
         if lease == "live":
             continue
-        if _lost_reason(claim, lease) and not _reason_result(state, {"id": issue_id}):
+        if _lost_reason(claim, lease) and not _reason_result(state, by_id.get(issue_id, {"id": issue_id})):
             continue  # Never turn an uncertain reason attempt into generic Todo replay.
         if lease is None and now - claim["claimedAt"] < LEGACY_RUN_GRACE_S:
             continue

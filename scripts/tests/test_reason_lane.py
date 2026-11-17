@@ -586,7 +586,7 @@ class DrainAndTickTest(unittest.TestCase):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             def admitted_job(*args, **kwargs):
                 (host.state / "lifecycle-drain.json").write_text("operator hold")
-                return {"confidence": "high", "publication": {"status": "published"}}
+                return importlib.import_module("scripts.tests.test_release_fixtures").publish_reason_fixture(reason, *args)
             with patch.object(reason, "healthy", return_value=True), \
                     patch.object(reason, "one_job", side_effect=admitted_job) as job:
                 result = reason.drain(host, self.lane(linear), CONFIG)

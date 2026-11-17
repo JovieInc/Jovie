@@ -385,7 +385,10 @@ def run_claimed(host, linear, issue, config, lease, *, one_job, run=lifecycle.ru
     settled = False
     try:
         record = one_job(linear, issue, config, host.state, run=run)
-        settled = True
+        publication = record.get("publication") or {}
+        settled = not publication or ownership._reason_result(host.state, issue)
+        if not settled and publication.get("status") != "blocked":
+            return {**record, "publication": ownership.reason_run_block()}
         return record
     except Exception:
         return {"confidence": "failed", "publication": ownership.reason_run_block()}
