@@ -68,7 +68,11 @@ export function readSourceProseEntries({ root, headSha, paths }) {
     paths.length > MAX_PROSE_FILES
   )
     throw new Error('Exact source prose identity required');
-  const prefix = ['--no-replace-objects', '--literal-pathspecs'];
+  const prefix = [
+    '--no-replace-objects',
+    '--literal-pathspecs',
+    '--no-lazy-fetch',
+  ];
   const options = {
     cwd: root,
     timeout: 30000,
