@@ -1,5 +1,6 @@
 """Failure-path and custody regressions for Linux lane resource scopes."""
 from __future__ import annotations
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import worker_resources as resources
+import lane_runner as lane
 
 UNIT = "jovie-lane-codex-" + "a" * 32 + ".scope"
 
@@ -184,6 +186,64 @@ class WorkerResourceTest(unittest.TestCase):
             self.assertEqual(resources.main(["--unit", UNIT, "--receipt-fd", "99", "--limits", "{}", "--", "worker"]), 78)
             self.assertEqual(resources.main(["--unit", UNIT, "--receipt-fd", "1", "--limits", "{}"]), 78)
         execute.assert_not_called()
+
+
+class ResourceDispatchHermeticTest(unittest.TestCase):
+    def test_escalation_reconcile_stays_hermetic_inside_the_release_selftest(self):
+        """JOV-10343: the reconcile's one budgeted gh read must never run inside a release self-test.
+        LANES_SELFTEST is that guard. This sets the marker and drops the local-test backend so the
+        assertion pins the marker even when a reconcile is due."""
+        # 21 context managers in one with exceed Python's 20-block limit.
+        with contextlib.ExitStack() as stack:
+            tmp = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(patch.dict(os.environ, {
+                "SYMPHONY_AUTOSCALE": "off",
+                "LANES_SELFTEST": "1",
+                "LANES_EXECUTION_BACKEND": "",
+            }))
+            for target, name, kwargs in (
+                (lane.autoscale, "mode", {"return_value": "off"}),
+                (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),
+                (lane.worktree_sweep, "maybe_spawn", {"return_value": "not-due"}),
+                (lane, "ensure_full_history", {}),
+                (lane, "load_providers", {"return_value": {"codex": {"slots": 1}}}),
+                (lane, "provider_healthy", {"return_value": True}),
+                (lane, "claim_remediation_events", {"return_value": {}}),
+                (lane, "collect_shipping_origin", {"return_value": {}}),
+                (lane, "Linear", {"side_effect": SystemExit("no LINEAR_API_KEY")}),
+                (lane.linear_sync, "tick", {"return_value": {}}),
+                (lane.macos_pool, "sample", {"return_value": {}}),
+                (lane.epics, "reconcile", {"return_value": {}}),
+                (lane.pr_events, "tick", {"return_value": {}}),
+                (lane.reason_lane, "tick", {"return_value": {}}),
+                (lane.continuity_clock, "tick", {"return_value": {"status": "current"}}),
+                (lane.doctor, "run", {"return_value": {}}),
+                (lane.escalation_reconcile, "due", {"return_value": True}),
+            ):
+                stack.enter_context(patch.object(target, name, **kwargs))
+            probe = stack.enter_context(patch.object(
+                lane.escalation_reconcile, "fetch_labeled",
+                side_effect=AssertionError("self-test leak")))
+            spawn = stack.enter_context(patch.object(lane.subprocess, "Popen"))
+
+            def observed_scope(_fd):
+                # Popen is synthetic: provide its exact scope's startup receipt
+                # rather than waiting for a kernel child that cannot exist.
+                command = spawn.call_args.args[0]
+                self.assertEqual(command[0], "systemd-run")
+                return {"schema": lane.worker_resources.SCHEMA, "ok": True,
+                        "unit": command[command.index("--unit") + 1],
+                        "limits": json.loads(command[command.index("--limits") + 1])}
+
+            stack.enter_context(patch.object(lane.worker_resources, "receive_receipt",
+                                            side_effect=observed_scope))
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 0)
+            probe.assert_not_called()
+            self.assertEqual(spawn.call_count, 1)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertEqual(tick["spawned"], ["codex"])
+            self.assertTrue(tick["workerResources"][0]["ok"])
 
 
 if __name__ == "__main__":
