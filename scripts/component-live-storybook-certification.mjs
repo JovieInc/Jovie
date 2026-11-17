@@ -16,6 +16,7 @@ import {
   LIVE_CERT_TIMEOUT_MS,
   removeWorkDir,
 } from './component-live-storybook-lifecycle.mjs';
+import { createStoryInventoryValidator } from './lib/component-story-inventory.mjs';
 import { oklchToRgb, parseOklch, relativeLuminance } from './lib/oklch.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -196,12 +197,6 @@ export function qualifyNode24(version = process.versions.node) {
   return { ok: true };
 }
 
-function normalizeRepoPath(value) {
-  return String(value || '')
-    .trim()
-    .replace(/\\/g, '/');
-}
-
 const LIVE_FAMILY_BY_BASENAME = Object.freeze({
   badge: 'atom.badge',
   button: 'atom.button',
@@ -241,61 +236,16 @@ export function resolveLiveStoriesForRun(options = {}) {
   return CANONICAL_LIVE_STORIES;
 }
 
+function storyInventoryFor(repoRoot = REPO_ROOT) {
+  return createStoryInventoryValidator({
+    repoRoot,
+    stories: CANONICAL_LIVE_STORIES,
+    storyId: storyIdFromTitleAndExport,
+  });
+}
+
 export function validateCanonicalStoryInventory(options = {}) {
-  const repoRoot = options.repoRoot ?? REPO_ROOT;
-  const stories = options.stories ?? CANONICAL_LIVE_STORIES;
-  const issues = [];
-  const allowSubset = options.allowSubset === true;
-  if (!Array.isArray(stories) || (!allowSubset && stories.length !== 6)) {
-    issues.push(
-      `canonical live inventory must declare exactly 6 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
-    );
-  }
-  const ids = new Set();
-  for (const story of stories ?? []) {
-    if (!isObject(story)) {
-      issues.push('canonical story entry is missing');
-      continue;
-    }
-    const importPath = normalizeRepoPath(story.importPath);
-    if (
-      !importPath.startsWith('packages/ui/atoms/') ||
-      importPath.includes('..')
-    ) {
-      issues.push(
-        `${story.id ?? importPath}: canonical import path must be packages/ui/atoms/*`
-      );
-    }
-    const abs = resolve(repoRoot, importPath);
-    if (!existsSync(abs)) {
-      issues.push(`${story.id ?? importPath}: canonical story file is missing`);
-      continue;
-    }
-    const source = readFileSync(abs, 'utf8');
-    if (
-      !source.includes(`title: '${story.title}'`) &&
-      !source.includes(`title: "${story.title}"`)
-    ) {
-      issues.push(
-        `${story.id}: story title ${story.title} is not declared in ${importPath}`
-      );
-    }
-    if (!new RegExp(`export const ${story.exportName}\\b`).test(source)) {
-      issues.push(
-        `${story.id}: export ${story.exportName} is not declared in ${importPath}`
-      );
-    }
-    const computed = storyIdFromTitleAndExport(story.title, story.exportName);
-    if (computed !== story.id) {
-      issues.push(
-        `${story.id}: computed story id is ${computed}; inventory id must match exactly`
-      );
-    }
-    if (ids.has(story.id))
-      issues.push(`${story.id}: duplicate canonical story id`);
-    ids.add(story.id);
-  }
-  return { ok: issues.length === 0, issues, stories };
+  return storyInventoryFor(options.repoRoot)(options);
 }
 
 function namedInvariants(sample) {
@@ -1114,10 +1064,8 @@ export function runLiveStorybookCertification(options = {}) {
   const node = qualifyNode24(options.nodeVersion ?? process.versions.node);
   const issues = [];
   if (!node.ok) issues.push(node.detail);
-  const catalog = validateCanonicalStoryInventory({
-    repoRoot: options.repoRoot,
-    stories: CANONICAL_LIVE_STORIES,
-  });
+  const validateInventory = storyInventoryFor(options.repoRoot);
+  const catalog = validateInventory();
   if (!catalog.ok) issues.push(...catalog.issues);
 
   const selected = resolveLiveStoriesForRun(options);
@@ -1152,12 +1100,15 @@ export function runLiveStorybookCertification(options = {}) {
     };
   }
 
-  const inventory = validateCanonicalStoryInventory({
-    repoRoot: options.repoRoot,
-    stories: options.stories ?? selected,
-    allowSubset: selectingFromChanges || Boolean(options.storyIds),
-  });
-  if (!inventory.ok) issues.push(...inventory.issues);
+  const stories = options.stories ?? selected;
+  const inventory =
+    stories === CANONICAL_LIVE_STORIES
+      ? catalog
+      : validateInventory({
+          stories,
+          allowSubset: selectingFromChanges || Boolean(options.storyIds),
+        });
+  if (inventory !== catalog && !inventory.ok) issues.push(...inventory.issues);
 
   const redFixtures = options.redFixtures ?? DELIBERATE_RED_LIVE_FIXTURES;
   const redReceipts = (redFixtures ?? []).map(sample => {

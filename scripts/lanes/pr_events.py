@@ -37,7 +37,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
-from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -51,6 +51,8 @@ RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 # Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
 # DIRTY and BEHIND keep lane-fix-red.
 REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+PASSING_CHECK_STATES = frozenset({"SUCCESS", "NEUTRAL", "SKIPPED"})  # as GitHub counts them (#25157)
+SWEEP_ENROLL_WAKES = 5  # enroll wakes per push sweep; the rest drain on the next landing
 # No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge are retired,
 # EVENT 2026-10-28): every hold here is a machine hold with a receipt and a release.
 HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred"})
@@ -472,7 +474,7 @@ def head_red(number: int, sh=run) -> bool | None:
 
 
 def head_settled_green(number: int, sh=run) -> bool:
-    """True only when every required check on this head has completed success.
+    """True only when every required check on this head passed and at least one succeeded.
 
     Pending, failed, cancelled, or unreadable is not green. The next check
     completion is the event that asks again; this does not sleep or poll.
@@ -496,7 +498,8 @@ def head_settled_green(number: int, sh=run) -> bool:
             continue
         if key and (key not in latest or at >= latest[key][0]):
             latest[key] = (at, state)
-    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
+    states = [state for _, state in latest.values()]
+    return "SUCCESS" in states and all(state in PASSING_CHECK_STATES for state in states)
 
 
 def red_label_justified(number: int, pr: dict, sh=run, gates: dict | None = None, now: float | None = None) -> bool:
@@ -558,17 +561,9 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
 
 
 def wake_green_enroll(number: int, sh=run) -> bool:
-    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
-
-    Label writes stay on GITHUB_TOKEN so a relay label never fans out into
-    label-triggered runs, which also means the DELETE that clears lane-fix-red
-    wakes nothing: with an already required-green, unchanged head no later
-    check completion comes either (#22417 sat green and unqueued 33 minutes
-    until an unrelated main push sweep). workflow_dispatch is the recursion-guard
-    exception, the relay job's actions: write grant pays for it, and green
-    enroll's own blocked recheck already uses the same hop. The enroll run
-    re-reads eligibility itself, so a hold, freeze or newer head stays safe.
-    """
+    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788): a GITHUB_TOKEN label
+    DELETE wakes nothing and an unchanged green head gets no new check (#22417 sat 33 min).
+    workflow_dispatch is the recursion-guard exception; enroll re-reads eligibility itself."""
     args = ["workflow", "run", GREEN_ENROLL_WORKFLOW,
             "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"]
     # Production goes through the budgeted client layer (external-api-guard ratchet);
@@ -1083,29 +1078,23 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
-                         premise: dict | None = None, previous_win_section: str | None = None) -> str:
+                         premise: dict | None = None, previous_win_section: str | None = None,
+                         blast_radius: dict | None = None, literal_mentions: tuple[str, ...] = ()) -> str:
     """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
-    if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
+    decisions = re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)
+    if len(decisions) > 1:
         raise ValueError("repair requires exactly one customer changelog decision")
     updated = body
     if not red_section_complete(updated):
         block = red_before_green_block(pr, excerpt)
         if block:
             updated = with_red_section(updated, block)
-    if customer_decision is not None and "customer-changelog/v1" not in updated:
-        if not isinstance(customer_decision, dict) or type(customer_decision.get("releaseWorthy")) is not bool:
-            raise ValueError("customer decision requires an explicit releaseWorthy boolean")
-        if customer_decision["releaseWorthy"] is False:
-            from fix_red_classes import stamp_internal_changelog
-            updated = stamp_internal_changelog(updated)
-        else:
-            note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
-            updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
     if locking_pr is not None:
         if type(locking_pr) is not int or locking_pr < 1:
             raise ValueError("locking PR requires an explicit positive PR number")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+        # Diagnostic examples are not the author's citation section. Use the
+        # same fence-aware boundaries as the canonical Fleet evidence parser.
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{1,6}\s+Locked areas\s*$", re.I)) is None:
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
@@ -1129,7 +1118,9 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    return quote_revision_references(updated)
+    updated = with_blast_radius(updated, blast_radius)
+    return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision),
+                                     literal_mentions=literal_mentions)
 
 
 def api_gh(args, **_):
@@ -1144,18 +1135,19 @@ def api_gh(args, **_):
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
                             locking_pr: int | None = None, win_section: str | None = None,
-                            premise: dict | None = None) -> bool:
+                            premise: dict | None = None, blast_radius: dict | None = None,
+                            literal_mentions: tuple[str, ...] = ()) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and win_section is None and premise is None
-            and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and win_section is None and premise is None and blast_radius is None
+            and not literal_mentions and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section, premise=premise)
+                                   win_section=win_section, premise=premise, blast_radius=blast_radius, literal_mentions=literal_mentions)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
@@ -1473,10 +1465,17 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
             continue
         if add_label(number, kind, sh):
             added.append((number, kind))
+    # A green head behind a stale lane-fix-red gets no further event (#25157), so wake enroll.
+    wakes = 0
     for pr in prs:
         number = pr.get("number")
-        if isinstance(number, int) and clear_stale_lane_fix_red(number, pr, sh):
+        if not isinstance(number, int) or (not pr.get("isDraft") and wakes >= SWEEP_ENROLL_WAKES):
+            continue  # past the cap the label stays, so every clear keeps its wake
+        if clear_stale_lane_fix_red(number, pr, sh):
             added.append((number, "cleared-red"))
+            if not pr.get("isDraft"):
+                wakes += 1
+                added.append((number, "enroll-wake" if wake_green_enroll(number, sh) else "enroll-wake-failed"))
     return added
 
 

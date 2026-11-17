@@ -1,5 +1,7 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
+
 interface ReleaseTaskPastReleaseStateProps {
   readonly onSetUpAnyway: () => void;
   readonly isLoading: boolean;
@@ -18,15 +20,14 @@ export function ReleaseTaskPastReleaseState({
         Campaign tasks help you prepare for upcoming releases. Since this one is
         already live, there&apos;s nothing to prepare.
       </p>
-      <button
-        type='button'
+      <PlainButton
         onClick={onSetUpAnyway}
         disabled={isLoading}
         className='text-2xs text-tertiary-token hover:text-secondary-token underline transition-colors disabled:cursor-not-allowed disabled:opacity-50'
         aria-busy={isLoading}
       >
         {isLoading ? 'Generating...' : 'Generate Release Plan Anyway'}
-      </button>
+      </PlainButton>
     </div>
   );
 }

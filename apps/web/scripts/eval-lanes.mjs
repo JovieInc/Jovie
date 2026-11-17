@@ -50,6 +50,7 @@ function gitDiscoveryEnv(sourceEnv = process.env) {
 
 export function discoverEvalFiles() {
   return execFileSync('git', ['ls-files'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: webRoot,
     encoding: 'utf8',
     env: gitDiscoveryEnv(),

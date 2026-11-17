@@ -604,6 +604,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
         "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
+        "failed24hByReason": failed_run_reason_counts(receipts),
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
@@ -841,6 +842,18 @@ def failed_by_reason(failures: dict) -> dict[str, int]:
     for record in failures.values():
         code = record.get("reason", "legacy") if isinstance(record, dict) else "legacy"
         counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def failed_run_reason_counts(receipts: list) -> dict[str, int]:
+    """Verdict=="failed" run receipts by reason class: the first reason prefix (JOV-12820).
+
+    Mirrors the noWorkRepairs24h grouping (claim-error / timeout / harness-error / ...),
+    which names the failing layer without reading runs/ledger.jsonl on the host — the
+    per-run reason strings never leave gem, so the alert used to file 'Root cause:
+    UNKNOWN' and every condition generation auto-closed unlearned."""
+    counts = Counter((r.get("reasons") or ["?"])[0].split(":", 1)[0]
+                     for r in receipts if r.get("verdict") == "failed")
     return dict(sorted(counts.items()))
 
 
@@ -1355,7 +1368,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
-        alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+        named = ", ".join(f"{reason} {count}" for reason, count in (obs.get("failed24hByReason") or {}).items())
+        alerts["failed-runs"] = (f"{obs['failed24h']} harness-failed runs in 24h ({named or 'reason classes ungrouped'}); "
+                                 "full reason strings in runs/ledger.jsonl")
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
@@ -2132,6 +2147,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
+            "failed_runs_by_reason": obs.get("failed24hByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
             "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in

@@ -34,6 +34,23 @@ describe('Footer', () => {
     }
   });
 
+  it('reserves the mobile band under the profile branding so hit boxes never overlap', () => {
+    const { container } = render(
+      <Footer variant='profile' artistHandle='tim' />
+    );
+
+    const brandingRow = screen
+      .getByRole('link', { name: 'Powered by Jovie Home' })
+      .closest('div')?.parentElement;
+    // The wrapper is the branding group div's parent (FooterBranding renders
+    // its own inner group div); the mobile reservation lifts the branding
+    // link's 44pt hit box clear of the absolute legal links (bottom-2
+    // right-4, 44pt boxes), while desktop keeps the tight band because its
+    // legal links are viewport-pinned.
+    expect(brandingRow).toHaveClass('pb-16', 'md:pb-2');
+    expect(container.querySelector('footer')?.className).toContain('relative');
+  });
+
   it('keeps regular footer destinations on the shared route registry', () => {
     render(<Footer variant='regular' />);
 

@@ -37,6 +37,7 @@ describe('AdminRouteViews', () => {
     expect(activeAdminView('shipping', '/app/ov/activity/123')).toBe(
       '/app/ov/activity'
     );
+    expect(activeAdminView('operations', '/app/ov/room')).toBe('/app/ov/room');
     expect(activeAdminView('operations', '/app/ov/elsewhere')).toBe(
       '/app/ov/operations'
     );

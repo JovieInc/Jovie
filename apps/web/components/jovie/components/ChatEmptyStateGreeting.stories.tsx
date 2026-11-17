@@ -1,6 +1,5 @@
 import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
 import { ChatEmptyStateGreeting } from './ChatEmptyStateGreeting';
 
 const meta = {
@@ -24,82 +23,62 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** JOV-7150: no eligible Insight — welcome plus the existing profile review path. */
-export const GreetingOnly: Story = {
-  args: {
-    insight: null,
-  },
-};
+/** Nothing finished yet: the greeting alone, so the composer is the focus. */
+export const Empty: Story = {};
 
-/** Synthetic action fixture; no success or growth claim is inferred. */
-export const WithInsight: Story = {
+/** A finished draft for a real release, with one link that opens it. */
+export const WithFinishedDraft: Story = {
   args: {
-    action: {
-      insightId: 'release-fixture',
-      suggestion: 'Draft a release update',
-      prompt:
-        'Help me draft an update about this release. Ask for missing facts.',
-      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    result: {
+      id: 'draft-fixture',
+      item: { kind: 'release', id: 'release-fixture', label: 'Wheels Up' },
+      result: {
+        kind: 'draft',
+        summary: 'Your playlist pitch for Wheels Up is ready.',
+        href: '/app/chat',
+      },
     },
-    onSelectAction: fn(),
   },
 };
 
-/**
- * JOV-7150: never fabricate a number. When the insight source is empty
- * (no current actionable insight), the caller resolves the action
- * to `null` rather than inventing one — same render as
- * `GreetingOnly`, named separately to document the no-fabrication
- * contract explicitly (see `resolveChatEmptyStateInsight`).
- */
-export const NoInsightWhenSourceIsEmpty: Story = {
+/** A long artist name and a long summary wrap without pushing the link off. */
+export const LongContent: Story = {
   args: {
-    insight: null,
-  },
-};
-
-export const LoadingNextStep: Story = {
-  args: { isLoading: true },
-};
-
-/** No eligible next step: the welcome keeps the profile review path. */
-export const EmptyNoNextStep: Story = {
-  args: { action: null },
-};
-
-/** No first name resolved: a plain time-of-day welcome, same next step. */
-export const PartialNoFirstName: Story = {
-  args: { firstName: null },
-};
-
-export const LongNameAndSuggestion: Story = {
-  args: {
-    firstName: 'The Extraordinarily Long Touring Ensemble Of Northern Lights',
-    action: {
-      insightId: 'long-fixture',
-      suggestion:
-        'Draft a fan update about the three new cities on the winter run, the rescheduled hometown show and the limited vinyl pressing that sold through overnight',
-      prompt: 'Help me draft a fan update. Ask for missing facts.',
-      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    firstName: 'Wolfgang Amadeus Maximilian Featherstonehaugh-Cholmondeley',
+    result: {
+      id: 'draft-long',
+      item: {
+        kind: 'release',
+        id: 'release-long',
+        label: 'The Night We Drove Down Every Coastal Highway Until Sunrise',
+      },
+      result: {
+        kind: 'draft',
+        summary:
+          'Your playlist pitch for The Night We Drove Down Every Coastal Highway Until Sunrise is ready, with three curator matches.',
+        href: '/app/chat',
+      },
     },
-    onSelectAction: fn(),
   },
 };
 
-export const RtlGreeting: Story = {
+/** Right-to-left text keeps the greeting and link aligned to the start edge. */
+export const Rtl: Story = {
   args: {
     firstName: 'ليلى',
-    action: {
-      insightId: 'rtl-fixture',
-      suggestion: 'اكتب تحديثًا للمعجبين عن الإصدار الجديد',
-      prompt: 'Help me draft a fan update. Ask for missing facts.',
-      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    result: {
+      id: 'finding-rtl',
+      item: { kind: 'release', id: 'release-rtl', label: 'قمر' },
+      result: {
+        kind: 'finding',
+        summary: 'وجد جوفي ثلاث قوائم تشغيل جديدة لأغنية قمر.',
+        href: '/app/chat',
+      },
     },
-    onSelectAction: fn(),
   },
   decorators: [
     Story => (
-      <div dir='rtl' lang='ar'>
+      <div dir='rtl'>
         <Story />
       </div>
     ),

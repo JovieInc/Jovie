@@ -141,6 +141,44 @@ describe('OutboundWorkspace', () => {
     ).toHaveTextContent('0');
   });
 
+  it('labels a held existing relationship and tags a noted one', () => {
+    mockQueue(
+      outboundFixtureQueue([
+        outboundFixtureRow({
+          leadId: 'n',
+          name: 'Nova Lane',
+          handle: 'novalane',
+          view: 'ready',
+          relationshipNotes: [
+            "Relationship: Armada Music, Tim's vocalist deals",
+          ],
+        }),
+        outboundFixtureRow({
+          leadId: 'd',
+          name: 'Dannic',
+          handle: 'djdannic',
+          view: 'held',
+          flags: ['existing_relationship'],
+          relationshipHold:
+            'Existing relationship: flag to Tim, no cold outreach',
+          message: null,
+        }),
+      ])
+    );
+    renderWorkspace();
+    // The noted artist stays in Ready to certify, with the tag on the row.
+    expect(screen.getByTestId('outbound-count-ready')).toHaveTextContent('1');
+    expect(screen.getByTestId('outbound-count-held')).toHaveTextContent('1');
+    expect(screen.getByTestId('outbound-relationship-note')).toHaveTextContent(
+      "Relationship: Armada Music, Tim's vocalist deals"
+    );
+    // The held artist is not offered in Ready to certify.
+    expect(screen.queryByText('Dannic')).toBeNull();
+    expect(
+      screen.queryByTestId('outbound-flag-existing-relationship')
+    ).toBeNull();
+  });
+
   it('shows a retryable error state', () => {
     mockQueue(undefined, { isError: true });
     renderWorkspace();

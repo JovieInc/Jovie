@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -91,8 +92,7 @@ export function ErrorDetails({
         </p>
 
         <div className='flex justify-center'>
-          <button
-            type='button'
+          <PlainButton
             onClick={handleCopy}
             className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-normal ease-interactive'
             // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
@@ -100,7 +100,7 @@ export function ErrorDetails({
           >
             <Copy className='h-3.5 w-3.5' aria-hidden='true' />
             Copy error details
-          </button>
+          </PlainButton>
         </div>
       </div>
 

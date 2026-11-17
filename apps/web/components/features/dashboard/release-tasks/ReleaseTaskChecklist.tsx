@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -239,7 +240,7 @@ export function ReleaseTaskChecklist({
     >
       {/* Progress bar + optional link to full page */}
       <motion.div
-        className='flex shrink-0 items-center gap-2 px-4 py-2'
+        className='flex shrink-0 items-center gap-2 px-3 py-2'
         initial={animateEntrance ? { opacity: 0, y: -8 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
@@ -251,23 +252,21 @@ export function ReleaseTaskChecklist({
           className='flex-1'
         />
         {!isCompact && (clustersData?.length ?? 0) > 0 && (
-          <button
-            type='button'
+          <PlainButton
             onClick={() => setCatalogDialogOpen(true)}
             className='flex-shrink-0 text-xs text-muted-foreground hover:text-foreground'
             data-testid='open-catalog-builder'
           >
             Add from catalog
-          </button>
+          </PlainButton>
         )}
         {variant === 'compact' && onNavigateToFullPage && (
-          <button
-            type='button'
+          <PlainButton
             onClick={onNavigateToFullPage}
             className='flex-shrink-0 text-3xs text-accent hover:underline'
           >
             Open &rarr;
-          </button>
+          </PlainButton>
         )}
       </motion.div>
 
