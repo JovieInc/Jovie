@@ -13,19 +13,32 @@ export const SPIKE_FACTOR = 3;
 export const SPIKE_MIN_USD = 0.5;
 
 const DAY_MS = 86_400_000;
-const num = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const num = v => {
+  if (
+    !['number', 'string'].includes(typeof v) ||
+    (typeof v === 'string' && !v.trim()) ||
+    !Number.isFinite(Number(v))
+  )
+    throw new Error('Vercel usage contains an invalid cost');
+  return Number(v);
+};
 
 /** Cost of a usage service row across CLI versions; the Pro seat is a fixed charge, not usage. */
 export function serviceCost(service) {
   if (service?.category === 'subscription' || service?.name === 'Pro') return 0;
   return num(service?.cost ?? service?.effectiveCost);
 }
-export const totalCost = services =>
-  (services ?? []).reduce((sum, s) => sum + serviceCost(s), 0);
+export const totalCost = services => {
+  if (!Array.isArray(services))
+    throw new Error('Vercel usage services are unavailable');
+  return services.reduce((sum, s) => sum + serviceCost(s), 0);
+};
 
 /** `vercel usage --breakdown daily --json` -> [{ day, usd, services }] oldest first. */
 export function dailySeries(usage) {
-  return (usage?.breakdown?.data ?? [])
+  if (!Array.isArray(usage?.breakdown?.data))
+    throw new Error('Vercel daily usage is unavailable');
+  return usage.breakdown.data
     .map(row => ({
       day: row.periodKey,
       usd: totalCost(row.services),
@@ -35,9 +48,10 @@ export function dailySeries(usage) {
 }
 /** `vercel usage --group-by project --json` -> { project: usd }. */
 export function projectTotals(usage) {
+  if (!Array.isArray(usage?.groupBy?.data))
+    throw new Error('Vercel project usage is unavailable');
   const out = {};
-  for (const p of usage?.groupBy?.data ?? [])
-    out[p.name] = totalCost(p.services);
+  for (const p of usage.groupBy.data) out[p.name] = totalCost(p.services);
   return out;
 }
 
@@ -63,6 +77,13 @@ export function project({
   now,
   window = 7,
 }) {
+  const end = new Date(`${periodEnd}T23:59:59Z`).getTime();
+  if (
+    !Number.isFinite(end) ||
+    !Number.isFinite(now.getTime()) ||
+    end < now.getTime()
+  )
+    throw new Error('Vercel billing period is invalid or expired');
   const today = now.toLocaleDateString('en-CA', {
     timeZone: 'America/Los_Angeles',
   });
