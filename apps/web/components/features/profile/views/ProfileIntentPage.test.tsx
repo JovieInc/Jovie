@@ -28,4 +28,22 @@ describe('ProfileIntentPage focus ring', () => {
       expect(link.className).not.toContain('var(--focus-ring)');
     }
   });
+
+  it('draws the header links from the media token, not raw white', () => {
+    render(
+      <ProfileIntentPage
+        mode='pay'
+        artistName='The Weeknd'
+        artistHandle='theweeknd'
+      >
+        <div>body</div>
+      </ProfileIntentPage>
+    );
+
+    for (const name of ['Back to The Weeknd', 'The Weeknd profile']) {
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveClass('text-on-media/44');
+      expect(link.className).not.toContain('white/');
+    }
+  });
 });

@@ -111,7 +111,10 @@ class RenumberTest(unittest.TestCase):
             snapshot = self.snap("generated", "sTheirs", {"mine": 2, "theirs": 3})
             (root / META / "0149_snapshot.json").write_text(snapshot)
 
-            changed = mr.normalize_generated(root, lambda *a: git(root, *a), "main", 5, {})
+            result = subprocess.run([
+                sys.executable, mr.__file__, "normalize", "--root", str(root), "--base", "main", "--pr", "5",
+            ], check=True, capture_output=True, text=True)
+            changed = json.loads(result.stdout)["changed"]
 
             self.assertIn(f"{MIG}/0161_generated.sql", changed)
             self.assertEqual((root / MIG / "0161_generated.sql").read_text(), "generated sql")
@@ -163,6 +166,19 @@ class RenumberTest(unittest.TestCase):
             self.assertEqual(snapshot.read_text(), git(root, "show", f"main:{META}/0148_snapshot.json"))
             self.assertEqual((root / META / "_journal.json").read_text(), git(root, "show", f"main:{META}/_journal.json"))
             self.assertTrue((root / MIG / "0148_theirs.sql").exists())
+
+    def test_cli_prepares_conflicted_metadata_for_canonical_generation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.build(root)
+            subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=root, capture_output=True)
+            result = subprocess.run([
+                sys.executable, mr.__file__, "prepare", "--root", str(root), "--base", "main",
+            ], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((root / MIG / "0148_mine.sql").exists())
+            self.assertEqual((root / META / "0148_snapshot.json").read_text(),
+                             git(root, "show", f"main:{META}/0148_snapshot.json"))
 
 
 class LaneFixTest(RenumberTest):

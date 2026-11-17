@@ -136,10 +136,6 @@ const ALLOWED: Readonly<Record<string, { max: number; why: string }>> = {
     max: 1,
     why: 'copy coverage fixture of the public claim',
   },
-  'components/features/auth/AuthOfferSummary.tsx': {
-    max: 1,
-    why: 'pre-auth sign-up recap: a new signup is locked to this list price',
-  },
 };
 
 function walk(dir: string, out: string[]): string[] {

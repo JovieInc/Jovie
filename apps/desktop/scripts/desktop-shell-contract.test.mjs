@@ -13,6 +13,7 @@ import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 import './desktop-titlebar-contract.cases.mjs';
 import './desktop-startup-contract.cases.mjs';
+import './desktop-update-control-contract.cases.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -504,7 +505,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function isAppOriginReachable\(\)/);
   assert.match(mainSource, /function findReachableHostedUrl\(/);
   assert.match(mainSource, /beginRecoveryUnlatch/);
-  assert.match(mainSource, /decideRecoveryUnlatch/);
+  assert.match(mainSource, /createRecoveryUnlatchController/);
+  const unlatchSource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery-unlatch.ts'),
+    'utf8'
+  );
+  assert.match(unlatchSource, /decideRecoveryUnlatch/);
   assert.match(recoverySource, /hostedUrlCandidates/);
   assert.match(recoverySource, /Jovie Couldn’t Load/);
   assert.match(recoverySource, /Check your connection, then try again\./);

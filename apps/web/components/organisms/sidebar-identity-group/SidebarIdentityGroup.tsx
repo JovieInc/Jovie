@@ -67,9 +67,9 @@ export function SidebarIdentityGroup({
       data-active={isPublicProfileActive ? 'true' : undefined}
       className={cn(
         'm-0 min-w-0 border-0',
-        calm
-          ? 'px-(--app-shell-sidebar-inset) py-0'
-          : 'px-(--app-shell-sidebar-inset) py-1.5'
+        // Calm row: the hover surface insets 4px and the row 8px, which
+        // lands the avatar column on the 12px nav icon column.
+        calm ? 'px-1 py-0' : 'px-(--app-shell-sidebar-inset) py-1.5'
       )}
     >
       <div
@@ -77,7 +77,7 @@ export function SidebarIdentityGroup({
         data-testid={SIDEBAR_IDENTITY_GROUP_TEST_ID}
         className={cn(
           'relative flex items-center rounded-lg px-0.5 py-0.5',
-          calm && 'p-0',
+          calm && 'px-2 py-0',
           'transition-colors duration-fast ease-interactive',
           'hover:bg-sidebar-accent',
           isPublicProfileActive && 'bg-sidebar-accent-active',

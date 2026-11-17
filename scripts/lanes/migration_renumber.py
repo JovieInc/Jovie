@@ -14,11 +14,15 @@ changed paths. The caller commits, merges main and pushes.
 Use `prepare_regeneration` during a main merge, run `pnpm --filter @jovie/web drizzle:generate`, then
 `normalize_generated(root, git, base_ref, pr_number, others)` for sparse migration numbering.
 It renames generated artifacts without merging or rewriting snapshot contents.
+CLI: `python3 scripts/lanes/migration_renumber.py prepare --base origin/main`,
+then the canonical generator, then `normalize --base origin/main --pr NUMBER`.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import subprocess
 from pathlib import Path
 
 from atomic_state import atomic_write_text
@@ -206,3 +210,29 @@ def renumber(root: Path, git, base_ref: str, pr_number: int, others: dict[int, l
     (root / META / "_journal.json").write_text(json.dumps(journal, indent=2) + "\n")
     changed.append(f"{META}/_journal.json")
     return sorted(set(changed))
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Prepare and normalize canonical migration regeneration.")
+    parser.add_argument("action", choices=("prepare", "normalize"))
+    parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument("--base", default="origin/main")
+    parser.add_argument("--pr", type=int)
+    parser.add_argument("--others-file", type=Path, help="JSON mapping of other PR numbers to migration numbers")
+    args = parser.parse_args()
+    if args.action == "normalize" and (args.pr is None or args.pr < 1):
+        parser.error("normalize requires a positive --pr")
+
+    def git(*parts):
+        return subprocess.run(["git", *parts], cwd=args.root, check=True, capture_output=True, text=True).stdout
+
+    if args.action == "prepare":
+        changed = prepare_regeneration(args.root, git, args.base)
+    else:
+        others = json.loads(args.others_file.read_text()) if args.others_file else {}
+        changed = normalize_generated(args.root, git, args.base, args.pr, others)
+    print(json.dumps({"action": args.action, "changed": changed}))
+
+
+if __name__ == "__main__":
+    main()

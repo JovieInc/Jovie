@@ -400,10 +400,10 @@ describe('ProfileDesktopSurface', () => {
 
     expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
-    expect(screen.getByAltText('Never Say A Word')).toHaveAttribute(
-      'data-priority',
-      'true'
-    );
+    // JOV-9611: desktop-only art is lazy, never an unconditional priority image.
+    const listenArtwork = screen.getByAltText('Never Say A Word');
+    expect(listenArtwork).toHaveAttribute('data-priority', 'false');
+    expect(listenArtwork).toHaveAttribute('loading', 'lazy');
 
     const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
     expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);

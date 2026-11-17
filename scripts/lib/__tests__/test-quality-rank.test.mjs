@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { emptyState, pickBatch } from '../mutation-sweep.mjs';
+import {
+  emptyState,
+  mergeStates,
+  pickBatch,
+  recordRun,
+} from '../mutation-sweep.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 import {
   parseChurn,
@@ -80,6 +85,7 @@ test('pickBatch breaks rank ties by touch before age', () => {
 
 import {
   aggregateByTier,
+  baselineSummary,
   evaluateFloors,
   modelFingerprint,
   rearmTop,
@@ -131,6 +137,26 @@ test('aggregateByTier leaves @jovie/ui sweep modules out of the web tiers', () =
   );
 });
 
+test('baselineSummary scores the whole state and counts unscored modules', () => {
+  const withUi = {
+    modules: {
+      ...state.modules,
+      'packages/ui/atoms/badge.tsx': {
+        status: 'scored',
+        valid: 90,
+        killed: 0,
+        survived: 90,
+      },
+      'lib/z.ts': { status: 'untested' },
+    },
+  };
+  const s = baselineSummary(withUi, surfaces);
+  expect(s.score).toBe(35);
+  expect(s.counts).toEqual({ scored: 3, untested: 1, error: 1, other: 0 });
+  expect(s.markdown).toContain('Overall: **35%** (70 of 200 mutants killed)');
+  expect(s.markdown).toContain('| billing | 1 | 60% |');
+});
+
 test('floors only ratchet up and violations are reported', () => {
   const t = aggregateByTier(state, surfaces);
   expect(evaluateFloors(t, { billing: 70 }).violations).toEqual([
@@ -159,8 +185,112 @@ test('model fingerprint is order independent and rearm marks top scored modules'
         { file: 'lib/y.ts' },
         { file: 'lib/x.ts' },
       ],
-      2
+      2,
+      '2026-11-05T00:00:00.000Z'
     )
   ).toBe(2);
   expect(s.modules['lib/billing/a.ts'].at).toBe(new Date(0).toISOString());
+  expect(s.modules['lib/billing/a.ts'].rearmedAt).toBe(
+    '2026-11-05T00:00:00.000Z'
+  );
+  expect(s.modules['lib/x.ts'].rearmedAt).toBe('2026-11-05T00:00:00.000Z');
+  expect(s.modules['lib/y.ts']).toEqual(state.modules['lib/y.ts']);
 });
+
+test('successive model re-arms retain the latest request in either observation order', () => {
+  const file = 'lib/billing/a.ts';
+  const current = {
+    ...emptyState(),
+    modules: {
+      [file]: {
+        ...state.modules[file],
+        at: '2026-11-01T00:00:00.000Z',
+      },
+    },
+  };
+  const baseline = structuredClone(current);
+  rearmTop(current, [{ file }], 1, '2026-11-05T00:00:00.000Z');
+  const previous = structuredClone(current);
+  const latest = '2026-11-06T00:00:00.000Z';
+  expect(rearmTop(current, [{ file }], 1, latest)).toBe(1);
+  for (const observations of [
+    [current, previous, baseline],
+    [baseline, previous, current],
+    [previous, current, baseline],
+  ]) {
+    const folded = mergeStates(...observations, previous, baseline);
+    expect(folded.modules[file].rearmedAt).toBe(latest);
+    expect(folded.modules[file].at).toBe(new Date(0).toISOString());
+  }
+});
+
+test.each([
+  ['scored', { mutants: [{ status: 'Killed' }, { status: 'Survived' }] }],
+  ['error', { error: 'Stryker timed out' }],
+  ['error', {}],
+])(
+  'a newer %s outcome retires a re-arm through repeated baseline folds',
+  (status, outcome) => {
+    const file = 'lib/billing/a.ts';
+    const candidate = { file, blob: 'blob', testCount: 1 };
+    const before = '2026-11-01T00:00:00.000Z';
+    const rearmedAt = '2026-11-05T00:00:00.000Z';
+    const after = '2026-11-06T00:00:00.000Z';
+    const current = emptyState();
+    recordRun(current, file, {
+      blob: candidate.blob,
+      sha: 'a'.repeat(40),
+      at: before,
+      durationMs: 1,
+      mutants: [{ status: 'Survived' }],
+    });
+    const baseline = structuredClone(current);
+    expect(rearmTop(current, [{ file }], 1, rearmedAt)).toBe(1);
+    const pending = structuredClone(current);
+    for (const observations of [
+      [current, baseline],
+      [baseline, current],
+    ]) {
+      const folded = mergeStates(...observations, baseline);
+      expect(folded.modules[file].rearmedAt).toBe(rearmedAt);
+      expect(
+        pickBatch(folded, [candidate], {
+          max: 1,
+          now: Date.parse(rearmedAt),
+        })
+      ).toEqual([file]);
+    }
+    const terminal = recordRun(current, file, {
+      blob: candidate.blob,
+      sha: 'b'.repeat(40),
+      at: after,
+      durationMs: 2,
+      ...outcome,
+    });
+    expect(terminal.status).toBe(status);
+    expect(terminal).not.toHaveProperty('rearmedAt');
+    expect(terminal.score).toBe(status === 'scored' ? 50 : null);
+    for (const observations of [
+      [current, pending, baseline],
+      [pending, baseline, current],
+      [baseline, current, pending],
+    ]) {
+      const folded = mergeStates(...observations, pending, baseline);
+      expect(folded.modules[file]).toEqual(terminal);
+      expect(
+        pickBatch(folded, [candidate], {
+          max: 1,
+          now: Date.parse(after),
+        })
+      ).toEqual([]);
+      if (status === 'error') {
+        expect(
+          pickBatch(folded, [candidate], {
+            max: 1,
+            now: Date.parse(after) + 86_400_000,
+          })
+        ).toEqual([file]);
+      }
+    }
+  }
+);

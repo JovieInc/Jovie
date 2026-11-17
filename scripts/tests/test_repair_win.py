@@ -37,6 +37,9 @@ class CompanyGuardPinWinTests(unittest.TestCase):
     def test_generated_evidence_fixes_fleet_and_reproduces_the_upstream_measurement(self):
         win = repair_win.company_guard_pin(self.files, self.comparison, adopted_comparison=self.adopted)
         self.assertIn("| commits | lower | 1 | 0 |", win)
+        self.assertIn("- Claim: Bring the shared company guard pin up to the verified upstream target.\n", win)
+        self.assertEqual(win.count("- Metric:"), 1)
+        self.assertNotIn("public-app certification", win)
         self.assertIn(f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{self.OLD}...{self.NEW} --jq .ahead_by", win)
         self.assertIn("- Verify: " + self.comparison["html_url"], win)
         self.assertNotIn("- Per-merge: yes", win)
@@ -124,6 +127,165 @@ console.log(JSON.stringify(['', win].map(body => evaluateFleetRules({
                         [{**self.files[0], "patch": patch.replace(f"-# ci-ref: {self.OLD}\n", "")}]]:
             with self.subTest(files=changed), self.assertRaises(ValueError):
                 repair_win.company_guard_pin(changed, self.comparison, adopted_comparison=self.adopted)
+
+    def cert_patch(self, old, new):
+        return (
+            "@@ -12,4 +12,4 @@\n"
+            f"-    uses: JovieInc/ci/.github/workflows/public-app-certification.yml@{old}\n"
+            f"+    uses: JovieInc/ci/.github/workflows/public-app-certification.yml@{new}\n"
+            f"-      ci-ref: {old}\n"
+            f"+      ci-ref: {new}\n")
+
+    def cert_file(self, old, new):
+        return {"filename": ".github/workflows/public-app-certification.yml", "status": "modified",
+                "patch": self.cert_patch(old, new)}
+
+    def compare(self, old, new, ahead):
+        shas = [format(index, "x").rjust(40, "e") for index in range(ahead - 1)] + [new]
+        return {"status": "ahead", "ahead_by": ahead, "behind_by": 0, "total_commits": ahead,
+                "base_commit": {"sha": old}, "merge_base_commit": {"sha": old},
+                "commits": [{"sha": sha} for sha in shas],
+                "html_url": f"https://github.com/JovieInc/ci/compare/{old}...{new}"}
+
+    def test_certification_companion_uses_its_own_commit_count(self):
+        cert_old = "c" * 40
+        guards = self.compare(self.OLD, self.NEW, 2)
+        cert = self.compare(cert_old, self.NEW, 1)
+        win = repair_win.company_guard_pin(
+            [*self.files, self.cert_file(cert_old, self.NEW)], guards, adopted_comparison=self.adopted,
+            certification_comparison=cert, certification_adopted=self.adopted)
+        self.assertIn("- Claim: Bring the shared company guard and public-app certification pins "
+                      "up to the verified upstream target.\n", win)
+        self.assertIn("upstream guard commits behind target | commits | lower | 2 | 0 |", win)
+        self.assertIn("upstream certification commits behind target | commits | lower | 1 | 0 |", win)
+        self.assertIn(f"compare/{cert_old}...{self.NEW}", win)
+        self.assertIn("- Verify: " + guards["html_url"], win)
+        self.assertEqual(win.count("- Metric:"), 2)
+        self.assertNotIn("- Per-merge: yes", win)
+        self.assertNotIn("- Pending: yes", win)
+
+    def test_machine_files_keep_the_one_workflow_measurement(self):
+        extra = [{"filename": name, "status": status} for name, status in (
+            ("scripts/lanes/repair_win.py", "modified"),
+            ("scripts/lanes/fix_red_measured_win.py", "added"),
+            ("scripts/tests/test_repair_win.py", "modified"))]
+        win = repair_win.company_guard_pin([*self.files, *extra], self.comparison, adopted_comparison=self.adopted)
+        self.assertIn("- Claim: Bring the shared company guard pin up to the verified upstream target.\n", win)
+        self.assertEqual(win.count("- Metric:"), 1)
+
+    def test_unrelated_or_removed_files_keep_the_one_workflow_error(self):
+        for extra in (
+            {"filename": "apps/web/app/page.tsx", "status": "modified"},
+            {"filename": "scripts/lanes/repair_win.py", "status": "removed"},
+            {"filename": ".github/workflows/public-app-certification.yml", "status": "added"},
+            "not-a-file",
+        ):
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "one modified workflow pin"):
+                repair_win.company_guard_pin([*self.files, extra], self.comparison, adopted_comparison=self.adopted)
+
+    def test_certification_evidence_uses_its_own_errors(self):
+        cert_old = "c" * 40
+        files = [*self.files, self.cert_file(cert_old, self.NEW)]
+        cert = self.compare(cert_old, self.NEW, 1)
+        with self.assertRaisesRegex(ValueError, "own upstream comparison"):
+            repair_win.company_guard_pin(files, self.comparison, adopted_comparison=self.adopted)
+        with self.assertRaisesRegex(ValueError, "certification workflow"):
+            repair_win.company_guard_pin(self.files, {**self.comparison, "ahead_by": 0},
+                                        adopted_comparison=self.adopted, certification_comparison=cert)
+        with self.assertRaisesRegex(ValueError, "upstream comparison must completely match"):
+            repair_win.company_guard_pin(files, {**self.comparison, "ahead_by": 0}, adopted_comparison=self.adopted,
+                                        certification_comparison=cert, certification_adopted=self.adopted)
+        moved = self.cert_file(cert_old, "d" * 40)
+        with self.assertRaisesRegex(ValueError, "public-app certification") as caught:
+            repair_win.company_guard_pin([*self.files, moved], self.comparison, adopted_comparison=self.adopted,
+                                        certification_comparison=cert, certification_adopted=self.adopted)
+        self.assertNotIn("adopted target", str(caught.exception))
+        with self.assertRaisesRegex(ValueError, "adopted certification") as caught:
+            repair_win.company_guard_pin(files, self.comparison, adopted_comparison=self.adopted,
+                                        certification_comparison=cert,
+                                        certification_adopted={**self.adopted, "status": "ahead"})
+        self.assertNotIn("adopted target", str(caught.exception))
+
+
+class MeasuredWinPublishTests(unittest.TestCase):
+    def files(self):
+        case = CompanyGuardPinWinTests()
+        case.setUp()
+        return case
+
+    def shell(self, case, pages, body_holder):
+        def sh(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body_holder[0])
+            if args[:2] == ["pr", "edit"]:
+                body_holder[0] = Path(args[args.index("--body-file") + 1]).read_text()
+                return SimpleNamespace(returncode=0, stdout="")
+            if args[0] == "api" and "--slurp" in args:
+                return SimpleNamespace(returncode=0, stdout=json.dumps(pages))
+            if args[0] == "api" and "/compare/" in args[-1]:
+                spec = args[-1].rsplit("/compare/", 1)[-1]
+                old, new = spec.split("...")
+                if old == new:
+                    payload = case.adopted
+                elif old == case.OLD:
+                    payload = case.comparison
+                else:
+                    return SimpleNamespace(returncode=1, stdout="")
+                return SimpleNamespace(returncode=0, stdout=json.dumps(payload))
+            return SimpleNamespace(returncode=1, stdout="")
+        return sh
+
+    def test_publish_writes_one_win_and_a_second_call_does_not_edit(self):
+        import fix_red_measured_win
+        case = self.files()
+        body = ["Summary\n"]
+        sh = self.shell(case, [case.files], body)
+        self.assertTrue(fix_red_measured_win.publish({"number": 25543}, sh))
+        self.assertIn("## Win", body[0])
+        self.assertEqual(body[0].count("customer-changelog/v1"), 1)
+        self.assertIn("| commits | lower | 1 | 0 |", body[0])
+        self.assertFalse(fix_red_measured_win.publish({"number": 25543}, sh))
+
+    def test_apply_skips_the_claim_until_the_diff_is_a_pin(self):
+        import fix_red_measured_win
+        calls, claimed = [], []
+
+        def sh(args):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout=json.dumps([[
+                {"filename": "README.md", "status": "modified", "patch": "+x\n"}]]))
+
+        reason = fix_red_measured_win.apply(
+            None, {"number": 25543}, lambda *args: claimed.append(args) or True, sh=sh)
+        self.assertIsNone(reason)
+        self.assertEqual(claimed, [])
+        self.assertFalse(any("/compare/" in str(args) for args in calls))
+        self.assertIsNone(fix_red_measured_win.optional_section({"number": 25543}, sh=sh))
+
+    def test_apply_claims_once_and_a_refused_claim_does_not_compare(self):
+        import fix_red_measured_win
+        case = self.files()
+        body = ["Summary\n"]
+        claimed = []
+        sh = self.shell(case, [case.files], body)
+        compared = []
+        original = sh
+
+        def tracking(args):
+            if args[0] == "api" and "/compare/" in args[-1]:
+                compared.append(args[-1])
+            return original(args)
+
+        reason = fix_red_measured_win.apply(
+            None, {"number": 25543}, lambda *args: claimed.append(args) or True, sh=tracking)
+        self.assertEqual(reason, "infra-rerun:measured-win")
+        self.assertEqual(claimed, [(None, {"number": 25543}, "repair-win")])
+        self.assertIn("## Win", body[0])
+        compared.clear()
+        refused = fix_red_measured_win.apply(
+            None, {"number": 25543}, lambda *args: False, sh=tracking)
+        self.assertIsNone(refused)
+        self.assertEqual(compared, [])
 
 
 class MeasuredWinPolicyTests(unittest.TestCase):

@@ -77,10 +77,6 @@
   "apps/web/components/features/admin/capacity/CapacityBoard.tsx": {
     "billing_claim": 3
   },
-  "apps/web/components/features/auth/AuthOfferSummary.tsx": {
-    "trial_claim": 2,
-    "billing_claim": 1
-  },
   "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
     "trial_claim": 1
   },
@@ -140,7 +136,7 @@
     "free_forever_claim": 1
   },
   "apps/web/data/homepageV2Copy.ts": {
-    "trial_claim": 3,
+    "trial_claim": 2,
     "no_card_claim": 1,
     "free_forever_claim": 1
   },
@@ -165,9 +161,6 @@
   "apps/web/data/product-truth/golden-path-proof.gen.json": {
     "free_forever_claim": 1,
     "refund_guarantee_claim": 3
-  },
-  "apps/web/data/product-truth/registry.ts": {
-    "trial_claim": 1
   },
   "apps/web/docs/auth-visual-audit-2026-05-09T031254Z.md": {
     "no_card_claim": 1

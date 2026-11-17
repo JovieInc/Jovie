@@ -239,7 +239,12 @@ describe('DashboardHeader', () => {
     expect(header).toHaveClass('bg-transparent');
     expect(header).not.toHaveClass('bg-(--app-shell-content-surface)');
     expect(header).toHaveAttribute('data-grid-anchor', 'desktop-content');
-    expect(header).toHaveAttribute('data-top-spacing-owner', 'shell-header');
+    // The controls reservation (JOV-7207) lives on the wrapper above the
+    // drag box, so the header keeps its owner without its border box
+    // stretching under the titlebar controls.
+    expect(
+      header.closest('[data-top-spacing-owner="shell-header"]')
+    ).not.toBeNull();
     expect(
       container.querySelector('.sm\\:px-\\(--app-shell-header-padding-x\\)')
     ).not.toBeNull();

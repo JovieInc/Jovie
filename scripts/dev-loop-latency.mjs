@@ -66,7 +66,11 @@ export function evaluateBudgets(results, budgets = BUDGETS) {
 }
 
 function git(...args) {
-  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+  return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
 }
 
 function timeStep(step) {

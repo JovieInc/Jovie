@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
@@ -16,6 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from './lib/child-process.mjs';
 import { snapshotSourceGuardActions } from './lib/source-guard-action-snapshot.mjs';
 import {
   applyExclusions,
@@ -34,6 +34,19 @@ import {
 } from './preflight.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function copyPreflightCli(destination) {
+  for (const file of [
+    'preflight.mjs',
+    'lib/preflight-depth.mjs',
+    'lib/preflight-shell.mjs',
+  ]) {
+    copyFileSync(
+      path.join(ROOT, 'scripts', file),
+      path.join(destination, 'scripts', file)
+    );
+  }
+}
 
 function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-hook-base-')));
@@ -853,14 +866,7 @@ test('pre-push Git environment cannot redirect fixture writes into its linked wo
     git(parent, 'config', 'user.email', 'parent@example.com');
     mkdirSync(path.join(parent, 'scripts', 'lib'), { recursive: true });
     mkdirSync(path.join(parent, '.github', 'workflows'), { recursive: true });
-    copyFileSync(
-      path.join(ROOT, 'scripts/preflight.mjs'),
-      path.join(parent, 'scripts/preflight.mjs')
-    );
-    copyFileSync(
-      path.join(ROOT, 'scripts/lib/preflight-depth.mjs'),
-      path.join(parent, 'scripts/lib/preflight-depth.mjs')
-    );
+    copyPreflightCli(parent);
     writeFileSync(path.join(parent, 'tracked.txt'), 'parent content\n');
     writeFileSync(
       path.join(parent, WORKFLOW_PATH),
@@ -1002,14 +1008,7 @@ function copiedCliFixture() {
   const real = path.join(root, 'real');
   const alias = path.join(root, 'alias');
   mkdirSync(path.join(real, 'scripts', 'lib'), { recursive: true });
-  copyFileSync(
-    path.join(ROOT, 'scripts/preflight.mjs'),
-    path.join(real, 'scripts/preflight.mjs')
-  );
-  copyFileSync(
-    path.join(ROOT, 'scripts/lib/preflight-depth.mjs'),
-    path.join(real, 'scripts/lib/preflight-depth.mjs')
-  );
+  copyPreflightCli(real);
   symlinkSync(
     path.join(ROOT, 'node_modules'),
     path.join(real, 'node_modules'),

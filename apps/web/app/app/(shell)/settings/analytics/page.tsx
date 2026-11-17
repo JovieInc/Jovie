@@ -15,11 +15,7 @@ export default function SettingsAnalyticsPage() {
   }
 
   return (
-    <SettingsSection
-      id='analytics'
-      title='Analytics'
-      description='Control how your visits appear in analytics.'
-    >
+    <SettingsSection id='analytics' title='Analytics'>
       <SettingsAnalyticsSection
         artist={artist}
         onArtistUpdate={setArtist}
