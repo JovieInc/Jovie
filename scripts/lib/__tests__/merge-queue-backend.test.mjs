@@ -1034,7 +1034,6 @@ describe('native live preflight', () => {
       drift: [],
     });
   });
-
   it('fails closed on a waited multi-entry cohort policy', () => {
     const retiredCohort = {
       ...VALID_RULESET,
@@ -1071,7 +1070,6 @@ describe('native live preflight', () => {
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
-
   it.each([
     1, 2, 3, 4,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
@@ -1094,7 +1092,6 @@ describe('native live preflight', () => {
       buildCount === 4 ? [] : ['max_entries_to_build']
     );
   });
-
   it.each([
     0,
     11,
@@ -1129,7 +1126,6 @@ describe('native live preflight', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toContain('max_entries_to_build');
   });
-
   it.each([
     ['check_response_timeout_minutes', 21],
     ['grouping_strategy', 'ALLGREEN'],
@@ -1158,7 +1154,6 @@ describe('native live preflight', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toContain(field);
   });
-
   it('does not fail enroll preflight when GraphQL live max_entries_to_build matches the lock', () => {
     const staleRest = {
       ...VALID_RULESET,
@@ -1182,7 +1177,6 @@ describe('native live preflight', () => {
     });
     expect(restOnly.ok).toBe(false);
     expect(restOnly.policyReadback.drift).toContain('max_entries_to_build');
-
     const liveGraphql = validateNativePreflightEvidence({
       ruleset: staleRest,
       repository: VALID_REPOSITORY,
@@ -1197,7 +1191,6 @@ describe('native live preflight', () => {
       observed: { max_entries_to_build: 4 },
     });
   });
-
   it('reads GraphQL mergeQueue.configuration during live preflight', async () => {
     const runner = createNativeRunner();
     const result = await preflightMergeQueue({
@@ -1258,7 +1251,6 @@ describe('native live preflight', () => {
         error.includes('check_response_timeout_minutes')
       )
     ).toBe(false);
-
     const actualTimeoutDrift = validateNativePreflightEvidence({
       ruleset: liveUntilCutover,
       repository: VALID_REPOSITORY,
@@ -1500,7 +1492,6 @@ describe('native live preflight', () => {
         write: vi.fn(),
       })
     ).rejects.toMatchObject({ code: 'native_preflight_failed' });
-
     await expect(
       runCli(['preflight'], {
         env: {
@@ -1512,7 +1503,6 @@ describe('native live preflight', () => {
         write: vi.fn(),
       })
     ).rejects.toMatchObject({ code: 'native_preflight_failed' });
-
     const retiredRunner = vi.fn();
     for (const args of [
       ['enroll', '14359', HEAD],
@@ -1581,7 +1571,6 @@ describe('native mutation actor boundary', () => {
       ],
     });
     const mutationRunner = createNativeRunner();
-
     await expect(
       enrollPullRequest(
         nativeOptions(readRunner, {
@@ -1590,7 +1579,6 @@ describe('native mutation actor boundary', () => {
         })
       )
     ).resolves.toMatchObject({ changed: true });
-
     expect(invokedMutationActorCheck(readRunner)).toBe(false);
     expect(invokedNativeMutation(readRunner)).toBe(false);
     expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
@@ -1619,7 +1607,6 @@ describe('native mutation actor boundary', () => {
       states: [queued, autoMergeOnly, prState()],
     });
     const mutationRunner = createNativeRunner();
-
     await expect(
       dequeuePullRequest(
         nativeOptions(readRunner, {
@@ -1627,7 +1614,6 @@ describe('native mutation actor boundary', () => {
         })
       )
     ).resolves.toMatchObject({ changed: true });
-
     expect(invokedMutationActorCheck(readRunner)).toBe(false);
     expect(invokedNativeMutation(readRunner)).toBe(false);
     expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
@@ -1648,7 +1634,6 @@ describe('native mutation actor boundary', () => {
     const runner = createNativeRunner({
       viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
     });
-
     await expect(
       runCli(['enroll', '14359', HEAD], {
         env: {
@@ -1678,7 +1663,6 @@ describe('native mutation actor boundary', () => {
     const runner = createNativeRunner({
       viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
     });
-
     await expect(invoke(runner)).rejects.toMatchObject({
       code: 'native_mutation_actor_unauthorized',
     });
@@ -1704,7 +1688,6 @@ describe('native mutation actor boundary', () => {
     ],
   ])('fails closed on %s evidence', async (_name, viewerPayload, code) => {
     const runner = createNativeRunner({ viewerPayload });
-
     await expect(enroll(runner)).rejects.toMatchObject({ code });
     expect(invokedNativeMutation(runner)).toBe(false);
   });
@@ -1716,7 +1699,6 @@ describe('native mutation actor boundary', () => {
       viewerPayload,
       states: [prState({ number: 99 })],
     });
-
     await expect(
       preflightMergeQueue({
         repository: REPOSITORY,
@@ -2201,7 +2183,6 @@ describe('native enrollment', () => {
         }),
       ],
     });
-
     await expect(
       enroll(runner, {
         postconditionAttempts: 6,
@@ -2228,7 +2209,6 @@ describe('native enrollment', () => {
         stderr: 'GraphQL: Pull request head SHA changed',
       },
     });
-
     await expect(
       enroll(runner, {
         postconditionAttempts: 2,
@@ -2403,7 +2383,6 @@ describe('native enrollment', () => {
     const runner = createNativeRunner({
       states: [prState({ isInMergeQueue: true, mergeQueueEntry })],
     });
-
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'incomplete_queue_state',
     });
@@ -2422,7 +2401,6 @@ describe('native enrollment', () => {
         stderr: 'GraphQL transport closed after dispatch',
       },
     });
-
     await expect(enroll(runner)).resolves.toMatchObject({
       changed: true,
       reconciledAfterCommandError: true,
@@ -2434,7 +2412,6 @@ describe('native enrollment', () => {
     const runner = createNativeRunner({
       states: [prState(), prState({ headRefOid: OTHER_HEAD })],
     });
-
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'head_changed',
     });
@@ -2446,7 +2423,6 @@ describe('native enrollment', () => {
       states: [prState(), prState()],
       enableResult: ok({ errors: [{ message: 'auto-merge unavailable' }] }),
     });
-
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
     ).rejects.toMatchObject({
@@ -2461,7 +2437,6 @@ describe('native enrollment', () => {
     const runner = createNativeRunner({
       states: [prState(), successOnly, successOnly],
     });
-
     await expect(
       enroll(runner, {
         postconditionAttempts: 2,
@@ -2556,16 +2531,27 @@ describe('native dequeue', () => {
     expect(invokedNativeMutation(runner)).toBe(false);
   });
 
-  it('draft cleanup requires a head and cannot disable newly ready auto-merge', async () => {
+  it.each([
+    ['ready with intent', { isDraft: false, autoMergeRequest: AUTO_MERGE }, 'dequeue_draft_raced'],
+    ['merged', { state: 'MERGED', isDraft: true }, 'dequeue_draft_raced'],
+    ['closed', { state: 'CLOSED', isDraft: true }, 'dequeue_draft_raced'],
+    ['unknown', { state: 'UNKNOWN', isDraft: true }, 'dequeue_draft_raced'],
+    ['ready without intent', { isDraft: false }, 'dequeue_draft_raced'],
+    ['replacement head', { headRefOid: OTHER_HEAD, isDraft: true }, 'dequeue_head_raced'],
+  ])('draft cleanup requires a head and rejects %s after dequeue', async (_name, terminal, code) => {
     await expect(dequeuePullRequest({ ...nativeOptions(vi.fn()), requireDraft: true }))
       .rejects.toMatchObject({ code: 'expected_head_required' });
     const queued = prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
-    const runner = createNativeRunner({ states: [queued, queued, prState({ isDraft: false, autoMergeRequest: AUTO_MERGE })] });
+    const runner = createNativeRunner({ states: [queued, queued, prState(terminal)] });
     await expect(reconcileDraftQueueEntry({ ...nativeOptions(runner), event: draftEvent() }))
-      .rejects.toMatchObject({ code: 'dequeue_draft_raced' });
+      .rejects.toMatchObject({ code });
     expect(runner.mock.calls.some(([args]) => queryText(args).includes('disablePullRequestAutoMerge'))).toBe(false);
   });
   it.each([
+    ['already merged outside queue', [prState({ state: 'MERGED', isDraft: true })]],
+    ['already closed outside queue', [prState({ state: 'CLOSED', isDraft: true })]],
+    ['unknown state outside queue', [prState({ state: 'UNKNOWN', isDraft: true })]],
+    ['ready outside queue', [prState({ isDraft: false })]],
     ['already ready', [prState({ isDraft: false, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })]],
     ['ready during revalidation', [
       prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY }),
@@ -2578,17 +2564,38 @@ describe('native dequeue', () => {
     expect(invokedNativeMutation(runner)).toBe(false);
   });
 
-  it('removes a stale draft queue entry without changing author readiness', async () => {
+  it.each([false, true])('removes a stale draft queue entry without changing author readiness (command error=%s)', async commandError => {
     const queued = prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
     const runner = createNativeRunner({ states: [queued, queued, prState({ isDraft: true })] });
-    await expect(dequeuePullRequest({ ...nativeOptions(runner), expectedHeadOid: HEAD, requireDraft: true }))
+    const invoke = async args => {
+      const result = await runner(args);
+      return commandError && queryText(args).includes('dequeuePullRequest')
+        ? { code: 1, stdout: '', stderr: 'fixture interrupted response' } : result;
+    };
+    await expect(dequeuePullRequest({ ...nativeOptions(invoke), expectedHeadOid: HEAD, requireDraft: true }))
       .resolves.toMatchObject({ changed: true, guardedQueueEntry: { id: ENTRY_ID }, state: { isDraft: true, headRefOid: HEAD, mergeQueueEntry: null } });
     expect(runner.mock.calls.filter(([args]) => queryText(args).includes('dequeuePullRequest'))).toHaveLength(1);
   });
 
+  it.each([{ state: 'MERGED', isDraft: true }, { state: 'OPEN', isDraft: false }])('draft cleanup rejects a raced auto-merge disable readback: %j', async terminal => {
+    const queued = prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
+    const runner = createNativeRunner({ states: [queued, queued, prState({ isDraft: true, autoMergeRequest: AUTO_MERGE }), prState(terminal)] });
+    await expect(reconcileDraftQueueEntry({ ...nativeOptions(runner), event: draftEvent() })).rejects.toMatchObject({ code: 'dequeue_draft_raced' });
+    expect(runner.mock.calls.filter(([args]) => queryText(args).includes('disablePullRequestAutoMerge'))).toHaveLength(1);
+  });
+  it.each(['OPEN', 'MERGED', 'CLOSED', 'UNKNOWN'])('generic absent-entry dequeue preserves %s state', async state => {
+    const runner = createNativeRunner({ states: [prState({ state, isDraft: true })] });
+    await expect(dequeue(runner)).resolves.toMatchObject({ changed: false, state: { state, isDraft: true } });
+    expect(invokedNativeMutation(runner)).toBe(false);
+    if (state === 'OPEN') {
+      const draftRunner = createNativeRunner({ states: [prState({ isDraft: true })] });
+      await expect(dequeuePullRequest({ ...nativeOptions(draftRunner), expectedHeadOid: HEAD, requireDraft: true })).resolves.toMatchObject({ changed: false, state: { state: 'OPEN', isDraft: true, headRefOid: HEAD } });
+      expect(invokedNativeMutation(draftRunner)).toBe(false);
+    }
+  });
+
   it('rejects guarded CLI dequeue without the sole-writer authorization', async () => {
     const runner = vi.fn();
-
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
         env: {
@@ -2658,7 +2665,6 @@ describe('native dequeue', () => {
     });
     const mutationRunner = createNativeRunner();
     const write = vi.fn();
-
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
         env: {
@@ -2677,7 +2683,6 @@ describe('native dequeue', () => {
         enqueuedAt: QUEUE_ENTRY.enqueuedAt,
       },
     });
-
     expect(
       readRunner.mock.calls.filter(([args]) =>
         queryText(args).includes('MergeQueuePullRequestState')
@@ -2712,7 +2717,6 @@ describe('native dequeue', () => {
       ],
     });
     const mutationRunner = createNativeRunner();
-
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
         env: {
@@ -2749,7 +2753,6 @@ describe('native dequeue', () => {
     });
     const readRunner = createNativeRunner({ states: [queued, replaced] });
     const mutationRunner = createNativeRunner();
-
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
         env: {
@@ -2786,7 +2789,6 @@ describe('native dequeue', () => {
       ],
     });
     const mutationRunner = createNativeRunner();
-
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
         env: {
@@ -2838,7 +2840,6 @@ describe('exact-head queue receipt proof', () => {
       ok: true,
       reason: 'queued',
     });
-
     const runner = createNativeRunner({ states: [state] });
     await expect(
       proveExactHeadQueueReceipt(
@@ -2869,7 +2870,6 @@ describe('exact-head queue receipt proof', () => {
         }),
       ],
     });
-
     await expect(
       proveExactHeadQueueReceipt(
         nativeOptions(runner, {
