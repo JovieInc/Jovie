@@ -24,13 +24,15 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import {
-  DspQuietRow,
+  DspEntityRow,
   InfoPopover,
   OverflowMenu,
 } from '@/components/molecules/inspector';
 import { ReleaseActionErrorCard } from '@/components/organisms/release-sidebar/ReleaseActionErrorCard';
+import { BASE_URL } from '@/constants/domains';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
+import { buildDestinationJovieLink } from '@/lib/links/destination-links';
 import { cn } from '@/lib/utils';
 
 import type { Release, ReleaseSidebarActionError } from './types';
@@ -109,10 +111,25 @@ export function ReleaseDspLinks({
                 data-dsp-status='linked'
                 data-provider={provider.key}
               >
-                <DspQuietRow
+                <DspEntityRow
                   className='min-w-0 flex-1'
                   label={label}
                   href={provider.url}
+                  entity={{
+                    kind: 'release',
+                    id: release.id,
+                    label: release.title,
+                    thumbnail: release.artworkUrl ?? undefined,
+                    artist: release.artistNames?.[0],
+                    releaseType: release.releaseType,
+                    releaseDate: release.releaseDate,
+                  }}
+                  jovieLinkUrl={buildDestinationJovieLink({
+                    baseUrl: BASE_URL,
+                    linkPath: release.smartLinkPath,
+                    destinationKey: provider.key,
+                    surface: 'release-sidebar',
+                  })}
                   icon={
                     <ProviderIcon
                       provider={provider.key}
@@ -149,7 +166,7 @@ export function ReleaseDspLinks({
             const config = providerConfig[key];
             const label = config?.label || key;
             return (
-              <DspQuietRow
+              <DspEntityRow
                 key={`missing-${key}`}
                 label={label}
                 testId={`dsp-find-${key}`}

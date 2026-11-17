@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -143,16 +144,25 @@ describe('EntityRail', () => {
     );
   });
 
-  it('reveals property copy controls in the same right gutter', () => {
+  it('copies copyable property values on click of the value itself (founder note 2026-11-09)', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
     renderReleaseRail();
-    const isrcRow = screen
-      .getAllByTestId('entity-rail-property-row')
-      .find(row => row.textContent?.includes('USRC17607839'));
-    expect(isrcRow).toBeDefined();
-    expect(isrcRow?.className).toContain('group');
-    const copy = screen.getByRole('button', { name: 'Copy ISRC' });
-    expect(isrcRow).toContainElement(copy);
-    // Rows without a copyValue keep the gutter empty, aligned with the rest.
+
+    // The copyable property's VALUE is the control; no separate gutter icon
+    // to hunt for.
+    const valueButton = screen.getByRole('button', {
+      name: 'Copy ISRC: USRC17607839',
+    });
+    await user.click(valueButton);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('USRC17607839'));
+
+    // Rows without a copyValue keep a non-interactive value.
     const statusRow = screen
       .getAllByTestId('entity-rail-property-row')
       .find(row => row.textContent?.includes('Live'));

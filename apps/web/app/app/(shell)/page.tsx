@@ -6,7 +6,9 @@ import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 
 const DASHBOARD_DESCRIPTION =
   'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
-const DASHBOARD_TITLE = 'Home';
+// The document title matches the header breadcrumb and rail label (Inbox),
+// per shell-ia.md — one name for the destination.
+const DASHBOARD_TITLE = 'Inbox';
 
 export function generateMetadata(): Metadata {
   return {

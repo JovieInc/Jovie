@@ -228,7 +228,11 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
         >
           <span className='ask-jovie-mark-icon inline-flex shrink-0'>
             <BrandLogo
-              size={24}
+              // Rail siblings (bell, search) render at
+              // --app-shell-sidebar-icon-size (1rem). 'compact' (16) is the
+              // locked-ladder rung that matches them; the old ad-hoc 24
+              // out-grew its own header row (shell-ia.md: O · bell · search).
+              size='compact'
               tone='auto'
               variant={variant}
               rounded={false}

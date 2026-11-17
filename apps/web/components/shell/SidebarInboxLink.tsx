@@ -18,7 +18,9 @@ export function SidebarInboxLink({
 }: {
   readonly availability?: InboxNavigationAvailability;
 }) {
-  const pending = availability?.state === 'available';
+  const pendingCount =
+    availability?.state === 'available' ? availability.pendingCount : 0;
+  const pending = pendingCount > 0;
   const label = pending
     ? `Inbox — ${formatInboxPendingWorkLabel(availability?.pendingCount ?? 0)}`
     : availability?.state === 'empty'
@@ -41,10 +43,12 @@ export function SidebarInboxLink({
         />
         {pending ? (
           <span
-            data-inbox-unread='true'
+            data-inbox-count='true'
             aria-hidden='true'
-            className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
-          />
+            className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent tabular-nums text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
+          >
+            {Math.min(pendingCount, 99)}
+          </span>
         ) : null}
       </Link>
     </Tooltip>

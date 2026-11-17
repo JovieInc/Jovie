@@ -19,6 +19,12 @@ const meta = {
     jovie: { uncoveredProps: ['emptyMessage', 'title'] },
   },
   args: {
+    track: {
+      id: 'track-example',
+      title: 'Midnight Drive',
+      durationMs: 193_000,
+      smartLinkPath: '/example/midnight-drive',
+    },
     findQuery: 'Midnight Drive',
     providers: [
       {

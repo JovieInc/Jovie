@@ -91,7 +91,7 @@ import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
-  DspQuietRow,
+  DspEntityRow,
   InspectorEmpty,
   InspectorRow,
   InspectorSection,
@@ -172,6 +172,7 @@ import { releaseStatusDotClasses } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { scopeWorkInspectorBundle } from '@/lib/library/work-inspector-read-model';
+import { workDestinationRowProps } from '@/lib/links/work-destination';
 import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
@@ -250,12 +251,10 @@ const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
-const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
-  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
-const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
-  LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-  'w-8 min-w-8'
-);
+// The toolbar rides the app-wide PageToolbar control scale (28px buttons,
+// 30px tabs); the former 32px local density is retired with the rest of the
+// one-bar unification.
+const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = 'w-7 min-w-7';
 
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
@@ -782,7 +781,6 @@ function LibraryStageTabs({
           ariaControls='library-catalog-panel'
           onKeyDown={handleTabKeyDown}
           onClick={() => onStage(tab)}
-          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
     </div>
@@ -1623,7 +1621,7 @@ const AssetCard = memo(function AssetCard({
           </div>
           <div className='min-w-0 px-3 pb-3 pt-2'>
             <div className='flex min-w-0 items-center gap-1.5'>
-              <h2 className='system-b-library-card-title min-w-0 flex-1 truncate'>
+              <h2 className='system-b-library-card-title line-clamp-2 min-w-0 flex-1'>
                 {asset.title}
               </h2>
               <LibraryStatusGlyph asset={asset} className='shrink-0' />
@@ -2140,7 +2138,7 @@ function ApprovalStatusEditor({
           disabled={isDisabled}
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
+            '-ml-1 inline-flex h-6 min-h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
@@ -2728,12 +2726,13 @@ function AssetDrawer({
                   <InspectorSection title='Destinations' className='py-3'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (
-                        <DspQuietRow
+                        <DspEntityRow
                           key={`${current.id}-${provider.key}`}
-                          className='system-b-library-provider-link'
+                          className='system-b-library-provider-link min-h-6'
                           label={provider.label}
                           href={provider.url}
                           closedTabIndex={closedTabIndex}
+                          {...workDestinationRowProps(current, provider.key)}
                           icon={
                             <ProviderIcon
                               provider={provider.key as ProviderKey}
