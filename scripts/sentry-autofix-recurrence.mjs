@@ -49,8 +49,43 @@ export async function runSentryRecurrenceObservations({
   };
 }
 
+// JOV-6813 (2026-11-16 15:43Z): one transient gh HTTP 503 while downloading a
+// production-marker artifact failed the whole hourly run as
+// verified_production_artifact_unavailable; the two prior hourly runs passed.
+// Retry the run on exactly that reason (3 attempts, fixed backoffs). The retry
+// is write-safe: a conclusion receipt is only recorded when the exact body is
+// not already on the issue (already_recorded), so a retried observation never
+// double-records. Every other reason returns after one attempt, and after the
+// last attempt the original failure stands -- nothing is skipped or softened.
+const RUN_ATTEMPT_DELAYS_MS = [500, 1_500];
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Retry the observation run only while it fails to read the production
+ * artifact evidence; a deterministic failure returns after one attempt.
+ * @param {Parameters<typeof runSentryRecurrenceObservations>[0]} [options]
+ * @param {number[]} [delaysMs] sleep before retry attempt N (attempts 2..N+1)
+ * @returns {ReturnType<typeof runSentryRecurrenceObservations>}
+ */
+export async function runSentryRecurrenceObservationsWithRetry(
+  options,
+  delaysMs = RUN_ATTEMPT_DELAYS_MS
+) {
+  let last;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
+    if (attempt > 0) sleepSync(delaysMs[attempt - 1]);
+    last = await runSentryRecurrenceObservations(options);
+    if (last.ok || last.reason !== 'verified_production_artifact_unavailable')
+      return last;
+  }
+  return last;
+}
+
 async function main() {
-  const result = await runSentryRecurrenceObservations({});
+  const result = await runSentryRecurrenceObservationsWithRetry({});
   console.log(JSON.stringify(result));
   if (!result.ok) throw new Error(result.reason);
 }

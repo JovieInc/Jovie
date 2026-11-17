@@ -266,7 +266,7 @@ describe('outcome → primitive → replaceable source', () => {
       drafts.find(item => item.primitive.kind === 'action')?.decision.kind
     ).toBe('no_action');
   });
-  it('trials and promotes a newly discovered supplier under the same contract, then replaces it', () => {
+  it('retains measured suppliers under the same contract pending owner certification', () => {
     const first = supplier();
     const initial = compilePresenceOutcome(command(), NOW);
     const measured = compilePresenceOutcome(
@@ -276,7 +276,7 @@ describe('outcome → primitive → replaceable source', () => {
     );
     expect(bio(measured)).toMatchObject({
       enabled: false,
-      decision: { kind: 'promote', supplierDigest: supplierDigest(first) },
+      decision: { kind: 'no_action', supplierDigest: null },
       state: 'unknown',
     });
     expect(bio(measured).trials[0].realized).toEqual(metrics);
@@ -292,7 +292,7 @@ describe('outcome → primitive → replaceable source', () => {
       )
     );
     expect(replaced.primitive).toEqual(primitive);
-    expect(replaced.decision.supplierDigest).toBe(supplierDigest(replacement));
+    expect(replaced.decision.kind).toBe('no_action');
     expect(replaced.trials).toHaveLength(2);
     expect(
       bio(compilePresenceOutcome(command({ suppliers: [] }), NOW, [replaced]))
@@ -386,7 +386,7 @@ describe('outcome → primitive → replaceable source', () => {
       ).state
     ).toBe('partial');
   });
-  it('invalidates dependent facts when a supplier is revoked or its policy changes', () => {
+  it('does not trust uncertified source facts, including after revocation', () => {
     const source = supplier();
     const observed = fact({
       sourceRef: 'provider:observation',
@@ -398,8 +398,8 @@ describe('outcome → primitive → replaceable source', () => {
           command({ facts: [observed], suppliers: [source] }),
           NOW
         )
-      )
-    ).toBeUndefined();
+      ).state
+    ).toBe('unknown');
     expect(
       bio(
         compilePresenceOutcome(
@@ -472,7 +472,7 @@ describe('outcome → primitive → replaceable source', () => {
   });
 });
 
-it('prefers measured lower-cost routes and deterministically breaks supplier ties', () => {
+it('requires owner certification even for measured lower-cost routes', () => {
   const costly = supplier('costly');
   const cheap = supplier('cheap');
   const tie = supplier('z-last');
@@ -487,8 +487,8 @@ it('prefers measured lower-cost routes and deterministically breaks supplier tie
       trial(cheap, { id: 'cheap' }),
     ],
   });
-  expect(bio(compilePresenceOutcome(input, NOW)).decision.supplierDigest).toBe(
-    supplierDigest(cheap)
+  expect(bio(compilePresenceOutcome(input, NOW)).decision.kind).toBe(
+    'no_action'
   );
 });
 
@@ -529,7 +529,7 @@ describe('durable disabled capability drafts in the existing governor', () => {
     const row = promoted.rows.find(
       item => item.plan.capabilityDraft?.primitive.id === primitive.id
     )!;
-    expect(row.plan.capabilityDraft?.decision.kind).toBe('promote');
+    expect(row.plan.capabilityDraft?.decision.kind).toBe('no_action');
     await expect(
       h.send({ op: 'claim', id: row.plan.id, worker: 'worker' })
     ).rejects.toThrow('allocation-not-ready');
