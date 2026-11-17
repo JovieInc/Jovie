@@ -19,7 +19,7 @@ export function SidebarInboxLink({
   readonly availability?: InboxNavigationAvailability;
 }) {
   const pendingCount =
-    availability?.state === 'available' ? availability.pendingCount : 0;
+    availability?.state === 'available' ? (availability.pendingCount ?? 0) : 0;
   const pending = pendingCount > 0;
   const label = pending
     ? `Inbox — ${formatInboxPendingWorkLabel(availability?.pendingCount ?? 0)}`

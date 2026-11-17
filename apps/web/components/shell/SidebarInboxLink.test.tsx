@@ -121,6 +121,12 @@ describe('central Inbox bell', () => {
     expect(document.querySelector('[data-inbox-count]')).toBeNull();
     rerender(
       <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: null }}
+      />
+    );
+    expect(document.querySelector('[data-inbox-count]')).toBeNull();
+    rerender(
+      <SidebarInboxLink
         availability={{ state: 'unknown', pendingCount: null }}
       />
     );
