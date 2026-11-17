@@ -11,6 +11,7 @@ import {
   canonicalJourneyChecks,
   type M2Receipt,
   readJson,
+  reportCanonicalCertificate,
   stepPassed,
 } from './certify-canonical-artist-site-evidence';
 import {
@@ -295,7 +296,12 @@ export function certifyCanonicalArtistSite(
     deferredHidden = true;
     deferredDetail =
       'Scanned markers were absent: pay-trigger, profile-mode-drawer-pay, profile-pay-recipient, tip-button, tip-drawer, ask-jovie launcher, operator-banner, and operator-lists-nav. Deep audience intelligence has no public marker.';
-  } else if (profileHealthy && !revisionBound) {
+  } else if (
+    profileHealthy &&
+    !revisionBound &&
+    Array.isArray(exposedDeferred) &&
+    exposedDeferred.length === 0
+  ) {
     deferredDetail = revisionDetail;
     deferredDefect = 'canonical-artist-site-source-revision';
   }
@@ -341,7 +347,9 @@ export function certifyCanonicalArtistSite(
   ];
   const navigationDetail = navigationOk
     ? 'Live mobile and desktop Events → Home → 15-second wait → reload and Back/Forward passed on the observed profile revision.'
-    : 'Live mobile/desktop profile navigation failed, was skipped, or lacks bound profile evidence.';
+    : revisionDeferral && navigationPassed
+      ? revisionDetail
+      : 'Live mobile/desktop profile navigation failed, was skipped, or lacks bound profile evidence.';
   const identityOk = profilePassed && claimOk;
   const hierarchyOk = profilePassed && goldenPassed;
   const releaseOk = referenceReleasePassed && goldenPassed;
@@ -351,14 +359,20 @@ export function certifyCanonicalArtistSite(
       identityOk,
       identityOk
         ? profileDetail
-        : `${profileDetail} ${journeyDetail} ${claimDetail}`,
+        : claimOk
+          ? `${profileDetail} ${journeyDetail} ${claimDetail}`
+          : `${journeyDetail} ${claimDetail} ${profileDetail}`,
       [...profileEvidence, ...claimAndJourney],
       boundDefect(profileHealthy && claimOk)
     ),
     row(
       'profile_hierarchy',
       hierarchyOk,
-      hierarchyOk ? profileDetail : `${profileDetail} ${journeyDetail}`,
+      hierarchyOk
+        ? profileDetail
+        : goldenPassed
+          ? `${profileDetail} ${journeyDetail}`
+          : `${journeyDetail} ${profileDetail}`,
       profileAndJourney,
       boundDefect(profileHealthy && goldenPassed)
     ),
@@ -374,7 +388,10 @@ export function certifyCanonicalArtistSite(
       releaseOk,
       releaseOk
         ? 'The live Never Say a Word release and artist loop are reachable.'
-        : profileHealthy && !revisionBound && referenceReleaseReachable
+        : profileHealthy &&
+            !revisionBound &&
+            referenceReleaseReachable &&
+            goldenPassed
           ? revisionDetail
           : 'The live Never Say a Word reference release loop did not pass.',
       profileAndJourney,
@@ -401,7 +418,9 @@ export function certifyCanonicalArtistSite(
     row(
       'refresh_back_retry',
       claimOk && navigationOk,
-      `${claimText} ${navigationDetail}`,
+      revisionDeferral && claimOk && navigationPassed
+        ? revisionDetail
+        : `${claimText} ${navigationDetail}`,
       [...claimAndJourney, ...navigationEvidence],
       'canonical-artist-site-refresh-back-retry'
     ),
@@ -468,29 +487,10 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     const certificate = certifyCanonicalArtistSite(
       parseOptions(process.argv.slice(2))
     );
-    console.log(certificate.statusLine);
-    for (const failure of certificate.failingChecks) {
-      console.error(`${failure.id}: ${failure.detail}`);
-    }
-    for (const failure of certificate.evidenceIntegrityFailures) {
-      console.error(`evidence: ${failure}`);
-    }
-    const deferred = certificate.checks.some(check =>
-      check.detail.startsWith('github-quota-deferred:')
+    process.exitCode = reportCanonicalCertificate(
+      certificate,
+      LINEAGE_DEFERRAL_DETAIL
     );
-    if (deferred) {
-      // The repository's quota-deferral convention (runWithGitHubRetry): a
-      // transport state, never a verdict on the change (JOV-12646). The
-      // written certificate stays RED — nothing certifies on an unbound
-      // revision — but the deferral must be visible without turning Golden
-      // Path (manual) red. Re-running after the quota reset re-reads lineage.
-      console.error(
-        `::warning title=github-quota-deferred::${LINEAGE_DEFERRAL_DETAIL}`
-      );
-      process.exitCode = 0;
-    } else if (!certificate.safeToSend) {
-      process.exitCode = 1;
-    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

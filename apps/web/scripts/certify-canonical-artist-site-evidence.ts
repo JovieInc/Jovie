@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { CanonicalArtistSiteCertification } from '@/lib/acquisition/canonical-artist-site-certification';
 import { countJourneyTests } from '../../../scripts/lib/journey-evidence-builder.mjs';
 
 export interface M2Receipt {
@@ -53,4 +54,30 @@ export function canonicalJourneyChecks(
       specOk('golden-path.spec.ts')
     : goldenPassed;
   return { billingJourneyOk, freeStateOk };
+}
+
+/** Lineage unavailability cannot hide a failed product or invalid receipt. */
+export function reportCanonicalCertificate(
+  certificate: CanonicalArtistSiteCertification,
+  lineageDeferralDetail: string
+): number {
+  console.log(certificate.statusLine);
+  for (const failure of certificate.failingChecks) {
+    console.error(`${failure.id}: ${failure.detail}`);
+  }
+  for (const failure of certificate.evidenceIntegrityFailures) {
+    console.error(`evidence: ${failure}`);
+  }
+  const isDeferred = (check: { detail: string }) =>
+    check.detail.startsWith('github-quota-deferred:');
+  if (certificate.checks.some(isDeferred)) {
+    console.error(
+      `::warning title=github-quota-deferred::${lineageDeferralDetail}`
+    );
+  }
+  const onlyDeferred =
+    certificate.failingChecks.length > 0 &&
+    certificate.failingChecks.every(isDeferred) &&
+    certificate.evidenceIntegrityFailures.length === 0;
+  return certificate.safeToSend || onlyDeferred ? 0 : 1;
 }
