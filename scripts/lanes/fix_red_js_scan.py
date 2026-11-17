@@ -279,14 +279,16 @@ def _scan_names(text: str, start: int, end: int, found: set[str]) -> None:
     token: list[str] = []
 
     def flush() -> None:
-        nonlocal prev_token
+        nonlocal prev_token, prev_char
         if not token:
             return
         word = "".join(token)
         token.clear()
-        if prev_char != ".":
+        member = prev_char == "."
+        if not member:
             found.add(word)
-        prev_token = word
+        prev_token = "" if member else word
+        prev_char = word[-1]
 
     while index < end:
         comment = _skip_comment(text, index, end)
@@ -308,9 +310,9 @@ def _scan_names(text: str, start: int, end: int, found: set[str]) -> None:
             prev_token = ""
             continue
         if char == "/" and index + 1 < end and text[index + 1] not in "/*":
+            flush()
             regex = prev_char in _REGEX_CHAR or prev_char == "" or prev_token in _REGEX_BEFORE
-            if regex and not (prev_char.isalnum() or prev_char in ")]"):
-                flush()
+            if regex and (prev_token in _REGEX_BEFORE or not (prev_char.isalnum() or prev_char in ")]")):
                 index = _skip_regex(text, index)
                 prev_char = "/"
                 prev_token = ""
