@@ -1,3 +1,4 @@
+import { buildPrivatePromotionAction } from './library-promotion-action';
 import { buildLibraryAskJovieDraft } from './library-chat-context';
 
 export { buildLibraryAskJovieDraft } from './library-chat-context';
@@ -45,6 +46,7 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-primary',
   'copy',
   'ask-jovie',
+  'draft-promotion',
   'archive',
   'restore',
 ] as const;
@@ -448,6 +450,9 @@ export function buildLibraryEntityActions({
       onAskJovie(buildLibraryAskJovieDraft(asset, profileId), profileId);
     },
   });
+
+  const promotionAction = buildPrivatePromotionAction(asset, profileId, openUrl);
+  if (promotionAction) actions.push(promotionAction);
 
   const lifecycleAction = buildLifecycleAction({
     asset,
