@@ -1092,8 +1092,9 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if locking_pr is not None:
         if type(locking_pr) is not int or locking_pr < 1:
             raise ValueError("locking PR requires an explicit positive PR number")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+        # Diagnostic examples are not the author's citation section. Use the
+        # same fence-aware boundaries as the canonical Fleet evidence parser.
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{1,6}\s+Locked areas\s*$", re.I)) is None:
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
