@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import {
   createDashboardQueryClient,
   DASHBOARD_FIXTURE_PROFILE_ID,
@@ -172,9 +172,11 @@ export const ErrorLoadFailed: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole('button', { name: 'Try Again' })
-    ).toBeVisible();
+    // The seeded error can be re-fetched on mount, so the retry affordance
+    // may land a frame or two after the first paint — poll for it.
+    await waitFor(() =>
+      expect(canvas.getByRole('button', { name: 'Try Again' })).toBeVisible()
+    );
   },
 };
 
