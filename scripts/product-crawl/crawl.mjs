@@ -116,13 +116,20 @@ async function openContext({ viewport, identity }) {
   if (BYPASS)
     await ctx.route(
       u => u.host === host,
-      r =>
-        r.continue({
-          headers: {
-            ...r.request().headers(),
-            'x-vercel-protection-bypass': BYPASS,
-          },
-        })
+      // A rejected continuation must not kill the crawl before its receipt.
+      // visit() still records failed navigation and HTTP error outcomes.
+      async r => {
+        try {
+          await r.continue({
+            headers: {
+              ...r.request().headers(),
+              'x-vercel-protection-bypass': BYPASS,
+            },
+          });
+        } catch {
+          // Keep reporting; catching this does not certify the page as ready.
+        }
+      }
     );
   return ctx;
 }
