@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockClearLeadAttributionCookie,
   mockGetProfileByUsername,
-  mockHashClaimToken,
   mockIsClaimTokenValid,
   mockLookupLeadByClaimToken,
   mockLookupUsernameByClaimToken,
@@ -16,7 +15,6 @@ const {
 } = vi.hoisted(() => ({
   mockClearLeadAttributionCookie: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
-  mockHashClaimToken: vi.fn(),
   mockIsClaimTokenValid: vi.fn(),
   mockLookupLeadByClaimToken: vi.fn(),
   mockLookupUsernameByClaimToken: vi.fn(),
@@ -77,10 +75,6 @@ vi.mock('@/lib/leads/funnel-events', () => ({
   setLeadAttributionCookieFromToken: mockSetLeadAttributionCookieFromToken,
 }));
 
-vi.mock('@/lib/security/claim-token', () => ({
-  hashClaimToken: mockHashClaimToken,
-}));
-
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: mockGetProfileByUsername,
   isClaimTokenValid: mockIsClaimTokenValid,
@@ -111,7 +105,6 @@ describe('Claim token route', () => {
       reset: 60,
     });
     mockLookupLeadByClaimToken.mockResolvedValue(null);
-    mockHashClaimToken.mockResolvedValue('hashed-token');
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
       usernameNormalized: 'claimableartist',
@@ -246,7 +239,8 @@ describe('Claim token route', () => {
       mode: 'token_backed',
       creatorProfileId: 'profile_1',
       username: 'claimableartist',
-      claimTokenHash: 'hashed-token',
+      claimTokenHash:
+        '397a2a9c5bf5e2ccec38c2596b682bb1bd05fe6e4ecea6c10cf42755ff225403',
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
@@ -290,7 +284,8 @@ describe('Claim token route', () => {
         mode: 'token_backed',
         creatorProfileId: 'fixture-profile',
         username: 'e2eclaimartist',
-        claimTokenHash: 'hashed-token',
+        claimTokenHash:
+          'd07f963c2bb7a3cc74a910e51ca0075b194da412a93737881f105a55156a988f',
       })
     );
   });
