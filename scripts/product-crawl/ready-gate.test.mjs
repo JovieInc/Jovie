@@ -364,3 +364,50 @@ test('a frozen-frame finding names the scripts that ran in the longest frame', (
   );
   assert.equal(bare.detail, 'main thread blocked 267ms (median of 3 loads)');
 });
+
+test('partial overlay walks or unconfirmed cleanup cannot certify complete coverage', () => {
+  const now = Date.parse('2026-11-17T06:00:00Z');
+  const complete = {
+    schema: 'product-crawl/v1',
+    origin: 'https://fixture.invalid',
+    at: new Date(now).toISOString(),
+    routes: [],
+    uncovered: [],
+    pages: [
+      { route: '/', identity: 'stranger', viewport: 'desktop', status: 200 },
+      { route: '/', identity: 'signed-in', viewport: 'desktop', status: 200 },
+    ],
+  };
+  for (const gap of [
+    { overlayWalks: { walks: [], left: 2 } },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', stoppedForTime: true, steps: [] },
+        ],
+        left: 0,
+      },
+    },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', error: 'closed', steps: [] },
+        ],
+        left: 0,
+      },
+    },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', cleanupPending: true, steps: [] },
+        ],
+        left: 0,
+      },
+    },
+  ])
+    assert.equal(
+      productReady({ ...complete, ...gap }, { now }).ready,
+      false,
+      JSON.stringify(gap)
+    );
+});
