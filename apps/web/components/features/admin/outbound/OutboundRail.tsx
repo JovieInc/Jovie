@@ -40,6 +40,7 @@ import {
   OUTBOUND_RAIL_COMMAND_EVENT,
   type OutboundRailCommand,
 } from './outbound-keys';
+import { outboundMessageEmptyReason } from './outbound-message-state';
 
 function useRailCommand(
   command: OutboundRailCommand,
@@ -148,14 +149,7 @@ function MessageSection({
           className='px-1 pb-2 text-xs text-secondary-token'
           data-testid='outbound-message-empty'
         >
-          {row.relationshipHold ??
-            (row.view === 'needs_judge'
-              ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
-              : row.flags.includes('cold_draft_unavailable')
-                ? 'Draft hidden until certified page facts and email compliance checks are available.'
-                : row.channel
-                  ? 'No claim link yet. Build the profile to draft a message.'
-                  : 'No reachable channel: no email address or Instagram handle on file.')}
+          {outboundMessageEmptyReason(row)}
         </p>
       </DrawerSection>
     );

@@ -98,6 +98,13 @@ describe('OutboundRail', () => {
     );
   });
 
+  it('explains a missing claim link when a recipient is reachable', () => {
+    renderRail({ row: outboundFixtureRow({ message: null }) });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'No claim link yet. Build the profile to draft a message.'
+    );
+  });
+
   it('lists missing evidence and the non-artist flag', () => {
     renderRail({
       row: outboundFixtureRow({
