@@ -67,6 +67,10 @@ _STDOUT = (
 def resolve_liveness_quota_text(rel: str, text: str) -> str | None:
     """Resolve one conflicted file. None when any hunk is a different shape."""
     rel = str(rel or "").replace("\\", "/")
+    # The legacy union predates retained per-leg/reset evidence. Never replace
+    # that newer contract with the old body; leave semantic repair to its owner.
+    if "quotaEvidence" in text or "readGithubGraphqlResponse" in text:
+        return None
     if rel.endswith(_LIVENESS):
         return _resolve_file(text, _liveness_hunk)
     if rel.endswith(_READ):

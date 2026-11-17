@@ -116,6 +116,13 @@ _LIVENESS = (
 
 
 class LivenessQuotaMergeTest(unittest.TestCase):
+    def test_legacy_union_preserves_new_quota_evidence_for_semantic_repair(self):
+        for marker in ("quotaEvidence", "readGithubGraphqlResponse"):
+            for relative in (quota._READ, quota._LIVENESS):
+                with self.subTest(marker=marker, relative=relative):
+                    self.assertIsNone(quota.resolve_liveness_quota_text(
+                        relative, f"// {marker}\n" + _HEADER + _HELPERS + _READ))
+
     def test_read_keeps_classifier_short_circuit_and_spent_budget_deferral(self):
         resolved = quota.resolve_liveness_quota_text(
             quota._READ, _HEADER + _HELPERS + _READ)

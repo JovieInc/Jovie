@@ -390,6 +390,103 @@ describe('quota-exhausted reads defer instead of filing a false P0 (JOV-9993)', 
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  it.each([403, 404, 500])(
+    'retains primary quota proof after a public %s without inventing a verdict',
+    async status => {
+      const fetchImpl = vi.fn(async (_url, init) =>
+        init?.headers?.Authorization
+          ? quotaDenied()
+          : new Response('{}', { status })
+      );
+      const { report } = await runLiveness({
+        registry: only('github:jovie:security-advisory-loop'),
+        nowMs: NOW,
+        fetchImpl,
+        token: 'actions-token',
+      });
+      const row = rowFor(report, 'github:jovie:security-advisory-loop');
+      expect(row).toMatchObject({
+        status: 'unknown',
+        reason: 'github-quota-deferred',
+        quotaEvidence: {
+          provider: 'github',
+          credentialLeg: 'authenticated',
+          status: 403,
+          observedAt: new Date(NOW).toISOString(),
+          kind: 'primary-rate-limit',
+          headers: {
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(NOW / 1000 + 1800),
+          },
+          retryAtMs: NOW + 1_801_000,
+        },
+        recoveryEvidence: {
+          credentialLeg: 'public',
+          status,
+          reason: `http-${status}`,
+        },
+      });
+      expect(row.quotaEvidence.message).toContain(
+        'API rate limit exceeded for installation'
+      );
+      expect(JSON.stringify(row)).not.toContain('actions-token');
+      expect(livenessDecisions(report)).toEqual([]);
+    }
+  );
+
+  it.each([null, { repository: { pullRequests: { nodes: [] } } }])(
+    'defers HTTP 200 GraphQL quota errors without trusting partial data (%j)',
+    async data => {
+      const observed = await observeGreenToEnqueue(
+        { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+        {
+          token: 'actions-token',
+          nowMs: NOW,
+          fetchImpl: async () =>
+            new Response(
+              JSON.stringify({
+                data,
+                errors: [{ type: 'RATE_LIMITED', message: 'quota denied' }],
+              }),
+              { status: 200 }
+            ),
+        }
+      );
+      expect(observed).toMatchObject({
+        ok: false,
+        reason: 'github-quota-deferred',
+        quotaEvidence: {
+          status: 200,
+          kind: 'primary-rate-limit',
+          retryAtMs: null,
+          headers: {},
+        },
+      });
+    }
+  );
+
+  it('keeps mixed GraphQL quota and schema errors unreadable', async () => {
+    const observed = await observeGreenToEnqueue(
+      { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+      {
+        token: 'actions-token',
+        nowMs: NOW,
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              data: { repository: { pullRequests: { nodes: [] } } },
+              errors: [
+                { type: 'RATE_LIMITED', message: 'quota denied' },
+                { type: 'GRAPHQL_VALIDATION_FAILED', message: 'unknown field' },
+              ],
+            }),
+            { status: 200 }
+          ),
+      }
+    );
+    expect(observed).toEqual({ ok: false, reason: 'green-enqueue-unreadable' });
+  });
+
   it('keeps a persisted red alert open across a deferred read', async () => {
     const fingerprint = livenessFingerprint(
       'github:jovie:security-advisory-loop'

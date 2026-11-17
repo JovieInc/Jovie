@@ -39,10 +39,60 @@
  * attribution is strict: a funded budget, no api base, or an unreadable
  * /rate_limit keeps the original failure so silence stays red.
  */
-import { classifyGitHubFailure } from './github-rate-limit.mjs';
+import {
+  classifyGitHubFailure,
+  PRIMARY,
+  retryAtFromHeaders,
+  SECONDARY,
+} from './github-rate-limit.mjs';
 
 const TIMEOUT_MS = 10_000;
 const BODY_SNIPPET_CHARS = 512;
+const QUOTA_HEADERS = [
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'x-ratelimit-resource',
+  'retry-after',
+];
+
+function quotaEvidence(read, classification, credentialLeg, nowMs) {
+  const headers = {};
+  for (const name of QUOTA_HEADERS) {
+    const value =
+      read.headers?.get?.(name) ??
+      Object.entries(read.headers ?? {}).find(
+        ([key]) => key.toLowerCase() === name
+      )?.[1];
+    if (value != null) headers[name] = String(value);
+  }
+  return {
+    provider: 'github',
+    credentialLeg,
+    observedAt: new Date(nowMs).toISOString(),
+    status: read.status,
+    message: read.bodyText ?? '',
+    headers,
+    kind: classification.kind,
+    retryAtMs: classification.retryAtMs,
+  };
+}
+
+function quotaRead(read, credentialLeg, nowMs) {
+  if (!quotaKindOf(read)) return null;
+  const classification = classifyGitHubFailure({
+    status: read.status,
+    message: read.bodyText,
+    headers: read.headers,
+    now: nowMs,
+  });
+  return {
+    ok: false,
+    reason: 'quota-deferred',
+    quotaKind: classification.kind,
+    quotaEvidence: quotaEvidence(read, classification, credentialLeg, nowMs),
+  };
+}
 
 /** The classifier's evidence from a denied response: status, headers, body. */
 async function deniedEvidence(response) {
@@ -127,6 +177,63 @@ export async function classifyDeniedResponse(response) {
   return quotaKindOf(await deniedEvidence(response));
 }
 
+/** Parse once; a partial GraphQL payload with errors never proves a heartbeat. */
+export async function readGithubGraphqlResponse(response, nowMs = Date.now()) {
+  if (response.status !== 200) {
+    const read = { ok: false, ...(await deniedEvidence(response)) };
+    return (
+      quotaRead(read, 'authenticated', nowMs) ?? {
+        ok: false,
+        reason: `http-${response.status}`,
+      }
+    );
+  }
+  const body = await response.json();
+  const errors = body?.errors;
+  if (
+    Array.isArray(errors) &&
+    errors.length &&
+    errors.every(error => {
+      const kind = classifyGitHubFailure({
+        message: error?.message ?? '',
+      }).kind;
+      return (
+        error?.type === 'RATE_LIMITED' ||
+        error?.extensions?.code === 'RATE_LIMITED' ||
+        kind === PRIMARY ||
+        kind === SECONDARY
+      );
+    })
+  ) {
+    const read = {
+      status: response.status,
+      headers: response.headers,
+      bodyText: JSON.stringify(errors).slice(0, BODY_SNIPPET_CHARS),
+    };
+    const classification = classifyGitHubFailure({
+      status: read.status,
+      message: read.bodyText,
+      headers: read.headers,
+      now: nowMs,
+    });
+    if (![PRIMARY, SECONDARY].includes(classification.kind))
+      classification.kind = PRIMARY;
+    classification.retryAtMs = retryAtFromHeaders(read.headers, nowMs);
+    return {
+      ok: false,
+      reason: 'quota-deferred',
+      quotaKind: classification.kind,
+      quotaEvidence: quotaEvidence(
+        read,
+        classification,
+        'authenticated',
+        nowMs
+      ),
+    };
+  }
+  return { ok: true, body };
+}
+
 /**
  * True when the shared installation REST budget is provably spent
  * (resources.core.remaining <= 0). GET /rate_limit is exempt from the REST
@@ -149,15 +256,27 @@ async function sharedBudgetSpent(fetchImpl, token, apiUrl) {
  * unauthenticated retry runs only when a token was used and only on a 403;
  * a retry that also 403s defers only while the shared budget is spent.
  */
-export async function readGithubJson(url, { fetchImpl, token, apiUrl = '' }) {
+export async function readGithubJson(
+  url,
+  { fetchImpl, token, apiUrl = '', nowMs = Date.now() }
+) {
   const read = await readJson(fetchImpl, url, githubHeaders(token));
   if (read.ok) return read;
   if (token && read.reason === 'http-403') {
     const recovery = await readJson(fetchImpl, url, {});
     if (recovery.ok) return recovery;
-    const recoveryKind = quotaKindOf(read) ?? quotaKindOf(recovery);
-    if (recoveryKind)
-      return { ok: false, reason: 'quota-deferred', quotaKind: recoveryKind };
+    const quota =
+      quotaRead(read, 'authenticated', nowMs) ??
+      quotaRead(recovery, 'public', nowMs);
+    if (quota)
+      return {
+        ...quota,
+        recoveryEvidence: {
+          credentialLeg: 'public',
+          status: recovery.status ?? null,
+          reason: recovery.reason,
+        },
+      };
     if (
       recovery.reason === 'http-403' &&
       (await sharedBudgetSpent(fetchImpl, token, apiUrl))
@@ -165,8 +284,8 @@ export async function readGithubJson(url, { fetchImpl, token, apiUrl = '' }) {
       return { ok: false, deferred: true, reason: 'quota-deferred' };
     return { ok: false, reason: recovery.reason };
   }
-  const quotaKind = quotaKindOf(read);
-  if (quotaKind) return { ok: false, reason: 'quota-deferred', quotaKind };
+  const quota = quotaRead(read, token ? 'authenticated' : 'public', nowMs);
+  if (quota) return quota;
   return { ok: false, reason: read.reason };
 }
 
@@ -228,5 +347,9 @@ export function githubReadFailure(read) {
     ok: false,
     deferred: read.deferred === true,
     reason: `github-${read.reason}`,
+    ...(read.quotaEvidence ? { quotaEvidence: read.quotaEvidence } : {}),
+    ...(read.recoveryEvidence
+      ? { recoveryEvidence: read.recoveryEvidence }
+      : {}),
   };
 }

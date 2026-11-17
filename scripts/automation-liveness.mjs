@@ -41,10 +41,10 @@ import {
   validateRegistry,
 } from './lib/automation-registry.mjs';
 import {
-  classifyDeniedResponse,
   githubHeaders,
   githubReadFailure,
   landedOnMainAt,
+  readGithubGraphqlResponse,
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
@@ -75,7 +75,7 @@ export async function observeWorkflowFailureStreak(
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
   const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+  const read = await readGithubJson(url, { fetchImpl, token, apiUrl, nowMs });
   if (!read.ok) return githubReadFailure(read);
   if (!Array.isArray(read.body?.workflow_runs))
     return { ok: false, reason: 'github-runs-unreadable' };
@@ -109,7 +109,7 @@ export async function observeWorkflowFailureStreak(
 /** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
 export async function observeGithubWorkflow(
   receipt,
-  { fetchImpl, token, apiUrl = GITHUB_API }
+  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
 ) {
   const conclusions = receipt.conclusions ?? ['success'];
   const branch = receipt.branch
@@ -133,7 +133,12 @@ export async function observeGithubWorkflow(
         : [query];
     });
     for (const url of urls) {
-      const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+      const read = await readGithubJson(url, {
+        fetchImpl,
+        token,
+        apiUrl,
+        nowMs,
+      });
       if (!read.ok) return githubReadFailure(read);
       if (!Array.isArray(read.body?.workflow_runs))
         return { ok: false, reason: 'github-runs-unreadable' };
@@ -721,14 +726,12 @@ export async function observeGreenToEnqueue(
       body: JSON.stringify({ query, variables: { owner, name } }),
       signal: controller.signal,
     });
-    if (response.status !== 200) {
-      // A GraphQL denial with GitHub's own rate-limit evidence is quota, not
-      // unreadable evidence (JOV-9993): defer like the REST observers.
-      const quotaKind = await classifyDeniedResponse(response);
-      if (quotaKind) return { ok: false, reason: 'github-quota-deferred' };
-      return { ok: false, reason: `green-enqueue-http-${response.status}` };
-    }
-    body = await response.json();
+    const read = await readGithubGraphqlResponse(response, nowMs);
+    if (!read.ok)
+      return read.reason === 'quota-deferred'
+        ? githubReadFailure(read)
+        : { ok: false, reason: `green-enqueue-${read.reason}` };
+    body = read.body;
   } catch (error) {
     return {
       ok: false,
