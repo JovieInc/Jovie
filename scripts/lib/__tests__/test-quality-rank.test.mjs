@@ -197,6 +197,33 @@ test('model fingerprint is order independent and rearm marks top scored modules'
   expect(s.modules['lib/y.ts']).toEqual(state.modules['lib/y.ts']);
 });
 
+test('successive model re-arms retain the latest request in either observation order', () => {
+  const file = 'lib/billing/a.ts';
+  const current = {
+    ...emptyState(),
+    modules: {
+      [file]: {
+        ...state.modules[file],
+        at: '2026-11-01T00:00:00.000Z',
+      },
+    },
+  };
+  const baseline = structuredClone(current);
+  rearmTop(current, [{ file }], 1, '2026-11-05T00:00:00.000Z');
+  const previous = structuredClone(current);
+  const latest = '2026-11-06T00:00:00.000Z';
+  expect(rearmTop(current, [{ file }], 1, latest)).toBe(1);
+  for (const observations of [
+    [current, previous, baseline],
+    [baseline, previous, current],
+    [previous, current, baseline],
+  ]) {
+    const folded = mergeStates(...observations, previous, baseline);
+    expect(folded.modules[file].rearmedAt).toBe(latest);
+    expect(folded.modules[file].at).toBe(new Date(0).toISOString());
+  }
+});
+
 test.each([
   ['scored', { mutants: [{ status: 'Killed' }, { status: 'Survived' }] }],
   ['error', { error: 'Stryker timed out' }],

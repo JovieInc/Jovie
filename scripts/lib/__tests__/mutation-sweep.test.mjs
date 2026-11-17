@@ -392,6 +392,11 @@ describe('baseline shards', () => {
         );
       }
     }
+    const tiedScore = stateOf(scored(rearmed.rearmedAt));
+    expect(mergeStates(current, tiedScore).modules['lib/a.ts']).toBe(rearmed);
+    expect(mergeStates(tiedScore, current).modules['lib/a.ts']).toBe(
+      tiedScore.modules['lib/a.ts']
+    );
   });
 
   it('keeps top-level fields from the first state that has them', () => {
