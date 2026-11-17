@@ -1,24 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
+import {
+  fakePage,
+  row,
+  stalledContext,
+  withWalkDir,
+} from './fixtures/overlay-page.mjs';
 import { findOrphanedOverlays } from './orphaned-overlays.mjs';
 import {
   overlayWalkSummary,
   pickWalkTargets,
-  RAIL,
+  runOverlayWalks,
   safePaths,
   walkPage,
 } from './overlay-walk.mjs';
 import { overlayWalkFindings, productReady } from './ready-gate.mjs';
-
-const row = (url, identity, overlaySurface, more = {}) => ({
-  route: url,
-  url,
-  identity,
-  viewport: 'desktop',
-  status: 200,
-  overlaySurface,
-  ...more,
-});
 
 test('walks sidebar pages first, one per section, per identity', () => {
   const pages = [
@@ -58,72 +55,6 @@ test('a walk only navigates to pages the crawl loaded as that identity', () => {
   );
 });
 
-/**
- * A scripted stand-in for a Playwright page with an unpinned sidebar holding
- * two hover triggers. `sticky` is the bug: the tooltip outlives the sidebar.
- */
-function fakePage({ sticky }) {
-  const state = { rail: false, layers: 0, path: '/app', log: [] };
-  const leave = () => {
-    state.rail = false;
-    if (!sticky) state.layers = 0;
-  };
-  const railLocator = {
-    first: () => railLocator,
-    isVisible: async () => true,
-    getAttribute: async () => 'false',
-    hover: async () => {
-      state.rail = true;
-    },
-  };
-  const triggers = {
-    count: async () => (state.rail ? 2 : 0),
-    nth: i => ({
-      hover: async () => {
-        state.log.push(`hover trigger ${i}`);
-        state.layers = 1;
-      },
-    }),
-  };
-  return {
-    state,
-    mouse: { move: async () => leave() },
-    keyboard: {
-      press: async () => {
-        state.layers = 0;
-      },
-    },
-    waitForTimeout: async () => {},
-    setViewportSize: async () => leave(),
-    locator: sel => (sel === RAIL ? railLocator : triggers),
-    waitForSelector: async () => {
-      if (!state.rail) throw new Error('timeout');
-    },
-    waitForFunction: async (_fn, [, before]) => {
-      if (!(state.layers > before)) throw new Error('timeout');
-    },
-    waitForURL: async () => {},
-    evaluate: async (fn, arg) => {
-      if (fn === findOrphanedOverlays)
-        return state.layers && !state.rail
-          ? [
-              {
-                kind: 'tooltip',
-                overlay: 'div',
-                text: "What's new",
-                reason: 'anchor-missing',
-                anchor: null,
-                box: [0, 0, 90, 28],
-              },
-            ]
-          : [];
-      if (typeof arg === 'string') return state.layers;
-      state.path = '/app/releases';
-      return state.path;
-    },
-  };
-}
-
 test('the tooltip that outlives the collapsing sidebar is recorded with its steps', async () => {
   const shots = [];
   const walk = await walkPage(fakePage({ sticky: true }), {
@@ -136,7 +67,7 @@ test('the tooltip that outlives the collapsing sidebar is recorded with its step
   assert.equal(walk.error, undefined);
   assert.equal(walk.rail, 'peek');
   const bad = walk.steps.filter(s => s.orphans);
-  assert.ok(bad.length >= 2);
+  assert.equal(bad.length, 1);
   assert.deepEqual(bad[0].trail, [
     'hover-open sidebar',
     'hover tooltip trigger',
@@ -248,4 +179,318 @@ test('the summary says what the walks could not reach', () => {
     overlayWalkSummary({ walks: [walks[0]], left: 0 }, true),
     'Overlay walks: 1 pages (1 peeked the sidebar open, 1 raised an overlay), 2 steps checked.'
   );
+});
+
+test('persistent orphans leave the screenshot budget for later distinct findings', async () => {
+  const page = fakePage({ sticky: true });
+  const evaluate = page.evaluate;
+  let checks = 0;
+  page.waitForTimeout = async ms => {
+    if (ms === 500) checks += 1;
+  };
+  page.evaluate = async (fn, arg) => {
+    if (fn !== findOrphanedOverlays) return evaluate(fn, arg);
+    return [2, 7, 10]
+      .filter(first => checks >= first)
+      .map(first => ({
+        kind: 'tooltip',
+        overlay: `div#orphan-${first}`,
+        box: [0, 0, 40, 20],
+        text: '',
+        reason: 'anchor-missing',
+        anchor: null,
+      }));
+  };
+  const shots = [];
+  const walk = await walkPage(page, {
+    safe: ['/app/releases'],
+    shot: async name => {
+      shots.push(name);
+      return name;
+    },
+  });
+  const bad = walk.steps.filter(s => s.orphans);
+  assert.deepEqual(
+    bad.flatMap(s => s.orphans.map(o => o.overlay)),
+    ['div#orphan-2', 'div#orphan-7', 'div#orphan-10']
+  );
+  assert.equal(shots.length, 3);
+  assert.ok(bad.every(s => s.screenshot));
+});
+
+test('a walk stops before a settle/recheck cannot fit and keeps earlier steps', async () => {
+  const page = fakePage({ sticky: true });
+  let now = 0;
+  page.waitForTimeout = async ms => {
+    now += ms;
+  };
+  const walk = await walkPage(page, { deadlineEpochMs: 1200, now: () => now });
+  assert.equal(walk.stoppedForTime, true);
+  assert.equal(walk.error, undefined);
+  assert.equal(walk.steps.length, 1);
+  assert.ok(now < 1200);
+});
+
+test('near-deadline targets are explicitly skipped without creating a browser context', async () => {
+  await withWalkDir(async out => {
+    let opened = 0;
+    const pages = ['/app', '/pricing'].map(url =>
+      row(url, 'stranger', { rail: true })
+    );
+    const result = await runOverlayWalks({
+      pages,
+      origin: 'https://crawl.test',
+      out,
+      deadlineEpochMs: 40_000,
+      now: () => 5001,
+      openContext: async () => {
+        opened += 1;
+        throw new Error('must not open');
+      },
+    });
+    assert.equal(opened, 0);
+    assert.equal(result.left, 2);
+    assert.deepEqual(result.walks, []);
+    assert.deepEqual(
+      result.skipped.map(s => [s.url, s.reason]),
+      [
+        ['/app', 'deadline'],
+        ['/pricing', 'deadline'],
+      ]
+    );
+    assert.match(
+      overlayWalkSummary(result, true),
+      /2 not walked before the deadline/
+    );
+  });
+});
+
+test('one deadline timer closes a stalled navigation and stops later batches', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await withWalkDir(async out => {
+    let now = 0;
+    let opened = 0;
+    let closed = 0;
+    let started;
+    const navigating = new Promise(resolve => {
+      started = resolve;
+    });
+    const pending = runOverlayWalks({
+      pages: ['/one', '/two', '/tri', '/four'].map(url =>
+        row(url, 'stranger', { rail: true })
+      ),
+      origin: 'https://crawl.test',
+      out,
+      deadlineEpochMs: 40_000,
+      now: () => now,
+      openContext: async () => {
+        opened += 1;
+        return stalledContext({
+          started,
+          closed: () => {
+            closed += 1;
+          },
+        });
+      },
+    });
+    await navigating;
+    now = 40_000;
+    t.mock.timers.tick(40_000);
+    const result = await pending;
+    assert.equal(opened, 3);
+    assert.equal(closed, 3);
+    assert.equal(result.walks.length, 3);
+    assert.ok(result.walks.every(w => w.stoppedForTime));
+    assert.equal(result.left, 1);
+    assert.equal(result.skipped[0].url, '/four');
+    assert.match(overlayWalkSummary(result, true), /3 stopped at the deadline/);
+  });
+});
+
+test('a context that opens after the deadline closes without starting a request', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await withWalkDir(async out => {
+    let now = 0;
+    /** @type {(context: any) => void} */
+    let open = () => assert.fail('context creation did not start');
+    let notifyStarted;
+    let notifyClosed;
+    const started = new Promise(resolve => {
+      notifyStarted = resolve;
+    });
+    const closed = new Promise(resolve => {
+      notifyClosed = resolve;
+    });
+    const pending = runOverlayWalks({
+      pages: [row('/app', 'stranger', { rail: true })],
+      origin: 'https://crawl.test',
+      out,
+      deadlineEpochMs: 40_000,
+      now: () => now,
+      openContext: () => {
+        notifyStarted();
+        return new Promise(resolve => {
+          open = resolve;
+        });
+      },
+    });
+    await started;
+    now = 40_000;
+    t.mock.timers.tick(40_000);
+    const result = await pending;
+    assert.equal(result.walks[0].stoppedForTime, true);
+    open({
+      addCookies: async () =>
+        assert.fail('late context must not configure a page'),
+      newPage: async () => assert.fail('late context must not open a page'),
+      close: async () => notifyClosed(),
+    });
+    await closed;
+  });
+});
+
+test('finite-deadline walks finish normally and preserve navigation failures', async () => {
+  await withWalkDir(async out => {
+    const pages = [row('/app', 'stranger', { rail: true })];
+    const page = fakePage({ sticky: false });
+    let closed = 0;
+    page.setDefaultTimeout = ms => assert.equal(ms, 5000);
+    page.goto = async (_url, options) => assert.equal(options.timeout, 30_000);
+    page.screenshot = async () => {};
+    const context = {
+      addCookies: async () => {},
+      newPage: async () => page,
+      close: async () => {
+        closed += 1;
+      },
+    };
+    const result = await runOverlayWalks({
+      pages,
+      origin: 'https://crawl.test',
+      out,
+      deadlineEpochMs: 50_000,
+      now: () => 0,
+      openContext: async () => context,
+    });
+    assert.equal(result.walks[0].stoppedForTime, undefined);
+    assert.equal(result.walks[0].error, undefined);
+    assert.ok(result.walks[0].steps.length > 0);
+    assert.equal(result.left, 0);
+    assert.equal(closed, 1);
+
+    page.goto = async () => {
+      throw new Error('net::ERR_FAILED\nstack');
+    };
+    const failed = await runOverlayWalks({
+      pages,
+      origin: 'https://crawl.test',
+      out,
+      openContext: async () => context,
+    });
+    assert.equal(failed.walks[0].error, 'net::ERR_FAILED');
+    assert.equal(failed.walks[0].stoppedForTime, undefined);
+    assert.equal(closed, 2);
+
+    context.close = async () => {
+      throw new Error('close rejected\nstack');
+    };
+    const uncertain = await runOverlayWalks({
+      pages,
+      origin: 'https://crawl.test',
+      out,
+      openContext: async () => context,
+    });
+    assert.equal(uncertain.walks[0].cleanupPending, true);
+    assert.equal(uncertain.walks[0].cleanupError, 'close rejected');
+    assert.match(
+      overlayWalkSummary(uncertain, true),
+      /1 context cleanups not confirmed/
+    );
+  });
+});
+
+test('runner captures distinct orphans and a screenshot failure does not erase the finding', async () => {
+  await withWalkDir(async out => {
+    for (const reject of [false, true]) {
+      const page = fakePage({ sticky: true });
+      page.setDefaultTimeout = () => {};
+      page.goto = async () => {};
+      page.screenshot = async options => {
+        assert.equal(options.timeout, 5000);
+        assert.match(options.path, /00-tooltip-then-collapse-/);
+        if (reject) throw new Error('capture failed');
+      };
+      const result = await runOverlayWalks({
+        pages: [row('/app', 'stranger', { rail: true })],
+        origin: 'https://crawl.test',
+        out,
+        openContext: async () => ({
+          addCookies: async () => {},
+          newPage: async () => page,
+          close: async () => {},
+        }),
+      });
+      const bad = result.walks[0].steps.filter(s => s.orphans);
+      assert.equal(bad.length, 1);
+      if (reject) assert.equal(bad[0].screenshot, null);
+      else
+        assert.match(
+          bad[0].screenshot,
+          /^overlay-walk\/00-tooltip-then-collapse-/
+        );
+    }
+  });
+});
+
+test('the existing deadline returns incomplete evidence when context close never acknowledges', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await withWalkDir(async out => {
+    for (const stalledNavigation of [true, false]) {
+      let now = 0;
+      let closeCalls = 0;
+      let reachedStage;
+      const stage = new Promise(resolve => {
+        reachedStage = resolve;
+      });
+      const page = fakePage({ sticky: false });
+      page.setDefaultTimeout = () => {};
+      page.goto = async () => {
+        if (stalledNavigation) {
+          reachedStage();
+          return new Promise(() => {});
+        }
+      };
+      const pending = runOverlayWalks({
+        pages: [row('/app', 'stranger', { rail: true })],
+        origin: 'https://crawl.test',
+        out,
+        deadlineEpochMs: 40_000,
+        now: () => now,
+        openContext: async () => ({
+          addCookies: async () => {},
+          newPage: async () => page,
+          close: () => {
+            closeCalls += 1;
+            reachedStage();
+            return new Promise(() => {});
+          },
+        }),
+      });
+      let settled = false;
+      pending.then(() => {
+        settled = true;
+      });
+      await stage;
+      now = 40_000;
+      t.mock.timers.tick(40_000);
+      // Drain one event-loop turn, with no elapsed-time assertion or sleep.
+      await nextTurn();
+      assert.equal(settled, true, 'receipt must not wait for a stuck close');
+      const result = await pending;
+      assert.equal(closeCalls, 1);
+      assert.equal(result.walks[0].stoppedForTime, true);
+      assert.equal(result.walks[0].cleanupPending, true);
+      if (!stalledNavigation) assert.ok(result.walks[0].steps.length > 0);
+    }
+  });
 });
