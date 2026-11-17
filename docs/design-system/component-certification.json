@@ -12,13 +12,527 @@
       "a11y",
       "frontend-rules"
     ],
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": [
+    "apps/web/components/atoms/AmountSelector.tsx": [
       "ds-owner",
       "tokens",
       "states",
       "tests",
       "a11y",
-      "frontend-rules"
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/AppSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/Copyright.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/JovieLogo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/LogoIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ActivityTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminPeopleRightPanelProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminReadUnavailable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminStepUp.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminVerificationRequired.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CapabilityEvidenceMatrix.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CreatorProfileSocialLinks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CreatorProfileTableRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/DeleteCreatorDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/FunnelMetricsStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/KpiItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/MetricsChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/MetricsChartClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/OperationalControlPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ReliabilityCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/SentryMetricsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ShippingVelocityCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ShippingVelocityChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/SpotifyAccountIdentity.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/TimActionRequiredSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WaitlistGateFunnel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WaitlistMetrics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WeeklyTrendChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WhatShipped.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-assets-table/AdminAssetsPageWrapper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/AuthRedirectHandler.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomePhoneFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeProfileShowcase.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeRelationshipPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/InputAuraFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/PipelineBottleneckBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProductScreenshot.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProductScreenshotClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProfileMockup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/claim-handle/HandleStatusIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-asset-share/LibraryAssetSharePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareAssetLayouts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareDropSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library/WorkInspectorActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/FounderReviewStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityCardStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxYoutubeThumbnailCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/WorkflowCaptureInboxCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pay/PayLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pitch/PitchEngagement.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/presence/PresenceStatusParts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/presence/workspace-controller.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ArtistThemeProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
@@ -28,6 +542,24 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/features/profile/ListenDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/PayDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
       "ds-owner",
       "tokens",
@@ -35,6 +567,15 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ProfileFooter.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/features/profile/ProfileHomeRail.tsx": [
       "ds-owner",
@@ -51,6 +592,231 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/feedback/FeedbackProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageCertifiedExposure.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageCertifiedSections.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageEditorialHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageElectricSeam.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepagePosterHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepagePrimaryAction.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageTrackedLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatEmptyStateOpportunityCards.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatStarterActionsRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/EntityResolutionProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/FeatureIntroCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/CliLandingPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/ConnectedComponentsGallery.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/FaqSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/FigCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingBentoSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingContentProse.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingContentShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingEditorialBackground.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingElectricSeam.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingFeatureGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingMetricCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
@@ -76,6 +842,609 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/molecules/DropdownEmptyRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FeatureCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FooterNavigation.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FormStatus.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/LegalHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/LegalSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/MeasuredValue.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ProfileNavButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/QRCodeCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/RouteSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SettingsLoadingSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SocialLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/StatusPipeline.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/StepCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerBackButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerCardActionBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerEntityAvatar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerFormField.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerFormGridRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerLoadingSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerPropertyRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerSplitButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerStatGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/EntityRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/EntityTabbedRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/StatRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/StatTile.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/filters/ActiveFilterPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/DisclosureRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/DspQuietRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorEmpty.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorLoading.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/OverflowMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/menus/ToolbarMenuPrimitives.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/settings/SettingsActionRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/settings/SettingsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/settings/SettingsPlanGateLabel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/settings/SettingsToggleRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AboutPageContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AnimatedAccordion.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ArtistsDirectory.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AuthLoader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/BenefitsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/BlogAuthorPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/BlogCategoryContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/BlogPostPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/BrandingBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/CTASection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/Combobox.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ComparisonPageContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/DashboardErrorFallback.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/DeferredSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/DocPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ErrorBoundary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/FeaturedArtistsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/LegalPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/PendingShellContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ProfileNotificationsButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ProfileSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/SidebarBottomNowPlayingBridge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/SocialBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/organisms/StandaloneProductPage.tsx": [
       "ds-owner",
       "tokens",
@@ -84,6 +1453,42 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/organisms/SupportPageContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/VoicePageContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/WorkspaceTabsSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/WrappedLinkMissingState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/organisms/billing/CheckoutUnlockCards.tsx": [
       "ds-owner",
       "tokens",
@@ -91,6 +1496,186 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/shell/ActionPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/AgentPulse.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ArtworkThumb.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/DueChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/LabelPills.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/LyricsHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/LyricsList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/MobilePlayerCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/PlayingBars.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/RuntimeUpdateProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/SmartLinkRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/Sparkline.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/Stat.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/SuggestionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/TabletPlayerCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ThreadComposer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ThreadImageCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ThreadTurn.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ThreadVideoCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/TypeBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "packages/ui/": [
       "ds-owner",
@@ -204,6 +1789,9 @@
       "long-content": "Every visible string is fixed copy in the component and it takes no props, so no caller text can grow. ErrorPhoneWidth shows the heading wrapping at 320px.",
       "rtl-overflow": "Its only copy is the fixed English heading and line, centred, with no caller text or input; the page is served in English to blocked accounts, so no right-to-left text can reach it."
     },
+    "apps/web/components/atoms/AmountSelector.tsx": {
+      "empty": "The tile renders one fixed tip amount and owns no collection that could be empty. The detector matched the items-center class in 'group relative flex h-12 w-full items-center justify-center rounded-full'."
+    },
     "apps/web/components/atoms/AnimatedIconSwap.tsx": {
       "empty": "AnimatedIconSwap renders exactly one keyed icon and never a collection; the detector matched the items-center class.",
       "long-content": "AnimatedIconSwap wraps one icon in a box its caller sizes and lays out no text; every caller passes a lucide glyph, so there is no content to overflow (the detector matched the children prop).",
@@ -272,6 +1860,9 @@
       "partial": "The icon draws one fixed music-note path; its two optional props are size (Sized, Compact) and className, so nothing can be partly present.",
       "long-content": "It renders no text; the detector matched its text- colour classes. Rtl shows the mark beside right-to-left copy."
     },
+    "apps/web/components/atoms/JovieLogo.tsx": {
+      "empty": "The logo always renders the fixed Jovie wordmark and owns no collection that could be empty. The detector matched the items-center class in \"cn('flex items-center gap-2', className)\"."
+    },
     "apps/web/components/atoms/Logo.tsx": {
       "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",
       "permission-denied": "Logo only draws the brand wordmark or mark and has no permission input or gated action; the detector matched role='img' on the labelled svg."
@@ -303,11 +1894,60 @@
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
       "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
     },
+    "apps/web/components/features/admin/ActivityTableUnified.tsx": {
+      "error": "It renders the events it is handed and has no failure path of its own; the detector matched the 'error' activity status, whose rows LongContentFiftyEvents shows. A failed activity read is handled by the admin activity page that loads the items.",
+      "offline": "It never fetches: the items stream in from the server page, and its isLoading flag only drives the static ActivityTableSkeleton (the Loading story)."
+    },
+    "apps/web/components/features/admin/AdminReadUnavailable.tsx": {
+      "loading": "The 'Reading current data…' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
+      "offline": "It never fetches: Retry only calls router.refresh(), and a read that failed for lack of connectivity reaches it as the caller's message, which ErrorReadFailed shows.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='status'. A read blocked by a missing admin step-up renders AdminVerificationRequired instead (its PermissionDeniedStepUpRequired story)."
+    },
+    "apps/web/components/features/admin/AdminVerificationRequired.tsx": {
+      "empty": "It holds no collection: a fixed or caller message, the unlock action and an optional step-up error. The detector matched the items-center class.",
+      "error": "The step-up error comes only from useAdminStepUp after a real passkey ceremony fails, which a story cannot trigger without a WebAuthn prompt; AdminStepUp's Error story shows the retry button and AdminVerificationRequired.certificate.test.tsx asserts the alert text and axe-clean markup."
+    },
+    "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx": {
+      "empty": "It holds no collection: the title and button copy only pluralise on count, and the dialog opens only from a non-empty table selection. The detector matched the items-center class."
+    },
+    "apps/web/components/features/admin/CreatorProfileTableRow.tsx": {
+      "offline": "The row never fetches; its verify, feature, marketing, refresh and delete actions are parent callbacks, and a request that failed for lack of connectivity reaches it as status 'error', which ErrorActionsFailed shows."
+    },
+    "apps/web/components/features/admin/DeleteCreatorDialog.tsx": {
+      "empty": "The deleted-data list is a fixed constant (three rows unclaimed, five claimed), never empty; with no profile the dialog renders nothing, which DeleteCreatorDialog.test.tsx asserts."
+    },
+    "apps/web/components/features/admin/MetricsChart.tsx": {
+      "loading": "Its only loading state is next/dynamic's skeleton while the bundled recharts chunk downloads, which takes no prop and lasts only until the chunk resolves, so no static story can hold it. MetricsChart.test.tsx and MetricsChart.certificate.test.tsx render it through a mocked next/dynamic and check its height and axe.",
+      "offline": "It never fetches: the points arrive as props from the server page, and the only network step is the bundled recharts chunk. Connectivity changes nothing it draws once the page has loaded."
+    },
+    "apps/web/components/features/admin/MetricsChartClient.tsx": {
+      "loading": "Its loading state is next/dynamic's placeholder while the MetricsChart chunk downloads; it takes no prop and ends when the chunk resolves, so no static story can hold it. MetricsChartClient.test.tsx renders it through a mocked next/dynamic with an axe check.",
+      "offline": "It never fetches: it forwards the server page's points to the lazily loaded MetricsChart, and the only network step is that bundled chunk."
+    },
+    "apps/web/components/features/admin/OperationalControlPanel.tsx": {
+      "long-content": "It takes no props: every heading, description and toggle label is fixed copy in the source, so no caller or data text can overflow it."
+    },
     "apps/web/components/features/admin/OperatorBanner.tsx": {
       "permission-denied": "The banner has no permission check of its own: the admin and environment gate lives in OperatorBannerWrapper, which returns null for non-admins (its PermissionDeniedNonAdmin story and OperatorBannerWrapper.test.tsx). The detector matched role='alert'."
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/ShippingVelocityCanvas.tsx": {
+      "permission-denied": "It draws the rows it is handed and has no gated action or permission input; the detector matched role='img' on the canvas."
+    },
+    "apps/web/components/features/admin/WaitlistGateFunnel.tsx": {
+      "permission-denied": "It renders counts only and has no gated action or permission input; the detector matched the waitlist role (artist, manager, label) each count is grouped by."
+    },
+    "apps/web/components/features/admin/WaitlistMetrics.tsx": {
+      "error": "It renders four already-loaded counts and has no failure path; the detector matched tone='error', the icon colour of the Email Failures count. A failed waitlist read is handled by the page that loads the metrics."
+    },
+    "apps/web/components/features/admin/WeeklyTrendChart.tsx": {
+      "loading": "Its loading state is next/dynamic's pulse block while the bundled recharts chunk downloads; it takes no prop and ends when the chunk resolves, so no static story can hold it. WeeklyTrendChart.test.tsx renders it through a mocked next/dynamic with an axe check.",
+      "offline": "It never fetches: the weekly rows arrive as props, and the only network step is the bundled recharts chunk."
+    },
+    "apps/web/components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx": {
+      "offline": "Rows arrive as server props; its only client requests are row actions, whose network failure raises the same failure toast ErrorVerifyFailed shows, and load-more, whose failure is swallowed (fetchNextPage().catch), so there is no separate offline UI."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
@@ -318,9 +1958,6 @@
     },
     "apps/web/components/features/auth/AuthLayout.tsx": {
       "empty": "AuthLayout is the auth chrome around one children slot and takes no collection; the detector matched the items-center and items-stretch classes. An absent title and footer is the PartialFormOnly story."
-    },
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": {
-      "permission-denied": "The recap has no permission input or gated action; the detector matched the pricing plan. Sign-in for an existing subscriber is shown by SignInContinue."
     },
     "apps/web/components/features/auth/AuthProviderButtons.tsx": {
       "empty": "The only product caller that renders a provider group, AuthShell, renders it only when at least one provider is enabled and otherwise leads with the email form (AuthShell.test.tsx, 'leads with the email form when no provider is enabled'); AuthProviderButtonSlots has no other caller, so an empty group never renders.",
@@ -404,6 +2041,16 @@
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
       "permission-denied": "PageErrorState has no gated action or permission input; it is the error surface that owners render. The detector matched role='alert'."
     },
+    "apps/web/components/features/home/HomeProfileShowcase.tsx": {
+      "long-content": "Every string the showcase shows comes from the fixed homepage-profile-preview-fixture states picked by stateId; no prop carries caller copy, so there is no longer content to render."
+    },
+    "apps/web/components/features/home/HomeRelationshipPanel.tsx": {
+      "empty": "The panel takes no props and always maps the four fixed RELATIONSHIP_DATA rows; the list can never be empty.",
+      "long-content": "The panel takes no props and renders only the fixed RELATIONSHIP_DATA names, actions and times; there is no caller copy that could run long."
+    },
+    "apps/web/components/features/home/claim-handle/HandleStatusIcon.tsx": {
+      "long-content": "The component renders only a spinner with the fixed label 'Checking Availability' or a check or X icon; the handle and handleError props are read but never shown as text, so no copy can run long."
+    },
     "apps/web/components/features/landing/LandingCTAButton.tsx": {
       "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
     },
@@ -414,6 +2061,21 @@
     },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx": {
+      "long-content": "All copy is fixed in the component (headings, the three step labels and descriptions); the only prop is setup, three booleans, so no caller copy can run long.",
+      "permission-denied": "The empty state has no gated action or role check. The detector matched the copy 'Plan Your Next Release' and 'music, and plans together'."
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton.tsx": {
+      "empty": "The skeleton draws two fixed tab stubs and three placeholder cards from constant keys; it holds no data that could be empty. An empty inbox is OpportunityInboxEmptyState once OpportunityInboxPageClient loads.",
+      "long-content": "It renders no visible text: every bar is an empty skeleton block and its only string is the sr-only status label. OpportunityInboxRouteSkeleton.test.tsx asserts the region holds no other text.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it.",
+      "partial": "The skeleton has no data, so it has no half-loaded face: it draws the same fixed tab stubs and three placeholder cards until the page swaps it out whole. The detector matched the width and height props passed to each placeholder bar.",
+      "permission-denied": "It takes no props and draws the same placeholders for every role; access to Home is decided by the shell layout before the fallback paints, so there is no gated face to draw."
+    },
+    "apps/web/components/features/pay/PayLanding.tsx": {
+      "empty": "The page takes no props and maps only the fixed STEPS, BENEFITS and USE_CASES 'as const' arrays (three, three and four items); no list can be empty.",
+      "long-content": "The page takes no props; every heading, step, benefit and use-case label is fixed marketing copy in the component (for example 'Turn every payment into a follower.'), so no caller copy can run long."
     },
     "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
       "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
@@ -428,6 +2090,10 @@
     },
     "apps/web/components/features/profile/AnonCookieBootstrap.tsx": {
       "error": "The bootstrap returns null; a rejected or non-OK assignment request keeps the ISR default variant and still fires onResolved, so the error has no visual output. AnonCookieBootstrap.certificate.test.tsx covers both failures with axe."
+    },
+    "apps/web/components/features/profile/ArtistThemeProvider.tsx": {
+      "error": "The provider renders only its children and has no error branch; useArtistThemeMutation saves silently ('This mutation is silent (no toasts)'), and the only throw is useArtistTheme's TypeError for a hook used outside the provider, a developer error.",
+      "offline": "The provider renders only its children; a theme save that cannot reach the network has no UI here, because the chosen theme is applied locally first and useArtistThemeMutation saves silently."
     },
     "apps/web/components/features/profile/ClaimBanner.tsx": {
       "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
@@ -555,6 +2221,17 @@
     "apps/web/components/feedback/Banner.tsx": {
       "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."
     },
+    "apps/web/components/homepage/HomepageCertifiedExposure.tsx": {
+      "error": "The exposure receipt renders null and only calls page() and track() once on mount; analytics failures are swallowed by the analytics client, so there is no failure to draw. The detector matched 'Search-submit' in its doc comment.",
+      "long-content": "The component renders null: it has no text to overflow. The detector matched 'name-search' in its doc comment. HomepageCertifiedExposure.certificate.test.tsx asserts it adds nothing to an axe-clean page.",
+      "offline": "The component renders null and never fetches; offline only changes whether the analytics beacon is delivered, which has no visual state. The detector matched 'Search-submit' in its doc comment.",
+      "rtl-overflow": "The component renders null: it has no text or layout to mirror."
+    },
+    "apps/web/components/homepage/HomepageCertifiedSections.tsx": {
+      "empty": "HomepageEditorialFeatureSection throws for fewer than one or more than two previews (asserted in HomepageCertifiedSections.test.tsx), and HomepageCertifiedSections always passes the record's two steps; there is no empty section to draw.",
+      "loading": "A static server-rendered section: nothing is fetched and no pending state exists. The detector matched the next/image loading='lazy' attribute.",
+      "offline": "A static server-rendered section with no requests of its own; offline has no distinct state. The detector matched the next/image loading='lazy' attribute."
+    },
     "apps/web/components/homepage/HomepageEditorial.tsx": {
       "empty": "Every list in the chapters (chapter index, profile rows, release captions, invite steps) maps over typed copy checked into data/homepageEditorialCopy.ts and is never fetched, so none can be empty; the detector matched those .map( calls.",
       "partial": "Each chapter takes one complete copy object whose fields are all required strings (HeroCopy maps every key to string; chapter copy needs headline and body), defaulting to HOMEPAGE_EDITORIAL_COPY, so a chapter cannot render with part of its copy. The detector counted the optional copy and headingId props.",
@@ -566,6 +2243,14 @@
     "apps/web/components/homepage/HomepageSpecSections.tsx": {
       "empty": "HomepageSpecSections cannot receive an empty spec: the content-record schema requires one to twelve sections with the hero first (lib/content-records/marketing-page.ts), and the code default always has all four.",
       "permission-denied": "HomepageSpecSections renders the public homepage with no gated action or permission input; the detector matched 'locked headline', which is a copy rule, not access control."
+    },
+    "apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx": {
+      "empty": "The headline is a required string split into sentence beats, so there is always at least one beat; there is no collection that can be empty. The detector matched beats.map.",
+      "permission-denied": "A public marketing hero with an anonymous claim form; nothing is gated by account or role. The detector matched the phrase 'locked headline' in a doc comment."
+    },
+    "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx": {
+      "long-content": "A decorative aria-hidden light field with no text (HomepageHeroLight.certificate.test.tsx asserts empty text content). The detector matched 'No text' in its doc comment.",
+      "rtl-overflow": "A decorative aria-hidden light field with no text or directional layout to mirror."
     },
     "apps/web/components/homepage/v3/Orbit.tsx": {
       "empty": "Orbit is decorative, aria-hidden geometry: every call site passes a fixed, non-empty literal ring list (homepage chapters, specs moment, home layout footer), so there is no data-driven collection that could be empty."
@@ -652,6 +2337,9 @@
     "apps/web/components/jovie/components/ErrorDisplay.tsx": {
       "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
     },
+    "apps/web/components/jovie/components/FeatureIntroCard.tsx": {
+      "permission-denied": "Every signed-in user sees the same intro catalog; the card gates nothing by role or plan. The detector matched role='region' on the card."
+    },
     "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
       "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
       "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
@@ -664,11 +2352,22 @@
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
       "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
     },
+    "apps/web/components/marketing/CliLandingPage.tsx": {
+      "empty": "The page takes no props and renders fixed command, job and FAQ constants defined beside it, so no list can be empty.",
+      "long-content": "The page takes no props: all copy is fixed constants reviewed in cli-landing.test.tsx, and long commands already scroll inside focusable regions (asserted in CliLandingPage.test.tsx).",
+      "rtl-overflow": "The page takes no props and ships one fixed English body; there is no caller-supplied copy to mirror."
+    },
+    "apps/web/components/marketing/MarketingBentoSection.tsx": {
+      "empty": "The section takes four required named card slots and maps that fixed tuple; it cannot be rendered with no cards. The detector matched cards.map and the grid-rows class."
+    },
     "apps/web/components/marketing/MarketingContainer.tsx": {
       "partial": "MarketingContainer holds no data: width picks one of three boxes and children is whatever the caller places; its optional props (bleed, className) are layout and styling flags with defaults, so nothing can be partially present."
     },
     "apps/web/components/marketing/MarketingHero.tsx": {
       "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
+    },
+    "apps/web/components/marketing/MarketingMetricCard.tsx": {
+      "empty": "A single metric with a required label and value; it owns no collection. The detector matched the items-center and items-end classes."
     },
     "apps/web/components/marketing/MarketingPageShell.tsx": {
       "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
@@ -700,6 +2399,12 @@
       "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
       "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
     },
+    "apps/web/components/molecules/FeatureCard.tsx": {
+      "empty": "FeatureCard renders one card from scalar title, description and metric props and owns no collection; the detector matched the items-center class on the metric badge."
+    },
+    "apps/web/components/molecules/FormStatus.tsx": {
+      "permission-denied": "FormStatus shows the loading, error and success lines its owning form passes and gates nothing; the detector matched role='alert' on the error line."
+    },
     "apps/web/components/molecules/InfoBox.tsx": {
       "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
     },
@@ -709,9 +2414,29 @@
       "offline": "LoadingSkeleton never fetches; its owner decides what replaces it when a request cannot be made, and the detector matched the word skeleton.",
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
     },
+    "apps/web/components/molecules/MeasuredValue.tsx": {
+      "empty": "MeasuredValue renders one reading and owns no collection; a missing reading is its unknown state (the Unknown and NeverSeen stories). The detector matched the items-center class on the unknown branch."
+    },
+    "apps/web/components/molecules/ProfileNavButton.tsx": {
+      "error": "The button has no error UI: its only catch blocks swallow a failed clipboard write or event dispatch by design (`// clipboard access may fail in certain contexts`), which ProfileNavButton.test.tsx asserts leaves the trigger usable.",
+      "partial": "Its only optional props are className and loading, and each variant (logo menu, back link) always renders whole; the menu items that depend on sign-in and viewport width are asserted in ProfileNavButton.test.tsx.",
+      "long-content": "The button shows an icon only and the menu copy is fixed; the artist handle goes into hrefs and never into visible text, so no prop can lengthen what it draws.",
+      "offline": "It never fetches or mutates: every item is a link, a clipboard write or a window event, so lost connectivity only reaches it as the browser's own navigation error. The detector matched the loading prop, shown in LoadingProfile."
+    },
     "apps/web/components/molecules/QRCode.tsx": {
       "loading": "The skeleton shows only while local generation is in flight, and a static story cannot hold that promise open; QRCode.test.tsx renders the skeleton before the encoder resolves and asserts it clears.",
       "offline": "QRCode generates locally and never fetches. A data URL that fails to decode uses the same same-size unavailable fallback as a generation error, which FailedGeneration names and QRCode.test.tsx asserts."
+    },
+    "apps/web/components/molecules/SettingsLoadingSkeleton.tsx": {
+      "empty": "The skeletons are the loading frame and take no data; the only .map draws three fixed placeholder cards (`[1, 2, 3].map`), and the detector matched the word list in the Contacts comment and the items-center class.",
+      "offline": "The skeletons paint while a settings route loads and never fetch or submit, so connectivity cannot reach them; the detector matched the loading and skeleton wording."
+    },
+    "apps/web/components/molecules/SocialLink.tsx": {
+      "loading": "The icon link has no pending phase: the link data arrives as a prop and a press opens the URL at once; the detector matched the comment `// Optional: could add loading state here`.",
+      "offline": "The click tracking is fire-and-forget (`trackSocialClick.mutate`) and the press opens the platform URL in a new tab, so lost connectivity only reaches it as the browser's own page for that tab; nothing the link draws changes."
+    },
+    "apps/web/components/molecules/StatusPipeline.tsx": {
+      "offline": "StatusPipeline only draws the stages its owner passes and never fetches; the detector matched the 'pending' stage state, shown in PendingAllStages."
     },
     "apps/web/components/molecules/UpgradeButton.tsx": {
       "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
@@ -730,11 +2455,21 @@
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     },
+    "apps/web/components/molecules/drawer/DrawerFormGridRow.tsx": {
+      "empty": "The row lays out one label beside one control and owns no collection; the detector matched the items-center class in `'grid items-center gap-2'`."
+    },
     "apps/web/components/molecules/drawer/DrawerInlineNote.tsx": {
       "partial": "The note holds one required message string; tone, inset, className and testId are presentation options shown by Default, ErrorTone and EmptyListNote, so there is no second piece of data that can be missing."
     },
+    "apps/web/components/molecules/drawer/DrawerLoadingSkeleton.tsx": {
+      "empty": "The skeleton is the drawer's loading frame and takes no data; its .map calls draw a fixed four-tab row and contentRows placeholder rows (`contentRowIds.map`), so there is no collection that could be empty.",
+      "offline": "The skeleton paints while a drawer's details load and never fetches or submits, so connectivity cannot reach it; the detector matched the Skeleton atom and the Loading details label."
+    },
     "apps/web/components/molecules/drawer/DrawerMediaThumb.tsx": {
       "permission-denied": "DrawerMediaThumb only renders an image or its fallback and has no gated action or permission input; the detector matched role='img' on the thumb."
+    },
+    "apps/web/components/molecules/drawer/DrawerPropertyRow.tsx": {
+      "empty": "The row renders one label and one value and owns no collection; a missing value is the caller's copy (PartialMissingValue). The detector matched the items-center class in `align === 'start' ? 'items-start' : 'items-center'`."
     },
     "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
       "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
@@ -752,12 +2487,44 @@
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
     },
+    "apps/web/components/molecules/drawer/EntityRail.tsx": {
+      "error": "The rail renders the entity its owner passes and fetches nothing; its only catch swallows a failed property copy (`// Copy failures are non-critical; useClipboard reports the error.`), so there is no error frame of its own."
+    },
     "apps/web/components/molecules/drawer/RightDrawer.tsx": {
       "permission-denied": "RightDrawer is the shell's rail container: it has no account, role or gated action of its own, and a read-only or locked inspector is drawn by the content passed in as children. The detector matched role='dialog' on the mobile sheet."
     },
     "apps/web/components/molecules/drawer/ShareableLinkRow.tsx": {
       "empty": "ShareableLinkRow always renders one required URL with its copy (and optional open) action and never a collection; the detector matched the items-center class.",
       "partial": "It renders one required url: displayValue falls back to that url and the other optional props are density, surface, visibility, labels and callbacks with defaults, so nothing can be partially present (NoOpenButton shows the copy-only row)."
+    },
+    "apps/web/components/molecules/drawer/StatTile.tsx": {
+      "offline": "StatTile only draws the value or state its owner passes and never fetches; a source that cannot answer is shown as the not-measured state (NotMeasured). The detector matched the 'loading' state prop."
+    },
+    "apps/web/components/molecules/inspector/DisclosureRow.tsx": {
+      "empty": "The row toggles one block of children and owns no collection; the detector matched the items-center class on its toggle button."
+    },
+    "apps/web/components/molecules/inspector/InspectorLoading.tsx": {
+      "offline": "It is a static skeleton and never fetches; the detector matched the Skeleton import and the word loading in its test id. Offline data is the caller's state."
+    },
+    "apps/web/components/molecules/inspector/InspectorRail.tsx": {
+      "offline": "The shell never fetches: callers drive isLoading and children, so offline data shows as the Loading story or the caller's own Error body. The detector matched isLoading.",
+      "permission-denied": "The shell has no account or gated action of its own; the detector matched role='tabpanel' and the [role=\"tab\"] focus selector."
+    },
+    "apps/web/components/molecules/settings/SettingsActionRow.tsx": {
+      "empty": "The row renders one required title with optional icon, description and action, and owns no collection; the detector matched the sm:items-start and items-start classes."
+    },
+    "apps/web/components/molecules/settings/SettingsPanel.tsx": {
+      "empty": "The panel renders its children inside one card and owns no collection; the detector matched the items-start and items-center classes. A headerless panel is PartialBodyOnly."
+    },
+    "apps/web/components/molecules/settings/SettingsToggleRow.tsx": {
+      "empty": "The row renders one required title and a switch or plan gate, and owns no collection; the detector matched the items-center and items-start classes."
+    },
+    "apps/web/components/organisms/AboutPageContent.tsx": {
+      "empty": "Every list on the page maps over fixed ABOUT_COPY constants (sections, related links) and ABOUT_FAQ_ITEMS, which are never empty; the component takes no props, so there is no empty-data state.",
+      "long-content": "AboutPageContent takes no props: the headline, sections, contact, related links and FAQ are fixed ABOUT_COPY strings, so no caller text can grow. The detector matched the section text and label fields of that copy."
+    },
+    "apps/web/components/organisms/AnimatedAccordion.tsx": {
+      "partial": "The accordion wraps one required children slot; its optional className, delay and duration are styling and animation timing with defaults, so nothing can be partially present. Open and Closed show its two visibility states."
     },
     "apps/web/components/organisms/AppShellFrame.tsx": {
       "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
@@ -771,8 +2538,24 @@
       "offline": "The skeleton is a static Suspense fallback that makes no request; connectivity belongs to the route that replaces it. The detector matched the word skeleton.",
       "permission-denied": "The fallback renders before any session or role is known and gates nothing. The detector matched role='status' on its loading announcement."
     },
+    "apps/web/components/organisms/AuthLoader.tsx": {
+      "empty": "AuthLoader takes no data and draws one fixed mark and message; it owns no collection. The detector matched the items-center layout classes.",
+      "long-content": "The only text is the fixed 'Loading...' line and the fixed Loading label; there are no props, so no caller copy can grow.",
+      "offline": "AuthLoader never fetches or submits; it is the placeholder a route shows while its own data loads, so connectivity cannot change what it draws. The detector matched the word loading.",
+      "permission-denied": "The loader renders before any session or role is known and gates nothing. The detector matched role='status' on its announcement."
+    },
     "apps/web/components/organisms/AuthShellWrapper.tsx": {
       "empty": "The wrapper composes providers around one route child and owns no collection. The detector matched the 'releases' pending-shell route name and the items-center class; the pending Releases overlay is covered by AuthShellWrapper.test.tsx."
+    },
+    "apps/web/components/organisms/BlogAuthorPage.tsx": {
+      "loading": "BlogAuthorPage is presentation only: the server route loads posts and the profile before it renders, so the body has no loading branch. The detector matched 'content/profile loading' in its doc comment.",
+      "offline": "The body never fetches or submits; the server route owns every request, so connectivity cannot change what it draws. The detector matched the word loading in its doc comment."
+    },
+    "apps/web/components/organisms/BrandingBadge.tsx": {
+      "long-content": "BrandingBadge takes no props and always draws the fixed line 'Made with Jovie', so no caller text can grow; the detector matched the text-xs class."
+    },
+    "apps/web/components/organisms/CTASection.tsx": {
+      "empty": "CTASection renders one heading and one action from required props and owns no collection that could be empty. The detector matched the items-center layout classes."
     },
     "apps/web/components/organisms/CookieBannerMount.tsx": {
       "loading": "The only in-flight state is a null Suspense fallback while PrivacyChoices loads. A static story cannot hold that chunk, and CookieBannerMount.test.tsx covers the banner after the lazy import.",
@@ -786,12 +2569,26 @@
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     },
+    "apps/web/components/organisms/DashboardErrorFallback.tsx": {
+      "loading": "The fallback renders only after the error boundary has caught an error, so it has no loading phase; the detector matched 'while loading your dashboard' in its default message."
+    },
+    "apps/web/components/organisms/DeferredSection.tsx": {
+      "empty": "DeferredSection wraps one required children slot and owns no collection; the detector matched the entries argument of its IntersectionObserver callback.",
+      "partial": "Its optional props (placeholder size, rootMargin, class names and test id) are geometry and styling with defaults, not content fields, so nothing can be partially present; Default and CompactPlaceholder show the two placeholder shapes."
+    },
     "apps/web/components/organisms/DesktopTitlebarSlot.tsx": {
       "error": "The module-level catch only absorbs a failed speculative titlebar import; it never sets render state or draws an error. The existing next/dynamic loader still owns the render import. desktop-startup-contract.cases.mjs executes the rejected warmup and verifies that the desktop render loader remains usable and browser output stays null; DesktopTitlebarSlot.test.tsx covers the mounted titlebar."
+    },
+    "apps/web/components/organisms/ErrorBoundary.tsx": {
+      "empty": "The boundary draws one recovery card for one caught error and owns no collection that could be empty. The detector matched the items-center layout classes.",
+      "permission-denied": "A recovery card with one retry or reload action and no gated action or permission input; the detector matched role='alert'."
     },
     "apps/web/components/organisms/MarketingSignInLink.tsx": {
       "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
       "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
+    },
+    "apps/web/components/organisms/PendingShellContext.tsx": {
+      "empty": "The context holds a single pending route ('releases' or null), not a collection; the null value is the NoopDefault story. The detector matched the word releases in the route type."
     },
     "apps/web/components/organisms/PricingRecipeBody.tsx": {
       "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
@@ -803,12 +2600,35 @@
       "partial": "The dialog's only prop is onClose. The optional analytics and onSave fields belong to stored consent and the cookie modal, not to partial content of this dialog.",
       "long-content": "The title, description, switch label and status lines are fixed copy with no caller text, so the dialog cannot grow. The detector matched text utilities and the description prop name."
     },
+    "apps/web/components/organisms/ProfileNotificationsButton.tsx": {
+      "long-content": "The bell shows an icon only; its accessible name is one of two fixed labels and its tooltip one of four fixed strings, so no caller text can grow. The detector matched the ariaLabel prop."
+    },
+    "apps/web/components/organisms/ProfileSection.tsx": {
+      "empty": "ProfileSection renders one required artist and an optional children slot; it owns no collection that could be empty. The detector matched the items-center layout classes."
+    },
     "apps/web/components/organisms/SharedCommandPalette.tsx": {
       "permission-denied": "The palette renders caller-ranked sections and has no locked, gated or entitlement row; entitlement filtering happens before sections reach it. The detector matched role='option' and role='listbox'."
+    },
+    "apps/web/components/organisms/SidebarBottomNowPlayingBridge.tsx": {
+      "error": "The bridge draws no error face: it reads only the active track's identity and isPlaying, and its catch absorbs a rejected toggleTrack, so a failed play leaves the same paused row with its Play control. SidebarBottomNowPlayingBridge.certificate.test.tsx covers the rejected toggle."
     },
     "apps/web/components/organisms/StandaloneProductPage.tsx": {
       "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
       "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
+    },
+    "apps/web/components/organisms/SupportPageContent.tsx": {
+      "long-content": "SupportPageContent takes no props: the hero, both help paths and the email fallback read fixed SUPPORT_PAGE_COPY constants and the support address, so no caller text can grow. The detector matched the hero title and text utility classes."
+    },
+    "apps/web/components/organisms/VoicePageContent.tsx": {
+      "empty": "The steps grid maps over the fixed VOICE_PAGE_STEPS constant (four steps) and the proof points are a fixed list; the component takes no props, so there is no empty-data state.",
+      "long-content": "VoicePageContent takes no props: hero, steps, consent card and closing band are fixed copy in the component, so no caller text can grow. The detector matched the title and desc fields of VOICE_PAGE_STEPS."
+    },
+    "apps/web/components/organisms/WorkspaceTabsSurface.tsx": {
+      "permission-denied": "The surface renders URL-backed view tabs around caller content and has no gated action or permission input; access to each workspace is decided by the route before it renders. The detector matched role='tab' and role='tablist'."
+    },
+    "apps/web/components/organisms/WrappedLinkMissingState.tsx": {
+      "empty": "The page takes no props and holds no data; it always draws the same heading, hint and Return Home link. The detector matched the items-center layout classes.",
+      "long-content": "Every visible string (title, subtitle, hint and link label) is fixed copy in the component with no props, so no caller text can grow."
     },
     "apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx": {
       "permission-denied": "Every desktop user may download, restart or retry an update; the control has no account, role or gated action. The detector matched role='status' on the polite announcement."
@@ -884,8 +2704,26 @@
       "offline": "Offline takes the same paths as the error waiver: the session comes from the auth client, and the billing and feedback requests fall back or report through the shared toast and the feedback modal, so the trigger and menu have no offline drawing.",
       "permission-denied": "Nothing in the menu is denied: Upgrade is the working checkout path for a free plan and Manage billing replaces it on Pro. The detector matched the upgrade and plan identifiers."
     },
+    "apps/web/components/organisms/user-button/UserButtonLoading.tsx": {
+      "offline": "These are the placeholders shown while the session or the plan is still loading, and the trigger avatar. They take no connectivity input and fetch nothing; an offline account button stays on the same placeholder, which the Loading stories show.",
+      "permission-denied": "The placeholders and the avatar carry no action and no account, role or plan check, so nothing in them can be denied. The detector matched the billing identifier in BillingLoadingRow."
+    },
+    "apps/web/components/shell/ActionPill.tsx": {
+      "error": "ActionPill is a pure presentational button with no request of its own; the detector matched type?: 'button' | 'submit'. Any submit outcome belongs to the caller's form.",
+      "offline": "It never fetches; the detector matched the 'submit' button type. Offline handling belongs to whatever the caller's onClick or form does."
+    },
+    "apps/web/components/shell/AgentPulse.tsx": {
+      "partial": "AgentPulse takes only two styling props (className, durationMs) and no data, so there is nothing to be partially present. AgentPulse.certificate.test.tsx renders the default and the overridden ring axe-clean.",
+      "long-content": "It renders one aria-hidden decorative ring with no visible text; the detector matched title='Agent working', a fixed hover title, so no caller copy can grow.",
+      "rtl-overflow": "It renders one aria-hidden inset ring (absolute inset-0) with no text, so direction cannot change or overflow it; the detector matched title='Agent working'."
+    },
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
+    },
+    "apps/web/components/shell/ArtworkThumb.tsx": {
+      "offline": "It does no fetch of its own: an offline image load fails like any broken source and paints the same cover tile as the Error story (ErrorEmptySource), which ArtworkThumb.certificate.test.tsx asserts for a failed load.",
+      "long-content": "title is never rendered as text; it only seeds the deterministic fallback tile colour (ArtworkFallbackTile seed), so long copy cannot reach the layout.",
+      "rtl-overflow": "It renders a fixed-size square tile with no text (title only seeds the fallback colours), so document direction cannot change or overflow it."
     },
     "apps/web/components/shell/AudioPlayControl.tsx": {
       "offline": "The play button fetches nothing and has no connectivity input: it renders isPlaying and isLoading from its owner, so a source that cannot load while offline reaches it as the Loading story. The detector matched the isLoading prop."
@@ -911,16 +2749,51 @@
       "long-content": "The skeleton renders no visible text, only fixed-size placeholder blocks and a fixed 'Loading lyrics' label, so there is no content to grow.",
       "offline": "The skeleton is a static route fallback that fetches nothing; when the lyrics route cannot load, the route's error boundary replaces it, not the skeleton."
     },
+    "apps/web/components/shell/PlayingBars.tsx": {
+      "empty": "PlayingBars draws three fixed bars and owns no collection; the detector matched the items-end and place-items-center classes.",
+      "partial": "Its only optional props are className and an aria label override, with no data to be partially present; PlayingBars.certificate.test.tsx covers both forms axe-clean.",
+      "long-content": "It renders no visible text: label is only the aria-label of the role='img' indicator, so long copy never reaches the layout.",
+      "permission-denied": "A now-playing indicator has no account, role or gated action; the detector matched role='img'.",
+      "rtl-overflow": "It renders three centred bars and no visible text (label is only the aria-label), so document direction does not change or overflow it."
+    },
+    "apps/web/components/shell/RuntimeUpdatePill.tsx": {
+      "offline": "The pill never fetches or submits: its press reloads the page on web or restarts the desktop app through the Electron bridge. Whether an update exists is useVersionMonitor's and the desktop updater's, and RuntimeUpdateProvider renders no pill without one."
+    },
+    "apps/web/components/shell/RuntimeUpdateProvider.tsx": {
+      "error": "A failed desktop install (.catch(() => setApplying(false))) clears the busy flag and the pill returns to its ready label, which RuntimeUpdateProvider.certificate.test.tsx asserts.",
+      "long-content": "Its only UI is RuntimeUpdatePill, whose title and description are fixed update copy built here (for example 'Restart Jovie to update'); the pill also truncates its label at max-w-80, so no caller copy can run long.",
+      "rtl-overflow": "Its only UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow.",
+      "loading": "Its busy face is RuntimeUpdatePill disabled with the Downloading or Updating label, drawn in RuntimeUpdatePill.stories LoadingUpdating; RuntimeUpdateProvider.certificate.test.tsx asserts the provider passes busy and the pill shows Updating Jovie disabled after apply.",
+      "offline": "The provider never fetches: whether an update exists comes from useVersionMonitor and the desktop updater, and applying reloads the page or restarts the app, so connectivity has no face of its own here."
+    },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
+    },
+    "apps/web/components/shell/Sparkline.tsx": {
+      "error": "The chart takes points from its caller and never loads anything; the detector matched the var(--color-error-text) stroke token for the down trend.",
+      "permission-denied": "A sparkline has no account, role or gated action; the detector matched role='img' on the chart svg."
+    },
+    "apps/web/components/shell/SuggestionCard.tsx": {
+      "empty": "The card renders one required title, body and action label and owns no collection; the detector matched the items-center classes."
     },
     "apps/web/components/shell/TasksRouteSkeleton.tsx": {
       "empty": "A fixed skeleton with no props: TaskWorkspaceLoadingRows draws five constant rows, so there is no collection that can be empty. The detector matched the items-center layout class.",
       "long-content": "It renders skeleton bars and a fixed Loading Tasks label only, with no text from any caller, so nothing can overflow. The detector matched aria-label.",
       "offline": "A static loading frame with no fetch or mutation; the Tasks route that shows it owns any network failure. The detector matched the skeleton classes (Loading)."
     },
+    "apps/web/components/shell/ThreadComposer.tsx": {
+      "error": "The composer has no failure UI: it clears its draft on submit and hands text to onSubmit, and its doc comment says callers attach their own .catch. The detector matched onSubmit and that .catch.",
+      "offline": "It never fetches; it forwards isLoading and isSubmitting to ChatInput (LoadingShell, LoadingSubmitting) and the caller's onSubmit owns any network work."
+    },
+    "apps/web/components/shell/ThreadImageCard.tsx": {
+      "empty": "The card renders one required prompt and owns no collection; the detector matched the inline-flex items-center toolbar class. A ready card with no actions is ReadyWithoutActions."
+    },
     "apps/web/components/shell/Tooltip.tsx": {
       "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
+    },
+    "apps/web/components/shell/TypeBadge.tsx": {
+      "empty": "TypeBadge renders one required label and owns no collection; the detector matched the items-center class.",
+      "permission-denied": "A decorative type pill has no account or gated action; the detector matched the words 'contact role' in its doc comment."
     },
     "apps/web/components/shell/useChatThreadContextMenu.tsx": {
       "empty": "The hook always builds the same two menu items (Copy Session ID, Archive) for any thread and renders no menu while closed (Closed story), so there is no empty item list. The detector matched the items field of the menu state.",

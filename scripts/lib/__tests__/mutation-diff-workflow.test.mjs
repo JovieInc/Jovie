@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,13 +10,20 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { commitMutationFixture } from './fixtures/mutation-git-receipt.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const workflow = readFileSync(
+const fullWorkflow = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
   'utf8'
 );
+// The one-off sharded baseline (2026-11-15) is the only hosted part; every contract
+// below holds for the diff and rolling-sweep jobs, which come before it.
+const baselineAt = fullWorkflow.indexOf('\n  baseline:');
+const workflow = fullWorkflow.slice(0, baselineAt);
+const baseline = fullWorkflow.slice(baselineAt);
 
 describe('Mutation Diff Gem contract', () => {
   // Policy 2026-10-29 (supersedes 2026-10-26 hosted-by-default): hosted CI is saturated, so every
@@ -43,15 +51,14 @@ describe('Mutation Diff Gem contract', () => {
     expect(workflow).toMatch(/--touch-file/u);
   });
 
-  it('confines its one secret to the issue-filing step and never runs on pull requests', () => {
-    const secrets = workflow.match(/\$\{\{\s*secrets\.[A-Z_]+/gu) ?? [];
-    expect(secrets).toHaveLength(1);
-    expect(secrets[0]).toMatch(/LINEAR_API_KEY/u);
+  it('prepares bounded survivor drafts without a secret or PR trigger', () => {
+    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./u);
     const step = workflow
-      .split('- name: File survivor issues')[1]
+      .split('- name: Prepare survivor issue drafts')[1]
       .split(/\n {6}- name:/u)[0];
-    expect(step).toMatch(/secrets\.LINEAR_API_KEY/u);
     expect(step).toMatch(/mutation-sweep-file-issues\.mjs/u);
+    expect(step).toContain('--drafts');
+    expect(step).toContain('--state');
     expect(step).not.toMatch(/mutation-sweep\.mjs|stryker|vitest/iu);
     expect(workflow).not.toMatch(/pull_request/u);
   });
@@ -59,7 +66,7 @@ describe('Mutation Diff Gem contract', () => {
   it('is event-driven: no cron, self-chains through workflow_dispatch only', () => {
     expect(workflow).not.toMatch(/^\s*schedule:/mu);
     expect(workflow).toMatch(
-      /cli\.ts gh --priority default -- workflow run mutation-diff\.yml --ref main/u
+      /node \.github\/scripts\/mutation-next-target-cli\.mjs dispatch/u
     );
     expect(workflow).toContain('actions: write');
   });
@@ -71,6 +78,52 @@ describe('Mutation Diff Gem contract', () => {
     expect(sweep).toContain('group: mutation-sweep');
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
+  });
+});
+
+describe('Mutation baseline contract', () => {
+  it('runs only on a main dispatch, hosted, with capped parallelism', () => {
+    const jobs = load(fullWorkflow).jobs;
+    for (const id of ['baseline', 'baseline-merge']) {
+      expect(jobs[id].if).toContain("inputs.mode == 'baseline'");
+      expect(jobs[id].if).toContain("github.ref == 'refs/heads/main'");
+      expect(jobs[id].if).toContain("github.event_name == 'workflow_dispatch'");
+      expect(jobs[id]['runs-on']).toBe('ubuntu-24.04');
+    }
+    expect(jobs.sweep.if).toContain("inputs.mode != 'baseline'");
+    expect(jobs.baseline.strategy.matrix.shard).toHaveLength(40);
+    expect(jobs.baseline.strategy['max-parallel']).toBeLessThanOrEqual(16);
+    expect(baseline).not.toMatch(/secrets\./u);
+    expect(baseline).not.toMatch(/workflow run mutation-diff/u);
+  });
+
+  it('saves the merged state where every later sweep folds it in', () => {
+    const jobs = load(fullWorkflow).jobs;
+    const merge = jobs['baseline-merge'];
+    expect(merge.needs).toBe('baseline');
+    expect(merge.if).toContain('always()');
+    // A shared group would let any queued sweep replace the pending merge.
+    expect(merge.concurrency).toBeUndefined();
+    const saves = merge.steps
+      .filter(step => step.uses?.startsWith('actions/cache/save@'))
+      .map(step => [step.with.path, step.with.key.split('$')[0]]);
+    expect(saves).toEqual([
+      ['.cache/jovie-mutation', 'mutation-sweep-portable-v2-'],
+      ['.cache/jovie-mutation-baseline', 'mutation-baseline-v1-'],
+    ]);
+    const restore = jobs.sweep.steps.find(
+      step => step.with?.path === '.cache/jovie-mutation-baseline'
+    );
+    expect(restore.with['restore-keys'].trim()).toBe('mutation-baseline-v1-');
+    const score = jobs.sweep.steps.find(step => step.id === 'score').run;
+    const fold = score.indexOf(
+      '.cache/jovie-mutation-baseline/sweep-state.json'
+    );
+    expect(fold).toBeGreaterThan(score.indexOf('flock -n 9'));
+    expect(fold).toBeLessThan(score.indexOf('mutation-sweep.mjs'));
+    expect(baseline).toMatch(/--shard "\$SHARD\/40"/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs merge/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs summary/u);
   });
 });
 
@@ -87,7 +140,242 @@ afterEach(() => {
     rmSync(root, { recursive: true, force: true });
 });
 
+describe('diff mutation capacity admission', () => {
+  it.each([
+    [0, 0, 0, true, true, 0],
+    [75, 0, 0, false, false, 0],
+    [23, 0, 23, false, false, 0],
+    [0, 75, 0, true, false, 0],
+    [0, 23, 23, true, false, 0],
+    [0, 0, 1, true, true, 1],
+    [0, 0, 0, false, false, 0, false],
+  ])(
+    'preflight %i then %i: exits %i, setup=%s, score=%s',
+    (earlyStatus, lateStatus, expectedStatus, setupExpected, scoreExpected, mutationStatus, hasFiles = true) => {
+      const diff = load(workflow).jobs.mutate.steps;
+      const capacity = diff.find(step => step.id === 'capacity');
+      const setup = diff.find(step => step.name === 'Setup Node.js and pnpm');
+      const mutation = diff.find(step => step.id === 'mutation');
+      const upload = diff.find(step => step.name === 'Upload mutation reports');
+      expect(
+        capacity,
+        'capacity must be checked before dependency setup'
+      ).toBeDefined();
+      expect(diff.indexOf(capacity)).toBeLessThan(diff.indexOf(setup));
+      expect(capacity.if).toBe("steps.files.outputs.files != ''");
+      expect(capacity.env.MUTATION_MAX_LOAD).toBe('8');
+      expect(mutation.env.MUTATION_MAX_LOAD).toBe('8');
+      expect(upload.if).toContain("steps.mutation.outputs.started == 'true'");
+      expect(upload.if).toContain('always()');
+
+      const root = mkdtempSync(resolve(tmpdir(), 'mutation-capacity-'));
+      fixtureRoots.push(root);
+      mkdirSync(resolve(root, 'scripts'));
+      const reportPath = resolve(
+        root,
+        'apps/web/reports/mutation/diff/report.json'
+      );
+      mkdirSync(resolve(root, 'apps/web/reports/mutation/diff'), {
+        recursive: true,
+      });
+      writeFileSync(reportPath, '{"stale":true}');
+      writeFileSync(
+        resolve(root, 'scripts/mutation-sweep-preflight.mjs'),
+        'process.exit(Number(process.env.PREFLIGHT_STATUS));\n'
+      );
+      writeFileSync(
+        resolve(root, 'scripts/mutation-diff.mjs'),
+        "import { writeFileSync, appendFileSync } from 'node:fs'; writeFileSync('scored', 'yes'); writeFileSync('apps/web/reports/mutation/diff/report.json', '{\"fresh\":true}'); appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'score: measured\\n'); process.exit(Number(process.env.MUTATION_STATUS));\n"
+      );
+      const summary = resolve(root, 'summary');
+      const output = resolve(root, 'output');
+      writeFileSync(summary, '');
+      writeFileSync(output, '');
+      const outputs = {
+        files: { files: hasFiles ? 'apps/web/lib/auth/example.ts' : '' },
+      };
+      const admitted = step =>
+        step.if
+          .replace(/^\$\{\{\s*(.*?)\s*\}\}$/u, '$1')
+          .split(' && ')
+          .every(condition => {
+            switch (condition) {
+              case 'always()':
+                return true;
+              case "hashFiles('apps/web/reports/mutation/diff/*.json') != ''":
+                return existsSync(reportPath);
+              case "steps.files.outputs.files != ''":
+                return outputs.files.files !== '';
+              case "steps.capacity.outputs.run == 'true'":
+                return outputs.capacity?.run === 'true';
+              case "steps.mutation.outputs.started == 'true'":
+                return outputs.mutation?.started === 'true';
+              default:
+                throw new Error(`unsupported step condition: ${condition}`);
+            }
+          });
+      const run = (step, status) =>
+        spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ...step.env,
+            PREFLIGHT_STATUS: String(status),
+            MUTATION_STATUS: String(mutationStatus),
+            GITHUB_OUTPUT: output,
+            GITHUB_STEP_SUMMARY: summary,
+          },
+        });
+      expect(admitted(capacity)).toBe(hasFiles);
+      let status = admitted(capacity) ? run(capacity, earlyStatus).status : 0;
+      outputs.capacity = Object.fromEntries(
+        readFileSync(output, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map(row => row.split('='))
+      );
+      const setupRan = status === 0 && admitted(setup);
+      if (setupRan) writeFileSync(resolve(root, 'setup'), 'yes');
+      if (status === 0 && admitted(mutation))
+        status = run(mutation, lateStatus).status;
+      expect(status).toBe(expectedStatus);
+      expect(existsSync(resolve(root, 'setup'))).toBe(setupExpected);
+      expect(existsSync(resolve(root, 'scored'))).toBe(scoreExpected);
+      const receipt = readFileSync(output, 'utf8');
+      outputs.mutation = Object.fromEntries(
+        receipt
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map(row => row.split('='))
+      );
+      // A pre-existing report is insufficient. A failing harness may upload its
+      // fresh report because the upload step uses always() and the start receipt.
+      expect(admitted(upload)).toBe(scoreExpected);
+      expect(JSON.parse(readFileSync(reportPath, 'utf8'))).toEqual(
+        scoreExpected ? { fresh: true } : { stale: true }
+      );
+      const report = readFileSync(summary, 'utf8');
+      expect(receipt.includes('started=true')).toBe(scoreExpected);
+      expect(report.includes('score: measured')).toBe(scoreExpected);
+      if (earlyStatus === 75 || lateStatus === 75)
+        expect(report).toContain('no mutation score produced');
+      if (expectedStatus !== 0) expect(report).not.toContain('Skipped');
+    }
+  );
+});
+
 describe('portable mutation evidence', () => {
+  it.each([true, false])(
+    'snapshots the failed sweep outside the workspace with optional files present=%s',
+    optional => {
+      const sweep = load(workflow).jobs.sweep.steps;
+      const save = sweep.find(step => step.name === 'Save sweep state');
+      const snapshot = sweep.find(step => step.id === 'snapshot');
+      const upload = sweep.find(
+        step => step.name === 'Upload sweep state and survivor tasks'
+      );
+      expect(snapshot).toBeDefined();
+      expect(sweep.indexOf(snapshot)).toBeLessThan(sweep.indexOf(save));
+      expect(sweep.indexOf(snapshot)).toBeLessThan(sweep.indexOf(upload));
+      expect(upload.if).toContain("steps.snapshot.outcome == 'success'");
+      expect(upload.if).not.toContain('hashFiles');
+      const condition = snapshot.if
+        .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+        .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
+      const allowed = (capacity, portable, hasState) =>
+        runInNewContext(condition, {
+          always: () => true,
+          hashFiles: () => (hasState ? 'digest' : ''),
+          steps: {
+            capacity: { outputs: { run: capacity } },
+            portable_state: { outcome: portable },
+            score: { outcome: 'failure', outputs: { admitted: 'true' } },
+          },
+        });
+      expect(allowed('true', 'success', true)).toBe(true);
+      expect(allowed('false', 'success', true)).toBe(false);
+      expect(allowed('true', 'failure', true)).toBe(false);
+      expect(allowed('true', 'success', false)).toBe(false);
+
+      const root = mkdtempSync(resolve(tmpdir(), 'mutation-snapshot-'));
+      fixtureRoots.push(root);
+      const workspace = resolve(root, 'workspace');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const cache = resolve(workspace, '.cache/jovie-mutation');
+      mkdirSync(resolve(cache, 'survivor-tasks'), { recursive: true });
+      mkdirSync(runnerTemp);
+      const files = {
+        'sweep-state.json': '{"score":42}\n',
+        ...(optional
+          ? {
+              'sweep-state.json.runs.jsonl': '{"run":1}\n',
+              'survivor-tasks/task.json': '{"survivor":true}\n',
+            }
+          : {}),
+      };
+      for (const [name, content] of Object.entries(files))
+        writeFileSync(resolve(cache, name), content);
+      writeFileSync(resolve(workspace, 'source.txt'), 'fixture');
+      commitMutationFixture(workspace);
+      const sha = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: workspace,
+        encoding: 'utf8',
+      }).stdout.trim();
+      if (optional) {
+        writeFileSync(
+          resolve(runnerTemp, 'test-quality-latest.json'),
+          '{"metric":1}\n'
+        );
+        writeFileSync(
+          resolve(runnerTemp, 'baseline-proposal.json'),
+          '{"baseline":1}\n'
+        );
+      }
+      const score = spawnSync('bash', ['-c', 'exit 7']);
+      expect(score.status).toBe(7);
+      const result = spawnSync(
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', snapshot.run],
+        {
+          cwd: workspace,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUNNER_TEMP: runnerTemp,
+            SCORE_SHA: sha,
+            UI_ONLY: 'false',
+            UI_INCLUDE: 'packages/ui/',
+            MAX_FILES: '4',
+            GITHUB_RUN_ID: '123',
+            GITHUB_RUN_ATTEMPT: '1',
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      for (const [name, content] of Object.entries(files)) {
+        expect(readFileSync(resolve(cache, name), 'utf8')).toBe(content);
+        expect(
+          readFileSync(resolve(runnerTemp, 'sweep-out', name), 'utf8')
+        ).toBe(content);
+      }
+      for (const name of [
+        'test-quality-latest.json',
+        'baseline-proposal.json',
+      ]) {
+        expect(existsSync(resolve(runnerTemp, 'sweep-out', name))).toBe(
+          optional
+        );
+        if (optional)
+          expect(readFileSync(resolve(runnerTemp, 'sweep-out', name))).toEqual(
+            readFileSync(resolve(runnerTemp, name))
+          );
+      }
+    }
+  );
+
   it('archives relative to the checkout and restores identical scores across runner homes', () => {
     const root = mkdtempSync(resolve(tmpdir(), 'certificate-cache-'));
     fixtureRoots.push(root);

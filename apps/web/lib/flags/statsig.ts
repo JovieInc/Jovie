@@ -95,6 +95,12 @@ export function createSpecsDataStore(): DataStore | undefined {
   if (!redis) return undefined;
   const storeKey = (key: string) => `statsig:${key}`;
   return {
+    // statsig-node-core's Rust specs adapter refuses to start unless the
+    // DataStore exposes an `initialize` function ("DataStore Error: No
+    // 'initialize' function provided") - without it the Redis spec store is
+    // silently skipped and every cold-start init waits on the network.
+    // See JOV-10537.
+    initialize: async () => {},
     get: async key => {
       try {
         const value = await withTimeout(redis.get(storeKey(key)), {

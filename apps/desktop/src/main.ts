@@ -156,7 +156,6 @@ import {
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
-  decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
@@ -165,12 +164,12 @@ import {
   hostedUrlCandidates,
   isChromiumErrorDocument,
   parseDidStartNavigation,
-  RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
   shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
+import { createRecoveryUnlatchController } from './renderer-recovery-unlatch';
 import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
@@ -1731,13 +1730,19 @@ function showDesktopLoadFailure(
   rendererBootControllers.get(win.webContents.id)?.beginRecoveryUnlatch();
 }
 
-async function probeAppUrl(url: string): Promise<boolean> {
+async function probeAppUrl(
+  url: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  if (signal?.aborted) return false;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
   try {
     const response = await fetch(url, {
       cache: 'no-store',
-      signal: controller.signal,
+      signal: signal
+        ? AbortSignal.any([controller.signal, signal])
+        : controller.signal,
     });
     return response.status > 0;
   } catch {
@@ -1748,19 +1753,24 @@ async function probeAppUrl(url: string): Promise<boolean> {
 }
 
 async function findReachableHostedUrl(
-  hostedUrl: string
+  hostedUrl: string,
+  signal?: AbortSignal
 ): Promise<string | null> {
   for (const candidate of hostedUrlCandidates(APP_URL, hostedUrl)) {
+    if (signal?.aborted) return null;
     const origin = new URL(candidate).origin;
     if (
-      await probeAppUrl(new URL('/api/health/build-info', origin).toString())
+      await probeAppUrl(
+        new URL('/api/health/build-info', origin).toString(),
+        signal
+      )
     ) {
       return candidate;
     }
-    if (await probeAppUrl(origin)) {
+    if (await probeAppUrl(origin, signal)) {
       return candidate;
     }
-    if (await probeAppUrl(candidate)) {
+    if (await probeAppUrl(candidate, signal)) {
       return candidate;
     }
   }
@@ -2025,7 +2035,6 @@ function attachRendererRecovery(
   let lastHostedUrl = APP_ENTRY_URL;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
-  let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const armWatchdogs = shouldArmRendererWatchdogsForAppEnv(APP_ENV);
   const webContentsId = win.webContents.id;
   const localHostedLoadRecovery = createLocalHostedLoadRetryController({
@@ -2055,47 +2064,16 @@ function attachRendererRecovery(
     clearLoadWatchdog();
   };
 
-  const stopRecoveryUnlatch = (): void => {
-    if (recoveryUnlatchTimer !== null) {
-      clearTimeout(recoveryUnlatchTimer);
-      recoveryUnlatchTimer = null;
-    }
-  };
-
-  const beginRecoveryUnlatch = (): void => {
-    stopRecoveryUnlatch();
-    // First probe does not wait for the data: URL to commit. Recapture 5:52
-    // PT had :3100 already warm while the recovery shell stayed latched.
-    let recoveryArmed = true;
-    const poll = (): void => {
-      if (win.isDestroyed() || rendererBooted) {
-        stopRecoveryUnlatch();
-        return;
-      }
-      void findReachableHostedUrl(lastHostedUrl).then(reachableHostedUrl => {
-        if (win.isDestroyed() || rendererBooted) {
-          stopRecoveryUnlatch();
-          return;
-        }
-        const action = decideRecoveryUnlatch({
-          showingFailurePage:
-            recoveryArmed ||
-            win.webContents.getURL().startsWith('data:text/html'),
-          booted: rendererBooted,
-          windowDestroyed: win.isDestroyed(),
-          reachableHostedUrl,
-        });
-        if (action === 'reload-hosted' && reachableHostedUrl) {
-          recoveryArmed = false;
-          lastHostedUrl = reachableHostedUrl;
-          void win.loadURL(reachableHostedUrl);
-          return;
-        }
-        recoveryUnlatchTimer = setTimeout(poll, RECOVERY_UNLATCH_POLL_MS);
-      });
-    };
-    poll();
-  };
+  const recoveryUnlatch = createRecoveryUnlatchController({
+    findReachableHostedUrl,
+    getHostedUrl: () => lastHostedUrl,
+    isWindowDestroyed: () => win.isDestroyed(),
+    isRendererBooted: () => rendererBooted,
+    reloadHosted: reachableHostedUrl => {
+      lastHostedUrl = reachableHostedUrl;
+      void win.loadURL(reachableHostedUrl);
+    },
+  });
 
   const recoverOrShowFailure = (
     reason: DesktopLoadFailureReason,
@@ -2228,16 +2206,16 @@ function attachRendererRecovery(
     localHostedLoadRecovery.reset();
     hostedLoadRetryCount = 0;
     clearAllWatchdogs();
-    stopRecoveryUnlatch();
+    recoveryUnlatch.stop();
   };
 
   rendererBootControllers.set(webContentsId, {
     markBooted: markRendererBooted,
-    beginRecoveryUnlatch,
+    beginRecoveryUnlatch: recoveryUnlatch.begin,
     dispose: () => {
       clearAllWatchdogs();
       localHostedLoadRecovery.dispose();
-      stopRecoveryUnlatch();
+      recoveryUnlatch.dispose();
       rendererBootControllers.delete(webContentsId);
     },
   });
@@ -2258,6 +2236,7 @@ function attachRendererRecovery(
       }) === 'arm-load-watchdog'
     ) {
       localHostedLoadRecovery.onHostedNavigationStarted();
+      recoveryUnlatch.stop();
       lastHostedUrl = navigation.url;
       armLoadWatchdog(navigation.url);
     }

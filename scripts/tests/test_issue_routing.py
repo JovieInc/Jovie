@@ -76,12 +76,12 @@ class RouteIssueTest(unittest.TestCase):
     def route(self, item, **kwargs):
         return remediation.route_issue(item, PROVIDERS, POLICY, kwargs.pop("availability", availability()), **kwargs)
 
-    def test_standard_work_goes_to_free_devin_first_then_subsidized_then_sonnet(self):
+    def test_standard_work_keeps_eligible_cost_order(self):
         self.assertEqual(chosen(self.route(issue())), ("devin", "swe-2-medium"))
         self.assertEqual(chosen(self.route(issue(), availability=availability({"devin"}))),
                          ("hyperagent", "z-ai/glm-5.3"))
         decision = self.route(issue(), availability=availability({"devin", "hyperagent"}))
-        self.assertEqual(chosen(decision), ("claude", "claude-sonnet-5-5"))
+        self.assertEqual(chosen(decision), ("grok", "grok-4.7"))
         self.assertIn("cheaper skipped: devin/swe-2-medium=down, hyperagent/z-ai/glm-5.3=down", decision["rationale"])
 
     def test_bounded_work_takes_the_cheapest_lane(self):
@@ -89,10 +89,10 @@ class RouteIssueTest(unittest.TestCase):
         self.assertEqual(decision["required"], "bounded")
         self.assertEqual(chosen(decision), ("devin", "swe-2-medium"))
 
-    def test_frontier_goes_to_opus_then_codex_as_claude_quota_fills(self):
+    def test_frontier_uses_capable_codex_without_spending_protected_subscription(self):
         work = issue(title="Production controller rebinds superseded generations")
         decision = self.route(work)
-        self.assertEqual(chosen(decision), ("claude", "claude-opus-5-5"))
+        self.assertEqual(chosen(decision), ("codex", "codex-default"))
         self.assertIn("below floor:", decision["rationale"])
         self.assertIn("devin/swe-2-medium", decision["rationale"])
         busy = self.route(work, availability=availability(pressure={"claude": 0.5}))
@@ -103,7 +103,7 @@ class RouteIssueTest(unittest.TestCase):
         decision = self.route(issue(title="Merge queue admission"), availability=availability({"claude", "codex"}))
         self.assertIsNone(decision["chosen"])
         self.assertIn("held, never downgraded", decision["rationale"])
-        self.assertEqual({row["lane"] for row in decision["candidates"]}, {"claude", "codex"})
+        self.assertEqual({row["lane"] for row in decision["candidates"]}, {"codex"})
 
     def test_no_enabled_route_for_the_floor_is_held(self):
         only_cheap = {"devin": PROVIDERS["devin"]}
@@ -111,11 +111,12 @@ class RouteIssueTest(unittest.TestCase):
         self.assertIsNone(decision["chosen"])
         self.assertIn("no enabled route", decision["rationale"])
 
-    def test_explicit_route_label_pins_lane_and_model_above_the_floor(self):
-        self.assertEqual(chosen(self.route(issue(labels=["route:claude:opus"]))), ("claude", "claude-opus-5-5"))
-        self.assertEqual(chosen(self.route(issue(labels=["claude"]))), ("claude", "claude-sonnet-5-5"))
+    def test_explicit_labels_pin_only_eligible_lanes_above_the_floor(self):
+        for labels in (["route:claude:opus"], ["claude"]):
+            self.assertEqual(chosen(self.route(issue(labels=labels))), ("devin", "swe-2-medium"))
+        self.assertEqual(chosen(self.route(issue(labels=["route:codex"]))), ("codex", "codex-default"))
         pinned = self.route(issue(title="Merge queue stalls", labels=["devin"]))
-        self.assertEqual(chosen(pinned), ("claude", "claude-opus-5-5"))
+        self.assertEqual(chosen(pinned), ("codex", "codex-default"))
         self.assertEqual(pinned["notes"], ["explicit-below-floor-or-disabled:devin"])
 
     def test_sensitive_work_stays_on_the_guarded_lane(self):
@@ -230,34 +231,28 @@ class AvailabilityTest(unittest.TestCase):
 
     def test_router_end_to_end_logs_its_rationale(self):
         # The router reads the wall clock for pool expiry, and Hyperagent's allowance ends at UTC midnight.
-        # Pin the clock to the last UTC noon so the 1 hour Claude window below never races midnight
-        # (this test failed every night from 23:00 to 00:00 UTC).
+        # Pin UTC noon so the protected open-window fixture never races the company pool's reset.
         now = 1_794_484_800.0  # 2026-11-12T12:00:00Z
         with patch.object(lane.time, "time", return_value=now):
             self._router_end_to_end(now)
 
     def _router_end_to_end(self, now: float):
-        router = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
+        router = lane.issue_router(self.host, "codex", PROVIDERS, POLICY)
         frontier = lane_issue("JOV-9", "Staging controller blocks every authorization")
-        self.assertIsNone(lane.admission_rejection(frontier, {}, now, frozenset(), "claude", router))
-        # Standard work: Devin is cheapest, but an idle Claude lane has no window to lose, so the pool with
-        # a real expiry (Hyperagent's daily cap) takes it (model-pools.json).
-        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, now, frozenset(), "claude", router),
+        self.assertIsNone(lane.admission_rejection(frontier, {}, now, frozenset(), "codex", router))
+        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, now, frozenset(), "codex", router),
                          "routed:hyperagent")
-        self.assertIn(("claude-subscription", None, "claude-lane-window-not-open"), [
-            (row["pool"], row["expiresAt"], row["basis"]) for row in router.decisions["JOV-10"]["pool"]["considered"]])
-        # Once the Claude 5h window is open it is the allowance lost first.
+        self.assertNotIn("claude-subscription", [row["pool"] for row in router.decisions["JOV-10"]["pool"]["considered"]])
         self.write("claude-quota.json", {"runs": [{"at": now - 4 * 3600, "model": "claude-opus-5-5"}]})
-        opened = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
-        self.assertIsNone(lane.admission_rejection(lane_issue("JOV-11"), {}, now, frozenset(), "claude", opened))
-        self.assertEqual(opened.decisions["JOV-11"]["pool"]["chosenPool"], "claude-subscription")
+        opened = lane.issue_router(self.host, "codex", PROVIDERS, POLICY)
+        self.assertEqual(lane.admission_rejection(lane_issue("JOV-11"), {}, now, frozenset(), "codex", opened),
+                         "routed:hyperagent")
         decision = router.decisions["JOV-9"]
-        self.assertEqual(decision["chosen"]["model"], "claude-opus-5-5")
-        lane.log_route(self.host, "claude", decision)
+        self.assertEqual(decision["chosen"]["model"], "codex-default")
+        lane.log_route(self.host, "codex", decision)
         logged = json.loads((self.host.state / "runs" / "routing.jsonl").read_text().splitlines()[0])
-        self.assertEqual(logged["claimedBy"], "claude")
-        self.assertEqual(logged["schema"], "jovie-lane-route/v1")
-        self.assertIn("effective cost", logged["rationale"])
+        self.assertEqual(logged["claimedBy"], "codex")
+        self.assertEqual(logged["chosen"]["lane"], "codex")
 
     def test_sensitive_issue_is_routed_to_codex_only(self):
         with patch.dict(os.environ, {"LANES_SLOTS_CODEX": "3"}):
@@ -268,6 +263,135 @@ class AvailabilityTest(unittest.TestCase):
     def test_registry_without_routes_keeps_first_come_admission(self):
         self.assertIsNone(lane.issue_router(self.host, "devin", {"devin": {"label": "devin"}}, POLICY))
 
+
+class NewAutomatedAssignmentTest(unittest.TestCase):
+    def setUp(self):
+        self.providers = {
+            "codex": {"tier": 1, "accountClass": "chatgpt-oauth", "cmd": ["codex"],
+                      "routes": [{"model": "codex-default", "capability": "frontier", "costClass": "subscription", "cost": 3.5}]},
+            "personal": {**PROVIDERS["claude"], "model": "claude-opus-5-5", "routes": [
+                {"model": "claude-opus-5-5", "alias": "opus", "capability": "frontier", "cost": 3}]},
+            "hyperagent": {**PROVIDERS["hyperagent"], "routes": [
+                {"model": "claude-opus-5-5", "capability": "frontier", "cost": 3.5}]},
+        }
+        self.issue = {"identifier": "JOV-1", "title": "controller repair", "labels": [],
+                      "description": "", "trusted": True, "requestedBy": "operator"}
+        self.policy = {"frontier": {"titlePatterns": ["controller"]}}
+
+    def route(self, **extra):
+        return remediation.route_issue({**self.issue, **extra}, self.providers, self.policy,
+                                       lambda *_: {"ok": True, "pressure": 0})
+
+    def test_cost_and_untrusted_labels_cannot_authorize_personal_pool(self):
+        for labels in ([], ["claude"], ["route:personal:opus"]):
+            with self.subTest(labels=labels):
+                result = self.route(labels=labels)
+                self.assertEqual(result["chosen"]["lane"], "codex")
+                self.assertNotIn("personal", {row["lane"] for row in result["candidates"]})
+                self.assertEqual(result["assignmentRejected"], [{"lane": "personal",
+                                 "why": "protected-subscription-task-authorization-required"}])
+
+    def test_company_route_retains_frontier_floor_when_codex_is_unavailable(self):
+        decision = remediation.route_issue(self.issue, self.providers, self.policy,
+                                          lambda name, _: {"ok": name != "codex"})
+        self.assertEqual((decision["chosen"]["lane"], decision["chosen"]["capability"]),
+                         ("hyperagent", "frontier"))
+        self.assertEqual(decision["required"], "frontier")
+
+    def test_no_personal_availability_or_expiry_probe(self):
+        def available(lane, _route):
+            self.assertNotEqual(lane, "personal")
+            return {"ok": True, "pressure": 0}
+        result = remediation.route_issue(self.issue, self.providers, self.policy,
+                                         lane.model_pools.guarded(available, self.providers, lane.model_pools.load()))
+        def expiry(lane):
+            self.assertNotEqual(lane, "personal")
+            return {"expiresAt": None}
+        self.assertEqual(lane.model_pools.balanced(result, self.providers, expiry, lane.model_pools.load())["chosen"]["lane"], "codex")
+
+    def test_failover_and_event_dispatch_do_not_use_personal_pool(self):
+        original = json.loads(json.dumps(self.providers))
+        healthy = lambda name, _spec: name != "personal" or self.fail("personal health probe")
+        self.assertIsNone(remediation.route_lane(self.providers, exclude={"codex"}, healthy=healthy))
+        self.assertIsNone(remediation.failover(self.providers, "codex", "quota", healthy=healthy)["to"])
+        self.assertNotEqual(remediation.event_dispatch_lane(self.providers, [], healthy=healthy)["lane"], "personal")
+        self.assertEqual(self.providers, original)
+
+    def test_prior_personal_attempt_keeps_its_escalation_ceiling(self):
+        result = remediation.select_escalation_lane(self.providers, {"personal"}, top_rung_used=False)
+        self.assertEqual((result["lane"], result["topRung"]), ("codex", True))
+        self.assertIsNone(remediation.select_escalation_lane(self.providers, {"personal"}, top_rung_used=True))
+
+    def test_stale_personal_chosen_is_not_reinserted(self):
+        codex = {"lane": "codex", "model": "codex-default", "capability": "frontier", "available": True, "pressure": 0, "cost": 3.5}
+        old = {"lane": "personal", "model": "claude-opus-5-5", "capability": "frontier", "available": True,
+               "pressure": 0, "cost": 3, "alias": "opus", "costClass": "subscription"}
+        decision = {"chosen": old, "candidates": [old, codex], "rationale": "old cached decision",
+                    "pool": {"chosenPool": "claude-subscription"}}
+        routed = lane.model_pools.balanced(decision, self.providers, lambda lane: {"expiresAt": None}, lane.model_pools.load())
+        self.assertEqual(routed["chosen"]["lane"], "codex")
+        self.assertNotEqual((routed.get("pool") or {}).get("chosenPool"), "claude-subscription")
+        self.assertEqual((routed["chosen"]["alias"], routed["chosen"]["cost"], routed["chosen"]["costClass"]),
+                         (None, 3.5, "subscription"))
+        held = lane.model_pools.balanced({**decision, "candidates": [old]}, self.providers, lambda _: self.fail("expiry probe"), lane.model_pools.load())
+        self.assertIsNone(held["chosen"])
+        self.assertNotIn("pool", held)
+
+    def test_conflicting_account_class_cannot_hide_personal_executor(self):
+        providers = {"renamed": {**self.providers["personal"], "accountClass": "hyperagent-credits"}, "codex": self.providers["codex"]}
+        result = remediation.route_issue(self.issue, providers, self.policy, lambda *_: {"ok": True})
+        self.assertEqual(result["chosen"]["lane"], "codex")
+
+    def test_expiry_primitive_filters_personal_pool(self):
+        chosen, record = lane.model_pools.choose([
+            {"lane": "personal", "pool": "claude-subscription", "expiry": {"expiresAt": "2026-11-11T12:01:00Z"}},
+            {"lane": "codex", "pool": "codex-subscription", "expiry": {"expiresAt": "2026-11-12T00:00:00Z"}},
+        ])
+        self.assertEqual(chosen["lane"], "codex")
+        self.assertNotIn("claude-subscription", {row["pool"] for row in record["considered"]})
+
+    def test_personal_run_is_refused_before_process_even_without_model(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"LANES_STATE": tmp}), \
+                patch.object(lane.subprocess, "Popen", side_effect=AssertionError("provider process would start")) as popen:
+            for args in (["run"], ["run", "--model", ""], ["run", "--model", "claude-opus-5-5"]):
+                with self.subTest(args=args), self.assertRaises(lane.model_pools.ModelPoolRefused):
+                    lane.run_agent(["python3", "/release/claude_lane.py", *args], Path(tmp), None, 5)
+            popen.assert_not_called()
+
+    def test_personal_run_stays_closed_when_pool_table_is_unreadable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(lane.model_pools.ModelPoolRefused):
+                lane.model_pools.command_guard(["python3", "claude_lane.py", "run"], table={}, state_dir=tmp)
+
+    def test_canonical_pool_and_registry_identity_stay_closed_without_table(self):
+        import capacity_registry
+        for table in ({}, {"schema": "other"}):
+            with self.subTest(table=table), patch.object(lane.model_pools, "load", return_value=table):
+                providers = {"renamed": {**self.providers["personal"], "cmd": ["unknown-runner"]},
+                             "codex": self.providers["codex"]}
+                result = remediation.route_issue(self.issue, providers, self.policy, lambda *_: {"ok": True})
+                self.assertEqual(result["chosen"]["lane"], "codex")
+                registry = {"providers": [{"id": "anthropic-claude", "usageModel": "subscription-pool"},
+                                           {"id": "openai-codex", "usageModel": "capped-quota"}]}
+                self.assertEqual([row["provider"] for row in capacity_registry.routing_order(registry, 0)], ["openai-codex"])
+
+    def test_existing_claim_and_attempt_bytes_are_untouched_by_spawn_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"LANES_STATE": tmp}):
+            state = Path(tmp)
+            originals = {"claims.json": b'{"task":"existing","owner":"personal"}\n',
+                         "execution-attempts.json": b'{"task":{"count":2,"status":"active"}}\n'}
+            for name, content in originals.items():
+                (state / name).write_bytes(content)
+            with self.assertRaises(lane.model_pools.ModelPoolRefused):
+                lane.model_pools.command_guard(["python3", "claude_lane.py", "run", "--model", "claude-opus-5-5"])
+            self.assertEqual({name: (state / name).read_bytes() for name in originals}, originals)
+
+    def test_personal_status_health_and_company_anthropic_remain_usable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for subcommand in ("health", "status"):
+                self.assertIsNone(lane.model_pools.command_guard(["python3", "claude_lane.py", subcommand], table=lane.model_pools.load(), state_dir=tmp))
+            self.assertEqual(lane.model_pools.command_guard(["hyperagent", "--model", "claude-opus-5-5"], table=lane.model_pools.load(), state_dir=tmp), "hyperagent")
+            self.assertIsNone(lane.model_pools.verdict("claude-opus-5-5", "claude-subscription", lane.model_pools.load()))
 
 if __name__ == "__main__":
     unittest.main()

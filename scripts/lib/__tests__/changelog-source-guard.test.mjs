@@ -1,13 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,53 +13,15 @@ import {
 } from '../changelog-filter-rules.mjs';
 import { checkEditorialOverlay } from '../customer-changelog-editorial.mjs';
 import { resolveRealGh, runWithRealGh } from '../real-gh-harness.mjs';
+import { createChangelogGuardFixture } from './changelog-source-guard.test-support.mjs';
 
 const guard = fileURLToPath(
   new URL('../../changelog-source-guard.mjs', import.meta.url)
 );
 let checkout, head, eventPath, localPr, localPrPath;
 beforeAll(() => {
-  checkout = mkdtempSync(join(tmpdir(), 'changelog-guard-'));
-  const git = (...args) =>
-    execFileSync('git', args, { cwd: checkout, encoding: 'utf8' }).trim();
-  git('init', '-q');
-  git('config', 'user.name', 'Guard test');
-  git('config', 'user.email', 'guard@example.invalid');
-  git('commit', '--allow-empty', '-qm', 'base');
-  const base = git('rev-parse', 'HEAD');
-  writeFileSync(join(checkout, 'internal.txt'), 'internal change\n');
-  git('add', 'internal.txt');
-  git('commit', '-qm', 'head');
-  head = git('rev-parse', 'HEAD');
-  eventPath = join(checkout, 'event.json');
-  writeFileSync(
-    eventPath,
-    JSON.stringify({
-      pull_request: {
-        number: 20031,
-        base: { sha: base },
-        head: { sha: head },
-        created_at: '2026-10-03T21:00:00Z',
-        body: 'outdated event metadata',
-      },
-    })
-  );
-  mkdirSync(join(checkout, 'apps/web/lib'), { recursive: true });
-  writeFileSync(
-    join(checkout, 'apps/web/lib/storefront.ts'),
-    'export const country = "jp";\n'
-  );
-  git('add', 'apps/web/lib/storefront.ts');
-  git('commit', '-qm', 'customer change');
-  localPr = {
-    number: 20031,
-    base: { sha: base },
-    head: { sha: git('rev-parse', 'HEAD') },
-    created_at: '2026-10-03T21:00:00Z',
-    body: '## Summary\nStorefront correction\n',
-  };
-  localPrPath = join(checkout, 'pr.json');
-  writeFileSync(localPrPath, JSON.stringify(localPr));
+  ({ checkout, head, eventPath, localPr, localPrPath } =
+    createChangelogGuardFixture());
 });
 afterAll(() => rmSync(checkout, { recursive: true, force: true }));
 
@@ -135,6 +89,41 @@ describe('local customer decision preflight', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('ambiguous');
   });
+  it('optionally checks Fleet repair evidence on the same proposed body', () => {
+    const prPath = join(checkout, 'repair.json');
+    writeFileSync(
+      prPath,
+      JSON.stringify({ ...localPr, title: 'fix(merch): publish gate' })
+    );
+    const bodyPath = join(checkout, 'repair.md');
+    const decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
+    writeFileSync(bodyPath, decision);
+    const red = preflight(
+      '--pr-file',
+      prPath,
+      '--body-file',
+      bodyPath,
+      '--fleet'
+    );
+    expect(red.status).not.toBe(0);
+    expect(red.stderr).toContain('red-before-green');
+    writeFileSync(
+      bodyPath,
+      `${decision}\n\n## Red-before-green\n\n- Failing command: pnpm test\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123\n`
+    );
+    const green = preflight(
+      '--pr-file',
+      prPath,
+      '--body-file',
+      bodyPath,
+      '--fleet'
+    );
+    expect(green.status, green.stderr).toBe(0);
+    expect(JSON.parse(green.stdout)).toMatchObject({
+      passed: true,
+      fleet: { errors: [] },
+    });
+  });
   it('rejects stale and absent PR snapshots and a body override without a PR', () => {
     const stalePath = join(checkout, 'stale.json');
     writeFileSync(
@@ -154,11 +143,12 @@ describe('local customer decision preflight', () => {
       'Missing exact PR revision evidence'
     );
     expect(preflight('--body-file', emptyPath).status).not.toBe(0);
+    expect(preflight('--fleet').stderr).toContain('--fleet requires --pr-file');
   });
   it('cannot override the hosted CI evidence source', () => {
     const result = spawnSync(
       process.execPath,
-      [guard, '--pr-file', localPrPath],
+      [guard, '--pr-file', localPrPath, '--fleet'],
       {
         cwd: checkout,
         encoding: 'utf8',

@@ -11,6 +11,7 @@ export function gitRefExists(repoRoot, ref) {
 }
 export function gitShowText(repoRoot, ref, relativePath) {
   const result = spawnSync('git', ['show', `${ref}:${relativePath}`], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

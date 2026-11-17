@@ -151,8 +151,11 @@ export function buildReferencedEntitiesBlock(
     );
   }
 
+  // Only the opening turn: the app shows the profile next moves under the
+  // first reply alone, so a later chip-only turn gets no opening brief.
   const latestUserText = input.userTexts[0];
   const chipOnlyOwnProfile =
+    input.userTexts.length === 1 &&
     latestUserText !== undefined &&
     isEntityOnlyText(latestUserText) &&
     extractEntities(latestUserText).some(

@@ -1,21 +1,9 @@
 #!/usr/bin/env node
-// Rolling mutation sweep over every tested apps/web module, on spare compute.
-//
-//   node scripts/mutation-sweep.mjs --state ~/.local/state/jovie-mutation/sweep-state.json \
-//        --max-files 6 --max-minutes 90            # rolling sweep batch
-//   node scripts/mutation-sweep.mjs --mode incremental  # only modules changed since scored
-//   node scripts/mutation-sweep.mjs --list-only          # print the next batch, run nothing
-//   node scripts/mutation-sweep.mjs --include packages/ui/atoms/  # @jovie/ui, keyed by repo path
-//
-// Per module it runs scripts/mutation-diff.mjs --scope all (same Stryker
-// harness as the enforced high-risk lane), then records score, mutant counts,
-// source blob and tested SHA in the state file, turns real survivors into
-// bounded "strengthen test" work items (deduped Linear issue per module, only
-// when remediation triggers are enabled) and suppresses recorded equivalent
-// mutants. The state file is the per-module metric of record; each run also
-// appends p50/p95-ready timing rows to <state>.runs.jsonl.
 
-import { spawnSync } from 'node:child_process';
+// Rolling spare-capacity sweep; existing web/UI state identities stay stable.
+//   --mode incremental selects changed inputs; --include packages/ui/ selects UI.
+// Survivor task JSON feeds the separate approval-required draft preparation step.
+
 import {
   appendFileSync,
   existsSync,
@@ -28,6 +16,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { spawnSync } from './lib/child-process.mjs';
 import {
   createTestSelector,
   readModuleSource,
@@ -35,21 +24,37 @@ import {
   readTestSources,
   selectHighRiskSources,
 } from './lib/mutation-diff.mjs';
+import {
+  proposeEvidenceFloors,
+  strongerHighWater,
+} from './lib/mutation-evidence.mjs';
 import { buildWorkflowRunUrl } from './lib/mutation-floor-intake.mjs';
+import {
+  configurationPaths,
+  inputDigest,
+  mutationInputReceipt,
+  mutationInputsUnchanged,
+  repositoryReader,
+  sweepEvidenceCandidates,
+  untestedMutationEntry,
+} from './lib/mutation-inputs.mjs';
+import {
+  mutationRunSucceeded,
+  runMutationHarness,
+} from './lib/mutation-lifecycle.mjs';
 import { loadMutationScoreBaseline } from './lib/mutation-score-floor.mjs';
 import {
-  buildSurvivorIssue,
   emptyState,
-  extractSurvivors,
   moduleKey,
   normalizeState,
-  partitionEquivalents,
   pickBatch,
-  proposeBaselineEntries,
-  ratchetVerdict,
-  recordRun,
+  selectPool,
   validateEquivalents,
 } from './lib/mutation-sweep.mjs';
+import {
+  recordEvidenceAttempt,
+  unresolvedMutationRun,
+} from './lib/mutation-sweep-attempt.mjs';
 import {
   harnessArgs,
   reportName,
@@ -57,6 +62,7 @@ import {
   rootRelative,
   stateKey,
 } from './lib/mutation-sweep-root.mjs';
+import { preflight as checkCapacity } from './mutation-sweep-preflight.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -78,41 +84,12 @@ const { values } = parseArgs({
     'touch-file': { type: 'string' },
     'list-only': { type: 'boolean', default: false },
     preflight: { type: 'boolean', default: false },
+    shard: { type: 'string' },
   },
 });
 
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
-function preflight() {
-  const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 8);
-  const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
-  const problems = [];
-  if (existsSync('/proc/meminfo')) {
-    const kb = Number(
-      /MemAvailable:\s+(\d+)/u.exec(
-        readFileSync('/proc/meminfo', 'utf8')
-      )?.[1] ?? 0
-    );
-    if (kb / 1048576 < minMemGb)
-      problems.push(
-        `MemAvailable ${(kb / 1048576).toFixed(1)}GB < ${minMemGb}GB`
-      );
-  }
-  if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[1]);
-    if (load > maxLoad) problems.push(`5-min load ${load} > ${maxLoad}`);
-  }
-  const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
-  const avail = Number(
-    df.stdout?.split('\n')[1]?.split(/\s+/u)[3] ?? Number.NaN
-  );
-  if (Number.isFinite(avail) && avail / 1048576 < minDiskGb) {
-    problems.push(
-      `disk ${(avail / 1048576).toFixed(0)}GB free < ${minDiskGb}GB`
-    );
-  }
-  return problems;
-}
+const preflight = () => checkCapacity(repoRoot);
 
 if (values.preflight) {
   const problems = preflight();
@@ -132,12 +109,24 @@ const num = (/** @type {string} */ name) => {
 };
 if (!['sweep', 'incremental'].includes(values.mode))
   throw new Error('--mode must be sweep or incremental');
+if (values['file-issues'])
+  throw new Error(
+    'Survivor text requires approval; prepare drafts with mutation-sweep-file-issues.mjs --drafts <path> --state <path> --tasks <dir>'
+  );
 if (!values.state && !values['list-only'])
   throw new Error('--state <path> is required');
 
 const git = (/** @type {string[]} */ args, input) =>
   spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', input });
-const headSha = values.sha ?? git(['rev-parse', 'HEAD']).stdout.trim();
+const head = git(['rev-parse', 'HEAD']);
+if (head.status !== 0 && !values['list-only'])
+  throw new Error('Cannot resolve tested commit');
+const headSha = head.stdout.trim();
+if (values.sha && values.sha !== headSha)
+  throw new Error('--sha must match checked-out HEAD');
+const worktree = git(['status', '--porcelain', '--untracked-files=normal']);
+const testedSha =
+  worktree.status === 0 && !worktree.stdout.trim() ? headSha : null;
 
 const baseline = loadMutationScoreBaseline(
   join(repoRoot, 'scripts/mutation-score-baseline.json')
@@ -166,6 +155,10 @@ if (statePath && existsSync(statePath)) {
   }
 }
 
+// Independent anchors survive a later baseline fold replacing a module attempt.
+const anchors = /** @type {Record<string, any>} */ (state).highWater ?? {};
+/** @type {any} */ (state).highWater = anchors;
+
 // --- candidates: every source of the target root under --include with a related test
 const staged = git(['ls-files', '-s', '-z', '--', target.root])
   .stdout.split('\0')
@@ -177,6 +170,11 @@ for (const row of staged) {
   if (match) blobs.set(match[2], match[1]);
 }
 const tracked = [...blobs.keys()];
+const inventory = git(['ls-files', '-z']);
+if (inventory.status !== 0 && !values['list-only'])
+  throw new Error('Mutation input inventory unavailable');
+const inputPaths = inventory.stdout.split('\0').filter(Boolean);
+const readInput = repositoryReader(repoRoot);
 const readModule = readModuleSource(rootDir);
 const includes = target.includes;
 const maxLoc = num('max-loc');
@@ -190,8 +188,7 @@ const selectRootTests = createTestSelector(
   readModule
 );
 const selectTests = (/** @type {string} */ key) => selectRootTests(rel(key));
-// Test selection costs ~1.3s per source (import-graph walk), so it runs lazily
-// on the ranked batch only. Modules with a same-named test rank first.
+// Select tests lazily for the ranked batch; bind the shared graph once.
 const testStems = new Set(
   tracked
     .filter(path => /\.test\.tsx?$/u.test(path))
@@ -246,18 +243,31 @@ for (const source of sources) {
     testCount: !GENERIC_STEMS.has(stem) && testStems.has(stem) ? 1 : 0,
   });
 }
-let pool = candidates;
-if (values.mode === 'incremental') {
-  pool = candidates.filter(
-    c => state.modules[c.file] && state.modules[c.file].blob !== c.blob
-  );
-}
+const configDigest = inputDigest(
+  configurationPaths(inputPaths, target.root),
+  readInput
+);
+const selectionDigest = inputDigest(['selection'], () =>
+  JSON.stringify(selectRootTests.inventory())
+);
+const metadata = /** @type {any} */ (state);
+const sequences = (metadata.sweepSequences ??= {});
+const runId = Number(sequences[target.root] ?? 0) + 1;
+const { selectionState, eligible } = sweepEvidenceCandidates(
+  candidates,
+  state,
+  configDigest,
+  selectionDigest,
+  readInput,
+  runId
+);
+const pool = selectPool(eligible, selectionState, values);
 /** @type {string[]} */
 let batch = [];
-if (explicit) batch = candidates.map(c => c.file);
+if (explicit) batch = eligible.map(c => c.file);
 else {
   const maxFiles = num('max-files');
-  for (const file of pickBatch(state, pool, {
+  for (const file of pickBatch(selectionState, pool, {
     max: Number.POSITIVE_INFINITY,
   })) {
     if (batch.length >= maxFiles) break;
@@ -266,17 +276,13 @@ else {
       continue;
     }
     const c = candidates.find(x => x.file === file);
-    state.modules[file] = {
-      blob: c?.blob ?? '',
-      sha: null,
-      at: new Date().toISOString(),
-      status: 'untested',
-      score: null,
-      valid: 0,
-      killed: 0,
-      survived: 0,
-      durationMs: 0,
-    };
+    state.modules[file] = untestedMutationEntry(
+      c?.blob ?? '',
+      `${target.root}/${rel(file)}`,
+      configDigest,
+      selectionDigest,
+      readInput
+    );
   }
 }
 
@@ -299,6 +305,7 @@ const persist = () => {
   writeFileSync(`${statePath}.tmp`, `${JSON.stringify(state, null, 1)}\n`);
   renameSync(`${statePath}.tmp`, statePath);
 };
+if (!values['list-only']) sequences[target.root] = runId;
 if (values['list-only'] || batch.length === 0) {
   if (!values['list-only'] && statePath) persist();
   writeOutputs(0);
@@ -314,9 +321,7 @@ const tasksDir = join(dirname(statePath), 'survivor-tasks');
 mkdirSync(tasksDir, { recursive: true });
 /** @type {string[]} */ const summaryRows = [];
 /** @type {{ file: string, reason: string }[]} */ const regressions = [];
-let issuesFiled = 0;
-let linearFilingStopped = false;
-let unfiledBatches = 0;
+let scoredNow = 0;
 
 for (const file of batch) {
   // Off-peak only: re-check the 5-minute load before every module, not just at start.
@@ -330,139 +335,141 @@ for (const file of batch) {
     break;
   }
   const started = Date.now();
+  const tests = selectTests(file).slice(0, 15);
+  const receipt = mutationInputReceipt({
+    root: target.root,
+    source: rel(file),
+    tests,
+    selector: selectRootTests,
+    tracked: inputPaths,
+    read: readInput,
+  });
+  const originalSource = readInput(`${target.root}/${rel(file)}`);
+  const taskFile = join(tasksDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`);
+  rmSync(taskFile, { force: true });
   const candidate = candidates.find(c => c.file === file);
   const blob = candidate?.blob ?? '';
   const reportFile = join(reportDir, reportName(rel(file)));
   rmSync(reportFile, { force: true });
   console.log(`\n=== sweep ${file}`);
-  const run = spawnSync(
-    process.execPath,
-    [join(repoRoot, target.harness), ...harnessArgs(target, rel(file))],
-    {
-      cwd: repoRoot,
-      stdio: 'inherit',
-      timeout: num('file-timeout-minutes') * 60_000,
-      killSignal: 'SIGKILL',
-      env: {
-        ...process.env,
-        CI: 'true',
-        STRYKER_CONCURRENCY: process.env.STRYKER_CONCURRENCY ?? '1',
-      },
-    }
-  );
+  /** @type {any} */
+  const run = receipt.unresolvedInputs.length
+    ? unresolvedMutationRun(receipt.unresolvedInputs)
+    : await runMutationHarness(
+        process.execPath,
+        [join(repoRoot, target.harness), ...harnessArgs(target, rel(file))],
+        {
+          cwd: repoRoot,
+          rootDir,
+          sourcePath: join(rootDir, rel(file)),
+          timeoutMs: num('file-timeout-minutes') * 60_000,
+          env: {
+            ...process.env,
+            CI: 'true',
+            STRYKER_CONCURRENCY: process.env.STRYKER_CONCURRENCY ?? '1',
+          },
+        }
+      );
   const durationMs = Date.now() - started;
   const at = new Date().toISOString();
-  const previous = state.modules[file];
-  const mutants = existsSync(reportFile)
-    ? readReportMutants(reportFile, rel(file))
-    : null;
-  let entry;
-  if (!mutants || mutants.length === 0) {
-    entry = recordRun(state, file, {
-      blob,
-      sha: headSha,
-      at,
-      durationMs,
-      error: run.error?.message ?? `harness exit ${run.status ?? run.signal}`,
-    });
-  } else {
-    const survivors = extractSurvivors(
-      file,
-      readFileSync(join(rootDir, rel(file)), 'utf8'),
-      // Stryker reports carry full spans; the diff-lib Mutant typedef is narrower.
-      /** @type {Parameters<typeof extractSurvivors>[2]} */ (
-        /** @type {unknown} */ (mutants)
-      )
-    );
-    const { real, equivalent } = partitionEquivalents(survivors, equivalents);
-    entry = recordRun(state, file, {
-      blob,
-      sha: headSha,
-      at,
-      durationMs,
-      mutants,
-      equivalent: equivalent.length,
-    });
-    // Survivors that the registry calls equivalent do not count against the score.
-    if (equivalent.length > 0 && entry.valid > 0) {
-      const detected = entry.killed;
-      const valid = entry.valid - equivalent.length;
-      entry.valid = valid;
-      entry.survived = Math.max(0, entry.survived - equivalent.length);
-      entry.score =
-        valid > 0 ? Math.round((detected / valid) * 1000) / 10 : null;
-    }
-    const tests = selectTests(file).slice(0, 15);
-    writeFileSync(
-      join(tasksDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`),
-      `${JSON.stringify({ file, sha: headSha, score: entry.score, valid: entry.valid, tests, survivors: real }, null, 1)}\n`
-    );
-    if (values['file-issues'] && real.length > 0 && !linearFilingStopped) {
-      const {
-        remediationTriggersEnabled,
-        upsertLinearIssueByTitleFingerprint,
-        logRemediationDryRun,
-      } = await import('./lib/linear-issue-intake.mjs');
-      const issue = buildSurvivorIssue(file, real, {
-        score: entry.score,
-        valid: entry.valid,
-        tests,
-        sha: headSha,
-        runUrl,
-      });
-      if (remediationTriggersEnabled(process.env)) {
-        const res = await upsertLinearIssueByTitleFingerprint({
-          fingerprint: issue.fingerprint,
-          title: issue.title,
-          description: issue.description,
-          priority: issue.priority,
-          reopenTerminal: false,
-          labelKey: issue.labelKey,
-        });
-        console.log(
-          `Linear survivors issue (${file}): ${res.action ?? 'failed'} ${res.url ?? res.reason ?? ''}`
-        );
-        if (res.reason === 'linear_rate_limited') {
-          // The shared Linear credential is spent. Stop spending: filing more
-          // survivors cannot succeed, and every retry starves the Fleet Gate
-          // / Triage consumers of the same credential for longer (JOV-12500).
-          linearFilingStopped = true;
-          unfiledBatches += 1;
-        } else issuesFiled += 1;
-      } else
-        logRemediationDryRun({
-          action: 'upsert',
-          key: 'mutation-survivors',
-          fingerprint: issue.fingerprint,
-        });
-    }
+  const previous = {
+    ...state.modules[file],
+    highWater: strongerHighWater(
+      anchors[file],
+      /** @type {any} */ (state.modules[file])?.highWater
+    ),
+  };
+  let reportMutants = null;
+  let reportError;
+  try {
+    reportMutants = readReportMutants(reportFile, rel(file), originalSource);
+  } catch (error) {
+    reportError = error.message;
   }
-  const verdict = ratchetVerdict(file, entry, previous, baseline);
-  if (!verdict.ok) regressions.push({ file, reason: verdict.reason });
+  const mutants =
+    mutationRunSucceeded(run) && !reportError ? reportMutants : null;
+  const unchanged =
+    receipt.configDigest === configDigest &&
+    receipt.selectionDigest === selectionDigest &&
+    mutationInputsUnchanged(receipt, {
+      root: target.root,
+      rootDir,
+      selector: selectRootTests,
+      read: readInput,
+    });
+  const partialMutants = mutants ? null : reportMutants;
+  const { entry, verdict, task } = recordEvidenceAttempt({
+    state,
+    file,
+    blob,
+    sha: testedSha,
+    at,
+    durationMs,
+    mutants,
+    partialMutants,
+    source: originalSource,
+    tests,
+    baseline,
+    equivalents,
+    configDigest,
+    runId,
+    timedOut: run.timedOut,
+    unchanged,
+    receipt,
+    previous,
+    error:
+      reportError ??
+      run.error?.message ??
+      'Missing or mismatched source report',
+  });
+  if (entry.highWater) anchors[file] = entry.highWater;
+  if (entry.status !== 'scored') entry.retryAfterRun ??= runId + 3;
+  if (task) {
+    writeFileSync(taskFile, `${JSON.stringify(task, null, 1)}\n`);
+  }
+  if (entry.status === 'scored' && entry.score !== null) scoredNow++;
+  // Cleanly stopped infrastructure attempts remain unknown, with bounded retry parking.
+  const stoppedCleanly =
+    (run.timedOut || run.interrupted || run.unsupported) &&
+    run.cleanupProved === true;
+  if ((!mutationRunSucceeded(run) || entry.error) && !stoppedCleanly)
+    process.exitCode = 1;
+  if (verdict.ok === false) regressions.push({ file, reason: verdict.reason });
   appendFileSync(
     runsLog,
-    `${JSON.stringify({ at, file, sha: headSha, mode: values.mode, durationMs, status: entry.status, score: entry.score, valid: entry.valid, survived: entry.survived, ratchet: verdict.ok ? 'ok' : verdict.reason, runUrl })}\n`
+    `${JSON.stringify({ at, file, sha: testedSha, mode: values.mode, durationMs, status: entry.status, score: entry.score, valid: entry.valid, survived: entry.survived, ratchet: verdict.status, reason: verdict.reason, runUrl })}\n`
   );
+  const scoreCell =
+    entry.status === 'scored'
+      ? `${entry.score}%`
+      : run.timedOut
+        ? 'timeout (unscored)'
+        : run.interrupted
+          ? 'interrupted (unscored)'
+          : 'error';
   summaryRows.push(
-    `| \`${file}\` | ${entry.status === 'scored' ? `${entry.score}%` : 'error'} | ${entry.valid} | ${entry.survived} | ${Math.round(durationMs / 1000)}s | ${verdict.ok ? verdict.reason : `REGRESSED: ${verdict.reason}`} |`
+    `| \`${file}\` | ${scoreCell} | ${entry.valid} | ${entry.survived} | ${Math.round(durationMs / 1000)}s | ${verdict.status}: ${verdict.reason} |`
   );
   // Atomic persist after every module so a killed run loses at most one.
   persist();
+  if (!run.cleanupProved) {
+    console.error(
+      `${file}: cleanup unproved; recovery files retained at ${run.tempDir}`
+    );
+    break;
+  }
   rmSync(reportFile, { force: true });
   rmSync(`${reportFile}.tests.json`, { force: true });
   rmSync(`${reportFile}.coverage`, { recursive: true, force: true });
-  rmSync(join(rootDir, '.stryker-tmp'), { recursive: true, force: true });
-  // The timeout's SIGKILL reaches only the harness; its Stryker child can keep
-  // mutating sources in place (inPlace: true), so a timed-out module ends the batch.
-  if (run.signal === 'SIGKILL') {
+  if (run.timedOut || run.interrupted) {
     console.log(
-      `${file} timed out; stopping so its Stryker run cannot overlap the next module.`
+      `${file} ${run.interrupted ? 'interrupted' : 'timed out'}; owned mutation run stopped. Recorded unknown and parked for three sweep invocations.`
     );
     break;
   }
 }
 
-writeOutputs(batch.length);
+writeOutputs(scoredNow);
 const scored = Object.values(state.modules).filter(m => m.status === 'scored');
 const summary = [
   `## Mutation sweep (${target.root})`,
@@ -473,17 +480,13 @@ const summary = [
   '| --- | ---: | ---: | ---: | ---: | --- |',
   ...summaryRows,
   '',
-  issuesFiled ? `${issuesFiled} survivor work item(s) filed.\n` : '',
-  linearFilingStopped
-    ? `Survivor filing stopped early: the shared Linear credential was rate-limited; ${unfiledBatches} module(s) with survivors left unfiled and the next sweep retries them.\n`
-    : '',
 ].join('\n');
 console.log(`\n${summary}`);
 if (values.summary) appendFileSync(values.summary, summary);
 if (values['propose-baseline']) {
-  const proposal = proposeBaselineEntries(state, baseline, {
-    runId: Number(process.env.GITHUB_RUN_ID ?? 0) || 1,
-    sha: headSha,
+  const proposal = proposeEvidenceFloors(state, baseline, {
+    runId,
+    configDigest,
   });
   writeFileSync(
     values['propose-baseline'],

@@ -341,10 +341,7 @@ export async function main(argv = process.argv.slice(2)) {
   const diff = spawnSync(
     'git',
     ['diff', '--name-only', `${values.base}...${values.sha}`],
-    {
-      cwd: ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: ROOT, encoding: 'utf8' }
   );
   if (diff.status !== 0)
     return fail(2, `cannot diff ${values.base}...${values.sha}`);

@@ -52,6 +52,21 @@ class ComposeRouteTest(unittest.TestCase):
         })
         self.assertEqual((shared["cls"], shared["action"]), ("composed", "sync-main"))
         self.assertEqual(shared["actions"], ["sync-main"])
+        design = ("Source Validation\tUNKNOWN STEP\t2026-11-13T19:17:13.8426377Z "
+                  " FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                  " > design-system source identity ratchet (JOV-5301)"
+                  " > exits zero from the CLI on the live tree\n")
+        budget = (
+            "Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5084741Z ##[error]routes./app/admin/hud grew 738 -> 975\n"
+            "Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5103474Z ##[error]firstLoad.baselines./ grew 578 -> 663\n")
+        inherited = classes.classify(pr("Source Validation", "Exact-head Coverage", merge="BLOCKED"), {
+            "Source Validation": design, "Exact-head Coverage": budget})
+        self.assertEqual((inherited["cls"], inherited["action"]), ("composed", "sync-main"))
+        self.assertEqual(inherited["actions"], ["sync-main"])
+        owned = classes.classify(pr("Source Validation", "Exact-head Coverage", merge="BLOCKED"), {
+            "Source Validation": design,
+            "Exact-head Coverage": budget + "AssertionError: expected 1\n"})
+        self.assertEqual((owned["cls"], owned["action"]), ("mixed", "agent"))
         paired = classes.classify(pr("A", "B"), {
             "A": "API rate limit exceeded",
             "B": "Unwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",
@@ -127,6 +142,37 @@ class ComposeExecutionTest(unittest.TestCase):
                 {"number": 24816, "body": "stale"}, {"actions": ["stamp-changelog", "wire-ci-fast"]}, Path("."), None, {})
         self.assertTrue(written[0].startswith(live))
         self.assertEqual(written[0].count("customer-changelog/v1"), 1)
+
+    def test_composed_repair_win_publishes_after_the_changelog_stamp(self):
+        order = []
+        route = {"actions": ["repair-win", "stamp-changelog"]}
+
+        def stamp(pr, **kwargs):
+            order.append("stamp")
+            return True
+
+        def publish(pr, sh):
+            order.append("publish")
+            return True
+
+        with patch.object(lane.pr_events, "ensure_red_before_green", side_effect=stamp), \
+                patch("fix_red_measured_win.publish", side_effect=publish):
+            done = lane.compose_deterministic_fix(None, {"number": 25543}, route, Path("."), None, {})
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(order, ["stamp", "publish"])
+        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True), \
+                patch("fix_red_measured_win.publish", return_value=False):
+            self.assertIsNone(lane.compose_deterministic_fix(
+                None, {"number": 25543}, route, Path("."), None, {}))
+
+    def test_single_repair_win_route_uses_apply(self):
+        route = {"action": "repair-win", "cls": "measured-win"}
+        with patch("fix_red_measured_win.apply", return_value="infra-rerun:measured-win") as apply:
+            reason = lane.deterministic_route_taken(None, {"body": "bare"}, route)
+        self.assertEqual(reason, "infra-rerun:measured-win")
+        apply.assert_called_once()
+        with patch("fix_red_measured_win.apply", return_value=None):
+            self.assertIsNone(lane.deterministic_route_taken(None, {"body": "bare"}, route))
 
 if __name__ == "__main__":
     unittest.main()

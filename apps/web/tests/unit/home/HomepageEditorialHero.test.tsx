@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
 import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
@@ -7,12 +7,6 @@ import {
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
-
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
-vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
-beforeEach(() => {
-  gate.WAITLIST_ENABLED = false;
-});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -39,8 +33,7 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('keeps the name search when the waitlist gate is on', () => {
-    gate.WAITLIST_ENABLED = true;
+  it('keeps the name search as the primary action', () => {
     render(
       <HomepagePrimaryAction
         appearance='editorial'
@@ -64,7 +57,6 @@ describe('HomepageEditorialHero', () => {
     ).not.toBeInTheDocument();
   });
   it('does not replace the hero name search with a waitlist link', () => {
-    gate.WAITLIST_ENABLED = true;
     renderHero();
     expect(screen.getByRole('combobox')).toHaveAttribute(
       'placeholder',
