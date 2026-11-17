@@ -30,7 +30,7 @@
  * ~/.local/state/jovie-lanes/preflight.jsonl; JOVIE_PREFLIGHT_LEDGER=off
  * disables it. That ledger is the measurement for CI rounds avoided.
  */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   closeSync,
@@ -46,6 +46,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
+import {
+  failureTrap,
+  runProgram,
+  shellQuote,
+  statementControl,
+} from './lib/preflight-shell.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
@@ -299,7 +305,10 @@ export const exclusionReason = statement =>
   statement.includes('\n') ? '' : lineExclusion(statement);
 
 /** Statement-level adjustments that keep one failure from hiding the rest. */
-export function prepareStatement(statement, { flockPath = '' } = {}) {
+export function prepareStatement(
+  statement,
+  { flockPath = '', completionFile = '' } = {}
+) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
@@ -309,8 +318,10 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
     const completeFetch = text.replace(/\s+--unshallow(?=\s|$)/u, '');
     text = `if [ "$(git rev-parse --is-shallow-repository)" = false ]; then\n${completeFetch}\nelse\n${text}\nfi`;
   }
-  // `exit` would end the process; contain it in a subshell.
-  if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
+  // Contain failed exits to collect other failures. A private normal-return
+  // marker distinguishes a successful exit from ordinary statement completion.
+  if (/\bexit\b/.test(text))
+    text = `( ${text}\n${completionFile ? `__pf_statement_rc=$?\n: > ${shellQuote(completionFile)} || exit 125\nexit "$__pf_statement_rc"\n` : ''})`;
   // Typechecks share gem's CPU: serialize them under the host lock.
   if (flockPath) {
     const quotedLock = `'${flockPath.replace(/'/g, `'\\''`)}'`;
@@ -350,22 +361,28 @@ export function buildProgram(statements, envVars, opts = {}) {
     // Collect parent-shell failures, but stop a failed subshell so a later
     // success cannot hide it from the workflow's background wait/status guard.
     lines.push('set -E');
-    lines.push(
-      `trap '__pf_failure=$?; if (( BASH_SUBSHELL > 0 )); then exit "$__pf_failure"; fi' ERR`
-    );
+    lines.push(failureTrap(opts.controlDir));
   }
   for (const [key, value] of Object.entries(envVars))
     lines.push(`export ${key}=${JSON.stringify(String(value))}`);
   statements.forEach((statement, index) => {
+    const control = statementControl(opts.controlDir, index);
+    const { completionFile } = control;
+    lines.push(...control.begin);
     lines.push(`printf '\\n${MARK}-BEGIN ${index}\\n'`);
     if (opts.qualification) lines.push('__pf_failure=0');
-    lines.push(prepareStatement(applyExclusions(statement, opts).text, opts));
+    const text = applyExclusions(statement, opts).text;
+    lines.push(prepareStatement(text, { ...opts, completionFile }));
     lines.push('__pf_rc=$?');
+    if (completionFile && !/\bexit\b/.test(text))
+      lines.push(`: > ${shellQuote(completionFile)} || exit 125`);
     if (opts.qualification)
       lines.push(
         'if [ "$__pf_failure" -ne 0 ]; then __pf_rc=$__pf_failure; fi'
       );
+    lines.push(...control.end);
     lines.push(`printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
+    lines.push(...control.stop);
   });
   return lines.join('\n');
 }
@@ -379,45 +396,6 @@ export function labelFor(statement) {
     .find(line => line.trim() && !line.trim().startsWith('#'));
   const flat = (first ?? statement).trim().replace(/\s+/g, ' ');
   return flat.length > 110 ? `${flat.slice(0, 107)}...` : flat;
-}
-
-function runProgram(program, cwd, env, onResult) {
-  return new Promise(resolve => {
-    const child = spawn('bash', ['-c', program], {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let buffer = '';
-    let current = null;
-    const handle = line => {
-      const begin = line.match(new RegExp(`^${MARK}-BEGIN (\\d+)$`));
-      const end = line.match(new RegExp(`^${MARK}-END (\\d+) (\\d+)$`));
-      if (begin) current = { index: Number(begin[1]), output: [] };
-      else if (end && current) {
-        onResult({
-          index: current.index,
-          code: Number(end[2]),
-          output: current.output,
-        });
-        current = null;
-      } else if (current) current.output.push(line);
-    };
-    const feed = chunk => {
-      buffer += chunk.toString();
-      let at;
-      while ((at = buffer.indexOf('\n')) >= 0) {
-        handle(buffer.slice(0, at));
-        buffer = buffer.slice(at + 1);
-      }
-    };
-    child.stdout.on('data', feed);
-    child.stderr.on('data', feed);
-    child.on('close', code => {
-      if (buffer) handle(buffer);
-      resolve(code);
-    });
-  });
 }
 
 function git(args, { cwd = ROOT, env = process.env } = {}) {
@@ -682,6 +660,7 @@ export async function main({
   const execStep = async step => {
     const out = [`\n== ${step.name}`];
     const statements = splitStatements(step.run);
+    const controlDir = mkdtempSync(path.join(runnerTemp, 'step-'));
     const program = buildProgram(
       statements,
       {
@@ -693,32 +672,53 @@ export async function main({
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },
-      { flockPath, qualification: args.hook }
+      { flockPath, qualification: args.hook, controlDir }
     );
     const seen = new Set();
     let mark = Date.now();
     const t0 = Date.now();
-    await runProgram(program, cwd, procEnv, ({ index, code, output }) => {
-      seen.add(index);
-      const took = Date.now() - mark;
-      mark = Date.now();
-      const label = labelFor(statements[index]);
-      for (const item of applyExclusions(statements[index], {
-        qualification: args.hook,
-      }).excluded)
-        excluded.push({ step: step.name, ...item });
-      timings.push({ step: step.name, label, ms: took });
-      if (code !== 0) {
-        failures.push({ step: step.name, label, code, output });
-        out.push(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
-      } else {
-        passed += 1;
-        if (!PLUMBING.test(label))
-          out.push(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
-      }
+    const result = await runProgram({
+      program,
+      cwd,
+      env: procEnv,
+      controlDir,
+      statementCount: statements.length,
+      onResult: ({ index, code, output, at }) => {
+        seen.add(index);
+        const took = at - mark;
+        mark = at;
+        const label = labelFor(statements[index]);
+        for (const item of applyExclusions(statements[index], {
+          qualification: args.hook,
+        }).excluded)
+          excluded.push({ step: step.name, ...item });
+        timings.push({ step: step.name, label, ms: took });
+        if (code !== 0) {
+          failures.push({ step: step.name, label, code, output });
+          out.push(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
+        } else {
+          passed += 1;
+          if (!PLUMBING.test(label))
+            out.push(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
+        }
+      },
     });
+    if (result.error)
+      failures.push({
+        step: step.name,
+        label: 'step shell control',
+        code: result.code || 1,
+        output: [result.error],
+      });
     statements.forEach((statement, index) => {
       if (seen.has(index)) return;
+      if (result.terminatedAfter !== null && index > result.terminatedAfter) {
+        skipped.push({
+          name: `${step.name}: ${labelFor(statement)}`,
+          reason: 'unreachable after successful step termination',
+        });
+        return;
+      }
       failures.push({
         step: step.name,
         label: labelFor(statement),

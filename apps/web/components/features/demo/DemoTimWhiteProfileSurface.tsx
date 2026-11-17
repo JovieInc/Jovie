@@ -42,6 +42,7 @@ import {
 } from '@/lib/profile/profile-theme';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { DemoClientProviders } from './DemoClientProviders';
+import { isProfileShowcaseStateId } from './demo-profile-showcase-states';
 
 const DEMO_PRESS_PHOTOS = [
   {
@@ -108,36 +109,6 @@ const DEMO_PROFILE_ARCHETYPE_KEYS = [
   'sparse',
   'template',
 ] as const;
-const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
-  'mock-home',
-  'streams-latest',
-  'streams-presave',
-  'streams-release-day',
-  'streams-video',
-  'tour-nearby',
-  'playlist-fallback',
-  'listen-fallback',
-  'alerts-fallback',
-  'events-empty',
-  'more-menu',
-  'fans-opt-in',
-  'fans-confirmed',
-  'fans-song-alert',
-  'fans-show-alert',
-  'subscribe-email',
-  'subscribe-otp',
-  'subscribe-otp-error',
-  'subscribe-name',
-  'subscribe-birthday',
-  'subscribe-done',
-  'tips-open',
-  'tips-apple-pay',
-  'tips-thank-you',
-  'tips-followup',
-  'tour',
-  'contact',
-  'catalog',
-] as const satisfies readonly ProfileShowcaseStateId[];
 const SUBSCRIBE_SHOWCASE_STATE_IDS = [
   'fans-opt-in',
   'subscribe-email',
@@ -391,14 +362,6 @@ function isDemoProfileArchetype(
   return DEMO_PROFILE_ARCHETYPE_KEYS.includes(value as DemoProfileArchetype);
 }
 
-function isProfileShowcaseStateId(
-  value: string | null
-): value is ProfileShowcaseStateId {
-  return DEMO_TIM_WHITE_SHOWCASE_STATE_IDS.includes(
-    value as ProfileShowcaseStateId
-  );
-}
-
 function DemoShowcaseShell({
   title,
   subtitle,
@@ -649,8 +612,10 @@ function SingleStatePhonePreview({
   );
 }
 
-function MoreMenuPhonePreview() {
-  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES['more-menu'];
+function DrawerPhonePreview({
+  stateId,
+}: Readonly<{ stateId: 'more-menu' | 'share' }>) {
+  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const profileAccentStyle = buildProfileAccentCssVars(
     readProfileAccentTheme(HOMEPAGE_PROFILE_PREVIEW_ARTIST.theme)
   );
@@ -811,8 +776,8 @@ export function DemoTimWhiteProfileSurface() {
   }
 
   if (showcaseState) {
-    if (showcaseState === 'more-menu') {
-      return <MoreMenuPhonePreview />;
+    if (showcaseState === 'more-menu' || showcaseState === 'share') {
+      return <DrawerPhonePreview stateId={showcaseState} />;
     }
 
     return (

@@ -14,55 +14,9 @@ import {
   SURFACE_IDS,
   statusFromChecks,
 } from '../prod-cert.mjs';
+import { PEN_IDS } from './fixtures/pen-green-env.mjs';
 
-const SHA = 'a'.repeat(40);
-const T = '2026-10-28T20:00:00.000Z';
-const check = (status, id = 'c') => ({
-  id,
-  status,
-  startedAt: T,
-  endedAt: T,
-  summary: 's',
-});
-
-/** @param {{ failPath?: string, sha?: string }} [options] */
-function fakeFetch({ failPath, sha = SHA } = {}) {
-  return async url => {
-    const u = new URL(url);
-    const html = (body, status = 200) =>
-      new Response(body, { status, headers: { 'content-type': 'text/html' } });
-    if (u.pathname === '/api/health/build-info') {
-      return new Response(
-        JSON.stringify({ commitSha: sha, deploymentId: 'dpl_1' })
-      );
-    }
-    if (u.pathname === failPath) return html('boom', 500);
-    if (u.pathname === '/api/handle/check') {
-      const taken = u.searchParams.get('handle') === 'tim';
-      return new Response(
-        JSON.stringify(
-          taken ? { available: false, reason: 'taken' } : { available: true }
-        )
-      );
-    }
-    if (u.pathname === '/og.png') {
-      return new Response('x', { headers: { 'content-type': 'image/png' } });
-    }
-    if (u.pathname === '/tim') {
-      return html(
-        '<title>Tim</title><h1>Tim</h1><meta property="og:image" content="/og.png"/><a href="/tim/song-1">s</a>'
-      );
-    }
-    if (u.pathname === '/tim/song-1') {
-      return html(
-        '<title>Song</title><meta property="og:image" content="/og.png"/>'
-      );
-    }
-    if (u.pathname === '/signin')
-      return html('<title>Sign in</title><input type="email">');
-    return html('<title>Jovie page</title>');
-  };
-}
+import { check, fakeFetch, SHA, T } from './fixtures/prod-cert-fakes.mjs';
 
 describe('statusFromChecks', () => {
   it('failed beats blocked beats passed, and no checks is never a pass', () => {
@@ -129,6 +83,7 @@ describe('runProductionCertification', () => {
     ).toEqual([
       'release-link-resolves',
       'release-og-image',
+      ...PEN_IDS,
       'click-analytics-capture',
     ]);
   });
@@ -224,6 +179,40 @@ describe('quality observations', () => {
       []
     );
   });
+
+  it('names the worst load in the check and posts the receipt without samples', async () => {
+    const steps = [
+      {
+        kind: 'observation',
+        surface: 'landing',
+        contractId: 'jank.worst-frame-ms',
+        dimension: 'responsiveness:landing',
+        value: 176,
+        unit: 'ms',
+        sampleSize: 3,
+        samples: [376.6, 106, 176],
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    const landing = receipts.find(r => r.surface === 'landing');
+    // The evidence route's observation schema is strict: no samples field.
+    expect(landing.observations).toEqual([
+      {
+        contractId: 'jank.worst-frame-ms',
+        dimension: 'responsiveness:landing',
+        value: 176,
+        unit: 'ms',
+        sampleSize: 3,
+      },
+    ]);
+    expect(
+      landing.checks.find(c => c.id === 'jank.worst-frame-ms').summary
+    ).toContain('load judged on the middle of 3; worst load 376.6');
+  });
 });
 
 describe('fileSurfaceIssues', () => {
@@ -234,16 +223,10 @@ describe('fileSurfaceIssues', () => {
       fetchImpl: fakeFetch({ failPath: '/claim' }),
     });
     await fileSurfaceIssues(receipts, { deps: { upsert, close } });
-    expect(upsert.mock.calls.map(c => c[0].fingerprint)).toEqual([
-      'prod-cert-claim',
-    ]);
-    expect(upsert.mock.calls[0][0]).toMatchObject({
-      fingerprint: 'prod-cert-claim',
-      labelKey: 'prod-cert-claim',
-    });
-    expect(close.mock.calls.map(c => c[0].fingerprint)).toEqual([
-      'prod-cert-landing',
-    ]);
+    const fp = calls => calls.map(c => c[0].fingerprint).join();
+    expect(fp(upsert.mock.calls)).toBe('prod-cert-claim,prod-cert-checkout');
+    expect(upsert.mock.calls[0][0].labelKey).toBe('prod-cert-claim');
+    expect(fp(close.mock.calls)).toBe('prod-cert-landing');
   });
 });
 
@@ -277,7 +260,9 @@ describe('JOV-9822 retries, full green and the overall verdict', () => {
     });
     const checkout = receipts.find(r => r.surface === 'checkout');
     expect(checkout.status).toBe('passed');
-    expect(checkout.checks).toHaveLength(1);
+    expect(
+      checkout.checks.filter(c => c.id === 'checkout-entry-renders')
+    ).toHaveLength(1);
   });
 
   it('a pass followed by a failed retry stays failed', async () => {

@@ -356,7 +356,6 @@ module.exports = [
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
-      'components/atoms/SettingsPlanGateLabel.tsx',
     ],
     rules: {
       'no-restricted-syntax': [
@@ -555,9 +554,9 @@ module.exports = [
       '@jovie/no-ad-hoc-currency': 'off',
     },
   },
-  // PaySelector: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
+  // PaySelector + ArtistInfo: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
   {
-    files: ['components/molecules/PaySelector.tsx'],
+    files: ['components/molecules/{PaySelector,ArtistInfo}.tsx'],
     rules: { 'boundaries/element-types': 'off' },
   },
   // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).

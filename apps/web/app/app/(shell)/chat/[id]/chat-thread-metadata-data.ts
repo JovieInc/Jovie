@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
+import { cache } from 'react';
 import { getSessionContext } from '@/lib/auth/session';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { db } from '@/lib/db';
@@ -8,7 +9,7 @@ import { chatConversations } from '@/lib/db/schema/chat';
 
 export const CHAT_THREAD_TITLE_FALLBACK = 'Chat';
 
-export async function loadChatThreadTitle(
+async function readChatThreadTitle(
   conversationId: string
 ): Promise<string | null> {
   try {
@@ -37,6 +38,13 @@ export async function loadChatThreadTitle(
     return null;
   }
 }
+
+/**
+ * `generateMetadata` and the page both need the thread title. React `cache()`
+ * dedupes them per request, so one navigation costs one session-context read
+ * and one query instead of two of each.
+ */
+export const loadChatThreadTitle = cache(readChatThreadTitle);
 
 export async function loadChatThreadMetadataTitle(
   conversationId: string

@@ -4,6 +4,7 @@ import {
   ICON_BUTTON_FADE_CLASSNAME,
   ICON_BUTTON_VISIBLE_CLASSNAME,
   IconButton,
+  type IconButtonName,
   type IconButtonSize,
 } from '@jovie/ui';
 import type {
@@ -36,14 +37,20 @@ interface InlineIconButtonSharedProps {
 }
 
 type InlineIconButtonAnchorProps = InlineIconButtonSharedProps &
-  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
+  Omit<
+    AnchorHTMLAttributes<HTMLAnchorElement>,
+    'children' | 'aria-label' | 'aria-labelledby'
+  > & {
     readonly href: string;
-  };
+  } & IconButtonName;
 
 type InlineIconButtonButtonProps = InlineIconButtonSharedProps &
-  Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
+  Omit<
+    ButtonHTMLAttributes<HTMLButtonElement>,
+    'children' | 'aria-label' | 'aria-labelledby'
+  > & {
     readonly href?: never;
-  };
+  } & IconButtonName;
 
 export type InlineIconButtonProps =
   | InlineIconButtonAnchorProps
@@ -67,15 +74,24 @@ export const InlineIconButton = React.memo(function InlineIconButton(
       fadeOnParentHover = false,
       size = 'lg',
       href,
+      ariaLabel,
+      'aria-label': ariaLabelProp,
+      'aria-labelledby': ariaLabelledBy,
       ...anchorProps
     } = props;
-
     return (
       <IconButton
         variant='inline'
         size={size}
         asChild
         className={sharedClassName(className, fadeOnParentHover)}
+        // IconButton resolves the name and Slot merges it onto the <a>; the
+        // props type already guarantees one of the three is a string.
+        {...({
+          ariaLabel,
+          'aria-label': ariaLabelProp,
+          'aria-labelledby': ariaLabelledBy,
+        } as IconButtonName)}
       >
         <a href={href} {...anchorProps}>
           {children}

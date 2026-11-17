@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { NativeSelect } from './native-select';
 
@@ -113,5 +114,54 @@ describe('NativeSelect', () => {
     expect(select.className).toContain(
       'focus-visible:border-(--linear-border-focus)'
     );
+  });
+});
+
+describe('NativeSelect certificate evidence', () => {
+  it('has no axe violations across labelled, invalid, bare, and disabled selects', async () => {
+    const { container } = render(
+      <div>
+        <NativeSelect options={OPTIONS} label='Release status' required />
+        <NativeSelect
+          options={OPTIONS}
+          label='Visibility'
+          error='Choose a visibility'
+        />
+        <NativeSelect options={OPTIONS} aria-label='Bare status' />
+        <NativeSelect
+          options={OPTIONS}
+          label='Locked status'
+          disabled
+          defaultValue='live'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(screen.getByLabelText('Bare status'), {
+      target: { value: 'live' },
+    });
+    expect(screen.getByLabelText('Bare status')).toHaveValue('live');
+  });
+
+  it('announces the error once and puts the asterisk at the inline end', () => {
+    const { container } = render(
+      <NativeSelect
+        options={OPTIONS}
+        label='Release status'
+        error='Choose a status'
+        required
+      />
+    );
+
+    const errorSlot = container.querySelector(
+      '[data-slot="native-select-error-slot"]'
+    );
+    // Deliberate-red: an aria-live wrapper around role=alert announced twice.
+    expect(errorSlot).not.toHaveAttribute('aria-live');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    const asterisk = container.querySelector('label [aria-hidden="true"]');
+    expect(asterisk?.className).toContain('ms-1');
+    expect(asterisk?.className).not.toContain('ml-1');
   });
 });

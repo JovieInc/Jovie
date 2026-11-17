@@ -150,10 +150,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -186,10 +182,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/contacts-table/row-actions.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/ContactsManager.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -210,19 +202,11 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx",
       "linearIssue": "JOV-8847"
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSummary.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -262,10 +246,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -298,14 +278,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/SettingsArtistProfileSection.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -326,10 +298,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -347,10 +315,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/tour-dates/tour-date-actions.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -450,10 +414,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/profile/DesktopQrOverlayClient.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/profile/ProfileAboutShare.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -463,10 +423,6 @@
     },
     {
       "path": "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -494,31 +450,11 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatFeedbackControl.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatPinnedOpportunityHeader.tsx",
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatProvidersRegistrar.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChipTray.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/FileAttachmentChip.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -571,18 +507,6 @@
     },
     {
       "path": "apps/web/components/shell/InlineEditRow.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerAction.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerLink.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PickerToggle.tsx",
       "linearIssue": "JOV-8847"
     },
     {

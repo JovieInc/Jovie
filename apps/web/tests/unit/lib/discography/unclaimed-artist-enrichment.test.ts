@@ -9,7 +9,8 @@ vi.mock('@/lib/db', () => ({}));
 vi.mock('@/lib/db/schema/links', () => ({
   socialLinks: { _: { name: 'socialLinks' } },
 }));
-vi.mock('@/lib/dsp-registry', () => ({
+vi.mock('@/lib/dsp-registry', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/dsp-registry')>()),
   SERVICE_TO_PROVIDER: {
     appleMusic: 'apple_music',
     soundcloud: 'soundcloud',

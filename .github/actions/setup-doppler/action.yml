@@ -1,21 +1,84 @@
 name: 'Setup Doppler'
 description: 'Install Doppler CLI without exporting secrets (Ubuntu/Debian runners only)'
 
+# The CLI .deb is cached per version and architecture, so a warm run installs
+# it with dpkg and never calls apt. A cold run fetches the pinned version from
+# packages.doppler.com (signed source, fingerprint-pinned key), refreshing only
+# the Doppler source, not the Ubuntu mirrors that stopped resolving on
+# 2026-11-11, and saves the .deb. Bump DOPPLER_CLI_VERSION for a new release.
 runs:
   using: 'composite'
   steps:
-    - name: Install Doppler CLI
+    - name: Resolve Doppler CLI package
+      id: doppler-package
       shell: bash
+      env:
+        DOPPLER_CLI_VERSION: '3.77.1'
       run: |
         set -euo pipefail
-        sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+        arch="$(dpkg --print-architecture)"
+        dir="$HOME/.cache/jovie-doppler-cli"
+        {
+          echo "version=$DOPPLER_CLI_VERSION"
+          echo "dir=$dir"
+          echo "deb=$dir/doppler_${DOPPLER_CLI_VERSION}_${arch}.deb"
+          echo "key=doppler-cli-deb-v1-${RUNNER_OS}-${arch}-${DOPPLER_CLI_VERSION}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore Doppler CLI package
+      if: runner.environment == 'github-hosted'
+      uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: ${{ steps.doppler-package.outputs.dir }}
+        key: ${{ steps.doppler-package.outputs.key }}
+
+    - name: Install Doppler CLI
+      id: doppler-install
+      shell: bash
+      env:
+        DOPPLER_CLI_VERSION: ${{ steps.doppler-package.outputs.version }}
+        DOPPLER_DEB: ${{ steps.doppler-package.outputs.deb }}
+      run: |
+        set -euo pipefail
+        cached="$(dpkg-deb --field "$DOPPLER_DEB" Package Version 2>/dev/null | tr '\n' ' ' || true)"
+        if [[ "$cached" == "Package: doppler Version: ${DOPPLER_CLI_VERSION} " ]] &&
+          sudo dpkg -i "$DOPPLER_DEB"; then
+          echo "Installed cached Doppler CLI ${DOPPLER_CLI_VERSION}; apt not used."
+          exit 0
+        fi
+        if ! command -v curl >/dev/null || ! command -v gpg >/dev/null; then
+          sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg
+        fi
         bash .github/scripts/install-doppler-keyring.sh \
           'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' \
           'BD8F51EC1320748CED4E6E3BDE2A7741A397C129' \
           '/usr/share/keyrings/doppler-archive-keyring.gpg'
         echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
-        sudo apt-get update && sudo apt-get install doppler
+        # Refresh the Doppler source only; the Ubuntu package lists stay as shipped.
+        sudo apt-get update -o Acquire::Retries=3 \
+          -o Dir::Etc::sourcelist=sources.list.d/doppler-cli.list \
+          -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0
+        sudo apt-get install -y -o Acquire::Retries=3 "doppler=${DOPPLER_CLI_VERSION}"
+        fetched="/var/cache/apt/archives/$(basename "$DOPPLER_DEB")"
+        if [[ -f "$fetched" ]]; then
+          mkdir -p "$(dirname "$DOPPLER_DEB")"
+          cp "$fetched" "$DOPPLER_DEB"
+          echo "fetched=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Save Doppler CLI package
+      if: steps.doppler-install.outputs.fetched == 'true' && runner.environment == 'github-hosted'
+      uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: ${{ steps.doppler-package.outputs.dir }}
+        key: ${{ steps.doppler-package.outputs.key }}
 
     - name: Verify Doppler installation
       shell: bash
-      run: doppler --version
+      env:
+        DOPPLER_CLI_VERSION: ${{ steps.doppler-package.outputs.version }}
+      run: |
+        set -euo pipefail
+        version="$(doppler --version)"
+        echo "$version"
+        [[ "$version" == *"$DOPPLER_CLI_VERSION"* ]]

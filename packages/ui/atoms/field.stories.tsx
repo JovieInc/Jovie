@@ -69,3 +69,67 @@ export const PreservesControlDescription: Story = {
     </div>
   ),
 };
+
+export const PartialLabelOnly: Story = {
+  render: () => (
+    <div className='w-72'>
+      <Field label='Display name' id='field-partial'>
+        <Input defaultValue='Tim' />
+      </Field>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only a label is supplied: no description or error, and the feedback slot still holds its space.',
+      },
+    },
+  },
+};
+
+export const PermissionDenied: Story = {
+  render: () => (
+    <div className='w-72'>
+      <Field
+        label='Payout email'
+        description='Only the account owner can change where payouts are sent.'
+        id='field-permission-denied'
+      >
+        <Input type='email' defaultValue='owner@jov.ie' disabled />
+      </Field>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The wrapped control is disabled for a viewer without rights; the description, wired via aria-describedby, says why.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='w-64'>
+      <Field
+        label='اسم العرض كما يظهر في ملفك الشخصي العام للمعجبين'
+        description='يظهر هذا الاسم في أعلى صفحة الروابط الخاصة بك وفي جميع الإصدارات القادمة.'
+        error='الاسم طويل جدًا، استخدم أقل من أربعين حرفًا.'
+        required
+        id='field-rtl'
+      >
+        <Input defaultValue='فرقة الليل الطويل وأصدقاؤها من الموسيقيين المستقلين' />
+      </Field>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic label, description, and error in a narrow right-to-left container: each line wraps from the start edge and the value clips inside the input.',
+      },
+    },
+  },
+};

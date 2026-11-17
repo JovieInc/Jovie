@@ -264,13 +264,15 @@ jobs:
           # The browser smoke exchanges the credential on the exact verified
           # build-info route, verifies build identity and host-only cookie
           # behavior, then navigates without credential headers or query params.
+          # auth-overlay-clearance proves One Tap and password-manager prompts
+          # can't cover the sign-in controls, at desktop and phone sizes.
           until CI=true \
             SMOKE_ONLY=1 \
             BASE_URL="${DEPLOYMENT_URL}" \
             EXPECTED_VERCEL_ENVIRONMENT=preview \
             PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
+                pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts tests/e2e/auth-overlay-clearance.spec.ts --project=chromium --reporter=line; do
             if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
               echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
               exit 1

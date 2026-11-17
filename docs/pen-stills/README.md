@@ -1,19 +1,32 @@
 # Pen stills
 
 Dark is the primary review mode. Light is a derived variant. The homepage
-manifest records the historical headline **Be found. Be understood.** This
+records the historical headline **Be found. Be understood.** This
 manifest and headline are unqualified inputs, not approval of the current
 homepage or authority to change its copy or Pen IDs.
 
-Canonical section stills are not in the repo yet. Provide authorized exports
+The homepage stills in `home/<viewport>/<section>.png` are the approved
+homepage v3 (Tim, 2026-11-08 01:43Z, design-approvals receipt
+home-canonical-v3): hero, profile, releases, specs, invite and footer at 1440
+and 390. The page code marks the same sections with `data-pen-section`.
+
+Other canonical section stills are not in the repo yet. Provide authorized exports
 locally to qualify comparisons; do not commit native images or upload private
 screenshots. The default diff remains advisory. Parked and fork frames stay in
 the manifest so the exclusion is explicit, and they are never captured.
 
 ## Manifest
 
-`homepage/manifest.json` is a `pen-still-manifest/v1` document. The schema is
-`manifest.schema.json`. Each frame names `sectionId`, `penNodeId`, `fileHash`
+The binding manifest is `docs/design-system/pen-bindings.json`
+(`jovie.pen-binding/v1`, schema `docs/design-system/pen-bindings.schema.json`):
+routes, their `sources`, an `approved` receipt, and per-viewport sections with
+`penFile`, `nodeId`, `still` and `sha256`. A route without `approved` is
+UNBOUND. Stills live at `docs/pen-stills/<slug>/<viewport>/<section>.png`.
+Write them with `pnpm design:pen-export`, record approval with
+`pnpm design:pen-export approve`, check with `pnpm design:pen-bindings`.
+`pen-still-diff` reads that file and turns bound routes into dark, active
+frames. The legacy `pen-still-manifest/v1` frame format below still loads for
+fixtures (`manifest.schema.json`). Each frame names `sectionId`, `penNodeId`, `fileHash`
 (`sha256:` or `null`), `stillPath`, `viewport` (`1440` or `390`), `mode`
 (`dark` or `light`), and `status` (`active`, `parked`, or `fork`). Only
 `active` frames are diffed. Dark frames are compared first.
@@ -27,13 +40,16 @@ is the target.
 
 ```bash
 node scripts/invariants/pen-still-diff.mjs \
-  --manifest docs/pen-stills/homepage/manifest.json \
+  --manifest docs/design-system/pen-bindings.json [--route /] \
   --out pen-still-out
 ```
 
-Capture reuses `captureSurfacePng` and `withCaptureBrowser` from
-`scripts/invariants/clef-screenshot-evaluator.mjs` (Playwright, viewports
-1440 and 390, dark unless the frame says light).
+Capture reuses `captureSurfacePng` from
+`scripts/invariants/clef-screenshot-capture.mjs` (Playwright, viewports
+1440 and 390, dark unless the frame says light). One browser starts lazily
+for the manifest and closes after evaluation. Each frame retains its own
+isolated page/context and closes it even after a capture failure. Missing
+stills, failed hashes and absent targets do not start Chromium.
 
 Each comparable frame reports section height ratio (render aspect / Pen
 aspect), mockup bbox aspect and area, text-block vertical centers, windowed
@@ -50,7 +66,9 @@ selected mode. Default advisory runs exit 0 for recorded comparison failures;
 invalid manifests and other command errors still exit nonzero.
 
 Each compared frame writes its own `triptych-<sha256>.png`, deterministically
-named from its section, mode and viewport identity. Full identity hashing avoids
+named from its route/story, section, mode and viewport identity. Route and story
+also scope duplicate detection, so two pages can retain independent `hero`
+comparisons even when their native node IDs coincide. Full identity hashing avoids
 path separators, case-folding collisions, lossy slug collisions and overlong
 filenames. `receipt.json` and `comment.md` reference those exact images. A legacy
 `triptych.png` alias is written only for one compared image (or the sole

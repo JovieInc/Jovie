@@ -283,13 +283,21 @@ describe('artist proof collector', () => {
 
   it('follows only declared redirects, one same-origin hop, and requires a 200', async () => {
     const artist = '/artists/f5441adb-6789-449a-9553-ab7460c9c61c';
-    const redirectHtml = `<section data-testid="profile-aeo-content"><a href="${artist}">Austin Leeds</a><a href="/tim/listen">Listen</a><a href="/moved">Moved</a><a href="/artists/3836027a-8351-4c0b-8922-c3259387bbf8">Off site</a></section>`;
+    const redirectHtml = `<section data-testid="profile-aeo-content"><a href="${artist}">Austin Leeds</a><a href="/tim/listen">Listen</a><a href="/moved">Moved</a><a href="/artists/3836027a-8351-4c0b-8922-c3259387bbf8">Off site</a><a href="/start?campaign=proof-to-claim">Claim yours</a></section>`;
     const routes: Record<string, Response | (() => Response)> = {
       'https://jov.ie/tim': () => new Response(redirectHtml, { status: 200 }),
       'https://jov.ie/api/health/build-info': () =>
         Response.json({
           commitSha: '0f42058e6e24a9882a538a6b5d94fa84b2f7c15f',
         }),
+      // Closed public signup (canon/PRODUCT.md, 2026-11-02): the profile's
+      // /start CTA hands off to the /waitlist role form.
+      'https://jov.ie/start?campaign=proof-to-claim': () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: '/waitlist' },
+        }),
+      'https://jov.ie/waitlist': () => new Response('', { status: 200 }),
       [`https://jov.ie${artist}`]: () =>
         new Response(null, {
           status: 307,
@@ -333,6 +341,13 @@ describe('artist proof collector', () => {
       status: 307,
       finalStatus: 404,
     });
+    expect(byUrl['https://jov.ie/start?campaign=proof-to-claim']).toMatchObject(
+      {
+        status: 307,
+        redirectedTo: 'https://jov.ie/waitlist',
+        finalStatus: 200,
+      }
+    );
     expect(byUrl['https://jov.ie/moved']).toEqual(
       expect.not.objectContaining({ finalStatus: expect.anything() })
     );
@@ -352,7 +367,7 @@ describe('artist proof collector', () => {
     expect(result.failed).toBe(true);
   });
 
-  it('declares only the stable artist route and route-config redirect sinks', () => {
+  it('declares only the stable artist route, route-config redirect sinks, and the closed-signup waitlist handoff', () => {
     expect(
       isDeclaredRedirect(
         new URL('https://jov.ie/artists/f5441adb-6789-449a-9553-ab7460c9c61c'),
@@ -371,6 +386,31 @@ describe('artist proof collector', () => {
     expect(isDeclaredRedirect(new URL('https://jov.ie/moved'), 'tim')).toBe(
       false
     );
+    // Closed public signup (canon/PRODUCT.md, 2026-11-02): the /start and
+    // /signup entry paths are declared only when they hand off to the
+    // /waitlist role form — any other destination still fails.
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', '/waitlist')
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(
+        new URL('https://jov.ie/start?campaign=proof-to-claim'),
+        'tim',
+        'https://jov.ie/waitlist'
+      )
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/signup'), 'tim', '/waitlist')
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', '/signin')
+    ).toBe(false);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/start'), 'tim', undefined)
+    ).toBe(false);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/claim'), 'tim', '/waitlist')
+    ).toBe(false);
   });
 
   it('requires the reference release to return explicitly to Tim White', async () => {

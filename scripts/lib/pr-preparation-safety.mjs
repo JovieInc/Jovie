@@ -7,7 +7,9 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 export const RECEIPT_SCHEMA = 'jovie-pr-preparation-canary-receipt/v1';
 const REQUIRED_CHECKS =
-  'PR Ready,Migration Guard,Fork PR Gate,PR Size Guard'.split(',');
+  'PR Ready,Migration Guard,Fork PR Gate,PR Size Guard,Company guards'.split(
+    ','
+  );
 export const HOLD_LABELS = Object.freeze(
   'hold,gated,incident,queue-deferred,needs-conflict-resolution,needs-manual-rebase,fast'.split(
     ','

@@ -98,7 +98,7 @@ export const SizeMatrix: Story = {
   ),
 };
 
-export const NarrowLongLabels: Story = {
+export const LongContentNarrowLabels: Story = {
   render: () => (
     <div className='w-64 rounded-2xl border border-subtle bg-surface-1 p-3'>
       <Demo longLabels />
@@ -148,4 +148,116 @@ export const DarkMode: Story = {
     </div>
   ),
   parameters: { backgrounds: { default: 'dark' } },
+};
+
+type ReleaseView = 'overview' | 'audience' | 'payouts';
+
+function PartialAvailabilityDemo() {
+  const [value, setValue] = useState<ReleaseView>('overview');
+  return (
+    <SegmentControl
+      value={value}
+      onValueChange={setValue}
+      aria-label='Release view'
+      options={[
+        { value: 'overview', label: 'Overview' },
+        {
+          value: 'audience',
+          label: 'Audience',
+          disabled: true,
+          title: 'Audience data appears after the first 24 hours',
+        },
+        {
+          value: 'payouts',
+          label: 'Payouts',
+          disabled: true,
+          title: 'Payouts appear after the first statement',
+        },
+      ]}
+    />
+  );
+}
+
+export const PartialAvailability: Story = {
+  render: () => (
+    <div className='w-80'>
+      <PartialAvailabilityDemo />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only part of the data exists yet: views without data stay in place, disabled, with a native title explaining when they unlock.',
+      },
+    },
+  },
+};
+
+type RtlView = 'links' | 'music' | 'videos';
+
+function RtlDemo({ variant }: { readonly variant: 'default' | 'linear-pill' }) {
+  const [value, setValue] = useState<RtlView>('music');
+  return (
+    <SegmentControl
+      value={value}
+      onValueChange={setValue}
+      aria-label='اختر العرض'
+      variant={variant}
+      layout={variant === 'linear-pill' ? 'hug' : 'fill'}
+      options={[
+        { value: 'links', label: 'الروابط الاجتماعية' },
+        { value: 'music', label: 'روابط الموسيقى والإصدارات' },
+        { value: 'videos', label: 'الفيديو' },
+      ]}
+    />
+  );
+}
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='grid w-72 gap-4'>
+      <RtlDemo variant='default' />
+      <RtlDemo variant='linear-pill' />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left tabs start at the right, long Arabic labels truncate inside their slot, and the linear-pill indicator follows the active tab.',
+      },
+    },
+  },
+};
+
+function RadioSemanticsDemo() {
+  const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d');
+  return (
+    <SegmentControl
+      semantics='radio'
+      variant='linear-pill'
+      layout='hug'
+      value={range}
+      onValueChange={setRange}
+      aria-label='Time range'
+      options={[
+        { value: '7d', label: '7 days' },
+        { value: '30d', label: '30 days' },
+        { value: '90d', label: '90 days' },
+      ]}
+    />
+  );
+}
+
+export const RadioSemantics: Story = {
+  render: () => <RadioSemanticsDemo />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A pure choice with no panel, such as a time range, uses radio semantics: a named radio group, no tabpanels, same keys and look.',
+      },
+    },
+  },
 };

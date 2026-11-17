@@ -66,3 +66,45 @@ export const Exhausted: Story = {
     candidates: [],
   },
 };
+
+/** A set that came back with no candidates opens straight on the request-more panel. */
+export const EmptyCandidateSet: Story = {
+  args: {
+    candidates: [],
+  },
+};
+
+/** Long release and style names wrap in the legend, footer and button labels. */
+export const LongContent: Story = {
+  args: {
+    releaseTitle:
+      'The Extended Midnight Drive Sessions (Deluxe Anniversary Edition)',
+    candidates: candidates.map((candidate, index) => ({
+      ...candidate,
+      id: `long-${candidate.id}`,
+      styleLabel:
+        index === 0
+          ? 'Hand-Painted Watercolor Collage With Film Grain'
+          : 'Retro Futurist Chrome Typography On Dusk Gradient',
+    })),
+  },
+};
+
+/** Right-to-left: the reject and accept pair mirrors; arrow keys keep their meaning. */
+export const RtlReview: Story = {
+  args: {
+    releaseTitle: 'ليلة في القاهرة',
+    candidates: candidates.map(candidate => ({
+      ...candidate,
+      id: `rtl-${candidate.id}`,
+      styleLabel: 'بوب حالم',
+    })),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -165,9 +165,18 @@ describe('ReleasePlanWizard', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a loading state while the gate is resolving', () => {
-    render(<ReleasePlanWizard {...baseProps} isGateLoading={true} />);
-    expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();
+  it('keeps a way out while the gate is resolving', () => {
+    const onClose = vi.fn();
+    render(
+      <ReleasePlanWizard
+        {...baseProps}
+        isGateLoading={true}
+        onClose={onClose}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Loading...' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('Generate button disables and relabels while submitting', () => {

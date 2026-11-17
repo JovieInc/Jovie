@@ -1497,43 +1497,6 @@ describe('marketing adversarial-review invariants', () => {
       )
     ).toBe(true);
   });
-
-  it('B1: golden fixtures that resolve to unproven variants are flagged (humanOptIn required at render time)', async () => {
-    // For each golden fixture, resolve the composition, walk the sections, find
-    // any variant with status: 'unproven'. These are legal in the tuple (the
-    // resolver produces them) BUT a real route deployment that uses them must
-    // carry humanOptIn on the route manifest entry (DX2). This test documents
-    // the requirement; it does NOT fail the gate (the gate cannot inspect
-    // render-time manifest entries from a unit test — that's a Linear follow-up
-    // for render-time recipe verification per DX8).
-    for (const file of [
-      'brief-01-artist-claim.json',
-      'brief-02-homepage-general.json',
-      'brief-03-pricing-compare.json',
-    ]) {
-      const content = await readFile(resolve(BRIEFS_DIR, file), 'utf-8');
-      const fixture = JSON.parse(content) as { brief: unknown };
-      const composition = resolveComposition(fixture.brief);
-      const unprovenVariants: string[] = [];
-      for (const s of composition.sections) {
-        const section = MARKETING_SECTIONS.find(sec => sec.id === s.sectionId);
-        const variant = section?.variants.find(v => v.id === s.variantId);
-        if (variant?.status === 'unproven') {
-          unprovenVariants.push(`${s.sectionId}/${s.variantId}`);
-        }
-      }
-      // Soft assertion: log but don't fail (the gate can't enforce render-time humanOptIn).
-      // A future render-time test (DX8 follow-up) will assert the route manifest carries humanOptIn.
-      if (unprovenVariants.length > 0) {
-        console.warn(
-          `[B1] ${file} resolves to unproven variants: ${unprovenVariants.join(', ')}. ` +
-            `A real route deployment using these must carry humanOptIn on the route manifest entry (DX2).`
-        );
-      }
-    }
-    // Always pass — this is a documentation/warning test, not a gate.
-    expect(true).toBe(true);
-  });
 });
 
 // Source inventory checks only. Mounted identity remains the route-health gate.
@@ -1554,7 +1517,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     // Source inventory is separate from deployed mounted and visual certification.
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'centered-none',
+      'left-none',
       'phone-right',
       'release-rail',
       'final-single-claim',

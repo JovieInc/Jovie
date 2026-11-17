@@ -215,13 +215,23 @@ export function buildPresenceRows(input: {
 export interface FixProposal {
   readonly issue: PresenceIssue;
   readonly title: string;
-  /** Task text handed to an agent only after the user approves. */
+  /**
+   * Task text handed to chat only after the user clicks the fix. It names the
+   * exact profile (label and public link) so chat never has to ask which one,
+   * and states the copy rule in plain words the model understands.
+   */
   readonly agentTask: string;
   readonly requiresApproval: true;
   /** Always false: the loop proposes, it never posts or messages anyone. */
   readonly autoPost: false;
   /** Copy rule applied to any text the agent drafts. */
   readonly copyRule: 'lifestyle_only' | 'brand_voice';
+}
+
+/** The profile a fix is about, as the user sees it on the row. */
+export interface FixTarget {
+  readonly label?: string | null;
+  readonly url?: string | null;
 }
 
 const FIX_TITLES: Record<PresenceIssueKind, string> = {
@@ -236,6 +246,72 @@ const FIX_TITLES: Record<PresenceIssueKind, string> = {
   jovie_does_not_link_out: 'Link this profile from your Jovie page',
 };
 
+/** What the user asks chat to do, given "my YouTube (youtube.com/@me)". */
+const FIX_ASKS: Record<PresenceIssueKind, (where: string) => string> = {
+  missing_profile: where => `Help me set up my ${where} profile.`,
+  broken_link: where =>
+    `The link to my ${where} is broken. Find the right one.`,
+  stale_check: where =>
+    `Re-check my ${where} and tell me what is out of date compared with my Jovie profile.`,
+  identity_conflict: where =>
+    `Check whether my ${where} is really mine; it conflicts with my identity.`,
+  handle_mismatch: where =>
+    `Align the handle on my ${where} with my Jovie handle.`,
+  bio_mismatch: where => `Update the bio on my ${where} to match my Jovie bio.`,
+  photo_mismatch: where =>
+    `Update the photo on my ${where} to match my Jovie photo.`,
+  no_link_back_to_jovie: where => `Add my Jovie link to my ${where}.`,
+  jovie_does_not_link_out: where => `Add my ${where} to my Jovie page.`,
+};
+
+const COPY_RULE_WORDS: Record<FixProposal['copyRule'], string> = {
+  lifestyle_only:
+    'This is my personal account, so keep any wording about me and my music, never a pitch for Jovie.',
+  brand_voice: 'Keep any wording in our brand voice.',
+};
+
+const PLATFORM_NAMES: Readonly<Record<string, string>> = {
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  x: 'X',
+  twitter: 'X',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  bandcamp: 'Bandcamp',
+  facebook: 'Facebook',
+  threads: 'Threads',
+};
+
+function platformName(platform: string): string {
+  return (
+    PLATFORM_NAMES[platform] ??
+    platform.replaceAll('_', ' ').replace(/^./, c => c.toUpperCase())
+  );
+}
+
+/** Public link as a person reads it: no scheme, no www, no trailing slash. */
+function readableUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return null;
+    }
+    const path = parsed.pathname.replace(/\/+$/, '');
+    return `${parsed.host.replace(/^www\./, '')}${path}`;
+  } catch {
+    return null;
+  }
+}
+
+function describeTarget(platform: string, target?: FixTarget): string {
+  const name = target?.label?.trim() || platformName(platform);
+  const link = readableUrl(target?.url);
+  return link ? `${name} (${link})` : name;
+}
+
 /**
  * Every issue becomes exactly one approvable action: no dead ends.
  * Personal mode drafts lifestyle-only copy and never a product pitch
@@ -243,16 +319,20 @@ const FIX_TITLES: Record<PresenceIssueKind, string> = {
  */
 export function proposeFix(
   issue: PresenceIssue,
-  mode: PresenceMode
+  mode: PresenceMode,
+  target?: FixTarget
 ): FixProposal {
   const title = FIX_TITLES[issue.kind];
   const rule = mode === 'personal' ? 'lifestyle_only' : 'brand_voice';
+  const where = describeTarget(issue.platform, target);
   return {
     issue,
-    title: `${title} (${issue.platform})`,
-    agentTask:
-      `${title} on ${issue.platform}. Draft the change for approval; ` +
-      `do not publish. Copy rule: ${rule}.`,
+    title: `${title} (${platformName(issue.platform)})`,
+    agentTask: [
+      FIX_ASKS[issue.kind](where),
+      'Draft any change for my approval and do not publish anything.',
+      COPY_RULE_WORDS[rule],
+    ].join(' '),
     requiresApproval: true,
     autoPost: false,
     copyRule: rule,

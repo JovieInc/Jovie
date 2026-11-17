@@ -7,6 +7,7 @@ import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
+import { useRailPreview } from '@/components/shell/useRailPreview';
 import { AppShellFrame } from './AppShellFrame';
 import { Sidebar, SidebarProvider } from './sidebar';
 
@@ -30,6 +31,20 @@ export const Default: Story = {};
 
 export const ChatAmbientGradient: Story = {
   args: { chatAmbientGradient: true, containerClassName: 'h-dvh' },
+};
+
+/** Suspense placeholder: the frame paints without the live landmark id or
+ * frame attribute while the signed-in shell resolves. */
+export const LoadingPlaceholder: Story = {
+  args: {
+    placeholder: true,
+    header: <header className='px-3 py-2'>Loading workspace</header>,
+    main: (
+      <div className='p-3' aria-busy='true'>
+        Loading chat
+      </div>
+    ),
+  },
 };
 
 export const WithInspector: Story = {
@@ -95,23 +110,43 @@ export const SettingsHeaderAlignment: Story = {
   ),
 };
 
-function OverlayInspectorFixture() {
-  const [open, setOpen] = useState(false);
+function InspectorFixture({
+  withPreview = false,
+}: {
+  readonly withPreview?: boolean;
+}) {
+  const [pinned, setPinned] = useState(false);
+  // Production wiring (PreviewPanelContext + ProfileContactSidebar): hover or
+  // focus on the toggle previews the rail as an overlay; a press pins it and
+  // the route yields.
+  const { isPreview, isFloating, dismissPreview } = useRailPreview({
+    side: 'right',
+    pinned,
+    enabled: withPreview,
+  });
+  const open = pinned || isPreview;
+  const presentation = isFloating ? 'overlay' : 'push';
+  const setOpen = (next: boolean | ((value: boolean) => boolean)) => {
+    dismissPreview();
+    setPinned(value => (typeof next === 'function' ? next(value) : next));
+  };
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
         containerClassName='h-dvh'
         sidebar={<Sidebar collapsible='icon'>Navigation</Sidebar>}
         header={
-          <div className='flex h-12 items-center justify-between px-3'>
+          <div className='flex h-(--app-shell-header-height) items-center justify-between px-3'>
             <span>Work</span>
             <RailToggleButton
               side='right'
               open={open}
-              openLabel='Collapse details'
+              pinned={pinned}
+              previewTrigger={withPreview}
+              openLabel={isPreview ? 'Pin details' : 'Collapse details'}
               closedLabel='Expand details'
               controlsId='story-inspector'
-              onToggle={() => setOpen(value => !value)}
+              onToggle={() => setOpen(value => (isPreview ? true : !value))}
             />
           </div>
         }
@@ -123,6 +158,7 @@ function OverlayInspectorFixture() {
             <label className='block p-4'>
               Notes
               <textarea
+                data-testid='story-route-notes'
                 className='block w-full'
                 defaultValue='Keep this draft'
               />
@@ -138,6 +174,7 @@ function OverlayInspectorFixture() {
             data-testid='story-inspector'
             isOpen={open}
             width={400}
+            presentation={presentation}
             ariaLabel='Work details'
             onKeyDown={event => {
               if (event.key === 'Escape') setOpen(false);
@@ -154,7 +191,11 @@ function OverlayInspectorFixture() {
                   defaultValue='Inspector draft'
                 />
               </label>
-              <p>Context stays inside the content panel, below its header.</p>
+              <p>
+                {presentation === 'push'
+                  ? 'The open inspector is a column: the route yields its width.'
+                  : 'A transient preview floats over the route below its header.'}
+              </p>
             </div>
           </RightDrawer>
         }
@@ -163,6 +204,13 @@ function OverlayInspectorFixture() {
   );
 }
 
-export const OverlayInspector: Story = {
-  render: () => <OverlayInspectorFixture />,
+/** Open/pinned inspector pushes the route (founder call 2026-11-08). */
+export const PushInspector: Story = {
+  render: () => <InspectorFixture />,
+};
+
+/** Hover/focus on the toggle previews the rail over the route (no push);
+ * pressing it pins the rail and the route yields with the same motion. */
+export const PreviewOverlayInspector: Story = {
+  render: () => <InspectorFixture withPreview />,
 };

@@ -64,6 +64,18 @@ describe('DemoShell', () => {
     expect(screen.getByText('Demo content')).toBeInTheDocument();
   });
 
+  it('sends the sidebar sign-up into the /start flow', () => {
+    render(
+      <DemoShell activeTab='inbox' onTabChange={vi.fn()}>
+        <div>Demo content</div>
+      </DemoShell>
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Sign up for Jovie' })
+    ).toHaveAttribute('href', '/start');
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource('components/features/demo/DemoShell.tsx');
     expect(source).toContain("@/components/organisms/sidebar'");

@@ -102,4 +102,63 @@ describe('SettingsPaySection', () => {
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
+  it('holds the QR box and the loaded grid while the summary loads', () => {
+    // Below lg the loaded block stacks a 148px QR box under the text; a
+    // placeholder without it grew on load and shifted the page (phone CLS
+    // 0.206 on /app/earnings, Nov 8).
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+
+    expect(getByTestId('settings-pay-loading')).toHaveClass(
+      'flex-col',
+      'gap-4',
+      'lg:flex-row'
+    );
+    expect(getByTestId('settings-pay-loading-qr')).toHaveClass('h-37', 'w-37');
+  });
+
+  it('holds the narrative as two 19px lines with no gap between them', () => {
+    // The narrative is leading-[19px]; two 19px bars with a 4px gap stood
+    // 42px tall against a 38px two-line paragraph.
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+    const narrative = getByTestId('settings-pay-loading-narrative');
+
+    expect(narrative.className).not.toMatch(/space-y|gap-/);
+    const lines = Array.from(narrative.children);
+    expect(lines).toHaveLength(2);
+    for (const line of lines) expect(line).toHaveClass('h-4.75');
+  });
+
+  it('holds the status pill and the actions row margin of the loaded surface', () => {
+    // The pill is one text-2xs line plus py-0.5 and a 1px border; the loaded
+    // actions row keeps a space-y-2.5 margin above the sr-only status line.
+    mockUseProfileMonetizationSummary.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = fastRender(<SettingsPaySection />);
+
+    expect(getByTestId('settings-pay-loading-pill')).toHaveClass(
+      'text-2xs',
+      'py-0.5',
+      'border'
+    );
+    expect(getByTestId('settings-pay-loading-actions')).toHaveClass('mb-2.5');
+  });
 });

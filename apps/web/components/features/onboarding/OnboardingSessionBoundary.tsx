@@ -3,9 +3,15 @@
 import { Button } from '@jovie/ui';
 import type { UIMessage } from 'ai';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
-import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
+import {
+  ONBOARDING_FRAME_CLASS,
+  OnboardingShell,
+  type OnboardingShellProps,
+} from './OnboardingShell';
 
 export interface OnboardingSessionSnapshot {
   readonly identityId: string | null;
@@ -236,43 +242,60 @@ export function OnboardingSessionBoundary({
         />
       );
     }
+    // The restore state sits in the same frame as the live chat. Rendered
+    // bare, desktop painted a flat page and then snapped to the raised,
+    // rounded shell panel the moment the conversation resolved.
     return (
-      <div
-        className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3'
-        role={failed ? 'alert' : 'status'}
-        aria-live='polite'
-        data-testid='onboarding-session-boundary'
-        data-restore-state={failed ? 'failed' : 'restoring'}
-        data-restore-error={failureCode ?? undefined}
-        data-auth-state={
-          isLoaded ? (userId ? 'signed-in' : 'anonymous') : 'loading'
-        }
-      >
-        <h1 className='m-0 text-balance text-base font-normal leading-normal'>
-          {failed
-            ? 'Your conversation could not be restored.'
-            : 'Restoring your conversation…'}
-        </h1>
-        {failed ? (
-          <>
-            <Button onClick={() => setRevision(current => current + 1)}>
-              Try Again
-            </Button>
-            {isSignedIn ? (
-              <Button
-                variant='secondary'
-                disabled={actionPending}
-                onClick={() => {
-                  void runAction('logout');
-                }}
+      <SidebarProvider defaultOpen={false}>
+        <AppShellFrame
+          placeholder
+          sidebar={null}
+          flushContent
+          containerClassName={ONBOARDING_FRAME_CLASS}
+          contentClassName='overflow-clip!'
+          main={
+            <>
+              <div aria-hidden='true' className='h-11 shrink-0' />
+              <div
+                className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3'
+                role={failed ? 'alert' : 'status'}
+                aria-live='polite'
+                data-testid='onboarding-session-boundary'
+                data-restore-state={failed ? 'failed' : 'restoring'}
+                data-restore-error={failureCode ?? undefined}
+                data-auth-state={
+                  isLoaded ? (userId ? 'signed-in' : 'anonymous') : 'loading'
+                }
               >
-                Log Out
-              </Button>
-            ) : null}
-            {actionError ? <p role='alert'>{actionError}</p> : null}
-          </>
-        ) : null}
-      </div>
+                <h1 className='m-0 text-balance text-base font-normal leading-normal'>
+                  {failed
+                    ? 'Your conversation could not be restored.'
+                    : 'Restoring your conversation…'}
+                </h1>
+                {failed ? (
+                  <>
+                    <Button onClick={() => setRevision(current => current + 1)}>
+                      Try Again
+                    </Button>
+                    {isSignedIn ? (
+                      <Button
+                        variant='secondary'
+                        disabled={actionPending}
+                        onClick={() => {
+                          void runAction('logout');
+                        }}
+                      >
+                        Log Out
+                      </Button>
+                    ) : null}
+                    {actionError ? <p role='alert'>{actionError}</p> : null}
+                  </>
+                ) : null}
+              </div>
+            </>
+          }
+        />
+      </SidebarProvider>
     );
   }
   const allowHandoff = loaded.allowHandoff;

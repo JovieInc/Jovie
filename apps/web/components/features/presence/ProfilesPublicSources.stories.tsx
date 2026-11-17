@@ -121,11 +121,71 @@ const data: ProfilesWorkspaceData = {
   providerAvailable: false,
 };
 
+// Reproduces the observed discovery gap, not a live account snapshot:
+// 40 profiles, six awaiting identity decisions, no connection suggestions.
+const pendingReviewData: ProfilesWorkspaceData = {
+  ...data,
+  rows: [
+    ...Array.from(
+      { length: 6 },
+      (_, index): ProfileWorkspaceSurfaceRow => ({
+        ...rows[0],
+        id: `pending-review-${index}`,
+        platform: index === 0 ? '7digital' : `pending_${index}`,
+        label: index === 0 ? '7digital' : `Pending Profile ${index + 1}`,
+        handle: null,
+        url: `https://example.com/pending-profile-${index + 1}`,
+        qualificationStatus: 'suggested',
+        monitoringState: index === 0 ? 'locked' : 'active',
+        identityPhoto: MISSING_IDENTITY_PHOTO,
+        identityEvidence: {
+          sourceCount: 1,
+          sourceTypes: ['identity_link'],
+          confidence: 0.7,
+        },
+      })
+    ),
+    ...rows,
+    ...Array.from(
+      { length: 29 },
+      (_, index): ProfileWorkspaceSurfaceRow => ({
+        ...rows[0],
+        id: `qualified-review-${index}`,
+        label: `Qualified Profile ${index + 1}`,
+        platform: `qualified_${index}`,
+        url: `https://example.com/qualified-profile-${index + 1}`,
+        identityPhoto: MISSING_IDENTITY_PHOTO,
+      })
+    ),
+  ],
+};
+
 function FixturePanel() {
   const panel = useRightPanel();
   return panel ? <AppShellRightRail>{panel}</AppShellRightRail> : null;
 }
-function PublicSourcesFixture() {
+function PublicSourcesFixture({
+  pinnedProfile = false,
+  pendingIdentityReview = false,
+}: Readonly<{ pinnedProfile?: boolean; pendingIdentityReview?: boolean }>) {
+  const baseData = pendingIdentityReview ? pendingReviewData : data;
+  const fixtureData = pinnedProfile
+    ? {
+        ...baseData,
+        rows: [
+          ...baseData.rows,
+          {
+            ...rows[0],
+            id: 'jovie-profile-review',
+            kind: 'jovie' as const,
+            platform: 'jovie',
+            label: 'Jovie Profile',
+            url: 'https://jov.ie/tim',
+            qualificationStatus: 'qualified' as const,
+          },
+        ],
+      }
+    : baseData;
   const [client] = useState(() => {
     const cache = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -178,8 +238,8 @@ function PublicSourcesFixture() {
               or production proof. Select a row to compare its source. Hover or
               keyboard-focus a row to inspect avatar emphasis.
             </div>
-            <div className='relative h-160 overflow-hidden border border-subtle bg-surface-0'>
-              <ProfilesWorkspace data={data} scope={scope} />
+            <div className='relative flex h-160 min-w-0 overflow-hidden border border-subtle bg-surface-0'>
+              <ProfilesWorkspace data={fixtureData} scope={scope} />
               <FixturePanel />
             </div>
           </section>
@@ -199,3 +259,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const PublicPortraitsAndExceptions: Story = {};
+export const PinnedProfileAndActions: Story = { args: { pinnedProfile: true } };
+export const PendingIdentitiesWithoutSuggestions: Story = {
+  args: { pendingIdentityReview: true },
+};
+export const CombinedIdentityActionsAndReview: Story = {
+  args: { pinnedProfile: true, pendingIdentityReview: true },
+};

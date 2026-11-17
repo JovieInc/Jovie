@@ -91,6 +91,8 @@ vi.mock('./pricing', () => ({
 }));
 
 vi.mock('./safety', () => ({
+  assertMerchCardCheckoutSellable: vi.fn(),
+  assertMerchOrderSellable: vi.fn(),
   getMerchCardSellability: vi
     .fn()
     .mockReturnValue({ sellable: true, reasons: [] }),

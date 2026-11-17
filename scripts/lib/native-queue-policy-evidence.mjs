@@ -20,6 +20,7 @@ export const requiredNames = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ];
 
 // Exact context names only. A later pending/failing result supersedes old green.

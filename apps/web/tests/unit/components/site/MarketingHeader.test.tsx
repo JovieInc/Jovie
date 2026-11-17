@@ -6,6 +6,7 @@ import {
   CANONICAL_PUBLIC_SHELL_CONTEXT,
   CANONICAL_PUBLIC_SHELL_EVENTS,
 } from '@/data/canonicalPublicShellOptimization';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
@@ -24,21 +25,6 @@ vi.mock('@/lib/analytics', async importOriginal => {
   return {
     ...actual,
     track: (...args: unknown[]) => mockTrack(...args),
-  };
-});
-
-// Product default: SHOW_MARKETING_CENTER_NAV is false (clean homepage baseline).
-// Enable it here so header content assertions exercise center nav in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_CENTER_NAV: true,
-      SHOW_HOMEPAGE_CENTER_NAV: true,
-    },
   };
 });
 
@@ -199,10 +185,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-on front-door contract on /signup.
+    // The shared public CTA follows the open front-door contract into /start.
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it('orders Customers, Product, and Pricing after the wordmark', () => {
@@ -253,17 +239,20 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one invite CTA on the invite-only homepage header', () => {
+  it('uses the one claim CTA on the homepage header', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Request an Invite' });
+    const ctas = screen.getAllByRole('link', {
+      name: HOME_MARKETING_HEADER_CTA.label,
+    });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/#request-invite');
+      expect(cta).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
     }
+    expect(HOME_MARKETING_HEADER_CTA.label).toBe('Claim your profile');
     expect(
-      screen.queryByRole('link', { name: 'Claim your profile' })
+      screen.queryByRole('link', { name: 'Request an Invite' })
     ).toBeNull();
   });
 
@@ -280,8 +269,8 @@ describe('MarketingHeader', () => {
       'marketing-glass'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
@@ -312,8 +301,8 @@ describe('MarketingHeader', () => {
       '/product'
     );
     expect(
-      screen.getByRole('link', { name: 'Request an Invite' })
-    ).toHaveAttribute('href', '/#request-invite');
+      screen.getByRole('link', { name: HOME_MARKETING_HEADER_CTA.label })
+    ).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

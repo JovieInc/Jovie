@@ -8,7 +8,7 @@ name: Surface Recertify
 # owners makes design-surface-census.test.mjs fail for every PR (2026-10-29: the
 # pricing row, after a footer comment change). This renews exactly the stale
 # rows: capture 1440 and 390 full-page evidence of the real route, validate it,
-# write the row's `sourceDigest` with the census module's own function, and open
+# write one evidence entry per changed file with the census module's own digest, and open
 # one `compounding` PR. Screenshots stay in the workflow artifact; the repo keeps
 # their sha256 digests and the run URL. Rows that cannot be captured (dynamic
 # routes, several sources, a failed render) stay red on purpose: Main Health
@@ -167,8 +167,9 @@ jobs:
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --artifact "surface-recert-$GITHUB_RUN_ID" \
             --sha "$GITHUB_SHA" | tee "$RUNNER_TEMP/apply.json"
-          pnpm exec biome format --write apps/web/data/designSystem/surfaceCensus.json
-          git diff --quiet -- apps/web/data/designSystem/surfaceCensus.json && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+          pnpm exec biome format --write apps/web/data/designSystem/surfaceCensus.evidence
+          # Renewals are new or rewritten per-file evidence entries, so count untracked files too.
+          if [ -z "$(git status --porcelain -- apps/web/data/designSystem/surfaceCensus.evidence)" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
 
       - name: Open or update the renewal PR
         if: steps.apply.outputs.changed == 'true'
@@ -184,16 +185,16 @@ jobs:
           node scripts/surface-recertify.mjs list | tee "$RUNNER_TEMP/remaining.json"
           remaining_count="$(node -e 'const fs = require("fs"); const renewed = JSON.parse(fs.readFileSync(process.argv[1],"utf8")).renewed; console.log(JSON.parse(fs.readFileSync(process.argv[2],"utf8")).filter(row => renewed.includes(row.id)).length)' "$RUNNER_TEMP/apply.json" "$RUNNER_TEMP/remaining.json")"
           git checkout -B "$BRANCH"
-          git add apps/web/data/designSystem/surfaceCensus.json
+          git add apps/web/data/designSystem/surfaceCensus.evidence
           git commit -q -m "chore(design): renew certification evidence for ${renewed}" -m "Automatic recertification after ${GITHUB_SHA:0:9}; evidence in workflow artifact surface-recert-${GITHUB_RUN_ID}."
           git push -q --force-with-lease origin "$BRANCH" || git push -q --force origin "$BRANCH"
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat > "$RUNNER_TEMP/body.md" <<BODY
           ## Summary
 
-          no Linear issue — automatic recertification (compounding). A push to main (${GITHUB_SHA:0:9}) changed the source or owners of certified surface(s): ${renewed}. \`design-surface-census.test.mjs\` fails for every PR until their \`sourceDigest\` is renewed, so the Surface Recertify bot rendered each route (Next dev build of that commit, Chromium), captured 1440 and 390 full-page evidence, validated it (HTTP 200, test sign-in for app routes, no redirect away from the route, no horizontal overflow, no page errors) and wrote the digest with the census module's own \`sourceDigest\`.
+          no Linear issue — automatic recertification (compounding). A push to main (${GITHUB_SHA:0:9}) changed the source or owners of certified surface(s): ${renewed}. \`design-surface-census.test.mjs\` fails for every PR until the evidence entry of each changed file is renewed, so the Surface Recertify bot rendered each route (Next dev build of that commit, Chromium), captured 1440 and 390 full-page evidence, validated it (HTTP 200, test sign-in for app routes, no redirect away from the route, no horizontal overflow, no page errors) and wrote one evidence entry per changed file with the census module's own \`fileDigest\`.
 
-          Evidence: screenshots are in workflow artifact \`surface-recert-${GITHUB_RUN_ID}\` of ${run_url} (kept 90 days). The repo keeps their sha256 digests in the census \`evidence.ref\`; no binary is added to the repo.
+          Evidence: screenshots are in workflow artifact \`surface-recert-${GITHUB_RUN_ID}\` of ${run_url} (kept 90 days). The repo keeps their sha256 digests in each entry's \`ref\`; no binary is added to the repo.
 
           <!-- customer-changelog/v1 {"releaseWorthy":false} -->
 
@@ -207,7 +208,7 @@ jobs:
 
           ## Blast radius
 
-          - What could break: nothing at runtime. One data file, \`apps/web/data/designSystem/surfaceCensus.json\`, evidence record(s) only.
+          - What could break: nothing at runtime. Evidence entries under \`apps/web/data/designSystem/surfaceCensus.evidence/\` only.
           - Proof: validated 1440 and 390 captures in ${run_url}; the apply log names every renewed, failed and skipped row.
           - Rows that could not be captured stay red on purpose (see run log); Main Health pages Summer for them.
 

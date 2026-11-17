@@ -5,14 +5,8 @@ import {
   ARTIST_PROFILE_SPEC_TILES,
   type ArtistProfileFeatureTile,
 } from '@/data/artistProfileFeatures';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
-// Footer CTA label tracks the prelaunch waitlist gate. Mirrors the hero
-// front-door pattern: "Request access" while we're waitlisting, then
-// "Start free trial" once the doors open.
-const FOOTER_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
-  ? 'Get started'
-  : 'Start free trial';
+const FOOTER_CTA_LABEL = 'Get started';
 
 function requireTile<T extends { readonly id: string }>(
   tiles: readonly T[],
