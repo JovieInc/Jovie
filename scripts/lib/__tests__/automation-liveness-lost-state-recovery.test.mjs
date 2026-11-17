@@ -1,12 +1,18 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { main } from '../../automation-liveness.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
 } from '../automation-registry.mjs';
 import { lostStatePrevious } from '../liveness-lost-state.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
+
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 
 // JOV-9641: during the 2026-11-14 Vercel DEPLOYMENT_PAUSED outage the
 // installation REST budget ran dry, so a liveness run's "Restore previous
@@ -183,4 +189,65 @@ describe('a lost restore resolves the alert instead of stranding it (JOV-9641)',
       )
     ).toEqual([]);
   });
+});
+
+describe('quota deferral retains reconciliation memory across a lost restore', () => {
+  it.each([
+    ['primary', false],
+    ['primary', true],
+    ['budget', false],
+    ['budget', true],
+  ])(
+    'keeps an existing alert resolvable after %s quota with empty=%s state',
+    async (kind, empty) => {
+      const directory = mkdtempSync(
+        join(tmpdir(), 'liveness-deferred-restore-')
+      );
+      const path = join(directory, 'state.json');
+      const id = 'github:jovie:security-advisory-loop';
+      const fingerprint = livenessFingerprint(id);
+      if (empty) writeFileSync(path, '');
+      vi.mocked(applyRemediationDecisionWithRetry).mockClear();
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime('2026-11-14T13:00:00Z');
+      vi.stubEnv('JOVIE_API_STATE', 'memory');
+      const stdout = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+      try {
+        await main({
+          argv: ['--file', '--previous', path],
+          env: { GH_TOKEN: 'fixture-token' },
+          fetchImpl: async url =>
+            String(url).endsWith('/rate_limit')
+              ? new Response(
+                  JSON.stringify({ resources: { core: { remaining: 0 } } })
+                )
+              : new Response(
+                  kind === 'primary'
+                    ? '{"message":"API rate limit exceeded for installation"}'
+                    : '{}',
+                  { status: 403 }
+                ),
+        });
+        const saved = JSON.parse(readFileSync(path, 'utf8'));
+        expect(saved[fingerprint]).toBe('red');
+        expect(
+          vi
+            .mocked(applyRemediationDecisionWithRetry)
+            .mock.calls.some(
+              ([decision]) => decision.fingerprint === fingerprint
+            )
+        ).toBe(false);
+        expect(
+          livenessDecisions({ results: [row(id, 'fresh')] }, saved)
+        ).toEqual([{ action: 'green', fingerprint, id }]);
+      } finally {
+        stdout.mockRestore();
+        vi.useRealTimers();
+        vi.unstubAllEnvs();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
 });
