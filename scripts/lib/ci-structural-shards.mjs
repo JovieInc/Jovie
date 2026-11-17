@@ -231,7 +231,7 @@ const lanesCoverageShard = ({ id, files, keyword }) =>
 export const lanesCoverageRun = (shards, combinedName) => {
   const background = shards.slice(0, -1);
   const last = shards[shards.length - 1];
-  return `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+  return `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine --rcfile=scripts/tests/coverage.ini ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 };
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */

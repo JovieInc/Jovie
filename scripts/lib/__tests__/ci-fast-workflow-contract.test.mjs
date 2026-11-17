@@ -476,7 +476,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
-      `python3 -m coverage combine ${shards.map(shard => `"${shard.data}"`).join(' ')}`
+      `python3 -m coverage combine --rcfile=scripts/tests/coverage.ini ${shards.map(shard => `"${shard.data}"`).join(' ')}`
     );
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
