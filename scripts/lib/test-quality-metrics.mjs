@@ -82,14 +82,18 @@ export const modelFingerprint = ids =>
     .digest('hex')
     .slice(0, 16);
 
-/** Mark the top-touch scored modules stale so the sweep re-scores them first. */
-export function rearmTop(state, ranked, n) {
+/**
+ * Mark the top-touch scored modules stale so the sweep re-scores them first. The
+ * epoch `at` orders them first; `rearmedAt` tells a state merge the re-arm is new.
+ */
+export function rearmTop(state, ranked, n, now = new Date().toISOString()) {
   let armed = 0;
   for (const r of ranked) {
     if (armed >= n) break;
     const m = state.modules?.[r.file];
     if (m?.status === 'scored') {
       m.at = new Date(0).toISOString();
+      m.rearmedAt = now;
       armed += 1;
     }
   }
