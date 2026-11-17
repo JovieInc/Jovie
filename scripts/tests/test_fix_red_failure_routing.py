@@ -162,6 +162,36 @@ class RouteBudgetGrowthTest(unittest.TestCase):
         stay = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': poisoned})
         self.assertEqual(stay['action'], 'agent')
 
+    def test_stale_html_ceiling_syncs_main(self):
+        suffix = ('. A loss needs an unexpired overrides entry in '
+                  'apps/web/scripts/route-render-modes.json '
+                  '(owner, reason, issue, removalCondition, evidence, expiresOn).')
+        line = f'##[error]/ baseline weakened: html 274803 -> 287251 bytes{suffix}\n'
+        stamped = f'2026-11-17T03:21:55.6387173Z {line}'
+        prefixed = f'Exact-head Coverage\tUNKNOWN STEP\t{stamped}'
+        cli = ('AssertionError: ::error::/about baseline weakened: '
+               f'html 70798 -> 72849 bytes{suffix}\n')
+        exit_line = '##[error]Process completed with exit code 1.\n'
+        for log in (line, stamped, prefixed, cli,
+                    'passing fixture: API rate limit exceeded\n' + line + exit_line):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual((route['cls'], route['action']),
+                             ('route-budget-growth', 'sync-main'), log)
+
+    def test_other_render_weakenings_stay_with_the_agent(self):
+        html = '##[error]/ baseline weakened: html 274803 -> 287251 bytes\n'
+        for log in (
+            '##[error]/ baseline weakened: html 287251 -> 274803 bytes\n',
+            '##[error]/ baseline weakened: html 287251 -> 287251 bytes\n',
+            '##[error]/ baseline weakened: render mode static -> dynamic\n',
+            '##[error]/ baseline weakened: revalidate window 3600 -> 60\n',
+            html + '##[error]/ baseline weakened: render mode static -> dynamic\n',
+            html + '##[error]AssertionError: expected 1 to be +0\n',
+            'baseline weakened: html 274803 -> 287251 bytes\n',
+        ):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual(route['action'], 'agent', log)
+
 
 class TreeByteBudgetTest(unittest.TestCase):
     def test_stale_head_route_precedes_the_general_tree_budget_route(self):
