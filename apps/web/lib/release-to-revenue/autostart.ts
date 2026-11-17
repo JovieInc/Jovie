@@ -91,3 +91,19 @@ export async function autostartDesignPartnerAutopilot(
     releaseId,
   };
 }
+
+/**
+ * Daily-maintenance sub-job: a trigger refusal throws so cron monitoring
+ * records it. Skips (flag off, no release, recent cycle) are not failures.
+ */
+export async function runDesignPartnerAutopilotSubJob(
+  now = new Date()
+): Promise<AutopilotAutostartResult> {
+  const result = await autostartDesignPartnerAutopilot(now);
+  if (result.status === 'trigger-failed') {
+    throw new Error(
+      `Design-partner autopilot trigger refused: ${result.detail ?? 'unknown'}`
+    );
+  }
+  return result;
+}

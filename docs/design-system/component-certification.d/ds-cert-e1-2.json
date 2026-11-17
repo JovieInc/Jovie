@@ -1,0 +1,285 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/hud/HudDetectionCoveragePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudEnvExceptionsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudExceptionsStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudFullscreenControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudKpiSubgrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudNoiseDisclosure.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudObservationStatus.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudShippingStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudSystemHealthStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/OperationalTasksPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/OvieHomeCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/OvieShippingStateCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/SummerReconcileSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/layout/AdminDetailRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/layout/AdminPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/layout/AdminRouteViews.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/layout/ShellPageTitle.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GoldenPathFunnelPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GrowthStatusPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GtmCollapsibles.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GtmFunnel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GtmSpeedDial.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/LeadTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/PmfMetricsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/WaitlistRankedQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/CreatorSourcingRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/OvieListWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/hud/HudFullscreenControl.tsx": {
+      "long-content": "The control renders two icon buttons whose only text is fixed copy (label = isFullscreen ? 'Exit fullscreen' : 'Fullscreen', plus 'Close'); it takes no caller text that could grow. The detector matched the aria-label and title attributes."
+    },
+    "apps/web/components/features/admin/hud/HudNoiseDisclosure.tsx": {
+      "empty": "The disclosure renders one summary and its children; it owns no collection that could be empty. The detector matched the list-none class on the summary."
+    },
+    "apps/web/components/features/admin/hud/HudSystemHealthStrip.tsx": {
+      "empty": "The strip always renders the four fixed entries built by buildHealthEntries (entries.map(entry => ...)); an unmeasured source shows as a muted entry, never as a missing one, so there is no empty collection."
+    },
+    "apps/web/components/features/admin/layout/AdminRouteViews.tsx": {
+      "empty": "The segments come from the fixed ADMIN_VIEW_GROUPS constant (options={views.map(view => ...)}), which is never empty for a known group; an unknown group renders nothing, which AdminRouteViews.test.tsx covers."
+    },
+    "apps/web/components/features/admin/leads/GoldenPathFunnelPanel.tsx": {
+      "permission-denied": "The panel renders the funnel it is given and has no account, role or gated action. The detector matched role='alert' on the load-error line and the 'upgrade-viewed' step label."
+    },
+    "apps/web/components/features/admin/leads/GrowthStatusPanel.tsx": {
+      "empty": "The panel renders one status switch and its copy; it owns no collection that could be empty. The detector matched the items-center class."
+    },
+    "apps/web/components/features/admin/leads/GtmCollapsibles.tsx": {
+      "empty": "The accordion always renders its three fixed sections and owns no collection; the detector matched the items-center class on the section toggle.",
+      "partial": "The only props are the optional initialOpen view and the fixed section titles; there is no data object that could arrive partly filled. The detector matched initialOpen?: and the helper parameter view?:.",
+      "long-content": "The three section titles are fixed copy (title='Intake & Keywords', 'Advanced Settings', 'Outreach & Campaigns'); all other text belongs to the child panels, which carry their own long-content stories."
+    },
+    "apps/web/components/features/admin/leads/GtmSpeedDial.tsx": {
+      "empty": "The dial maps the fixed SPEED_OPTIONS constant (SPEED_OPTIONS.map(speed => ...)), which is never empty; it owns no data collection."
+    },
+    "apps/web/components/features/admin/leads/WaitlistRankedQueuePanel.tsx": {
+      "loading": "The panel is a pure props component with no fetch or pending state; the page loads the queue before rendering it. The detector matched the word pending in its doc comment ('The pending admission queue in spend order').",
+      "offline": "The panel makes no request and has no mutation, so it has no offline state. The detector matched the word pending in its doc comment ('The pending admission queue in spend order')."
+    },
+    "apps/web/components/features/admin/lists/CreatorSourcingRow.tsx": {
+      "empty": "The component is a single row for one list member and owns no collection; an absent creator is the MissingProfile story. The detector matched the items-center class and the word list in its doc comment and aria-labels."
+    },
+    "apps/web/components/features/admin/lists/OvieListWorkspace.tsx": {
+      "permission-denied": "The workspace has no role or gated branch: any failed read, a 403 included, renders the same 'List unavailable' state (ErrorListUnavailable). The detector matched role='status' on the loading placeholder."
+    }
+  }
+}

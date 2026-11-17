@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { HomepageNameSearch } from './HomepageNameSearch';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -16,7 +17,7 @@ function submit(name = 'Alex Example') {
 }
 
 describe('homepage read-only name discovery', () => {
-  it('shows a real public profile and preserves the waitlist and invite recovery', async () => {
+  it('shows a real public profile and preserves the claim and sign-in recovery', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -34,15 +35,16 @@ describe('homepage read-only name discovery', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
-    ).toHaveAttribute('href', '#waitlist');
-    expect(
-      screen.getByRole('link', { name: 'Have an invite? Sign in' })
-    ).toHaveAttribute('href', '/signin');
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
+    ).toHaveAttribute('href', '/start');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
     expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty('method', 'POST');
   });
 
-  it('offers a useful waitlist path when no public result exists', async () => {
+  it('offers a useful claim path when no public result exists', async () => {
     vi.stubGlobal(
       'fetch',
       vi
@@ -55,7 +57,7 @@ describe('homepage read-only name discovery', () => {
       await screen.findByText(/No matching public profile yet/)
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toBeVisible();
   });
 
@@ -74,7 +76,7 @@ describe('homepage read-only name discovery', () => {
     ).toBeVisible();
     expect(screen.queryByText(/No matching public profile/)).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toBeVisible();
   });
 
@@ -92,7 +94,7 @@ describe('homepage read-only name discovery', () => {
       );
       expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
       expect(
-        screen.getByRole('link', { name: 'Join the waitlist' })
+        screen.getByRole('link', { name: getClaimProfileIntent().label })
       ).toBeVisible();
     }
   );
@@ -153,11 +155,12 @@ describe('homepage read-only name discovery', () => {
 
   it('recovers from a transport error without opening signup', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
-    const { container } = render(<HomepageNameSearch />);
+    render(<HomepageNameSearch />);
     submit();
     await waitFor(() => expect(screen.getByRole('alert')).toBeVisible());
+    // The recovery door is the claim entry at /start, never signup.
     expect(
-      container.querySelector('a[href*="signup"], a[href*="/start"]')
-    ).toBeNull();
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
+    ).toHaveAttribute('href', '/start');
   });
 });
