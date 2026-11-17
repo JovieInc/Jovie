@@ -488,9 +488,7 @@ function toContextMenuItem(action: LibraryEntityAction): ContextMenuItemType {
     disabled: action.disabled,
     subText: action.disabledReason,
     destructive: action.destructive,
-    onClick: () => {
-      void action.onExecute?.();
-    },
+    onClick: () => void action.onExecute?.(),
   };
 }
 
