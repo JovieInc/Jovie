@@ -76,7 +76,7 @@ export default async function LibraryPage({
   const requestedDocument = (await searchParams).document;
   const requestedId =
     typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
-      ? requestedDocument
+      ? requestedDocument.toLowerCase()
       : null;
   const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
