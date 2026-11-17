@@ -30,4 +30,3 @@ class WinPolicyTests(unittest.TestCase):
         win = self.WIN.replace("| 1 | 0 |", "| 1 | ? |") + "- Pending: yes\n"
         body = events.repair_evidence_body(self.PR, "Summary", win_section=win)
         self.assertTrue(body.endswith(win))
-
