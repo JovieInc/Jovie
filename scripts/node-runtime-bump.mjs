@@ -26,7 +26,6 @@ export const PIN_FILES = [
   '.nvmrc',
   '.node-version',
   'package.json',
-  'apps/console/package.json',
   'apps/docs/package.json',
   'apps/macos/package.json',
   'apps/ovie/package.json',

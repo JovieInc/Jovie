@@ -22,7 +22,6 @@ const CONFIG = readFileSync(
 );
 const VITEST_MANIFEST_PATHS = [
   'package.json',
-  'apps/console/package.json',
   'apps/eve-pilot/package.json',
   'apps/macos/package.json',
   'apps/ovie/package.json',

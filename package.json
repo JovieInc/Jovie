@@ -126,8 +126,6 @@
     "dev:web:fast": "bash scripts/dev-web-fast.sh",
     "verify:workflow-references": "node scripts/verify-workflow-references.mjs",
     "test:workflow-references": "node --test scripts/verify-workflow-references.test.mjs",
-    "dev:console": "pnpm --filter @jovie/console run dev",
-    "sweep:taste-inbox": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/console run sweep",
     "ios:open": "open apps/ios/Jovie.xcodeproj",
     "ios:setup-env": "bash apps/ios/scripts/setup-env.sh",
     "ios:build": "bash apps/ios/scripts/run-xcodebuild.sh build",

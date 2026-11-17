@@ -35,7 +35,6 @@ describe('Node runtime contract', () => {
 
     const majorPinnedPackagePaths = [
       'package.json',
-      'apps/console/package.json',
       'apps/ovie/package.json',
       'apps/web/package.json',
     ];

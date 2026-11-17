@@ -1,8 +1,10 @@
 # ADR: One data architecture for the Next.js apps (2026-10-29)
 
 Status: **accepted**. Owner: Summer (debt intake), any coder (fixes).
-Scope: `apps/web` (Jovie + the Ovie admin tree), `apps/ovie`, `apps/console`,
+Scope: `apps/web` (Jovie + the Ovie admin tree), `apps/ovie`,
 `apps/docs`, `apps/should-i-make`.
+Console was in the original audit scope; JOV-8893 retires its source in favor
+of Ovie. The dated audit remains historical evidence.
 Evidence: [data-architecture-audit-2026-10-29.md](data-architecture-audit-2026-10-29.md).
 Enforced by: `node scripts/data-architecture-guard.mjs` (Source Validation +
 `pnpm preflight:changed`), library registry `canon/data-architecture.json`, rule
@@ -52,8 +54,7 @@ client updates one query key.
 
 - **Ship now:** guard + ratchet (new violations fail, existing ones only shrink);
   daily remediation sweep files one owned Linear issue per rule with debt; scope
-  the profile family-tag flush; enable Cache Components in `apps/console` and
-  `apps/should-i-make`.
+  the profile family-tag flush; enable Cache Components in `apps/should-i-make`.
 - **Re-evaluate when:** `route-segment-config` + `runtime-nodejs-export` +
   `unstable-cache` reach zero in `apps/web`, or the public profile loader takes
   an immutable profile-id tag.

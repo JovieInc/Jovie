@@ -1,6 +1,5 @@
 {
   "size": {
-    "apps/console/lib/factory-health.ts": 597,
     "apps/desktop/scripts/desktop-shell-contract.test.mjs": 2337,
     "apps/desktop/scripts/smoke-native-auth.mjs": 1594,
     "apps/desktop/src/main.ts": 3941,
@@ -935,11 +934,6 @@
     ".github/scripts/run-web-ai-health.mjs:exports": 2,
     ".github/scripts/staging-supersession-policy.mjs:exports": 3,
     ".github/scripts/update-quarantine.js:exports": 1,
-    "apps/console/lib/capture-target.ts:types": 1,
-    "apps/console/lib/factory-health.ts:types": 2,
-    "apps/console/lib/linear.ts:exports": 1,
-    "apps/console/lib/linear.ts:types": 1,
-    "apps/console/lib/screenshots.ts:exports": 1,
     "apps/docs/app/_meta.ts:files": 1,
     "apps/docs/app/docs/_meta.ts:files": 1,
     "apps/docs/app/docs/build-your-presence/_meta.ts:files": 1,
@@ -3261,8 +3255,6 @@
     "workers/observability-ingest/src/report.ts:types": 2
   },
   "jscpd": {
-    "apps/console/lib/factory-health.ts": 9,
-    "apps/console/tsconfig.json": 24,
     "apps/desktop/scripts/smoke-native-auth.mjs": 29,
     "apps/desktop/src/desktop-auto-update.ts": 26,
     "apps/docs/tsconfig.json": 28,

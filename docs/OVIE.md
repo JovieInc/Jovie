@@ -99,3 +99,32 @@ surface per product", enforced by `pnpm run surfaces:check`.
 - HUD surface: `apps/web/app/hud/page.tsx`
 - Program contract: `apps/web/lib/ovie/program.ts`
 - Ops entry contract: `apps/web/lib/ovie/ops-entrypoint.ts`
+
+## Console retirement (JOV-8893)
+
+EVENT: founder decision 2026-11-17: Ovie is the single internal operations
+surface. The superseded standalone Console source and launch scripts are
+removed. Use `/app/ov/inbox` for decisions and evidence, and `/app/ov/ops` for
+operating health. `apps/ovie/scripts/routes.mjs` generates adapters to those
+same shared screens; it does not own another implementation.
+
+Console's Linear, capture-target and screenshot helpers had no imports outside
+the deleted app. Existing Ovie Design Lab proposals, Summer cards,
+certification inventory and visual QA retain the decision and screenshot jobs.
+The independent iOS capture harness remains. The old public HTML export and
+its merge-as-production health calculations are retired, not migrated.
+
+The old `needs:taste` / `needs:human` label queue is not the current Ovie intake.
+The source audit found two nonterminal legacy entries, JOV-5863 (YouTube hero
+taste) and JOV-5907 (Help Center certification with outstanding dependencies).
+Both were Backlog, outside Console's triage/unstarted/started query; no
+Console-visible active issue was found in the complete label inventory.
+Their records and acceptance criteria remain in Linear. JOV-8893 must reconcile
+any remaining decision through the existing Ovie intake before outcome closure;
+source deletion does not prove those obligations satisfied.
+
+The June fixture and dated October evidence are historical artifacts, not
+runtime evidence. External build consumers, deployment status and public
+exposure remain unverified. Source retirement changes no deployment or security
+settings. Git history retains the removed app for recovery; reverting the
+retirement also requires an explicit change to the existing surface invariant.

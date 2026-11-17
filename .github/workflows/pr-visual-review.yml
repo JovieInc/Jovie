@@ -21,7 +21,6 @@ on:
       - 'apps/web/data/**'
       - 'apps/web/public/**'
       - 'apps/web/styles/**'
-      - 'apps/console/**'
       - 'apps/ios/**'
       - 'packages/ui/**'
       - '**/*.css'

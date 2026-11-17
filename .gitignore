@@ -4,7 +4,6 @@
 /node_modules
 scripts/node_modules
 apps/web/node_modules
-apps/console/node_modules
 /.bundle/
 /vendor/bundle/
 /.pnp
@@ -41,9 +40,6 @@ apps/eve-pilot/coverage/
 /artifacts/
 apps/web/test-results/
 apps/web/artifacts/
-apps/console/node_modules
-apps/console/.next
-apps/console/public/taste-inbox/screenshots/
 
 # next.js
 /.next/

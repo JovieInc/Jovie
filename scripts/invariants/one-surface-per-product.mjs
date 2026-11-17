@@ -3,7 +3,9 @@
 // per product"). Fails when an apps/* directory is unregistered, an
 // 'independent' app has no justification, a forbidden parallel implementation
 // (for example native Ovie or the JovieInc/ovie repo) is tracked, or a
-// registry still lists a forbidden repository.
+// registry still lists a forbidden repository or launch configuration selects a
+// retired operator app. Historical artifacts and retirement records are not
+// launch configuration.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,6 +24,12 @@ export function validateSurfaces({
   if (registry.schema !== SURFACES_SCHEMA) {
     problems.push(`schema must be ${SURFACES_SCHEMA}`);
   }
+  const launchConfigPatterns = (registry.launchConfigPaths ?? []).map(
+    pattern => new RegExp(pattern)
+  );
+  const launchConfigFiles = trackedFiles.filter(file =>
+    launchConfigPatterns.some(pattern => pattern.test(file))
+  );
   const apps = registry.apps ?? {};
   for (const dir of appDirs) {
     const entry = apps[dir];
@@ -51,6 +59,16 @@ export function validateSurfaces({
         problems.push(
           `${name}: parallel implementation tracked at ${hit} (matches ${pattern}); extend ${product.shell} instead`
         );
+      }
+    }
+    for (const file of launchConfigFiles) {
+      const text = readFile(file);
+      for (const reference of product.forbiddenLaunchReferences ?? []) {
+        if (text.includes(reference)) {
+          problems.push(
+            `${file} still launches or selects retired ops surface ${reference}; extend ${product.shell} instead`
+          );
+        }
       }
     }
     for (const repo of product.forbiddenRepos ?? []) {

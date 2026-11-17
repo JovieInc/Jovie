@@ -219,12 +219,6 @@
     ".windsurf/scripts/bash-safety-check.sh": {
       "gh-shell": 1
     },
-    "apps/console/lib/factory-health.ts": {
-      "provider-host": 3
-    },
-    "apps/console/lib/linear.ts": {
-      "provider-host": 1
-    },
     "apps/eve-pilot/agent/lib/linear-client.ts": {
       "provider-host": 1
     },

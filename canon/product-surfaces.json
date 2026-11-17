@@ -5,7 +5,7 @@
     "ovie": {
       "surface": "web",
       "shell": "apps/web /app/ov on the shared Jovie/Ovie shell",
-      "decision": "Tim White 2026-10-28: the native Ovie Mac app shouldn't exist; one Ovie, web, shared shell",
+      "decision": "Tim White 2026-10-28: the native Ovie Mac app shouldn't exist; one Ovie, web, shared shell; Tim White 2026-11-17: Ovie is the only internal ops surface; retire apps/console under JOV-8893",
       "forbiddenRepos": ["JovieInc/ovie"],
       "forbiddenTrackedPaths": [
         "^tools/shipping-menu-bar/",
@@ -13,7 +13,14 @@
         "(^|/)Ovie[A-Za-z]*\\.(xcodeproj|xcworkspace)(/|$)",
         "(^|/)Sources/Ovie/",
         "(^|/)OvieApp\\.swift$",
-        "^apps/web/components/features/admin/hud/OvieMacHud"
+        "^apps/web/components/features/admin/hud/OvieMacHud",
+        "^apps/console/"
+      ],
+      "forbiddenLaunchReferences": [
+        "@jovie/console",
+        "apps/console",
+        "dev:console",
+        "sweep:taste-inbox"
       ]
     }
   },
@@ -53,11 +60,6 @@
       "kind": "independent",
       "justification": "browser extension"
     },
-    "apps/console": {
-      "product": "jovie",
-      "kind": "independent",
-      "justification": "console app"
-    },
     "apps/docs": {
       "product": "jovie",
       "kind": "independent",
@@ -73,5 +75,14 @@
       "kind": "independent",
       "justification": "separate product"
     }
-  }
+  },
+  "launchConfigPaths": [
+    "^(package\\.json|pnpm-workspace\\.yaml|turbo\\.json|vercel\\.json)$",
+    "^(apps|packages|workers)/[^/]+/(package|turbo|vercel)\\.json$",
+    "^\\.github/workflows/[^/]+\\.ya?ml$",
+    "^\\.codex/.*\\.(jsonc?|toml|ya?ml)$",
+    "^\\.onlook/[^/]+\\.(jsonc?|toml|ya?ml)$",
+    "^config/node-runtime-policy\\.json$",
+    "^scripts/(ci-fast-lanes|node-runtime-bump)\\.mjs$"
+  ]
 }

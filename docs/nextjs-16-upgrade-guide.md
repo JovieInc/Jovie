@@ -7,6 +7,11 @@ This is a source/compatibility receipt, **not completed adoption or deployed cer
 The implementation lane publishes one draft; the independent gate owns landing.
 Remaining architecture maintenance and customer-path certification stay in JOV-7987.
 
+Historical source receipt: the Console rows below describe the October audit.
+JOV-8893 subsequently retires that app's source; current operator entry points
+are documented in [Ovie](OVIE.md#console-retirement-jov-8893). Deployment status
+is not established by either source audit.
+
 ## Supported upgrade decision
 
 Registry `latest` was 16.4.1, published 2026-10-14T17:43:55Z; `canary` was

@@ -670,7 +670,6 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'scripts/ci-fast-lanes.mjs',
   'pnpm-lock.yaml',
   'package.json',
-  'apps/console/package.json',
   'apps/ovie/package.json',
   'apps/web/package.json',
   'apps/docs/package.json',
