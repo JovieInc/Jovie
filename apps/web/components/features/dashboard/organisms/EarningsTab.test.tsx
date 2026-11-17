@@ -142,4 +142,12 @@ describe('EarningsTab', () => {
     expect(tableProps.last?.rowMode).toBe('dense');
     expect(tableProps.last?.caption).toBe('Tips');
   });
+
+  it('backs the QR preview with the on-media token rather than raw white', () => {
+    const { container } = renderTab();
+    expect(container.querySelector('.bg-white')).toBeNull();
+    expect(container.querySelectorAll('.bg-on-media').length).toBeGreaterThan(
+      0
+    );
+  });
 });
