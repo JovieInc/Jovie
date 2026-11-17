@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
@@ -95,3 +96,23 @@ class FocusCanonStripTest(unittest.TestCase):
             self.assertEqual(calls[-1][:4], ["git", "push", "-q", "origin"])
             self.assertEqual(receipt["strippedFocus"], [HEADER])
             self.assertFalse((Path(tmp) / "apps/web/focus-canon.baseline.json").exists())
+
+    def test_failed_replace_preserves_original_and_does_not_commit(self):
+        calls = []
+
+        def sh(argv, **_kwargs):
+            calls.append(argv)
+            return SimpleNamespace(returncode=0, stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            full = Path(tmp) / HEADER
+            full.parent.mkdir(parents=True)
+            original = "'focus-ring-themed relative size-7';\n"
+            full.write_text(original, encoding="utf-8")
+            fixer = focus.bind(sh, {"Affected Unit Tests (4/4)": job_log(HEADER)})
+            with patch("atomic_state.os.replace", side_effect=OSError("replace refused")):
+                with self.assertRaisesRegex(OSError, "replace refused"):
+                    fixer(None, {"headRefName": "claude/ds-focus-canon"}, {}, tmp, None, {})
+            self.assertEqual(full.read_text(encoding="utf-8"), original)
+            self.assertEqual(list(full.parent.iterdir()), [full])
+            self.assertEqual(calls, [])

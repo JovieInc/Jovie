@@ -15,6 +15,8 @@ import re
 import types
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 ACTION = "strip-focus-canon"
 CLASS = "focus-canon"
 _BASELINE = "focus-canon.baseline.json"
@@ -245,7 +247,7 @@ def bind(sh, failed_logs):
                 return None
             if stripped == original:
                 continue
-            full.write_text(stripped, encoding="utf-8")
+            atomic_write_text(full, stripped, encoding="utf-8")
             changed.append(rel)
         if not changed:
             return None
