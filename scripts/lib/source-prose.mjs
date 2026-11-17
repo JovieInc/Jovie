@@ -109,7 +109,13 @@ export function readSourceProseEntries({ root, headSha, paths }) {
     .map(row => {
       const match = row.match(/^(\d+) (\w+) ([a-f0-9]{40})\t(.+)$/u);
       if (!match) throw new Error('Malformed source prose tree');
-      return { mode: match[1], type: match[2], sha: match[3], path: match[4] };
+      return {
+        mode: match[1],
+        type: match[2],
+        sha: match[3],
+        path: match[4],
+        bytes: Buffer.alloc(0),
+      };
     });
   if (
     entries.length !== paths.length ||
@@ -142,6 +148,7 @@ export function readSourceProseEntries({ root, headSha, paths }) {
   const batch = execFileSync('git', [...prefix, 'cat-file', '--batch'], {
     ...options,
     input,
+    encoding: null,
   });
   let cursor = 0;
   for (const entry of entries) {
