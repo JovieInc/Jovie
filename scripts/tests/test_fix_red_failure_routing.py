@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lanes'))
 import fix_red_classes as classes
+import fix_red_failure_routing as routing
 import lane_runner as lane
 
 HEAD = '99320365a5ba5f03eb7cfd48c1a10137bd3d4031'
@@ -277,6 +278,41 @@ class TreeByteBudgetTest(unittest.TestCase):
                     prefixed = ''.join(prefix + line + '\n' for line in log.splitlines())
                     route = classes.classify(red('PR Size Guard'), {'PR Size Guard': prefixed})
                     self.assertEqual(route['action'], 'agent')
+
+
+class SyncClaimTest(unittest.TestCase):
+    def test_sync_claim_qualifies_only_sync_main(self):
+        tip = 'ab' * 20
+        nested = {'baseRef': {'target': {'oid': tip}}}
+        self.assertEqual(routing.sync_claim(nested, 'sync-main'), f'sync-main:{tip}')
+        self.assertEqual(routing.sync_claim({'baseRefOid': tip}, 'sync-main'), f'sync-main:{tip}')
+        self.assertEqual(routing.base_tip({'baseRef': {'target': {'oid': 'cd' * 20}}, 'baseRefOid': tip}), 'cd' * 20)
+        self.assertEqual(routing.sync_claim({}, 'sync-main'), 'sync-main')
+        self.assertEqual(routing.sync_claim({'baseRefOid': 'not-a-sha'}, 'sync-main'), 'sync-main')
+        self.assertEqual(routing.sync_claim({'baseRefOid': tip}, 'rerun'), 'rerun')
+        self.assertEqual(routing.base_tip(None), '')
+
+    def test_a_later_base_tip_syncs_a_head_whose_unqualified_claim_is_burned(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        host = lane.Host(state=Path(tmp.name))
+        head = 'c' * 40
+        tip_a = 'd' * 40
+        tip_b = 'e' * 40
+        (host.state / 'class-routes.json').write_text(json.dumps({'25910': {'sync-main': head}}))
+        pr = {'number': 25910, 'headRefOid': head, 'baseRefOid': tip_a, 'body': ''}
+        route = {'action': 'sync-main', 'cls': 'tracked-byte-stale'}
+        with patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
+            reason = lane.deterministic_route_taken(host, pr, route)
+            self.assertEqual(reason, 'infra-rerun:tracked-byte-stale')
+            self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
+            pr['baseRefOid'] = tip_b
+            again = lane.deterministic_route_taken(host, pr, route)
+        self.assertEqual(again, 'infra-rerun:tracked-byte-stale')
+        self.assertEqual(sync.call_count, 2)
+        saved = json.loads((host.state / 'class-routes.json').read_text())
+        self.assertEqual(saved['25910']['sync-main'], head)
+        self.assertEqual(saved['25910'][f'sync-main:{tip_b}'], head)
 
 
 class AliasClassificationTest(unittest.TestCase):
