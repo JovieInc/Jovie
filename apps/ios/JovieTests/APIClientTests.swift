@@ -510,41 +510,27 @@ struct APIClientTests {
   }
 
   @Test func retriesWithFreshTokenAfterUnauthorized() async throws {
-    // The legacy 401 retry path fences on the shared NativeSessionTokenStore
-    // generation. Hold the test lock so no concurrently running suite can
-    // rotate that generation between the fence capture and the 401 handling;
-    // otherwise the fence (correctly) discards the stale 401 as
-    // requestFailed(401) instead of retrying (run 43966928778).
     try await withNativeSessionTokenStoreTestIsolation {
       let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
       var requestCount = 0
-
       MockURLProtocol.requestHandler = { request in
         requestCount += 1
         let statusCode = requestCount == 1 ? 401 : 200
         let response = HTTPURLResponse(
-          url: request.url!,
-          statusCode: statusCode,
-          httpVersion: nil,
-          headerFields: nil
+          url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil
         )!
-
         if statusCode == 401 {
           return (response, Data())
         }
-
         let data = try JSONEncoder().encode(MobileMeResponse.previewReady)
         return (response, data)
       }
-
       let client = APIClient(
         baseURL: URL(string: "https://jov.ie")!,
         session: makeSession(),
         tokenProvider: tokenProvider
       )
-
       let response = try await client.fetchMe()
-
       #expect(response.state == .ready)
       #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
     }
