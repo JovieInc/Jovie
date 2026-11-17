@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { get, put } from '@vercel/blob';
+import { put } from '@vercel/blob';
+import { getBlobWithRetry } from '@/lib/blob/get-with-retry';
 import {
   getBlobCommandOptions,
   isBlobStorageConfigured,
@@ -14,14 +15,18 @@ import {
 } from './pipeline-bottleneck';
 
 async function readBlob(path: string): Promise<unknown> {
-  const blob = await get(path, {
-    ...getBlobCommandOptions(),
-    access: 'public',
-    // Public overwrites propagate through Blob's CDN within 60s. The SDK's
-    // useCache:false origin bypass applies only to private storage.
-    // https://vercel.com/docs/vercel-blob#caching
-    abortSignal: AbortSignal.timeout(5_000),
-  });
+  const blob = await getBlobWithRetry(
+    path,
+    {
+      ...getBlobCommandOptions(),
+      access: 'public',
+      // Public overwrites propagate through Blob's CDN within 60s. The SDK's
+      // useCache:false origin bypass applies only to private storage.
+      // https://vercel.com/docs/vercel-blob#caching
+      abortSignal: AbortSignal.timeout(5_000),
+    },
+    'pipeline-bottleneck.readBlob'
+  );
   if (!blob || blob.statusCode !== 200) return null;
   return new Response(blob.stream).json();
 }

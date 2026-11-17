@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentType } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ProfileMonetizationSummaryResponse } from '@/lib/profile-monetization';
@@ -92,12 +92,16 @@ export const ErrorSummaryFailed: Story = {
   decorators: [shell('error')],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByText('Could not load your payments summary right now.')
-    ).toBeVisible();
-    await expect(
-      canvas.getByRole('button', { name: 'Try Again' })
-    ).toBeVisible();
+    // The seeded error can be re-fetched on mount, so the error panel may
+    // land a frame or two after the first paint — poll for it.
+    await waitFor(() =>
+      expect(
+        canvas.getByText('Could not load your payments summary right now.')
+      ).toBeVisible()
+    );
+    await waitFor(() =>
+      expect(canvas.getByRole('button', { name: 'Try Again' })).toBeVisible()
+    );
   },
 };
 
