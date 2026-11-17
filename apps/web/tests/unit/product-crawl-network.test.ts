@@ -1,7 +1,9 @@
 // @vitest-environment node
-import { it } from 'vitest';
+import { expect, it } from 'vitest';
 import { runFollowupNetworkFixture } from './fixtures/product-crawl-network.mjs';
 
 it('preserves cache, worker coverage and device identity with scoped admission', async () => {
-  await runFollowupNetworkFixture();
+  const result = await runFollowupNetworkFixture();
+  expect(result.candidate).toEqual(result.baseline);
+  expect(result.cap.admission.blocked).toBe(2);
 }, 60_000);
