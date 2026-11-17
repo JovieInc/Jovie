@@ -25,6 +25,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/resolve-main-sha.sh
             .github/scripts/gh-api-hold.sh
+            .github/scripts/staging-identity-read.sh
             .github/scripts/staging-supersession-policy.mjs
           sparse-checkout-cone-mode: false
       - name: Fetch sealed product-lane release receipt
