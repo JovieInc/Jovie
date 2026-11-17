@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
@@ -161,6 +161,20 @@ class SplitSizeTest(unittest.TestCase):
             apply.reset_mock()
             self.assertIs(split.bind(None, {"guard": "##[error]" + size})(None, {}, route, Path('.'), None, {}), strict)
             apply.assert_not_called()
+
+    def test_mixed_plain_and_annotated_size_checks_refuse_a_partial_publication(self):
+        import fix_red_size_500
+        size = "size-500: scripts/lib/__tests__/%s.test.mjs: 631 lines, over 500 and not baselined\n"
+        logs = {"Plain": size % "a", "Annotated": "##[error]" + size % "b"}
+        pr = _pr(*logs)
+        route = classes.classify(pr, logs)
+        self.assertEqual(route["action"], classes.SPLIT_SIZE)
+        self.assertEqual(route["files"], ["scripts/lib/__tests__/a.test.mjs", "scripts/lib/__tests__/b.test.mjs"])
+        strict = Mock()
+        with patch.object(fix_red_size_500, "bind", return_value=strict), patch.object(split, "apply") as apply:
+            self.assertIsNone(split.bind(None, logs)(None, pr, route, Path('.'), None, {}))
+        strict.assert_not_called()
+        apply.assert_not_called()
 
 
 if __name__ == "__main__":

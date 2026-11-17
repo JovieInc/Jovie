@@ -281,6 +281,8 @@ def bind(sh, failed_logs):
     def fix(host, pr, route, worktree, log, receipt):
         text = fix_red_size_500._log_text(failed_logs, host, pr)
         if "##[error]" in text:
+            if set(paths_from_log(text)) - set(fix_red_size_500.paths(text)):
+                return None
             return strict(host, pr, route, worktree, log, receipt)
         files = paths_from_log(text)
         if not files or any(path not in ((route or {}).get("files") or []) for path in files):
