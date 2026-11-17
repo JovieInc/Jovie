@@ -157,7 +157,8 @@ jobs:
           fi
           policy_root="$(mktemp -d "$RUNNER_TEMP/source-docs-policy.XXXXXX")"
           git archive "$EXPECTED_BASE" scripts LESSONS.guards.json .github/scripts .github/ci-harness docs/doc-freshness-registry.json repository-docs.json | tar -x -C "$policy_root"
-          export CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          export CURRENT_BASE
           export SOURCE_DOCS_PLAN="$policy_root/source-docs-plan.json"
           if node "$policy_root/scripts/source-docs-check.mjs" plan; then
             echo "helper_root=$policy_root" >> "$GITHUB_OUTPUT"
@@ -167,8 +168,7 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.source_docs.outputs.docs_only != 'true'
-      - &source-docs-check
-        name: Validate applicable docs contracts without workspace dependencies
+      - name: Validate applicable docs contracts without workspace dependencies
         if: steps.source_docs.outputs.docs_only == 'true'
         env:
           SOURCE_DOCS_PLAN: ${{ steps.source_docs.outputs.plan }}
@@ -554,8 +554,7 @@ jobs:
           [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
           git rev-list --objects --missing=error \
             "$SOURCE_HEAD_SHA" "refs/remotes/origin/$TARGET_BASE_REF" >/dev/null
-      - &reused-setup
-        if: steps.reuse.outputs.reuse != 'true'
+      - if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-node-pnpm
       - name: Restore pinned scanner binaries
         # Warm cache never touches the network (JOV-11689). Contents are
@@ -855,7 +854,8 @@ jobs:
           fi
           policy_root="$(mktemp -d "$RUNNER_TEMP/source-docs-policy.XXXXXX")"
           git archive "$EXPECTED_BASE" scripts LESSONS.guards.json .github/scripts .github/ci-harness docs/doc-freshness-registry.json repository-docs.json | tar -x -C "$policy_root"
-          export CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          export CURRENT_BASE
           export SOURCE_DOCS_PLAN="$policy_root/source-docs-plan.json"
           if node "$policy_root/scripts/source-docs-check.mjs" plan; then
             echo "helper_root=$policy_root" >> "$GITHUB_OUTPUT"

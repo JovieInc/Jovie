@@ -1330,6 +1330,38 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
+  const assertDocsCondition = (step, expected, unit = false) => {
+    for (const reuse of [undefined, 'false', 'true'])
+      for (const docsOnly of [undefined, 'false', 'true', 'invalid'])
+        for (const shard of unit ? ['1/4', '2/4', '3/4', '4/4'] : ['4/4'])
+          for (const mask of unit ? [0, 1, 2, 3, 4, 5, 6, 7] : [0]) {
+            const state = {
+              reuse,
+              docsOnly,
+              shard,
+              web: Boolean(mask & 1),
+              ui: Boolean(mask & 2),
+              ovie: Boolean(mask & 4),
+            };
+            const actual = runInNewContext(step.if, {
+              matrix: { shard },
+              steps: {
+                reuse: { outputs: { reuse } },
+                source_docs: { outputs: { docs_only: docsOnly } },
+                scope: {
+                  outputs: Object.fromEntries(
+                    ['web', 'ui', 'ovie'].map(key => [key, String(state[key])])
+                  ),
+                },
+              },
+            });
+            assert.equal(
+              actual,
+              expected(state),
+              `${step.name}: ${reuse}/${docsOnly}/${shard}/${mask}`
+            );
+          }
+  };
   const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
   assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
   assert.equal(client.with['persist-credentials'], false);
@@ -1386,16 +1418,46 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
           continue;
         }
         if (
+          [
+            'Prime the pinned source runtime before classification',
+            'Select the pinned source runtime without dependency hydration',
+            'Classify exact source docs before dependency setup',
+          ].includes(step.name)
+        ) {
+          assertDocsCondition(step, ({ shard }) => shard === '4/4', true);
+          continue;
+        }
+        if (step.name === 'Validate docs contracts in the merged-guard slot') {
+          assertDocsCondition(
+            step,
+            ({ shard, docsOnly }) => shard === '4/4' && docsOnly === 'true',
+            true
+          );
+          continue;
+        }
+        if (
           ['Setup Node.js and pnpm', 'Setup Playwright warm path'].includes(
             step.name
           )
         ) {
-          assert.match(
-            step.if,
-            /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && /
+          assertDocsCondition(
+            step,
+            ({ shard, docsOnly, reuse, web, ui, ovie }) =>
+              (shard === '4/4' && docsOnly !== 'true') ||
+              (reuse !== 'true' &&
+                (web ||
+                  (step.name === 'Setup Node.js and pnpm' && (ui || ovie)))),
+            true
           );
-          continue; // Full truth table covers reused/no-diff cases.
+          continue;
         }
+      }
+      if (step.name === 'Setup dependencies for applicable source contracts') {
+        assertDocsCondition(
+          step,
+          ({ reuse, docsOnly }) => reuse !== 'true' && docsOnly !== 'true'
+        );
+        continue;
       }
       if (
         job === 'security' &&
@@ -1437,14 +1499,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
       );
     }
   }
-  const always = [
-    // The disk-read guards run on every edit and can launch Chromium, so
-    // their browser setup must run whenever they do (#21956, 2026-10-20).
-    'Setup Playwright (Chromium)',
-    'Validate customer changelog decision from trusted base',
-    'Measure actual installed source dependency graph',
-    'Preserve exact source dependency evidence',
-  ];
+  const always = ['Validate customer changelog decision from trusted base'];
   // Fleet evidence is a status read in `ready`, produced by the base-branch
   // Fleet Rules Evidence workflow; it never depends on proof reuse.
   assert.ok(
@@ -1462,11 +1517,28 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
       `${name} must run on a metadata-only edit`
     );
   }
-  assert.equal(
+  for (const name of [
+    'Setup Playwright (Chromium)',
+    'Measure actual installed source dependency graph',
+    'Preserve exact source dependency evidence',
+  ])
+    assertDocsCondition(
+      deterministic.find(step => step.name === name),
+      ({ docsOnly }) => docsOnly !== 'true'
+    );
+  assertDocsCondition(
     deterministic.find(
       step => step.name === 'Run deterministic source contract'
-    ).if,
-    gate
+    ),
+    ({ reuse, docsOnly }) => reuse !== 'true' && docsOnly !== 'true'
+  );
+  assertDocsCondition(
+    deterministic.find(
+      step =>
+        step.name ===
+        'Validate applicable docs contracts without workspace dependencies'
+    ),
+    ({ docsOnly }) => docsOnly === 'true'
   );
   // Every step that can launch Chromium runs after the browser setup and is
   // never broader than it.
@@ -1474,12 +1546,8 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   const setup = names.indexOf('Setup Playwright (Chromium)');
   for (const name of ['Run deterministic source contract']) {
     assert.ok(setup >= 0 && names.indexOf(name) > setup, name);
-    const step = deterministic[names.indexOf(name)];
-    assert.ok(
-      deterministic[setup].if === undefined ||
-        step.if === deterministic[setup].if,
-      `${name} can run without Playwright`
-    );
+    // The truth tables above prove the contract only runs on a full path,
+    // and every full path provisions Chromium even on metadata proof reuse.
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
