@@ -235,14 +235,14 @@ const config: StorybookConfig = {
           find: '@/app/app/(shell)/dashboard/actions/creator-profile',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
-        {
-          find: '@/app/onboarding/actions/connect-spotify',
+        ...[
+          '@/app/onboarding/actions/upgrade-offer',
+          '@/app/onboarding/actions/connect-spotify',
+          '@/app/onboarding/actions/update-profile',
+        ].map(find => ({
+          find,
           replacement: require.resolve('./onboarding-actions-mock.ts'),
-        },
-        {
-          find: '@/app/onboarding/actions/update-profile',
-          replacement: require.resolve('./onboarding-actions-mock.ts'),
-        },
+        })),
         {
           find: '@/app/onboarding/actions/enrich-profile',
           replacement: require.resolve('./enrich-profile-mock.ts'),

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 
 const mocks = vi.hoisted(() => ({
   interval: undefined as string | undefined,
@@ -33,8 +34,8 @@ vi.mock('@/lib/auth/plan-intent', () => ({
   recommendPlan: () => 'pro',
   validatePlan: (plan: string) => plan,
 }));
-vi.mock('@/lib/config/pricing', () => ({
-  PRICING: { pro: { monthly: { priceId: 'price_visibility', amount: 19900 } } },
+vi.mock('@/lib/stripe/price-ids', () => ({
+  getStripePriceIds: () => ({ artistVisibilityProMonthly: 'price_visibility' }),
 }));
 vi.mock('@/lib/onboarding/upgrade-offer', () => ({
   hasOnboardingUpgradeOfferState: mocks.hasOfferState,
@@ -119,7 +120,7 @@ it('passes only the current monthly price to checkout', async () => {
   });
   expect(page.props).toMatchObject({
     monthlyPriceId: 'price_visibility',
-    monthlyAmount: 19900,
+    monthlyAmount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
     annualPriceId: null,
     annualAmount: null,
   });

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 
 const {
   clearPlanIntentMock,
@@ -90,7 +91,8 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
   recordOnboardingUpgradeOfferDecision: recordOfferDecisionMock,
 }));
 
-vi.mock('@/lib/entitlements/registry', () => ({
+vi.mock('@/lib/entitlements/registry', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/entitlements/registry')>()),
   getLimit: (_plan: string, key: string) =>
     key === 'analyticsRetentionDays' ? 180 : null,
   getEntitlements: () => ({
@@ -358,11 +360,7 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     // Certified capabilities only (JOV-7794); monitoring is internal-only.
-    for (const highlight of [
-      'Release Emails',
-      '180-day Analytics',
-      'Verified Badge',
-    ]) {
+    for (const highlight of getPaidPlanAdditionNames()) {
       expect(screen.getByText(highlight)).toBeInTheDocument();
     }
     expect(
@@ -491,7 +489,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
     expect(screen.queryByText(/monitoring/i)).not.toBeInTheDocument();
     expect(
-      screen.getByText('Email your verified subscribers when new music drops')
+      screen.getByText('Release notifications (email to your audience)')
     ).toBeInTheDocument();
   });
 });
