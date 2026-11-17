@@ -6337,19 +6337,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
 
 
 def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
-    """Restore main's generated copies, then regenerate from the merged source, including
-    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
-    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
-    if not generated:
-        return True
-    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
-        return False
-    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
-    for command in commands:
-        guard()
-        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
-            return False
-    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+    return fix_red_source_edits.regenerate_merged_generated(
+        worktree, paths, log, resolvers=remediation.GENERATED_RESOLVERS, sh=sh, guard=guard)
 
 
 def union_merge_file(worktree: Path, path: str, log) -> bool:
