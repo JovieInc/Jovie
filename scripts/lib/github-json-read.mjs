@@ -273,7 +273,7 @@ export async function readGithubJson(
         ...quota,
         recoveryEvidence: {
           credentialLeg: 'public',
-          status: recovery.status ?? null,
+          status: 'status' in recovery ? recovery.status : null,
           reason: recovery.reason,
         },
       };
@@ -341,6 +341,7 @@ export async function landedOnMainAt(
 /**
  * Observation failure shape for the run-list observers: the `github-`
  * reason prefix with the deferred flag carried through (JOV-10153).
+ * @returns {{ok: false, deferred: boolean, reason: string, lastProofAt?: string, quotaEvidence?: object, recoveryEvidence?: object}}
  */
 export function githubReadFailure(read) {
   return {

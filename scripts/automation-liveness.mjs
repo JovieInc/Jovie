@@ -65,6 +65,7 @@ const GITHUB_API = 'https://api.github.com';
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
  * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
  * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
+ * @returns {Promise<{ok: boolean, reason?: string, deferred?: boolean, lastProofAt?: string, startedAt?: string, endedAt?: string, ref?: string, outcome?: string, url?: string, streak?: ReturnType<typeof redGate.summarizeRunStreak>, detailOnStale?: boolean, quotaEvidence?: object, recoveryEvidence?: object}>}
  */
 export async function observeWorkflowFailureStreak(
   receipt,
@@ -106,10 +107,12 @@ export async function observeWorkflowFailureStreak(
   };
 }
 
-/** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
+/** Last run of a workflow whose conclusion is one of `receipt.conclusions`.
+ * @returns {Promise<{ok: boolean, reason?: string, deferred?: boolean, lastProofAt?: string, startedAt?: string, endedAt?: string, ref?: string, outcome?: string, url?: string, streak?: ReturnType<typeof redGate.summarizeRunStreak>, quotaEvidence?: object, recoveryEvidence?: object}>}
+ */
 export async function observeGithubWorkflow(
   receipt,
-  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
+  { fetchImpl, token, nowMs = Date.now(), apiUrl = GITHUB_API }
 ) {
   const conclusions = receipt.conclusions ?? ['success'];
   const branch = receipt.branch
