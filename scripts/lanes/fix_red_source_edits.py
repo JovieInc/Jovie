@@ -15,6 +15,7 @@ from pathlib import Path
 from subprocess import TimeoutExpired
 
 from atomic_state import atomic_write_text
+from split_helper_import import resolve_split_helper_conflict
 
 # Generated conflicts restore main, then run each canonical generator once.
 SHIPPING_SNAPSHOT_COMMAND = ("node", "scripts/shipping-slo-report.mjs", "refresh-latest")
@@ -67,6 +68,7 @@ from fix_red_conflict_resolvers import (  # noqa: F401
     resolve_additive_certificate_waivers, resolve_additive_node_test_file,
     resolve_additive_node_tests_text, resolve_additive_statement_file,
 )
+from fix_red_liveness_quota import resolve_liveness_quota_text  # noqa: F401
 from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
 
 # Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
@@ -107,7 +109,7 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
-    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, dropped screen-debt rows, or split helper imports.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch.
@@ -120,6 +122,7 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         resolved: dict[str, str] = {}
+        extras: dict[str, str] = {}
         for path in conflicted:
             target = worktree / path
             try:
@@ -132,6 +135,19 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
                 if text is None and not stage_choice:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_liveness_quota_text(path, target.read_text())
+                if text is None and not stage_choice:
+                    split = resolve_split_helper_conflict(worktree, path)
+                    if split is not None:
+                        candidate, writes = split
+                        clash = any(extra in conflicted or extras.get(extra, writes[extra]) != writes[extra]
+                                    for extra in writes)
+                        if clash:
+                            candidate = None
+                        if candidate is not None:
+                            text = candidate
+                            extras.update(writes)
             except OSError:
                 text = None
             if text is None:
@@ -141,10 +157,12 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         try:
             for path, text in resolved.items():
                 atomic_write_text(worktree / path, text)
+            for path, text in extras.items():
+                atomic_write_text(worktree / path, text)
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        if not commit_open_merge(worktree, conflicted, sh, log, guard=guard):
+        if not commit_open_merge(worktree, [*conflicted, *extras], sh, log, guard=guard):
             return False
     guard()
     if not push:
@@ -155,26 +173,87 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
 # Company guards annotates each over-baseline file, then Actions appends
 # "Process completed with exit code 1." A stale branch still carries files
 # main already shrunk, and a red check reports BLOCKED so the BEHIND fallback
-# never runs. Sync main when those growth lines are the only errors. Another
-# error stays with the model. classify() checks this after SIGNATURES.
+# never runs. Sync main when the growth is not in this head's diff. When every
+# grew path is a file this head changed, extract: syncing main cannot shrink a
+# file this PR grew. Another error stays with the model. classify() checks this
+# after SIGNATURES. Pass changedFiles to stay hermetic; a PR dict without it
+# reads `git diff --name-only origin/main...HEAD`.
 _SIZE_500_ERROR = re.compile(r"size-500: \S+: grew \d+ -> \d+\s*$")
+_SIZE_500_GREW = re.compile(r"size-500: (\S+): grew (\d+) -> \d+\s*$")
 _ANNOTATED_ERROR = re.compile(r"##\[error\]([^\n]+)")
 _GHA_EXIT = re.compile(r"Process completed with exit code \d+\.?\s*$")
+
+
+def _annotated_errors(text: str) -> list[str]:
+    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
+    return [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
 
 
 def size_500_stale_hit(text: object) -> tuple[str, str] | None:
     """Return `("size-500-stale", "sync-main")` when every annotated error is size growth."""
     if not isinstance(text, str):
         return None
-    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
-    errors = [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
+    errors = _annotated_errors(text)
     if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
         return None
     return ("size-500-stale", "sync-main")
 
 
-def size_500_route(text: object) -> tuple[str, str] | None:
-    """Unbaselined over-500 tests split. Growth-only logs sync main. Mixed logs stay with the model."""
+def size_500_grew(text: object) -> list[tuple[str, int]] | None:
+    """`(path, baseline)` for a growth-only log. None when any other error is present."""
+    if not isinstance(text, str):
+        return None
+    errors = _annotated_errors(text)
+    if not errors:
+        return None
+    found: list[tuple[str, int]] = []
+    for item in errors:
+        match = _SIZE_500_GREW.fullmatch(item)
+        if match is None:
+            return None
+        found.append((match.group(1), int(match.group(2))))
+    return found
+
+
+def _diff_names() -> set[str] | None:
+    """Files this head changed against origin/main. None when git cannot answer."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            check=False, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return {line for line in result.stdout.splitlines() if line}
+
+
+def _changed_names(changed) -> set[str] | None:
+    """Explicit changedFiles, else the live diff for a PR dict. None means no diff was named."""
+    if not isinstance(changed, dict):
+        return None
+    if "changedFiles" not in changed:
+        return _diff_names()
+    files = changed.get("changedFiles")
+    if isinstance(files, (list, set, tuple)) and all(isinstance(item, str) for item in files):
+        return set(files)
+    return None
+
+
+def size_500_route(text: object, changed=None) -> tuple[str, str] | None:
+    """Unbaselined over-500 tests split. Own growth extracts. Other growth syncs main."""
     from fix_red_size_500 import unbaselined_hit
 
-    return unbaselined_hit(text) or size_500_stale_hit(text)
+    unbaselined = unbaselined_hit(text)
+    if unbaselined:
+        return unbaselined
+    grew = size_500_grew(text)
+    if not grew:
+        return None
+    names = _changed_names(changed)
+    if names is not None and all(path in names for path, _baseline in grew):
+        return ("size-500-self-growth", "extract-size-500")
+    return ("size-500-stale", "sync-main")
