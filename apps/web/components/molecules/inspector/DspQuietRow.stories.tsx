@@ -105,7 +105,7 @@ export const ErrorClipboardRefused: Story = {
     await userEvent.click(actions);
     const body = within(canvasElement.ownerDocument.body);
     await userEvent.click(
-      await body.findByRole('menuitem', { name: 'Copy Link', exact: true })
+      await body.findByRole('menuitem', { name: 'Copy Link' })
     );
     await waitFor(() =>
       expect(body.getByText('Could not copy to the clipboard')).toBeVisible()

@@ -18,7 +18,6 @@ describe('DspQuietRow certificate', () => {
     );
     const link = screen.getByRole('link', {
       name: 'Spotify open.spotify.com/album/take-me-over',
-      exact: true,
     });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveTextContent('open.spotify.com/album/take-me-over');
