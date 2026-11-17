@@ -32,10 +32,18 @@ describe('OutboundViews', () => {
   });
 
   it('keeps a secondary selection named in the trigger without inventing loading counts', () => {
-    render(<OutboundViews view='sent' onViewChange={vi.fn()} />);
+    const { rerender } = render(
+      <OutboundViews view='sent' onViewChange={vi.fn()} />
+    );
     expect(
       screen.getByRole('button', { name: 'All Outbound views, current: Sent' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Sent 0')).toBeNull();
+    expect(screen.getByTestId('outbound-count-ready')).toBeEmptyDOMElement();
+    rerender(
+      <OutboundViews view='sent' counts={counts} onViewChange={vi.fn()} />
+    );
+    expect(screen.getByTestId('outbound-count-ready')).toHaveTextContent('1');
+    expect(screen.getByTestId('outbound-count-flagged')).toHaveTextContent('0');
   });
 });

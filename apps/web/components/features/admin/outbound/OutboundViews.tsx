@@ -51,7 +51,17 @@ export function OutboundViews({
               key={option}
               active={view === option}
               onClick={() => onViewChange(option)}
-              label={<span className='tabular-nums'>{label(option)}</span>}
+              label={
+                <>
+                  {OUTBOUND_VIEW_LABELS[option]}{' '}
+                  <span
+                    data-testid={`outbound-count-${option}`}
+                    className='tabular-nums'
+                  >
+                    {counts?.[option]}
+                  </span>
+                </>
+              }
             />
           ))}
         </div>
