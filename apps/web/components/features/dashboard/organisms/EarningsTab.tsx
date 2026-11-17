@@ -115,7 +115,7 @@ const QrPreview = memo(function QrPreview({
   if (isLoading || !dataUrl) {
     return (
       <div
-        className='flex items-center justify-center rounded-lg bg-white dark:bg-surface-1'
+        className='flex items-center justify-center rounded-lg bg-on-media dark:bg-surface-1'
         style={{ width: QR_DISPLAY_SIZE, height: QR_DISPLAY_SIZE }}
         aria-hidden='true'
       >
@@ -353,7 +353,7 @@ export function EarningsTab() {
 
           <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
             {/* Preview */}
-            <div className='shrink-0 rounded-lg bg-white dark:bg-surface-1 p-2'>
+            <div className='shrink-0 rounded-lg bg-on-media dark:bg-surface-1 p-2'>
               <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
             </div>
 

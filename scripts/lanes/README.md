@@ -35,6 +35,7 @@ The harness, not the model, owns:
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
 | Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
+| Liveness quota conflicts: when every hunk is the quota-deferral union in `github-json-read.mjs` or `automation-liveness.mjs`, keep the rate-limit classifier short-circuit and the spent-budget deferral. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_liveness_quota.resolve_liveness_quota_text()` |
 | Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
@@ -364,12 +365,48 @@ Ranking, prioritization and strategy decisions are not made on Summer's flash mo
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
 (question, decision type, context refs, deadline). Only issues with that block are reason-lane
 jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
-Each disk-admitted dispatch tick schedules the native `reason_lane.py tick` before code-history
-preparation and code-provider work. Its queue read runs separately, so unavailable code history
-does not suppress reasoning and a slow Linear read does not delay code. Disk denial still blocks
-starts; `reason.lock` guards the check and the existing drain, whose job leases, provider health
-and budget checks are unchanged. `tick.json` says only `scheduled`; `reason-tick.json` records the
-queue-check outcome and next action. Neither receipt proves a worker accepted or completed a job.
+The optional independent reason wake is **inactive by default**. After the native owner
+commissions the actual admission producer under JOV-12872, `LANES_REASON_WAKE=1` opts the
+installer into a five-minute recovery backstop (`jovie-lanes-reason.timer` on Linux,
+`com.jovie.lanes-reason` on macOS). Default installation leaves any existing reason artifacts
+alone; opt-in refuses unmarked operator-owned units/plists. Both the native producer and
+backstop invoke only the accepted `$state/current/reason_lane.py tick`. Native owners must
+inventory installed commands, identities, provider/resource policy and existing wakes before
+activation. A local adapter or timer is not evidence that the real producer is connected.
+
+The verified native producer invokes `tick --event-file <private-file>` with
+`LANES_REASON_WAKE=1`. The bounded JSON object has exactly `schema: jovie.reason-event/v1`,
+`issueId` (canonical UUID), `issueIdentifier` (`JOV-N`), `issueUpdatedAt` (UTC revision),
+`deliveryId` (64 lowercase hex), `providerAt` and `receivedAt` (UTC timestamps or null).
+It carries metadata only: current native queue eligibility is always reread; event content
+never executes or grants admission. Private per-revision receipts in `reason-events/pending`
+and `reason-events/checked` coalesce duplicate deliveries. The same guarded backstop retries
+lost or blocked checks. Busy controls stay pending; event finalization and drain exit each
+request the same guarded check once, closing the final-read/unlock race without a polling loop.
+A successful check or spawned drain does not prove worker acceptance
+or job completion. Raw provider-to-received and received-to-check timestamp pairs remain
+explicitly unqualified until native producer verification; they are separate from queue-check
+duration and do not produce intake-dwell samples. A distinct event or pending recovery forces
+one current Linear queue read through the existing shared client/cache; ordinary fallback
+keeps its 60-second cache. Native activation must measure event volume and verify quota
+headroom; this path does not claim zero additional API calls. Opt-in propagates to main
+dispatcher/drain and independent-wake environments. A continuation requires inherited
+`LANES_REASON_WAKE=1` and qualified private pending evidence; absent/explicit `0` remains
+blocked with an owner and next action. JOV-12872 must verify all accepted worker environments.
+Default/`0` installation is not an uninstaller: it leaves pre-existing reason units alone.
+To stop this optional component, its native owner disables the producer and sets its accepted
+worker environments to `LANES_REASON_WAKE=0`, then runs
+`systemctl --user disable --now jovie-lanes-reason.timer` on Linux, or
+`launchctl unload ~/Library/LaunchAgents/com.jovie.lanes-reason.plist` on macOS after confirming
+that artifact is source-owned. The existing lifecycle drain/EX remains the operator stop for
+all lane work; ordinary dispatcher fallback remains available.
+
+The ordinary dispatch hook remains a fallback before code preparation. Every path preserves
+shared disk admission, lifecycle drains, `reason.lock`, issue leases, provider routes and
+approved budgets; concurrent wakes do not add model concurrency. `tick.json` says only
+`scheduled`; `reason-tick.json` and append-only daily `runs/reason-checks/YYYY-MM-DD.jsonl`
+record queue-check timing, accepted-release provenance and explicit blockers. The daily date
+comes from the locally generated observation time; older audit history is retained.
 Per job:
 
 1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,

@@ -59,6 +59,17 @@ _GREW = (
     "##[error]size-500: scripts/lanes/lane_runner.py: grew 11721 -> 11736\n"
     "##[error]Process completed with exit code 1.\n"
 )
+_SELF_GROWTH = (
+    "##[error]size-500: apps/web/lib/ovie/certifications/inventory.server.test.ts: grew 853 -> 887\n"
+    "##[error]size-500: apps/web/lib/ovie/certifications/inventory.server.ts: grew 942 -> 957\n"
+    "##[error]size-500: apps/web/lib/ovie/mcp/store.ts: grew 668 -> 670\n"
+    "##[error]Process completed with exit code 1.\n"
+)
+_SELF_PATHS = [
+    "apps/web/lib/ovie/certifications/inventory.server.test.ts",
+    "apps/web/lib/ovie/certifications/inventory.server.ts",
+    "apps/web/lib/ovie/mcp/store.ts",
+]
 
 
 class Size500SplitTest(unittest.TestCase):
@@ -124,7 +135,9 @@ class Size500RouteTest(unittest.TestCase):
         routed = classes.classify(pr("Company guards"), {"Company guards": _UNBASED})
         self.assertEqual((routed["cls"], routed["action"]), ("size-500-unbaselined", "split-size-500"))
         self.assertEqual(routed["files"], ["scripts/lib/__tests__/component-story-completion.test.mjs"])
-        grew = classes.classify(pr("Company guards"), {"Company guards": _GREW})
+        payload = pr("Company guards")
+        payload["changedFiles"] = []
+        grew = classes.classify(payload, {"Company guards": _GREW})
         self.assertEqual((grew["cls"], grew["action"]), ("size-500-stale", "sync-main"))
         self.assertEqual(size_500_route(_GREW), ("size-500-stale", "sync-main"))
 
@@ -136,6 +149,20 @@ class Size500RouteTest(unittest.TestCase):
         self.assertEqual(mixed["action"], "agent")
         ranked = classes.classify(pr("Company guards"), {"Company guards": _UNBASED + "API rate limit exceeded\n"})
         self.assertEqual(ranked["action"], "rerun")
+
+    def test_growth_of_files_this_head_changed_extracts(self):
+        self.assertEqual(
+            size_500_route(_SELF_GROWTH, {"changedFiles": _SELF_PATHS}),
+            ("size-500-self-growth", "extract-size-500"))
+        self.assertEqual(
+            size_500_route(_SELF_GROWTH, {"changedFiles": _SELF_PATHS[:2]}),
+            ("size-500-stale", "sync-main"))
+        self.assertEqual(size_500_route(_SELF_GROWTH), ("size-500-stale", "sync-main"))
+        payload = pr("Company guards")
+        payload["changedFiles"] = _SELF_PATHS
+        got = classes.classify(payload, {"Company guards": _SELF_GROWTH})
+        self.assertEqual((got["cls"], got["action"]), ("size-500-self-growth", "extract-size-500"))
+        self.assertEqual(got["files"], sorted(_SELF_PATHS))
 
 
 class Size500FixerTest(unittest.TestCase):
@@ -183,6 +210,45 @@ class Size500FixerTest(unittest.TestCase):
             self.assertEqual((root / rel).read_text(), original)
             self.assertFalse((root / "scripts/lib/__tests__/demo.size500-2.test.mjs").exists())
             self.assertFalse(any(args[:2] == ["git", "commit"] for args in calls))
+
+    def test_self_growth_commits_a_fast_forward_and_never_forces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rel, _original, calls, sh = self._layout(root, 0)
+            log = f"##[error]size-500: {rel}: grew 500 -> 600\n##[error]Process completed with exit code 1.\n"
+            fixer = size500.bind_self_growth(sh, {"Company guards": log})
+            receipt = {}
+            result = fixer(object(), pr("Company guards"), {}, root, None, receipt)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(receipt["resolution"], "extract-size-500")
+            pushed = [args for args in calls if args[:3] == ["git", "push", "-q"]]
+            self.assertEqual(pushed, [["git", "push", "-q", "origin", "HEAD:glm/jov-12692-stale-capture-diagnosis"]])
+            self.assertFalse(any(
+                "--force" in arg or "--force-with-lease" in arg or arg.startswith("+")
+                for args in calls for arg in args))
+            self.assertLessEqual(size500.line_count((root / rel).read_text()), 500)
+            self.assertFalse(any(args[:2] == ["node", "--check"] and args[-1].endswith(".ts") for args in calls))
+
+    def test_a_production_growth_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rel = "apps/web/lib/demo.ts"
+            target = root / rel
+            target.parent.mkdir(parents=True)
+            original = "export const value = 1;\n"
+            target.write_text(original)
+            calls = []
+
+            def sh(args, cwd=None, log=None, timeout=None):
+                calls.append(list(args))
+                return SimpleNamespace(returncode=0, stdout="")
+
+            log = f"##[error]size-500: {rel}: grew 10 -> 11\n##[error]Process completed with exit code 1.\n"
+            fixer = size500.bind_self_growth(sh, {"Company guards": log})
+            self.assertIsNone(fixer(object(), pr("Company guards"), {}, root, None, {}))
+            self.assertEqual(target.read_text(), original)
+            self.assertFalse(any(args[:2] == ["git", "commit"] for args in calls))
+            self.assertFalse(any("--force" in arg for args in calls for arg in args))
 
 
 if __name__ == "__main__":
