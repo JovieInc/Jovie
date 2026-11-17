@@ -31,7 +31,10 @@ vi.mock('./trigger-new-release', () => ({
   triggerNewRelease: mockTriggerNewRelease,
 }));
 
-import { autostartDesignPartnerAutopilot } from './autostart';
+import {
+  autostartDesignPartnerAutopilot,
+  runDesignPartnerAutopilotSubJob,
+} from './autostart';
 
 const partner = {
   creatorUsername: 'tim',
@@ -103,5 +106,63 @@ describe('autostartDesignPartnerAutopilot', () => {
       status: 'trigger-failed',
       detail: 'release-not-found',
     });
+  });
+
+  it('throws a trigger refusal from the sub-job so cron monitoring sees it', async () => {
+    selectResults.push([{ id: 'release-new' }], []);
+    mockTriggerNewRelease.mockResolvedValue({
+      ok: false,
+      code: 'release-not-found',
+    });
+    await expect(runDesignPartnerAutopilotSubJob()).rejects.toThrow(
+      'release-not-found'
+    );
+  });
+
+  it('keeps a skip as a sub-job success', async () => {
+    mockResolveDesignPartnerConfig.mockResolvedValue(null);
+    await expect(runDesignPartnerAutopilotSubJob()).resolves.toEqual({
+      status: 'not-configured',
+    });
+  });
+
+  it.each(['flag-off', 'no-release', 'recent-cycle'])(
+    'keeps %s as a sub-job success without triggering a release',
+    async status => {
+      mockGetAppFlagValue.mockResolvedValue(status !== 'flag-off');
+      if (status !== 'no-release') selectResults.push([{ id: 'release-new' }]);
+      if (status === 'recent-cycle') selectResults.push([{ id: 'run-old' }]);
+
+      await expect(runDesignPartnerAutopilotSubJob()).resolves.toEqual({
+        status,
+      });
+      expect(mockTriggerNewRelease).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['created', 'existing'])(
+    'preserves a %s run result',
+    async status => {
+      selectResults.push([{ id: 'release-new' }], []);
+      mockTriggerNewRelease.mockResolvedValue({
+        ok: true,
+        run: { runId: 'run-1', status },
+      });
+
+      await expect(runDesignPartnerAutopilotSubJob()).resolves.toEqual({
+        status: status === 'created' ? 'started' : 'existing',
+        runId: 'run-1',
+        releaseId: 'release-new',
+      });
+    }
+  );
+
+  it('reports an unknown refusal instead of treating it as a success', async () => {
+    selectResults.push([{ id: 'release-new' }], []);
+    mockTriggerNewRelease.mockResolvedValue({ ok: false });
+
+    await expect(runDesignPartnerAutopilotSubJob()).rejects.toThrow(
+      'Design-partner autopilot trigger refused: unknown'
+    );
   });
 });

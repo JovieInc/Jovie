@@ -222,4 +222,34 @@ describe('gh-api-hold.sh transient retry', () => {
     expect(result.stderr).toContain('Holding');
     expect(result.stderr).not.toContain('transient failure');
   });
+
+  it('drains a large rate-limit response before deciding to hold', () => {
+    const result = runHold({
+      failures: 1,
+      error: `API rate limit exceeded for installation\n${'x'.repeat(262144)}`,
+      retryAttempts: '3',
+      retrySeconds: '0',
+      rateLimitReset: '1',
+    });
+    expect(result.status, result.stderr.slice(0, 200)).toBe(0);
+    expect(result.calls).toBe(3);
+    expect(result.slept).toBe('0');
+    expect(result.stdout).toContain('{"ok":true}');
+    expect(result.stderr).toContain('Holding');
+    expect(result.stderr).not.toContain('transient failure');
+  });
+
+  it('drains a large transient response before deciding to retry', () => {
+    const result = runHold({
+      failures: 1,
+      error: `gh: HTTP 503: service unavailable\n${'x'.repeat(262144)}`,
+      retryAttempts: '3',
+      retrySeconds: '0',
+    });
+    expect(result.status, result.stderr.slice(0, 200)).toBe(0);
+    expect(result.calls).toBe(2);
+    expect(result.slept).toBe('0');
+    expect(result.stdout).toContain('{"ok":true}');
+    expect(result.stderr).toContain('transient failure');
+  });
 });
