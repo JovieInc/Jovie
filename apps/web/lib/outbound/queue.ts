@@ -249,8 +249,12 @@ export function buildOutboundRow(input: {
   if (basis === 'unscored') flags.push('unscored');
   if (basis === 'presence_only') flags.push('presence_only_fit');
   const missing = missingEvidence(facts);
+  const saved = approval.latestCopy?.channel;
+  // A saved draft keeps its channel only while its recipient is on file.
+  const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const gate =
-    input.dogfoodGate === null && !input.coldDraftEnabled
+    input.dogfoodGate === null &&
+    !(input.coldDraftEnabled && channel === 'email')
       ? null
       : (input.dogfoodGate ?? DOGFOOD_GATE_CLOSED);
   // A relationship hold shows as held, with its reason, whatever the judge says.
@@ -258,9 +262,6 @@ export function buildOutboundRow(input: {
     gate && !gate.passed && !approval.relationshipHold
       ? 'needs_judge'
       : classify(facts, approval, flags, missing);
-  const saved = approval.latestCopy?.channel;
-  // A saved draft keeps its channel only while its recipient is on file.
-  const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
   // No cold draft exists for an artist Tim already works with.
   const message =
