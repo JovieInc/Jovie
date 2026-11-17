@@ -10,7 +10,6 @@ import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
@@ -23,12 +22,11 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
-import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import { SidebarHeaderActions } from '@/components/shell/SidebarHeaderActions';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -37,7 +35,6 @@ import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCom
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
 import {
@@ -188,9 +185,6 @@ function SidebarHeaderNav({
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
-  const isDesktop = useIsElectronRuntime();
-  const { state, isMobile, isPreview, open: pinned } = useSidebar();
-  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
@@ -288,28 +282,11 @@ function SidebarHeaderNav({
           );
         })()}
       </div>
-      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <RailStagedContent
-          hidden={chromeHidden}
-          className='flex items-center'
-          data-sidebar-header-actions='true'
-        >
-          <SidebarInboxLink availability={inboxNavigation} />
-          <HeaderSearchSurfaceFromContext compact />
-        </RailStagedContent>
-      ) : null}
-
-      {!isDesktop ? (
-        <RailStagedContent
-          hidden={
-            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
-          }
-          stage={headerOwnsCollapsedToggle}
-          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
-        >
-          <SidebarCollapseButton />
-        </RailStagedContent>
-      ) : null}
+      <SidebarHeaderActions
+        showActions={!isRouteSidebar && !isOperatorSection && !isDemoRoute}
+        headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
+        inboxNavigation={inboxNavigation}
+      />
     </div>
   );
 }
@@ -369,11 +346,14 @@ export function UnifiedSidebar({
     >
       <SidebarHeader
         data-electron-drag-region='true'
+        // Same height as the content header, so the logo row and the page
+        // title share one center line (Tim, Nov 14: the 64px header sat the
+        // brand row 12px below "Home").
+        // Every sidebar (customer, route and operator) uses the one unified
+        // header-height token (founder lock 2026-09-25).
         className={cn(
           'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-          isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pt-5 pb-4'
+          'h-(--app-shell-header-height) py-0.5'
         )}
       >
         <SidebarHeaderNav
