@@ -190,8 +190,16 @@ export function artifactMatches(artifact, name, producer) {
   );
 }
 
+/** New admission/publication keeps the live-cache identity gate. */
+export const verifyPublication = (request, evidence) =>
+  verifyPublicationEvidence(request, evidence, true);
+
+/** Historical completion needs durable authenticated bytes, not cache retention. */
+export const verifyHistoricalPublication = (request, evidence) =>
+  verifyPublicationEvidence(request, evidence, false);
+
 /** Failure conclusions can still publish honest unknown/module-regression history. */
-export function verifyPublication(request, evidence) {
+function verifyPublicationEvidence(request, evidence, requireLiveCache) {
   const {
     run,
     latestRun,
@@ -231,8 +239,8 @@ export function verifyPublication(request, evidence) {
     return hold('exact snapshot/cache/artifact publication is incomplete');
   if (
     !artifactMatches(artifact, pred.artifactName, pred) ||
-    cache?.key !== pred.cacheKey ||
-    cache.ref !== 'refs/heads/main'
+    ((requireLiveCache || cache != null) &&
+      (cache?.key !== pred.cacheKey || cache?.ref !== 'refs/heads/main'))
   )
     return hold('publication artifact or main cache identity mismatch');
   if (

@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SHELL_RAIL_PREVIEW_GRACE_MS } from './rail-motion';
+import {
+  SHELL_RAIL_PREVIEW_GRACE_MS,
+  SHELL_RAIL_PREVIEW_INTENT_MS,
+} from './rail-motion';
 import { useRailPreview } from './useRailPreview';
 
 function Harness({
@@ -9,11 +12,13 @@ function Harness({
   resetKey = 'home',
   enabled = true,
   previewTrigger,
+  enterIntentMs,
 }: {
   side: 'left' | 'right';
   resetKey?: string;
   enabled?: boolean;
   previewTrigger?: boolean;
+  enterIntentMs?: number;
 }) {
   const [pinned, setPinned] = useState(false);
   const { isPreview, isFloating, dismissPreview } = useRailPreview({
@@ -21,6 +26,7 @@ function Harness({
     pinned,
     enabled,
     resetKey,
+    enterIntentMs,
   });
   return (
     <>
@@ -341,6 +347,72 @@ describe.each(['left', 'right'] as const)(
         'true'
       );
     });
+
+    it('keeps pointer re-entry subject to hover intent after an explicit close', () => {
+      vi.useFakeTimers();
+      render(
+        <Harness side={side} enterIntentMs={SHELL_RAIL_PREVIEW_INTENT_MS} />
+      );
+      const trigger = screen.getByTestId('trigger');
+      const rail = screen.getByTestId('rail');
+      const outside = screen.getByTestId('outside');
+      // Seed the last genuine pointer position outside the rail. Explicit
+      // closing suppresses layout-generated hover until the pointer travels.
+      fireEvent.pointerMove(outside, { clientX: 500, clientY: 500 });
+      fireEvent.click(trigger);
+      fireEvent.click(trigger);
+      const original = Object.getOwnPropertyDescriptor(
+        document,
+        'elementFromPoint'
+      );
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: () => outside,
+      });
+      try {
+        fireEvent.pointerMove(trigger, {
+          clientX: 20,
+          clientY: 20,
+          pointerType: 'mouse',
+        });
+        expect(rail).toHaveAttribute('data-preview', 'false');
+        act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_INTENT_MS - 1));
+        expect(rail).toHaveAttribute('data-preview', 'false');
+        act(() => vi.advanceTimersByTime(1));
+        expect(rail).toHaveAttribute('data-preview', 'true');
+        expect(rail).toHaveAttribute('data-pinned', 'false');
+        // Activating the same live control now pins the preview exactly once.
+        fireEvent.click(trigger);
+        expect(rail).toHaveAttribute('data-pinned', 'true');
+        expect(rail).toHaveAttribute('data-preview', 'false');
+      } finally {
+        if (original)
+          Object.defineProperty(document, 'elementFromPoint', original);
+        else Reflect.deleteProperty(document, 'elementFromPoint');
+      }
+    });
+
+    it.each(['mouse', 'touch'])(
+      'keeps %s focus from moving the toggle before click activation',
+      pointerType => {
+        vi.useFakeTimers();
+        render(
+          <Harness side={side} enterIntentMs={SHELL_RAIL_PREVIEW_INTENT_MS} />
+        );
+        const trigger = screen.getByTestId('trigger');
+        const rail = screen.getByTestId('rail');
+        fireEvent.pointerOver(trigger, { pointerType });
+        fireEvent.pointerDown(trigger, { pointerType });
+        act(() => trigger.focus());
+        expect(rail).toHaveAttribute('data-preview', 'false');
+        act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_INTENT_MS));
+        expect(rail).toHaveAttribute('data-preview', 'false');
+        fireEvent.pointerUp(trigger, { pointerType });
+        fireEvent.click(trigger);
+        expect(rail).toHaveAttribute('data-pinned', 'true');
+        expect(rail).toHaveAttribute('data-preview', 'false');
+      }
+    );
 
     it('allows fresh keyboard preview after an explicit close when focus moves outside first', () => {
       render(<Harness side={side} />);

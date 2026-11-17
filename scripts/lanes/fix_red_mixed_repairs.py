@@ -20,6 +20,15 @@ def publish_pr_body(lane, host, pr: dict, name: str, text: str) -> bool:
     return edited.returncode == 0
 
 
+def stamp_changelog_decision(lane, host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = lane.fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    return lane._publish_pr_body(host, pr, "changelog", stamped)
+
+
 def stamp_fleet_body(lane, host, pr: dict) -> str | None:
     """Stamp missing repair evidence once per head; a measured win stays with the model."""
     body = pr.get("body")
