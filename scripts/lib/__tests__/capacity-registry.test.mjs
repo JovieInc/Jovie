@@ -85,8 +85,20 @@ describe('evaluation', () => {
 
   it('flags a manual fact older than the threshold as stale and a live fact much sooner', () => {
     const registry = base();
-    const later = NOW + 9 * 86_400_000;
-    const view = evaluateRegistry(registry, { now: later, spend: spend() });
+    const ledger = structuredClone(spend());
+    const gateway = ledger.providers.find(
+      entry => entry.id === 'vercel-ai-gateway-credits'
+    );
+    gateway.snapshot.observedAt = new Date(NOW).toISOString();
+    const boundary = NOW + registry.thresholds.manualMaxAgeDays * 86_400_000;
+    const fresh = evaluateRegistry(registry, { now: boundary, spend: ledger });
+    expect(find(fresh, 'vercel-ai-gateway').accounts[0].credits.freshness).toBe(
+      'fresh'
+    );
+    const view = evaluateRegistry(registry, {
+      now: boundary + 1,
+      spend: ledger,
+    });
     expect(find(view, 'vercel-ai-gateway').accounts[0].credits.freshness).toBe(
       'stale'
     );
