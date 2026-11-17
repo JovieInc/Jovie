@@ -72,4 +72,3 @@ def remove_worktree(lane, host, worktree: Path) -> bool:
             lambda args: sh(["git", *args], cwd=host.repo, timeout=120), worktree)
         return removed
     return True
-
