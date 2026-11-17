@@ -28,7 +28,6 @@ ALLOWED = {
     ("epics.py", "_decompose", "open-w"): "per-run agent log, private to the run",
     ("lane_runner.py", "_adopt_pr", "open-w"): "per-run agent log, private to the run",
     ("lane_runner.py", "_fix_red_pr", "open-w"): "per-run agent log, private to the run",
-    ("lane_runner.py", "run_issue", "open-w"): "per-run agent log, private to the run",
     ("worktree_pool.py", "fill", "open-w"): "flock sentinel, no content",
 }
 

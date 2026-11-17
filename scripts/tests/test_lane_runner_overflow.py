@@ -166,6 +166,21 @@ class WorktreeHostGateTest(unittest.TestCase):
             lane._adopt_pr(self.host, "codex", pr, SimpleNamespace())
         self.assertEqual(json.loads(attempts.read_text()), final)
 
+    def test_a_host_hold_leaves_another_branch_writers_attempt_untouched(self):
+        pr = {"number": 4, "headRefName": "codex/x", "headRefOid": "a" * 40}
+        self.state.mkdir(parents=True)
+        attempts = self.state / "fix-attempts.json"
+        incumbent = {"4": {"sha": pr["headRefOid"], "count": 2, "at": 1,
+                           "owner": "another-fixture-writer", "fence": "preserved"}}
+        attempts.write_text(json.dumps(incumbent))
+        with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem"}), \
+                patch.object(lane, "run_agent") as agent:
+            receipt = lane._fix_red_pr(self.host, "codex", {"cmd": ["true"]}, pr, branch_held=False)
+        self.assertEqual(receipt["verdict"], "worktree-host-held")
+        self.assertEqual(json.loads(attempts.read_text()), incumbent)
+        self.assertNotIn("attemptRefunded", receipt)
+        agent.assert_not_called()
+
     def test_a_capped_worker_never_claims_or_bounces_an_issue(self):
         slot = SimpleNamespace(release=Mock())
         with patch.object(lane, "HOST", "mac"), \

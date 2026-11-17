@@ -3607,7 +3607,7 @@ def _run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue, 
     if cloud is not None:
         return cloud_lane_dispatch.record_receipt(THIS, runs, receipt, cloud)
     receipt["offer"]["accepted"] = True
-    with open(runs / f"{run_id}.log", "w") as log:
+    with open(runs / f"{run_id}.log", "a") as log:
         try:
             def revoke_run(error) -> None:
                 """Any kill of this run — timeout, guard hold, operator signal — permanently
@@ -8011,7 +8011,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     repair_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
     if repair_held:
         receipt.update(verdict="worktree-host-held", reasons=[repair_held], endedAt=now_iso())
-        end_local_fix_attempt(host, pr, receipt)
+        if branch_held:
+            end_local_fix_attempt(host, pr, receipt)
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
     receipt["targetStateReads"] = 1
