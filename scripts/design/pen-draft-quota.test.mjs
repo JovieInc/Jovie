@@ -188,11 +188,16 @@ test('other infrastructure failures are not drafting-agent quota', () => {
     'Agent failed: billing_error',
   ])
     assert.equal(deferralReason(output), null, output);
+  assert.deepEqual(
+    deferralReason(
+      'GitHub API quota resets in 30 seconds\nAgent failed: rate_limit'
+    ),
+    { reason: 'rate_limit', reset: null, detail: 'Agent failed: rate_limit' }
+  );
 });
 
 test('a first deferral needs an issue id and one successful comment', async () => {
   for (const mode of ['missing-id', 'rejected-comment', 'uncertain-comment']) {
-    const network = fakeNetwork();
     let comments = 0;
     const result = await publishDeferredNote(
       {
@@ -204,12 +209,16 @@ test('a first deferral needs an issue id and one successful comment', async () =
         log: () => {},
         fetchImpl: async (url, init) => {
           const { query } = JSON.parse(String(init.body));
-          if (
-            query.includes('mutation PenDraftDeferredCreate') &&
-            mode === 'missing-id'
-          )
+          if (query.includes('query PenDraftDeferredIssue'))
+            return Response.json({ data: { issues: { nodes: [] } } });
+          if (query.includes('mutation PenDraftDeferredCreate'))
             return Response.json({
-              data: { issueCreate: { success: true, issue: {} } },
+              data: {
+                issueCreate: {
+                  success: true,
+                  issue: mode === 'missing-id' ? {} : { id: 'deferred-0' },
+                },
+              },
             });
           if (query.includes('mutation PenDraftDeferredComment')) {
             comments += 1;
@@ -219,7 +228,7 @@ test('a first deferral needs an issue id and one successful comment', async () =
               data: { commentCreate: { success: false } },
             });
           }
-          return network.fetchImpl(url, init);
+          throw new Error('unexpected operation');
         },
       },
       {

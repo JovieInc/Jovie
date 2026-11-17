@@ -16,14 +16,14 @@ const RATE_LIMIT_RESET = /resets ([^\n\r]+)/i;
  */
 export function deferralReason(output) {
   const text = String(output ?? '');
-  if (!RATE_LIMIT_LINE.test(text)) return null;
+  const refusals = text
+    .split(/[\r\n]+/)
+    .filter(line => RATE_LIMIT_LINE.test(line));
+  if (!refusals.length) return null;
   return {
     reason: 'rate_limit',
-    reset: RATE_LIMIT_RESET.exec(text)?.[1]?.trim() ?? null,
-    detail:
-      (text.split(/[\r\n]+/).find(line => RATE_LIMIT_LINE.test(line)) ?? '')
-        .trim()
-        .slice(0, 200) || null,
+    reset: RATE_LIMIT_RESET.exec(refusals.join('\n'))?.[1]?.trim() ?? null,
+    detail: refusals[0].trim().slice(0, 200) || null,
   };
 }
 
