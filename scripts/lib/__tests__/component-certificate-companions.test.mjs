@@ -110,5 +110,108 @@ describe('component certificate companion files', () => {
     const missing = run();
     assert.equal(missing.status, 1);
     assert.match(missing.stdout, /matches no component/);
+
+    // Waivers out of path order fail the gate until --sort puts them in place.
+    const registry = join(
+      root,
+      'docs/design-system/component-certification.json'
+    );
+    writeFileSync(
+      registry,
+      JSON.stringify({
+        gates: { [source]: ['tests', 'a11y'] },
+        waivers: {
+          'packages/ui/b.tsx': { rtl: 'No text', empty: 'No list' },
+          'packages/ui/a.tsx': { offline: 'No network' },
+        },
+      })
+    );
+    const unsorted = run();
+    assert.equal(unsorted.status, 1, unsorted.stdout);
+    assert.match(unsorted.stdout, /waivers is not sorted by component path/);
+    assert.match(
+      unsorted.stdout,
+      /run node scripts\/component-certificate\.mjs --sort/
+    );
+    const sort = spawnSync(
+      process.execPath,
+      [cli, '--repo-root', root, '--sort'],
+      {
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(sort.status, 0, sort.stderr);
+    const { waivers } = JSON.parse(readFileSync(registry, 'utf8'));
+    assert.deepEqual(Object.keys(waivers), [
+      'packages/ui/a.tsx',
+      'packages/ui/b.tsx',
+    ]);
+    // State order inside an entry stays as written.
+    assert.deepEqual(Object.keys(waivers['packages/ui/b.tsx']), [
+      'rtl',
+      'empty',
+    ]);
+    assert.equal(run().status, 0);
+  });
+  it('merges gates and waivers from component-certification.d shards', () => {
+    const docs = join(root, 'docs/design-system');
+    mkdirSync(join(docs, 'component-certification.d'), { recursive: true });
+    const shard = join(docs, 'component-certification.d/batch.json');
+    const run = () =>
+      spawnSync(process.execPath, [cli, '--repo-root', root, '--gate'], {
+        encoding: 'utf8',
+      });
+    writeFileSync(
+      join(docs, 'component-certification.json'),
+      JSON.stringify({ policy: {}, gates: {}, waivers: {} })
+    );
+    // A gate written only in a shard is enforced.
+    writeFileSync(
+      shard,
+      JSON.stringify({ gates: { [component]: ['states'] } })
+    );
+    const red = run();
+    assert.equal(red.status, 1, red.stdout);
+    assert.match(red.stdout, /note\.tsx \[states\] fail/);
+    write(
+      'note.states.stories.tsx',
+      'export const LongContent = {};\nexport const Rtl = {};\n'
+    );
+    const green = run();
+    assert.equal(green.status, 0, green.stdout);
+
+    // The same component in two files fails until one entry is left.
+    writeFileSync(
+      join(docs, 'component-certification.d/other.json'),
+      JSON.stringify({ gates: { [component]: ['states'] } })
+    );
+    const twice = run();
+    assert.equal(twice.status, 1, twice.stdout);
+    assert.match(
+      twice.stdout,
+      /other\.json: gates names packages\/ui\/atoms\/note\.tsx, already in .*batch\.json/
+    );
+    rmSync(join(docs, 'component-certification.d/other.json'));
+
+    // A shard out of path order fails, and --sort fixes it in place.
+    writeFileSync(
+      shard,
+      JSON.stringify({
+        gates: { [component]: ['states'] },
+        waivers: {
+          'packages/ui/b.tsx': { rtl: 'No text' },
+          'packages/ui/a.tsx': { offline: 'No network' },
+        },
+      })
+    );
+    const unsorted = run();
+    assert.equal(unsorted.status, 1, unsorted.stdout);
+    assert.match(unsorted.stdout, /batch\.json: waivers is not sorted/);
+    spawnSync(process.execPath, [cli, '--repo-root', root, '--sort']);
+    assert.deepEqual(
+      Object.keys(JSON.parse(readFileSync(shard, 'utf8')).waivers),
+      ['packages/ui/a.tsx', 'packages/ui/b.tsx']
+    );
+    assert.equal(run().status, 0);
   });
 });

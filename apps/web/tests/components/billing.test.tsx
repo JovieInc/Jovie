@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useFeatureFlag } from '@/lib/analytics';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { renderWithQueryClient } from '../utils/test-utils';
 
 // Mock the analytics
@@ -31,6 +32,8 @@ global.fetch = vi.fn();
 Object.defineProperty(window, 'location', {
   value: {
     href: '',
+    pathname: '/app/releases',
+    search: '?view=list',
   },
   writable: true,
 });
@@ -38,7 +41,7 @@ Object.defineProperty(window, 'location', {
 describe('Billing Components', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (global.fetch as any).mockClear();
+    (global.fetch as any).mockReset();
     window.location.href = 'https://localhost.test/';
     pushMock.mockClear();
   });
@@ -151,17 +154,43 @@ describe('Billing Components', () => {
       });
     });
 
-    it('validates priceId when direct upgrade is enabled but priceId is missing', async () => {
+    it('loads canonical pricing and checks out when the caller omits priceId', async () => {
       mockUseFeatureFlag.mockReturnValue(true);
-
+      const offer = ARTIST_VISIBILITY_OFFER.pro;
+      const url = 'https://checkout.stripe.com/session/default';
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce(
+          Response.json({
+            options: [
+              {
+                priceId: 'price_presence',
+                amount: toCents(offer.monthlyUsd),
+                currency: offer.currency,
+                interval: offer.interval,
+                description: offer.displayName,
+              },
+            ],
+          })
+        )
+        .mockResolvedValueOnce(Response.json({ url }));
       renderWithQueryClient(<UpgradeButton />);
-      const button = screen.getByRole('button');
-
-      fireEvent.click(button);
-
-      await waitFor(() => {
-        expect(pushMock).toHaveBeenCalledWith('/pricing');
+      const button = await screen.findByRole('button', {
+        name: 'Upgrade to Artist Presence',
       });
+      fireEvent.click(button);
+      await waitFor(() => expect(window.location.href).toBe(url));
+      expect(pushMock).not.toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/stripe/checkout',
+        expect.objectContaining({
+          body: JSON.stringify({
+            priceId: 'price_presence',
+            source: 'in_app',
+            returnTo: '/app/releases?view=list',
+            humanConfirmed: true,
+          }),
+        })
+      );
     });
 
     it('handles successful direct checkout', async () => {
@@ -189,7 +218,12 @@ describe('Billing Components', () => {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ priceId, humanConfirmed: true }),
+            body: JSON.stringify({
+              priceId,
+              source: 'in_app',
+              returnTo: '/app/releases?view=list',
+              humanConfirmed: true,
+            }),
             signal: expect.anything(),
           })
         );

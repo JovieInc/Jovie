@@ -261,6 +261,18 @@ describe.each(['left', 'right'] as const)(
       expect(screen.getByTestId('trigger')).toHaveFocus();
     });
 
+    it('returns focus to the toggle when Escape collapses a rail item', () => {
+      render(<Harness side={side} />);
+      const item = screen.getByRole('button', { name: 'Rail action' });
+      act(() => item.focus());
+      fireEvent.keyDown(item, { key: 'Escape' });
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-preview',
+        'false'
+      );
+      expect(screen.getByTestId('trigger')).toHaveFocus();
+    });
+
     it('retains the underlying preview when Escape is consumed by a nested overlay', () => {
       render(<Harness side={side} />);
       fireEvent.pointerOver(screen.getByTestId('trigger'));

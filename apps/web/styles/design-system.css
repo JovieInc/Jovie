@@ -154,7 +154,7 @@
   --app-shell-content-padding-y: 8px;
   --app-shell-content-surface: var(--linear-bg-surface-0);
   --app-shell-control-height-sm: 28px;
-  --app-shell-control-padding-x: 11px;
+  --app-shell-control-padding-x: 10px;
   --app-shell-control-radius: 9999px;
   --app-shell-toolbar-gap: 4px;
   --app-shell-audio-bar-max-height: 120px;
@@ -188,6 +188,7 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -314,6 +315,22 @@
     );
   --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
   --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  /* Layout shell stage layers (PublicProfileLayoutShell). Declared here, on
+     the shell's own element, so --profile-stage-glow-a resolves against the
+     artist accent the shell sets inline. */
+  --profile-stage-ambient-glow: radial-gradient(
+    circle at 50% 30%,
+    var(--profile-stage-glow-a, rgba(255, 255, 255, 0.18)),
+    transparent 60%
+  );
+  --profile-stage-scrim:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%),
+    linear-gradient(
+      180deg,
+      rgba(6, 8, 13, 0.34) 0%,
+      rgba(7, 8, 10, 0.82) 42%,
+      rgba(8, 9, 10, 0.98) 100%
+    );
   --profile-content-bg: linear-gradient(
     180deg,
     rgba(14, 16, 20, 0.96),
@@ -1731,6 +1748,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    - surface-3: Pressed/active
 */
 
+[data-proof-theme],
 :root {
   /* Noir Ion ziawi lock (2026-09-09–10, re-locked 2026-09-25: raised = lighter) —
      light 5-step ladder + 6 accents. */
@@ -1743,7 +1761,37 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      on brand fills, photos and fixed-dark media. */
   --color-verified: #0084d1;
   --color-on-media: #ffffff;
+  /* The black that stays black on an on-media white fill (a white pill's
+     label), in light and dark alike. */
+  --color-ink-on-media: #000000;
   --color-verified-backing: var(--color-on-media);
+  /* Quiet header text link (marketing Sign in / Log in) and its hover. The
+     dark values live in the .dark block below so scoped dark wrappers match. */
+  --color-header-text-link: oklch(37.1% 0 none);
+  --color-header-text-link-hover: oklch(14.5% 0 none);
+  /* Mobile nav sheet: the scrim behind it and its upward shadow, the same in
+     light and dark. */
+  --mobile-nav-scrim: oklch(0% 0 0 / 0.6);
+  --shadow-mobile-nav-sheet:
+    0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15);
+  /* Fallback cover art sleeve (ArtworkFallbackTile): the same light-on-dark
+     bevel over the seeded surface in light and dark. */
+  --artwork-fallback-sleeve: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.012) 52%,
+    rgba(0, 0, 0, 0.13)
+  );
+  --artwork-fallback-sleeve-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -24px 48px rgba(0, 0, 0, 0.14);
+  /* Top sheen over the compact profile surface (ProfileCompactSurface),
+     the same in light and dark. */
+  --profile-compact-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025),
+    transparent 34%
+  );
   /* Glass (2026-10-26): one semantic material for frosted panels. Shell
      mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
      theme so secondary text clears 4.5:1 over black, white and every accent
@@ -1780,6 +1828,22 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  /* Profile preview bento (ProfilePreviewBento): the default hero, an accent
+     purple glow over a dark vertical gradient, and the fade into its base,
+     the same in light and dark. */
+  --profile-preview-bento-hero:
+    radial-gradient(
+      120% 90% at 50% -10%,
+      rgba(123, 108, 255, 0.42) 0%,
+      rgba(70, 58, 170, 0.14) 38%,
+      rgba(12, 12, 20, 0) 66%
+    ),
+    linear-gradient(180deg, #14131f 0%, #0c0c12 100%);
+  --profile-preview-bento-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #0c0c12
+  );
   /* Light aliases keep shared marketing chrome on the same Noir Ion token
      family as the dark surface while the footer theme control is active. */
   --noir-ion-text-strong: var(--color-text-primary-token);
@@ -1848,6 +1912,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (light): raw Ion accents clear 4.5:1 only on dark
+     surfaces. On light paper they need darkened text mixes (WCAG 2.2 AA). */
+  --color-accent-blue-text: #0072c6;
+  --color-accent-pink-text: #c4187f;
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -2016,13 +2084,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-row-selected: oklch(94.8% 0.006 282);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--color-accent-blue);
+  --color-link-default: var(--color-accent-blue-text);
   --color-link-hover: color-mix(
     in oklab,
-    var(--color-accent-blue) 82%,
+    var(--color-accent-blue-text) 82%,
     var(--linear-text-primary)
   );
-  --color-link-visited: var(--color-accent-purple);
+  --color-link-visited: var(--color-accent-purple-text);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.8;
   --state-offline-bg: var(--color-warning-subtle);
@@ -2033,7 +2101,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2054,6 +2122,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
 /* Dark mode — Jovie Noir Ion ziawi lock (2026-09-09–10).
    Exactly 5 surfaces. Focus = ion. Aqua/gold/flare alias mint/orange/red. */
+[data-proof-theme="dark"],
 :root.dark {
   --noir-ion-canvas: #030406;
   --noir-ion-shell: #07080a;
@@ -2065,6 +2134,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-floating: #232427;
   --color-verified: #00bcff;
   --color-on-media: #ffffff;
+  --color-ink-on-media: #000000;
   --color-verified-backing: var(--color-bg-base);
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
@@ -2191,6 +2261,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #a47bff;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (dark): the raw accents clear 4.5:1 on dark
+     surfaces, so the text variants rebind to them. */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -2369,7 +2443,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2385,6 +2459,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 .dark {
   --color-verified: #00bcff;
   --color-verified-backing: var(--color-bg-base);
+  /* The quiet header text link reads the same wrapper (dark: variant parity). */
+  --color-header-text-link: color-mix(in oklab, #fff 60%, transparent);
+  --color-header-text-link-hover: color-mix(in oklab, #fff 90%, transparent);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats
@@ -3215,6 +3292,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 /* ============================================
    SEMANTIC STATUS COLORS (OKLCH)
    ============================================ */
+[data-proof-theme],
 :root {
   /* Success */
   --color-success: var(--color-accent-green);
@@ -3239,6 +3317,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-info-foreground: oklch(100% 0 0);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   /* Success — Mint */
   --color-success: var(--color-accent-green);
@@ -3263,18 +3342,35 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    orange, red) that stay locked to the Noir Ion palette; these derived tokens
    keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
    and elevated dark surfaces, without redefining the palette. */
+[data-proof-theme],
 :root {
-  --color-success-text: color-mix(in srgb, var(--color-success) 48%, black);
-  --color-warning-text: color-mix(in srgb, var(--color-warning) 70%, black);
-  --color-error-text: color-mix(in srgb, var(--color-error) 85%, black);
+  --color-success-text: color-mix(in srgb, var(--color-success) 42%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
+  --color-error-text: color-mix(in srgb, var(--color-error) 78%, black);
   --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   --color-success-text: var(--color-success);
   --color-warning-text: var(--color-warning);
   --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
   --color-accent-text: var(--color-accent);
+}
+
+/* Fixed-theme Storybook semantic-token proofs reuse the palettes above.
+   These two non-inline Tailwind aliases must resolve on the proof subtree.
+   This does not isolate ancestor-based dark: variants. */
+[data-proof-theme] {
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-focus: var(--color-border-focus);
+}
+
+/* Partial cards dim their subtree. Strengthen default description copy while
+   preserving custom semantic foregrounds, which replace the secondary class. */
+:where([data-content-state="partial"])
+[data-slot="card-description"].text-secondary-token {
+  color: var(--color-text-primary-token);
 }
 
 /* ============================================
@@ -3548,6 +3644,44 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 }
 
 /* ============================================
+   PUBLIC SURFACE + SMART LINK TOKENS (2026-11-11)
+   ============================================
+   Theme-constant on purpose: each token carries the exact literal its
+   component drew before it existed (component certification, tokens), so
+   light and dark compute what they did. The pattern pairs keep their own
+   light and dark members because the components pick one with dark:. */
+:root {
+  /* SmartLinkPoweredByFooter light brand line and link hover; dark: keeps
+     muted-foreground. Same values as Tailwind neutral-700 and neutral-950. */
+  --color-smart-link-footer-text: oklch(37.1% 0 none);
+  --color-smart-link-footer-text-hover: oklch(14.5% 0 none);
+  /* PublicSurfaceShell scrim over blurred ambient artwork. */
+  --public-surface-ambient-scrim:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%),
+    linear-gradient(
+      180deg,
+      rgba(6, 8, 13, 0.34) 0%,
+      rgba(7, 8, 10, 0.82) 42%,
+      rgba(8, 9, 10, 0.98) 100%
+    );
+  /* BackgroundPattern grid lines and dots. */
+  --background-pattern-grid:
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  --background-pattern-grid-dark:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  --background-pattern-dots: radial-gradient(
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px
+  );
+  --background-pattern-dots-dark: radial-gradient(
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
+}
+
+/* ============================================
    MENU/DROPDOWN TOKENS
    ============================================ */
 :root {
@@ -3715,6 +3849,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;
@@ -3745,6 +3886,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
@@ -3821,6 +3963,13 @@ html:not(.dark) .teleprompter-studio {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;
@@ -3907,6 +4056,7 @@ html:not(.dark) .teleprompter-studio {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --ds-marketing-eyebrow-color: #9da2ac;
   --public-shell-text: #f5f7fb;
 }
@@ -4001,6 +4151,15 @@ html:not(.dark) .smart-link-powered-by {
     transition:
       box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
       border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+/* Icons never squash. A Lucide glyph beside truncating text keeps its drawn
+   size, so the text gives way instead. :where() keeps specificity at 0 and
+   the base layer sits under utilities, so an explicit shrink class still wins. */
+@layer base {
+  :where(svg.lucide) {
+    flex-shrink: 0;
   }
 }
 

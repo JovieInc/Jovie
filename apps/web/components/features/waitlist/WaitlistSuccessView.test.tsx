@@ -11,7 +11,7 @@ import storyMeta, {
 } from './WaitlistSuccessView.stories';
 
 describe('WaitlistSuccessView', () => {
-  it('shows no payment CTA on the waitlist confirmation (invite-only GTM)', async () => {
+  it('shows no payment CTA on the waitlist confirmation', async () => {
     const { container } = render(<WaitlistSuccessView />);
 
     expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
@@ -60,11 +60,11 @@ describe('WaitlistSuccessView', () => {
       container.querySelector('[data-auth-chrome="splash-b"]')
     ).not.toBeNull();
     expect(
-      screen.getByRole('heading', { level: 1, name: "You're on the list" })
+      screen.getByRole('heading', { level: 1, name: "You're on the waitlist." })
     ).toBeVisible();
     expect(
       screen.getByText(
-        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
+        'Your request is saved. Come back to /start when your spot opens.'
       )
     ).toBeVisible();
     expect(screen.getByTestId('waitlist-next-steps').children).toHaveLength(3);
@@ -76,12 +76,16 @@ describe('WaitlistSuccessView', () => {
   it('shows the held jov.ie handle when a reservation profile exists', async () => {
     const { container } = render(<WaitlistSuccessView reservedHandle='tim' />);
 
+    // The locked post-claim copy (Tim, 2026-11-09), verbatim.
     expect(
-      screen.getByRole('heading', { level: 1, name: "You're on the list" })
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Your handle is reserved. You’re on the waitlist.',
+      })
     ).toBeVisible();
     expect(
       screen.getByText(
-        "jov.ie/tim is yours. Your name and profile are reserved, and we'll email you the moment your spot opens."
+        "jov.ie/tim is yours, and we'll email you the moment your spot opens."
       )
     ).toBeVisible();
     expect(screen.queryByText(/Request saved\./)).toBeNull();
@@ -93,7 +97,7 @@ describe('WaitlistSuccessView', () => {
 
     expect(
       screen.getByText(
-        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
+        'Your request is saved. Come back to /start when your spot opens.'
       )
     ).toBeVisible();
     expect(screen.queryByText(/jov\.ie\//)).toBeNull();

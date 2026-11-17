@@ -226,20 +226,21 @@ jobs:
 
           # Perf class, measured on the same server and reported by the
           # layout-budget job, never by this one (one spec asserts one class).
+          # Green only when both layout tests ran: a skipped test (Stripe test
+          # prerequisites unavailable) exits 0 too, and is `unmeasured`.
           set +e
           E2E_SKIP_WEB_SERVER=1 BASE_URL=http://localhost:3260 \
+            PLAYWRIGHT_JSON_OUTPUT_FILE="$RECEIPT_DIR/playwright-layout.json" \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test tests/e2e/claim-checkout-layout.perf.spec.ts \
-              --project=chromium --reporter=line --output=test-results/layout-budget \
+              --project=chromium --reporter=line,json --output=test-results/layout-budget \
             > "$RECEIPT_DIR/playwright-layout.log" 2>&1
           layout_status=$?
           set -e
           tail -n 60 "$RECEIPT_DIR/playwright-layout.log"
-          if [ "$layout_status" -eq 0 ]; then
-            echo "layout_outcome=success" >> "$GITHUB_OUTPUT"
-          else
-            echo "layout_outcome=failure" >> "$GITHUB_OUTPUT"
-          fi
+          layout_outcome=$(node "$GITHUB_WORKSPACE/scripts/claim-dogfood-report.mjs" layout-outcome \
+            "$layout_status" "$RECEIPT_DIR/playwright-layout.json") || layout_outcome=failure
+          echo "layout_outcome=$layout_outcome" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       - name: Emit stage events (claim-dogfood)
@@ -334,6 +335,9 @@ jobs:
               echo "Layout-shift budget held on /claim and /billing/success." ;;
             failure)
               echo "::error::Layout-shift budget breached (CLS >= 0.1). See the dogfood job log (Run the claim dogfood step) and the claim-layout-budget-report artifact."
+              exit 1 ;;
+            unmeasured)
+              echo "::error::Layout-shift budget was not measured: the perf spec was skipped (Stripe test prerequisites unavailable) or ran no test. See the dogfood job log."
               exit 1 ;;
             *)
               echo "::error::Layout-shift budget was not measured: the dogfood job stopped before the perf spec ran."

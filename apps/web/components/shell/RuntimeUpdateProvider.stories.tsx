@@ -20,8 +20,8 @@ export const Default: Story = {
           Shell content stays mounted inside the provider.
         </p>
         <p className='text-sm text-secondary-token'>
-          Runtime update state survives route changes; the Inbox owns its
-          display.
+          Runtime update state survives route changes; an available update shows
+          as a bottom-corner pill outside the page content.
         </p>
       </div>
     ),

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AppSegmentControl } from './AppSegmentControl';
 
 const options = [
@@ -9,6 +10,58 @@ const options = [
 ] as const;
 
 describe('AppSegmentControl', () => {
+  it.each(['muted', 'ghost'] as const)(
+    'keeps the %s radio choice named and axe-clean across selection',
+    async surface => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+      const view = (value: 'details' | 'activity') => (
+        <AppSegmentControl
+          value={value}
+          onValueChange={onValueChange}
+          options={options}
+          surface={surface}
+          semantics='radio'
+          aria-label='Entity view'
+        />
+      );
+      const { container, rerender } = render(view('details'));
+
+      expect(
+        screen.getByRole('radiogroup', { name: 'Entity view' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Details' })).toBeChecked();
+      await expectNoA11yViolations(container);
+
+      await user.click(screen.getByRole('radio', { name: 'Activity' }));
+      expect(onValueChange).toHaveBeenCalledExactlyOnceWith('activity');
+      rerender(view('activity'));
+
+      expect(screen.getByRole('radio', { name: 'Activity' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Activity' })).toHaveFocus();
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      await expectNoA11yViolations(container);
+    }
+  );
+
+  it('keeps the RTL tablist and disabled option named and axe-clean', async () => {
+    const { container } = render(
+      <AppSegmentControl
+        value='details'
+        onValueChange={vi.fn()}
+        options={[options[0], { ...options[1], disabled: true }]}
+        dir='rtl'
+        aria-label='Entity view'
+      />
+    );
+
+    expect(
+      screen.getByRole('tablist', { name: 'Entity view' })
+    ).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(screen.getByRole('tab', { name: 'Activity' })).toBeDisabled();
+    await expectNoA11yViolations(container);
+  });
+
   it('maps the muted app surface to the canonical small control contract', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();

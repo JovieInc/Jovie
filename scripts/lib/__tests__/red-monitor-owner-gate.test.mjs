@@ -80,6 +80,7 @@ describe('summarizeRunStreak', () => {
       countIsLowerBound: false,
       lastGreenAt: at(5),
       greenBefore: null,
+      redSince: at(1),
       failingRunIds: [4, 3],
     });
   });
@@ -93,6 +94,7 @@ describe('summarizeRunStreak', () => {
     expect(streak.countIsLowerBound).toBe(true);
     expect(streak.lastGreenAt).toBeNull();
     expect(streak.greenBefore).toBe(at(30));
+    expect(streak.redSince).toBe(at(30));
   });
 
   it('is empty for no runs', () => {
@@ -104,10 +106,16 @@ describe('summarizeRunStreak', () => {
 });
 
 describe('needsOwner', () => {
-  const streak = (failures, lastGreenHours, greenBeforeHours = null) => ({
+  const streak = (
+    failures,
+    lastGreenHours,
+    greenBeforeHours = null,
+    redSinceHours = undefined
+  ) => ({
     consecutiveFailures: failures,
     lastGreenAt: lastGreenHours === null ? null : at(lastGreenHours),
     greenBefore: greenBeforeHours === null ? null : at(greenBeforeHours),
+    ...(redSinceHours === undefined ? {} : { redSince: at(redSinceHours) }),
   });
 
   it('never flags a monitor whose newest verdict is green, however old', () => {
@@ -122,8 +130,32 @@ describe('needsOwner', () => {
     expect(needsOwner(streak(4, 1), NOW)).toBe(true);
   });
 
-  it('flags a red streak more than 24 hours past the last green', () => {
+  it('flags a red streak whose first failure is more than 24 hours old', () => {
+    expect(needsOwner(streak(2, 50, null, 25), NOW)).toBe(true);
+    // An observation without redSince falls back to the last green.
     expect(needsOwner(streak(1, 25), NOW)).toBe(true);
+  });
+
+  it("does not flag a weekly or daily monitor's first failure (Seer review on #25013)", () => {
+    // Weekly: last green 7 days ago, first failure an hour ago.
+    const weekly = summarizeRunStreak([
+      run(2, 'failure', 1),
+      run(1, 'success', 24 * 7),
+    ]);
+    expect(needsOwner(weekly, NOW)).toBe(false);
+    // Daily with jitter: last green 24.5 hours ago, first failure just now.
+    const daily = summarizeRunStreak([
+      run(2, 'failure', 0.2),
+      run(1, 'success', 24.5),
+    ]);
+    expect(needsOwner(daily, NOW)).toBe(false);
+    // Still red a day later: now it needs an owner.
+    const stillRed = summarizeRunStreak([
+      run(3, 'failure', 0.2),
+      run(2, 'failure', 24.2),
+      run(1, 'success', 48.5),
+    ]);
+    expect(needsOwner(stillRed, NOW)).toBe(true);
   });
 
   it('uses the oldest verdict in view as the bound when no green is visible', () => {
@@ -241,6 +273,27 @@ describe('evaluateRedMonitors', () => {
     expect(redMonitorAnnotations(result)).toContain('::error::');
   });
 
+  it('reports redHours from the first failure, falling back to the last green without redSince', () => {
+    const one = {
+      entries: [entry('github:jovie:nightly', 'nightly.yml')],
+    };
+    const streak = {
+      consecutiveFailures: 5,
+      countIsLowerBound: false,
+      lastGreenAt: at(30),
+      greenBefore: null,
+      failingRunIds: [5, 4, 3, 2, 1],
+    };
+    const hours = s =>
+      evaluateRedMonitors({
+        registry: one,
+        observations: new Map([['github:jovie:nightly', { streak: s }]]),
+        nowMs: NOW,
+      }).offenders[0].redHours;
+    expect(hours({ ...streak, redSince: at(6) })).toBe(6);
+    expect(hours({ ...streak, redSince: null })).toBe(30);
+  });
+
   it('a live owner lease on an open incident covers every registry entry of that workflow', () => {
     const incidents = {
       leases: [
@@ -345,7 +398,8 @@ describe('automation-liveness wiring', () => {
         workflow: 'claim-checkout-dogfood.yml',
         consecutiveFailures: 4,
         reason: 'no-incident',
-        redHours: 30,
+        // Red since the first failure 4h ago, not since the green 30h ago.
+        redHours: 4,
       }),
     ]);
   });

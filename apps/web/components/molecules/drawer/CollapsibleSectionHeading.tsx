@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -23,7 +24,7 @@ export function CollapsibleSectionHeading({
   'data-testid': testId,
 }: CollapsibleSectionHeadingProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onToggle}
       aria-expanded={isOpen}
@@ -44,6 +45,6 @@ export function CollapsibleSectionHeading({
           !isOpen && '-rotate-90'
         )}
       />
-    </button>
+    </PlainButton>
   );
 }

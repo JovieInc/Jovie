@@ -104,6 +104,15 @@ function RendererMenu({
         <DropdownMenuPrimitive.Portal>
           <DropdownMenuPrimitive.Content
             aria-label={label}
+            /* A text input is not an allowed child of role="menu" (axe
+               aria-required-children): the searchable surface presents as a
+               group and the item rows keep an inner menu, mirroring
+               CommonDropdown's composition. Radix hardcodes aria-orientation
+               on the content; orientation is not an allowed aria-* attribute
+               on role="group" (axe aria-allowed-attr), so strip it here just
+               like CommonDropdown does. */
+            role='group'
+            aria-orientation={undefined}
             className={cn(DROPDOWN_CONTENT_BASE, 'w-64')}
           >
             <SearchableContent
@@ -112,13 +121,15 @@ function RendererMenu({
               onQueryChange={setQuery}
               onClear={() => setQuery('')}
             />
-            {renderRootBody({
-              isLoading,
-              items: filterItems(items, query, 'recursive'),
-              emptyMessage: 'No actions found',
-              renderItems: rows =>
-                rows.map(row => renderItem(row, menuContext)),
-            })}
+            <div role='menu'>
+              {renderRootBody({
+                isLoading,
+                items: filterItems(items, query, 'recursive'),
+                emptyMessage: 'No actions found',
+                renderItems: rows =>
+                  rows.map(row => renderItem(row, menuContext)),
+              })}
+            </div>
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>
       </DropdownMenuPrimitive.Root>

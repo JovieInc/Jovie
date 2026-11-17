@@ -6,6 +6,8 @@ import {
   CLAIM_DOGFOOD_KEY,
   CLAIM_LAYOUT_BUDGET_KEY,
   journeyOutcome,
+  layoutBudgetOutcome,
+  layoutIntakeCommand,
   reportClaimDogfoodResult,
   reportClaimLayoutBudgetResult,
 } from '../../claim-dogfood-report.mjs';
@@ -168,5 +170,65 @@ describe('claim layout-budget intake (perf class)', () => {
         reopenTerminal: true,
       })
     );
+  });
+});
+
+describe('claim layout-budget verdict (Seer review on #25005)', () => {
+  const stats = over => ({
+    stats: { expected: 0, skipped: 0, unexpected: 0, flaky: 0, ...over },
+  });
+
+  it('is green only when every layout test ran and passed', () => {
+    expect(layoutBudgetOutcome(0, stats({ expected: 2 }))).toBe('success');
+    expect(layoutBudgetOutcome(0, stats({ expected: 1, flaky: 1 }))).toBe(
+      'success'
+    );
+  });
+
+  it('a skipped or empty run is unmeasured, never green', () => {
+    // getStripeContextOrSkip skips both tests and Playwright still exits 0.
+    expect(layoutBudgetOutcome(0, stats({ skipped: 2 }))).toBe('unmeasured');
+    expect(layoutBudgetOutcome(0, stats({ expected: 1, skipped: 1 }))).toBe(
+      'unmeasured'
+    );
+    expect(layoutBudgetOutcome(0, stats({}))).toBe('unmeasured');
+    expect(layoutBudgetOutcome(0, null)).toBe('unmeasured');
+  });
+
+  it('a non-zero exit stays a failure', () => {
+    expect(layoutBudgetOutcome(1, stats({ unexpected: 1 }))).toBe('failure');
+    expect(layoutBudgetOutcome('1', null)).toBe('failure');
+  });
+
+  it('an unmeasured run neither resolves nor files the issue', async () => {
+    const close = vi.fn();
+    const upsert = vi.fn();
+    const notify = vi.fn();
+    const result = await reportClaimLayoutBudgetResult(
+      { outcome: 'unmeasured' },
+      { env: { LINEAR_API_KEY: 'lin_test' }, close, upsert, notify }
+    );
+    expect(close).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, action: 'unmeasured' });
+  });
+
+  it('a failed Linear intake warns and never fails the dogfood job', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const report = vi.fn(async () => ({ ok: false, reason: 'rate-limited' }));
+      await expect(
+        layoutIntakeCommand({ LAYOUT_OUTCOME: 'failure' }, report)
+      ).resolves.toMatchObject({ ok: false });
+      expect(report).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'failure' })
+      );
+      expect(log.mock.calls.flat().join('\n')).toContain(
+        '::warning::Claim layout Linear intake failed: rate-limited'
+      );
+    } finally {
+      log.mockRestore();
+    }
   });
 });

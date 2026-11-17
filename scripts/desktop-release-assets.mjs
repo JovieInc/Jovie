@@ -337,9 +337,11 @@ export function selectRecoverableProductionDraft(
   invariant(Array.isArray(releases), 'GitHub releases are malformed.');
   const candidates = releases.filter(
     release =>
+      // JOV-12659: target is repaired by the metadata update, so any private
+      // empty draft named for this version is recoverable — including one whose
+      // tag GitHub renamed to untagged-* after a target-only retarget.
       UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
-      release.name === version &&
-      release.target_commitish === releaseSha
+      release.name === version
   );
   invariant(
     candidates.length <= 1,
@@ -1141,14 +1143,6 @@ export class GitHubClient {
     });
   }
 
-  async retargetEmptyDraft(releaseId, releaseSha) {
-    return this.request(`/repos/${this.repository}/releases/${releaseId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ target_commitish: releaseSha }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   async updateTagCommit(tag, releaseSha) {
     return this.request(
       `/repos/${this.repository}/git/refs/tags/${encodeURIComponent(tag)}`,
@@ -1397,17 +1391,23 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (
-    environment === 'staging' &&
-    release.target_commitish !== releaseSha
-  ) {
+  } else if (release.target_commitish !== releaseSha) {
     invariant(
       release.draft === true &&
+        release.published_at === null &&
+        release.name === version &&
+        release.prerelease === spec.prerelease &&
         Array.isArray(release.assets) &&
         release.assets.length === 0,
-      'A non-empty or public release cannot be retargeted.'
+      'A non-empty or public release cannot be retargeted (JOV-12609).'
     );
-    release = await client.retargetEmptyDraft(release.id, releaseSha);
+    release = await updateRelease(
+      client,
+      release,
+      environment,
+      releaseSha,
+      version
+    );
   }
   validateReleaseEnvelope({
     environment,

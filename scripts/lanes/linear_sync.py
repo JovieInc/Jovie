@@ -506,12 +506,12 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, bu
             break
         except Exception as error:
             _settle(state, entry["key"], error=f"{type(error).__name__}: {error}")
+            outcome = "partial"
             continue
         _settle(state, entry["key"])
         delivered.append({"key": entry["key"], "result": result})
-    else:
-        if len(entries) > limit:
-            outcome = "partial"
+    if outcome == "drained" and len(entries) > limit:
+        outcome = "partial"
     return {"outcome": outcome, "delivered": delivered}
 
 

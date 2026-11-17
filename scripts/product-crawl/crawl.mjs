@@ -4,6 +4,7 @@
 //   node scripts/product-crawl/crawl.mjs --origin https://jov.ie --out <dir>
 //     [--storage-state <signed-in Playwright state>] [--unclaimed-handle testartist]
 //     [--deadline-epoch-ms <ms>]  (or CRAWL_DEADLINE_EPOCH_MS)
+//     [--shard 2/4]  (or CRAWL_SHARD; loads only this shard's routes, shard.mjs)
 // Past the deadline it starts no new page loads and still writes the
 // receipt, which then names how many loads were left (never ready). A crawl
 // that ran into the job timeout used to leave no receipt at all.
@@ -11,15 +12,20 @@
 // longest main-thread stall, load time, console errors, failed same-origin
 // requests, placeholder text and sideways scroll. The public profile is also
 // crawled on an unclaimed test profile, where the claim banner must show.
-// The crawl only loads pages: it never clicks, submits or pays.
+// The crawl only loads pages: it never clicks, submits or pays. Its last
+// pass (overlay-walk.mjs) hovers, resizes, presses Escape and follows one
+// link on a few pages, looking for overlays left up without their anchor.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
+import { MEASURE, OBSERVE } from './observe.mjs';
+import { MAX_WALKS_PER_IDENTITY, runOverlayWalks } from './overlay-walk.mjs';
 import {
   CLAIM_BANNER,
+  causeOf,
   fromThirdPartyFrame,
   median,
   PLACEHOLDER,
@@ -38,6 +44,7 @@ import {
   sitemapPaths,
   strangerDiscovery,
 } from './sample-params.mjs';
+import { inShard, parseShard, summaryLines } from './shard.mjs';
 import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 
 const { values: args } = parseArgs({
@@ -52,8 +59,10 @@ const { values: args } = parseArgs({
       type: 'string',
       default: process.env.CRAWL_DEADLINE_EPOCH_MS || '',
     },
+    shard: { type: 'string', default: process.env.CRAWL_SHARD || '' },
   },
 });
+const shard = parseShard(args.shard);
 
 const DEADLINE = Number(args['deadline-epoch-ms']) || Infinity;
 const started = Date.now();
@@ -92,44 +101,18 @@ function concrete(route) {
   return simple.includes('[') ? null : simple;
 }
 
-// Runs in the page, so it is a string: these scripts type-check as Node.
-const OBSERVE = `
-  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {} };
-  const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
-  // Names the elements that moved, so a layout-shift finding says what to fix.
-  const label = n => {
-    if (!n || n.nodeType !== 1) return null;
-    const cls = typeof n.className === 'string' ? n.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
-    const testId = n.getAttribute('data-testid');
-    return (n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (testId ? '[data-testid=' + testId + ']' : '') + (cls ? '.' + cls : '')).slice(0, 100);
-  };
-  watch('layout-shift', e => {
-    if (e.hadRecentInput) return;
-    window.__crawl.cls += e.value;
-    for (const s of e.sources ?? []) {
-      const k = label(s.node);
-      if (k) window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
-    }
-  });
-  watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
-  watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
-`;
-const MEASURE = `({ ...window.__crawl, text: document.body?.innerText ?? '',
-  overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
-
 const browser = await chromium.launch();
 const pages = [];
 const uncovered = [];
 const host = new URL(args.origin).host;
 
-async function visit({ route, target, viewport, identity, fixture, collect }) {
+async function openContext({ viewport, identity }) {
   const ctx = await browser.newContext({
     viewport: VIEWPORTS[viewport],
     ...(identity === 'signed-in'
       ? { storageState: args['storage-state'] }
       : {}),
   });
-  await ctx.addInitScript(OBSERVE);
   if (BYPASS)
     await ctx.route(
       u => u.host === host,
@@ -141,6 +124,12 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
           },
         })
     );
+  return ctx;
+}
+
+async function visit({ route, target, viewport, identity, fixture, collect }) {
+  const ctx = await openContext({ viewport, identity });
+  await ctx.addInitScript(OBSERVE);
   const page = await ctx.newPage();
   const consoleErrors = [];
   const failedRequests = [];
@@ -152,7 +141,13 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       thirdPartyConsole += 1;
       return;
     }
-    consoleErrors.push(m.text().slice(0, 200));
+    // Chrome leaves the address out of a failed load's text; add its path.
+    const at = m.location()?.url;
+    const path =
+      at && /^Failed to load resource/.test(m.text())
+        ? ` (${new URL(at).pathname})`
+        : '';
+    consoleErrors.push((m.text() + path).slice(0, 200));
   });
   page.on('pageerror', e => consoleErrors.push(String(e).slice(0, 200)));
   page.on('response', r => {
@@ -189,11 +184,27 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
     row.clsSources = Object.entries(m.shifts ?? {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([node, value]) => ({ node, value: Number(value.toFixed(4)) }));
+      .map(([node, value]) => ({
+        node,
+        value: Number(value.toFixed(4)),
+      }))
+      .map(s => {
+        const { added, ...move } = m.moves?.[s.node] ?? {};
+        const cause = causeOf(added, move.atMs);
+        return cause
+          ? {
+              ...s,
+              ...move,
+              after: { node: cause.node, h: cause.h, atMs: cause.atMs },
+            }
+          : { ...s, ...move };
+      });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
+    if (m.frame) row.frame = m.frame;
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
+    row.overlaySurface = m.overlaySurface;
     if (row.expectClaimBanner) row.claimBanner = CLAIM_BANNER.test(m.text);
     row.consoleErrors = [...new Set(consoleErrors)];
     row.thirdPartyConsole = thirdPartyConsole;
@@ -275,6 +286,7 @@ const samples = sample();
 
 const todo = [];
 for (const route of routes) {
+  if (!inShard(route, shard)) continue;
   let target = concrete(route);
   if (!target) {
     const cover = coverRoute(route, samples, { signedIn, sitemapProblem });
@@ -356,6 +368,11 @@ for (const [k, row] of suspects.entries()) {
   row.longestTaskSamplesMs = all.map(r => r.longestTaskMs);
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
+  // Name the scripts from the load the reported stall came from.
+  const at = row.longestTaskSamplesMs.indexOf(row.longestTaskMs);
+  const frame = all[at]?.frame;
+  if (frame) row.frame = frame;
+  else delete row.frame;
 }
 // A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
 const throttled = pages.filter(wasThrottled);
@@ -378,6 +395,17 @@ if (throttleRechecksLeft)
   console.warn(
     `[crawl] ${throttleRechecksLeft} rate-limited pages judged without a quiet reload`
   );
+// Interaction walks on the pages that have a sidebar or hover triggers.
+const overlayWalks = await runOverlayWalks({
+  pages,
+  origin: args.origin,
+  out: args.out,
+  openContext,
+  pastDeadline,
+  skip: skipSignedIn,
+  // Each shard walks its own pages; together they walk about one crawl's worth.
+  max: Math.max(1, Math.ceil(MAX_WALKS_PER_IDENTITY / shard.count)),
+});
 await browser.close();
 
 const receipt = {
@@ -385,12 +413,16 @@ const receipt = {
   origin: args.origin,
   sha: args.sha || null,
   at: new Date().toISOString(),
-  routes,
+  shard,
+  signedIn,
+  // A shard owns only its routes; merge-receipts.mjs unions them back.
+  routes: routes.filter(r => inShard(r, shard)),
   samples: Object.fromEntries(samples),
   sitemapProblem,
   uncovered,
   closedInProduction,
   outOfTime: loadsLeft || resamplesLeft ? { loadsLeft, resamplesLeft } : null,
+  overlayWalks,
   pages,
 };
 const verdict = productReady(receipt);
@@ -404,38 +436,7 @@ await writeFile(
   JSON.stringify(verdict, null, 1)
 );
 
-const byKind = {};
-for (const f of verdict.findings) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
-const lines = [
-  `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
-  '',
-  `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
-  '',
-  `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
-  '',
-  `Findings by kind: ${
-    Object.entries(byKind)
-      .map(([k, n]) => `${k} ${n}`)
-      .join(', ') || 'none'
-  }`,
-  '',
-  ...Object.keys(byKind).flatMap(kind => {
-    const rows = rankFindings(verdict.findings).filter(f => f.kind === kind);
-    return [
-      '',
-      `### ${kind} (${rows.length})`,
-      '',
-      '| route | viewport | detail |',
-      '| --- | --- | --- |',
-      ...rows
-        .slice(0, 25)
-        .map(
-          f =>
-            `| ${f.route} | ${f.viewport} | ${f.detail.replaceAll('|', '/').replaceAll('\n', ' ')} |`
-        ),
-    ];
-  }),
-];
+const lines = summaryLines(receipt, verdict);
 await writeFile(join(args.out, 'summary.md'), lines.join('\n'));
 console.log(lines.join('\n'));
 // Every finding, one JSON line each, so the full list survives in the job log.
@@ -444,5 +445,9 @@ for (const f of rankFindings(verdict.findings))
 for (const p of pages.filter(x => !x.error && !x.authGated))
   console.log(
     `crawl-page ${JSON.stringify({ route: p.route, url: p.url, identity: p.identity, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+  );
+for (const w of overlayWalks.walks)
+  console.log(
+    `crawl-walk ${JSON.stringify({ route: w.route, url: w.url, identity: w.identity, rail: w.rail, opened: w.opened, steps: w.steps?.length, orphaned: w.steps?.filter(s => s.orphans).length, error: w.error })}`
   );
 // The crawl reports; ready-gate.mjs decides. Exit 0 so the receipt uploads.

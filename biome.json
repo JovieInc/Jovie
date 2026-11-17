@@ -62,7 +62,10 @@
         "noDistractingElements": "error",
         "noHeaderScope": "error",
         "noInteractiveElementToNoninteractiveRole": "error",
-        "noLabelWithoutControl": "error",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": { "inputComponents": ["HostDrawnInput"] }
+        },
         "noNoninteractiveElementInteractions": "error",
         "noNoninteractiveElementToInteractiveRole": "error",
         "noNoninteractiveTabindex": "error",

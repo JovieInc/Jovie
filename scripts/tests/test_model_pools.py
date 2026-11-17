@@ -99,8 +99,6 @@ class RuntimeGuardTest(unittest.TestCase):
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
     def test_allowed_commands_pass_and_name_their_pool(self):
-        self.assertEqual(pools.command_guard(["python3", "/release/claude_lane.py", "run", "--model", "claude-opus-5-5"],
-                                             table=TABLE, state_dir=self.state), "claude-subscription")
         self.assertEqual(pools.command_guard(["hyperagent", "execute", "--model=fable-5.1", "-p", "x"],
                                              table=TABLE, state_dir=self.state), "hyperagent")
         self.assertEqual(self.refusals(), [])
@@ -215,7 +213,7 @@ class BalanceTest(unittest.TestCase):
                 {"lane": "hyperagent", "pool": "hyperagent", "expiry": pools.pool_expiry("hyperagent", NOW, registry=self.REGISTRY)}]
         self.assertEqual(pools.choose(rows)[0]["lane"], "hyperagent")
         rows[0]["expiry"] = pools.pool_expiry("claude-subscription", NOW, claude_state={"runs": [{"at": NOW - 3600}]})
-        self.assertEqual(pools.choose(rows)[0]["lane"], "claude")  # an open window (4h left) is lost before midnight UTC
+        self.assertEqual(pools.choose(rows)[0]["lane"], "hyperagent")  # expiry cannot authorize the protected pool
 
     def test_hyperagent_expiry_is_the_daily_cap_day_then_the_credit_expiry(self):
         seen = pools.pool_expiry("hyperagent", NOW, registry=self.REGISTRY)
@@ -243,24 +241,20 @@ class BalanceTest(unittest.TestCase):
         return pools.balanced(decision, providers, lambda lane: pools.pool_expiry(
             pools.pool_for_lane(providers[lane], TABLE), now, claude_state=claude_state, registry=self.REGISTRY), TABLE)
 
-    def test_router_takes_the_pool_that_expires_first(self):
+    def test_protected_pool_is_not_spent_even_when_its_window_expires_first(self):
         providers = {"claude": claude_lane(), "hyperagent": hyperagent_lane()}
-        idle = self.route(providers, NOW)
-        self.assertEqual((idle["chosen"]["lane"], idle["pool"]["considered"][-1]["basis"]),
-                         ("hyperagent", "claude-lane-window-not-open"))  # no open window, nothing to lose on Claude
-        midday = self.route(providers, NOW, claude_state={"runs": [{"at": NOW - 3600}]})
-        self.assertEqual(midday["chosen"]["lane"], "claude")  # the open 5h window ends before the UTC day does
-        self.assertEqual(midday["pool"]["rule"], "earliest-expiry")
-        self.assertEqual(midday["pool"]["chosenPool"], "claude-subscription")
-        self.assertEqual([row["pool"] for row in midday["pool"]["considered"]], ["claude-subscription", "hyperagent"])
-        late = self.route(providers, datetime(2026, 11, 11, 22, 0, tzinfo=timezone.utc).timestamp())
-        self.assertEqual((late["chosen"]["lane"], late["chosen"]["costClass"], late["chosen"]["alias"]),
-                         ("hyperagent", "subsidized", None))  # the day's Hyperagent runs are lost at 00:00 UTC
-        self.assertEqual(late["pool"]["chosenPool"], "hyperagent")
-        self.assertIn("pool hyperagent expires first (was claude/claude-opus-5-5)", late["rationale"])
+        for now, state in ((NOW, None), (NOW, {"runs": [{"at": NOW - 3600}]}),
+                           (datetime(2026, 11, 11, 22, 0, tzinfo=timezone.utc).timestamp(), None)):
+            with self.subTest(now=now, state=state):
+                result = self.route(providers, now, claude_state=state)
+                self.assertEqual(result["chosen"]["lane"], "hyperagent")
+                self.assertEqual(result["pool"]["rule"], "single-pool")
+                self.assertEqual([row["pool"] for row in result["pool"]["considered"]], ["hyperagent"])
 
     def test_a_moved_choice_records_the_metrics_of_the_lane_that_runs(self):
-        providers = {"claude": claude_lane(), "hyperagent": hyperagent_lane()}
+        providers = {"codex": {"tier": 1, "model": "codex-default", "accountClass": "chatgpt-oauth",
+                               "routes": [{"model": "codex-default", "capability": "frontier", "cost": 1}]},
+                     "hyperagent": hyperagent_lane()}
         late = datetime(2026, 11, 11, 22, 0, tzinfo=timezone.utc).timestamp()
         moved = self.route(providers, late, claude_state={"runs": [{"at": late - 60}]}, availability=lambda lane, _route: {
             "ok": True, "why": "ok", "pressure": 0.4 if lane == "hyperagent" else 0.1})
@@ -281,8 +275,8 @@ class BalanceTest(unittest.TestCase):
         gateway = {"tier": 0, "model": "anthropic/claude-opus-5.5", "accountClass": "vercel-ai-gateway",
                    "cmd": ["fx", "ask", "--model", "anthropic/claude-opus-5.5"],
                    "routes": [{"model": "anthropic/claude-opus-5.5", "capability": "frontier", "costClass": "api", "cost": 0.1}]}
-        decision = self.route({"gateway": gateway, "claude": claude_lane()}, NOW)
-        self.assertEqual(decision["chosen"]["lane"], "claude")
+        decision = self.route({"gateway": gateway, "hyperagent": hyperagent_lane()}, NOW)
+        self.assertEqual(decision["chosen"]["lane"], "hyperagent")
         refused = next(row for row in decision["candidates"] if row["lane"] == "gateway")
         self.assertEqual((refused["available"], refused["why"]), (False, "model-pool-refused"))
         held = self.route({"gateway": gateway}, NOW)
@@ -298,8 +292,8 @@ class BalanceTest(unittest.TestCase):
             {"frontier": {"labels": ["route:frontier"]}}, lambda _lane, _route: {"ok": True, "why": "ok", "pressure": 0})
         with tempfile.TemporaryDirectory() as tmp:
             routed = lane_runner.pool_routed(SimpleNamespace(state=Path(tmp)), decision, providers)
-        self.assertEqual(routed["pool"]["rule"], "earliest-expiry")
-        self.assertIn(routed["pool"]["chosenPool"], ("claude-subscription", "hyperagent"))
+        self.assertEqual(routed["pool"]["rule"], "single-pool")
+        self.assertEqual(routed["pool"]["chosenPool"], "hyperagent")
         spec = {**providers[routed["chosen"]["lane"]], "route": routed}
         self.assertEqual(pools.receipt(spec, routed["pool"], TABLE)["balance"]["chosenPool"], routed["pool"]["chosenPool"])
         self.assertEqual(pools.receipt(spec, routed["pool"], TABLE)["pool"], routed["pool"]["chosenPool"])
@@ -411,6 +405,7 @@ class BalanceTest(unittest.TestCase):
         decision = self.route(providers, NOW)
         self.assertEqual(decision["chosen"]["lane"], "grok")
         self.assertNotIn("pool", decision)
+
 
 
 if __name__ == "__main__":

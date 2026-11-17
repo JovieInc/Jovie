@@ -449,8 +449,13 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(45);
+    expect(LANES_PYTEST_FILES).toHaveLength(52);
+    expect(whole).toContain('scripts/tests/test_revert_first.py');
+    expect(whole).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(whole).toContain('scripts/tests/test_reason_publication.py');
+    expect(whole).toContain('scripts/tests/test_pr_events_blast_radius.py');
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
+    expect(whole).toContain('scripts/tests/test_pr_events_red_repair.py');
     expect(whole).toContain('scripts/tests/test_pr_body_markup.py');
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
@@ -461,7 +466,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_cloud_lane.py');
     expect(command).toContain(
-      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+      'coverage report --include="*/scripts/lanes/cloud_lane*.py" --fail-under=90'
     );
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
@@ -733,7 +738,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ]);
   });
 
-  it('selects the desktop updater geometry proof for modal changes', () => {
+  it('selects the desktop updater geometry proofs for modal and control changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -746,6 +751,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
       'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.stories.tsx',
+      'apps/web/lib/desktop/desktop-update-control-state.ts',
+      'apps/web/tests/e2e/storybook-desktop-update-control.spec.ts',
     ]) {
       expect(
         spawnSync('grep', ['-qE', pattern ?? 'a^'], {
@@ -767,9 +776,71 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain(
       'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
     );
-    expect(
-      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
-    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)'
+    );
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-modal.spec.ts'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-control.spec.ts'
+    );
+  });
+
+  it('selects the account surface captures for the menu, banner and footer', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /ACCOUNT_SURFACE_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'packages/ui/atoms/inset-panel.tsx',
+      'packages/ui/atoms/inset-panel.stories.tsx',
+      'packages/ui/lib/inset-panel-styles.ts',
+      'apps/web/components/organisms/user-button/UserButton.tsx',
+      'apps/web/components/organisms/user-button/UserButton.stories.tsx',
+      'apps/web/components/organisms/user-button/UsageMenuItem.tsx',
+      'apps/web/components/organisms/user-button/account-loading-fill.ts',
+      'apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.tsx',
+      'apps/web/components/shell/SidebarDock.tsx',
+      'apps/web/components/shell/SidebarDock.stories.tsx',
+      'apps/web/components/shell/SidebarDockCards.tsx',
+      'apps/web/tests/e2e/storybook-account-surface.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    for (const path of [
+      'apps/web/components/organisms/Other.tsx',
+      'apps/web/components/shell/SidebarDockBridge.tsx',
+      'packages/ui/atoms/kbd.tsx',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).not.toBe(0);
+    }
+    expect(remaining).toContain(
+      'RUN_ACCOUNT_SURFACE: ${{ steps.storybook-browser.outputs.account_surface }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-account-surface.spec.ts)'
+    );
   });
 
   it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
@@ -1319,7 +1390,11 @@ describe('ci-fast bounded parallel workflow', () => {
     const outPath = join(repo, 'ci-fast-lanes.json');
     const changedPath = join(repo, relativePath);
     const runGit = args =>
-      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      });
     try {
       mkdirSync(binDir, { recursive: true });
       mkdirSync(dirname(changedPath), { recursive: true });
@@ -1424,7 +1499,11 @@ describe('ci-fast bounded parallel workflow', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-selector-mismatch-'));
     const outPath = join(repo, 'ci-fast-lanes.json');
     const runGit = args =>
-      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      });
     try {
       expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
       expect(
@@ -2133,7 +2212,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs scripts/ci-trigger-budget.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
@@ -2525,6 +2604,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toMatch(
       /^readonly SHELLCHECK_IMAGE='koalaman\/shellcheck@sha256:[0-9a-f]{64}'$/m
     );
+    expect(script).toContain(
+      'sha_ok "$VENDORED_QUEUE_PATCH" "$ACTIONLINT_QUEUE_PATCH_SHA256"'
+    );
+    expect(script).toContain('vendored queue patch sha256 mismatch');
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
@@ -3272,7 +3355,11 @@ describe('CI diff selection on a divergent PR', () => {
   it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
     const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repository,
+        encoding: 'utf8',
+      }).trim();
     const select = (event, base = '') => {
       vi.stubEnv('GITHUB_EVENT_NAME', event);
       vi.stubEnv('GITHUB_BASE_REF', 'main');
@@ -3359,7 +3446,11 @@ describe('CI filename argv boundary (JOV-7573)', () => {
   function makeRepo(files) {
     const repository = mkdtempSync(join(tmpdir(), 'ci-argv-boundary-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repository, encoding: 'utf8' });
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repository,
+        encoding: 'utf8',
+      });
     git('init', '-b', 'main');
     git('config', 'user.name', 'CI test');
     git('config', 'user.email', 'ci-test@example.invalid');
@@ -3582,6 +3673,7 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
     expect(() => new RegExp(line), line).not.toThrow();
   }
   const selected = execFileSync('git', ['ls-files'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: REPO_ROOT,
     encoding: 'utf8',
   })

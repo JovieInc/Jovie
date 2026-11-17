@@ -30,8 +30,9 @@ RED_RUNS = [run(RED, "failure", rid=3, at="2026-11-11T10:05:00Z"), run(GREEN, "s
 
 class Fake:
     def __init__(self, runs, *, log=f"{RED}\x1fitstimwhite\x1f{SUBJECT}", reverts=(), culprit_pr=None,
-                 conflict=False):
+                 conflict=False, reverted_log="", existing_pr=()):
         self.runs, self.log, self.reverts, self.conflict = runs, log, list(reverts), conflict
+        self.reverted_log, self.existing_pr = reverted_log, list(existing_pr)
         self.culprit_pr = culprit_pr or {"labels": [], "body": ""}
         self.gh_calls, self.git_calls = [], []
 
@@ -42,6 +43,8 @@ class Fake:
             return json.dumps({"workflow_runs": self.runs})
         if path and "labels=main-red-revert" in path:
             return json.dumps(self.reverts)
+        if path and "pulls?head=" in path:
+            return json.dumps(self.existing_pr)
         if path and path.startswith("repos/JovieInc/Jovie/issues/"):
             return json.dumps(self.culprit_pr)
         if args[:4] == ["api", "-X", "POST", "repos/JovieInc/Jovie/pulls"]:
@@ -51,7 +54,7 @@ class Fake:
     def git(self, *args):
         self.git_calls.append(args)
         if args[0] == "log":
-            return self.log
+            return self.reverted_log if any(str(a).startswith("--grep=") for a in args) else self.log
         if args[:2] == ("revert", "--no-edit") and self.conflict:
             raise subprocess.CalledProcessError(1, "git revert")
         return ""
@@ -116,6 +119,30 @@ class OpenRevertTest(unittest.TestCase):
         self.assertEqual(main(fake)["decision"], {"action": "alert", "reason": "attempt-cap"})
         self.assertEqual(fake.writes(), [])
 
+    def test_a_culprit_whose_revert_already_merged_is_not_reverted_again(self):
+        # Seer review on #25020: still red after the revert merged; the streak's first red push is unchanged.
+        fake = Fake(RED_RUNS, reverted_log=f"{'c' * 40}\x1frevert(main-red): new tier copy (#24100) (#25050)")
+        result = main(fake)
+        self.assertEqual(result["decision"], {"action": "alert", "reason": "culprit-already-reverted-needs-bisect"})
+        self.assertIn(("log", "--format=%H%x1f%s", "-F", f"--grep={RED}", "--grep=(#24100)", f"{RED}..origin/main"),
+                      fake.git_calls)
+        self.assertEqual(fake.writes(), [])
+
+    def test_a_mention_that_is_not_a_revert_does_not_count(self):
+        fake = Fake(RED_RUNS, reverted_log=f"{'c' * 40}\x1fdocs: note on new tier copy (#24100) (#25060)")
+        self.assertEqual(main(fake)["decision"]["action"], "open-revert")
+
+    def test_a_revert_pr_left_unlabelled_is_reused_not_reopened(self):
+        # Seer review on #25020: the PR was created but the label call failed, so open_reverts (label filter) misses
+        # it; the next wake must label the open PR on that head branch instead of a POST that 422s.
+        fake = Fake(RED_RUNS, existing_pr=[{"number": 25050, "created_at": "2026-11-11T10:09:00Z"}])
+        result = main(fake)
+        writes = fake.writes()
+        self.assertFalse(any(w[:4] == ["api", "-X", "POST", "repos/JovieInc/Jovie/pulls"] for w in writes))
+        self.assertEqual(writes[0][:4], ["api", "-X", "POST", "repos/JovieInc/Jovie/issues/25050/labels"])
+        self.assertEqual(writes[1], ["workflow", "run", "merge-queue-green-enroll.yml", "-f", "pr_number=25050"])
+        self.assertEqual(result["revert"]["pr"], 25050)
+
 
 class NoMutationTest(unittest.TestCase):
     def test_plan_and_dry_mode_never_write(self):
@@ -124,7 +151,7 @@ class NoMutationTest(unittest.TestCase):
                 fake = Fake(RED_RUNS)
                 main(fake, command, mode)
                 self.assertEqual(fake.writes(), [])
-                self.assertEqual([c[0] for c in fake.git_calls], ["log"])
+                self.assertEqual({c[0] for c in fake.git_calls}, {"log"})
 
     def test_a_time_bomb_on_an_unchanged_commit_reverts_nothing(self):
         fake = Fake([run(GREEN, "failure", event="workflow_dispatch", rid=4), run(GREEN, "success")])

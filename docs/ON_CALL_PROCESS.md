@@ -117,7 +117,9 @@ tell us when something real breaks.
 when either is true:
 
 - more than 3 consecutive failed runs, or
-- more than 24 hours since the last green run.
+- red for more than 24 hours, counted from the streak's first failed run (not
+  from the last green run, which for a daily or weekly monitor is a cadence
+  ago).
 
 A monitor whose newest run is green is never red, however long ago it last
 ran. Skipped and cancelled runs carry no verdict.

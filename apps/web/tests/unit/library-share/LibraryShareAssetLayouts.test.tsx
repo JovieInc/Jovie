@@ -34,6 +34,18 @@ describe('LibraryShareAssetLayouts', () => {
     expect(image).not.toHaveClass('object-cover');
   });
 
+  it('writes the release type eyebrow in sentence case, never forced caps', () => {
+    render(
+      <LibraryShareAssetCard
+        asset={asset}
+        downloadsEnabled={false}
+        layout='list'
+      />
+    );
+    const eyebrow = screen.getByText('Single');
+    expect(eyebrow).not.toHaveClass('uppercase');
+  });
+
   it('uses the banned-icon-safe AudioLines glyph without artwork', () => {
     const { container } = render(
       <LibraryShareAssetCard

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# api-budget: github-app-core 60/hr - estimate: 12 Main Health wakes/hr x 4 REST reads; a revert (4 writes) is exceptional.
+# api-budget: github-app-core 60/hr - estimate: 12 Main Health wakes/hr x 4 REST reads; a revert (1 read, 4 writes) is exceptional.
 # api-budget: github-actions-token 60/hr - the same calls, only when the Jovie Bot installation bucket is exhausted.
 """Open the revert for a culprit commit Main Health named (revert first, canon/MERGE_QUEUE_STEWARD.md).
 
@@ -76,6 +76,21 @@ def commit_range(io: Io, green: str, red: str) -> list[dict] | None:
             for sha, author, subject in rows]
 
 
+def reverted_on_main(io: Io, culprit: dict) -> str | None:
+    """The revert commit on origin/main after `culprit` (ours says `Reverts <sha>`, git's `This reverts commit
+    <sha>`, a squash title keeps `(#<pr>)`), or None."""
+    needles = [str(culprit["sha"])] + ([f"(#{culprit['pr']})"] if culprit.get("pr") else [])
+    try:
+        out = io.git("log", "--format=%H%x1f%s", "-F", *[f"--grep={n}" for n in needles], f"{culprit['sha']}..origin/main")
+    except subprocess.CalledProcessError:
+        return None
+    for line in out.splitlines():
+        sha, _, subject = line.partition("\x1f")
+        if sha.strip() and rf.is_revert(subject):
+            return sha.strip()
+    return None
+
+
 def open_reverts(io: Io) -> list[dict]:
     issues = io.api(f"repos/{REPO}/issues?labels={rf.REVERT_LABEL}&state=open&per_page=50") or []
     return [{"number": i["number"], **(rf.read_marker(i.get("body")) or {})} for i in issues if i.get("pull_request")]
@@ -93,6 +108,8 @@ def plan(io: Io, mode: str) -> dict:
         pr = io.api(f"repos/{REPO}/issues/{culprit['pr']}") or {}
         culprit["labels"] = [label.get("name") for label in pr.get("labels") or []]
         culprit["priorAttempts"] = (rf.read_marker(pr.get("body")) or {}).get("attempt", 0)
+    if culprit and culprit.get("sha"):
+        culprit["revertedBy"] = reverted_on_main(io, culprit)
     reverts = open_reverts(io)
     return {"attribution": attribution, "openReverts": reverts,
             "decision": rf.decide(attribution, open_reverts=reverts, mode=mode)}
@@ -128,8 +145,14 @@ def open_revert(io: Io, p: dict) -> dict:
         return {"opened": False, "reason": "revert-conflict", "plan": r}
     io.git("commit", "--amend", "-m", r["commitMessage"])
     io.git("push", "--force-with-lease", "origin", r["branch"])
-    pr = json.loads(io.gh(["api", "-X", "POST", f"repos/{REPO}/pulls", "-f", f"title={r['title']}", "-f",
-                           f"head={r['branch']}", "-f", "base=main", "-f", f"body={r['body']}"], "merge"))
+    # An earlier wake may have opened this PR and then failed to label it (open_reverts filters by label): reuse it
+    # rather than a POST that 422s on the same head branch.
+    existing = io.api(f"repos/{REPO}/pulls?head={REPO.split('/')[0]}:{r['branch']}&state=open&per_page=1")
+    if isinstance(existing, list) and existing:
+        pr = existing[0]
+    else:
+        pr = json.loads(io.gh(["api", "-X", "POST", f"repos/{REPO}/pulls", "-f", f"title={r['title']}", "-f",
+                               f"head={r['branch']}", "-f", "base=main", "-f", f"body={r['body']}"], "merge"))
     io.gh(["api", "-X", "POST", f"repos/{REPO}/issues/{pr['number']}/labels",
            *[arg for label in r["labels"] for arg in ("-f", f"labels[]={label}")]], "merge")
     # Green Enroll is the only queue writer; it jumps `compounding` PRs once their checks are green.

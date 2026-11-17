@@ -16,7 +16,7 @@ import {
 } from './lib/blog-content-ci.mjs';
 
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
-import { ONBOARDING_TEST_PRODUCERS } from './lib/onboarding-test-producers.mjs';
+import { KNOWN_VITEST_FIXTURE_PRODUCERS } from './lib/onboarding-test-producers.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -102,7 +102,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
-  ...ONBOARDING_TEST_PRODUCERS,
+  ...KNOWN_VITEST_FIXTURE_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
@@ -348,7 +348,6 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -1190,6 +1189,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'pr_events',
     'remediation',
     'reason_lane',
+    'reason_dispatch',
+    'reason_publication',
     'doctor',
     'hud',
     'disk_guard',
@@ -2780,10 +2781,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')

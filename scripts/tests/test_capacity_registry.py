@@ -370,6 +370,7 @@ class CoordinationRules(unittest.TestCase):
         self.assertLess(order.index("xai-grok"), order.index("openai-codex"))
         self.assertLess(order.index("openai-codex"), order.index("hyperagent"))
         self.assertNotIn("kimi", order)
+        self.assertNotIn("anthropic-claude", order)
 
     def test_live_row_overrides_the_snapshot_only_when_newer(self):
         account = {"quota": {"remainingPercent": 43, "observedAt": "2026-10-25T00:38:35Z"}}

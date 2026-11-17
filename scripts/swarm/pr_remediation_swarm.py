@@ -32,7 +32,7 @@ from apiclient.gh import run_gh  # noqa: E402
 SCHEMA = "jovie-remediation-swarm/v1"
 HOST = "gha-swarm"
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
-CLAIM_TTL_S = 2 * 3600
+CLAIM_TTL_S = 60 * 60  # same TTL as scripts/lanes/pr_events.py CLAIM_TTL_S
 RECENT_PUSH_S = 20 * 60
 LABEL = "lane-fix-red"
 CONFLICT_LABEL = "lane-fix-conflict"
@@ -436,7 +436,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
-    elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN}:
+    elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN, classes.BIOME_FORMAT}:
         skip = "deterministic-unsupported->lanes"
     elif action == classes.AGENT:
         if cls["cls"] in NOT_MODEL_FIXABLE:

@@ -15,9 +15,23 @@ export interface CustomerIngestionRecoveryReceipt {
   readonly checkedAt: string;
 }
 
+/**
+ * A story may answer the action itself (a pending or rejected request) by
+ * setting this hook; it must remove the hook when the story unmounts.
+ */
+export type RerunCustomerIngestionStoryMock = (
+  formData: FormData
+) => Promise<CustomerIngestionRecoveryReceipt>;
+
 export async function rerunCustomerIngestionAction(
-  _formData: FormData
+  formData: FormData
 ): Promise<CustomerIngestionRecoveryReceipt> {
+  const storyMock = (
+    globalThis as {
+      __jovieRerunIngestionMock?: RerunCustomerIngestionStoryMock;
+    }
+  ).__jovieRerunIngestionMock;
+  if (storyMock) return storyMock(formData);
   return {
     state: 'requested',
     queuedCount: 2,

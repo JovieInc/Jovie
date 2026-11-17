@@ -30,12 +30,6 @@ const FORBIDDEN_GMAIL_MUTATION_ENDPOINT =
 const NON_GET_METHOD = /\bmethod\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i;
 
 describe('Gmail connector: read-only surface', () => {
-  it('gmail connector directory exists or is absent (C-PR-2 not yet merged)', () => {
-    // This test always passes — it documents the expected state.
-    // If the directory exists, the next test will scan it.
-    expect(true).toBe(true);
-  });
-
   it('no module in apps/web/lib/connectors/gmail/** exports a function named "send"', () => {
     const dirToCheck = existsSync(GMAIL_DIR)
       ? GMAIL_DIR

@@ -25,3 +25,250 @@ console.log(JSON.stringify([
     problems = json.loads(checked.stdout)
     if problems:
         raise ValueError("measured win policy: " + "; ".join(problems))
+
+
+GUARD = ".github/workflows/company-guards.yml"
+CERT = ".github/workflows/public-app-certification.yml"
+ONE_PIN = "company guard Win requires one modified workflow pin"
+GUARD_CLAIM = "Bring the shared company guard pin up to the verified upstream target."
+BOTH_CLAIM = (
+    "Bring the shared company guard and public-app certification pins up to the verified upstream target."
+)
+MACHINE_FILES = frozenset({
+    "scripts/lanes/repair_win.py",
+    "scripts/lanes/fix_red_measured_win.py",
+    "scripts/lanes/fix_red_mixed_repairs.py",
+    "scripts/lanes/fix_red_compose.py",
+    "scripts/lanes/fix_red_classes.py",
+    "scripts/tests/test_repair_win.py",
+    "scripts/tests/test_fix_red_classes.py",
+    "scripts/tests/test_fix_red_mixed_repairs.py",
+    "scripts/tests/test_fix_red_compose.py",
+})
+_CERT_USES = re.compile(
+    r"^([+-])    uses: JovieInc/ci/\.github/workflows/public-app-certification\.yml@([0-9a-f]{40})\Z")
+_CERT_REF = re.compile(r"^([+-])      ci-ref: ([0-9a-f]{40})\Z")
+
+
+def _forward_count(comparison, old: str, new: str, message: str) -> int:
+    url = f"https://github.com/JovieInc/ci/compare/{old}...{new}"
+    count = comparison.get("ahead_by")
+    commits = comparison.get("commits")
+    if (comparison.get("html_url") != url or comparison.get("status") != "ahead"
+            or type(count) is not int or count <= 0
+            or type(comparison.get("behind_by")) is not int or comparison["behind_by"] != 0
+            or type(comparison.get("total_commits")) is not int or comparison["total_commits"] != count
+            or (comparison.get("base_commit") or {}).get("sha") != old
+            or (comparison.get("merge_base_commit") or {}).get("sha") != old
+            or not isinstance(commits, list) or len(commits) != count
+            or any(not isinstance(commit, dict) or not isinstance(commit.get("sha"), str)
+                   or not re.fullmatch(r"[0-9a-f]{40}", commit["sha"]) for commit in commits)
+            or len({commit["sha"] for commit in commits}) != count
+            or commits[-1]["sha"] != new):
+        raise ValueError(message)
+    return count
+
+
+def _adopted_count(adopted, new: str, message: str) -> int:
+    if (not isinstance(adopted, dict)
+            or adopted.get("html_url") != f"https://github.com/JovieInc/ci/compare/{new}...{new}"
+            or adopted.get("status") != "identical"
+            or any(type(adopted.get(key)) is not int or adopted[key] != 0
+                   for key in ("ahead_by", "behind_by", "total_commits"))
+            or adopted.get("commits") != []
+            or any(not isinstance(adopted.get(key), dict) or adopted[key].get("sha") != new
+                   for key in ("base_commit", "merge_base_commit"))):
+        raise ValueError(message)
+    return adopted["ahead_by"]
+
+
+def _guard_pins(workflow: dict) -> tuple[str, str]:
+    patch = workflow.get("patch")
+    if not isinstance(patch, str):
+        raise ValueError("company guard pin patch unavailable")
+    changed = [line for line in patch.splitlines() if line.startswith(("+", "-"))]
+    pins = {}
+    for sign in ("-", "+"):
+        for marker in ("company-guards.yml@", "ci-ref: "):
+            matches = [re.fullmatch(re.escape(sign + "# " + marker) + r"([0-9a-f]{40})", line)
+                       for line in changed]
+            matches = [match.group(1) for match in matches if match]
+            if len(matches) != 1:
+                raise ValueError("company guard Win requires both exact old and new pins")
+            pins[sign, marker] = matches[0]
+    old, new = pins["-", "ci-ref: "], pins["+", "ci-ref: "]
+    if len(changed) != 4 or old == new or any(
+            pins[sign, "company-guards.yml@"] != pins[sign, "ci-ref: "] for sign in ("-", "+")):
+        raise ValueError("company guard workflow change is not a consistent pin-only bump")
+    return old, new
+
+
+def _cert_old(workflow: dict, new: str) -> str:
+    patch = workflow.get("patch")
+    if not isinstance(patch, str):
+        raise ValueError("public-app certification pin patch unavailable")
+    changed = [line for line in patch.splitlines() if line.startswith(("+", "-"))]
+    pins = {}
+    for line in changed:
+        uses, ref = _CERT_USES.fullmatch(line), _CERT_REF.fullmatch(line)
+        if uses is None and ref is None:
+            raise ValueError("public-app certification workflow change is not a consistent pin-only bump")
+        key = (uses.group(1), "uses") if uses else (ref.group(1), "ref")
+        if key in pins:
+            raise ValueError("public-app certification Win requires both exact old and new pins")
+        pins[key] = uses.group(2) if uses else ref.group(2)
+    needed = {("-", "uses"), ("+", "uses"), ("-", "ref"), ("+", "ref")}
+    if set(pins) != needed:
+        raise ValueError("public-app certification Win requires both exact old and new pins")
+    cert_old, cert_new = pins["-", "ref"], pins["+", "ref"]
+    if (len(changed) != 4 or cert_old == cert_new or cert_new != new
+            or pins["-", "uses"] != cert_old or pins["+", "uses"] != cert_new):
+        raise ValueError("public-app certification workflow change is not a consistent pin-only bump")
+    return cert_old
+
+
+def pin_revisions(files) -> tuple[str, str, str | None]:
+    """(old guard pin, new pin, old certification pin or None). Fails closed on any other diff."""
+    if not isinstance(files, list):
+        raise ValueError(ONE_PIN)
+    guards, certs = [], []
+    for file in files:
+        if not isinstance(file, dict):
+            raise ValueError(ONE_PIN)
+        name, status = file.get("filename"), file.get("status")
+        if name == GUARD:
+            guards.append(file)
+        elif name == CERT:
+            certs.append(file)
+        elif name in MACHINE_FILES and status in {"added", "modified"}:
+            continue
+        else:
+            raise ValueError(ONE_PIN)
+    if len(guards) != 1 or guards[0].get("status") != "modified":
+        raise ValueError(ONE_PIN)
+    if len(certs) > 1 or (certs and certs[0].get("status") != "modified"):
+        raise ValueError(ONE_PIN)
+    old, new = _guard_pins(guards[0])
+    return old, new, _cert_old(certs[0], new) if certs else None
+
+
+def _metric(name: str, count: int, after: int, old: str, new: str) -> str:
+    return (
+        f"- Metric: {name} | commits | lower | {count} | {after} | "
+        "GitHub compare API, old pin versus adopted target | "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by"
+    )
+
+
+def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison: dict,
+                      certification_comparison: dict | None = None,
+                      certification_adopted: dict | None = None) -> str:
+    """Generate a measured Win for a pin-only workflow edit, never a speed claim.
+
+    Pass fresh REST PR files and GitHub comparisons for OLD...NEW and NEW...NEW.
+    A modified public-app certification workflow needs its own pair of comparisons.
+    Feed the returned section to pr_events.repair_evidence_body(win_section=...).
+    The caller owns the GitHub read and exact-head binding; this helper does no I/O
+    except the existing canonical Win validation. Mismatched evidence fails closed.
+    """
+    old, new, cert_old = pin_revisions(files)
+    if (certification_comparison is not None or certification_adopted is not None) and cert_old is None:
+        raise ValueError("public-app certification comparison requires the certification workflow")
+    count = _forward_count(
+        comparison, old, new, "upstream comparison must completely match the workflow's forward pin bump")
+    after = _adopted_count(
+        adopted_comparison, new, "adopted target comparison must prove zero remaining commits at the new pin")
+    metrics = [_metric("upstream guard commits behind target", count, after, old, new)]
+    claim = GUARD_CLAIM
+    if cert_old is not None:
+        if certification_comparison is None or certification_adopted is None:
+            raise ValueError("public-app certification pin requires its own upstream comparison")
+        cert_count = _forward_count(
+            certification_comparison, cert_old, new,
+            "certification comparison must completely match the workflow's forward pin bump")
+        cert_after = _adopted_count(
+            certification_adopted, new,
+            "adopted certification comparison must prove zero remaining commits at the new pin")
+        metrics.append(_metric(
+            "upstream certification commits behind target", cert_count, cert_after, cert_old, new))
+        claim = BOTH_CLAIM
+    section = "\n".join([
+        "## Win", "", f"- Claim: {claim}", "- Area: ci", "- Theme: guard-freshness",
+        *metrics, f"- Verify: https://github.com/JovieInc/ci/compare/{old}...{new}", "",
+    ])
+    validate(section)
+    return section
+
+
+def dependabot_patch_ignores(before: dict, after: dict, *, before_sha: str, after_sha: str) -> str:
+    """Measure exact-name, unrestricted ignores for unchanged pnpm patches.
+
+    Snapshots contain parsed package.json (manifest) and dependabot.yml (config).
+    This proves configuration coverage, not updater runtime or elapsed savings.
+    """
+    if any(not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha)
+           for sha in (before_sha, after_sha)):
+        raise ValueError("Dependabot evidence requires exact Git revisions")
+    patches = before.get("manifest", {}).get("pnpm", {}).get("patchedDependencies")
+    if not isinstance(patches, dict) or not patches or patches != after.get(
+            "manifest", {}).get("pnpm", {}).get("patchedDependencies"):
+        raise ValueError("Dependabot evidence requires unchanged, nonempty patch mappings")
+    names = set()
+    for spec in patches:
+        match = re.fullmatch(r"((?:@[^/@]+/)?[^/@]+)@\d+\.\d+\.\d+(?:[-+][\w.-]+)?", spec)
+        if not match:
+            raise ValueError("Dependabot evidence requires exact-version patch keys")
+        names.add(match[1])
+
+    def uncovered(snapshot):
+        updates = snapshot.get("config", {}).get("updates", [])
+        roots = [row for row in updates if row.get("package-ecosystem") == "npm"
+                 and (row.get("directory") == "/" or "/" in row.get("directories", []))]
+        if len(roots) != 1:
+            raise ValueError("Dependabot evidence requires one root npm update policy")
+        ignored = {row.get("dependency-name") for row in roots[0].get("ignore", [])
+                   if not row.get("versions") and not row.get("update-types")}
+        return names - ignored
+
+    old, new = uncovered(before), uncovered(after)
+    if new:
+        raise ValueError("Dependabot ignores must fully cover patched packages: " + ", ".join(sorted(new)))
+    if not old:
+        raise ValueError("Dependabot evidence requires an observed improvement")
+    section = "\n".join([
+        "## Win", "",
+        "- Claim: Exclude every exact-version pnpm-patched package from root Dependabot version bumps.",
+        "- Area: ci", "- Theme: dependency-update-reliability",
+        f"- Metric: patched packages without unrestricted root Dependabot ignores | packages | lower | "
+        f"{len(old)} | {len(new)} | parsed Git configuration snapshots (not updater runtime) | "
+        f"python3 scripts/lanes/repair_win.py dependabot-patches {before_sha} {after_sha}",
+        f"- Verify: https://github.com/JovieInc/Jovie/compare/{before_sha}...{after_sha}", "",
+    ])
+    validate(section)
+    return section
+
+
+def dependabot_snapshot(sha: str) -> dict:
+    """Read immutable repository data; parse YAML with the installed repo parser."""
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("snapshot requires an exact Git revision")
+    def read(path):
+        return subprocess.check_output(["git", "show", f"{sha}:{path}"], cwd=ROOT, text=True)
+    yaml = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
+console.log(JSON.stringify(load(readFileSync(0, 'utf8'))));
+"""], cwd=ROOT, input=read(".github/dependabot.yml"), text=True, capture_output=True, check=True, timeout=10)
+    return {"manifest": json.loads(read("package.json")), "config": json.loads(yaml.stdout)}
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("kind", choices=["dependabot-patches"])
+    parser.add_argument("before_sha")
+    parser.add_argument("after_sha")
+    args = parser.parse_args()
+    print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
+                                  before_sha=args.before_sha, after_sha=args.after_sha), end="")
