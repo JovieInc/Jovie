@@ -473,4 +473,3 @@ def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
         pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
         seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
     return "\n".join(seen) + "\n"
-

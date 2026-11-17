@@ -73,5 +73,3 @@ class CommentedTestListMergeTest(unittest.TestCase):
         row = "  'scripts/a.test.mjs', // original\n"
         self.assertIsNone(classes.merge_additive_quoted_entries(row, row.replace('original', 'changed')))
         self.assertIsNone(classes.merge_additive_quoted_entries(row, "  'scripts/b.test.mjs', run()\n"))
-
-
