@@ -1,8 +1,9 @@
 import 'server-only';
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { artistRules } from '@/lib/db/schema/library-content-graph';
+import { type EnforcedArtistRule, MAX_PROMPT_ARTIST_RULES } from './gate';
 import type { ArtistRuleStrength, ArtistRuleView } from './types';
 
 function provenanceSource(
@@ -57,6 +58,36 @@ export async function listArtistRulesForProfile(
     .where(eq(artistRules.creatorProfileId, creatorProfileId))
     .orderBy(desc(artistRules.createdAt));
   return rules.map(toView);
+}
+
+/**
+ * Active, in-effect artist-wide rules the chat enforces for one profile.
+ * Release, channel and item scoped rules are a later slice.
+ */
+export async function listEnforcedArtistRules(
+  creatorProfileId: string,
+  now: Date = new Date()
+): Promise<EnforcedArtistRule[]> {
+  return db
+    .select({
+      id: artistRules.id,
+      category: artistRules.category,
+      ruleKey: artistRules.ruleKey,
+      instruction: artistRules.instruction,
+      strength: artistRules.strength,
+    })
+    .from(artistRules)
+    .where(
+      and(
+        eq(artistRules.creatorProfileId, creatorProfileId),
+        eq(artistRules.status, 'active'),
+        eq(artistRules.scope, 'artist'),
+        or(isNull(artistRules.effectiveAt), lte(artistRules.effectiveAt, now)),
+        or(isNull(artistRules.expiresAt), gt(artistRules.expiresAt, now))
+      )
+    )
+    .orderBy(desc(artistRules.createdAt))
+    .limit(MAX_PROMPT_ARTIST_RULES);
 }
 
 export async function createConfirmedArtistRule(input: {

@@ -236,6 +236,24 @@ describe('AuthShell canonical wiring', () => {
     expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
   });
 
+  it('keeps the header toggle hidden for an older preload bridge', () => {
+    sidebarMock.state = 'closed';
+    const bridge = Object.getOwnPropertyDescriptor(window, 'electronAPI');
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { versions: { app: 'old' } },
+    });
+    try {
+      renderAuthShell();
+      expect(
+        screen.queryByTestId('sidebar-rail-toggle')
+      ).not.toBeInTheDocument();
+    } finally {
+      if (bridge) Object.defineProperty(window, 'electronAPI', bridge);
+      else Reflect.deleteProperty(window, 'electronAPI');
+    }
+  });
+
   it('hydrates the collapsed Electron shell without replacing server content (JOV-7207)', async () => {
     sidebarMock.state = 'closed';
     const tree = (

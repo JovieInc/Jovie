@@ -22,7 +22,7 @@ import 'server-only';
  * @see @/lib/merch/service — selectMerchDesign (Phase B entry)
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
@@ -34,6 +34,8 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 import { resolveMerchCatalogSelection } from './catalog';
+import { resolveMerchConceptCount } from './concept-review';
+import { getMerchConceptFeedback } from './concept-review-store';
 import {
   MERCH_CONTENT_CONTRACT_VERSION,
   MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
@@ -47,13 +49,30 @@ import {
 } from './content-review';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import {
+  MERCH_DESIGN_STRATEGIES,
+  type MerchDesignStrategy,
+} from './design-strategies';
+import { persistMerchConceptPlan } from './generation-concepts';
+import {
   MERCH_CANONICAL_PIPELINE_ID,
   MERCH_GENERATION_CONTRACT_VERSION,
   type MerchGenerationReceipt,
 } from './generation-contract';
+import {
+  buildMerchGenerationFailureSummary,
+  captureMerchCatalogFallback,
+  captureMerchGenerationFailureOutcome,
+  classifyMerchGenerationFailure,
+  type MerchGenerationFailureClass,
+  type MerchGenerationStage,
+} from './generation-failures';
+import { persistUnrenderedMerchOption } from './generation-quarantine';
+import {
+  logMerchGenerationReceipt,
+  schedulePrintfulMockupEnrichment,
+} from './generation-receipts';
 import { generatePrintGraphic } from './graphic-engine';
 import { createGeneratedMerchArtwork } from './mockup-engine';
-import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import {
   buildMerchPricingSnapshot,
   calculateRecommendedSalePriceCents,
@@ -94,88 +113,7 @@ export async function resolveMerchGenerationPrerequisites<
   return { artistName, catalog, modelWeights };
 }
 
-/**
- * Each strategy deliberately occupies a different visual lane. Keep the
- * fields separate so adjective-only changes cannot collapse the options into
- * the same composition again.
- */
-export interface MerchDesignStrategy {
-  readonly label: string;
-  readonly composition: string;
-  readonly typographyRole: string;
-  readonly motifSystem: string;
-  readonly palette: string;
-  readonly density: string;
-}
-
-export const MERCH_DESIGN_STRATEGIES: readonly MerchDesignStrategy[] = [
-  {
-    label: 'Signal Field',
-    composition:
-      'an offset left-to-right signal field with one dominant graphic band and intentional open space',
-    typographyRole:
-      'artist name as a small signature line, with the verified source phrase as the primary readable type',
-    motifSystem:
-      'abstract pulse lines, register marks, and measured signal fragments only',
-    palette: 'ink black, bone, and one electric blue accent',
-    density: 'medium density with a clear quiet margin',
-  },
-  {
-    label: 'Archive Stamp',
-    composition:
-      'a compact centered archival seal with a broad empty outer field, not a poster layout',
-    typographyRole:
-      'verified source phrase set as small circular utility type, artist name as a secondary catalog credit',
-    motifSystem:
-      'abstract catalog notches, concentric rings, and a single geometric identifier',
-    palette: 'one-color charcoal print with no secondary accent',
-    density: 'minimal density with large negative space',
-  },
-  {
-    label: 'Night Transit',
-    composition:
-      'a wide horizontal transit strip across the lower third, leaving the upper field deliberately empty',
-    typographyRole:
-      'artist name as a wide wordmark, verified source phrase as a short route label beneath it',
-    motifSystem:
-      'abstract route geometry, timing ticks, and directional arrows without place names or dates',
-    palette: 'deep charcoal, silver gray, and restrained violet',
-    density: 'medium-high density confined to the lower strip',
-  },
-  {
-    label: 'Editorial Cut',
-    composition:
-      'a vertical editorial split with the image language concentrated in one narrow side column',
-    typographyRole:
-      'verified source phrase as the hero typographic crop, artist name as a small byline',
-    motifSystem:
-      'abstract crop marks, halftone texture, and one cut-paper shape',
-    palette: 'black, soft white, and one muted pink accent',
-    density: 'high contrast with controlled medium density',
-  },
-  {
-    label: 'Object Study',
-    composition:
-      'one isolated abstract object centered low on the canvas with a large unprinted field above',
-    typographyRole:
-      'artist name as compact utility type, verified source phrase as a caption adjacent to the object',
-    motifSystem:
-      'one non-figurative geometric object built from the source phrase initials, never a logo recreation',
-    palette: 'black and off-white only',
-    density: 'minimal density',
-  },
-  {
-    label: 'Type Stack',
-    composition:
-      'a tall stacked type system filling the center column with no illustrative scene',
-    typographyRole:
-      'verified source phrase and artist name share equal typographic weight in distinct lines',
-    motifSystem:
-      'simple rule lines and typographic spacing only, no icons or symbolic illustration',
-    palette: 'ink black with one restrained orange registration mark',
-    density: 'typography-dense but visually spare',
-  },
-];
+export { MERCH_DESIGN_STRATEGIES, type MerchDesignStrategy };
 
 function normalizedStrategyLabel(value: string): string {
   return value.trim().toLocaleLowerCase();
@@ -258,7 +196,7 @@ export function buildMerchImagePrompt(
     `Motif system: ${strategy.motifSystem}.`,
     `Palette: ${strategy.palette}. Density: ${strategy.density}.`,
     recentLine,
-    'Print-ready artwork only, no garment and no mockup. Render no text beyond the verified source phrase and artist name. Do not depict people, faces, portraits, models, bodies, or human figures. Do not invent, imitate, or imply the artist likeness. Do not recreate logos, trademarks, lyrics, catalog facts, place names, or tour dates from a textual description.',
+    'Illustration layer only, no garment and no mockup. Do not render text, names, lettering, logos, marks, dates, or positioning guides. Exact approved typography and marks require a separate deterministic composition stage. Do not depict people, faces, portraits, models, bodies, or human figures. Do not invent, imitate, or imply the artist likeness. Do not recreate logos, trademarks, lyrics, catalog facts, place names, or tour dates from a textual description.',
   ]
     .filter(Boolean)
     .join(' ');
@@ -297,7 +235,10 @@ async function resolveGenerationPricing(prompt: string) {
       placements: catalog.placements,
       technique: catalog.technique,
     };
-  } catch {
+  } catch (error) {
+    // Draft-only fallback: record it at warning level with a sanitized reason
+    // class so a dead Printful catalog is production-visible.
+    await captureMerchCatalogFallback({ error });
     return {
       pricing: fallbackPricing(),
       productionWarnings: [] as string[],
@@ -446,59 +387,6 @@ export function resolveGenerationNextStep(
     : MERCH_NO_DESIGNS_NEXT_STEP;
 }
 
-function logMerchGenerationReceipt(receipt: MerchGenerationReceipt): void {
-  logger.info('[merch-generation] production receipt', { ...receipt });
-}
-
-/**
- * Schedules durable, observable Printful mockup enrichment for the generated
- * designs (JOV-4743). Each option stays `pending_mockup` until the truthful
- * product mockup is attached (`mockup_ready`) or the retry budget/timeout is
- * exhausted (`mockup_failed`, which blocks publish). Replaces the previous
- * untracked fire-and-forget `Promise.allSettled` path.
- */
-function schedulePrintfulMockupEnrichment(params: {
-  readonly generationId: string;
-  readonly profileId: string;
-  readonly startedAt: number;
-  readonly requestedDesignCount: number;
-  readonly contentReviews: MerchGenerationReceipt['contentReviews'];
-  readonly designs: readonly {
-    readonly optionId: string;
-    readonly printFileUrl: string;
-  }[];
-}): void {
-  scheduleMerchMockupEnrichment(
-    params.designs.map(({ optionId, printFileUrl }) => ({
-      optionId,
-      request: {
-        printFileUrl,
-        catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-        catalogVariantIds: Object.values(
-          MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
-        ),
-        placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-        technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
-        productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
-      },
-    })),
-    outcomes => {
-      logMerchGenerationReceipt({
-        pipeline: MERCH_CANONICAL_PIPELINE_ID,
-        contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
-        generationId: params.generationId,
-        profileId: params.profileId,
-        requestedDesignCount: params.requestedDesignCount,
-        readyDesignCount: params.designs.length,
-        mockups: outcomes,
-        contentReviews: params.contentReviews,
-        disposition: 'ready',
-        durationMs: Date.now() - params.startedAt,
-      });
-    }
-  );
-}
-
 /** Concept line stored with a generated design. Source suffix stays a separate string. */
 export function formatMerchDesignConcept(
   directionLabel: string,
@@ -524,6 +412,7 @@ export async function generateMerchDesigns(params: {
   readonly turnId?: string | null;
 }): Promise<MerchDesignCarouselResult> {
   const startedAt = Date.now();
+  const count = resolveMerchConceptCount(params.count, DEFAULT_DESIGN_COUNT);
   if (requiresAssetPreservingRender(params.source)) {
     throw new TypeError(
       'This Library asset needs an asset-preserving render path. Jovie will not recreate an uploaded logo from a text prompt.'
@@ -531,7 +420,6 @@ export async function generateMerchDesigns(params: {
   }
 
   const generationId = randomUUID();
-  const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
   const [prerequisites, recentSelectedLabels] = await Promise.all([
     resolveMerchGenerationPrerequisites({
       artistName: () => artistName(params.profileId),
@@ -548,21 +436,45 @@ export async function generateMerchDesigns(params: {
     generationId,
   });
 
-  await db.insert(merchGenerationBatches).values({
-    id: generationId,
-    creatorProfileId: params.profileId,
-    createdByClerkUserId: params.clerkUserId,
-    chatConversationId: params.conversationId ?? null,
-    chatTurnId: params.turnId ?? null,
+  const directions = selectMerchDesignStrategies(count, recentSelectedLabels);
+  const conceptStartedAt = new Date();
+  const conceptPlan = {
+    profileId: params.profileId,
+    artistName: name,
     prompt: params.prompt,
-    command: 'generate_merch_designs',
+    source: params.source,
+    feedback: await getMerchConceptFeedback(params.profileId),
+    product: {
+      catalogProductId: catalog.catalogProductId,
+      catalogVariantIds: catalog.catalogVariantIds,
+      placements: catalog.placements,
+      technique: catalog.technique,
+      colorway: catalog.colorway,
+    },
+    candidates: directions.map(strategy => ({
+      key: strategy.label,
+      strategy,
+      prompt: buildMerchImagePrompt(
+        name,
+        params.prompt,
+        strategy,
+        params.source,
+        recentSelectedLabels
+      ),
+    })),
+  };
+  const conceptReceipt = await persistMerchConceptPlan({
+    generationId,
+    plan: conceptPlan,
+    params,
     artistBrief: minimalBrief(name, params.prompt, params.source),
-    status: 'generating',
+    enteredAt: conceptStartedAt,
   });
-
   // Bias model selection toward the artist's previous picks while selecting
   // visual strategy families away from their recent choices.
-  const directions = selectMerchDesignStrategies(count, recentSelectedLabels);
+  const reviewedDirections = conceptReceipt.rankedKeys.map(
+    key => directions.find(direction => direction.label === key)!
+  );
   const grossMargin =
     pricing.retailPriceCents -
     pricing.estimatedPrintfulProductCostCents -
@@ -581,60 +493,38 @@ export async function generateMerchDesigns(params: {
     readonly optionNumber: number;
     readonly designName: string;
     readonly concept: string;
-    readonly review: MerchContentReview;
-  }) => {
-    await db.insert(merchDesignOptions).values({
-      id: input.optionId,
-      generationBatchId: generationId,
-      creatorProfileId: params.profileId,
-      optionNumber: input.optionNumber,
-      status: 'rejected',
-      designLane: 'fashion_graphic_item',
-      designName: input.designName,
-      productType: catalog.productType,
-      printfulProductName: catalog.productName,
-      printfulCatalogProductId: catalog.catalogProductId,
-      printfulCatalogVariantIds: catalog.catalogVariantIds,
-      variantMap: catalog.variantMap,
-      colorway: catalog.colorway,
-      availableSizes: catalog.sizes,
-      placements: catalog.placements,
-      technique: catalog.technique,
-      retailPriceCents: pricing.retailPriceCents,
-      estimatedPrintfulProductCostCents:
-        pricing.estimatedPrintfulProductCostCents,
-      estimatedShippingCostCents: pricing.estimatedShippingCostCents,
-      estimatedGrossMarginCents: grossMargin,
-      artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
-      jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
-      pricing,
-      concept: input.concept,
-      whyItFits: MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
-      mockupUrls: [],
-      printFileUrls: [],
-      productionWarnings: [
-        ...catalogWarnings,
-        MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
-      ],
-      qualityReview: {
-        copyrightRisk: 'low',
-        typography: 'generated',
-        printFeasible: false,
-        contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
-        pipeline: MERCH_CANONICAL_PIPELINE_ID,
-        ...stampMerchContentReview(input.review),
-      },
-      learning: {
-        styleLane: 'fashion_graphic_item',
-        typographyStyle: 'rejected',
-        graphicDensity: 'minimal',
-        garmentColor: catalog.colorway,
-        motifs: [],
-        selectedOverOptionIds: [],
-        rejectedAttributes: [...input.review.failureCodes],
-      },
+    readonly review?: MerchContentReview;
+  }) =>
+    persistUnrenderedMerchOption({
+      generationId,
+      profileId: params.profileId,
+      catalog,
+      grossMargin,
+      catalogWarnings,
+      conceptReview: conceptReceipt,
+      ...input,
     });
-  };
+
+  if (conceptReceipt.decision !== 'eligible') {
+    for (const [index, candidate] of conceptPlan.candidates.entries()) {
+      await persistRejectedOption({
+        optionId: randomUUID(),
+        optionNumber: index + 1,
+        designName: `${params.source.sourceText} ${candidate.key}`,
+        concept: candidate.prompt,
+      });
+    }
+    return {
+      success: true,
+      generationId,
+      prompt: params.prompt,
+      state: 'concept_review_required',
+      contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+      nextStep:
+        'The ideas need review before I can make artwork. Nothing has been generated.',
+      designs: [],
+    };
+  }
 
   if (!evaluateMerchCandidateReadiness(promptReview).ready) {
     const optionId = randomUUID();
@@ -646,6 +536,17 @@ export async function generateMerchDesigns(params: {
       review: promptReview,
     });
     const contentReviews = [toContentReviewReceipt(optionId, promptReview)];
+    // Whole-prompt content rejection: a product gate, not a provider incident,
+    // so the outcome capture deliberately no-ops for a pure content_reject.
+    const failureSummary = buildMerchGenerationFailureSummary({
+      requested: count,
+      ready: 0,
+      failureClasses: ['content_reject'],
+    });
+    await captureMerchGenerationFailureOutcome({
+      generationId,
+      failureSummary,
+    });
     logMerchGenerationReceipt({
       pipeline: MERCH_CANONICAL_PIPELINE_ID,
       contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
@@ -655,6 +556,7 @@ export async function generateMerchDesigns(params: {
       readyDesignCount: 0,
       mockups: [],
       contentReviews,
+      failureSummary,
       disposition: 'failed',
       durationMs: Date.now() - startedAt,
     });
@@ -679,13 +581,14 @@ export async function generateMerchDesigns(params: {
         confidence: review.confidence,
         reviewed_at: review.reviewedAt,
       })),
+      failureSummary,
       nextStep: MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
       designs: [],
     };
   }
 
   const attempts = await Promise.all(
-    directions.map(
+    reviewedDirections.map(
       async (
         direction,
         index
@@ -694,6 +597,7 @@ export async function generateMerchDesigns(params: {
         readonly preview: MerchDesignPreview | null;
         readonly review: MerchContentReview | null;
         readonly printFileUrl?: string;
+        readonly failureClass?: MerchGenerationFailureClass;
       }> => {
         const optionId = randomUUID();
         const sourceLabel = params.source
@@ -707,18 +611,19 @@ export async function generateMerchDesigns(params: {
           params.prompt,
           sourceLabel
         );
+        // Track the pipeline stage so a per-design failure can be classified
+        // (image vs artwork upload vs persist) without leaking raw provider
+        // messages anywhere user-facing.
+        let stage: MerchGenerationStage = 'graphic';
         try {
           const graphic = await generatePrintGraphic({
-            prompt: buildMerchImagePrompt(
-              name,
-              params.prompt,
-              direction,
-              params.source,
-              recentSelectedLabels
-            ),
+            prompt: conceptPlan.candidates.find(
+              candidate => candidate.key === direction.label
+            )!.prompt,
             selection: { weights: modelWeights },
             content: { prompt: params.prompt, concept },
           });
+          stage = 'artwork';
           const artwork = await createGeneratedMerchArtwork({
             profileId: params.profileId,
             generationId,
@@ -726,6 +631,7 @@ export async function generateMerchDesigns(params: {
             printFile: graphic.image,
             productType: catalog.productType,
           });
+          stage = 'persist';
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -760,9 +666,13 @@ export async function generateMerchDesigns(params: {
             printFileUrls: [artwork.printFileUrl],
             productionWarnings: catalogWarnings,
             qualityReview: {
-              copyrightRisk: 'low',
+              copyrightRisk: 'unknown',
               typography: 'generated',
-              printFeasible: true,
+              printFeasible: false,
+              artworkHash: createHash('sha256')
+                .update(graphic.image)
+                .digest('hex'),
+              conceptReview: conceptReceipt,
               contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
               pipeline: MERCH_CANONICAL_PIPELINE_ID,
               mockupStatus: 'pending_mockup',
@@ -814,10 +724,10 @@ export async function generateMerchDesigns(params: {
               fulfillment: 'Printful standard US',
               profile_destination: 'Artist profile merch section',
               sellability: {
-                sellable: pricing.printfulCostSource === 'printful',
+                sellable: false,
                 reasons:
                   pricing.printfulCostSource === 'printful'
-                    ? []
+                    ? conceptReceipt.publicationBlockers
                     : [
                         'Catalog/fulfillment unavailable; approval will quarantine this item as a private draft.',
                       ],
@@ -826,6 +736,10 @@ export async function generateMerchDesigns(params: {
             },
           };
         } catch (error) {
+          const failureClass = classifyMerchGenerationFailure({
+            stage,
+            error,
+          });
           if (error instanceof MerchPersonContentRejectedError) {
             await persistRejectedOption({
               optionId,
@@ -838,13 +752,19 @@ export async function generateMerchDesigns(params: {
               optionId,
               failureCodes: error.review.failureCodes,
             });
-            return { optionId, preview: null, review: error.review };
+            return {
+              optionId,
+              preview: null,
+              review: error.review,
+              failureClass,
+            };
           }
           logger.warn('[merch-designs] generation failed for one design', {
             optionId,
+            failureClass,
             err: error instanceof Error ? error.message : String(error),
           });
-          return { optionId, preview: null, review: null };
+          return { optionId, preview: null, review: null, failureClass };
         }
       }
     )
@@ -858,6 +778,16 @@ export async function generateMerchDesigns(params: {
       ? [toContentReviewReceipt(attempt.optionId, attempt.review)]
       : []
   );
+  const failureSummary = buildMerchGenerationFailureSummary({
+    requested: count,
+    ready: ready.length,
+    failureClasses: attempts.flatMap(attempt =>
+      attempt.failureClass ? [attempt.failureClass] : []
+    ),
+  });
+  // Production-visible outcome: one incident when nothing rendered for a
+  // non-content reason, one warning for a partial batch (no-op otherwise).
+  await captureMerchGenerationFailureOutcome({ generationId, failureSummary });
 
   logger.info('[merch-designs] generation response ready', {
     ms: Date.now() - startedAt,
@@ -869,7 +799,20 @@ export async function generateMerchDesigns(params: {
 
   const enrichmentDesigns = attempts.flatMap(attempt =>
     attempt.preview && attempt.printFileUrl
-      ? [{ optionId: attempt.optionId, printFileUrl: attempt.printFileUrl }]
+      ? [
+          {
+            optionId: attempt.optionId,
+            printFileUrl: attempt.printFileUrl,
+            // Enrich with the option's OWN resolved catalog product — the
+            // default tee here is what produced tee mockups on hoodie/hat
+            // options.
+            catalogProductId: catalog.catalogProductId,
+            catalogVariantIds: catalog.catalogVariantIds,
+            placements: catalog.placements,
+            technique: catalog.technique,
+            productType: catalog.productType,
+          },
+        ]
       : []
   );
   if (enrichmentDesigns.length > 0) {
@@ -879,6 +822,7 @@ export async function generateMerchDesigns(params: {
       startedAt,
       requestedDesignCount: count,
       contentReviews,
+      failureSummary,
       designs: enrichmentDesigns,
     });
   } else {
@@ -891,6 +835,7 @@ export async function generateMerchDesigns(params: {
       readyDesignCount: 0,
       mockups: [],
       contentReviews,
+      failureSummary,
       disposition: 'failed',
       durationMs: Date.now() - startedAt,
     });
@@ -919,6 +864,7 @@ export async function generateMerchDesigns(params: {
       reviewed_at: review.reviewedAt,
     })),
     nextStep: resolveGenerationNextStep(ready.length, contentReviews),
+    failureSummary,
     designs: ready,
   };
 }

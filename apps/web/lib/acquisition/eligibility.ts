@@ -66,6 +66,16 @@ export const REVENUE_CONE_REQUIREMENTS = [
       'Repair the failing profile check, then rerun the public-profile canary and M2 workflow.',
   },
   {
+    // Tim, 2026-11-07: model the customers and run a would-they-buy test
+    // before anyone leaves the waitlist. Green only on a passing buyer-eval
+    // gate (scripts/buyer-eval/gate.mjs), which needs a positive canary.
+    id: 'buyer_would_pay',
+    label: 'Modeled buyers say they would pay for the current build',
+    owner: 'buyer-eval gate (decisions/company/buyer-eval-gate-2026-10-31)',
+    nextAction:
+      'Fix the top objection in the latest no-pay buyer verdicts, then rerun the buyer-eval gate on the new build.',
+  },
+  {
     id: 'selected_rail',
     label: 'A currently supported commerce rail is selected',
     owner: 'commerce capability decision (JOV-8215)',

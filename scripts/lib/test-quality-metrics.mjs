@@ -9,6 +9,9 @@ export function aggregateByTier(state, surfaces) {
   const out = {};
   for (const [file, m] of Object.entries(state.modules ?? {})) {
     if (m.status !== 'scored' || !(m.valid > 0)) continue;
+    // Tiers map apps/web paths; @jovie/ui modules share the sweep state under
+    // their packages/ui/ key and are certified per component instead.
+    if (file.startsWith('packages/')) continue;
     const t = tierFor(file, surfaces).name;
     const a = (out[t] ??= {
       modules: 0,
@@ -79,16 +82,54 @@ export const modelFingerprint = ids =>
     .digest('hex')
     .slice(0, 16);
 
-/** Mark the top-touch scored modules stale so the sweep re-scores them first. */
-export function rearmTop(state, ranked, n) {
+/**
+ * Mark the top-touch scored modules stale so the sweep re-scores them first. The
+ * epoch `at` orders them first; `rearmedAt` tells a state merge the re-arm is new.
+ */
+export function rearmTop(state, ranked, n, now = new Date().toISOString()) {
   let armed = 0;
   for (const r of ranked) {
     if (armed >= n) break;
     const m = state.modules?.[r.file];
     if (m?.status === 'scored') {
       m.at = new Date(0).toISOString();
+      m.rearmedAt = now;
       armed += 1;
     }
   }
   return armed;
+}
+
+/**
+ * Markdown summary of a whole sweep state: the repo-wide mutation score (apps/web
+ * and packages alike), how many modules were scored, untested or errored, and the
+ * per-tier scores. Used by the one-off baseline run's job summary.
+ */
+export function baselineSummary(state, surfaces) {
+  const counts = { scored: 0, untested: 0, error: 0, other: 0 };
+  let valid = 0;
+  let killed = 0;
+  for (const m of Object.values(state.modules ?? {})) {
+    if (m.status in counts) counts[m.status] += 1;
+    else counts.other += 1;
+    if (m.status !== 'scored' || !(m.valid > 0)) continue;
+    valid += m.valid;
+    killed += m.killed ?? m.valid - m.survived;
+  }
+  const score = valid ? Math.round((killed / valid) * 1000) / 10 : 0;
+  const tiers = aggregateByTier(state, surfaces);
+  const lines = [
+    '## Mutation baseline',
+    '',
+    `Overall: **${score}%** (${killed} of ${valid} mutants killed) across ${counts.scored} scored modules.`,
+    `Untested modules: ${counts.untested}. Errored: ${counts.error}.`,
+    '',
+    '| Tier | Modules | Score |',
+    '|---|---:|---:|',
+    ...Object.entries(tiers)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([t, a]) => `| ${t} | ${a.modules} | ${a.score}% |`),
+    '',
+  ];
+  return { score, valid, killed, counts, tiers, markdown: lines.join('\n') };
 }

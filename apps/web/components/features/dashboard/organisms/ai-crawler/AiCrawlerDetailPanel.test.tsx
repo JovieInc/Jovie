@@ -83,6 +83,23 @@ describe('AiCrawlerDetailPanel', () => {
     expect(screen.getByText('GPTBot')).toBeInTheDocument();
   });
 
+  it('colours crawler bars from the accent tokens with no raw hex fallback', () => {
+    const { container } = render(
+      <AiCrawlerDetailPanel isOpen onClose={() => undefined} />
+    );
+
+    const bar = container.querySelector<HTMLElement>('li [style]');
+    expect(bar?.getAttribute('style')).toContain('var(--color-accent-blue)');
+    expect(bar?.getAttribute('style')).not.toMatch(/#[0-9a-f]{3,8}/i);
+  });
+
+  it('renders the sync date pinned to UTC so server and client HTML match', () => {
+    render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
+
+    // syncedAt 2026-09-01T12:00Z renders the same in every time zone/locale.
+    expect(screen.getByText('Updated Sep 1, 2026')).toBeInTheDocument();
+  });
+
   it('keeps missing telemetry Unknown rather than treating it as zero', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: undefined,

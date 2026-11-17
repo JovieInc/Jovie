@@ -219,7 +219,7 @@ describe('route hero audit', () => {
     // mismatch means the route chose a hero the table does not allow.
     expect(summary).toMatchInlineSnapshot(`
       {
-        "/": "unlocked-code-variant: centered-none -> centered-homepage",
+        "/": "wrong-variant: left-none -> centered-homepage",
         "/about": "ok: left-content",
         "/alternatives/*": "ok: left-content",
         "/artist-notifications": "ok: f-layout-desktop-screenshot",

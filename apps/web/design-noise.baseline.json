@@ -136,9 +136,6 @@
     "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": {
       "icon-tile": 2
     },
-    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingNameStep.tsx": {
-      "disabled-submit": 1
-    },
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": {
       "icon-tile": 1
     },
@@ -165,9 +162,6 @@
     },
     "apps/web/components/features/dashboard/youtube/ChannelIntelligencePanel.tsx": {
       "icon-tile": 2
-    },
-    "apps/web/components/features/dashboard/youtube/RevivalQueuePanel.tsx": {
-      "icon-tile": 1
     },
     "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
       "icon-tile": 1

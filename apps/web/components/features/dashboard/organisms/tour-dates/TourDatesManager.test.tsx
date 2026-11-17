@@ -191,4 +191,13 @@ describe('TourDatesManager shell rail', () => {
       ).toBeNull();
     });
   });
+
+  it('marks the Bandsintown connection with the success tokens', () => {
+    render(<Harness />);
+
+    const mark = screen.getByTestId('tour-dates-connected-mark');
+    expect(mark.className).toContain('bg-success-subtle');
+    expect(mark.className).not.toMatch(/teal/);
+    expect(screen.getByText('Test Artist')).toBeInTheDocument();
+  });
 });

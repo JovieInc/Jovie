@@ -75,7 +75,7 @@ test('the old homepage manifest is gone and nothing in the pipeline reads it', (
       ':!scripts/design/*.test.mjs',
       'docs',
     ],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   );
   assert.equal(run.stdout.trim(), '');
 });
@@ -231,6 +231,16 @@ test('validator rejects each structural defect', () => {
     assert.match(validateBindings(doc).join('\n'), expected);
   }
   assert.deepEqual(validateBindings(base()), []);
+});
+
+test('a frame may cite a .pen file or an approved HTML art-direction page', () => {
+  const doc = base();
+  doc.routes['/'].viewports['1440'] = [
+    { ...frame('/', 1440, 'hero'), penFile: 'home-canonical-v3/index.html' },
+  ];
+  assert.deepEqual(validateBindings(doc), []);
+  doc.routes['/'].viewports['1440'][0].penFile = 'hero.png';
+  assert.match(validateBindings(doc).join('\n'), /penFile must be a \.pen or/);
 });
 
 test('filesystem checks: dead source globs, missing stills and hash drift', () => {

@@ -24,16 +24,21 @@ export interface SparklineProps {
 const VIEWBOX_W = 340;
 const VIEWBOX_H = 120;
 
+// Status TEXT tokens, not the neon accent fills: --color-accent-green is
+// about 1.3:1 on white cards, while the -text tokens hold contrast in light
+// and dark, so the line clears 3:1 for graphics in both modes.
 const STROKE_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'rgba(165,243,252,0.85)',
-  down: 'rgba(253,164,175,0.85)',
-  flat: 'rgba(255,255,255,0.4)',
+  up: 'var(--color-success-text)',
+  down: 'var(--color-error-text)',
+  flat: 'var(--color-text-tertiary-token)',
 };
 const FILL_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'rgba(103,232,249,0.10)',
-  down: 'rgba(253,164,175,0.10)',
-  flat: 'rgba(255,255,255,0.06)',
+  up: 'color-mix(in oklab, var(--color-success-text) 12%, transparent)',
+  down: 'color-mix(in oklab, var(--color-error-text) 12%, transparent)',
+  flat: 'color-mix(in oklab, var(--color-text-tertiary-token) 8%, transparent)',
 };
+const PLAYHEAD_STROKE = 'var(--color-border-strong)';
+const POINT_OUTLINE = 'var(--color-bg-base)';
 
 /**
  * Sparkline — minimal area-under-line chart. Single SVG, no chart
@@ -123,7 +128,7 @@ export function Sparkline({
             y1={0}
             x2={playheadX}
             y2={VIEWBOX_H}
-            stroke='rgba(255,255,255,0.30)'
+            stroke={PLAYHEAD_STROKE}
             strokeWidth={1}
             vectorEffect='non-scaling-stroke'
           />
@@ -132,7 +137,7 @@ export function Sparkline({
             cy={playheadY}
             r={3}
             fill={stroke}
-            stroke='rgba(0,0,0,0.45)'
+            stroke={POINT_OUTLINE}
             strokeWidth={1}
             vectorEffect='non-scaling-stroke'
           />

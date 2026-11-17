@@ -45,7 +45,7 @@ export function Spinner({
       data-size={size}
       data-tone={tone}
       className={cn(
-        'inline-flex items-center justify-center align-middle text-current',
+        'inline-flex shrink-0 items-center justify-center align-middle text-current',
         'motion-reduce:transition-none',
         sizeClasses[size],
         toneClasses[tone],

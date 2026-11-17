@@ -23,7 +23,7 @@ export interface BrandLogoProps {
 
 const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
   auto: undefined,
-  white: 'text-white dark:text-white',
+  white: 'text-on-media',
   color: 'text-accent',
   muted: 'text-muted-foreground/50',
 };

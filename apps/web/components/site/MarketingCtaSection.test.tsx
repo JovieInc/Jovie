@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingCtaSection } from './MarketingCtaSection';
 
 describe('MarketingCtaSection native boundary', () => {
-  it('forwards native section attributes and preserves child interaction without adding wrappers', () => {
+  it('forwards native section attributes and preserves child interaction without adding wrappers', async () => {
     const activate = vi.fn();
     const { container } = render(
       <MarketingCtaSection
@@ -28,5 +29,6 @@ describe('MarketingCtaSection native boundary', () => {
     expect(section.firstElementChild?.tagName).toBe('H2');
     fireEvent.click(screen.getByRole('button', { name: 'Existing action' }));
     expect(activate).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
   });
 });

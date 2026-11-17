@@ -29,6 +29,8 @@ export interface EntitySidebarShellProps {
   readonly 'data-testid'?: string;
   /** Optional surface override applied to the outer RightDrawer. */
   readonly drawerClassName?: string;
+  /** Desktop placement request forwarded to RightDrawer. */
+  readonly presentation?: 'push' | 'overlay';
 
   /** Header title — string or ReactNode */
   readonly title?: ReactNode;
@@ -127,6 +129,7 @@ export function EntitySidebarShell({
   contextMenuItems,
   'data-testid': testId,
   drawerClassName,
+  presentation,
   title,
   onClose,
   headerActions,
@@ -236,6 +239,7 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
       className={drawerClassName}
+      presentation={presentation}
     >
       <div
         data-right-rail-workspace
@@ -268,7 +272,13 @@ export function EntitySidebarShell({
                 variant={workspaceContentSurface}
                 className='overflow-hidden'
               >
-                <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
+                {/* The 1px bottom seam is padding, not a transparent border:
+                    same border-box geometry, and the card stays the only
+                    bordered surface around the title bar and tabs. */}
+                <div
+                  data-entity-sidebar-header-band=''
+                  className='bg-transparent pb-px backdrop-blur-[12px]'
+                >
                   {showMinimalHeaderBar ? (
                     <EntityHeader
                       layout='chrome'

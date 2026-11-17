@@ -15,7 +15,11 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
-import { gateProfilePublicationAtEdge } from '@/lib/routing/profile-publication-edge';
+import { resolveDesktopMarketingRedirect } from '@/lib/desktop/desktop-marketing-guard';
+import {
+  gateProfilePublicationAtEdge,
+  getProfileModeQueryRewrite,
+} from '@/lib/routing/profile-publication-edge';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
   createFastNotFoundResponse,
@@ -189,6 +193,26 @@ export default async function middleware(
   }
 
   // ========================================================================
+  // The Mac app is a product surface. A desktop-shell request for a
+  // marketing page (document load, Next client navigation or prefetch) goes
+  // to the app home instead; signed-out visitors continue to sign-in from
+  // there. Browsers never carry the JovieDesktop/ user-agent token.
+  // ========================================================================
+  const desktopMarketingRedirect = resolveDesktopMarketingRedirect({
+    method: req.method,
+    pathname: req.nextUrl.pathname,
+    userAgent: req.headers.get('user-agent'),
+  });
+  if (desktopMarketingRedirect) {
+    const response = NextResponse.redirect(
+      new URL(desktopMarketingRedirect, req.url),
+      307
+    );
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
+
+  // ========================================================================
   // Public profiles are ISR-cached; publication is decided fresh here on
   // every request so a cached body is never served after withdrawal,
   // deletion, rename or a storage failure (JOV-8629 §6.2).
@@ -196,6 +220,12 @@ export default async function middleware(
   if (req.method !== 'OPTIONS') {
     const profilePublicationResponse = await gateProfilePublicationAtEdge(req);
     if (profilePublicationResponse) return profilePublicationResponse;
+    // JOV-12081: a published profile's ?mode= view renders through the
+    // guarded mode-render marker destination. The next.config afterFiles
+    // rewrite that used to own this never applies to the prerendered
+    // profile route, so the proxy rewrites it here, per request.
+    const profileModeRewrite = getProfileModeQueryRewrite(req);
+    if (profileModeRewrite) return profileModeRewrite;
   }
 
   // ========================================================================

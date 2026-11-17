@@ -419,7 +419,7 @@ describe('UnifiedSidebar library route', () => {
     const settingsNav = screen.getByRole('navigation', {
       name: 'settings navigation',
     });
-    for (const label of ['Account', 'Artist']) {
+    for (const label of ['Personal', 'Artist']) {
       const group = within(settingsNav)
         .getAllByText(label)
         .find(node => node.className.includes('font-caption'));
@@ -681,11 +681,10 @@ describe('UnifiedSidebar library route', () => {
     const link = within(nav).getByRole('link', { name: 'Shipping' });
     fireEvent.mouseOver(link);
     fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    const shippingCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state');
+    await waitFor(() => expect(shippingCalls()).toHaveLength(1));
+    expect(shippingCalls()[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     fetchMock.mockRestore();
   });
 
@@ -719,6 +718,7 @@ describe('UnifiedSidebar library route', () => {
       )
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ov-nav-section-tools').className).toBe('');
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();

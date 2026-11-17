@@ -69,6 +69,17 @@ export function failingItemLines({ red, body, companion }) {
   ];
 }
 
+/** The last line; a skipped check is named, never folded into "all clear". */
+export function verdictLine(total, results = []) {
+  const skips = results.filter(r => r.skip).map(r => r.name);
+  const tail = skips.length
+    ? `; SKIPPED here (CI runs): ${skips.join(', ')}`
+    : '';
+  return total
+    ? `\n${total} item(s) to fix before pushing${tail}.`
+    : `\nall clear${tail}.`;
+}
+
 /** Load high enough that a local red may be noise (override JOVIE_PREFLIGHT_OVERLOAD_FACTOR). */
 export function hostOverloaded(
   env = process.env,

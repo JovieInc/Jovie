@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import './MarketingFooter.css';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -13,6 +15,10 @@ import {
   type MarketingFooterColumn,
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
+import {
+  PRIVACY_CHOICES_HREF,
+  PRIVACY_CHOICES_LABEL,
+} from '@/lib/cookies/consent-state';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
@@ -74,6 +80,10 @@ interface MarketingFooterProps {
   readonly columns?: readonly MarketingFooterColumn[];
   /** Published legal row (Privacy and Terms are required by the record). */
   readonly legalLinks?: readonly MarketingFooterLink[];
+  /** Section id for the Pen design-diff gate (`data-pen-section`). */
+  readonly penSection?: string;
+  /** Static, decorative art drawn behind the footer content (aria-hidden by the caller). */
+  readonly decoration?: ReactNode;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -83,15 +93,8 @@ function resolveFooterVariant(
   pathname: string | null
 ): ResolvedVariant {
   const isMinimalPath = pathname ? MINIMAL_FOOTER_PATHS.has(pathname) : false;
-  const autoVariant: ResolvedVariant =
-    FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
-      ? 'expanded'
-      : 'minimal';
-  const requested = variant === 'auto' ? autoVariant : variant;
-  if (requested === 'expanded' && !FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER) {
-    return 'minimal';
-  }
-  return requested;
+  const autoVariant: ResolvedVariant = isMinimalPath ? 'minimal' : 'expanded';
+  return variant === 'auto' ? autoVariant : variant;
 }
 
 const markLinkClassName =
@@ -140,10 +143,11 @@ export function FooterColumnsNav({
       )}
       aria-label='Footer'
     >
-      {footerColumns.map(column => {
-        const columnLabelId = `footer-column-${column.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')}`;
+      {footerColumns.map((column, index) => {
+        // Key by position, not a slug of the title: non-Latin titles (Arabic)
+        // collapse to the same [a-z0-9] slug. Not useId(), so server and
+        // client markup stay identical whatever the route (hydration test).
+        const columnLabelId = `footer-column-${index}`;
         return (
           <section key={column.title} aria-labelledby={columnLabelId}>
             <p id={columnLabelId} className='mf-eyebrow'>
@@ -181,6 +185,13 @@ function FooterLegalNav({
 }: Readonly<{ links?: readonly MarketingFooterLink[] }>) {
   return (
     <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
+      <Link
+        href={PRIVACY_CHOICES_HREF}
+        prefetch={false}
+        className={footerLegalLinkClassName}
+      >
+        {PRIVACY_CHOICES_LABEL}
+      </Link>
       {links.map(link => (
         <Link
           key={link.href}
@@ -201,6 +212,8 @@ export function MarketingFooter({
   showCta = true,
   columns,
   legalLinks,
+  penSection,
+  decoration,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -223,8 +236,10 @@ export function MarketingFooter({
         className
       )}
       data-testid='marketing-footer'
+      data-pen-section={penSection}
       data-footer-variant={resolvedVariant}
     >
+      {decoration}
       <div
         className={cn(
           'public-container',

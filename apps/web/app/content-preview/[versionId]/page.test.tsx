@@ -31,7 +31,7 @@ vi.mock('@/components/homepage/HomepageSpecSections', () => ({
     <div data-testid='sections'>{JSON.stringify(sections)}</div>
   ),
 }));
-vi.mock('../../(home)/homepage-query-provider', () => ({
+vi.mock('../../(home)/HomepageQueryProvider', () => ({
   HomepageQueryProvider: ({ children }: { children: ReactNode }) => children,
 }));
 

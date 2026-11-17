@@ -206,3 +206,98 @@ export const ConformanceMatrix: Story = {
     },
   },
 };
+
+export const Partial: Story = {
+  render: () => (
+    <Sheet defaultOpen>
+      <SheetContent aria-describedby={undefined}>
+        <SheetHeader>
+          <SheetTitle>Filters</SheetTitle>
+        </SheetHeader>
+      </SheetContent>
+    </Sheet>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required title, with the optional side, description, body and footer omitted; the sheet defaults to the right edge.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <Sheet defaultOpen>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>
+            Audience insights for every territory, platform and smart link you
+            shared this release cycle
+          </SheetTitle>
+          <SheetDescription>
+            Listener counts update hourly and include returning visitors, new
+            subscribers and fans who opened your links from playlists, press
+            coverage or social posts.
+          </SheetDescription>
+        </SheetHeader>
+        <div className='grid min-w-0 gap-2'>
+          {Array.from({ length: 14 }, (_, index) => index + 1).map(row => (
+            <p
+              key={row}
+              className='min-w-0 break-words text-sm text-secondary-token'
+            >
+              Territory {row}: listeners arriving from
+              https://jov.ie/artist/a-very-long-public-profile-slug-{row}
+            </p>
+          ))}
+        </div>
+        <SheetFooter>
+          <Button variant='secondary'>Reset every filter</Button>
+          <Button>Apply audience filters</Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'A long title, description, unbroken URLs and many rows wrap within the sheet width and the body scrolls instead of overflowing.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <Sheet defaultOpen>
+        <SheetContent side='left' dir='rtl'>
+          <SheetHeader>
+            <SheetTitle>تفاصيل الجمهور حسب الدولة والمنصة</SheetTitle>
+            <SheetDescription>
+              راجع عدد المستمعين العائدين والمشتركين الجدد دون أن تفقد مكانك في
+              الصفحة. تُحدَّث الأرقام كل ساعة لجميع الروابط التي شاركتها.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetFooter>
+            <Button variant='secondary'>إعادة التعيين</Button>
+            <Button>تطبيق عوامل التصفية</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic copy wraps inside a start-edge sheet and the footer actions follow the reading direction.',
+      },
+    },
+  },
+};

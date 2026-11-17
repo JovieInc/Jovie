@@ -415,14 +415,12 @@ describe('diff gate', () => {
       join(root, story),
       "import { PublishAction } from './PublishAction';"
     );
+    // A stale entry passes; an uncovered component with no entry fails.
+    expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
+    writeFileSync(join(root, component.replace('Publish', 'Draft')), '');
     expect(
       checkStoryBaseline([story], { repoRoot: root }).map(issue => issue.rule)
     ).toEqual(['story-baseline-stale']);
-    writeFileSync(
-      join(root, policyPath),
-      JSON.stringify({ ...policy, allowlist: [] })
-    );
-    expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
   });
 
   it('keeps unrelated publication free of story-inventory work', () => {

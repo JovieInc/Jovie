@@ -96,8 +96,6 @@ describe('SettingsPaymentsSection', () => {
 
     expect(row).toHaveAttribute('data-tone', 'default');
     expect(row).toHaveAttribute('aria-disabled', 'true');
-    expect(
-      screen.getByRole('button', { name: 'Connect Stripe' })
-    ).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Connect Stripe' })).toBeNull();
   });
 });

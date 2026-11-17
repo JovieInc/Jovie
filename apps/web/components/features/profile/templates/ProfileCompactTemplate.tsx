@@ -26,7 +26,6 @@ import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryExitDelta,
   readPublicProfileHistoryDepth,
-  resolvePublicProfileBackAction,
   withPublicProfileHistoryDepth,
 } from '@/features/profile/profile-surface-state';
 import {
@@ -34,6 +33,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { resolveTabBackAction } from '@/features/profile/sibling-tabs';
 import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -1055,8 +1055,8 @@ export function ProfileCompactTemplate({
     const arrivalHistoryLength =
       arrivalHistoryLengthRef.current ?? historyLength;
     const internalHistoryDepth = profileHistoryDepthRef.current;
-    const action = resolvePublicProfileBackAction({
-      isProfileRoot: requestedMode === 'profile',
+    const action = resolveTabBackAction({
+      mode: requestedMode,
       historyLength,
       referrer: document.referrer,
       isSignedIn,
@@ -1143,7 +1143,7 @@ export function ProfileCompactTemplate({
         previewExitHref={profileHref}
         compactSurface={
           <div
-            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
+            className='public-profile-compact-shell relative mx-auto flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
             data-interactive-ready={isHydrated ? 'true' : undefined}
             data-alert-opt-in-variant={resolvedAlertOptInVariant}
@@ -1260,7 +1260,7 @@ export function ProfileCompactTemplate({
               data-sheet-container
             >
               <ProfileDesktopSurface
-                presentation='modal'
+                presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
                 onReady={handleDesktopSurfaceReady}
                 artist={artist}
@@ -1311,7 +1311,7 @@ export function ProfileCompactTemplate({
                 open={creditsOpen && isDesktopLayout}
                 onOpenChange={setCreditsOpen}
                 credits={visibleReleaseCredits}
-                presentation='modal'
+                presentation='embedded'
               />
             </div>
           ) : null

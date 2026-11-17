@@ -11,12 +11,22 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { captureWarning } from '@/lib/error-tracking';
-import { getRedis } from '@/lib/redis';
+import {
+  invalidateRedisByPrefix,
+  invalidateRedisKey,
+  isRedisCacheAvailable,
+  isRedisCacheQuarantined,
+  quarantineRedisCache,
+  REDIS_CACHE_BUDGET_MS,
+  tryReadFromRedis,
+  withinCacheBudget,
+  writeToRedis,
+} from './cache-redis';
 
 const CACHE_PREFIX = 'db:cache:v2:';
 const DEFAULT_TTL_SECONDS = 60; // 1 minute default
 const MAX_MEMORY_CACHE_SIZE = 5000;
+const CACHE_LOAD_MAX_AGE_MS = 30_000;
 
 /**
  * Sentinel wrapper to distinguish cached null/undefined from cache miss.
@@ -102,6 +112,82 @@ class InMemoryCache<T> {
 // Singleton in-memory cache
 const memoryCache = new InMemoryCache<unknown>(MAX_MEMORY_CACHE_SIZE);
 
+interface CacheLoad {
+  signature: string;
+  invalidated: boolean;
+  result: Promise<unknown>;
+  write: Promise<void> | null;
+  release: () => void;
+}
+
+const activeLoads = new Map<string, Set<CacheLoad>>();
+let activeLoadCount = 0;
+const invalidations = new Set<{
+  matches: (key: string) => boolean;
+  done: Promise<void>;
+}>();
+
+async function waitForInvalidation(cacheKey: string): Promise<boolean> {
+  const deadline = performance.now() + REDIS_CACHE_BUDGET_MS;
+  let pending = [...invalidations].filter(item => item.matches(cacheKey));
+  try {
+    while (pending.length > 0) {
+      await withinCacheBudget(
+        () => Promise.all(pending.map(item => item.done)),
+        deadline
+      );
+      pending = [...invalidations].filter(item => item.matches(cacheKey));
+    }
+    return true;
+  } catch (error) {
+    quarantineRedisCache(error);
+    return false;
+  }
+}
+
+function invalidateLoads(
+  matches: (key: string) => boolean,
+  clearMemory: () => void,
+  clearRedis: (deadline: number) => Promise<void>
+): Promise<void> {
+  const deadline = performance.now() + REDIS_CACHE_BUDGET_MS;
+  const writes: Promise<void>[] = [];
+  for (const [key, loads] of activeLoads) {
+    if (!matches(key)) continue;
+    for (const load of loads) {
+      load.invalidated = true;
+      if (load.write) writes.push(load.write);
+      load.release();
+    }
+    activeLoads.delete(key);
+  }
+  clearMemory();
+  if (invalidations.size >= MAX_MEMORY_CACHE_SIZE) {
+    quarantineRedisCache(
+      new Error('Redis cache invalidation capacity exceeded')
+    );
+    return Promise.resolve();
+  }
+
+  // Drain already-issued SETs before DEL; unfinished reads may still resolve
+  // to their original caller, but their invalidated load cannot publish again.
+  const done = Promise.resolve().then(async () => {
+    try {
+      await withinCacheBudget(() => Promise.all(writes), deadline);
+      if (!isRedisCacheQuarantined()) await clearRedis(deadline);
+    } catch (error) {
+      quarantineRedisCache(error);
+    }
+  });
+  const entry = { matches, done };
+  invalidations.add(entry);
+  const release = () => {
+    invalidations.delete(entry);
+  };
+  void done.then(release, release);
+  return done;
+}
+
 export interface CacheOptions {
   /** TTL in seconds (default: 60) */
   ttlSeconds?: number;
@@ -109,36 +195,6 @@ export interface CacheOptions {
   useRedis?: boolean;
   /** Skip memory cache (default: false) */
   skipMemoryCache?: boolean;
-}
-
-/**
- * Try to read a value from Redis cache.
- * Returns null if Redis is unavailable or read fails.
- */
-async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
-  // Non-production getRedis() is null unless REDIS_URL is loopback Redis,
-  // so this layer stays on the in-memory LRU and does not call Upstash.
-  const redis = getRedis();
-  if (!redis) return null;
-
-  try {
-    return await redis.get<T>(cacheKey);
-  } catch (error) {
-    captureWarning('[db-cache] Redis read failed', error);
-    return null;
-  }
-}
-
-/**
- * Write a value to Redis cache (fire-and-forget).
- */
-function writeToRedis<T>(cacheKey: string, value: T, ttlSeconds: number): void {
-  const redis = getRedis();
-  if (!redis) return;
-
-  redis.set(cacheKey, value, { ex: ttlSeconds }).catch(err => {
-    captureWarning('[db-cache] Redis write failed', err);
-  });
 }
 
 /**
@@ -166,6 +222,9 @@ export async function cacheQuery<T>(
   } = options;
   const cacheKey = `${CACHE_PREFIX}${key}`;
   const ttlMs = ttlSeconds * 1000;
+  if ([...invalidations].some(item => item.matches(cacheKey))) {
+    if (!(await waitForInvalidation(cacheKey))) return queryFn();
+  }
 
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
@@ -175,35 +234,72 @@ export async function cacheQuery<T>(
     }
   }
 
-  // Layer 2: Try Redis if enabled
-  if (useRedis) {
-    const redisResult = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
-    if (redisResult?.__sentinel) {
-      // Populate memory cache from Redis hit
-      if (!skipMemoryCache) {
-        memoryCache.set(cacheKey, redisResult, ttlMs);
+  // Cache keys must already include authorization/tenant scope. Coalescing is
+  // process-local and only shares requests with identical cache options.
+  // Disabling both caches preserves an explicit uncached read.
+  if (!useRedis && skipMemoryCache) return queryFn();
+  const signature = JSON.stringify([ttlSeconds, useRedis, skipMemoryCache]);
+  const loads = activeLoads.get(cacheKey) ?? new Set<CacheLoad>();
+  for (const existing of loads) {
+    if (existing.signature === signature) return existing.result as Promise<T>;
+  }
+  // Bypass caching when metadata admission is full; never retain an unbounded
+  // map of distinct keys/options or make the cache an origin retry owner.
+  if (activeLoadCount >= MAX_MEMORY_CACHE_SIZE) return queryFn();
+  const load: CacheLoad = {
+    signature,
+    invalidated: false,
+    result: Promise.resolve(),
+    write: null,
+    release: () => {},
+  };
+  activeLoadCount++;
+  loads.add(load);
+  activeLoads.set(cacheKey, loads);
+  load.result = Promise.resolve().then(async () => {
+    if (useRedis) {
+      const cached = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
+      if (cached?.__sentinel && !isRedisCacheQuarantined()) {
+        if (!skipMemoryCache && !load.invalidated) {
+          memoryCache.set(cacheKey, cached, ttlMs);
+        }
+        return cached.value;
       }
-      return redisResult.value;
     }
-  }
-
-  // Layer 3: Cache miss - execute query
-  const result = await queryFn();
-
-  // Wrap in sentinel so null/undefined results are cached too,
-  // preventing repeated DB queries on 404/bot paths
-  const wrapped: CacheSentinel<T> = { __sentinel: true, value: result };
-
-  // Populate caches (fire-and-forget for non-blocking)
-  if (!skipMemoryCache) {
-    memoryCache.set(cacheKey, wrapped, ttlMs);
-  }
-
-  if (useRedis) {
-    writeToRedis(cacheKey, wrapped, ttlSeconds);
-  }
-
-  return result;
+    const result = await queryFn();
+    const wrapped: CacheSentinel<T> = { __sentinel: true, value: result };
+    if (!load.invalidated) {
+      if (!skipMemoryCache) memoryCache.set(cacheKey, wrapped, ttlMs);
+      if (useRedis) load.write = writeToRedis(cacheKey, wrapped, ttlSeconds);
+    }
+    return result;
+  });
+  let released = false;
+  const retentionTimer = setTimeout(() => {
+    if (load.write)
+      quarantineRedisCache(
+        new Error('Redis cache write outlived load retention')
+      );
+    load.invalidated = true;
+    load.release();
+  }, CACHE_LOAD_MAX_AGE_MS);
+  const release = () => {
+    if (released) return;
+    released = true;
+    clearTimeout(retentionTimer);
+    activeLoadCount--;
+    loads.delete(load);
+    if (loads.size === 0 && activeLoads.get(cacheKey) === loads) {
+      activeLoads.delete(cacheKey);
+    }
+  };
+  load.release = release;
+  const settled = () => {
+    if (load.write) void load.write.then(release, release);
+    else release();
+  };
+  void load.result.then(settled, settled);
+  return load.result as Promise<T>;
 }
 
 /**
@@ -215,105 +311,45 @@ export async function cacheQuery<T>(
 export async function invalidateCache(key: string): Promise<void> {
   const cacheKey = `${CACHE_PREFIX}${key}`;
 
-  // Invalidate memory cache
-  memoryCache.delete(cacheKey);
-
-  // Invalidate Redis cache
-  const redis = getRedis();
-  if (redis) {
-    await redis.del(cacheKey).catch(err => {
-      captureWarning('[db-cache] Redis delete failed', err);
-    });
-  }
-}
-
-/**
- * Delete Redis keys in batches via pipeline to minimize HTTP round-trips.
- * Returns the number of failed deletes.
- */
-async function deleteKeysInBatches(
-  redis: NonNullable<ReturnType<typeof getRedis>>,
-  keys: string[]
-): Promise<number> {
-  const BATCH_SIZE = 500;
-  let failedDeletes = 0;
-  for (let i = 0; i < keys.length; i += BATCH_SIZE) {
-    const batch = keys.slice(i, i + BATCH_SIZE);
-    const pipeline = redis.pipeline();
-    for (const key of batch) {
-      pipeline.del(key);
-    }
-    const results = await pipeline.exec();
-    // Upstash pipeline results are typed as unknown[], errors are Error instances
-    for (const result of results) {
-      if (result instanceof Error) {
-        failedDeletes++;
-        captureWarning('[db-cache] Redis pipeline DEL failed', result);
-      }
-    }
-  }
-  return failedDeletes;
-}
-
-/**
- * Scan and delete Redis keys matching a prefix.
- */
-async function invalidateRedisByPrefix(
-  fullPrefix: string,
-  prefix: string
-): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-
-  try {
-    const keysToDelete: string[] = [];
-    let cursor: string | number = 0;
-
-    do {
-      const result: [string | number, string[]] = await redis.scan(cursor, {
-        match: `${fullPrefix}*`,
-        count: 100,
-      });
-      cursor = result[0];
-      keysToDelete.push(...result[1]);
-    } while (cursor !== 0 && cursor !== '0');
-
-    if (keysToDelete.length > 0) {
-      const failedDeletes = await deleteKeysInBatches(redis, keysToDelete);
-      Sentry.addBreadcrumb({
-        category: 'db-cache',
-        message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
-        level: 'info',
-      });
-    }
-  } catch (error) {
-    captureWarning('[db-cache] Redis prefix invalidation failed', error);
-  }
+  await invalidateLoads(
+    candidate => candidate === cacheKey,
+    () => memoryCache.delete(cacheKey),
+    deadline => invalidateRedisKey(cacheKey, deadline)
+  );
 }
 
 /**
  * Invalidate all cached queries matching a prefix.
  * Useful for invalidating related caches (e.g., all profile caches for a user).
  *
- * Clears both in-memory and Redis caches so other instances don't serve stale data.
+ * Clears this process's memory and shared Redis entries. Other processes keep
+ * their already-cached values until their TTL expires.
  *
  * @param prefix - Key prefix to match
  */
 export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
   const fullPrefix = `${CACHE_PREFIX}${prefix}`;
 
-  // Invalidate memory cache
-  const deleted = memoryCache.deleteByPrefix(fullPrefix);
-  if (deleted > 0) {
-    Sentry.addBreadcrumb({
-      category: 'db-cache',
-      message: `Invalidated ${deleted} memory cache entries`,
-      level: 'info',
-    });
-  }
-
-  // Invalidate Redis cache using SCAN to find matching keys
-  await invalidateRedisByPrefix(fullPrefix, prefix);
+  await invalidateLoads(
+    candidate => candidate.startsWith(fullPrefix),
+    () => {
+      const deleted = memoryCache.deleteByPrefix(fullPrefix);
+      if (deleted > 0) {
+        Sentry.addBreadcrumb({
+          category: 'db-cache',
+          message: `Invalidated ${deleted} memory cache entries`,
+          level: 'info',
+        });
+      }
+    },
+    deadline =>
+      invalidateRedisByPrefix(
+        fullPrefix,
+        prefix,
+        deadline,
+        MAX_MEMORY_CACHE_SIZE
+      )
+  );
 }
 
 /**
@@ -322,10 +358,16 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
 export function getCacheStats(): {
   memoryCache: { size: number; maxSize: number; utilization: number };
   redisAvailable: boolean;
+  inFlightLoads: { size: number; maxSize: number; maxAgeMs: number };
 } {
   return {
     memoryCache: memoryCache.stats(),
-    redisAvailable: getRedis() !== null,
+    redisAvailable: isRedisCacheAvailable(),
+    inFlightLoads: {
+      size: activeLoadCount,
+      maxSize: MAX_MEMORY_CACHE_SIZE,
+      maxAgeMs: CACHE_LOAD_MAX_AGE_MS,
+    },
   };
 }
 

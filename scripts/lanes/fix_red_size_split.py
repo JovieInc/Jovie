@@ -22,6 +22,7 @@ SIZE_500_NEW = re.compile(
     r"size-500: (?P<path>[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:mjs|js)): "
     r"\d+ lines, over 500 and not baselined"
 )
+SIZE_BASELINE_GREW = re.compile(r"size-500: [A-Za-z0-9_./-]+: grew \d+ -> \d+")
 _TEST_FILE = re.compile(r"\.(?:test|spec)\.(?P<ext>mjs|js)$")
 _IMPORT = re.compile(
     r"import\s+(.+?)\s+from\s+(['\"][^'\"]+['\"])\s*;?\s*$",
@@ -42,6 +43,16 @@ def paths_from_log(log: str) -> list[str]:
         if path not in seen:
             seen.append(path)
     return seen
+
+
+def legacy_hit(text: str, hit):
+    """Plain legacy size logs outrank fixture quota text, never annotated validation."""
+    if "##[error]" not in text and (hit is None or hit[0] in {"quota-deferred", "platform-infra"}):
+        if SIZE_500_NEW.search(text):
+            return "size-500-new", "split-size-500"
+        if SIZE_BASELINE_GREW.search(text):
+            return "size-baseline-grew", "sync-main"
+    return hit
 
 
 def _name_in(name: str, text: str) -> bool:
@@ -170,6 +181,10 @@ def split_unbaselined_vitest(text: str, filename: str) -> dict[str, str] | None:
     statements = parse_statements(text)
     if statements is None:
         return None
+    # Import redistribution needs modeled bindings. Side-effect and other
+    # unsupported imports must stay with the model rather than disappear.
+    if any(stmt.kind == "import" and _parse_import(stmt.text) is None for stmt in statements):
+        return None
     suites = [stmt for stmt in statements if stmt.kind in {"describe", "suite"}]
     bindings = [stmt for stmt in statements if stmt.kind == "binding"]
     if len(suites) < 2:
@@ -255,6 +270,24 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
     if any(not body.strip() for body in pieces.values()):
         return None
     return pieces
+
+
+def bind(sh, failed_logs):
+    """Keep current annotated validation authoritative when serving legacy routes."""
+    import fix_red_size_500
+
+    strict = fix_red_size_500.bind(sh, failed_logs)
+
+    def fix(host, pr, route, worktree, log, receipt):
+        text = fix_red_size_500._log_text(failed_logs, host, pr)
+        if "##[error]" in text:
+            return strict(host, pr, route, worktree, log, receipt)
+        files = paths_from_log(text)
+        if not files or any(path not in ((route or {}).get("files") or []) for path in files):
+            return None
+        return apply(sh, pr, worktree, log, receipt, files)
+
+    return fix
 
 
 def apply(sh, pr, worktree, log, receipt, files):

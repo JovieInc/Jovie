@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 
 const WORKFLOW = readFileSync(
   resolve(import.meta.dirname, '../../../.github/workflows/pr-size-guard.yml'),

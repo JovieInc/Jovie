@@ -75,4 +75,20 @@ describe('JOV-5466 token retire', () => {
     );
     expect(source).not.toMatch(/--linear-app-/);
   });
+  it('outlines the active tab with a theme token that shows in light mode', () => {
+    render(
+      <DrawerTabStrip<Tab>
+        tabs={TABS}
+        active='overview'
+        onChange={() => undefined}
+      />
+    );
+    const active = screen.getByRole('tab', {
+      name: 'Overview',
+      selected: true,
+    });
+    expect(active.className).toContain('ring-(--app-shell-border)');
+    expect(active.className).not.toContain('ring-white/10');
+    expect(active.className).not.toMatch(/shadow-\[[^\]]*rgba/);
+  });
 });

@@ -206,7 +206,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Get New Music')).toBeInTheDocument();
+    expect(screen.getByText('Get updates')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
     expect(screen.queryByText('Optional')).not.toBeInTheDocument();
   }, 10_000);
@@ -218,7 +218,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
-    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
+    expect(await screen.findByText('Get updates')).toBeInTheDocument();
   });
 
   it('closes immediately when dismissal persistence is rate-limited', async () => {
@@ -228,7 +228,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />);
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -248,7 +248,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     );
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -272,7 +272,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(mockGetCaptureDismissalStatus).toHaveBeenCalledWith('artist-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
 
     await act(async () => {
       resolveStatus(null);
@@ -292,7 +292,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     );
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     let resolveNextArtistStatus!: (value: null) => void;
@@ -391,7 +391,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       />
     );
 
-    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
+    expect(await screen.findByText('Get updates')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -429,7 +429,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
+    expect(await screen.findByText('Get updates')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({

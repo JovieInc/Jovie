@@ -13,7 +13,9 @@ describe('ArtistProfileSectionHeader', () => {
       />
     );
 
-    expect(screen.getByText('Artist Profile')).toBeInTheDocument();
+    const eyebrow = screen.getByText('Artist Profile');
+    expect(eyebrow).toBeInTheDocument();
+    expect(eyebrow.className).not.toMatch(/\buppercase\b/);
     const heading = screen.getByRole('heading', {
       level: 2,
       name: 'Your music stays together. The right action leads.',

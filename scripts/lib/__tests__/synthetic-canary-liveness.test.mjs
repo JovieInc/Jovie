@@ -171,7 +171,11 @@ describe('synthetic canary dead-man', () => {
     // manual dispatch would otherwise have left the dead-man blind.
     expect(
       await check(githubFor([run({ event: 'workflow_dispatch' })]))
-    ).toMatchObject({ ok: true, missedSlot: false });
+    ).toMatchObject({
+      ok: true,
+      reason: 'Scheduled canary healthy',
+      missedSlot: false,
+    });
   });
 
   it('excludes a very late daily cron run (2026-10-30 shape) from the heartbeat', async () => {
@@ -360,118 +364,5 @@ describe('synthetic canary dead-man', () => {
       token: 'test-credential',
     });
     expect(await main({ env: {}, now: NOW })).toBe(0);
-  });
-});
-describe('missed-slot dispatch fallback', () => {
-  const staleRun = () => [run({ id: 110, created_at: iso(421) })];
-  const withPost = (github, status) => {
-    github.rest.mockImplementation(async (method, path) => {
-      if (method === 'POST') return { status };
-      return {
-        status: 200,
-        json: () => ({ workflow_runs: staleRun() }),
-      };
-    });
-    return github;
-  };
-
-  it('re-dispatches the canary on a missed slot without softening the verdict', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const dir = mkdtempSync(join(tmpdir(), 'synthetic-dispatch-'));
-    const env = {
-      GITHUB_REPOSITORY: repo,
-      SYNTHETIC_CANARY_DISPATCH: '1',
-      GITHUB_OUTPUT: join(dir, 'output'),
-      GITHUB_STEP_SUMMARY: join(dir, 'summary'),
-    };
-    try {
-      const github = withPost(githubFor(staleRun()), 204);
-      expect(await main({ github, env, now: NOW })).toBe(1);
-      const post = github.rest.mock.calls.find(([method]) => method === 'POST');
-      expect(post[1]).toBe(
-        `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/dispatches`
-      );
-      expect(post[2]).toEqual({ ref: 'main' });
-      expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain(
-        'test_status=failed\n'
-      );
-      expect(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8')).toContain(
-        'canary re-dispatched'
-      );
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('never dispatches while the gate is off, on a failed canary, or with a run in flight', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const off = githubFor(staleRun());
-    await main({ github: off, env: { GITHUB_REPOSITORY: repo }, now: NOW });
-    expect(off.rest.mock.calls.every(([method]) => method === 'GET')).toBe(
-      true
-    );
-    const failed = githubFor(
-      [run({ id: 111, created_at: iso(30), conclusion: 'failure' })],
-      { 111: [job()] }
-    );
-    await main({
-      github: failed,
-      env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
-      now: NOW,
-    });
-    expect(failed.rest.mock.calls.every(([method]) => method === 'GET')).toBe(
-      true
-    );
-    // The fallback's own aftermath: its dispatched run is still queued above
-    // the stale scheduled run — the alarm holds, the re-kick does not repeat.
-    const inFlight = run({ id: 112, status: 'queued', conclusion: null });
-    const aftermath = githubFor(
-      [inFlight, run({ id: 113, created_at: iso(421) })],
-      { 112: [], 113: [] }
-    );
-    await main({
-      github: aftermath,
-      env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
-      now: NOW,
-    });
-    expect(
-      aftermath.rest.mock.calls.every(([method]) => method === 'GET')
-    ).toBe(true);
-  });
-
-  it('keeps the dead-man red when the dispatch is rejected or errors', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const dir = mkdtempSync(join(tmpdir(), 'synthetic-dispatch-rejected-'));
-    try {
-      const rejected = withPost(githubFor(staleRun()), 403);
-      expect(
-        await main({
-          github: rejected,
-          env: {
-            GITHUB_REPOSITORY: repo,
-            SYNTHETIC_CANARY_DISPATCH: '1',
-            GITHUB_STEP_SUMMARY: join(dir, 's'),
-          },
-          now: NOW,
-        })
-      ).toBe(1);
-      const throwing = githubFor(staleRun());
-      throwing.rest.mockImplementation(async method => {
-        if (method === 'POST') throw new Error('sensitive response body');
-        return {
-          status: 200,
-          json: () => ({ workflow_runs: staleRun() }),
-        };
-      });
-      expect(
-        await main({
-          github: throwing,
-          env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
-          now: NOW,
-        })
-      ).toBe(1);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });

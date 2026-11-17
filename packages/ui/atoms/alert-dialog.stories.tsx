@@ -103,3 +103,63 @@ export const Destructive: Story = {
     </AlertDialog>
   ),
 };
+
+export const Partial: Story = {
+  render: () => (
+    <AlertDialog defaultOpen>
+      <AlertDialogContent aria-describedby={undefined}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard draft?</AlertDialogTitle>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction>Discard</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required title and actions, with the optional description and trigger omitted; the layout stays balanced.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <AlertDialog defaultOpen>
+        <AlertDialogContent dir='rtl'>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              هل تريد حذف هذا الإصدار نهائيًا من مكتبتك الموسيقية؟
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف الإصدار وجميع المقاطع المرتبطة به، وستتوقف الروابط العامة
+              التي شاركتها مع جمهورك عن العمل فورًا. يبقى سجل الإحصائيات متاحًا
+              لك.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction variant='destructive'>
+              حذف الإصدار
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic copy wraps inside the dialog and the footer actions mirror their order.',
+      },
+    },
+  },
+};

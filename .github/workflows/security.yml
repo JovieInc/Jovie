@@ -77,7 +77,20 @@ jobs:
             exit 1
           fi
 
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run secret scan (gitleaks + trufflehog)
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -113,13 +126,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Scan lockfiles with osv-scanner
         run: |
           set -euo pipefail
-          version=v2.5.1
-          sha=f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be
-          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/${version}/osv-scanner_linux_amd64"
-          echo "${sha}  osv-scanner" | sha256sum -c -
+          # Cached, sha256-pinned (scripts/security/scanner-pins.txt), with a
+          # container-image fallback when the release CDN 504s (JOV-11689).
+          source scripts/security/fetch-scanner.sh
+          cp "$(fetch_scanner osv-scanner 2.5.1)" osv-scanner
           chmod +x osv-scanner
           set +e
           ./osv-scanner scan source --format sarif --output-file osv.sarif .
@@ -128,8 +151,48 @@ jobs:
           if [[ "$code" -gt 1 ]]; then
             exit "$code"
           fi
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check the installation quota before uploading osv SARIF
+        # JOV-11801: the pinned upload action answers "API rate limit exceeded
+        # for installation" whenever the shared Actions token bucket is empty,
+        # reddening main with no verdict on the code (episodes 1-12). The gate
+        # reads the bucket first and defers the upload, visibly, only while it
+        # cannot carry the upload's own calls; every other upload failure still
+        # fails the job, and the scan step above is unchanged and fail-closed.
+        id: osv_upload_gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The osv job times out at 20 minutes. A rate-limit hold must finish
+          # inside that window (gh-api-hold.sh otherwise waits up to 3900s).
+          # GET /rate_limit does not spend the bucket it reports.
+          GH_API_HOLD_BUDGET_SECONDS: 90
+          GH_API_HOLD_TOKEN_CAP_SECONDS: 90
+        run: |
+          set -euo pipefail
+          hold_script=".github/scripts/gh-api-hold.sh"
+          if [[ ! -f "$hold_script" ]]; then
+            echo "::error::Missing ${hold_script} - cannot gate the osv SARIF upload"
+            exit 1
+          fi
+          # GET /rate_limit never spends the bucket it reports, so the read
+          # answers even while the bucket is empty. A read failure does not
+          # defer: the upload is then attempted and stays fail-closed.
+          if ! quota="$(bash "$hold_script" api rate_limit --jq '{remaining: .resources.core.remaining, reset: .resources.core.reset, limit: .resources.core.limit}')"; then
+            echo "::warning::github-quota-deferred gate could not read the rate limit; attempting the osv SARIF upload"
+            echo "defer=false" >>"${GITHUB_OUTPUT:-/dev/null}"
+            exit 0
+          fi
+          printf '%s' "$quota" | node scripts/security/sarif-upload-gate.mjs --label osv
       - name: Upload osv SARIF
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        # success() stays explicit: a custom if replaces the default status
+        # check, and a failed scan must not upload.
+        if: steps.osv_upload_gate.outputs.defer != 'true' && success()
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: osv.sarif
           category: osv
@@ -160,7 +223,7 @@ jobs:
             exit "$code"
           fi
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: semgrep.sarif
           category: semgrep
@@ -211,7 +274,20 @@ jobs:
             exit 1
           fi
 
+      - name: Restore pinned scanner binaries
+        # Warm cache never touches the network (JOV-11689). Contents are
+        # re-verified against scripts/security/scanner-pins.txt on every use.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /tmp/trufflehog-3.99.8
+            /tmp/gitleaks-8.21.2
+            /tmp/osv-scanner-2.5.1
+          key: scanner-bins-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/security/scanner-pins.txt') }}
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
+        env:
+          # Read-only token for the release-download fallback.
+          RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -246,6 +322,7 @@ jobs:
             exit 1
           fi
           TRUFFLEHOG_BIN="$trufflehog_bin" ./scripts/security/scan-secrets.test.sh
+          ./scripts/security/fetch-scanner.test.sh
           node --test scripts/security/prepare-ci-secret-scan-range.test.mjs
 
   trivy:
@@ -272,7 +349,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
@@ -310,7 +387,7 @@ jobs:
         run: node scripts/lib/scorecard-credential-guard.mjs
 
       - name: Upload Scorecard results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'

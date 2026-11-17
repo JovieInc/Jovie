@@ -118,7 +118,7 @@ export function ContextMenuOverlay({
       <div
         ref={ref}
         role='menu'
-        className='absolute min-w-50 max-w-70 rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
+        className='absolute min-w-50 max-w-70 rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 backdrop-blur-xl shadow-(--shadow-popover) p-1'
         style={{ left: pos.left, top: pos.top }}
       >
         {state.items.map((item, index) => {
@@ -151,7 +151,7 @@ export function ContextMenuOverlay({
                 item.disabled
                   ? 'opacity-50 cursor-not-allowed text-secondary-token'
                   : item.tone === 'danger'
-                    ? 'text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10'
+                    ? 'text-error-text hover:text-error-text hover:bg-error-subtle'
                     : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
               )}
             >
@@ -162,7 +162,7 @@ export function ContextMenuOverlay({
                     item.disabled
                       ? 'text-tertiary-token'
                       : item.tone === 'danger'
-                        ? 'text-rose-300/70 group-hover/mi:text-rose-200'
+                        ? 'text-error-text group-hover/mi:text-error-text'
                         : 'text-tertiary-token group-hover/mi:text-primary-token'
                   )}
                   strokeWidth={2.25}

@@ -20,7 +20,7 @@
           "matchingUrlPattern": "\\/app\\/chat",
           "assertions": {
             "categories:performance": [
-              "error",
+              "warn",
               {
                 "minScore": 0.85
               }

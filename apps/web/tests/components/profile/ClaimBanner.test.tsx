@@ -157,4 +157,53 @@ describe('ClaimBanner', () => {
       ...PUBLIC_PROFILE_DESKTOP_CONTEXT,
     });
   });
+
+  it('reserves the height of the copy it may switch to without showing it', () => {
+    render(
+      <ClaimBanner
+        profileHandle='unfazed'
+        ctaHref='/unfazed/claim?next=auth'
+        variant='organic'
+        reserveVariant='claim_intent'
+      />
+    );
+
+    expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
+      'This profile is unclaimed. Is it yours? Claim it with Spotify.'
+    );
+    const reserved = screen.getByTestId('claim-banner-reserved-copy');
+    expect(reserved).toHaveTextContent(
+      'Your profile is ready. Claim it to turn on release emails.'
+    );
+    expect(reserved).toHaveAttribute('aria-hidden', 'true');
+    expect(reserved).toHaveClass('invisible');
+  });
+
+  it('counts no impression until the variant is settled, then counts the settled one', () => {
+    const { rerender } = render(
+      <ClaimBanner
+        profileHandle='unfazed'
+        ctaHref='/unfazed/claim?next=auth'
+        variant='organic'
+        trackExposure={false}
+      />
+    );
+
+    expect(track).not.toHaveBeenCalled();
+
+    rerender(
+      <ClaimBanner
+        profileHandle='unfazed'
+        ctaHref='/unfazed/claim?next=auth'
+        variant='claim_intent'
+        trackExposure
+      />
+    );
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(
+      'profile_claim_banner_impression',
+      expect.objectContaining({ variant: 'claim_intent' })
+    );
+  });
 });

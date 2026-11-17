@@ -49,10 +49,6 @@ const REQUIRED_DESTRUCTIVE_FLOWS = [
     file: 'components/features/dashboard/molecules/ContactDeleteConfirmDialog.tsx',
   },
   {
-    name: 'disconnect platform',
-    file: 'components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx',
-  },
-  {
     name: 'disconnect integration',
     file: 'components/features/dashboard/organisms/SettingsTouringSection.tsx',
   },

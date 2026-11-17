@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 
 const pathnameRef = vi.hoisted(() => ({ current: null as string | null }));
 
@@ -17,6 +18,9 @@ vi.mock('@/lib/content-records/site-chrome.server', () => ({
   getSiteChrome: async () => undefined,
 }));
 vi.mock('./home.css', () => ({}));
+vi.mock('next/font/local', () => ({
+  default: () => ({ className: 'geist-mono', variable: 'geist-mono-var' }),
+}));
 vi.mock('../../components/marketing/MarketingSnapRail.css', () => ({}));
 
 import HomeLayout from './layout';
@@ -44,10 +48,53 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml('/')).toBe(server);
   });
 
-  it('always renders the homepage page-contract marker and the invite CTA', async () => {
+  it('scopes Geist Mono to the homepage shell', async () => {
+    expect(await renderHtml(null)).toContain('geist-mono-var home-viewport');
+  });
+
+  it('always renders the homepage page-contract marker and the claim CTA', async () => {
     const html = await renderHtml(null);
     expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/#request-invite"');
-    expect(html).not.toContain('href="/start"');
+    expect(html).toContain(`href="${HOME_MARKETING_HEADER_CTA.href}"`);
+    expect(html).not.toContain('href="/#request-invite"');
+  });
+
+  describe('homepage claim intent', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    async function renderFreshLayout() {
+      vi.resetModules();
+      pathnameRef.current = null;
+      const { default: FreshLayout } = await import('./layout');
+      const { container, unmount } = render(
+        await FreshLayout({ children: <p>hero</p> })
+      );
+      const html = container.innerHTML;
+      unmount();
+      return html;
+    }
+
+    it('points the header action and the page-contract marker at the claim intent', async () => {
+      const html = await renderFreshLayout();
+      const { getClaimProfileIntent } = await import(
+        '@/data/marketingCtaIntents'
+      );
+      const claim = getClaimProfileIntent();
+      expect(html).toContain('data-primary-cta="true"');
+      expect(html).toContain(`href="${claim.href}"`);
+      expect(html).toContain(claim.label);
+      expect(html).not.toContain('#request-invite');
+      expect(html).not.toMatch(/request an invite/i);
+    });
+
+    it('keeps the shared claim entry while /start owns the closed-signup gate', async () => {
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+      const html = await renderFreshLayout();
+      expect(html).toContain(`href="${HOME_MARKETING_HEADER_CTA.href}"`);
+      expect(html).not.toContain('href="/#request-invite"');
+    });
   });
 });

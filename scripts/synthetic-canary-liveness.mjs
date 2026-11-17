@@ -8,7 +8,7 @@ export const MAX_SILENCE_MINUTES = 420; // Six-hour interval + one-hour grace.
 export const RUN_GRACE_MINUTES = 60; // Includes runner queue time; job timeout is 20m.
 const CANARY = 'Production Synthetic Tests';
 const DAILY = 'Web AI Health (Daily)';
-const DAILY_TITLE = 'Production Synthetic Monitoring (47 7 * * *)';
+export const DAILY_TITLE = 'Production Synthetic Monitoring (47 7 * * *)';
 const CANARY_TITLE = 'Production Synthetic Monitoring (17 */6 * * *)';
 
 /**
@@ -175,6 +175,7 @@ export async function dispatchSyntheticCanary({ github, repo }) {
       // One attempt: a timed-out-but-accepted dispatch retried would enqueue a
       // duplicate canary run; a missed re-kick is retried by the next check.
       maxAttempts: 1,
+      maxWaitMs: 5_000,
     }
   );
   if (response.status !== 204) throw new Error('dispatch-rejected');

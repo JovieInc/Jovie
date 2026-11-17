@@ -12,9 +12,13 @@ const {
   const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
   const mockUpdate = vi.fn().mockReturnValue({ set: mockUpdateSet });
 
+  // A Laylo lead: Linktree and Beacons leads never reach qualifyLead (see
+  // process-batch-search-evidence.test.ts).
   const mockSelectLimit = vi
     .fn()
-    .mockResolvedValue([{ linktreeUrl: 'https://linktr.ee/test' }]);
+    .mockResolvedValue([
+      { linktreeUrl: 'https://laylo.com/test', sourcePlatform: 'laylo' },
+    ]);
   const mockSelectWhere = vi.fn().mockReturnValue({ limit: mockSelectLimit });
   const mockSelectFrom = vi.fn().mockReturnValue({ where: mockSelectWhere });
   const mockSelect = vi.fn().mockReturnValue({ from: mockSelectFrom });
@@ -61,7 +65,7 @@ describe('processLeadBatch — scrape retry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDb._selectLimit.mockResolvedValue([
-      { linktreeUrl: 'https://linktr.ee/test' },
+      { linktreeUrl: 'https://laylo.com/test', sourcePlatform: 'laylo' },
     ]);
     mockDb._updateSet.mockReturnValue({ where: mockDb._updateWhere });
     mockDb._updateWhere.mockReturnValue({ returning: mockDb._returning });
@@ -76,9 +80,28 @@ describe('processLeadBatch — scrape retry', () => {
 
     const result = await processLeadBatch(['lead-1'], 1);
 
-    expect(result.error).toBe(1);
-    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(result.error).toBe(0);
+    expect(result.deferred).toBe(1);
+    // Only updatedAt moves, so the cron rotates past the lead; no attempt is
+    // spent and it is never disqualified for it.
+    expect(mockDb._updateSet).toHaveBeenCalledTimes(1);
+    expect(mockDb._updateSet).toHaveBeenCalledWith({
+      updatedAt: expect.any(Date),
+    });
+    expect(mockCaptureError).not.toHaveBeenCalled();
     expect(mockPipelineWarn).not.toHaveBeenCalled();
+  });
+
+  it('still defers the lead when touching updatedAt fails', async () => {
+    mockQualifyLead.mockRejectedValueOnce(
+      new ExtractionError('Disabled', 'SOCIAL_HTML_DISABLED')
+    );
+    mockDb._updateWhere.mockRejectedValueOnce(new Error('db down'));
+
+    const result = await processLeadBatch(['lead-1'], 1);
+
+    expect(result.deferred).toBe(1);
+    expect(result.error).toBe(0);
   });
 
   it('increments scrapeAttempts on qualification failure', async () => {

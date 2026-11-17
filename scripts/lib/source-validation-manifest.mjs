@@ -13,6 +13,7 @@
  * scoped) or NOT_LOCAL (heavy, CI-only or covered elsewhere, with the reason).
  */
 import { readFileSync } from 'node:fs';
+import { selectLocalGuards } from './preflight-local-guards.mjs';
 
 const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 
@@ -31,6 +32,14 @@ const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 
 /** @type {readonly Guard[]} */
 export const SOURCE_VALIDATION_GUARDS = Object.freeze([
+  {
+    id: 'web-eslint',
+    name: 'changed web ESLint (including hook dependencies)',
+    command:
+      'ESLINT_CHANGED_BASE="origin/{base}" pnpm --filter @jovie/web run lint:eslint:changed',
+    when: /^apps\/web\/.+\.tsx?$/,
+    covers: ['pnpm --filter @jovie/web run lint:eslint:changed'],
+  },
   {
     id: 'wf:refs',
     name: 'workflow references',
@@ -147,11 +156,27 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['pnpm screen-registration-gate'],
   },
   {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate',
+    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:(?:component-certification|cert-screens)\.json$|component-certification\.d\/)|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
+    covers: ['pnpm component-certificate:gate'],
+  },
+  {
     id: 'layout-guard-pen',
     name: 'layout-guard pen contracts still rendered',
     command: 'node scripts/layout-guard-pen-contracts.mjs',
     when: /^(?:apps\/web\/(?:app|components|data)\/|scripts\/layout-guard-pen)/,
     covers: ['scripts/layout-guard-pen-contracts.mjs'],
+  },
+  {
+    id: 'onboarding-browser',
+    name: 'onboarding recovery browser proof',
+    command:
+      'pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --output=.cache/onboarding-recovery-results --project=chromium --reporter=line',
+    when: /^apps\/web\/(?:components\/features\/onboarding\/|tests\/e2e\/storybook-onboarding-recovery\.spec\.ts$)/,
+    covers: ['tests/e2e/storybook-onboarding-recovery.spec.ts'],
+    heavy: true,
   },
   {
     // Measured >180s on a laptop: CI-grade, run with --thorough.
@@ -267,10 +292,23 @@ export const coveredBy = atom =>
   NOT_LOCAL.some(n => atom.includes(n.match));
 
 /** Guards whose trigger matches the changed paths, `{base}` expanded. */
+/**
+ * Guards for these changed paths: Source Validation's, then the pre-push-only
+ * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ */
 export function selectManifestGuards(paths, base = 'main') {
-  return SOURCE_VALIDATION_GUARDS.filter(g =>
-    paths.some(p => g.when.test(p))
-  ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) }));
+  // Supplemental local guards may refine a CI guard (for example, include
+  // uncommitted files in ESLint). Keep one command per ID in manifest order.
+  const guards = new Map(
+    [
+      ...SOURCE_VALIDATION_GUARDS.filter(g => paths.some(p => g.when.test(p))),
+      ...selectLocalGuards(paths),
+    ].map(g => [g.id, g])
+  );
+  return [...guards.values()].map(g => ({
+    ...g,
+    command: g.command.replaceAll('{base}', base),
+  }));
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

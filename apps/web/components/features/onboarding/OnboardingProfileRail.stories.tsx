@@ -39,6 +39,14 @@ export const Default: Story = {
   args: {
     state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   },
+  // JOV-12045: the side rail's height chain is definite now (the preview
+  // fits the rail at rest), so the story mounts it in a fixed-height
+  // surface like the other side stories.
+  render: () => (
+    <div style={{ height: 692, width: 380 }}>
+      <OnboardingProfileRail state={EMPTY_ONBOARDING_PROFILE_BUILDER_STATE} />
+    </div>
+  ),
 };
 
 // The clearance stories need a real release: with streaming destinations
@@ -169,4 +177,81 @@ export const UnavailableFounderSource: Story = {
       },
     },
   },
+};
+
+const SIDE_FRAME = { height: 692, width: 380 } as const;
+
+export const EmptyRail: Story = {
+  args: {
+    state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const ErrorUnavailableSource: Story = {
+  args: UnavailableFounderSource.args,
+};
+
+export const PartialArtistNoImage: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        imageUrl: null,
+        followers: null,
+        genres: [],
+      },
+    },
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const LongArtistName: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        name: 'The Extraordinarily Long Named Midnight Orchestra Collective',
+      },
+      handle: 'theextraordinarilylongnamedmidnightorchestra',
+    },
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const RtlArtist: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        name: 'فرقة منتصف الليل',
+      },
+    },
+  },
+  render: args => (
+    <div dir='rtl' lang='ar' style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
 };

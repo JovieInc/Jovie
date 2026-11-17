@@ -33,7 +33,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Product-gallery body: one real screenshot-registry capture per phone with a short caption. A grid on wide screens; a focusable scroll-snap rail on phones that never scrolls the page sideways.',
+          'Product-gallery body: one registry capture per phone with a short caption. All previews are visible on desktop. Mobile uses the canonical snap rail with visible Previous/Next controls, keyboard access and native swipe.',
       },
     },
   },
