@@ -58,7 +58,7 @@ export function PrivatePromotionForm({
   return (
     <section className='mx-auto flex w-full max-w-2xl flex-col gap-4 p-4'>
       <h1 className='line-clamp-2 text-xl font-medium'>
-        Draft a promotion for {title}
+        {title}
       </h1>
       {copy === null && (
         <>
@@ -74,7 +74,7 @@ export function PrivatePromotionForm({
             disabled={!angle.trim()}
             onClick={() => setCopy(composePromotion(title, angle, context))}
           >
-            Prepare caption
+            Preview
           </Button>
         </>
       )}
