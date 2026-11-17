@@ -467,6 +467,26 @@
         }
       ]
     },
+    "reason-check": {
+      "entityId": "<host>@<checkId> (native jovie.reason-check/v1 UUID)",
+      "description": "Exact-release-bound guarded queue-check execution only. Empty, running and spawned checks never prove worker acceptance, job completion or publication. Scheduler wait is outside this span; source registration is not installation or commissioning proof.",
+      "stages": [
+        {
+          "id": "queue-check",
+          "meaning": "guarded queue observation attempt from startedAt to observedAt, including disk admission and dependency reads; excludes hosted scheduling, provider execution and publication",
+          "producer": "scripts/lanes/stage_events.py",
+          "status": "pushed",
+          "source": "lanes-stage-feed"
+        },
+        {
+          "id": "checked",
+          "meaning": "terminal queue-check outcome; blocked and rate-limited checks fail, successful empty or spawned checks certify no work outcome",
+          "producer": "scripts/lanes/stage_events.py",
+          "status": "pushed",
+          "source": "lanes-stage-feed"
+        }
+      ]
+    },
     "automation-run": {
       "entityId": "<automationId>@<runRef> (registry id in canon/automation-registry.jsonl plus the run's own reference)",
       "description": "One run of a registered automation, from start to its terminal receipt, as observed by the dead-man liveness check.",
