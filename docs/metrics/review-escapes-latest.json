@@ -1,7 +1,7 @@
 {
   "schema": "jovie-review-escapes/v1",
   "windowDays": 30,
-  "mergedPrs": 936,
+  "mergedPrs": 937,
   "escapedPrs": 38,
   "escapeRate": 0.0406,
   "byLayer": {
@@ -333,5 +333,5 @@
       "guardAdded": true
     }
   ],
-  "generatedAt": "2026-11-16T17:06:20.347Z"
+  "generatedAt": "2026-11-16T23:53:29.752Z"
 }
