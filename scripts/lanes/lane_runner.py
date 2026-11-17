@@ -174,9 +174,9 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_escalation_reconcile.py", "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
-# Dependencies outside scripts/lanes for installed source admission and the HUD's
-# PROMOTION line (JOV-6836).
+# Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+                  "scripts/tests/test_size_500_stale.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_publication_cases.py",
