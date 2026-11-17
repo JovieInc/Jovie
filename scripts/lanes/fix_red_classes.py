@@ -206,7 +206,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
@@ -215,7 +215,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = fix_red_size_split.legacy_hit(text, hit)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
             hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
@@ -447,7 +447,7 @@ def resolve_and_chain_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").resolve_coverage_include_hunk(hunk.group("ours"), hunk.group("theirs"))
         if resolved is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -672,8 +672,8 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
 
 
 def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only a one-line identifier list. None when any
-    hunk has another shape, so the caller leaves that merge to a model."""
+    """Replace hunks that are one identifier list or one quoted pytest path list.
+    None when any hunk has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -684,7 +684,7 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").merge_pytest_file_list(hunk.group("ours"), hunk.group("theirs"))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

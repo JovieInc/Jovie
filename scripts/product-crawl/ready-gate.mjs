@@ -252,6 +252,7 @@ export function overlayWalkFindings(walk) {
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
  *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
  *   strangerOnlyShards?: number[],
+ *   traffic?: { admission?: { blocked?: number, visitsNotStarted?: number }, accounting?: unknown },
  *   overlayWalks?: { walks: (Parameters<typeof overlayWalkFindings>[0] & { stoppedForTime?: boolean, cleanupPending?: boolean, error?: string })[], left?: number, skipped?: unknown[] },
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
@@ -300,6 +301,11 @@ export function productReady(receipt, opts = {}) {
       );
   }
   const overlays = receipt?.overlayWalks;
+  const admission = receipt?.traffic?.admission;
+  if (admission?.blocked || admission?.visitsNotStarted)
+    reasons.push(
+      `crawl admission budget stopped ${admission.blocked || 0} request hops and ${admission.visitsNotStarted || 0} visits`
+    );
   if (overlays?.left || overlays?.skipped?.length)
     reasons.push(
       `${overlays.left || overlays.skipped.length} overlay pages not walked before the deadline`

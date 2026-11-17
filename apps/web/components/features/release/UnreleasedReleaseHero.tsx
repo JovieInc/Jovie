@@ -8,6 +8,7 @@
  * menu button top-right, content area below with notification signup.
  */
 
+import { PlainButton } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -120,7 +121,7 @@ export function UnreleasedReleaseHero({
         title='Menu'
       >
         <div className='flex flex-col gap-0.5'>
-          <button
+          <PlainButton
             type='button'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
@@ -130,7 +131,7 @@ export function UnreleasedReleaseHero({
           >
             <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
-          </button>
+          </PlainButton>
         </div>
       </ProfileDrawerShell>
       <ProfileDrawerShell

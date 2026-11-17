@@ -8,8 +8,9 @@ import subprocess
 
 # Inherited design identities removed on main need the existing one-sync-per-head
 # route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
+# failure plus a typed identity or an error with zero baseline growth.
 DESIGN_SOURCE_CLI = re.compile(
+    r"(?:AssertionError: |##\[error\])\[design-system-source-ratchet\] FAIL — \d+ identities \(0 new / baseline \d+\)|"
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
     r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
@@ -133,9 +134,10 @@ RENDER_MODE_SNAPSHOT = RenderModeSnapshotDrift()
 
 # PR Size Guard counts the PR head for repository hygiene and the merged tree
 # for the combined-tree budget. A head that has not yet merged a main prune
-# (drizzle snapshots, #25664) fails both while the live base tip is already
-# under budget. Sync main once; a head that is still over after that sync is
-# a real shrink, and claim_route will not sync it again.
+# (drizzle snapshots, #25664) fails while the live base tip is already under
+# budget. sync_claim allows one sync per head against that tip. The same tip
+# does not sync again. A later tip, after an up-to-date sync burned the old
+# key, gets its own claim. A head still over after that sync is a real shrink.
 _TREE_BYTE_LINE = re.compile(
     r'(?:##\[error\]|::error::)\s*\d+ bytes of tracked regular files '
     r'\(merged tree; base \d+ [+-]\d+\) exceeds the \d+-byte combined-tree budget')
@@ -171,6 +173,35 @@ class TreeByteBudget:
 
 
 TREE_BYTE_BUDGET = TreeByteBudget()
+
+
+def base_tip(pr) -> str:
+    """Current base branch tip, or "" when the pull request does not name one."""
+    if not isinstance(pr, dict):
+        return ""
+    ref = pr.get("baseRef")
+    oid = None
+    if isinstance(ref, dict):
+        target = ref.get("target")
+        if isinstance(target, dict):
+            oid = target.get("oid")
+    if not isinstance(oid, str):
+        oid = pr.get("baseRefOid")
+    return oid if isinstance(oid, str) and _SHA.fullmatch(oid) else ""
+
+
+def sync_claim(pr, action: str) -> str:
+    """Route claim key. sync-main is once per head and base tip.
+
+    A no-op sync records the unqualified key `sync-main` on that head. Main
+    can then land a prune without changing the head. The qualified key
+    `sync-main:<tip>` is free, so the lane merges the new tip instead of
+    dispatching a model. Other actions stay once per head.
+    """
+    if action != "sync-main":
+        return action
+    tip = base_tip(pr)
+    return f"sync-main:{tip}" if tip else action
 
 
 class SoleAliasReviewFailure:
@@ -306,7 +337,10 @@ def stuck_sync_claim(pr, routes, synced) -> bool:
     if not isinstance(head, str) or _SHA.fullmatch(head) is None:
         return False
     claimed = routes.get(str(pr["number"]))
-    if not isinstance(claimed, dict) or claimed.get("sync-main") != head:
+    # The live claim is sync-main:<tip> once a base tip is known. The bare key
+    # remains the claim only when the pull request has no tip.
+    key = sync_claim(pr, "sync-main")
+    if not isinstance(claimed, dict) or claimed.get(key) != head:
         return False
     receipt = synced.get(str(pr["number"]))
     return not (isinstance(receipt, dict) and receipt.get("from") == head)
@@ -320,12 +354,14 @@ def stuck_sync_is_clean(pr, routes, synced, merge_clean) -> bool:
 def sync_claim_or_retry(route, claim_infra, claim_route, host, pr, read_json, conflict_files) -> bool:
     """Claim the route. Retry a receipt-less sync-main once when main merges clean.
 
-    ``rerun`` and ``sync-main`` are the fix_red_classes action strings. The
-    caller passes the lane's claim and merge-tree functions so this module
-    stays free of the runner import cycle.
+    sync-main uses ``sync_claim`` (once per head and base tip). A crash after
+    that claim and before ``synced.json`` retries once when the merge-tree is
+    clean. ``rerun`` stays once per head. The caller passes the lane's claim
+    and merge-tree functions so this module stays free of the runner import cycle.
     """
     action = route.get("action") if isinstance(route, dict) else None
-    claimed = claim_infra(host, pr) if action == "rerun" else claim_route(host, pr, action)
+    key = sync_claim(pr, action) if action == "sync-main" else action
+    claimed = claim_infra(host, pr) if action == "rerun" else claim_route(host, pr, key)
     if claimed or action != "sync-main":
         return bool(claimed)
     routes = read_json(host.state / "class-routes.json")

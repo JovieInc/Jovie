@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lanes'))
 import fix_red_classes as classes
+import fix_red_failure_routing as routing
 import lane_runner as lane
 
 HEAD = '99320365a5ba5f03eb7cfd48c1a10137bd3d4031'
@@ -54,6 +55,20 @@ class DesignSourceCliTest(unittest.TestCase):
         pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
         with patch.object(lane, 'failed_logs', return_value={'Source Validation': 'API rate limit exceeded'}):
             self.assertEqual(lane.infra_only_red(None, pr), 'api-rate-limit-exceeded')
+
+    def test_truncated_zero_growth_failure_uses_main_sync_without_infra_retry(self):
+        header = '[design-system-source-ratchet] FAIL — 1888 identities (0 new / baseline 1907)'
+        for prefix in ('AssertionError: ', '##[error]AssertionError: '):
+            diagnostic = prefix + header
+            pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+            logs = {'Source Validation': 'passing fixture: API rate limit exceeded\n' + diagnostic}
+            with patch.object(lane, 'failed_logs', return_value=logs):
+                self.assertIsNone(lane.infra_only_red(None, pr))
+                self.assertEqual(lane.route_fix_red(None, pr)['action'], 'sync-main')
+        for diagnostic in (header, 'AssertionError: ' + header.replace('FAIL', 'PASS'),
+                           'AssertionError: ' + header.replace('0 new', '1 new')):
+            got = classes.classify(red('Source Validation'), {'Source Validation': diagnostic})
+            self.assertNotEqual(got['action'], 'sync-main')
 
     def test_direct_identity_diagnostic_uses_existing_main_sync_route(self):
         header = '[design-system-source-ratchet] FAIL — 1900 identities (0 new / baseline 1907)\n'
@@ -264,6 +279,41 @@ class TreeByteBudgetTest(unittest.TestCase):
                     route = classes.classify(red('PR Size Guard'), {'PR Size Guard': prefixed})
                     self.assertEqual(route['action'], 'agent')
 
+class SyncClaimTest(unittest.TestCase):
+    def test_sync_claim_qualifies_only_sync_main(self):
+        tip, other = 'ab' * 20, 'cd' * 20
+        for pr, action, want in (
+            ({'baseRef': {'target': {'oid': tip}}}, 'sync-main', f'sync-main:{tip}'),
+            ({'baseRefOid': tip}, 'sync-main', f'sync-main:{tip}'),
+            ({}, 'sync-main', 'sync-main'),
+            ({'baseRefOid': 'not-a-sha'}, 'sync-main', 'sync-main'),
+            ({'baseRefOid': tip}, 'rerun', 'rerun'),
+        ):
+            self.assertEqual(routing.sync_claim(pr, action), want)
+        self.assertEqual((routing.base_tip({'baseRef': {'target': {'oid': other}}, 'baseRefOid': tip}), routing.base_tip(None)), (other, ''))
+
+    def test_burned_claim_syncs_again_when_the_base_tip_changes(self):
+        with tempfile.TemporaryDirectory() as name:
+            host = lane.Host(state=Path(name))
+            head, tip_a, tip_b = 'c' * 40, 'd' * 40, 'e' * 40
+            (host.state / 'class-routes.json').write_text(json.dumps({'25910': {'sync-main': head}}))
+            pr = {'number': 25910, 'headRefOid': head, 'baseRefOid': tip_a, 'body': ''}
+            route = {'action': 'sync-main', 'cls': 'tracked-byte-stale'}
+
+            def finished(*_args, **_kwargs):
+                # Production sync_main writes this receipt before it returns.
+                (host.state / 'synced.json').write_text(json.dumps(
+                    {'25910': {'from': head, 'ok': True}}))
+                return 'synced'
+
+            with patch.object(lane.pr_events, 'sync_main', side_effect=finished) as sync:
+                self.assertEqual(lane.deterministic_route_taken(host, pr, route), 'infra-rerun:tracked-byte-stale')
+                self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
+                pr['baseRefOid'] = tip_b
+                self.assertEqual(lane.deterministic_route_taken(host, pr, route), 'infra-rerun:tracked-byte-stale')
+            saved = json.loads((host.state / 'class-routes.json').read_text())['25910']
+            self.assertEqual((sync.call_count, saved['sync-main'], saved[f'sync-main:{tip_b}']), (2, head, head))
+
 
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):
@@ -473,6 +523,9 @@ class StuckSyncRetryTest(unittest.TestCase):
             (self.pr, self.routes, {'25257': {'from': self.head, 'ok': False}}, True, False),
             ({'number': '25257', 'headRefOid': self.head}, self.routes, {}, True, False),
             (self.pr, self.routes, [], True, False),
+            ({**self.pr, 'baseRefOid': 'd' * 40},
+             {'25257': {'sync-main:' + 'd' * 40: self.head}}, {}, True, True),
+            ({**self.pr, 'baseRefOid': 'd' * 40}, self.routes, {}, True, False),
         ]
         for pr, routes, synced, clean, expected in rows:
             self.assertIs(claim(pr, routes, synced, clean), expected)
@@ -493,6 +546,24 @@ class StuckSyncRetryTest(unittest.TestCase):
         self.assertEqual((reason, merged.call_count, sync.call_count), (None, 0, 0))
         reason, merged, sync = self._taken({}, ['apps/web/a.tsx'])
         self.assertEqual((reason, merged.call_count, sync.call_count), (None, 1, 0))
+
+    def test_qualified_tip_without_a_receipt_retries_only_when_the_merge_is_clean(self):
+        tip = 'd' * 40
+        pr = {**self.pr, 'baseRefOid': tip}
+        routes = {'25257': {f'sync-main:{tip}': self.head}}
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[routes, {}]), \
+                patch.object(lane, 'conflict_files', return_value=[]) as merged, \
+                patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
+            reason = lane.deterministic_route_taken(self.host, pr, self.route)
+        self.assertEqual((reason, merged.call_count, sync.call_count),
+                         ('infra-rerun:design-source-cli', 1, 1))
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[routes, {}]), \
+                patch.object(lane, 'conflict_files', return_value=['scripts/lanes/lane_runner.py']) as blocked, \
+                patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
+            reason = lane.deterministic_route_taken(self.host, pr, self.route)
+        self.assertEqual((reason, blocked.call_count, sync.call_count), (None, 1, 0))
 
 
 if __name__ == '__main__':

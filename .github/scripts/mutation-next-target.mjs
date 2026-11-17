@@ -14,7 +14,7 @@ import {
   same,
   scoringJob,
   validRequest,
-  verifyPublication,
+  verifyHistoricalPublication,
 } from './mutation-next-evidence.mjs';
 
 export {
@@ -283,8 +283,8 @@ export function selectRequest(requests, history) {
       const publishedRequest = { ...request, predecessor };
       publishedRequest.requestDigest = digest(requestBody(publishedRequest));
       if (
-        verifyPublication(publishedRequest, entry.publication).status !==
-        'ready'
+        verifyHistoricalPublication(publishedRequest, entry.publication)
+          .status !== 'ready'
       )
         return hold('measurement result publication is unknown');
       if (

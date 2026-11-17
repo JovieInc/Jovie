@@ -288,6 +288,62 @@ class MeasuredWinPublishTests(unittest.TestCase):
         self.assertEqual(compared, [])
 
 
+class GitHubActionPinWinTests(MeasuredWinPublishTests):
+    def files(self):
+        case = super().files()
+        case.files = [{"filename": ".github/workflows/sonarcloud.yml", "status": "modified", "patch": (
+            "@@ -1 +1 @@\n"
+            f"-        uses: SonarSource/sonarqube-scan-action@{case.OLD} # v8.4.1\n"
+            f"+        uses: SonarSource/sonarqube-scan-action@{case.NEW} # v8.5.0\n")}]
+        for comparison in (case.comparison, case.adopted):
+            comparison["html_url"] = comparison["html_url"].replace(
+                "JovieInc/ci", "SonarSource/sonarqube-scan-action")
+        return case
+
+    def test_action_win_uses_its_own_upstream_without_claiming_faster_ci(self):
+        import fix_red_measured_win
+        case = self.files()
+        section = fix_red_measured_win.section_for(case.files, self.shell(case, [], [""]))
+        self.assertIn("SonarSource/sonarqube-scan-action", section)
+        self.assertIn("| commits | lower | 1 | 0 |", section)
+        self.assertNotIn("JovieInc/ci", section)
+        self.assertNotIn("faster", section)
+        self.assertIn("runtime or throughput improvement is not measured", section)
+
+    def test_non_pin_edits_and_untrusted_comparisons_never_publish(self):
+        import fix_red_measured_win
+        case = self.files()
+        workflow = case.files[0]
+        for changes in (
+            [{**workflow, "patch": workflow["patch"] + "+permissions: write-all\n"}],
+            [{**workflow, "patch": workflow["patch"].replace("+        uses: SonarSource/", "+        uses: attacker/")}],
+            [{**workflow, "patch": workflow["patch"].replace(case.NEW, "v8.5.0")}],
+            [{**workflow, "patch": None}],
+            [{**workflow, "status": "added"}],
+            [workflow, workflow],
+            [workflow, {"filename": "README.md", "status": "modified", "patch": "+extra\n"}],
+        ):
+            with self.subTest(changes=changes):
+                body, claimed = ["Summary\n"], []
+                result = fix_red_measured_win.apply(None, {"number": 25797},
+                    lambda *args: claimed.append(args) or True,
+                    sh=self.shell(case, [changes], body))
+                self.assertIsNone(result)
+                self.assertEqual(claimed, [])
+                self.assertEqual(body, ["Summary\n"])
+        for comparison, change in ((case.comparison, {"status": "diverged"}),
+                                   (case.comparison, {"html_url": "https://github.com/attacker/action/compare/a...b"}),
+                                   (case.adopted, {"ahead_by": 1})):
+            original = dict(comparison)
+            comparison.update(change)
+            body = ["Summary\n"]
+            self.assertFalse(fix_red_measured_win.publish({"number": 25797},
+                self.shell(case, [case.files], body)))
+            self.assertEqual(body, ["Summary\n"])
+            comparison.clear()
+            comparison.update(original)
+
+
 class MeasuredWinPolicyTests(unittest.TestCase):
     PR = fixtures.RedBeforeGreenEvidenceTests.PR
     WIN = fixtures.RedBeforeGreenEvidenceTests.WIN

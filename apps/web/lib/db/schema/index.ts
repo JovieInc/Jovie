@@ -1,8 +1,5 @@
 /**
  * Database Schema - Explicit Named Re-exports
- *
- * This file re-exports all schema definitions from domain-focused modules
- * using explicit named exports for deterministic tree-shaking.
  */
 
 // Pixel Tracking (Events, Creator Configs)
@@ -177,6 +174,7 @@ export {
   insertStripeWebhookEventSchema,
   type NewBillingAuditLog,
   type NewStripeWebhookEvent,
+  priceLocks,
   type StripeWebhookEvent,
   selectBillingAuditLogSchema,
   selectStripeWebhookEventSchema,
@@ -1455,27 +1453,7 @@ export {
   userInterviews,
 } from './user-interviews';
 // Waitlist
-export {
-  insertWaitlistAuditLogSchema,
-  insertWaitlistEntrySchema,
-  insertWaitlistInviteSchema,
-  insertWaitlistSettingsSchema,
-  type NewWaitlistAuditLog,
-  type NewWaitlistEntry,
-  type NewWaitlistInvite,
-  selectWaitlistAuditLogSchema,
-  selectWaitlistEntrySchema,
-  selectWaitlistInviteSchema,
-  selectWaitlistSettingsSchema,
-  type WaitlistAuditLog,
-  type WaitlistEntry,
-  type WaitlistInvite,
-  type WaitlistSettings,
-  waitlistAuditLogs,
-  waitlistEntries,
-  waitlistInvites,
-  waitlistSettings,
-} from './waitlist';
+export * from './waitlist';
 // Apple Wallet profile passes
 export {
   type AppleWalletPassDevice,
