@@ -89,7 +89,7 @@ describe('AdminWaitlistTableUnified', () => {
     expect(screen.getByText('Waitlisted')).toBeInTheDocument();
     expect(screen.getByText('Jan 10, 2026')).toBeInTheDocument();
     expect(screen.getByRole('table').getAttribute('data-table-row-mode')).toBe(
-      'dense'
+      'description'
     );
     await expectNoA11yViolations(container);
   });
@@ -125,6 +125,33 @@ describe('AdminWaitlistTableUnified', () => {
     expect(
       screen.getByText('current_tool: my existing workflow')
     ).toBeInTheDocument();
+  });
+
+  it('opens complete captured words by keyboard without changing a decision', async () => {
+    const user = userEvent.setup();
+    const wants = 'objection: I cannot prepare every release twice';
+    renderTable({
+      entries: [
+        entry({
+          status: 'queued',
+          decisionReason: 'hold_capacity_full',
+          wants,
+        }),
+      ],
+    });
+    const trigger = screen.getByRole('button', {
+      name: 'Read full captured words for Ari Lane',
+    });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.getByRole('dialog', { name: 'captured words for Ari Lane' })
+    ).toHaveTextContent(wants);
+    expect(mocks.approveEntry).not.toHaveBeenCalled();
+    expect(mocks.resendInvite).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('explains the empty waitlist', async () => {

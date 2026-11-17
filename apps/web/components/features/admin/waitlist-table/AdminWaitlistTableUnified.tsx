@@ -250,7 +250,7 @@ export function AdminWaitlistTableUnified({
         </div>
       }
       getRowId={row => row.id}
-      rowMode='dense'
+      rowMode='description'
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
       rowSelection={rowSelection}

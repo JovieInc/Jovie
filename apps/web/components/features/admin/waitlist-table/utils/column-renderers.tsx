@@ -13,6 +13,7 @@ import {
   TableCheckboxCell,
 } from '@/components/organisms/table';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { TableDescription } from '@/components/organisms/table/molecules/TableDescription';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
@@ -133,16 +134,17 @@ export function renderDecisionCell(entry: WaitlistEntryRow) {
     return <EmptyCell />;
   }
   return (
-    <div className='min-w-0 space-y-1'>
+    <div className='min-w-0 space-y-1 whitespace-normal'>
       {entry.decisionReason ? (
         <div className='text-tertiary-token font-mono text-xs'>
           {entry.decisionReason}
         </div>
       ) : null}
       {entry.wants ? (
-        <TruncatedText lines={2} className='text-secondary-token'>
-          {entry.wants}
-        </TruncatedText>
+        <TableDescription
+          text={entry.wants}
+          label={`captured words for ${entry.fullName}`}
+        />
       ) : null}
     </div>
   );
