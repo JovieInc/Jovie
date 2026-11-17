@@ -235,4 +235,69 @@ describe('profile mode query rewrite (JOV-12081)', () => {
       getProfileModeQueryRewrite(gateRequest('/dualipa?mode=listen', 'POST'))
     ).toBeNull();
   });
+
+  // The rewrite must only fire for a pair the build actually prerendered.
+  // getProfileModeRenderStaticParams returns [] when the build has no
+  // database (the daily workflow_dispatch CI build runs without one), and an
+  // ISR fallback render for a pair the build did not prerender serves Next's
+  // flight-only __next_error__ shell — no h1, no testids (JOV-12081,
+  // JOV-12481). The generated prerender set is the build-time truth the
+  // proxy reads; the alias-budget constant alone is not sufficient.
+  describe('bounded by the build-time prerender set', () => {
+    it('keeps every budget pair on the canonical render when the build prerendered nothing', () => {
+      const prerenderedNothing = new Set<string>();
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/dualipa?mode=listen'),
+          prerenderedNothing
+        )
+      ).toBeNull();
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/dualipa?mode=subscribe'),
+          prerenderedNothing
+        )
+      ).toBeNull();
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/testartist?mode=pay'),
+          prerenderedNothing
+        )
+      ).toBeNull();
+    });
+
+    it('rewrites exactly the pairs the build prerendered', () => {
+      const onlyListen = new Set(['dualipa:listen']);
+      const rewrite = getProfileModeQueryRewrite(
+        gateRequest('/dualipa?mode=listen'),
+        onlyListen
+      );
+      expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/listen/__profile-mode-alias`
+      );
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/dualipa?mode=tour'),
+          onlyListen
+        )
+      ).toBeNull();
+    });
+
+    it('defaults to the build-generated prerender set (the full alias budget locally)', () => {
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/dualipa?mode=listen')
+        )?.headers.get('x-middleware-rewrite')
+      ).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/listen/__profile-mode-alias`
+      );
+      expect(
+        getProfileModeQueryRewrite(
+          gateRequest('/testartist?mode=pay')
+        )?.headers.get('x-middleware-rewrite')
+      ).toBe(
+        `${GATE_ORIGIN}/testartist/profile-mode-render/pay/__profile-mode-alias`
+      );
+    });
+  });
 });

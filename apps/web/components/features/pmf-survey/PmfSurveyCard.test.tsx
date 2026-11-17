@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PmfSurveyCard } from './PmfSurveyCard';
 
 function setup(
@@ -171,5 +172,86 @@ describe('PmfSurveyCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByTestId('pmf-survey-card')).not.toBeInTheDocument();
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('keeps the typed benefit and its focus through a re-render, Escape and blur', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(async () => ({ ok: true }));
+    const onDismiss = vi.fn(async () => ({ ok: true }));
+    const { rerender } = render(
+      <PmfSurveyCard onDismiss={onDismiss} onSubmit={onSubmit} />
+    );
+
+    const benefit = screen.getByLabelText(/main benefit/);
+    await user.click(benefit);
+    await user.type(benefit, 'Every release in one link');
+    expect(benefit).toHaveValue('Every release in one link');
+
+    rerender(
+      <PmfSurveyCard
+        onDismiss={vi.fn(async () => ({ ok: true }))}
+        onSubmit={onSubmit}
+      />
+    );
+    expect(screen.getByLabelText(/main benefit/)).toBe(benefit);
+    expect(benefit).toHaveFocus();
+    expect(benefit).toHaveValue('Every release in one link');
+
+    await user.keyboard('{Escape}');
+    await user.tab();
+    expect(benefit).not.toHaveFocus();
+    expect(benefit).toHaveValue('Every release in one link');
+  });
+
+  it('is axe-clean while asking, after a missing answer and after a failed save', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <PmfSurveyCard
+        onDismiss={vi.fn(async () => ({ ok: true }))}
+        onSubmit={vi.fn(async () => {
+          throw new Error('offline');
+        })}
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Send answer' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Pick an answer first.'
+    );
+    await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('radio', { name: 'Not Disappointed' }));
+    await user.click(screen.getByRole('button', { name: 'Send answer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your answer was not saved. Try again.'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean while sending, when thanked and right to left', async () => {
+    const onSubmit = vi.fn(async () => ({ ok: true }));
+    const onDismiss = vi.fn(async () => ({ ok: true }));
+    const { container, rerender } = render(
+      <PmfSurveyCard
+        initialState='pending'
+        onDismiss={onDismiss}
+        onSubmit={onSubmit}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Sending' })).toBeDisabled();
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <div dir='rtl' lang='ar'>
+        <PmfSurveyCard
+          initialState='done'
+          onDismiss={onDismiss}
+          onSubmit={onSubmit}
+        />
+      </div>
+    );
+    expect(screen.getByText('Thanks for answering')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

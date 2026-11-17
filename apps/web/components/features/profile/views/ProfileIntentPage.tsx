@@ -44,7 +44,7 @@ export function ProfileIntentPage({
       <header className='relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 px-5 pb-3 pt-5'>
         <Link
           href={`/${artistHandle}`}
-          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-on-media/[0.04] text-on-media/44 transition-colors duration-subtle hover:bg-on-media/[0.08] hover:text-on-media/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
           aria-label={`Back to ${artistName}`}
           data-testid='profile-intent-page-back'
         >
@@ -55,20 +55,20 @@ export function ProfileIntentPage({
             {entry.title}
           </h1>
           {entry.subtitle ? (
-            <p className='mt-0.5 truncate text-3xs font-[440] leading-[1.1] tracking-tight text-white/46'>
+            <p className='mt-0.5 truncate text-3xs font-[440] leading-[1.1] tracking-tight text-on-media/46'>
               {entry.subtitle}
             </p>
           ) : null}
         </div>
         <Link
           href={`/${artistHandle}`}
-          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-on-media/[0.04] text-on-media/44 transition-colors duration-subtle hover:bg-on-media/[0.08] hover:text-on-media/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
           aria-label={`${artistName} profile`}
         >
           <Mark size={18} className='h-5 w-5' />
         </Link>
       </header>
-      <div className='mx-5 h-px bg-white/[0.06]' />
+      <div className='mx-5 h-px bg-on-media/[0.06]' />
       <section
         className='flex-1 overflow-y-auto px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3'
         data-testid='profile-intent-page-body'

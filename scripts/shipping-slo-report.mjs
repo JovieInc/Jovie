@@ -4,6 +4,9 @@
  *
  *   node scripts/shipping-slo-report.mjs validate
  *       Validate docs/metrics/shipping-slo-baseline.json. Exit 1 on error.
+ *   node scripts/shipping-slo-report.mjs refresh-latest
+ *       Regenerate conflicting latest snapshots from origin/main and live
+ *       evidence without changing the baseline or its daily history.
  *
  *   node scripts/shipping-slo-report.mjs report [--input raw.json]
  *          [--workflows ci.yml,...] [--days 21] [--write-latest]
@@ -663,9 +666,23 @@ export function buildReport(
   };
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+export async function main(args = process.argv.slice(2)) {
   const command = args[0] && !args[0].startsWith('--') ? args[0] : 'report';
+
+  if (command === 'refresh-latest') {
+    execFileSync(
+      process.execPath,
+      [
+        resolve(REPO_ROOT, 'scripts/review-escapes.mjs'),
+        'report',
+        '--ref',
+        'origin/main',
+        '--write-latest',
+      ],
+      { cwd: REPO_ROOT, stdio: 'inherit' }
+    );
+    return main(['report', '--write-latest', '--no-history', ...args.slice(1)]);
+  }
 
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
   const stageManifest = JSON.parse(readFileSync(STAGE_MANIFEST_PATH, 'utf8'));
@@ -808,10 +825,12 @@ async function main() {
 
   if (hasArg(args, '--write-latest')) {
     // Keep daily history current even when no ratchet values improve.
-    baselineDoc = appendDailyHistory(baselineDoc, report, {
-      now: Date.parse(report.generatedAt),
-    });
-    writeFileSync(BASELINE_PATH, formatBiomeJson(baselineDoc));
+    if (!hasArg(args, '--no-history')) {
+      baselineDoc = appendDailyHistory(baselineDoc, report, {
+        now: Date.parse(report.generatedAt),
+      });
+      writeFileSync(BASELINE_PATH, formatBiomeJson(baselineDoc));
+    }
     writeFileSync(LATEST_PATH, formatBiomeJson(report.gistSlo));
     writeFileSync(
       BLOG_LATENCY_PATH,
