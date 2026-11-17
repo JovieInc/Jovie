@@ -31,7 +31,7 @@ describe('MarketingPhoneStateGallery states', () => {
       <MarketingPhoneStateGallery {...meta.args} {...EmptyGallery.args} />
     );
     const region = screen.getByRole('region', { name: 'Profile states' });
-    expect(region).toHaveAttribute('data-count', '0');
+    expect(region.closest('[data-count]')).toHaveAttribute('data-count', '0');
     expect(within(region).queryAllByRole('figure')).toHaveLength(0);
     await expectNoA11yViolations(container);
   });

@@ -18,6 +18,8 @@ import time
 from datetime import datetime, timezone
 
 import machine_gap
+from fix_red_source_edits import GENERATED_RESOLVERS
+import model_pools
 import revert_first
 
 SCHEMA = "jovie.remediation-event/v1"
@@ -60,16 +62,6 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
-# Generated conflicts restore main's copy, then regenerate from merged sources
-# (JOV-6837/JOV-7594). Each output keeps its canonical generator.
-GENERATED_RESOLVERS = {
-    "docs/REPOSITORY_SOURCES.md": ("python3", "scripts/repository_docs.py", "--write"),
-    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
-    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
-    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
-    # Integrity record of the scoped rule files: recomputed from the merged rule bodies.
-    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
-}
 # Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
 # conflict is never a model's call.
 UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
@@ -597,8 +589,7 @@ def classify_event(event: dict) -> dict:
 
 
 def _indexed(providers: dict, *, remote: bool = False) -> list[tuple[int, int, str, dict]]:
-    """Lanes by tier. Remote-only lanes (`repairs: false`, Hyperagent) cannot continue a local
-    worktree or repair a checkout, so handoff and escalation never see them unless asked."""
+    """Lanes by tier; local handoff/escalation exclude remote-only (`repairs: false`) lanes."""
     rows = []
     for index, (name, spec) in enumerate(providers.items()):
         if not isinstance(spec, dict) or (not remote and spec.get("repairs") is False):
@@ -619,7 +610,8 @@ def route_lane(providers: dict, *, exclude: set[str] | None = None, healthy=None
     cooled = cooled or set()
     healthy = healthy or (lambda name, spec: True)
     for tier, index, name, spec in _indexed(providers):
-        if name in exclude or name in cooled or not spec.get("enabled", True):
+        if (model_pools.lane_assignment_reason(spec) or name in exclude or name in cooled
+                or not spec.get("enabled", True)):
             continue
         if not healthy(name, spec):
             continue
@@ -651,7 +643,8 @@ def select_escalation_lane(providers: dict, attempted: set[str], *, healthy=None
     tiers = {}
     for tier, index, name, spec in _indexed(providers):
         tiers[name] = tier
-        if not spec.get("enabled", True) or name in cooled or not healthy(name, spec):
+        if (model_pools.lane_assignment_reason(spec) or not spec.get("enabled", True)
+                or name in cooled or not healthy(name, spec)):
             continue
         catalog.append({"lane": name, "spec": spec, "tier": tier, "index": index})
     if not catalog:
@@ -712,7 +705,7 @@ def issue_routes(providers: dict) -> list[dict]:
     """Every enabled (lane, model) route with its capability and base cost."""
     rows = []
     for tier, index, name, spec in _indexed(providers, remote=True):
-        if not spec.get("enabled", True):
+        if model_pools.lane_assignment_reason(spec) or not spec.get("enabled", True):
             continue
         for order, route in enumerate(spec.get("routes") or ()):
             if not isinstance(route, dict) or not route.get("model"):
@@ -739,17 +732,14 @@ def explicit_lane(labels, providers: dict) -> dict | None:
 
 
 def route_issue(issue: dict, providers: dict, policy: dict, availability, *, only_lanes=None) -> dict:
-    """Pure routing decision; `availability(lane, route)` returns {ok, why, pressure}.
-
-    Candidates are routes at or above the floor, cheapest effective cost first (ties: tier,
-    then list order). An explicit lane narrows the candidates to that lane when it can clear
-    the floor; otherwise it is ignored and the receipt says so. `only_lanes` is the guarded
-    sensitive-surface restriction. The first available candidate is chosen; none -> held.
-    """
+    """Cheapest eligible available route above the floor, else held; labels pin eligible routes.
+    availability returns {ok, why, pressure}; only_lanes restricts sensitive work; ties use tier/order."""
     labels = issue.get("labels") or []
     need = required_capability(issue.get("title", ""), issue.get("description", ""), labels, policy)
     floor = capability_rank(need["capability"])
     routes = issue_routes(providers)
+    assignment_rejected = [{"lane": name, "why": reason} for name, spec in providers.items() if isinstance(spec, dict)
+                           and (reason := model_pools.lane_assignment_reason(spec))]
     if only_lanes is not None:
         routes = [row for row in routes if row["lane"] in only_lanes]
     qualified = [row for row in routes if capability_rank(row["capability"]) >= floor]
@@ -762,7 +752,9 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
             qualified = pinned
             notes.append(f"explicit:{explicit['via']}")
         else:
-            notes.append(f"explicit-below-floor-or-disabled:{explicit['via']}")
+            why = ("explicit-assignment-ineligible" if model_pools.lane_assignment_reason(providers[explicit["lane"]])
+                   else "explicit-below-floor-or-disabled")
+            notes.append(f"{why}:{explicit['via']}")
     candidates = []
     for row in qualified:
         seen = availability(row["lane"], row) or {}
@@ -789,7 +781,7 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
         if rejected:
             rationale += "; below floor: " + ", ".join(sorted({f"{row['lane']}/{row['model']}" for row in rejected}))
     return {"schema": ROUTING_SCHEMA, "issue": issue.get("identifier"), "required": need["capability"],
-            "reasons": need["reasons"], "notes": notes,
+            "reasons": need["reasons"], "notes": notes, "assignmentRejected": assignment_rejected,
             "chosen": None if chosen is None else {key: chosen[key] for key in
                                                    ("lane", "model", "alias", "capability", "costClass",
                                                     "cost", "pressure", "paceAdjust", "effectiveCost")},
