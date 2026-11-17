@@ -48,11 +48,6 @@
   color: var(--hv3-t1);
 }
 
-.hv3-btn:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-}
-
 /* ── Hero ─────────────────────────────────────────────────────────── */
 
 .hv3-hero {

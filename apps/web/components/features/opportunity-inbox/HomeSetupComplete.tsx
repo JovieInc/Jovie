@@ -59,7 +59,7 @@ export function HomeSetupComplete({
                   <li key={step.label}>
                     <Link
                       href={APP_ROUTES.SETTINGS_PROFILE}
-                      className='focus-ring-themed flex min-h-10 items-center gap-3 rounded-md py-2 hover:bg-surface-1'
+                      className='flex min-h-10 items-center gap-3 rounded-md py-2 hover:bg-surface-1'
                     >
                       <Check
                         className='size-4 shrink-0 text-success'
@@ -91,7 +91,7 @@ export function HomeSetupComplete({
       <div>
         <Link
           href={`${APP_ROUTES.DASHBOARD}?view=done`}
-          className='focus-ring-themed inline-flex min-h-12 items-center rounded-md text-app text-secondary-token hover:text-primary-token'
+          className='inline-flex min-h-12 items-center rounded-md text-app text-secondary-token hover:text-primary-token'
         >
           View Completed Work
         </Link>

@@ -86,6 +86,10 @@ describe('WaitlistRoleForm', () => {
     const chipLabels = screen
       .getAllByRole('radio')
       .map(radio => radio.closest('label')?.textContent);
+    // The pill owns the keyboard outline for its hidden radio (focus.css).
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio.closest('label')).toHaveAttribute('data-focus-container');
+    }
     unmount();
 
     render(<WaitlistRoleForm />);

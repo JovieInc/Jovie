@@ -54,11 +54,6 @@
   color: var(--hv3-t1);
 }
 
-.hv3-form .waitlist-chip:has(:focus-visible) {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-}
-
 .hv3-form [data-slot="inline-subscribe"] {
   width: 28.75rem;
   min-height: 0;

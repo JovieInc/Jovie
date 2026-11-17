@@ -449,9 +449,8 @@
     .cl-socialButtonsBlockButton,
     .cl-formButtonPrimary
   ):focus-visible {
-  outline: none;
   border-color: var(--clerk-color-border-strong);
-  box-shadow: 0 0 0 2px rgba(113, 112, 255, 0.28);
+  box-shadow: none;
 }
 
 /* Auth-tier primary — tighter than the marketing Button lg CTA (h-11 / 14px). */
