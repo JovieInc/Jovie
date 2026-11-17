@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { buildCertificationDecisionDigest } from '@/lib/agent-os/certification';
 import {
   fixturePacket,
@@ -10,6 +10,7 @@ import {
   packetDecisionLedgerKey,
   parsePacketDecisionLedger,
   readPacketDecisionLedger,
+  readPacketDecisionLedgers,
   recordPacketFounderDecision,
 } from './packet-decisions';
 import type { CertificationPacketFile } from './packet-files.server';
@@ -214,5 +215,70 @@ describe('parsePacketDecisionLedger', () => {
     expect(() => parsePacketDecisionLedger(raw, 'flows')).toThrow(
       PacketDecisionPersistenceError
     );
+  });
+});
+
+describe('readPacketDecisionLedgers (JOV-12821)', () => {
+  const DOMAINS = ['flows', 'marketing', 'lyb'] as const;
+
+  it('batches all domain ledger keys into one getMany round trip', async () => {
+    const records = new Map<string, unknown>([
+      [
+        packetDecisionLedgerKey('flows'),
+        JSON.stringify({
+          schemaVersion: 1,
+          contract: 'jovie.certification/v1',
+          domain: 'flows',
+          records: {},
+          updatedAt: '2026-09-27T07:00:00.000Z',
+        }),
+      ],
+    ]);
+    const getMany: Mock = vi.fn(async (keys: readonly string[]) => {
+      const rows = new Map<string, unknown>();
+      for (const key of keys) {
+        if (records.has(key)) rows.set(key, records.get(key));
+      }
+      return rows;
+    });
+    const reads = await readPacketDecisionLedgers(
+      { ...memoryCertificationBackend(records), getMany },
+      DOMAINS
+    );
+    expect(getMany).toHaveBeenCalledTimes(1);
+    expect(getMany.mock.calls[0]?.[0]).toHaveLength(DOMAINS.length);
+    expect(reads.get('flows')).toMatchObject({ ok: true });
+    // An absent ledger is an empty one, never an error.
+    expect(reads.get('marketing')).toMatchObject({ ok: true });
+  });
+
+  it('fails only the unreadable domain closed when batching is unavailable', async () => {
+    const backend = memoryCertificationBackend();
+    const originalGet = backend.get.bind(backend);
+    const get: Mock = vi.fn(async (key: string) => {
+      if (key === packetDecisionLedgerKey('marketing')) {
+        throw new Error('db down');
+      }
+      return originalGet(key);
+    });
+    const reads = await readPacketDecisionLedgers(
+      { ...backend, get } as never,
+      DOMAINS
+    );
+    expect(reads.get('marketing')).toMatchObject({ ok: false });
+    expect(reads.get('flows')).toMatchObject({ ok: true });
+  });
+
+  it('fails every domain closed when the batched round trip itself fails', async () => {
+    const getMany: Mock = vi.fn(async () => {
+      throw new Error('db down');
+    });
+    const reads = await readPacketDecisionLedgers(
+      { ...memoryCertificationBackend(), getMany },
+      DOMAINS
+    );
+    for (const domain of DOMAINS) {
+      expect(reads.get(domain)).toMatchObject({ ok: false });
+    }
   });
 });

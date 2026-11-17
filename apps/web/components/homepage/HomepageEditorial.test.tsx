@@ -129,8 +129,15 @@ describe('HomepageEditorial chapters', () => {
     expect(section).toHaveAttribute('id', HOMEPAGE_INVITE_ANCHOR);
     const claim = getClaimProfileIntent();
     expect(
-      within(section).getByRole('link', { name: claim.label })
-    ).toHaveAttribute('href', claim.href);
+      within(section).getByRole('button', { name: claim.label })
+    ).toHaveAttribute('type', 'submit');
+    expect(
+      within(section).getByRole('textbox', { name: 'Your handle' })
+    ).toHaveAttribute('name', 'handle');
+    expect(within(section).getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      claim.href
+    );
     expect(
       within(section).queryByTestId('waitlist-role-form')
     ).not.toBeInTheDocument();
@@ -138,6 +145,31 @@ describe('HomepageEditorial chapters', () => {
     expect(steps).toHaveLength(COPY.claim.steps.length);
     expect(steps[0]).toHaveTextContent(`01${COPY.claim.steps[0].title}`);
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps typed handle and keyboard focus through rerender and offline editing', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<HomepageInviteClose />);
+    const handle = screen.getByRole('textbox', {
+      name: COPY.claim.handleLabel,
+    });
+    await user.click(handle);
+    await user.type(handle, 'myhandle');
+    rerender(<HomepageInviteClose />);
+    expect(handle).toHaveValue('myhandle');
+    expect(handle).toHaveFocus();
+    await user.keyboard('{Escape}');
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      await user.type(handle, '-offline');
+    } finally {
+      offline.mockRestore();
+    }
+    expect(handle).toHaveValue('myhandle-offline');
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: getClaimProfileIntent().label })
+    ).toHaveFocus();
   });
 
   it('closes on the invite form only while public signup is closed', async () => {
