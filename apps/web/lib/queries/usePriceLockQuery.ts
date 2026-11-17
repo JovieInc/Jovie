@@ -2,10 +2,22 @@
 
 /** Reads the signed-in person's price lock for client pricing surfaces. */
 
-import type { PriceLockView } from '@/lib/billing/price-lock-view';
+import {
+  applyPriceLockToOptions,
+  type PriceLockView,
+} from '@/lib/billing/price-lock-view';
 import { FetchError, fetchWithTimeout } from './fetch';
+import type { PricingOptionsRawResponse } from './usePricingOptionsQuery';
 
-export { applyPriceLockToOptions } from '@/lib/billing/price-lock-view';
+export async function lockPricing(
+  pending: Promise<PricingOptionsRawResponse>,
+  signal?: AbortSignal
+) {
+  const lockRead = fetchPriceLock({ signal });
+  const [raw, priceLock] = await Promise.all([pending, lockRead]);
+  const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
+  return { options: applyPriceLockToOptions(listed, priceLock), priceLock };
+}
 
 /** Null when there is no lock to apply; any outage fails the query. */
 export async function fetchPriceLock({

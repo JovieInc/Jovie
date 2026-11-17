@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import { pricingOptionsQueryOptions } from '@/lib/queries/usePricingOptionsQuery';
+import { priceLockViewFixture } from '@/tests/fixtures/billing/price-lock';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -17,18 +18,10 @@ const LISTED = {
   description: 'Artist Presence',
   plan: 'pro',
 };
-const LOCK = {
-  locked: true,
+const LOCK = priceLockViewFixture({
   priceVersionId: 'pro-owned-12',
-  lockedAt: '2026-10-29T00:00:00.000Z',
-  month: {
-    amountCents: 1200,
-    currency: 'usd',
-    interval: 'month',
-    priceId: 'price_owned',
-  },
-  year: null,
-};
+  stripePriceIdMonthly: 'price_owned',
+});
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -37,12 +30,15 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function respond(lockStatus = 200) {
+function respond(lockStatus = 200, rawStatus = 200) {
   return vi
     .spyOn(globalThis, 'fetch')
     .mockImplementation(async input =>
       String(input) === '/api/stripe/pricing-options'
-        ? jsonResponse({ pricingOptions: [LISTED], options: [LISTED] })
+        ? jsonResponse(
+            { pricingOptions: [LISTED], options: [LISTED] },
+            rawStatus
+          )
         : jsonResponse({ priceLock: LOCK }, lockStatus)
     );
 }
@@ -78,6 +74,23 @@ describe('pricingOptionsQueryOptions', () => {
       kind: 'http',
       status: 500,
     });
+  });
+
+  it('rejects a raw read failure even while the lock module is pending', async () => {
+    const gate = Promise.withResolvers<void>();
+    vi.doMock('@/lib/queries/usePriceLockQuery', async importOriginal => {
+      await gate.promise;
+      return importOriginal();
+    });
+    respond(200, 500);
+    const options = await queryOptions();
+    const result = options.queryFn({});
+    try {
+      await expect(result).rejects.toMatchObject({ kind: 'http', status: 500 });
+    } finally {
+      gate.resolve();
+      await vi.dynamicImportSettled();
+    }
   });
 
   it('starts the raw read while lock tooling is still loading', async () => {

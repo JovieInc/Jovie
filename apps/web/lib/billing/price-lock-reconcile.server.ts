@@ -26,13 +26,12 @@ export function toReconcileSubscription(
   sub: Stripe.Subscription
 ): ReconcileSubscription {
   const price = sub.items.data[0]?.price;
-  const priceId = price?.id ?? null;
   const interval = price?.recurring?.interval;
-  const mapping = priceId ? getPriceMappingDetails(priceId) : null;
+  const mapping = price?.id ? getPriceMappingDetails(price.id) : null;
   return {
     subscriptionId: sub.id,
     status: sub.status,
-    priceId,
+    priceId: price?.id ?? null,
     mappedPlan: mapping?.plan ?? null,
     unitAmountCents: price?.unit_amount ?? null,
     currency: price?.currency ?? null,

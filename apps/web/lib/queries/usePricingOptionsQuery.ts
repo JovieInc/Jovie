@@ -31,7 +31,7 @@ export interface PricingOption {
  * Raw response from the pricing options API.
  * The API returns both fields for backwards compatibility.
  */
-interface PricingOptionsRawResponse {
+export interface PricingOptionsRawResponse {
   pricingOptions?: PricingOption[];
   options?: PricingOption[];
 }
@@ -55,17 +55,13 @@ async function fetchPricingOptions({
   signal?: AbortSignal;
 }): Promise<PricingOptionsResponse> {
   // Apply the lock here; a lock read failure fails the query, never a list price.
-  const lockTools = import('./usePriceLockQuery');
-  const [raw, priceLock, tools] = await Promise.all([
-    fetchPricingOptionsRaw({ signal }),
-    lockTools.then(module => module.fetchPriceLock({ signal })),
-    lockTools,
-  ]);
-  const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
-  return {
-    options: tools.applyPriceLockToOptions(listed, priceLock),
-    priceLock,
-  };
+  const raw = fetchPricingOptionsRaw({ signal });
+  return Promise.all([
+    raw,
+    import('./usePriceLockQuery').then(module =>
+      module.lockPricing(raw, signal)
+    ),
+  ]).then(([, pricing]) => pricing);
 }
 
 /**

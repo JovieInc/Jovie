@@ -1,9 +1,8 @@
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
-export type PriceLockPlan = 'pro';
 export type PriceInterval = 'month' | 'year';
 export interface PriceVersion {
   readonly id: string;
-  readonly plan: PriceLockPlan;
+  readonly plan: 'pro';
   readonly monthlyUsd: number;
   readonly yearlyUsd: number | null;
   readonly currency: 'usd';
@@ -27,7 +26,7 @@ export type PriceLockSource =
   | 'first_view'
   | 'backfill_subscription';
 export interface PriceLockSnapshot {
-  readonly plan: PriceLockPlan;
+  readonly plan: PriceVersion['plan'];
   readonly priceVersionId: string;
   readonly currency: string;
   readonly monthlyAmountCents: number | null;
@@ -99,7 +98,7 @@ export function buildPriceLockSnapshot(input: {
 }
 export function buildPriceLockFromSubscriptionPrice(input: {
   readonly stripePriceId: string;
-  readonly plan: PriceLockPlan;
+  readonly plan: PriceVersion['plan'];
   readonly amountCents: number;
   readonly interval: PriceInterval;
   readonly currency: string;
