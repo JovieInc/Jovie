@@ -33,6 +33,7 @@ import { hashCredential } from '../packages/api-client/store.ts';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
+  isQuotaDeferredRow,
   livenessDecisions,
   livenessFingerprint,
   loadRegistry,
@@ -42,9 +43,15 @@ import {
 import {
   githubHeaders,
   githubReadFailure,
+  landedOnMainAt,
+  readGithubGraphqlResponse,
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
+import {
+  EX_TEMPFAIL,
+  QUOTA_DEFERRED_MARKER,
+} from './lib/github-rate-limit.mjs';
 import {
   DEFECT_HOLD_CLASSES,
   queueRemovalHold,
@@ -64,6 +71,7 @@ const GITHUB_API = 'https://api.github.com';
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
  * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
  * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
+ * @returns {Promise<{ok: boolean, reason?: string, deferred?: boolean, lastProofAt?: string, startedAt?: string, endedAt?: string, ref?: string, outcome?: string, url?: string, streak?: ReturnType<typeof redGate.summarizeRunStreak>, detailOnStale?: boolean, quotaEvidence?: object, recoveryEvidence?: object}>}
  */
 export async function observeWorkflowFailureStreak(
   receipt,
@@ -74,7 +82,7 @@ export async function observeWorkflowFailureStreak(
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
   const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+  const read = await readGithubJson(url, { fetchImpl, token, apiUrl, nowMs });
   if (!read.ok) return githubReadFailure(read);
   if (!Array.isArray(read.body?.workflow_runs))
     return { ok: false, reason: 'github-runs-unreadable' };
@@ -105,10 +113,12 @@ export async function observeWorkflowFailureStreak(
   };
 }
 
-/** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
+/** Last run of a workflow whose conclusion is one of `receipt.conclusions`.
+ * @returns {Promise<{ok: boolean, reason?: string, deferred?: boolean, lastProofAt?: string, startedAt?: string, endedAt?: string, ref?: string, outcome?: string, url?: string, streak?: ReturnType<typeof redGate.summarizeRunStreak>, quotaEvidence?: object, recoveryEvidence?: object}>}
+ */
 export async function observeGithubWorkflow(
   receipt,
-  { fetchImpl, token, apiUrl = GITHUB_API }
+  { fetchImpl, token, nowMs = Date.now(), apiUrl = GITHUB_API }
 ) {
   const conclusions = receipt.conclusions ?? ['success'];
   const branch = receipt.branch
@@ -132,7 +142,12 @@ export async function observeGithubWorkflow(
         : [query];
     });
     for (const url of urls) {
-      const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+      const read = await readGithubJson(url, {
+        fetchImpl,
+        token,
+        apiUrl,
+        nowMs,
+      });
       if (!read.ok) return githubReadFailure(read);
       if (!Array.isArray(read.body?.workflow_runs))
         return { ok: false, reason: 'github-runs-unreadable' };
@@ -167,55 +182,6 @@ export async function observeGithubWorkflow(
 /** A timestamp inside a JSON document (status feeds, health routes). */
 export async function observeJsonTimestamp(receipt, { fetchImpl }) {
   return projectJsonHeartbeat(receipt, await readJson(fetchImpl, receipt.url));
-}
-
-const PUSH_RUNS_PAGE = 100;
-const LANDING_SKEW_MS = 2 * 60_000;
-
-/**
- * When a merge-queue squash commit reached main.
- *
- * Its committer date is the queue time, which can precede the fast-forward
- * onto main by hours. The earliest push-event run at or after that date is
- * the landing time. An unreadable or incomplete run list keeps the committer
- * date, so a real stall still alerts.
- */
-async function landedOnMainAt(
-  repo,
-  sha,
-  committerDate,
-  { fetchImpl, token, apiUrl }
-) {
-  const committerMs = Date.parse(committerDate ?? '');
-  const base = `${apiUrl}/repos/${repo}/actions/runs?head_sha=${encodeURIComponent(sha)}&event=push&per_page=${PUSH_RUNS_PAGE}`;
-  const headers = githubHeaders(token);
-  const first = await readJson(fetchImpl, base, headers);
-  if (!first.ok || !Array.isArray(first.body?.workflow_runs))
-    return committerDate;
-  let runs = first.body.workflow_runs;
-  const total = Number(first.body.total_count);
-  if (Number.isFinite(total) && total > runs.length) {
-    const lastPage = Math.ceil(total / PUSH_RUNS_PAGE);
-    const older = await readJson(
-      fetchImpl,
-      `${base}&page=${lastPage}`,
-      headers
-    );
-    if (!older.ok || !Array.isArray(older.body?.workflow_runs))
-      return committerDate;
-    runs = older.body.workflow_runs;
-  }
-  const landedMs = runs
-    .map(run => Date.parse(run?.created_at ?? ''))
-    .filter(
-      ms =>
-        Number.isFinite(ms) &&
-        (!Number.isFinite(committerMs) || ms + LANDING_SKEW_MS >= committerMs)
-    )
-    .reduce((min, ms) => Math.min(min, ms), Number.POSITIVE_INFINITY);
-  return Number.isFinite(landedMs)
-    ? new Date(landedMs).toISOString()
-    : committerDate;
 }
 
 function shaFromMainRef(head) {
@@ -708,9 +674,12 @@ export async function observeGreenToEnqueue(
       body: JSON.stringify({ query, variables: { owner, name } }),
       signal: controller.signal,
     });
-    if (response.status !== 200)
-      return { ok: false, reason: `green-enqueue-http-${response.status}` };
-    body = await response.json();
+    const read = await readGithubGraphqlResponse(response, nowMs);
+    if (!read.ok)
+      return read.reason === 'quota-deferred'
+        ? githubReadFailure(read)
+        : { ok: false, reason: `green-enqueue-${read.reason}` };
+    body = read.body;
   } catch (error) {
     return {
       ok: false,
@@ -760,9 +729,15 @@ export async function observeGreenToEnqueue(
       fetchImpl,
       token,
       apiUrl,
+      nowMs,
     });
     if (!timing.ok)
-      return { ok: false, reason: 'green-enqueue-checks-unreadable' };
+      return {
+        ...timing,
+        reason:
+          ('reason' in timing ? timing.reason : null) ??
+          'green-enqueue-checks-unreadable',
+      };
     if (timing.greenAt === null) continue;
     if (DEFECT_HOLD_CLASSES.has(timing.holdClass ?? '')) held.push(pr.number);
     else waiting.push({ number: pr.number, greenAt: timing.greenAt });
@@ -972,12 +947,21 @@ export async function main({
     );
   }
   const previous = readPrevious(args.previous);
-  // JOV-9641: a missing state file means the restore step lost the persisted
-  // alert state (its gh api failures are swallowed); stateless critical rows
-  // read as red so a recovered loop resolves its open alert, not green.
+  // A restored alert state and a genuinely quota-deferred observation
+  // remain separate facts: neither an absent cache nor quota proves health.
   const decisionPrevious = lostStatePrevious(args, report, previous);
   const decisions = livenessDecisions(report, decisionPrevious);
-  const full = { ...report, startedAt, endedAt, runUrl, decisions };
+  const quotaDeferred = report.results
+    .filter(isQuotaDeferredRow)
+    .map(row => row.id);
+  const full = {
+    ...report,
+    startedAt,
+    endedAt,
+    runUrl,
+    decisions,
+    quotaDeferred,
+  };
   if (args.output)
     writeFileSync(args.output, `${JSON.stringify(full, null, 2)}\n`);
   if (args.events)
@@ -1002,11 +986,14 @@ export async function main({
   // fingerprint green, silently dropping a red->green resolution the next
   // filing run would have delivered (an open alert stuck unresolved).
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
-    const state = { ...previous };
+    const state = { ...decisionPrevious };
     for (const row of report.results) {
-      if (!row.critical) continue;
+      if (!row.critical || isQuotaDeferredRow(row)) continue;
       const fingerprint = livenessFingerprint(row.id);
-      state[fingerprint] = alertStateFor(row.status, previous[fingerprint]);
+      state[fingerprint] = alertStateFor(
+        row.status,
+        decisionPrevious[fingerprint]
+      );
     }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
@@ -1030,8 +1017,14 @@ export async function main({
     if (args.previous)
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
+  if (quotaDeferred.length)
+    process.stdout.write(
+      `::warning::${QUOTA_DEFERRED_MARKER}: GitHub quota denied the read of ` +
+        `${quotaDeferred.length} automation(s) (${quotaDeferred.join(', ')}); ` +
+        'not a silence verdict. The next 20-minute bucket re-reads them.\n'
+    );
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status)).map(row => row.id) })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status) && !isQuotaDeferredRow(row)).map(row => row.id), quotaDeferred })}\n`
   );
   return full;
 }
@@ -1039,7 +1032,13 @@ export async function main({
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   main()
     .then(full => {
-      if (redGate.enforcedRed(full)) process.exitCode = 1; // enforcing gate
+      if (redGate.enforcedRed(full))
+        process.exitCode = 1; // enforcing gate
+      // A quota-deferred run is infrastructure, not a verdict (JOV-9993):
+      // exit 75 like every other github-quota-deferred lane, so a blind
+      // bucket stays visible instead of silently green.
+      else if ('quotaDeferred' in full && full.quotaDeferred?.length)
+        process.exitCode = EX_TEMPFAIL;
     })
     .catch(error => {
       process.stderr.write(

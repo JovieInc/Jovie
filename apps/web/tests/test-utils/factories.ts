@@ -36,6 +36,7 @@ export function createMockRelease(
     profileId: 'profile_1',
     title,
     releaseDate: '2025-06-01T00:00:00.000Z',
+    status: 'released',
     artworkUrl: 'https://cdn.jovie.test/releases/artwork.jpg',
     slug,
     smartLinkPath,
