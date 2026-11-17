@@ -3,7 +3,8 @@
  * Component certificate CLI.
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
  *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
- *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json)
+ *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json
+ *     or a shard in component-certification.d/)
  *   node scripts/component-certificate.mjs --sort   (sort gates, waivers and screen debt by component path)
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
@@ -31,6 +32,10 @@ import {
   mutationStateKey,
   mutationTestsFor,
 } from './lib/component-certificate-mutation.mjs';
+import {
+  readCertificationRegistry,
+  sortCertificationRegistry,
+} from './lib/component-certification-registry.mjs';
 import { loadStoryReceipts } from './lib/component-story-receipts.mjs';
 
 const { values } = parseArgs({
@@ -113,16 +118,13 @@ const readWithCompanions = (rel, suffix) => {
 // PR appends.
 if (values.sort) {
   const { sortByPath } = await import('./lib/component-cert-screens.mjs');
-  /** @type {{rel: string, keys: string[]}[]} */
-  const files = [
-    { rel: values.registry, keys: ['gates', 'waivers'] },
-    { rel: values.screens, keys: ['debt'] },
-  ];
-  for (const { rel, keys } of files) {
-    const abs = rel.startsWith('/') ? rel : join(root, rel);
-    if (!existsSync(abs)) continue;
+  sortCertificationRegistry(root, values.registry);
+  const abs = values.screens.startsWith('/')
+    ? values.screens
+    : join(root, values.screens);
+  if (existsSync(abs)) {
     const doc = JSON.parse(readFileSync(abs, 'utf8'));
-    for (const key of keys) if (doc[key]) doc[key] = sortByPath(doc[key]);
+    if (doc.debt) doc.debt = sortByPath(doc.debt);
     writeFileSync(abs, `${JSON.stringify(doc, null, 2)}\n`);
   }
   process.exit(0);
@@ -136,11 +138,18 @@ if (values.guards) {
   process.exit(s.errors.length ? 1 : 0);
 }
 
-const registry = readJson(values.registry, { policy: {}, waivers: {} });
+const { registry, errors: registryErrors } = readCertificationRegistry(
+  root,
+  values.registry,
+  { policy: {}, waivers: {} }
+);
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-const { a11y, visual, renderInputs } = loadStoryReceipts(root, values);
+const { a11y, visual, renderInputs, renderInputsFor } = loadStoryReceipts(
+  root,
+  values
+);
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -208,13 +217,28 @@ const prefixGateScope = new Set([
   ...(values.component ?? []),
   ...gatedFiles,
 ]);
-for (const rel of [...(values.component ?? []), ...gatedFiles, ...screenFiles])
-  if (!seen.has(rel) && seen.add(rel))
-    list.push({
+const scopedDirectories = new Map();
+for (const rel of [
+  ...(values.component ?? []),
+  ...gatedFiles,
+  ...screenFiles,
+]) {
+  if (seen.has(rel)) continue;
+  seen.add(rel);
+  const dir = dirname(rel);
+  if (!scopedDirectories.has(dir))
+    scopedDirectories.set(
+      dir,
+      new Map(listComponentsInRoot(dir, root, false).map(c => [c.sourceRel, c]))
+    );
+  list.push(
+    scopedDirectories.get(dir).get(rel) ?? {
       sourceRel: rel,
       testRel: rel.replace(/\.tsx$/, '.test.tsx'),
       storyRel: rel.replace(/\.tsx$/, '.stories.tsx'),
-    });
+    }
+  );
+}
 if (!values.all && values.component)
   list = list.filter(c => values.component.includes(c.sourceRel));
 
@@ -249,6 +273,7 @@ const certificates = list.map(c => {
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
       renderInputs,
+      componentRenderInputs: renderInputsFor(c.sourceRel),
       mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],
@@ -275,12 +300,7 @@ if (values.gate) {
     },
     registry.gates ?? {}
   );
-  const { unsortedPathErrors } = await import(
-    './lib/component-cert-screens.mjs'
-  );
-  const orderErrors = ['gates', 'waivers'].flatMap(key =>
-    unsortedPathErrors(`${values.registry}: ${key}`, registry[key])
-  );
+  const orderErrors = registryErrors;
   if (orderErrors.length) {
     result.errors.push(...orderErrors);
     result.ok = false;

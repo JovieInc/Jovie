@@ -207,6 +207,7 @@ export function certificationProofsExistAtRef(ref, cwd = process.cwd()) {
   return BLOG_CERTIFICATION_PROOFS.every(proof => {
     try {
       execFileSync('git', ['cat-file', '-e', `${ref}:${proof}`], {
+        maxBuffer: 256 * 1024 * 1024,
         cwd,
         stdio: 'ignore',
       });
@@ -235,7 +236,12 @@ export function classifyBlogContentDiff(
       baseSha,
       headSha,
     ],
-    { cwd, encoding: 'buffer', stdio: ['ignore', 'pipe', 'pipe'] }
+    {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      encoding: 'buffer',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
   );
   return {
     ...classifyBlogContentChanges(parseNameStatusZ(raw), {

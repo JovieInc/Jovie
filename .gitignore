@@ -229,6 +229,7 @@ apps/desktop/src/*
 !apps/desktop/src/window-chrome.ts
 !apps/desktop/src/visual-activity.ts
 !apps/desktop/src/renderer-recovery.ts
+!apps/desktop/src/renderer-recovery-unlatch.ts
 !apps/desktop/src/tray.ts
 !apps/desktop/src/ovie-door.ts
 !apps/desktop/src/operator-launch.ts

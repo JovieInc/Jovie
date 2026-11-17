@@ -1,4 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { FormEvent, KeyboardEvent } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Button } from './button';
 
@@ -215,4 +217,78 @@ describe('Button pill state choreography', () => {
       'true'
     );
   });
+
+  it.each([
+    ['boolean', true],
+    ['string', 'true'],
+  ] as const)(
+    'cancels native submission and caller handlers for %s aria-disabled',
+    (_kind, ariaDisabled) => {
+      const submit = vi.fn((event: FormEvent) => event.preventDefault());
+      const capture = vi.fn();
+      const action = vi.fn();
+      render(
+        <form onSubmit={submit}>
+          <Button
+            pendingPresentation='morph'
+            type='submit'
+            aria-disabled={ariaDisabled}
+            onClickCapture={capture}
+            onClick={action}
+          >
+            Publish
+          </Button>
+        </form>
+      );
+      const button = screen.getByRole('button', { name: 'Publish' });
+      button.focus();
+      expect(fireEvent.click(button, { detail: 0 })).toBe(false);
+      expect(fireEvent.click(button, { detail: 1 })).toBe(false);
+      expect(capture).not.toHaveBeenCalled();
+      expect(action).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+      expect(button).toHaveFocus();
+    }
+  );
+});
+
+describe('Button keyboard caller cancellation', () => {
+  it.each(['Enter', ' '] as const)(
+    'honors caller cancellation of %s keyboard activation and restores it',
+    async key => {
+      const user = userEvent.setup({ delay: null });
+      const submit = vi.fn((event: FormEvent) => event.preventDefault());
+      const action = vi.fn();
+      const cancel = vi.fn((event: KeyboardEvent) => event.preventDefault());
+      const allow = vi.fn();
+      const view = (onKeyDown: typeof cancel | typeof allow) => (
+        <form onSubmit={submit}>
+          <Button
+            pendingPresentation='morph'
+            type='submit'
+            onKeyDown={onKeyDown}
+            onClick={action}
+          >
+            Publish
+          </Button>
+        </form>
+      );
+      const { rerender } = render(view(cancel));
+      const button = screen.getByRole('button', { name: 'Publish' });
+      button.focus();
+      const input = key === 'Enter' ? '{Enter}' : ' ';
+      await user.keyboard(input);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(cancel.mock.calls[0][0].key).toBe(key);
+      expect(action).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+
+      rerender(view(allow));
+      await user.keyboard(input);
+      expect(allow).toHaveBeenCalledOnce();
+      expect(action).toHaveBeenCalledOnce();
+      expect(submit).toHaveBeenCalledOnce();
+      expect(button).toHaveFocus();
+    }
+  );
 });

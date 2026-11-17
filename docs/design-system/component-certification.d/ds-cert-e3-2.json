@@ -1,0 +1,279 @@
+{
+  "gates": {
+    "apps/web/components/organisms/table/SortableHeaderButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/ActionsCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceActionsCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceCountryCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceCreatedAtCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceLastActionCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceLastSeenCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceLocationCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceRowSelectionCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceSourceCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceVisitsCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/DateCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/TableBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/TableCountBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/TableDependencyGuide.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/TableHeaderCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/TableIconButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/ExportCSVButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/HeaderBulkActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/SocialLinksCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TableBulkActionsToolbar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TableDescription.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TableHeaderRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TableIssueSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TableSearchBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/ToolbarFilterSuggestions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/whats-new/WhatsNewBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/organisms/table/SortableHeaderButton.tsx": {
+      "empty": "The header button renders one label and one sort glyph from its label and direction props; it owns no collection that could be empty. The detector matched the class 'items-center' on its Button."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceCountryCell.tsx": {
+      "long-content": "The cell text is formatCountryLabel(geoCountry), which returns a two-letter code or 'Unknown' (code.slice(0, 2).toUpperCase()), so no input can produce long text."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceCreatedAtCell.tsx": {
+      "long-content": "The only text is formatLongDate(lastSeenAt), which is formatShortDate (\"Dec 29, 2024\") or '—'; the menu trigger is icon-only, so no input can produce long text."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceLastSeenCell.tsx": {
+      "long-content": "The only text is formatTimeAgo(lastSeenAt), a short bucket such as '3mo ago' or '—'; the menu trigger is icon-only, so no input can produce long text."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceSourceCell.tsx": {
+      "permission-denied": "The source cell has no account, role check or gated action. The detector matched role='img' on the labelled icon wrapper."
+    },
+    "apps/web/components/organisms/table/atoms/TableIconButton.tsx": {
+      "empty": "The icon button renders one icon and an optional tooltip; it owns no collection that could be empty. The detector matched the word rows in the doc comment '24px control for 32px dense rows'."
+    },
+    "apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx": {
+      "empty": "The row renders one task's leading, title, metadata and action slots; it owns no collection that could be empty (the list that owns rows has its own empty state). The detector matched the class 'items-center' on its wrappers."
+    }
+  }
+}

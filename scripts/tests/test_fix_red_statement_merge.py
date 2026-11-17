@@ -33,6 +33,13 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             self.conflict(ours, theirs, base)),
             "import { describe, expect, it, vi, afterEach } from 'vitest';\n" + extra)
 
+    def test_overlapping_tests_deduplicate_but_changed_same_title_stays_unresolved(self):
+        live = "  it('keeps a live track', async () => {\n    expect(await exists()).toBe(true);\n  });\n"
+        failed = "  it('does not redirect after a failed check', async () => {\n    await expect(resolve()).resolves.toBeNull();\n  });\n"
+        self.assertEqual(self.resolve(self.conflict(live + failed, live)), live + failed)
+        changed = live.replace('toBe(true)', 'toBe(false)')
+        self.assertIsNone(self.resolve(self.conflict(live, changed)))
+
     def test_named_import_deletions_aliases_and_binding_collisions_stay_unresolved(self):
         base = "import { describe, it } from 'vitest';\n"
         added = "import { describe, it, expect } from 'vitest';\n"
@@ -132,3 +139,58 @@ class AdditiveStatementMergeTest(unittest.TestCase):
                              "import { describe, it, expect, afterEach } from 'vitest';\n")
             self.assertIn("<<<<<<<", target.read_text())
             self.assertIsNone(edits.resolve_additive_statement_file(work, "README.md", sh))
+
+
+class SharedCloserItMergeTest(unittest.TestCase):
+    @staticmethod
+    def conflict(ours, theirs):
+        return (
+            f"<<<<<<< HEAD\n{ours}=======\n{theirs}>>>>>>> origin/main\n"
+            "  });\n"
+        )
+
+    def test_unions_main_then_head_and_closes_each_test(self):
+        text = "before\n" + self.conflict(
+            "  it('head flow', () => {\n    expect(head).toBe(true);\n",
+            "  it('main menu', () => {\n    expect(main).toBe(false);\n",
+        ) + "after();\n"
+        resolved = statements.resolve_shared_closer_it_text(text)
+        self.assertEqual(resolved, (
+            "before\n"
+            "  it('main menu', () => {\n    expect(main).toBe(false);\n  });\n"
+            "\n"
+            "  it('head flow', () => {\n    expect(head).toBe(true);\n  });\n"
+            "after();\n"))
+        with tempfile.TemporaryDirectory() as scratch:
+            work = Path(scratch)
+            rel = "HeaderNav.test.tsx"
+            (work / rel).write_text(text)
+            self.assertEqual(edits.resolve_additive_statement_file(
+                work, rel, lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="")),
+                resolved)
+
+    def test_unknown_shapes_stay_unresolved(self):
+        cases = [
+            self.conflict(
+                "  it('same', () => {\n    expect(1).toBe(1);\n",
+                "  it('same', () => {\n    expect(2).toBe(2);\n",
+            ),
+            self.conflict(
+                "  it.each([true])('flag %s', () => {\n    expect(true).toBe(true);\n",
+                "  it('other', () => {\n    expect(true).toBe(true);\n",
+            ),
+            "<<<<<<< HEAD\n  it('a', () => {\n=======\n  it('b', () => {\n>>>>>>> origin/main\n",
+            self.conflict("  const value = 1;\n", "  const value = 2;\n"),
+            "<<<<<<< HEAD\n  it('a', () => {\n||||||| base\n=======\n  it('b', () => {\n>>>>>>> main\n  });\n",
+            self.conflict(
+                "  it('a', () => {\n    expect(1).toBe(1);\n",
+                "  it('b', () => {\n    expect(2).toBe(2);\n",
+            ) + self.conflict("  changed\n", "  other\n"),
+        ]
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertIsNone(statements.resolve_shared_closer_it_text(text))
+        same = "  it('same', () => {\n    expect(1).toBe(1);\n"
+        self.assertEqual(
+            statements.resolve_shared_closer_it_text(self.conflict(same, same)),
+            "  it('same', () => {\n    expect(1).toBe(1);\n  });\n")

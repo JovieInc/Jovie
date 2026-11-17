@@ -9,6 +9,14 @@ import {
   test,
 } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
+import {
+  attachWaitlistDiagnostics,
+  type ComposingKeyObservation,
+  dispatchComposingKey,
+  focusWaitlistOption,
+  observeWaitlistProofErrors,
+  WAITLIST_COMPOSING_KEYS,
+} from './fixtures/waitlist-composition-evidence';
 
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
 const INPUT_FOCUS_STORY_ID = 'ui-atoms-input--keyboard-focus';
@@ -19,6 +27,13 @@ const VIEWPORTS = [
   { id: 'desktop', width: 1280, height: 800 },
   { id: 'compact', width: 390, height: 844 },
 ] as const;
+
+async function setStoryTheme(page: Page, theme: 'light' | 'dark') {
+  await page.addInitScript(
+    value => localStorage.setItem('jovie-theme-storybook', value),
+    theme
+  );
+}
 
 async function openStory(page: Page, storyId: string) {
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
@@ -175,10 +190,7 @@ test.describe('Shared error copy contrast', () => {
       test(`error copy meets WCAG AA [${theme} ${story}] @a11y`, async ({
         page,
       }, testInfo) => {
-        await page.addInitScript(
-          value => localStorage.setItem('jovie-theme-storybook', value),
-          theme
-        );
+        await setStoryTheme(page, theme);
         const root = await openStory(page, story);
         await expect(page.locator('html')).toHaveClass(new RegExp(theme));
         await page.evaluate(() => document.fonts.ready);
@@ -242,10 +254,7 @@ test.describe('Composite field and switch error-copy contrast', () => {
       test(`error copy meets WCAG AA [${theme} ${fixture.story}] @a11y`, async ({
         page,
       }, testInfo) => {
-        await page.addInitScript(
-          value => localStorage.setItem('jovie-theme-storybook', value),
-          theme
-        );
+        await setStoryTheme(page, theme);
         const root = await openStory(page, fixture.story);
         await expect(page.locator('html')).toHaveClass(new RegExp(theme));
         await expect(
@@ -280,6 +289,210 @@ test.describe('Composite field and switch error-copy contrast', () => {
         expect(measured.length).toBeGreaterThan(0);
         for (const check of measured)
           expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+test.describe('Link and danger-tooltip text contrast', () => {
+  const stories = [
+    'shadcn-link--default',
+    'shadcn-link--active',
+    'shadcn-link--visited',
+    'shadcn-link--as-child',
+    'shadcn-link--long-content',
+    'shadcn-link--state-matrix',
+    'ui-atoms-tooltip--danger',
+  ] as const;
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const story of stories) {
+      test(`semantic text meets WCAG AA [${theme} ${story}] @a11y`, async ({
+        page,
+      }, testInfo) => {
+        await setStoryTheme(page, theme);
+        await openStory(page, story);
+        await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+        const selector =
+          story === 'ui-atoms-tooltip--danger'
+            ? '[data-testid="tooltip-content"]'
+            : '#storybook-root [data-variant="link"]:not([aria-disabled="true"])';
+        await expect(page.locator(selector).first()).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const result = await new AxeBuilder({ page })
+          .include(selector)
+          .options(wcag22AaAxeOptions())
+          .analyze();
+        const measured = [...result.passes, ...result.violations]
+          .filter(rule => rule.id === 'color-contrast')
+          .flatMap(rule => rule.nodes)
+          .flatMap(node => node.any)
+          .filter(check => check.id === 'color-contrast');
+        const evidence = JSON.stringify({ story, theme, result }, null, 2);
+        await testInfo.attach('semantic-text-contrast.json', {
+          body: evidence,
+          contentType: 'application/json',
+        });
+        await attachScreenshot(
+          testInfo,
+          `semantic-text-${theme}-${story}.png`,
+          page.locator('body')
+        );
+        await writeFile(
+          join(EVIDENCE_DIR, `semantic-text-${theme}-${story}.json`),
+          evidence
+        );
+        expect(result.violations).toEqual([]);
+        expect(
+          result.incomplete.filter(rule => rule.id === 'color-contrast')
+        ).toEqual([]);
+        expect(measured.length).toBeGreaterThan(0);
+        for (const check of measured)
+          expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+    test(`visited preview preserves interactive color precedence [${theme}]`, async ({
+      page,
+    }, testInfo) => {
+      await setStoryTheme(page, theme);
+      await openStory(page, 'shadcn-link--visited');
+      const link = page.locator('#storybook-root [data-variant="link"]');
+      const tokens = await link.evaluate(element => {
+        const probe = document.createElement('span');
+        element.append(probe);
+        const colors: Record<string, string> = {};
+        for (const state of ['visited', 'hover']) {
+          probe.style.color = `var(--color-link-${state})`;
+          colors[state] = getComputedStyle(probe).color;
+        }
+        probe.remove();
+        return colors;
+      });
+      const color = () =>
+        link.evaluate(element => getComputedStyle(element).color);
+      await page.mouse.move(0, 0);
+      const observed: Record<string, string> = { idle: await color() };
+      await page.keyboard.press('Tab');
+      await expect(link).toBeFocused();
+      expect(
+        await link.evaluate(element => element.matches(':focus-visible'))
+      ).toBe(true);
+      observed.focus = await color();
+      await link.hover();
+      observed.hover = await color();
+      await page.mouse.down();
+      observed.active = await color();
+      await page.mouse.up();
+      await page.mouse.move(0, 0);
+      observed.restored = await color();
+      const evidencePath = testInfo.outputPath('visited-preview-colors.json');
+      await writeFile(
+        evidencePath,
+        JSON.stringify({ theme, tokens, observed })
+      );
+      await testInfo.attach('visited-preview-colors.json', {
+        path: evidencePath,
+        contentType: 'application/json',
+      });
+      expect(observed).toEqual({
+        idle: tokens.visited,
+        focus: tokens.visited,
+        hover: tokens.hover,
+        active: tokens.hover,
+        restored: tokens.visited,
+      });
+    });
+  }
+});
+
+test.describe('Waitlist Spotify native composition events', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const option of ['artist', 'manual'] as const) {
+      test(`composition preserves editing before ordinary ${option} activation [${theme}]`, async ({
+        page,
+      }, testInfo) => {
+        const { pageErrors, resourceErrors } = observeWaitlistProofErrors(page);
+        const events: ComposingKeyObservation[] = [];
+
+        const root = page.locator('#storybook-root');
+        const view = page.locator('body');
+        const name = `waitlist-composition-${theme}-${option}`;
+        let failure: unknown;
+        let screenshotFailure: unknown;
+        try {
+          await setStoryTheme(page, theme);
+          await openStory(
+            page,
+            'features-waitlist-waitlistspotifysearch--results'
+          );
+          await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+          const search = root.getByRole('combobox', {
+            name: 'Search Spotify artists',
+          });
+          await expect(search).toHaveValue('Neon');
+          await expect(
+            root.getByRole('button', { name: /Neon Harbour/ })
+          ).toBeVisible();
+          await focusWaitlistOption(page, search, option);
+          const activeOption =
+            option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
+          await expect(search).toHaveAttribute(
+            'aria-activedescendant',
+            activeOption
+          );
+
+          // These are native DOM event flags, not an OS input-method replay.
+          for (const key of WAITLIST_COMPOSING_KEYS) {
+            const event = await dispatchComposingKey(search, key);
+            events.push(event);
+            expect(event.isComposing).toBe(true);
+            expect(event.defaultPrevented).toBe(false);
+            await expect(search).toBeVisible();
+            await expect(search).toBeFocused();
+            await expect(search).toHaveValue('Neon');
+            await expect(search).toHaveAttribute('aria-expanded', 'true');
+            await expect(search).toHaveAttribute(
+              'aria-activedescendant',
+              activeOption
+            );
+          }
+          await attachScreenshot(testInfo, `${name}-editing.png`, view);
+          await attachA11yResult(page, testInfo, `${name}-editing-a11y.json`);
+
+          await page.keyboard.press('Enter');
+          if (option === 'artist') {
+            await expect(
+              root.getByRole('button', { name: 'Change', exact: true })
+            ).toBeVisible();
+            await expect(
+              root.getByText('Neon Harbor', { exact: true })
+            ).toBeVisible();
+          } else {
+            await expect(root.getByLabel('Spotify link')).toBeVisible();
+          }
+          await expect(search).toHaveCount(0);
+          await assertNoHorizontalOverflow(page, name);
+          await attachA11yResult(page, testInfo, `${name}-a11y.json`);
+          expect(pageErrors).toEqual([]);
+          expect(resourceErrors).toEqual([]);
+        } catch (error) {
+          failure = error;
+        } finally {
+          try {
+            await attachScreenshot(testInfo, `${name}-final.png`, view);
+          } catch (error) {
+            screenshotFailure = error;
+          }
+          await attachWaitlistDiagnostics(testInfo, EVIDENCE_DIR, name, {
+            theme,
+            option,
+            events,
+            pageErrors,
+            resourceErrors,
+            failure,
+            screenshotFailure,
+          });
+        }
       });
     }
   }

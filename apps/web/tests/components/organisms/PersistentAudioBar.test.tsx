@@ -198,7 +198,7 @@ describe('PersistentAudioBar', () => {
     );
     const hide = screen.getByRole('button', { name: 'Hide Player' });
     await user.click(hide);
-    const show = screen.getByRole('button', { name: 'Show Player' });
+    const show = screen.getByRole('button', { name: /Show Player/ });
     await waitFor(() => expect(show).toHaveFocus());
     await user.click(show);
     await waitFor(() => expect(hide).toHaveFocus());

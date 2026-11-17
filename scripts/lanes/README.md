@@ -33,7 +33,7 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
-| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
 | Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
@@ -133,11 +133,10 @@ origin fails without changing existing bytes. New heads require new receipts;
 neither repair nor review/finalizer receipts rewrite origin history.
 
 The Dependabot metadata-certified producer and atomic pin-sync writer emit after
-their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+their final heads are known. Shipping SLO (snapshot and ratchet),
 Screenshots (new and updated PR), Production Controller customer notes, Desktop
 Release stamps, and both coverage/nightly report publishers use the same
-`shipping_origin.py emit-automation` boundary after publication. Sentry records
-the evidenced Claude provider, without inventing a model from its routing tier.
+`shipping_origin.py emit-automation` boundary after publication.
 
 Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
 days. The existing lanes dispatch tick reads artifacts from both reporting
@@ -365,21 +364,30 @@ Ranking, prioritization and strategy decisions are not made on Summer's flash mo
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
 (question, decision type, context refs, deadline). Only issues with that block are reason-lane
 jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
-Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
-(flock `reason.lock`), so a job starts within a minute. Per job:
+Each disk-admitted dispatch tick schedules the native `reason_lane.py tick` before code-history
+preparation and code-provider work. Its queue read runs separately, so unavailable code history
+does not suppress reasoning and a slow Linear read does not delay code. Disk denial still blocks
+starts; `reason.lock` guards the check and the existing drain, whose job leases, provider health
+and budget checks are unchanged. `tick.json` says only `scheduled`; `reason-tick.json` records the
+queue-check outcome and next action. Neither receipt proves a worker accepted or completed a job.
+Per job:
 
 1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,
    `linear:open-p0-p1` (open JOV P0/P1 list); URLs are listed, not fetched. Models get no tools.
-2. Proposer: `claude -p` on Opus 5.5 (subscription login; `~/.config/jovie-lanes/claude.env` may
-   hold `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), structured JSON, `--max-budget-usd`.
+2. Proposer: the configured Hyperagent GLM 5.3 route. Money/auth/release judgment jobs use
+   the configured Hyperagent Opus 5.5 agent; an absent judgment agent stays unavailable.
+   `reason.json` owns the existing routes and limits; personal Claude is not a reasoning route.
 3. Adversarial reviewer, first healthy of: `grok` CLI on grok-4.7 (subscription), then the
    Hyperagent "Grok 4.7 Reviewer" agent (Hyperagent credits, through `~/.local/bin/hyperagent`).
    A 402/quota answer cools that reviewer for 6h.
 4. `reconcile()`: high confidence only when a reviewer ran, kept the #1, shares two of the top
    three, did not reject, and the proposer is at or above 0.6. Anything else is low.
-5. A comment with a `summer.reasoning-result/v1` block, the GBrain page
-   `ops/summer/decisions/<date>-<jov-n>-<slug>`, then Done. That state change is the Linear
-   webhook that wakes Summer. A failed job retries once, then goes to Canceled with a `failed` block.
+5. Seal the full produced result in private `reason-results/` state before publication.
+   Verify the complete GBrain memo and the exact, stable-ID Linear result comment before
+   Done wakes Summer. An uncertain write keeps a blocked receipt with its owner and next
+   action; the existing drain retries those saved bytes without model work. Changed input,
+   expired deadlines and corrupt state stay blocked. Model failures retain their existing
+   bounded retry and Canceled outcome.
 
 `decisionType: research` (tier 4) runs the Hyperagent research backend instead and posts the memo.
 Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
@@ -959,6 +967,37 @@ Also in the same module and companions:
   Each pass records, per lane, free seats, seats fed and the reason any seat stayed idle
   (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
   the old routing; `observe` records what it would do and claims as before.
+
+## Observed admission capacity
+
+`pr_wip.py admit` and `new_issue_budget` use the caller's matched shared quota ledger
+and the fresh runner backlog in `release-flow.json`. Producer PR counts and the
+November 1 WIP targets remain diagnostic. Historical merge dwell and quota-deferred
+head counts cannot hold new work after the current constraint clears.
+
+A known zero remains blocked until its provider reset. A passed reset needs a fresh
+observation; it does not imply a refilled bucket. An existing admission invocation may
+make one quota-free `/rate_limit` refresh through the shared client. Unknown quota or
+CI evidence retains the existing bounded base and repair seats and prevents growth.
+Actual calls reserve at the shared client, and PR creation makes one bounded attempt.
+Caller quota does not certify a separate Actions installation. Recorded WIP overrides
+cannot override real quota or CI saturation.
+
+After its normal body and diff qualification, `pr:open` uses the existing `repair`
+request priority for corrections with red-before-green evidence on the canonical CI,
+agent-control-plane, identity, payment or proxy risk surfaces. The same priority reaches
+the prospective gate and the single creation attempt. It can use the existing repair
+reserve; it cannot spend an empty bucket or override CI backlog.
+
+`pr:open open --no-repair-reserve` explicitly declines that reserve and uses `default`
+for both capacity admission and the single creation request. It is a boolean downgrade,
+not a free-form priority setting; automatic selection stays unchanged when omitted.
+The existing publication receipt records the automatic and effective priorities.
+Every quota, CI, source, body and publication-head gate still applies.
+
+Ship now: use observed capacity with the existing event and lanes invocation paths.
+Re-evaluate when: JOV-7514 runtime receipts show idle capacity or a wrong-bucket hold.
+Then: repair that evidence path under JOV-8754; do not add another controller.
 
 ## Tests
 

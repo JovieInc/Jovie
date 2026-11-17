@@ -19,6 +19,7 @@ on:
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-trim.mjs'
       - '.github/workflows/pen-draft.yml'
   # A brief change drafts on its own PR too, so the frames are in review
   # before merge and nobody has to start a run by hand.
@@ -27,6 +28,7 @@ on:
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-trim.mjs'
       - '.github/workflows/pen-draft.yml'
   workflow_dispatch:
     inputs:
@@ -99,7 +101,8 @@ jobs:
     needs: plan
     if: ${{ needs.plan.outputs.frames != '[]' }}
     runs-on: ubuntu-24.04
-    # pen-draft.mjs budgets 20 minutes for bounded retries; reserve five for setup and upload.
+    # pen-draft.mjs budgets 23 minutes: one attempt, or a retry after an early
+    # failure. Setup and upload take under a minute, so two are reserved.
     timeout-minutes: 25
     # Share the editor lease across PRs, main pushes and manual runs. Native
     # queueing retains up to 100 pending jobs instead of replacing the oldest.
@@ -134,7 +137,13 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The Pen agent is Claude Code: run it on the paid subscription, never a
+          # metered API key (Tim, 2026-11-10). The metered key ran out of credit
+          # and every draft since failed with billing_error.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Blank drafts on the script's default, Fable 5.2. Set the repository
+          # variable to move drafts to another model without a code change.
+          PEN_DRAFT_MODEL: ${{ vars.PEN_DRAFT_MODEL }}
           FRAME: ${{ matrix.frame }}
         run: node scripts/design/pen-draft.mjs --out "$RUNNER_TEMP/pen-draft" --only "$FRAME"
 

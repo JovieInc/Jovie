@@ -14,6 +14,8 @@ import {
 import { join, relative, resolve } from 'node:path';
 
 export const RENDER_INPUT_SCHEMA = 'jovie.component-render-inputs/v1';
+/** Per-component closure binding (scripts/lib/component-render-closure.mjs). */
+export const RENDER_INPUT_SCHEMA_V2 = 'jovie.component-render-inputs/v2';
 export const STORYBOOK_PROFILE = Object.freeze({
   JOVIE_LIVE_STORYBOOK_CERT: '',
   JOVIE_STORYBOOK_MANUAL_AXE: '1',
@@ -27,22 +29,28 @@ export const STORYBOOK_PROFILE = Object.freeze({
 });
 const ROOT_INPUT =
   /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.nvmrc|\.node-version|\.npmrc|\.gitignore|\.gitattributes|\.?pnpmfile\.[cm]?js|tsconfig[^/]*\.json|(?:postcss|tailwind|vite)\.config\.[^/]+)$/;
-const PRODUCER_INPUTS = new Set([
+/** The capture code itself: a change here re-proves every receipt. */
+export const PRODUCER_INPUTS = new Set([
   'scripts/component-story-evidence.mjs',
   'scripts/component-ship-policy.mjs',
   'scripts/lib/component-story-evidence-lib.mjs',
   'scripts/lib/component-evidence.mjs',
   'scripts/lib/component-story-receipts.mjs',
   'scripts/lib/component-render-inputs.mjs',
+  'scripts/lib/component-render-closure.mjs',
   '.github/workflows/visual-a11y.yml',
 ]);
+// These support directories contain imported Storybook/runtime code and assets.
+const RUNTIME_SUPPORT_INPUT = /^apps\/web\/(?:tests\/fixtures|lib\/docs)\//;
 /** Mirrors the workflow's render-only eligibility, preserving its older matrix. */
 export function isRenderInput(path) {
   if (ROOT_INPUT.test(path) || PRODUCER_INPUTS.has(path)) return true;
   return (
     /^(?:apps\/web|packages|patches)\//.test(path) &&
     !/^apps\/web\/app\/(?:api|actions)\//.test(path) &&
-    !/(?:^|\/)(?:__tests__|tests|docs)\//.test(path) &&
+    !/(?:^|\/)__tests__\//.test(path) &&
+    (RUNTIME_SUPPORT_INPUT.test(path) ||
+      !/(?:^|\/)(?:tests|docs)\//.test(path)) &&
     !/\.(?:test|spec)\.|\.md$/.test(path)
   );
 }
@@ -165,7 +173,9 @@ export function storyComponentInputs(root, selected, env) {
 }
 
 export function renderBindingProblem(binding) {
-  return binding?.schema !== RENDER_INPUT_SCHEMA ||
+  return ![RENDER_INPUT_SCHEMA, RENDER_INPUT_SCHEMA_V2].includes(
+    binding?.schema
+  ) ||
     binding?.mode !== 'storybook-full' ||
     !/^[0-9a-f]{64}$/.test(binding?.digest ?? '')
     ? 'missing or invalid render input binding'
@@ -179,6 +189,7 @@ export function renderReceiptCurrent(receipt, sourceHash, expected) {
     receipt.sourceHash === sourceHash &&
     !renderBindingProblem(expected) &&
     !renderBindingProblem(receipt.renderInputs) &&
+    receipt.renderInputs.schema === expected.schema &&
     receipt.renderInputs.digest === expected.digest
   );
 }

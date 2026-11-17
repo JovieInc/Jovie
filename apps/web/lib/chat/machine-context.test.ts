@@ -50,6 +50,13 @@ describe('stripMachineContext', () => {
     expect(stripMachineContext(text)).toBe(text);
     expect(hasMachineContext(text)).toBe(false);
   });
+
+  it('keeps JSON a person pasted themselves', () => {
+    const text = 'Is this config right?\n{"theme":"dark","size":2}';
+    expect(stripMachineContext(text)).toBe(text);
+    expect(stripMachineContext('{"a":1}')).toBe('{"a":1}');
+    expect(hasMachineContext(text)).toBe(false);
+  });
 });
 
 describe('titles never carry machine context', () => {
@@ -76,6 +83,12 @@ describe('titles never carry machine context', () => {
         'Help me with this library item. {"kind":"rel...'
       )
     ).toBe('Help me with this library item.');
+  });
+
+  it('keeps a title that only quotes JSON', () => {
+    expect(stripMachineContextFromTitle('Parse {"name":"Tim"} for me')).toBe(
+      'Parse {"name":"Tim"} for me'
+    );
   });
 
   it('titles a chip-only profile chat with the profile name', () => {

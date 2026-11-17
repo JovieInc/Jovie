@@ -151,6 +151,7 @@ describe('Component Certificate workflow contract', () => {
 ${commit}
 git update-ref refs/remotes/origin/main HEAD
 ${unmerged ? commit : ''}
+export CERT_SHA="$(git rev-parse HEAD)" CERT_EVENT_NAME=workflow_dispatch
 ${gate?.run || 'true'}`,
         ],
         { cwd: root, encoding: 'utf8' }

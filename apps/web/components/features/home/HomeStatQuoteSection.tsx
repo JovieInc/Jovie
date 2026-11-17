@@ -24,7 +24,7 @@ export function HomeStatQuoteSection({
   const id = 'sq-purple';
   return (
     <section
-      className='relative overflow-hidden bg-black dark:bg-black py-32 sm:py-40'
+      className='relative overflow-hidden bg-ink-on-media py-32 sm:py-40'
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.stats}
     >
       <svg

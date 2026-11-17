@@ -121,11 +121,10 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal, and the
-# reconcile pass (epics.reconcile) expires it after 72h without activity. `codex-blocked`
-# only steers routing away from codex; `reasoning-job` belongs to the reason lane only when
-# Summer's job block is present; `type:epic` is a decomposition unit (epics.py);
-# `no-symphony` no longer excludes (the claiming agent decides what the issue needs).
+# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal (epics.reconcile
+# expires it after 72h idle); `codex-blocked` steers routing off codex; `reasoning-job` is the reason
+# lane's only with Summer's job block; `type:epic` is a decomposition unit; `no-symphony` no longer
+# excludes. A `fleet` issue addressed to Lola, Chloe or Aeon is theirs for 72h (epics.fleet_reserved).
 HARD_EXCLUDED_LABELS = frozenset({"hold"})
 CODEX_BLOCKED_LABEL = "codex-blocked"
 REASONING_JOB_LABEL = "reasoning-job"
@@ -154,10 +153,10 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_header_zindex.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_header_zindex.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
-              "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
+              "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
               "scripts/tests/test_quota_rerun.py",
@@ -221,7 +220,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/jev-gateway.mjs", "scripts/invariants/jev-shadow.mjs",
                   "scripts/invariants/jev-writing-quality.mjs", "scripts/invariants/run-outcome.mjs",
                   "scripts/invariants/writing-surfaces.mjs", "scripts/invariants/writing-surfaces-registry.json",
-                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
+                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-registry.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
@@ -710,9 +709,10 @@ def sensitive_text_released(issue: Issue) -> bool:
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
-    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
-    if excluded:
+    if excluded := sorted(HARD_EXCLUDED_LABELS & labels):
         return "excluded-label:" + excluded[0]
+    if agent := epics.fleet_reserved(issue):
+        return "fleet-reserved:" + agent
     if REASONING_JOB_LABEL in labels and reason_lane.has_job_block(issue.description):
         return "reason-lane-job"
     if CODEX_BLOCKED_LABEL in labels and provider == "codex":
@@ -6337,19 +6337,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
 
 
 def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
-    """Restore main's generated copies, then regenerate from the merged source, including
-    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
-    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
-    if not generated:
-        return True
-    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
-        return False
-    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
-    for command in commands:
-        guard()
-        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
-            return False
-    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+    return fix_red_source_edits.regenerate_merged_generated(
+        worktree, paths, log, resolvers=remediation.GENERATED_RESOLVERS, sh=sh, guard=guard)
 
 
 def union_merge_file(worktree: Path, path: str, log) -> bool:
@@ -6990,7 +6979,7 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
     if not logs:
         return None
     routed = fix_red_classes.classify(pr, logs)
-    if routed.get("action") == fix_red_failure_routing.ALIAS_ACTION or fix_red_failure_routing.has_local_prerequisite_failure(routed, logs):
+    if routed.get("action") == fix_red_failure_routing.ALIAS_ACTION or fix_red_failure_routing.has_source_prerequisite_failure(routed, logs):
         return None
     found = set()
     for text in logs.values():
@@ -8764,23 +8753,23 @@ def pr_is_terminal(pr: dict) -> bool:
                                                    pr_events.PREFIX + "escalating"}))
 
 
-def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
-    """A lane's new-issue admission: its producer's WIP cap (pr-wip-policy.json, same rule as pr-open;
-    the retired JOV-6833/JOV-7514 slot caps stay gone). Repairs never consult it; unknown inventory admits."""
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None, *, capacity: dict | None = None) -> dict:
+    """New intake uses current quota/CI evidence; counts are diagnostics. Repairs never consult it."""
     if slots <= 0:
         return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
-    wip = pr_wip.admit(inventory, name)
-    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else "wip-cap",
+    wip = pr_wip.admit(inventory, name, capacity=capacity)
+    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else wip["reason"], "capacity": wip,
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
             "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """The WIP count reads the shared open-PR summary (60 s cache); an unreadable one admits."""
+    """One local capacity observation; the shared PR summary is diagnostic only."""
     inventory = pr_wip.safe_inventory(open_prs_summary) if slots > 0 else None
-    return {**new_issue_budget(name, slots, inventory), "observedAt": now_iso(), "error": None}
+    capacity = pr_wip.observe_capacity(refresh=True) if slots > 0 else None
+    return {**new_issue_budget(name, slots, inventory, capacity=capacity), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
@@ -10140,6 +10129,10 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 except (Exception, SystemExit) as error:
                     tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
+        try:
+            tick["reason"] = reason_lane.schedule_tick(host, THIS)
+        except (Exception, SystemExit) as error:  # reasoning failure never blocks code dispatch
+            tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):
             try:
@@ -10244,16 +10237,12 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
     if tick["error"] or tick.get("admissionDenied"):
-        # A denied tick must not launch another worker through ancillary event paths.
+        # Do not launch later ancillary workers after code preparation fails or disk admission is denied.
         return finish_dispatch(host, tick)
     try:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except (Exception, SystemExit) as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
-    try:
-        tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
-    except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
-        tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         owner = os.environ.get("OUTCOME_LANE_OWNER", "gem").split(".")[0]
         tick["outcome"] = (outcome_lane.tick(host, THIS) if HOST == owner else
