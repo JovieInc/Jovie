@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
-import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { loadLibraryDocuments } from '@/lib/db/creator-documents/library-page';
 import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -67,9 +69,15 @@ export default async function LibraryPage({
   readonly searchParams: Promise<{
     readonly section?: string | string[] | undefined;
     readonly view?: string | string[] | undefined;
+    readonly document?: string | string[];
   }>;
 }) {
   const { view } = await searchParams;
+  const requestedDocument = (await searchParams).document;
+  const requestedId =
+    typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
+      ? requestedDocument.toLowerCase()
+      : null;
   const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
@@ -120,7 +128,10 @@ export default async function LibraryPage({
           userId: routeContext.userId,
           profileId,
         });
-        const privateDocuments = await listCreatorDocuments(profileId);
+        const privateDocuments = await loadLibraryDocuments(
+          profileId,
+          requestedId
+        );
         return {
           documents: [...privateDocuments.documents],
           nextCursor: privateDocuments.nextCursor,
@@ -255,6 +266,12 @@ export default async function LibraryPage({
     creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
+  if (
+    requestedId &&
+    !creatorDocumentsLoadFailed &&
+    !creatorDocuments.some(item => item.id === requestedId)
+  )
+    notFound();
   const teleprompterTakes = await takesPromise;
 
   return (
