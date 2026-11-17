@@ -37,7 +37,7 @@ function signupFixture(closed: boolean, reject?: () => Promise<Response>) {
 async function assertFailedJoin(canvasElement: HTMLElement, message: string) {
   const canvas = within(canvasElement);
   const email = canvas.getByLabelText('Email address');
-  const artist = canvas.getByRole('radio', { name: 'Artist', exact: true });
+  const artist = canvas.getByRole('radio', { name: 'Artist' });
   await userEvent.click(artist);
   await userEvent.type(email, 'person@example.com');
   const submit = canvas.getByRole('button', {
