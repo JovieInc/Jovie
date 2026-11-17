@@ -11,6 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
 import fix_red_source_edits as edits  # noqa: E402
+import fix_red_statement_merge as statements  # noqa: E402
+# Release self-test runs this listed file only, so the split class has to load here.
+from scripts.tests.test_duplicate_clock_pin import DuplicateClockPinTest  # noqa: E402
+
+assert issubclass(DuplicateClockPinTest, unittest.TestCase)
 
 
 def pr(*names, merge="BLOCKED"):
@@ -41,6 +46,39 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
         self.assertEqual(result["waivers"]["head.tsx"], self.ours["waivers"]["head.tsx"])
         self.assertEqual(result["policy"], self.base["policy"])
 
+    def test_unions_gate_and_waiver_additions_without_losing_criteria(self):
+        self.base["gates"]["existing.tsx"] = ["tests", "a11y"]
+        for document in (self.ours, self.theirs):
+            document["gates"].update(self.base["gates"])
+        self.ours["gates"]["head.tsx"] = ["states", "tests", "a11y"]
+        self.theirs["gates"]["main.tsx"] = ["tests", "a11y"]
+        result = json.loads(self.resolve())
+        self.assertEqual(list(result["gates"]), ["existing.tsx", "head.tsx", "main.tsx"])
+        for document in (self.ours, self.theirs):
+            for path, criteria in document["gates"].items():
+                self.assertEqual(result["gates"][path], criteria)
+        self.assertEqual(set(result["waivers"]), {"existing.tsx", "head.tsx", "main.tsx"})
+
+    def test_refuses_gate_deletions_edits_conflicts_and_malformed_rows(self):
+        for mutation in ("delete", "edit", "conflict", "unknown", "empty", "scalar", "duplicate"):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                for document in (self.base, self.ours, self.theirs):
+                    document["gates"]["existing.tsx"] = ["tests", "a11y"]
+                self.ours["gates"]["head.tsx"] = ["tests"]
+                if mutation == "delete":
+                    del self.ours["gates"]["existing.tsx"]
+                elif mutation == "edit":
+                    self.theirs["gates"]["existing.tsx"] = ["tests"]
+                elif mutation == "conflict":
+                    self.theirs["gates"]["head.tsx"] = ["a11y"]
+                else:
+                    self.ours["gates"]["head.tsx"] = {
+                        "unknown": ["future-criterion"], "empty": [], "scalar": "tests",
+                        "duplicate": ["tests", "tests"],
+                    }[mutation]
+                self.assertIsNone(self.resolve())
+
     def test_refuses_edits_deletions_conflicting_additions_and_other_paths(self):
         for mutate in (
             lambda: self.ours["policy"].update(mutationMin=0),
@@ -57,6 +95,8 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
         self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
 
     def test_real_git_append_conflict_is_repaired_through_existing_machine(self):
+        self.ours["gates"]["head.tsx"] = ["states", "tests", "a11y"]
+        self.theirs["gates"]["main.tsx"] = ["tests", "a11y"]
         debt_rel = "docs/design-system/cert-screens.json"
         debt_base = {"schema": "jovie.cert-screens/v1", "debt": {
             "kept.tsx": "a11y,states",
@@ -107,49 +147,6 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             self.assertEqual(list(debt["debt"]), ["kept.tsx", "also.tsx"])
             self.assertEqual(debt["schema"], debt_base["schema"])
             self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
-
-
-class SubtractiveScreenDebtTest(unittest.TestCase):
-    REL = "docs/design-system/cert-screens.json"
-
-    def setUp(self):
-        self.base = {"schema": "jovie.cert-screens/v1", "debt": {
-            "kept.tsx": "a11y,states",
-            "drop-head.tsx": "states",
-            "also.tsx": "tests",
-            "drop-main.tsx": "a11y",
-        }}
-        self.ours = json.loads(json.dumps(self.base))
-        self.theirs = json.loads(json.dumps(self.base))
-        del self.ours["debt"]["drop-head.tsx"]
-        del self.theirs["debt"]["drop-main.tsx"]
-
-    def resolve(self, rel=None, blobs=None):
-        values = blobs or [json.dumps(value) for value in (self.base, self.ours, self.theirs)]
-        def sh(args, **kwargs):
-            return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
-        return edits.resolve_subtractive_screen_debt(Path("."), rel or self.REL, sh)
-
-    def test_keeps_main_order_and_drops_either_sides_removals(self):
-        result = json.loads(self.resolve())
-        self.assertEqual(list(result["debt"]), ["kept.tsx", "also.tsx"])
-        self.assertEqual(result["debt"]["kept.tsx"], "a11y,states")
-        self.assertEqual(result["schema"], self.base["schema"])
-
-    def test_refuses_additions_edits_and_other_paths(self):
-        for mutate in (
-            lambda: self.ours["debt"].update({"new.tsx": "states"}),
-            lambda: self.ours["debt"].update({"kept.tsx": "changed"}),
-            lambda: self.theirs.update(schema="other"),
-            lambda: self.ours["debt"].update({"kept.tsx": ""}),
-            lambda: self.theirs["debt"].update({"added.tsx": "states"}),
-        ):
-            self.setUp()
-            mutate()
-            self.assertIsNone(self.resolve())
-        self.assertIsNone(self.resolve("docs/design-system/component-certification.json"))
-        self.assertIsNone(self.resolve(blobs=['{"debt":{},"debt":{}}'] * 3))
-        self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
 
 
 class SpacingSnapTest(unittest.TestCase):
@@ -375,6 +372,92 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
                 self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
 
 
+class AdditiveStatementMergeTest(unittest.TestCase):
+    @staticmethod
+    def conflict(ours, theirs, base=""):
+        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
+
+    def test_unions_empty_base_statements_in_main_order(self):
+        ours = (
+            "const mockSweepLegacySlugs = vi.hoisted(() =>\n"
+            "  vi.fn(async () => ({ renamed: 1 }))\n"
+            ");\n"
+        )
+        theirs = "const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());\n"
+        mock_ours = (
+            "vi.mock('@/lib/discography/slug-migration', () => ({\n"
+            "  sweepLegacySlugsForCron: mockSweepLegacySlugs,\n"
+            "}));\n"
+        )
+        mock_theirs = (
+            "vi.mock('@/lib/discography/apple-music-import', () => ({\n"
+            "  sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,\n"
+            "}));\n"
+        )
+        expect_ours = "    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });\n"
+        expect_theirs = (
+            "    expect(data.results.appleMusicCatalogImport.data).toEqual({\n"
+            "      profilesChecked: 2,\n"
+            "      releasesImported: 3,\n"
+            "      failed: 0,\n"
+            "    });\n"
+        )
+        text = (
+            "before\n"
+            + self.conflict(ours, theirs)
+            + "middle\n"
+            + self.conflict(mock_ours, mock_theirs)
+            + "after\n"
+            + self.conflict(expect_ours, expect_theirs)
+        )
+        merged = statements.resolve_additive_statements_text(text)
+        self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
+
+    def test_unions_an_import_and_accepts_route_group_paths(self):
+        imported = "import { getRequestSession } from '@/lib/auth/request-session';\n"
+        mocks = (
+            "const winbackMocks = vi.hoisted(() => ({ resolveWinbackResumeToken: vi.fn() }));\n"
+            "vi.mock('@/lib/waitlist/winback-resume.server', () => ({\n"
+            "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
+            "}));\n"
+        )
+        merge = statements.resolve_additive_statements_text
+        self.assertEqual(merge(self.conflict(imported, mocks)), mocks + imported)
+        self.assertEqual(merge(self.conflict(imported, imported)), imported)
+        self.assertIsNone(merge(self.conflict(
+            imported, "import { other } from '@/lib/auth/request-session';\n")))
+        self.assertIsNone(merge(self.conflict(
+            "import {\n  getRequestSession,\n} from '@/lib/auth/request-session';\n", mocks)))
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout="")
+
+        for rel in (
+            "apps/web/app/(dynamic)/start/page.test.ts",
+            "apps/web/app/[username]/page.test.tsx",
+            "apps/web/app/(.)photo/page.test.ts",
+            "README.md",
+        ):
+            calls.clear()
+            self.assertIsNone(edits.resolve_additive_statement_file(Path("."), rel, sh))
+            self.assertEqual(bool(calls), rel != "README.md")
+
+    def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
+        added = "const head = vi.fn();\n"
+        for value in (
+            self.conflict(added, "const main = vi.fn();\n", "const old = vi.fn();\n"),
+            self.conflict("  return 1;\n", "  return 2;\n"),
+            self.conflict("const head = vi.fn();\n", "const head = vi.fn(async () => 1);\n"),
+            self.conflict("vi.mock('@/a', () => ({\n", "vi.mock('@/b', () => ({\n"),
+            self.conflict(added, "const main = vi.fn();\n").replace("||||||| base\n", ""),
+            "const clean = vi.fn();\n",
+        ):
+            with self.subTest(value=value):
+                self.assertIsNone(statements.resolve_additive_statements_text(value))
+
+
 class Size500StaleTest(unittest.TestCase):
     LOG = "\n".join([
         "##[warning]vacuous-verdict: apps/web/lib/finance/metrics/engine.ts: 1 vacuous verdict site(s)",
@@ -407,6 +490,11 @@ class Size500StaleTest(unittest.TestCase):
         })
         self.assertEqual((got["cls"], got["action"]), ("mixed", "agent"))
 
+    def test_tracked_byte_stale_head_syncs_main(self):
+        fit = "PR head has 10 tracked regular-file bytes, exceeding the 8-byte repository budget, while the merged tree fits at 7 bytes"
+        over = "9 bytes of tracked regular files (merged tree; base 8 +1) exceeds the 8-byte combined-tree budget"
+        self.assertEqual(classes.classify(pr("PR Size Guard"), {"PR Size Guard": fit})["action"], "sync-main")
+        self.assertEqual(classes.classify(pr("PR Size Guard"), {"PR Size Guard": over})["action"], "agent")
 
 if __name__ == "__main__":
     unittest.main()

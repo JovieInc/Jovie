@@ -66,9 +66,9 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(BASE_URL),
-  alternates: {
-    canonical: '/',
-  },
+  // No `alternates` here on purpose: metadata is inherited down the segment
+  // tree, so a root canonical makes every page that forgets its own claim to
+  // be a duplicate of the homepage. Each indexable page sets its own.
   openGraph: {
     type: 'website',
     locale: 'en_US',

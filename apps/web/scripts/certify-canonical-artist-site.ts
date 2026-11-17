@@ -7,7 +7,16 @@ import {
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
 } from '@/lib/acquisition/canonical-artist-site-certification';
-import { countJourneyTests } from '../../../scripts/lib/journey-evidence-builder.mjs';
+import {
+  canonicalJourneyChecks,
+  type M2Receipt,
+  readJson,
+  stepPassed,
+} from './certify-canonical-artist-site-evidence';
+import {
+  classifyDeployedRevisionFromGit,
+  resolveGitRoot,
+} from './certify-canonical-artist-site-lineage';
 
 export interface CanonicalArtistSiteCliOptions {
   readonly candidateId: string;
@@ -26,20 +35,24 @@ export interface CanonicalArtistSiteCliOptions {
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
   readonly sourceHistory?: readonly string[];
   /**
+   * Checkout root for the git-path lineage binding. Defaults to the repo that
+   * contains the process working directory; only used when git can answer.
+   */
+  readonly gitRoot?: string;
+  /**
+   * True when `--source-history` was passed and its file parsed to zero
+   * entries. The Golden Path shell pre-creates the history file and clears it
+   * only when a history page failed (e.g. a GitHub installation-quota 403),
+   * so empty lineage evidence is a transport failure — never proof that the
+   * deployed revision is unrelated to the certified one.
+   */
+  readonly lineageFileEmpty?: boolean;
+  /**
    * Playwright JSON report of the golden-path run. When present, the revenue
    * checks read the spec that proves them instead of the whole step outcome,
    * so an unrelated spec (e.g. /start layout) cannot flip them.
    */
   readonly journeyReportPath?: string;
-}
-
-interface M2Receipt {
-  readonly steps?: readonly {
-    readonly name?: string;
-    readonly ok?: boolean;
-    readonly detail?: string;
-    readonly evidence?: readonly string[];
-  }[];
 }
 
 interface ProfileResult {
@@ -111,16 +124,40 @@ function optional(argv: readonly string[], name: string): string | undefined {
   return value;
 }
 
-function loadSourceHistory(path: string | undefined): readonly string[] {
-  if (!path) return [];
+function loadSourceHistory(path: string | undefined): {
+  entries: readonly string[];
+  fileWritten: boolean;
+} {
+  if (!path) return { entries: [], fileWritten: false };
   try {
-    return parseSourceHistory(readFileSync(resolve(path), 'utf8'));
+    const entries = parseSourceHistory(readFileSync(resolve(path), 'utf8'));
+    return { entries, fileWritten: true };
   } catch {
-    return [];
+    return { entries: [], fileWritten: false };
+  }
+}
+
+/**
+ * A lineage read that promised evidence and delivered none (the flag was
+ * passed but the file is missing or empty) is a transport failure, not
+ * drift. The Golden Path shell always creates the file, so empty content
+ * means every history page failed.
+ */
+export const LINEAGE_DEFERRAL_DETAIL =
+  'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty and git could not answer (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.';
+
+export class LineageEvidenceUnavailableError extends Error {
+  readonly deployedRevision: string | null;
+  constructor(deployedRevision: string | null) {
+    super(LINEAGE_DEFERRAL_DETAIL);
+    this.name = 'LineageEvidenceUnavailableError';
+    this.deployedRevision = deployedRevision;
   }
 }
 
 function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
+  const historyFlag = optional(argv, '--source-history');
+  const history = loadSourceHistory(historyFlag);
   return {
     candidateId: required(argv, '--candidate-id'),
     runId: required(argv, '--run-id'),
@@ -135,21 +172,11 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     navigationStatus: required(argv, '--navigation-status'),
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
-    sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
+    sourceHistory: history.entries,
+    lineageFileEmpty: historyFlag !== undefined && history.entries.length === 0,
+    gitRoot: optional(argv, '--git-root'),
     journeyReportPath: optional(argv, '--journey-report'),
   };
-}
-
-function readJson<T>(path: string): T | null {
-  try {
-    return JSON.parse(readFileSync(resolve(path), 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-function stepPassed(receipt: M2Receipt | null, name: string): boolean {
-  return receipt?.steps?.some(step => step.name === name && step.ok) ?? false;
 }
 
 export function certifyCanonicalArtistSite(
@@ -164,43 +191,55 @@ export function certifyCanonicalArtistSite(
 
   const goldenPassed = options.goldenPathStatus === 'success';
   const journeyReportRequested = options.journeyReportPath !== undefined;
-  const journeyReport = options.journeyReportPath
-    ? readJson(options.journeyReportPath)
-    : null;
-  // Use the existing journey verifier's strict executed-test semantics.
-  // Explicitly requested evidence cannot fall back to a green aggregate.
-  const specOk = (file: string) => {
-    try {
-      const { tests } = countJourneyTests(journeyReport, file);
-      return (
-        tests.total > 0 &&
-        tests.passed === tests.total &&
-        tests.failed === 0 &&
-        tests.skipped === 0
-      );
-    } catch {
-      return false;
-    }
-  };
-  const billingJourneyOk = journeyReportRequested
-    ? specOk('golden-path.spec.ts')
-    : goldenPassed;
-  const freeStateOk = journeyReportRequested
-    ? specOk('claim-prebuilt.smoke.spec.ts') &&
-      specOk('golden-path-home-welcome.spec.ts') &&
-      specOk('golden-path.spec.ts')
-    : goldenPassed;
+  const { billingJourneyOk, freeStateOk } = canonicalJourneyChecks(
+    options.journeyReportPath,
+    goldenPassed
+  );
   const claimContractPassed = options.claimContractStatus === 'success';
   const deployedRevision = profileReport?.snapshot?.releaseSha ?? null;
   const profileHealthy =
     options.profileStatus === 'success' && profile?.failed === false;
-  const revisionRelation = classifyDeployedRevision(
-    options.sourceRevision,
-    deployedRevision,
-    options.sourceHistory ?? []
-  );
+  // Bind from the local checkout first (JOV-12646: the commits-API lineage
+  // read loses whole pushes to GitHub installation-quota deferrals). Git is
+  // only skipped when it cannot answer; the lineage file then decides as
+  // before. A git `unrelated` verdict is real evidence — both revisions are
+  // present locally — and must stay RED even when the lineage file is empty.
+  const gitRoot = options.gitRoot ?? resolveGitRoot(process.cwd());
+  const gitLineage = gitRoot
+    ? classifyDeployedRevisionFromGit(
+        gitRoot,
+        options.sourceRevision,
+        deployedRevision
+      )
+    : 'unanswered';
+  const revisionRelation =
+    gitLineage === 'unanswered'
+      ? classifyDeployedRevision(
+          options.sourceRevision,
+          deployedRevision,
+          options.sourceHistory ?? []
+        )
+      : gitLineage;
   const revisionBound =
     revisionRelation === 'same' || revisionRelation === 'ancestor';
+  // A history file the workflow pre-created but left empty means every
+  // commits-history page failed (GitHub installation-quota 403 or transport)
+  // and git could not answer either: the deployed revision cannot be bound,
+  // which is missing evidence, not drift. Report a visible deferral instead
+  // of issuing a false GREEN or turning Golden Path (manual) red (JOV-12646):
+  // the certificate stays RED with the deferral detail, the CLI announces the
+  // quota-deferral and exits 0, and a re-run after the quota reset re-reads
+  // the lineage. Real failures keep their hard RED: an unhealthy profile or
+  // genuine drift (git-answered or history-answered unrelated) never reaches
+  // this branch.
+  const revisionDeferral =
+    options.lineageFileEmpty === true &&
+    gitLineage === 'unanswered' &&
+    revisionRelation === 'unrelated' &&
+    profileHealthy;
+  const revisionSummary = revisionDeferral
+    ? new LineageEvidenceUnavailableError(deployedRevision).message
+    : `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
   const profilePassed = profileHealthy && revisionBound;
   const exposedDeferred = profile?.exposedDeferredSurfaces;
   const boundDefect = (passesIgnoringRevision: boolean) =>
@@ -231,7 +270,7 @@ export function certifyCanonicalArtistSite(
   const journeyDetail = goldenPassed
     ? 'Production build passed the prebuilt claim, real-auth golden path, start-entry continuity, and Stripe journey.'
     : 'Production-faithful Golden Path did not pass.';
-  const revisionDetail = `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
+  const revisionDetail = revisionSummary;
   const profileDetail = profilePassed
     ? revisionRelation === 'ancestor'
       ? `Live Tim White profile passed. Deployed revision ${deployedRevision ?? 'unknown'} is an ancestor of source revision ${options.sourceRevision}.`
@@ -436,7 +475,22 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     for (const failure of certificate.evidenceIntegrityFailures) {
       console.error(`evidence: ${failure}`);
     }
-    if (!certificate.safeToSend) process.exitCode = 1;
+    const deferred = certificate.checks.some(check =>
+      check.detail.startsWith('github-quota-deferred:')
+    );
+    if (deferred) {
+      // The repository's quota-deferral convention (runWithGitHubRetry): a
+      // transport state, never a verdict on the change (JOV-12646). The
+      // written certificate stays RED — nothing certifies on an unbound
+      // revision — but the deferral must be visible without turning Golden
+      // Path (manual) red. Re-running after the quota reset re-reads lineage.
+      console.error(
+        `::warning title=github-quota-deferred::${LINEAGE_DEFERRAL_DETAIL}`
+      );
+      process.exitCode = 0;
+    } else if (!certificate.safeToSend) {
+      process.exitCode = 1;
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

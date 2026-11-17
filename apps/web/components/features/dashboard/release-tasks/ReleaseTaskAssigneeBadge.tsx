@@ -12,8 +12,8 @@ const ASSIGNEE_VARIANTS = {
     dotClassName: 'bg-accent',
   },
   ai_workflow: {
-    className: 'border-purple-500/20 bg-purple-500/5',
-    dotClassName: 'bg-purple-500',
+    className: 'border-accent-purple-text/20 bg-accent-purple-text/5',
+    dotClassName: 'bg-accent-purple-text',
   },
 } as const;
 

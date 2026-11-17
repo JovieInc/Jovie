@@ -12,6 +12,8 @@ import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 import './desktop-titlebar-contract.cases.mjs';
+import './desktop-startup-contract.cases.mjs';
+import './desktop-update-control-contract.cases.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -503,7 +505,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function isAppOriginReachable\(\)/);
   assert.match(mainSource, /function findReachableHostedUrl\(/);
   assert.match(mainSource, /beginRecoveryUnlatch/);
-  assert.match(mainSource, /decideRecoveryUnlatch/);
+  assert.match(mainSource, /createRecoveryUnlatchController/);
+  const unlatchSource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery-unlatch.ts'),
+    'utf8'
+  );
+  assert.match(unlatchSource, /decideRecoveryUnlatch/);
   assert.match(recoverySource, /hostedUrlCandidates/);
   assert.match(recoverySource, /Jovie Couldn’t Load/);
   assert.match(recoverySource, /Check your connection, then try again\./);
@@ -767,7 +774,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.match(wordmarkPathFn, /process\.resourcesPath/);
   assert.match(
     whenReadyBody,
-    /const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark\(\);/
+    /const bootSplashWordmarkReady = nightlyUpdateLaunch[\s\S]*?: preloadDesktopBootSplashWordmark\(\);/
   );
   const preloadAwait = whenReadyBody.indexOf('await bootSplashWordmarkReady;');
   const firstCreateWindow = whenReadyBody.indexOf('createWindow(');
@@ -1267,7 +1274,7 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /scheduleNightlyUpdateLaunchAgent/);
   assert.match(
     mainSource,
-    /await hydrateWindowState\(\);[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
+    /await Promise\.all\(\[[\s\S]*hydrateWindowState\(\),[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
   );
   assert.doesNotMatch(mainSource, /spawnSync/);
   assert.doesNotMatch(mainSource, /writeFileSync/);
@@ -1830,6 +1837,7 @@ test('Ovie recovery real preload sends zero arguments on its dedicated channel',
           },
         },
         ipcRenderer: {
+          on() {},
           invoke(...args) {
             calls.push(args);
             return Promise.resolve(response);
@@ -1839,7 +1847,10 @@ test('Ovie recovery real preload sends zero arguments on its dedicated channel',
     },
   });
   assert.equal(await api.openCurrentOvieInBrowser(), response);
-  assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
+  assert.deepEqual(calls, [
+    ['desktop-get-full-screen-state'],
+    ['open-current-ovie-in-browser'],
+  ]);
 });
 
 test('real native cancel wiring retries only an interrupted workspace document', async () => {
@@ -2110,6 +2121,7 @@ test('View Toggle Sidebar sends one command through the real preload and unsubsc
           },
         },
         ipcRenderer: {
+          invoke: async () => false,
           on: (channel, listener) => listeners.set(channel, listener),
           removeListener: (channel, listener) => {
             assert.equal(listeners.get(channel), listener);
@@ -2142,7 +2154,8 @@ test('View Toggle Sidebar sends one command through the real preload and unsubsc
   toggle.click();
   assert.equal(toggles, 1);
   unsubscribe();
-  assert.equal(listeners.size, 0);
+  assert.equal(listeners.has('toggle-sidebar'), false);
+  assert.deepEqual([...listeners.keys()], ['desktop-full-screen-changed']);
 });
 
 test('Cmd+B reaches the renderer policy without consuming editor input or other menu accelerators', async () => {

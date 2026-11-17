@@ -322,6 +322,9 @@ const VOCAL_PATTERN = /\b(vocals?|vocalist|topline|singer|vox)\b/i;
 const CREDIT_DISPUTE_PATTERN =
   /\b(wrong artist|wrong credit|incorrect(ly)? credit\w*|misattribut\w*|credit (error|issue|correction))\b/i;
 const CREDIT_FIX_PATTERN = /\b(fixed|corrected|resolved|updated)\b/i;
+/** A fix word that is negated or still pending reads as an open dispute. */
+const CREDIT_FIX_NEGATED_PATTERN =
+  /\b(not|never|cannot|no longer|\w+n['’]t|yet to be|needs? to be|to be)\s+(?:\w+\s+){0,2}(fixed|corrected|resolved|updated)\b/i;
 
 const REPLY_PREFIX_PATTERN =
   /^\s*(re|fw|fwd|aw|completed|please docusign|signature requested|reminder)\s*:\s*/i;
@@ -463,7 +466,9 @@ export function classifyRecordFileThread(
   const hints: RecordFileThreadHint[] = [];
   if (VOCAL_PATTERN.test(subject)) hints.push('vocal');
   if (CREDIT_DISPUTE_PATTERN.test(subject)) {
-    const fixed = CREDIT_FIX_PATTERN.test(subject);
+    const fixed =
+      CREDIT_FIX_PATTERN.test(subject) &&
+      !CREDIT_FIX_NEGATED_PATTERN.test(subject);
     hints.push(fixed ? 'credit_fixed' : 'credit_dispute');
     add(fixed ? 'subject.credit_fixed' : 'subject.credit_dispute', {
       kind: 'metadata_delivery',

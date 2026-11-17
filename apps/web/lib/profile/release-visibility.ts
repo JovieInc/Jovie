@@ -1,5 +1,5 @@
 import { determineReleasePhase } from '@/lib/discography/release-phase';
-import { isPublicReleaseEligible } from '@/lib/profile/public-release-eligibility';
+import { isPublicReleaseEligible } from '@/lib/profile/public-release-eligibility.shared';
 
 const RETIREMENT_DAYS = 90;
 

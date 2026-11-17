@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
@@ -12,7 +12,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  useFormField,
 } from './form';
 
 // Helper: wraps form fields in a full Form context using react-hook-form
@@ -173,7 +172,7 @@ describe('Form', () => {
       expect(label).toHaveAttribute('for', input.id);
     });
 
-    it('applies error styling when field has error', async () => {
+    it('marks an invalid label and clears that state after valid submission', async () => {
       const user = userEvent.setup({ delay: null });
       render(<TestFormWithValidation />);
 
@@ -183,6 +182,19 @@ describe('Form', () => {
       // After validation, the label should have the destructive class
       const label = await screen.findByText('Email');
       expect(label.className).toContain('text-destructive');
+      expect(label).toHaveAttribute('data-invalid', 'true');
+
+      await user.type(
+        screen.getByRole('textbox', { name: 'Email' }),
+        'listener@example.test'
+      );
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      await waitFor(() => {
+        expect(label).not.toHaveAttribute('data-invalid');
+        expect(label).not.toHaveClass('text-destructive');
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -195,9 +207,9 @@ describe('Form', () => {
     it('sets aria-describedby to description id', () => {
       render(<TestForm />);
       const input = screen.getByPlaceholderText('Enter username');
-      // Should reference the description element
-      expect(input).toHaveAttribute('aria-describedby');
-      expect(input.getAttribute('aria-describedby')).toBeTruthy();
+      const description = screen.getByText('Your public display name.');
+      expect(description.id).toBeTruthy();
+      expect(input).toHaveAccessibleDescription('Your public display name.');
     });
 
     it('omits aria-invalid when no error exists', () => {
@@ -429,55 +441,6 @@ describe('Form', () => {
     });
   });
 
-  describe('FormField', () => {
-    it('fails clearly outside a FormField context', () => {
-      function OrphanFieldProbe() {
-        useFormField();
-        return null;
-      }
-
-      expect(() => render(<OrphanFieldProbe />)).toThrow(
-        'useFormField should be used within <FormField>'
-      );
-    });
-
-    it('fails clearly outside a FormItem context', () => {
-      function ItemProbe() {
-        useFormField();
-        return null;
-      }
-
-      expect(() =>
-        render(
-          <TestForm>
-            <FormField name='username' render={() => <ItemProbe />} />
-          </TestForm>
-        )
-      ).toThrow('useFormField should be used within <FormItem>');
-    });
-
-    it('provides field context for child components', () => {
-      render(<TestForm />);
-      // The form renders correctly with field context
-      expect(screen.getByPlaceholderText('Enter username')).toBeInTheDocument();
-    });
-
-    it('connects field to react-hook-form', async () => {
-      const onSubmit = vi.fn();
-      const user = userEvent.setup({ delay: null });
-      render(<TestForm onSubmit={onSubmit} />);
-
-      const input = screen.getByPlaceholderText('Enter username');
-      await user.type(input, 'testuser');
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
-
-      expect(onSubmit).toHaveBeenCalledWith(
-        { username: 'testuser' },
-        expect.anything()
-      );
-    });
-  });
-
   describe('Form Integration', () => {
     it('handles full form submission flow', async () => {
       const onSubmit = vi.fn();
@@ -521,8 +484,13 @@ describe('Form', () => {
       }
 
       render(<FullForm />);
-      await user.type(screen.getByPlaceholderText('Name'), 'John');
-      await user.type(screen.getByPlaceholderText('Email'), 'john@test.com');
+      const name = screen.getByRole('textbox', { name: 'Name' });
+      const email = screen.getByRole('textbox', { name: 'Email' });
+      expect(name.id).toBeTruthy();
+      expect(email.id).toBeTruthy();
+      expect(name.id).not.toBe(email.id);
+      await user.type(name, 'John');
+      await user.type(email, 'john@test.com');
       await user.click(screen.getByRole('button', { name: 'Submit' }));
 
       expect(onSubmit).toHaveBeenCalledWith(

@@ -39,6 +39,8 @@ async function patchHandler(
         contactEmail: leads.contactEmail,
         instagramHandle: leads.instagramHandle,
         creatorProfileId: leads.creatorProfileId,
+        // Read by the existing-relationship hold (management credits in bio).
+        bio: leads.bio,
         claimTokenHash: leads.claimTokenHash,
         claimTokenExpiresAt: leads.claimTokenExpiresAt,
       })

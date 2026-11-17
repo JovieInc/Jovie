@@ -9,10 +9,14 @@ const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());
+const mockSweepLegacySlugs = vi.hoisted(() =>
+  vi.fn(async () => ({ renamed: 1 }))
+);
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
+const mockAutostartDesignPartnerAutopilot = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
 const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
@@ -60,13 +64,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
 vi.mock('@/app/api/cron/billing-reconciliation/route', () => ({
   runReconciliation: mockRunReconciliation,
 }));
@@ -100,7 +97,9 @@ vi.mock('@/lib/waitlist/auto-accept', () => ({
 vi.mock('@/lib/discography/apple-music-import', () => ({
   sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,
 }));
-
+vi.mock('@/lib/discography/slug-migration', () => ({
+  sweepLegacySlugsForCron: mockSweepLegacySlugs,
+}));
 vi.mock('@/lib/discography/re-enrich', () => ({
   sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
 }));
@@ -115,6 +114,10 @@ vi.mock('@/lib/profile-search/runner', () => ({
 
 vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
   syncAiCrawlerAnalyticsCron: mockSyncAiCrawlerAnalyticsCron,
+}));
+
+vi.mock('@/lib/release-to-revenue/autostart', () => ({
+  autostartDesignPartnerAutopilot: mockAutostartDesignPartnerAutopilot,
 }));
 
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
@@ -288,6 +291,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       releasesImported: 3,
       failed: 0,
     });
+    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });
     expect(data.results.onboardingScriptAggregation.success).toBe(true);
     expect(data.results.onboardingScriptAggregation.data).toEqual({
       syncedSeeds: 2,
@@ -315,6 +319,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       },
     });
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
+    expect(mockAutostartDesignPartnerAutopilot).toHaveBeenCalledTimes(1);
     expect(data.results.founderReviewUploadLeases.success).toBe(true);
     expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
     expect(data.results.aiGatewaySpend).toEqual({
