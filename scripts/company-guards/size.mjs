@@ -76,10 +76,10 @@ export function baselineFile(root) {
 }
 
 /**
- * @param {{ cwd?: string }} [options]
+ * @param {{ cwd?: string, baseRef?: string }} [options]
  * @returns {{ fails: string[], count: number }}
  */
-export function run({ cwd = process.cwd() } = {}) {
+export function run({ cwd = process.cwd(), baseRef } = {}) {
   const root = repoRoot(cwd);
   const files = execFileSync('git', ['ls-files'], {
     cwd: root,
@@ -101,8 +101,34 @@ export function run({ cwd = process.cwd() } = {}) {
   const baseline = existsSync(path)
     ? JSON.parse(readFileSync(path, 'utf8'))
     : {};
+  const fails = compare(current, baseline);
+  if (baseRef) {
+    const git = args =>
+      execFileSync('git', args, {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 1 << 26,
+      });
+    // Independent additions can exceed the limit only in the merge. Match
+    // hosted CI's combined source instead of trusting the branch's count.
+    const tree = git(['merge-tree', '--write-tree', baseRef, 'HEAD']).trim();
+    const changed = git([
+      'diff',
+      '--name-only',
+      '--diff-filter=AM',
+      '-z',
+      baseRef,
+      tree,
+    ])
+      .split('\0')
+      .filter(Boolean);
+    const merged = measure(changed, file => git(['show', `${tree}:${file}`]));
+    fails.push(
+      ...compare(merged, baseline).map(fail => `merged tree: ${fail}`)
+    );
+  }
   return {
-    fails: compare(current, baseline),
+    fails,
     count: Object.keys(current).length,
   };
 }
@@ -124,7 +150,14 @@ function main() {
     );
     process.exit(2);
   }
-  const result = run();
+  const baseIndex = process.argv.indexOf('--base-ref');
+  if (baseIndex !== -1 && !process.argv[baseIndex + 1]) {
+    console.error('size-500: --base-ref requires a revision');
+    process.exit(2);
+  }
+  const result = run({
+    baseRef: baseIndex === -1 ? undefined : process.argv[baseIndex + 1],
+  });
   for (const fail of result.fails) console.error(`size-500: ${fail}`);
   console.log(`size-500: ${result.count} oversize file(s) baselined/seen`);
   if (result.fails.length) process.exit(1);

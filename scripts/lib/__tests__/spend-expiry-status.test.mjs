@@ -72,9 +72,12 @@ describe('resolved spend expiries', () => {
     ).toEqual(['codex-fourth: banked-reset-1: unknown expiry status lapzed']);
   });
 
-  it('still alerts when a dated spend expiry is explicitly active', () => {
-    expect(fourthExpiryFindings('active').length).toBeGreaterThan(0);
-  });
+  it.each([undefined, 'active'])(
+    'still alerts for expiry status %s',
+    status => {
+      expect(fourthExpiryFindings(status).length).toBeGreaterThan(0);
+    }
+  );
 });
 
 describe('committed registry', () => {
@@ -85,7 +88,11 @@ describe('committed registry', () => {
       provider => provider.id === 'codex-fourth'
     );
     expect(fourth?.expiries).toEqual([
-      expect.objectContaining({ id: 'banked-reset-1', status: 'lapsed' }),
+      expect.objectContaining({
+        id: 'banked-reset-1',
+        status: 'lapsed',
+        expiresAt: bankedReset,
+      }),
     ]);
     const { findings } = evaluateRegistry({
       credentials: creds,
