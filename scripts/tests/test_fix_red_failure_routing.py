@@ -454,52 +454,45 @@ class RouteBudgetRoutingTest(unittest.TestCase):
 
 
 class StuckSyncRetryTest(unittest.TestCase):
-    """A consumed sync-main claim with no receipt must sync again when main is clean."""
-
     def setUp(self):
         self.head = 'a' * 40
         self.pr = {'number': 25257, 'headRefOid': self.head}
         self.routes = {'25257': {'sync-main': self.head}}
+        self.host = types.SimpleNamespace(state=Path(tempfile.mkdtemp()))
+        self.route = {'action': 'sync-main', 'cls': 'design-source-cli'}
 
     def test_missing_receipt_is_clean_only_for_this_head(self):
         claim = lane.fix_red_failure_routing.stuck_sync_is_clean
-        self.assertTrue(claim(self.pr, self.routes, {}, True))
-        self.assertTrue(claim(self.pr, self.routes, {'25257': {'from': 'b' * 40, 'ok': True}}, True))
-        self.assertFalse(claim(self.pr, self.routes, {}, False))
-        self.assertFalse(claim(self.pr, self.routes, {}, None))
-        self.assertFalse(claim(self.pr, {}, {}, True))
-        self.assertFalse(claim(self.pr, {'25257': {'sync-main': 'c' * 40}}, {}, True))
-        self.assertFalse(claim(self.pr, self.routes, {'25257': {'from': self.head, 'ok': False}}, True))
-        self.assertFalse(claim({'number': '25257', 'headRefOid': self.head}, self.routes, {}, True))
-        self.assertFalse(claim(self.pr, self.routes, [], True))
-        self.assertEqual(classes.RERUN, 'rerun')
-        self.assertEqual(classes.SYNC_MAIN, 'sync-main')
+        rows = [
+            (self.pr, self.routes, {}, True, True),
+            (self.pr, self.routes, {'25257': {'from': 'b' * 40, 'ok': True}}, True, True),
+            (self.pr, self.routes, {}, False, False),
+            (self.pr, self.routes, {}, None, False),
+            (self.pr, {}, {}, True, False),
+            (self.pr, {'25257': {'sync-main': 'c' * 40}}, {}, True, False),
+            (self.pr, self.routes, {'25257': {'from': self.head, 'ok': False}}, True, False),
+            ({'number': '25257', 'headRefOid': self.head}, self.routes, {}, True, False),
+            (self.pr, self.routes, [], True, False),
+        ]
+        for pr, routes, synced, clean, expected in rows:
+            self.assertIs(claim(pr, routes, synced, clean), expected)
+        self.assertEqual((classes.RERUN, classes.SYNC_MAIN), ('rerun', 'sync-main'))
+
+    def _taken(self, synced, conflicts):
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[self.routes, synced]), \
+                patch.object(lane, 'conflict_files', return_value=conflicts) as merged, \
+                patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
+            reason = lane.deterministic_route_taken(self.host, self.pr, self.route)
+        return reason, merged, sync
 
     def test_route_retries_sync_once_when_the_merge_is_clean(self):
-        host = types.SimpleNamespace(state=Path('/tmp/stuck-sync'))
-        route = {'action': 'sync-main', 'cls': 'design-source-cli'}
-        with patch.object(lane, 'claim_route', return_value=False), \
-                patch.object(lane, 'read_json', side_effect=[self.routes, {}]), \
-                patch.object(lane, 'conflict_files', return_value=[]) as merged, \
-                patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
-            reason = lane.deterministic_route_taken(host, self.pr, route)
-        self.assertEqual(reason, 'infra-rerun:design-source-cli')
-        merged.assert_called_once()
-        sync.assert_called_once()
-        with patch.object(lane, 'claim_route', return_value=False), \
-                patch.object(lane, 'read_json', side_effect=[self.routes, {'25257': {'from': self.head, 'ok': False}}]), \
-                patch.object(lane, 'conflict_files') as merged, \
-                patch.object(lane.pr_events, 'sync_main') as sync:
-            self.assertIsNone(lane.deterministic_route_taken(host, self.pr, route))
-        merged.assert_not_called()
-        sync.assert_not_called()
-        with patch.object(lane, 'claim_route', return_value=False), \
-                patch.object(lane, 'read_json', side_effect=[self.routes, {}]), \
-                patch.object(lane, 'conflict_files', return_value=['apps/web/a.tsx']) as merged, \
-                patch.object(lane.pr_events, 'sync_main') as sync:
-            self.assertIsNone(lane.deterministic_route_taken(host, self.pr, route))
-        merged.assert_called_once()
-        sync.assert_not_called()
+        reason, merged, sync = self._taken({}, [])
+        self.assertEqual((reason, merged.call_count, sync.call_count), ('infra-rerun:design-source-cli', 1, 1))
+        reason, merged, sync = self._taken({'25257': {'from': self.head, 'ok': False}}, [])
+        self.assertEqual((reason, merged.call_count, sync.call_count), (None, 0, 0))
+        reason, merged, sync = self._taken({}, ['apps/web/a.tsx'])
+        self.assertEqual((reason, merged.call_count, sync.call_count), (None, 1, 0))
 
 
 if __name__ == '__main__':
