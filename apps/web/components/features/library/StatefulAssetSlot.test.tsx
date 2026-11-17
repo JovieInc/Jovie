@@ -47,6 +47,7 @@ describe('StatefulAssetSlot', () => {
     );
     expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
     expect(screen.getByRole('button', { name: 'Replace' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Replace')).toHaveClass('sr-only');
     fireEvent.change(screen.getByLabelText('Replace'), {
       target: {
         files: [new File(['art'], 'cover.jpg', { type: 'image/jpeg' })],
