@@ -1,13 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,57 +13,15 @@ import {
 } from '../changelog-filter-rules.mjs';
 import { checkEditorialOverlay } from '../customer-changelog-editorial.mjs';
 import { resolveRealGh, runWithRealGh } from '../real-gh-harness.mjs';
+import { createChangelogGuardFixture } from './changelog-source-guard.test-support.mjs';
 
 const guard = fileURLToPath(
   new URL('../../changelog-source-guard.mjs', import.meta.url)
 );
 let checkout, head, eventPath, localPr, localPrPath;
 beforeAll(() => {
-  checkout = mkdtempSync(join(tmpdir(), 'changelog-guard-'));
-  const git = (...args) =>
-    execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: checkout,
-      encoding: 'utf8',
-    }).trim();
-  git('init', '-q');
-  git('config', 'user.name', 'Guard test');
-  git('config', 'user.email', 'guard@example.invalid');
-  git('commit', '--allow-empty', '-qm', 'base');
-  const base = git('rev-parse', 'HEAD');
-  writeFileSync(join(checkout, 'internal.txt'), 'internal change\n');
-  git('add', 'internal.txt');
-  git('commit', '-qm', 'head');
-  head = git('rev-parse', 'HEAD');
-  eventPath = join(checkout, 'event.json');
-  writeFileSync(
-    eventPath,
-    JSON.stringify({
-      pull_request: {
-        number: 20031,
-        base: { sha: base },
-        head: { sha: head },
-        created_at: '2026-10-03T21:00:00Z',
-        body: 'outdated event metadata',
-      },
-    })
-  );
-  mkdirSync(join(checkout, 'apps/web/lib'), { recursive: true });
-  writeFileSync(
-    join(checkout, 'apps/web/lib/storefront.ts'),
-    'export const country = "jp";\n'
-  );
-  git('add', 'apps/web/lib/storefront.ts');
-  git('commit', '-qm', 'customer change');
-  localPr = {
-    number: 20031,
-    base: { sha: base },
-    head: { sha: git('rev-parse', 'HEAD') },
-    created_at: '2026-10-03T21:00:00Z',
-    body: '## Summary\nStorefront correction\n',
-  };
-  localPrPath = join(checkout, 'pr.json');
-  writeFileSync(localPrPath, JSON.stringify(localPr));
+  ({ checkout, head, eventPath, localPr, localPrPath } =
+    createChangelogGuardFixture());
 });
 afterAll(() => rmSync(checkout, { recursive: true, force: true }));
 
