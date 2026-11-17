@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
@@ -220,12 +221,8 @@ describe('pricingOptionsQueryOptions', () => {
       const signal = init?.signal;
       if (!signal) throw new Error('Missing request signal');
       signals.push(signal);
-      return new Promise<Response>((_resolve, reject) => {
-        signal.addEventListener(
-          'abort',
-          () => reject(new DOMException('Aborted', 'AbortError')),
-          { once: true }
-        );
+      return once(signal, 'abort').then(() => {
+        throw signal.reason;
       });
     });
     const controller = new AbortController();
@@ -249,12 +246,8 @@ describe('pricingOptionsQueryOptions', () => {
       .mockImplementation((_input, init) => {
         const signal = init?.signal;
         if (!signal) throw new Error('Missing request signal');
-        return new Promise<Response>((_resolve, reject) => {
-          signal.addEventListener(
-            'abort',
-            () => reject(new DOMException('Aborted', 'AbortError')),
-            { once: true }
-          );
+        return once(signal, 'abort').then(() => {
+          throw signal.reason;
         });
       });
     const controller = new AbortController();
