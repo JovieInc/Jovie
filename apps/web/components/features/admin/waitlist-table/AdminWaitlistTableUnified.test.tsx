@@ -45,6 +45,8 @@ function entry(overrides: Partial<WaitlistEntryRow> = {}): WaitlistEntryRow {
     spotifyArtistName: null,
     heardAbout: null,
     status: 'new',
+    decisionReason: null,
+    wants: null,
     primarySocialFollowerCount: null,
     createdAt: new Date('2026-01-10T00:00:00.000Z'),
     updatedAt: new Date('2026-01-10T00:00:00.000Z'),
@@ -90,6 +92,39 @@ describe('AdminWaitlistTableUnified', () => {
       'dense'
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('shows held and not-a-fit decisions with captured words', () => {
+    renderTable({
+      entries: [
+        entry({
+          id: 'held',
+          status: 'queued',
+          decisionReason: 'hold_capacity_full',
+          wants: 'objection: I cannot prepare every release twice',
+        }),
+        entry({
+          id: 'not-fit',
+          status: 'disqualified',
+          decisionReason: 'disqualified_wrong_audience',
+          wants: 'current_tool: my existing workflow',
+        }),
+      ],
+      total: 2,
+    });
+    expect(
+      screen.getByRole('columnheader', { name: /Decision/ })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Queued (held)')).toBeInTheDocument();
+    expect(screen.getByText('Not a fit')).toBeInTheDocument();
+    expect(screen.getByText('hold_capacity_full')).toBeInTheDocument();
+    expect(screen.getByText('disqualified_wrong_audience')).toBeInTheDocument();
+    expect(
+      screen.getByText('objection: I cannot prepare every release twice')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('current_tool: my existing workflow')
+    ).toBeInTheDocument();
   });
 
   it('explains the empty waitlist', async () => {
