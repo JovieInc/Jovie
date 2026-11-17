@@ -5,7 +5,7 @@ import { LogOut } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { matchesSettingsSearchQuery } from '@/components/features/settings/settings-decision-admission';
-import { SidebarMenu, useSidebar } from '@/components/organisms/sidebar';
+import { useSidebar } from '@/components/organisms/sidebar';
 import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import {
@@ -14,44 +14,14 @@ import {
   type SettingsNavItem,
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
-import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
-import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
+import { SettingsNavGroup } from './SettingsNavGroup';
 
-/** Render a group of nav items */
-export function SettingsNavGroup({
-  items,
-  pathname,
-  isItemActive,
-  onPrefetch,
-}: Readonly<{
-  items: readonly NavItem[];
-  pathname: string;
-  isItemActive?: (item: NavItem) => boolean;
-  onPrefetch?: (item: NavItem) => void;
-}>) {
-  return (
-    <SidebarMenu>
-      {items.map(item => {
-        const isActive =
-          isItemActive?.(item) ??
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
-        return (
-          <NavMenuItem
-            key={item.id}
-            item={item}
-            isActive={isActive}
-            calm
-            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
-          />
-        );
-      })}
-    </SidebarMenu>
-  );
-}
+// Retain the public import while operator navigation uses the eager group only.
+export { SettingsNavGroup } from './SettingsNavGroup';
 
 const GROUP_LABEL_CLASS = cn(
   'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',

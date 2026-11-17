@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -366,10 +367,13 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('removes only the duplicate Settings account menu while preserving dock and profile access', () => {
+  it('removes only the duplicate Settings account menu while preserving dock and profile access', async () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.SETTINGS,
       section: 'settings',
+    });
+    await act(async () => {
+      await vi.dynamicImportSettled();
     });
 
     const panel = screen.getByTestId('sidebar-user-panel');

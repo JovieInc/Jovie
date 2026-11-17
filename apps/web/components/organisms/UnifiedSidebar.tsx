@@ -49,12 +49,18 @@ import {
   type OperatorNavSection,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
-import { SettingsNavGroup, SettingsNavigation } from './SettingsSidebarNav';
+import { SettingsNavGroup } from './SettingsNavGroup';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 // Founder-only (OV) block: split out so creator routes never ship it.
 const OperatorListsNav = dynamic(() =>
   import('./OperatorListsNav').then(module => module.OperatorListsNav)
+);
+
+// Settings-only search/profile/auth code is not initial operator route JS.
+// Keep default SSR so direct Settings entries retain their navigation content.
+const SettingsNavigation = dynamic(() =>
+  import('./SettingsSidebarNav').then(module => module.SettingsNavigation)
 );
 
 export interface UnifiedSidebarProps {
