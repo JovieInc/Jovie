@@ -172,6 +172,7 @@ describe('Billing Components', () => {
             ],
           })
         )
+        .mockResolvedValueOnce(Response.json({ priceLock: null }))
         .mockResolvedValueOnce(Response.json({ url }));
       renderWithQueryClient(<UpgradeButton />);
       const button = await screen.findByRole('button', {

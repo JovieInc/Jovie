@@ -10,7 +10,7 @@ export function getArtistPresenceMonthlyPrice(
   lock?: PriceLockView | null
 ): string | undefined {
   const locked = lock?.month;
-  if (lock && !locked?.priceId) return undefined;
+  if (locked && !locked.priceId) return undefined;
   const offer = ARTIST_VISIBILITY_OFFER.pro;
   const matches = new Set(
     options

@@ -31,7 +31,6 @@ const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
 const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
-const mockWithStripeRetry = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -84,19 +83,14 @@ vi.mock('@/lib/stripe/config', () => ({
   },
 }));
 
-vi.mock('@/lib/stripe/retry', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/stripe/retry')>();
-  return {
-    ...actual,
-    withStripeRetry: mockWithStripeRetry,
-  };
-});
-
 import { POST } from '@/app/api/stripe/checkout/route';
 
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z'));
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -113,63 +107,11 @@ describe('POST /api/stripe/checkout', () => {
       customerId: 'cus_123',
     });
     mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
-    mockWithStripeRetry.mockImplementation(async (_operation, fn) => {
-      let attempts = 0;
+  });
 
-      while (true) {
-        try {
-          return await fn();
-        } catch (error) {
-          attempts += 1;
-          const statusCode =
-            typeof error === 'object' &&
-            error !== null &&
-            'statusCode' in error &&
-            typeof error.statusCode === 'number'
-              ? error.statusCode
-              : undefined;
-          const errorType =
-            typeof error === 'object' &&
-            error !== null &&
-            'type' in error &&
-            typeof error.type === 'string'
-              ? error.type
-              : undefined;
-          const errorName = error instanceof Error ? error.name : undefined;
-          const transient =
-            errorType === 'StripeConnectionError' ||
-            errorType === 'StripeAPIError' ||
-            errorType === 'StripeRateLimitError' ||
-            errorType === 'StripeIdempotencyError' ||
-            errorName === 'StripeConnectionError' ||
-            errorName === 'StripeAPIError' ||
-            errorName === 'StripeRateLimitError' ||
-            errorName === 'StripeIdempotencyError' ||
-            statusCode === 408 ||
-            statusCode === 409 ||
-            statusCode === 429 ||
-            statusCode === 500 ||
-            statusCode === 502 ||
-            statusCode === 503 ||
-            statusCode === 504;
-
-          if (!transient) {
-            throw error;
-          }
-
-          if (attempts >= 3) {
-            const { StripeRetryExhaustedError } = await import(
-              '@/lib/stripe/retry'
-            );
-            throw new StripeRetryExhaustedError(
-              'createCheckoutSession',
-              attempts,
-              error
-            );
-          }
-        }
-      }
-    });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -625,7 +567,9 @@ describe('POST /api/stripe/checkout', () => {
       body: JSON.stringify({ priceId: 'price_123' }),
     });
 
-    const response = await POST(request);
+    const pending = POST(request);
+    await vi.runAllTimersAsync();
+    const response = await pending;
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -659,7 +603,9 @@ describe('POST /api/stripe/checkout', () => {
       body: JSON.stringify({ priceId: 'price_123' }),
     });
 
-    const response = await POST(request);
+    const pending = POST(request);
+    await vi.runAllTimersAsync();
+    const response = await pending;
     const payload = await response.json();
 
     expect(response.status).toBe(503);

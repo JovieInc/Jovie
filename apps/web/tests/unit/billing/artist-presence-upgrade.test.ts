@@ -75,6 +75,26 @@ describe('Artist Presence upgrade', () => {
       ).toBeUndefined();
     }
   );
+  it('uses the canonical monthly offer when only the yearly interval is locked', () => {
+    const lock: PriceLockView = {
+      locked: true,
+      priceVersionId: 'yearly',
+      lockedAt: '2026-10-29T00:00:00Z',
+      month: null,
+      year: {
+        amountCents: 19200,
+        currency: 'usd',
+        interval: 'year',
+        priceId: 'price_yearly',
+      },
+    };
+    expect(getArtistPresenceMonthlyPrice([monthly], lock)).toBe(
+      'price_presence'
+    );
+    expect(
+      getArtistPresenceMonthlyPrice([{ ...monthly, amount: 1 }], lock)
+    ).toBeUndefined();
+  });
   it('preserves a screen and query without a fragment', () => {
     expect(normalizeUpgradeReturnTo('/app/releases?release=123#edit')).toBe(
       '/app/releases?release=123'

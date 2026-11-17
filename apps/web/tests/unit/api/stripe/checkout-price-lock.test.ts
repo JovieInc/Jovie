@@ -42,11 +42,6 @@ vi.mock('@/lib/stripe/config', () => ({
   isMaxPriceId: () => false,
   PRICE_MAPPINGS: {},
 }));
-vi.mock('@/lib/stripe/retry', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/stripe/retry')>()),
-  withStripeRetry: async (_operation: string, fn: () => Promise<unknown>) =>
-    fn(),
-}));
 
 import { POST } from '@/app/api/stripe/checkout/route';
 
