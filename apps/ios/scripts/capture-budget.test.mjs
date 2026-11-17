@@ -90,11 +90,16 @@ test('withDeadline passes the underlying result and rejection through', async ()
 test('withDeadline rejects with a named error when the work outlives the deadline', async t => {
   // Real 250ms waits fail test-hygiene (real-sleep). The test clock fires the
   // 50ms deadline and leaves the later completion pending.
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000 });
-  const startedAt = Date.now();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let completed = false;
   const pending = assert.rejects(
     withDeadline(
-      new Promise(done => setTimeout(() => done('late'), 250)),
+      new Promise(done =>
+        setTimeout(() => {
+          completed = true;
+          done('late');
+        }, 250)
+      ),
       50,
       'work capture'
     ),
@@ -105,7 +110,7 @@ test('withDeadline rejects with a named error when the work outlives the deadlin
   );
   t.mock.timers.tick(50);
   await pending;
-  assert.equal(Date.now() - startedAt, 50);
+  assert.equal(completed, false);
 });
 
 test('the budget defaults leave headroom under the 15-minute CI step', () => {

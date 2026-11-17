@@ -88,6 +88,8 @@ describe('SmartLinkProviderButton', () => {
     expect(button).not.toHaveClass('bg-white/10');
     expect(button).not.toHaveClass('hover:bg-white/15');
     expect(button).not.toHaveClass('backdrop-blur-sm');
+    expect(button).toHaveClass('ring-on-media/8');
+    expect(button.className).not.toMatch(/ring-white/);
     expect(button.className).not.toMatch(
       /(?:^|\s)(?:hover:scale|active:scale|hover:-?translate|animate-bounce|transition-transform)(?:\s|$)/
     );
