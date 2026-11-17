@@ -76,14 +76,14 @@ describe('evaluateAccessSignal', () => {
     expect(result.rationale).toBe('insufficient_signal');
   });
 
-  it('forces waitlist after the max-turn cap with weak signal', () => {
+  it('records incomplete capture at the turn cap with weak signal', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: 'under_500' },
       spotifyFollowers: null,
       turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
     });
     expect(result.kind).toBe('waitlist');
-    expect(result.rationale).toContain('max_turns_reached');
+    expect(result.rationale).toBe('queued_needs_capture_incomplete');
   });
 
   it('still grants instant access even at the turn cap if signal qualifies', () => {

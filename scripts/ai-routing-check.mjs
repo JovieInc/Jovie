@@ -7,8 +7,10 @@
  * live deployment: Gateway spend by key and model against each caller's declared
  * ceiling, the Workers AI relay health, the Vercel env flags that switch a route
  * on, and Gateway credit runway (page under 3 days). Exits 1 on any high or
- * critical finding. --record appends the per-provider $/day snapshot (measure
- * everything) to a JSONL ledger. Reads AI_GATEWAY_API_KEY from the environment
+ * critical finding; an exhausted Gateway budget (402 or spend cap) is reported
+ * as a gateway-runway finding with budgetExhausted: true and exits 75
+ * (EX_TEMPFAIL), never a crash. --record appends the per-provider $/day
+ * snapshot (measure everything) to a JSONL ledger. Reads AI_GATEWAY_API_KEY from the environment
  * and never prints it.
  *
  * Subsidy pools: the ledger policy in routing.json is always checked. With host
@@ -24,11 +26,12 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createApiClient } from '../packages/api-client/client.ts';
+import { createApiClient, EX_TEMPFAIL } from '../packages/api-client/client.ts';
 import { providerSpec } from '../packages/api-client/contract.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import { fetchRows } from './ai-gateway-report.mjs';
 import {
+  budgetExhaustedResult,
   evaluateRouting,
   evaluateSubsidyPools,
   profilesFromDropIns,
@@ -195,10 +198,24 @@ export async function main(
   // n + 1 calendar days. Ask for days - 1 so the per-day rate divides the
   // window it measured (it read a stale day and over-reported by ~50%).
   const span = Math.max(0, days - 1);
-  const [keyRows, modelRows] = await Promise.all([
-    fetchRows('api_key_name', span, apiKey, fetchImpl),
-    fetchRows('model', span, apiKey, fetchImpl),
-  ]);
+  let keyRows;
+  let modelRows;
+  try {
+    [keyRows, modelRows] = await Promise.all([
+      fetchRows('api_key_name', span, apiKey, fetchImpl),
+      fetchRows('model', span, apiKey, fetchImpl),
+    ]);
+  } catch (error) {
+    if (error?.kind !== 'budget_exhausted') throw error;
+    const record = {
+      ...budgetExhaustedResult({ days, reason: error.message }),
+      checkedAt: new Date().toISOString(),
+      gatewayBalanceUsd: null,
+    };
+    if (argv.includes('--json')) console.log(JSON.stringify(record, null, 2));
+    else console.log(`  [critical] ${record.findings[0].message}`);
+    return EX_TEMPFAIL;
+  }
   const creditsRead = await readGatewayCredits({
     token: apiKey,
     fetchImpl,

@@ -2,10 +2,12 @@
 /**
  * Fail-closed golden-path lock (JOV-5085): the certified homepage front
  * door → logged-out first message sends → waitlist write only after
- * verified auth. The certified homepage has exactly two states
+ * verified auth. The homepage front door is certified in these states
  * (JOV-5864 / JOV-6794):
- * - open (WAITLIST_ENABLED=false): name search
- *   ("Search your name" → "Find me") with a /start handoff
+ * - open claim (public signup reopened 2026-11-09): one "Claim your profile"
+ *   link into /start, or the jov.ie/you link claim form submitting to /start
+ * - legacy open: name search ("Search your name" → "Find me") with a /start
+ *   handoff
  * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Claim your profile"
  *   primary CTA → /signup. Waitlist gating is the only allowed gate.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
@@ -154,6 +156,21 @@ export function evaluateHomepageHtml(html) {
       reason: `found link claim "${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" submitting to ${GOLDEN_PATH_START_PATH}`,
     };
   }
+  // Open claim front door: the shared claim-profile intent renders the hero,
+  // header and closing actions as one link into /start. The label must sit
+  // inside the link that goes to /start; a /start link elsewhere on the page
+  // does not count.
+  const claimLinkPattern = new RegExp(
+    `<a\\b[^>]*\\bhref\\s*=\\s*["'][^"']*\\/start(?:[?"']|\\/)[^>]*>(?:(?!<\\/a>)[\\s\\S]){0,400}?${GOLDEN_PATH_GATED_CTA_LABEL}`,
+    'i'
+  );
+  if (claimLinkPattern.test(html)) {
+    return {
+      id: 'homepage-cta',
+      ok: true,
+      reason: `found claim CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" linking to ${GOLDEN_PATH_START_PATH}`,
+    };
+  }
   // Legacy name search, accepted until production carries the link claim.
   if (hasPlaceholder && hasAction && hasStartHandoff) {
     return {
@@ -182,7 +199,7 @@ export function evaluateHomepageHtml(html) {
   return {
     id: 'homepage-cta',
     ok: false,
-    reason: `homepage conversion must be the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" → ${GOLDEN_PATH_START_PATH}), the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
+    reason: `homepage conversion must be the claim CTA ("${GOLDEN_PATH_GATED_CTA_LABEL}" linking to ${GOLDEN_PATH_START_PATH}), the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" → ${GOLDEN_PATH_START_PATH}), the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
   };
 }
 
@@ -619,7 +636,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     '',
     'Locked path (do not invent a new product flow):',
     '1. https://jov.ie homepage',
-    `2. Certified front door (JOV-5864 / JOV-6794): open state = name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") → ${GOLDEN_PATH_START_PATH}; waitlist-gated prelaunch state = "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (the only allowed gate)`,
+    `2. Certified front door (JOV-5864 / JOV-6794): open state = claim CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" linking to ${GOLDEN_PATH_START_PATH} (current), or the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}") or legacy name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") into ${GOLDEN_PATH_START_PATH}; waitlist-gated prelaunch state = "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (the only allowed gate). Never revert an open claim CTA to an older front door.`,
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
@@ -641,7 +658,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
         ]
       : []),
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require a certified front door: either the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (open state) or "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (waitlist-gated prelaunch state, JOV-6794; never revert to Get started or an uncertified waitlist wall)`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require a certified front door: the claim CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" inside a link to ${GOLDEN_PATH_START_PATH} (open state), the link claim or name search with a ${GOLDEN_PATH_START_PATH} handoff, or "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (waitlist-gated prelaunch state, JOV-6794; never revert to Get started or an uncertified waitlist wall)`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with ${JSON.stringify(buildProdProbeChatPayload())} — must not 401 or say "Too many messages"; this probe supplies no Turnstile token, so TURNSTILE_REQUIRED leaves the post-challenge path untested`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,

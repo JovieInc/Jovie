@@ -80,6 +80,7 @@ test('pickBatch breaks rank ties by touch before age', () => {
 
 import {
   aggregateByTier,
+  baselineSummary,
   evaluateFloors,
   modelFingerprint,
   rearmTop,
@@ -129,6 +130,26 @@ test('aggregateByTier leaves @jovie/ui sweep modules out of the web tiers', () =
   expect(aggregateByTier(withUi, surfaces)).toEqual(
     aggregateByTier(state, surfaces)
   );
+});
+
+test('baselineSummary scores the whole state and counts unscored modules', () => {
+  const withUi = {
+    modules: {
+      ...state.modules,
+      'packages/ui/atoms/badge.tsx': {
+        status: 'scored',
+        valid: 90,
+        killed: 0,
+        survived: 90,
+      },
+      'lib/z.ts': { status: 'untested' },
+    },
+  };
+  const s = baselineSummary(withUi, surfaces);
+  expect(s.score).toBe(35);
+  expect(s.counts).toEqual({ scored: 3, untested: 1, error: 1, other: 0 });
+  expect(s.markdown).toContain('Overall: **35%** (70 of 200 mutants killed)');
+  expect(s.markdown).toContain('| billing | 1 | 60% |');
 });
 
 test('floors only ratchet up and violations are reported', () => {

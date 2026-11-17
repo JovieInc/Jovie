@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   checkPair,
   contrastRatio,
@@ -26,12 +27,13 @@ describe('DrawerButton', () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
 
-    const { rerender } = render(
+    const { container, rerender } = render(
       <>
         <DrawerButton onClick={onClick}>Save changes</DrawerButton>
         <DrawerButton disabled>Saving changes</DrawerButton>
       </>
     );
+    await expectNoA11yViolations(container);
 
     const save = screen.getByRole('button', { name: 'Save changes' });
     const saving = screen.getByRole('button', { name: 'Saving changes' });
@@ -55,6 +57,28 @@ describe('DrawerButton', () => {
     expect(
       screen.getByRole('button', { name: 'Open settings' })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps long and right-to-left labels as the accessible name', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <DrawerButton tone='primary'>
+          Save changes and publish to every connected platform
+        </DrawerButton>
+        <DrawerButton tone='ghost'>حفظ التغييرات</DrawerButton>
+      </div>
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Save changes and publish to every connected platform',
+      })
+    ).toHaveAttribute('data-variant', 'primary');
+    expect(
+      screen.getByRole('button', { name: 'حفظ التغييرات' })
+    ).toHaveAttribute('data-variant', 'ghost');
+    await expectNoA11yViolations(container);
   });
 
   it('paints idle Refresh secondary text above AA on the hud shell', () => {

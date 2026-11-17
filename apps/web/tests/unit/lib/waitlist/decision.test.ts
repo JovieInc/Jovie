@@ -59,6 +59,32 @@ describe('decideQualification (qualify/2026-11-v1)', () => {
     expect(decision.reason).toBe('golden_path_admit');
   });
 
+  it.each(['needs_you', 'disqualify'] as const)(
+    'preserves conversation %s even when the golden path is green',
+    verdict => {
+      const decision = decideQualification({
+        receipt: receiptFor({ answers: fullAnswers }),
+        goldenPath: {
+          spotifyArtistId: 'artist-1',
+          reach: 5_000,
+          goldenPathVerdict: 'ELIGIBLE',
+        },
+        conversation: {
+          decision: verdict,
+          needsYouReasons: ['ambiguous_authority'],
+        },
+      });
+      expect(decision.outcome).toBe(
+        verdict === 'needs_you' ? 'queued' : 'disqualified'
+      );
+      expect(decision.reason).toBe(
+        verdict === 'needs_you'
+          ? 'needs_you_ambiguous_authority'
+          : 'conversation_disqualify'
+      );
+    }
+  );
+
   it('maps every hold_* reason to queued, never disqualified', () => {
     const holds = [
       'hold_identity_unresolved',
@@ -78,6 +104,19 @@ describe('decideQualification (qualify/2026-11-v1)', () => {
       expect(decision.outcome).toBe('queued');
       expect(decision.reason).toBe(hold);
     }
+  });
+
+  it('retains a blocked golden-path hold even when capture is complete', () => {
+    const decision = decideQualification({
+      receipt: receiptFor({ answers: fullAnswers }),
+      goldenPath: {
+        spotifyArtistId: 'artist-1',
+        reach: 5_000,
+        goldenPathVerdict: 'BLOCKED',
+      },
+    });
+    expect(decision.outcome).toBe('queued');
+    expect(decision.reason).toBe('hold_golden_path_not_green');
   });
 
   it('a caller hold wins over a green golden path', () => {

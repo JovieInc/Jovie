@@ -90,8 +90,8 @@ export interface DecideQualificationInput {
 
 /**
  * The decision table. Order matters and every branch is deterministic:
- * disqualifiers first, then golden-path admit, then holds, then needs-you,
- * then Mom Test coverage.
+ * disqualifiers and judgment-required conversations first, then golden-path
+ * admission and capacity holds, then Mom Test coverage.
  */
 export function decideQualification(
   input: DecideQualificationInput
@@ -104,24 +104,6 @@ export function decideQualification(
     return decision('disqualified', `disqualified_${disqualifier}`, wants);
   }
 
-  // 2. Golden path green (identity resolved, not high-profile) admits with
-  //    proof still required at claim time.
-  if (input.goldenPath) {
-    const admission = decideGoldenPathAdmission(input.goldenPath);
-    if (admission.admit && !input.goldenPathHold) {
-      return decision('qualified', 'golden_path_admit', wants);
-    }
-    if (admission.admit && input.goldenPathHold) {
-      return decision('queued', input.goldenPathHold, wants);
-    }
-  }
-
-  // 3. Any hold (cone not green, capacity full, auto-accept off, high-profile
-  //    verification) is OUR readiness, never their disqualification.
-  if (input.goldenPathHold) {
-    return decision('queued', input.goldenPathHold, wants);
-  }
-
   // 4. Judgment-required conversations route to a human, held as queued.
   if (input.conversation?.decision === 'needs_you') {
     const reason = input.conversation.needsYouReasons[0] ?? 'high_value';
@@ -129,6 +111,22 @@ export function decideQualification(
   }
   if (input.conversation?.decision === 'disqualify') {
     return decision('disqualified', 'conversation_disqualify', wants);
+  }
+
+  // 2. Golden path green (identity resolved, not high-profile) admits with
+  //    proof still required at claim time.
+  if (input.goldenPath) {
+    const admission = decideGoldenPathAdmission(input.goldenPath);
+    if (admission.admit && !input.goldenPathHold) {
+      return decision('qualified', 'golden_path_admit', wants);
+    }
+    return decision('queued', input.goldenPathHold ?? admission.reason, wants);
+  }
+
+  // 3. Any hold (cone not green, capacity full, auto-accept off, high-profile
+  //    verification) is OUR readiness, never their disqualification.
+  if (input.goldenPathHold) {
+    return decision('queued', input.goldenPathHold, wants);
   }
 
   // 5. Full Mom Test coverage with no disqualifier qualifies.
@@ -201,8 +199,8 @@ function kindForDimension(
 
 /**
  * Role-form Mom Test answers (request-access form) → decision. The form
- * captures two past-behavior questions; both answered qualifies, anything
- * less is request_evidence naming the gap. The admission score never
+ * captures two past-behavior questions; missing dimensions remain explicit
+ * evidence gaps under the shared qualification contract. The admission score never
  * participates: it ranks, it never decides (admission-score v1 rule).
  */
 export interface RoleFormDecisionInput {

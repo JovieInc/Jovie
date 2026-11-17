@@ -98,6 +98,10 @@ vi.mock('@/lib/ovie/summer-cards.server', () => ({
   applySummerCardDefaults: mockApplySummerCardDefaults,
 }));
 
+vi.mock('@/lib/founder-welcome/server', () => ({
+  founderWelcomeJob: vi.fn(async () => ({ filed: 0 })),
+}));
+
 vi.mock(
   '@/lib/connectors/workflows/reconcile-orphaned-approved-actions',
   () => ({

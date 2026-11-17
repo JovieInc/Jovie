@@ -29,6 +29,7 @@
  * "tabs must not scale" default: the 44px hit cell itself never scales.
  */
 
+import { PlainButton } from '@jovie/ui';
 import {
   CalendarDays,
   House,
@@ -251,16 +252,16 @@ export function BottomTabBar({
             const isActive = !isMenuOpen && tab.id === activeTab;
 
             return (
-              <button
+              <PlainButton
                 key={tab.id}
                 type='button'
                 onClick={() => onTabSelect(tab.id)}
                 className={cn(
                   'profile-liquid-glass-nav__item relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
-                    ? 'text-white dark:text-white'
-                    : 'text-white/40 hover:text-white/62'
+                    ? 'text-on-media'
+                    : 'text-on-media/40 hover:text-on-media/62'
                 )}
                 // aria-current="page" marks the active tab for screen readers
                 aria-current={isActive ? 'page' : undefined}
@@ -281,13 +282,13 @@ export function BottomTabBar({
                   <Icon
                     className={cn(
                       'profile-liquid-glass-nav__icon h-4 w-4 shrink-0 transition-[color,stroke-width] duration-subtle',
-                      isActive ? 'text-white dark:text-white' : 'text-white/52'
+                      isActive ? 'text-on-media' : 'text-on-media/52'
                     )}
                     strokeWidth={isActive ? 2.35 : 1.8}
                     aria-hidden='true'
                   />
                 </span>
-              </button>
+              </PlainButton>
             );
           })}
         </div>

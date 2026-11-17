@@ -17,8 +17,8 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
-import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
+import { buildEntryValues } from '@/lib/waitlist/access-request-entry';
 import {
   type AdmissionScore,
   isOutrankedByQueue,
@@ -30,6 +30,7 @@ import {
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { insertChatCapabilityWants } from '@/lib/waitlist/capability-wants.server';
+import { QUALIFICATION_RULE_VERSION } from '@/lib/waitlist/decision';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
@@ -45,10 +46,7 @@ import {
   releaseAutoAcceptSlot,
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
-import {
-  hashEmailForWaitlist,
-  isUnqualifiedSignupEntry,
-} from '@/lib/waitlist/signup-entry';
+import { isUnqualifiedSignupEntry } from '@/lib/waitlist/signup-entry';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -58,6 +56,7 @@ import {
   isStatusUpgrade,
   type UserLifecycleStatus,
 } from '@/lib/waitlist/status-precedence';
+import { readSupportLoadCapacity } from '@/lib/waitlist/support-load.server';
 import { recordWaitlistJoin } from './acquisition-stages';
 
 const WAITLIST_LOCK_PREFIX = 'waitlist:';
@@ -103,79 +102,6 @@ export interface WaitlistAccessRequestResult {
   readonly outcome: WaitlistAccessOutcome;
 }
 
-function normalizeSpotifyUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.protocol = 'https:';
-    for (const param of [
-      'si',
-      'utm_source',
-      'utm_medium',
-      'utm_campaign',
-      'nd',
-    ]) {
-      parsed.searchParams.delete(param);
-    }
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
-function buildQualificationInputs(data: WaitlistRequestPayload) {
-  return {
-    primaryGoal: data.primaryGoal ?? null,
-    primarySocialUrl: data.primarySocialUrl,
-    spotifyUrl: data.spotifyUrl ?? null,
-    spotifyArtistName: data.spotifyArtistName?.trim() || null,
-    heardAbout: data.heardAbout?.trim() || null,
-    selectedPlan: data.selectedPlan ?? null,
-  };
-}
-
-function buildEntryValues(params: {
-  readonly data: WaitlistRequestPayload;
-  readonly email: string;
-  readonly fullName: string;
-  readonly source: string;
-  readonly admissionScore?: AdmissionScore;
-}) {
-  const { data, email, fullName, source } = params;
-  const { platform, normalizedUrl } = detectPlatformFromUrl(
-    data.primarySocialUrl
-  );
-  const spotifyUrlNormalized = data.spotifyUrl
-    ? normalizeSpotifyUrl(data.spotifyUrl)
-    : null;
-
-  return {
-    fullName,
-    email,
-    emailNormalized: email,
-    emailHash: hashEmailForWaitlist(email),
-    primaryGoal: data.primaryGoal ?? null,
-    primarySocialUrl: data.primarySocialUrl,
-    primarySocialPlatform: platform,
-    primarySocialUrlNormalized: normalizedUrl,
-    spotifyUrl: data.spotifyUrl ?? null,
-    spotifyUrlNormalized,
-    spotifyArtistName: data.spotifyArtistName?.trim() || null,
-    heardAbout: data.heardAbout?.trim() || null,
-    selectedPlan: data.selectedPlan ?? null,
-    source,
-    canonical: true,
-    qualificationInputs: {
-      ...buildQualificationInputs(data),
-      ...(params.admissionScore
-        ? { admissionScore: params.admissionScore }
-        : {}),
-    },
-    updatedAt: new Date(),
-    // Store a useful fallback in existing fields without inventing launch scoring.
-    primarySocialFollowerCount: null,
-  };
-}
-
 async function lockWaitlistEmail(
   tx: DbOrTransaction,
   normalizedEmail: string
@@ -195,6 +121,7 @@ async function findLatestEntryByEmail(
       id: waitlistEntries.id,
       status: waitlistEntries.status,
       source: waitlistEntries.source,
+      decisionRuleVersion: waitlistEntries.decisionRuleVersion,
       waitlistedAt: waitlistEntries.waitlistedAt,
     })
     .from(waitlistEntries)
@@ -346,21 +273,18 @@ async function decideAccess(params: {
     mode === 'waitlist_enabled' ? params.goldenPathAdmission : undefined;
   // Best leads first: with N slots left today, admit now only if fewer than N
   // pending entrants outrank this one; the rest wait for the ranked drain.
+  const budget = await readSupportLoadCapacity(settings);
   if (goldenPathDecision?.admit && params.admissionScore) {
-    const remaining = Math.max(
-      0,
-      settings.autoAcceptDailyLimit - settings.autoAcceptedToday
-    );
     const pending = await listPendingScoresDesc(
       params.tx,
-      remaining,
+      budget.remaining,
       Math.max(1, Math.trunc(settings.autoAcceptAfterDays))
     );
     if (
       isOutrankedByQueue({
         candidateScore: params.admissionScore.score,
         pendingScoresDesc: pending,
-        remainingSlots: remaining,
+        remainingSlots: budget.remaining,
       })
     ) {
       goldenPathDecision = { admit: false, reason: 'hold_outranked' };
@@ -382,7 +306,7 @@ async function decideAccess(params: {
   // Admission state only: nothing here emails or invites anyone.
   let reservedAdmissionSlot = false;
   if (mode === 'waitlist_enabled' && qualification.status === 'approved') {
-    const reservation = await tryReserveAutoAcceptSlot(params.tx);
+    const reservation = await tryReserveAutoAcceptSlot(params.tx, budget);
     if (reservation.shouldAutoAccept) {
       reservedAdmissionSlot = true;
     } else {
@@ -493,24 +417,29 @@ async function handleExistingEntryResubmission(params: {
     };
   }
 
-  const nextExistingStatus =
-    isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
+  const preserveDecision =
+    existing.decisionRuleVersion === QUALIFICATION_RULE_VERSION ||
+    ['queued', 'qualified', 'disqualified'].includes(existing.status);
+  const nextExistingStatus = preserveDecision
+    ? existing.status
+    : isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
       ? 'waitlisted'
       : existing.status;
 
-  await tx
-    .update(waitlistEntries)
-    .set({
-      ...entryValues,
-      qualificationResult: {
-        status: 'waitlisted',
-        reasonCode: 'already_waitlisted',
-      },
-      status: nextExistingStatus,
-      statusReason: 'already_waitlisted',
-      waitlistedAt: existing.waitlistedAt ?? new Date(),
-    })
-    .where(eq(waitlistEntries.id, existing.id));
+  if (!preserveDecision)
+    await tx
+      .update(waitlistEntries)
+      .set({
+        ...entryValues,
+        qualificationResult: {
+          status: 'waitlisted',
+          reasonCode: 'already_waitlisted',
+        },
+        status: nextExistingStatus,
+        statusReason: 'already_waitlisted',
+        waitlistedAt: existing.waitlistedAt ?? new Date(),
+      })
+      .where(eq(waitlistEntries.id, existing.id));
 
   const statusChange = await upsertUserStatus({
     tx,

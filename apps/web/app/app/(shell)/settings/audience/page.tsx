@@ -9,11 +9,7 @@ export default function SettingsAudiencePage() {
   const { isGrowth, isPro } = useSettingsContext();
 
   return (
-    <SettingsSection
-      id='audience-tracking'
-      title='Audience & tracking'
-      description='Fan verification, opt-ins, and tracking.'
-    >
+    <SettingsSection id='audience-tracking' title='Audience & tracking'>
       <div className='space-y-4'>
         <SettingsAudienceSection isGrowth={isGrowth} />
         <SettingsAdPixelsSection isPro={isPro} />

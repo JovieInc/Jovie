@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, ConfirmDialog } from '@jovie/ui';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   type KeyboardEvent,
@@ -26,9 +27,23 @@ import {
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import type { TeleprompterTakeSummary } from '@/lib/teleprompter/takes/contract';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
-import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
+
+/**
+ * The documents workspace (and the Tiptap editor under it) only renders when a
+ * document is open. Imported statically, every cold /app/library load
+ * evaluated the editor's modules inside the hydration task, the frozen frame
+ * the product crawl flags. It loads in its own chunk when a document opens.
+ */
+const CreatorDocumentsWorkspace = dynamic(
+  () =>
+    import('./CreatorDocumentsWorkspace').then(
+      module => module.CreatorDocumentsWorkspace
+    ),
+  { loading: () => <div className='flex min-h-0 flex-1' aria-busy='true' /> }
+);
 
 const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
 
@@ -45,6 +60,7 @@ export function LibraryPageClient({
   creatorDocumentsLoadFailed = false,
   youtubeVideos = [],
   youtubeConnected = false,
+  teleprompterTakes = [],
   relationships = [],
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
@@ -64,6 +80,7 @@ export function LibraryPageClient({
   readonly creatorDocumentsLoadFailed?: boolean;
   readonly youtubeVideos?: readonly PublicVideoListItem[];
   readonly youtubeConnected?: boolean;
+  readonly teleprompterTakes?: readonly TeleprompterTakeSummary[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
@@ -263,6 +280,7 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
+            teleprompterTakes={teleprompterTakes}
             merchProducts={merchCards.map(card => ({
               id: card.id,
               title: card.title,

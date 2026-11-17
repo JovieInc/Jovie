@@ -22,88 +22,15 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { registerElectronTitlebarFullscreenTest } from './utils/electron-titlebar-fullscreen';
+import {
+  gotoShellRoute,
+  installElectronRuntime,
+  waitForSettledShell,
+} from './utils/electron-titlebar-runtime';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-async function installElectronRuntime(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {},
-    });
-    document.documentElement.dataset.desktopRuntime = 'electron';
-  });
-}
-
-async function forceElectronRuntime(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {},
-    });
-    document.documentElement.dataset.desktopRuntime = 'electron';
-  });
-  // JOV-8941: flipping the runtime attribute re-applies the electron padding
-  // rules, and the shell body animates gap/padding (SHELL_RAIL_FRAME_GAP,
-  // duration-cinematic). A real Electron preload sets the attribute before
-  // first paint so no transition runs there; in this simulated runtime the
-  // geometry must wait for the shell chain (body, main plane, #main-content)
-  // to reach animation rest before anything is measured.
-  await page.waitForFunction(
-    () => {
-      const shell = document.querySelector('[data-app-shell-body="true"]');
-      if (!shell) return false;
-      const targets = [
-        shell,
-        document.querySelector('[data-app-shell-main-plane="true"]'),
-        document.querySelector('#main-content'),
-      ];
-      return targets.every(
-        el => el === null || el.getAnimations().length === 0
-      );
-    },
-    { timeout: 10_000 }
-  );
-}
-
-async function gotoShellRoute(
-  page: Page,
-  route: string = APP_ROUTES.CALENDAR,
-  persona: 'admin' | 'creator-ready' = 'creator-ready'
-): Promise<void> {
-  const maxAttempts = 3;
-  const authEntryUrl = `/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(
-    route
-  )}`;
-  const routePattern = new RegExp(route.replaceAll('/', '\\/'));
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await page.goto(authEntryUrl, {
-        timeout: 120_000,
-        waitUntil: 'domcontentloaded',
-      });
-      await page.waitForURL(routePattern, { timeout: 60_000 });
-      await forceElectronRuntime(page);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const shouldRetry =
-        attempt < maxAttempts &&
-        /ERR_CONNECTION_REFUSED|ERR_EMPTY_RESPONSE|ECONNRESET/i.test(message);
-      if (!shouldRetry) throw error;
-      await page.waitForTimeout(1000 * attempt);
-    }
-  }
-}
-
-// Streaming can briefly hold a suspended copy of the shell next to the
-// resolved one; geometry is only meaningful once exactly one frame remains.
-async function waitForSettledShell(page: Page): Promise<void> {
-  const frame = page.locator('[data-app-shell-frame="true"]');
-  await expect(frame).toHaveCount(1, { timeout: 30_000 });
-  await expect(frame).toBeVisible();
-}
+registerElectronTitlebarFullscreenTest();
 
 async function assertElectronShellControls(
   page: Page,
@@ -166,41 +93,10 @@ test('titlebar DOM has a single sidebar toggle and no second main-cell band', as
   await expect(
     titlebarRow.locator('[data-testid="electron-titlebar-main-cell"]')
   ).toHaveCount(0);
-  await expect(page.getByTestId('dashboard-header')).toHaveAttribute(
+  await expect(page.getByTestId('dashboard-header-row')).toHaveAttribute(
     'data-electron-drag-region',
     'true'
   );
-});
-
-test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
-  page,
-}) => {
-  // Skip outside the explicit dev-auth E2E lane; duplicate-control checks need a bypassed Clerk session.
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
-  test.setTimeout(180_000);
-
-  await installElectronRuntime(page);
-  await gotoShellRoute(page);
-
-  await waitForSettledShell(page);
-
-  await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
-  await expect(
-    page.locator('header a[aria-label="New Conversation"]')
-  ).toHaveCount(0);
-  await expect(
-    page.locator('[data-testid="electron-sidebar-toggle"]')
-  ).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(1);
-
-  // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
-  const titlebarToggle = page.locator(
-    '[data-testid="electron-sidebar-toggle"]'
-  );
-  await expect(titlebarToggle).toBeAttached();
 });
 
 test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignment)', async ({
@@ -248,17 +144,31 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       sidebarWidth: readPx('--electron-sidebar-width'),
       shellGap: readPx('--app-shell-gap'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
+      trafficLightToggleGap: readPx('--electron-traffic-light-toggle-gap'),
     };
   });
 
   // If we can read the token, check the sidebar column width matches.
-  expect(tokens.titlebarHeight).toBe(40);
-  expect(tokens.trafficLightSafeWidth).toBe(70);
-  expect(tokens.trafficLightX).toBe(20);
+  // JOV-8940: the locked 44pt title row matches the unified toolbar height;
+  // the native lights lead at 12px and center on the row's icon centerline.
+  expect(tokens.titlebarHeight).toBe(44);
+  expect(tokens.trafficLightSafeWidth).toBe(58);
+  expect(tokens.trafficLightX).toBe(12);
   // JOV-8974: the titlebar band sits one shell gap below the window top, so
-  // the native lights ride down with it (native y 17 + the top gutter).
-  expect(tokens.trafficLightY).toBe(17 + (tokens.shellGap ?? 0));
+  // the native lights ride down with it (locked 15px in-band + the gutter).
+  expect(tokens.trafficLightY).toBe(15 + (tokens.shellGap ?? 0));
   expect(tokens.collapsedSidebarWidth).toBe(52);
+  // The first interactive control clears the hidden native lights by the
+  // locked toggle gap instead of hugging them.
+  expect(tokens.trafficLightToggleGap).toBeGreaterThanOrEqual(12);
+  expect(
+    Math.abs(
+      (tokens.trafficLightY ?? 0) +
+        14 / 2 -
+        ((tokens.shellGap ?? 0) + (tokens.titlebarHeight ?? 0) / 2)
+    ),
+    'traffic-light center matches the title row icon centerline'
+  ).toBeLessThanOrEqual(1);
 
   if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
     const sidebarCell = page.locator(
@@ -376,6 +286,9 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const sidebar = document.querySelector<HTMLElement>(
         '[data-app-shell-sidebar-mount="true"]'
       );
+      const contentColumn = document.querySelector<HTMLElement>(
+        '[data-app-shell-content-column="true"]'
+      );
       const mainPlane = document.querySelector<HTMLElement>(
         '[data-app-shell-main-plane="true"]'
       );
@@ -386,12 +299,33 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         '[data-settings-layout-column="true"]'
       );
       const mainContent = document.querySelector<HTMLElement>('#main-content');
-      if (!titlebar || !body || !sidebar || !mainPlane) return null;
+      if (!titlebar || !body || !sidebar || !mainPlane || !contentColumn)
+        return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
       const bodyBox = body.getBoundingClientRect();
       const sidebarBox = sidebar.getBoundingClientRect();
       const mainPlaneBox = mainPlane.getBoundingClientRect();
+      const contentColumnBox = contentColumn.getBoundingClientRect();
+      const header = contentColumn.querySelector<HTMLElement>(
+        '[data-top-spacing-owner="shell-header"]'
+      );
+      const title = header?.querySelector<HTMLElement>('h1');
+      // JOV-7207 (#25590) moved the window-controls reservation padding onto
+      // the [data-top-spacing-owner] wrapper and deepened the header to
+      // wrapper > header > row. The content column's inner start is now the
+      // wrapper's reservation padding plus the title row's own header
+      // padding-x — read both instead of firstElementChild (the unpadded
+      // <header> box since that refactor).
+      const headerInner =
+        header?.querySelector<HTMLElement>(
+          '[data-testid="dashboard-header-row"]'
+        ) ?? (header?.firstElementChild as HTMLElement | null);
+      const headerPaddingLeft =
+        headerInner && header
+          ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft) +
+            Number.parseFloat(getComputedStyle(header).paddingLeft)
+          : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
@@ -403,6 +337,16 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        // JOV-8940: the page title aligns with the content column's inner
+        // start — never jammed against the window-control cluster. Routes
+        // without a shell header report null and skip the assertion.
+        titleColumnStartDelta:
+          title && headerPaddingLeft !== null
+            ? Math.abs(
+                title.getBoundingClientRect().left -
+                  (contentColumnBox.left + headerPaddingLeft)
+              )
+            : null,
         mainContentRight: mainContentBox?.right ?? null,
         mainContentBottom: mainContentBox?.bottom ?? null,
         viewportWidth: window.innerWidth,
@@ -446,6 +390,12 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       ),
       `${route} main plane aligns to the body content grid`
     ).toBeLessThanOrEqual(1);
+    if (geometry?.titleColumnStartDelta != null) {
+      expect(
+        geometry.titleColumnStartDelta,
+        `${route} title aligns with the content column start`
+      ).toBeLessThanOrEqual(1);
+    }
     // JOV-8941: the native window owns the right and bottom edges in
     // Electron, so the main panel meets the window frame instead of reading
     // as a floating card with a gutter on those edges. Fractional layout can

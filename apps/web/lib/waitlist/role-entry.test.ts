@@ -6,8 +6,12 @@ const mocks = vi.hoisted(() => ({
   conflict: vi.fn(),
   returning: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({
-  db: { insert: () => ({ values: mocks.values }) },
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runAtomicDbOperation: (
+    operation: (tx: {
+      insert: () => { values: typeof mocks.values };
+    }) => Promise<unknown>
+  ) => operation({ insert: () => ({ values: mocks.values }) }),
 }));
 vi.mock('@/lib/waitlist/signup-entry', () => ({
   hashEmailForWaitlist: () => 'private-hash',

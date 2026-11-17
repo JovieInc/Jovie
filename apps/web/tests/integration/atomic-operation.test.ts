@@ -11,12 +11,17 @@ import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { waitlistAuditLogs, waitlistEntries } from '@/lib/db/schema/waitlist';
+import {
+  capabilityWants,
+  waitlistAuditLogs,
+  waitlistEntries,
+} from '@/lib/db/schema/waitlist';
 import {
   approveWaitlistEntryInTx,
   disapproveWaitlistEntryInTx,
 } from '@/lib/waitlist/approval';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
+import { joinWaitlistWithRole } from '@/lib/waitlist/role-entry';
 import { registerContentPublicationCertification } from './fixtures/content-publication-certification';
 
 vi.mock('@/lib/auth/proxy-state', () => ({
@@ -78,6 +83,7 @@ const tables = [
   waitlistEntries,
   waitlistAuditLogs,
   ingestionJobs,
+  capabilityWants,
 ];
 const actorId = randomUUID();
 const entryId = randomUUID();
@@ -134,6 +140,9 @@ describe.skipIf(!target)(
           `CREATE TEMP TABLE "${config.name}" (${columns.join(',')})`
         );
       }
+      await client.unsafe(
+        `CREATE UNIQUE INDEX role_entry_email_unique ON waitlist_entries(email_normalized) WHERE canonical = true`
+      );
       await client.unsafe(`CREATE FUNCTION pg_temp.inject_write_failure() RETURNS trigger LANGUAGE plpgsql AS $$
       DECLARE n integer := coalesce(nullif(current_setting('jovie.write_count',true),''),'0')::integer + 1;
       BEGIN PERFORM set_config('jovie.write_count',n::text,true);
@@ -171,6 +180,67 @@ describe.skipIf(!target)(
           )
         )
       );
+
+    it('rolls back interrupted role decisions and stores wants once after retry', async () => {
+      for (const table of tables)
+        await client.unsafe(`TRUNCATE "${getTableConfig(table).name}"`);
+      const input = {
+        email: 'role-atomic@example.com',
+        role: 'artist' as const,
+        now: new Date('2026-11-09T12:00:00Z'),
+        decision: {
+          contract: 'jovie.conversation-loop/v1' as const,
+          ruleVersion: 'qualify/2026-11-v1' as const,
+          outcome: 'queued' as const,
+          reason: 'hold_capacity_full' as const,
+          wants: [
+            {
+              kind: 'current_tool' as const,
+              text: 'my existing workflow',
+              capabilityKey: null,
+              sourceTurnId: 'turn-1',
+            },
+          ],
+        },
+      };
+      await client.unsafe(
+        `CREATE FUNCTION pg_temp.reject_role_write() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected role persistence failure'; END $$`
+      );
+      for (const table of [waitlistEntries, capabilityWants]) {
+        const before = await snapshot();
+        await client.unsafe(
+          `CREATE TRIGGER reject_role_write AFTER INSERT ON "${getTableConfig(table).name}" FOR EACH STATEMENT EXECUTE FUNCTION pg_temp.reject_role_write()`
+        );
+        try {
+          await expect(joinWaitlistWithRole(input)).rejects.toThrow();
+          expect(await snapshot()).toEqual(before);
+        } finally {
+          await client.unsafe(
+            `DROP TRIGGER reject_role_write ON "${getTableConfig(table).name}"`
+          );
+        }
+      }
+      expect(await joinWaitlistWithRole(input)).toMatchObject({
+        created: true,
+      });
+      const committed = await snapshot();
+      expect(committed[2]).toHaveLength(1);
+      expect(committed[2][0]).toMatchObject({
+        status: 'queued',
+        decision_reason: 'hold_capacity_full',
+        decided_by: 'rules',
+      });
+      expect(committed[5]).toHaveLength(1);
+      expect(committed[5][0]).toMatchObject({
+        kind: 'current_tool',
+        text: 'my existing workflow',
+        source_turn_id: 'turn-1',
+      });
+      expect(await joinWaitlistWithRole(input)).toMatchObject({
+        created: false,
+      });
+      expect(await snapshot()).toEqual(committed);
+    });
 
     for (const approval of [true, false]) {
       it(`${approval ? 'approval + invite outbox' : 'revocation'} rolls back at every write boundary and commits/replays coherently`, async () => {
@@ -261,7 +331,7 @@ describe('atomic certification target', () => {
           'postgres://postgres@127.0.0.1:55469/jov6269_atomic',
         DB_CERTIFICATION: 'true',
         DATABASE_URL:
-          'postgres://role:secret@ep-example-pooler.us-east-1.aws.neon.tech/neondb', // trufflehog:ignore
+          'postgres://postgres@ep-example-pooler.us-east-1.aws.neon.tech/neondb',
       })
     ).toEqual({
       url: 'postgres://postgres@127.0.0.1:55469/jov6269_atomic',
@@ -273,7 +343,7 @@ describe('atomic certification target', () => {
     const resolved = resolveAtomicTestDatabaseUrl({
       DB_CERTIFICATION: 'true',
       DATABASE_URL:
-        'postgres://role:secret@ep-example-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require', // trufflehog:ignore
+        'postgres://postgres@ep-example-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
     });
     expect(resolved?.mode).toBe('certification');
     if (!resolved) throw new Error('missing certification target');
@@ -289,7 +359,7 @@ describe('atomic certification target', () => {
     expect(
       resolveAtomicTestDatabaseUrl({
         DATABASE_URL:
-          'postgres://role:secret@ep-example-pooler.us-east-1.aws.neon.tech/neondb', // trufflehog:ignore
+          'postgres://postgres@ep-example-pooler.us-east-1.aws.neon.tech/neondb',
       })
     ).toBeNull();
   });
@@ -298,7 +368,7 @@ describe('atomic certification target', () => {
     const resolved = resolveAtomicTestDatabaseUrl({
       DB_CERTIFICATION: 'true',
       DATABASE_URL:
-        'postgres://role:secret@ep-example.us-east-1.aws.neon.tech/neondb?sslmode=require', // trufflehog:ignore
+        'postgres://postgres@ep-example.us-east-1.aws.neon.tech/neondb?sslmode=require',
     });
     if (!resolved) throw new Error('missing certification target');
     expect(new URL(resolved.url).hostname).toBe(

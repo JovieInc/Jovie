@@ -94,11 +94,7 @@ export function ArtistProfileContent({
     return (
       <>
         <CompanionRailReservation />
-        <SettingsSection
-          id='artist-profile'
-          title='Profile'
-          description='Photo, name, username, and brand details shown on your public profile.'
-        >
+        <SettingsSection id='artist-profile' title='Profile'>
           <div
             className='space-y-4'
             role='status'
@@ -142,7 +138,6 @@ export function ArtistProfileContent({
       <SettingsSection
         id='artist-profile'
         title='Profile'
-        description='Photo, name, username, and brand details shown on your public profile.'
         headerAction={
           <div className='flex shrink-0 items-center gap-2'>
             {artist.handle ? (

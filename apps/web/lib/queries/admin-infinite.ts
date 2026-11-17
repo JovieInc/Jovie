@@ -1,6 +1,7 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import type { WaitlistStatus } from '@/lib/waitlist/state-machine';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -95,22 +96,9 @@ export interface WaitlistEntryRow {
   spotifyUrlNormalized: string | null;
   spotifyArtistName: string | null;
   heardAbout: string | null;
+  status: WaitlistStatus;
   decisionReason: string | null;
   wants: string | null;
-  status:
-    | 'new'
-    | 'invited'
-    | 'claimed'
-    | 'chat_started'
-    | 'qualified'
-    | 'waitlisted'
-    | 'disqualified'
-    | 'queued'
-    | 'approved'
-    | 'signed_up'
-    | 'rejected'
-    | 'expired'
-    | 'blocked';
   primarySocialFollowerCount: number | null;
   createdAt: Date;
   updatedAt: Date;

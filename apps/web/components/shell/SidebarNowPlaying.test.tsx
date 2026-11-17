@@ -61,7 +61,7 @@ describe('SidebarNowPlaying', () => {
         collapsed
       />
     );
-    expect(container.querySelector('span.bg-emerald-400')).toBeInTheDocument();
+    expect(container.querySelector('span.bg-success')).toBeInTheDocument();
   });
 
   it('merges shell chrome classes from the caller', () => {

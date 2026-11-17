@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { DbOrTransaction } from '@/lib/db';
 import { capabilityWants } from '@/lib/db/schema/waitlist';
 
 /**
@@ -8,7 +9,7 @@ import { capabilityWants } from '@/lib/db/schema/waitlist';
  * under its company size baseline; call inside the intake transaction.
  */
 export async function insertChatCapabilityWants(
-  tx: { insert: (table: unknown) => { values: (rows: unknown) => unknown } },
+  tx: DbOrTransaction,
   entryId: string,
   interviewResponses: {
     readonly currentWorkflow?: string | null;
@@ -17,19 +18,18 @@ export async function insertChatCapabilityWants(
   } | null
 ): Promise<void> {
   const answers = [
-    interviewResponses?.currentWorkflow,
-    interviewResponses?.biggestBlocker,
-    interviewResponses?.launchGoal,
+    { kind: 'current_tool', text: interviewResponses?.currentWorkflow },
+    { kind: 'objection', text: interviewResponses?.biggestBlocker },
+    { kind: 'want', text: interviewResponses?.launchGoal },
   ]
-    .map(answer => (answer ?? '').trim())
-    .filter(answer => answer.length > 0);
+    .map(answer => ({ ...answer, text: (answer.text ?? '').trim() }))
+    .filter(answer => answer.text.length > 0);
   if (answers.length === 0) return;
   await tx.insert(capabilityWants).values(
     answers.map(answer => ({
       waitlistEntryId: entryId,
-      kind:
-        answer === interviewResponses?.biggestBlocker ? 'objection' : 'want',
-      text: answer,
+      kind: answer.kind,
+      text: answer.text,
       capabilityKey: null,
       source: 'onboarding_chat',
     }))

@@ -324,9 +324,10 @@ describe('DashboardNav route warming', () => {
     expect(newChatAction.closest('nav')?.className).toContain(
       'overflow-anchor-none'
     );
-    expect(
-      newChatAction.closest('[data-sidebar-search-slot]')?.className
-    ).toContain('lg:overflow-hidden');
+    const commandSlot = newChatAction.closest('[data-sidebar-search-slot]');
+    expect(commandSlot?.className).toContain('lg:overflow-hidden');
+    // The slot sits on the sidebar column: no private margin beside nav rows.
+    expect(commandSlot?.className).not.toMatch(/(^|\s)mx-\d/);
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();

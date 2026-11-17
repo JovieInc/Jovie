@@ -1,5 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type {
+  ComponentType,
+  CSSProperties,
+  KeyboardEvent,
+  ReactNode,
+} from 'react';
 
 /**
  * Supported dropdown variants
@@ -331,6 +336,26 @@ export interface CommonDropdownProps {
   readonly maxHeight?: number | string;
 
   /**
+   * Pin the search header and scroll only the item list. The list fades at
+   * whichever edge still has rows clipped behind it, and the fade goes away
+   * once that edge is reached. Use for long history-style lists. The panel
+   * takes a fixed width (`minWidth`, default 25rem, capped to the viewport)
+   * so long rows truncate instead of widening it. Typing on a row goes to
+   * the search field, so the list keeps filtering wherever focus sits.
+   *
+   * Pass `MENU_SCROLL_BODY` from `@jovie/ui`. It is passed in rather than
+   * built in so menus that don't use it don't ship its code.
+   */
+  readonly scrollBody?: CommonDropdownScrollBody;
+
+  /**
+   * Open/close motion. Omitted, the menu fades (opacity only). Pass
+   * `MENU_MOTION_ANCHORED` for a subtle scale and fade from the trigger, with
+   * a faster exit. Reduced motion removes both.
+   */
+  readonly motion?: CommonDropdownMotion;
+
+  /**
    * Loading state (shows spinner)
    */
   readonly isLoading?: boolean;
@@ -396,4 +421,34 @@ export function isActionRow(
   item: CommonDropdownItem
 ): item is CommonDropdownActionRow {
   return item.type === 'action-row';
+}
+
+/** The pinned-search, scrolling-rows layout behind `scrollBody`. */
+export interface CommonDropdownScrollBody {
+  /** Wraps the rows: scrolls them and fades whichever edge is clipped. */
+  readonly Body: ComponentType<{ readonly children: ReactNode }>;
+  /** Classes for the menu surface, which itself no longer scrolls. */
+  readonly contentClassName: string;
+  /**
+   * Surface style: the requested `minWidth` becomes a fixed width capped to
+   * the viewport, and the surface itself doesn't scroll.
+   */
+  readonly getContentStyle: (
+    minWidth?: number | string,
+    maxHeight?: number | string
+  ) => CSSProperties;
+  /** Hands a printable key or Backspace pressed on a row to the search. */
+  readonly redirectTyping: (
+    event: KeyboardEvent<HTMLDivElement>,
+    input: HTMLInputElement | null,
+    query: string,
+    setQuery: (query: string) => void
+  ) => void;
+}
+
+/** Open/close motion for a menu surface. */
+export interface CommonDropdownMotion {
+  /** Written to `data-motion` so tests and visual checks can read it. */
+  readonly name: string;
+  readonly className: string;
 }

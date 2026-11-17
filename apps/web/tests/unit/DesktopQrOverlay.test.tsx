@@ -1,6 +1,35 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DesktopQrOverlay } from '@/features/profile/DesktopQrOverlay';
+
+const { DATA_URL, getQrCodeDataUrl } = vi.hoisted(() => ({
+  DATA_URL: 'data:image/png;base64,QRPNG',
+  getQrCodeDataUrl: vi.fn<(data: string, size: number) => Promise<string>>(
+    async () => 'data:image/png;base64,QRPNG'
+  ),
+}));
+
+vi.mock('@/components/molecules/QRCode', () => ({
+  __esModule: true,
+  // Plain <img> stand-in: the real component renders a locally generated
+  // data URL, so the overlay contract under test is what it feeds the
+  // generator and that no image network request is ever constructed.
+  QRCode: ({
+    data,
+    label,
+    size,
+  }: Readonly<{ data: string; label?: string; size?: number }>) => (
+    <img
+      src={DATA_URL}
+      alt={label}
+      data-encoded={data}
+      width={size ?? 120}
+      height={size ?? 120}
+    />
+  ),
+  getQrCodeDataUrl: (...args: unknown[]) =>
+    getQrCodeDataUrl(...(args as [string, number])),
+}));
 
 function mockMatchMedia(matches: boolean) {
   return vi.fn().mockImplementation(() => ({
@@ -50,13 +79,79 @@ describe('DesktopQrOverlay', () => {
     ).toBeNull();
   });
 
-  it('preloads the QR image URL on mount', () => {
+  it('warms the QR cache on mount once the page has loaded', () => {
     render(<DesktopQrOverlay handle='tim' />);
-    expect(imageSrcSetter).toHaveBeenCalledWith(
-      expect.stringContaining(
-        encodeURIComponent(`${globalThis.location.origin}/tim`)
-      )
+    expect(getQrCodeDataUrl).toHaveBeenCalledWith(
+      `${globalThis.location.origin}/tim`,
+      120
     );
+  });
+
+  it('constructs no Image element: QR generation makes no network request', () => {
+    // The QR is generated locally from the `qrcode` dependency. The old
+    // implementation preloaded an api.qrserver.com PNG, which broke the
+    // profile pages' published zero-third-party-requests claim
+    // (apps/web/content/comparative-claims.ts) and could hold the load
+    // event for 30s+ on a slow upstream.
+    render(<DesktopQrOverlay handle='tim' />);
+    expect(imageSrcSetter).not.toHaveBeenCalled();
+  });
+
+  it('waits for the window load event before generating the QR', () => {
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='tim' />);
+      expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
+      expect(getQrCodeDataUrl).not.toHaveBeenCalled();
+
+      readyState.mockReturnValue('complete');
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
+
+      expect(getQrCodeDataUrl).toHaveBeenCalledWith(
+        `${globalThis.location.origin}/tim`,
+        120
+      );
+    } finally {
+      readyState.mockRestore();
+    }
+  });
+
+  it('holds the QR card render until the window load event', async () => {
+    // ?mode=pay opens the card at hydration; its render waits for load
+    // together with the warm-up so a cold visit paints without it.
+    window.history.pushState({}, '', '/testartist?mode=pay');
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='testartist' />);
+      expect(
+        screen.queryByAltText('Scan To Open This Profile On Your Phone')
+      ).toBeNull();
+      expect(screen.getByTestId('desktop-qr-placeholder')).toHaveStyle({
+        width: '120px',
+        height: '120px',
+      });
+
+      readyState.mockReturnValue('complete');
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
+
+      const qr = await screen.findByAltText(
+        'Scan To Open This Profile On Your Phone'
+      );
+      expect(qr.getAttribute('src')).toMatch(/^data:/);
+      expect(qr.getAttribute('data-encoded')).toContain('testartist');
+      expect(screen.queryByTestId('desktop-qr-placeholder')).toBeNull();
+    } finally {
+      readyState.mockRestore();
+      window.history.pushState({}, '', '/');
+    }
   });
 
   it('opens the QR code on desktop when the profile is in pay mode', async () => {
@@ -65,11 +160,8 @@ describe('DesktopQrOverlay', () => {
     const qrCode = await screen.findByAltText(
       'Scan To Open This Profile On Your Phone'
     );
-    expect(qrCode).toHaveAttribute(
-      'src',
-      expect.stringContaining('api.qrserver.com')
-    );
-    expect(qrCode.getAttribute('src')).toContain('testartist');
+    expect(qrCode.getAttribute('src')).toMatch(/^data:/);
+    expect(qrCode.getAttribute('data-encoded')).toContain('testartist');
     const card = qrCode.closest('[popover="manual"]');
     expect(card).not.toBeNull();
     // The pay drawer's modal focus boundary must leave this card usable.
