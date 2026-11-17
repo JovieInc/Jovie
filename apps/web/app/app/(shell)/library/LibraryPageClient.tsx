@@ -254,6 +254,7 @@ export function LibraryPageClient({
           <CreatorDocumentsWorkspace
             key={creatorProfileId}
             creatorProfileId={creatorProfileId}
+            initialDocumentId={documentId}
             initialDocuments={creatorDocuments}
             initialNextCursor={creatorDocumentsNextCursor}
             initialLoadFailed={creatorDocumentsLoadFailed}
