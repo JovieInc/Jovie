@@ -675,9 +675,9 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    // Stage tabs ride the shared 30px PageToolbarTabButton standard.
+    // Stage tabs keep the current shared 28px PageToolbarTabButton standard.
     for (const name of ['All', 'Ideas']) {
-      expect(screen.getByRole('tab', { name })).toHaveClass('h-7.5');
+      expect(screen.getByRole('tab', { name })).toHaveClass('h-7');
       expect(screen.getByRole('tab', { name })).not.toHaveClass('h-8');
     }
     expectToolbarControl(

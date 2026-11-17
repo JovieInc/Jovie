@@ -140,6 +140,7 @@ export function DspQuietRow({
           target='_blank'
           rel='noopener noreferrer'
           tabIndex={closedTabIndex}
+          aria-label={showUrl ? `${label} ${displayDspUrl(href)}` : undefined}
           data-dsp-row='linked'
           // The focusable element owns the canonical DSP-row ring (no
           // offset; focus-visible:bg-surface-1 replaces it) even though the
@@ -159,6 +160,7 @@ export function DspQuietRow({
           </span>
           {showUrl ? (
             <span className='min-w-0 flex-1 truncate font-mono text-2xs text-tertiary-token'>
+              {' '}
               {displayDspUrl(href)}
             </span>
           ) : null}
