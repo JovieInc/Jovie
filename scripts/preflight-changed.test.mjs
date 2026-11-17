@@ -24,6 +24,7 @@ import {
   changedFiles,
   downgradeHostRed,
   GENERATORS,
+  guardScanScript,
   HEAVY_GUARDS,
   hostSlotted,
   invariantTestFiles,
@@ -910,7 +911,7 @@ test('private data guard uses an absolute XDG cache when home is unavailable', a
       `jobs:\n  guard:\n    uses: JovieInc/ci/.github/workflows/guard.yml@${sha}\n`
     );
     writeFileSync(
-      path.join(cache, 'jovie-preflight', `private-data-${sha}.py`),
+      path.join(cache, 'jovie-preflight', `private-data-scan-${sha}.py`),
       'import os, sys\nprint(os.environ["FAIL_ON_FINDINGS"])\nsys.exit(7)\n'
     );
     const runner = `import { privateDataCheck } from ${JSON.stringify(new URL('./preflight-changed.mjs', import.meta.url).href)};
@@ -933,7 +934,7 @@ console.log(JSON.stringify(r));`;
     const fallbackCache = path.join(fallbackHome, '.cache/jovie-preflight');
     mkdirSync(fallbackCache, { recursive: true });
     writeFileSync(
-      path.join(fallbackCache, `private-data-${sha}.py`),
+      path.join(fallbackCache, `private-data-scan-${sha}.py`),
       'import sys\nsys.exit(8)\n'
     );
     for (const invalid of ['', 'relative-cache']) {
@@ -950,5 +951,151 @@ console.log(JSON.stringify(r));`;
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const FETCH_PY = String.raw`
+import base64, os, re, subprocess, sys
+env = os.environ.copy()
+token = env.pop("GH_TOKEN", "")
+env.update({"GIT_CONFIG_COUNT": "1"})
+`;
+
+const SCAN_PY = String.raw`
+import os, re, subprocess, sys
+PATH_RULES = [("env-file", r"(^|/)\.env(\.[^/]+)?$", None)]
+CONTENT_RULES = [("home-path", re.compile(r"/Users/[A-Za-z][A-Za-z0-9._-]+/"))]
+def git(*a):
+    return subprocess.run(["git", *a], check=True, capture_output=True, text=True).stdout
+base = os.environ["PR_BASE_SHA"]
+head = os.environ["HEAD_SHA"]
+findings = []
+paths = [p for p in git("diff", "--name-only", "--diff-filter=AMR", "-z", base, head).split("\0") if p]
+for p in paths:
+    for name, pat, exempt in PATH_RULES:
+        if re.search(pat, p):
+            findings.append((name, p, 0))
+    if os.path.isfile(p):
+        for ln, text in enumerate(open(p, encoding="utf-8", errors="ignore"), 1):
+            for name, rx in CONTENT_RULES:
+                if rx.search(text):
+                    findings.append((name, p, ln))
+for name, p, ln in findings:
+    print(f"::error file={p}::private-data-guard rule={name} at {p}:{ln}")
+print(f"private-data-guard scanned: {len(findings)} finding(s)")
+if findings and os.environ.get("FAIL_ON_FINDINGS") == "true":
+    sys.exit(1)
+`;
+
+const heredoc = (indent, python) => [
+  `${indent}python3 - <<'PY'`,
+  ...python
+    .split('\n')
+    .filter(Boolean)
+    .map(l => `${indent}${l}`),
+  `${indent}PY`,
+];
+
+/** A pinned-guard workflow shape: the base-fetch block plus the scan step. */
+const guardWorkflowFixture = (steps = ['fetch', 'scan']) => {
+  const rows = ['name: Private Data Guard', 'jobs:', '  guard:', '    steps:'];
+  if (steps.includes('fetch'))
+    rows.push(
+      '      - name: Fetch exact comparison base',
+      '        run: |',
+      ...heredoc('          ', FETCH_PY),
+      ''
+    );
+  if (steps.includes('scan'))
+    rows.push(
+      '      - name: Scan for private data',
+      '        run: |',
+      ...heredoc('          ', SCAN_PY)
+    );
+  return `${rows.join('\n')}\n`;
+};
+
+test('private data preflight extracts the scan step, not the base-fetch block', () => {
+  const picked = guardScanScript(guardWorkflowFixture());
+  assert.ok(picked.script, picked.fail);
+  assert.match(picked.script, /PATH_RULES/);
+  assert.match(picked.script, /private-data-guard scanned/);
+  assert.doesNotMatch(picked.script, /GIT_CONFIG_COUNT/);
+});
+
+test('private data scan extraction fails closed on a missing or malformed step', () => {
+  const missing = guardScanScript(guardWorkflowFixture(['fetch']));
+  assert.match(
+    missing.fail,
+    /no "Scan for private data" step in the pinned workflow/
+  );
+  const malformed = guardScanScript(
+    [
+      'jobs:',
+      '  guard:',
+      '    steps:',
+      '      - name: Scan for private data',
+      '        run: python3 scanner.py',
+      '',
+    ].join('\n')
+  );
+  assert.match(malformed.fail, /no python heredoc/);
+  const unterminated = guardScanScript(
+    [
+      'jobs:',
+      '  guard:',
+      '    steps:',
+      '      - name: Scan for private data',
+      '        run: |',
+      "          python3 - <<'PY'",
+      '          import os',
+    ].join('\n')
+  );
+  assert.match(unterminated.fail, /unterminated/);
+});
+
+test('extracted scan script fails forbidden data and passes a clean change', {
+  skip: process.platform === 'win32',
+}, () => {
+  const picked = guardScanScript(guardWorkflowFixture());
+  assert.ok(picked.script, picked.fail);
+  const repo = baseFixtureRepo('pdg-scan');
+  const scratch = mkdtempSync(path.join(tmpdir(), 'pdg-scan-'));
+  try {
+    gitIn(repo, ['checkout', '-qb', 'feature']);
+    const rev = args =>
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' }).stdout.trim();
+    const script = path.join(scratch, 'guard-scan.py');
+    writeFileSync(script, `${picked.script}\n`);
+    const run = () =>
+      spawnSync('python3', [script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EVENT_NAME: 'pull_request',
+          PR_BASE_SHA: rev(['rev-parse', 'main']),
+          HEAD_SHA: rev(['rev-parse', 'HEAD']),
+          FULL_TREE: 'false',
+          FAIL_ON_FINDINGS: 'true',
+        },
+      });
+    writeFileSync(path.join(repo, 'notes.txt'), 'plain note\n');
+    gitIn(repo, ['add', '-A']);
+    gitIn(repo, ['commit', '-m', 'clean']);
+    const clean = run();
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    assert.match(clean.stdout, /0 finding\(s\)/);
+    writeFileSync(path.join(repo, '.env'), 'TOKEN=1\n');
+    writeFileSync(path.join(repo, 'leak.md'), 'see /Users/timwhite/notes/x\n');
+    gitIn(repo, ['add', '-A']);
+    gitIn(repo, ['commit', '-m', 'forbidden']);
+    const red = run();
+    assert.equal(red.status, 1, red.stdout + red.stderr);
+    assert.match(red.stdout, /rule=env-file/);
+    assert.match(red.stdout, /rule=home-path/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+    rmSync(repo, { recursive: true, force: true });
   }
 });
