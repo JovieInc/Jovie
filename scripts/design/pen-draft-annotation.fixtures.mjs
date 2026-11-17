@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,5 +23,26 @@ export function* blockedRuns() {
       }
     );
     yield { githubActions, out, res };
+  }
+}
+
+/** Preserve the blocked receipt, failure status and both annotation modes. */
+export function assertBlockedRuns() {
+  for (const { githubActions, out, res } of blockedRuns()) {
+    assert.equal(res.status, 1);
+    assert.match(
+      res.stdout,
+      /^pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
+    );
+    if (githubActions === 'true')
+      assert.match(
+        res.stdout,
+        /^::error title=pen-draft blocked::pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
+      );
+    else assert.doesNotMatch(res.stdout, /^::error/m);
+    assert.equal(
+      JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8')).blocked,
+      'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL'
+    );
   }
 }

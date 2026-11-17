@@ -23,7 +23,7 @@ import {
   useTrimmedInput,
   writeCanonical,
 } from './pen-draft.mjs';
-import { blockedRuns } from './pen-draft-annotation.fixtures.mjs';
+import { assertBlockedRuns } from './pen-draft-annotation.fixtures.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
   for (const b of loadBriefs())
@@ -308,25 +308,10 @@ test('a frame without its .pen or preview is not drafted', () => {
   );
 });
 
-test('a blocked run names secrets in CI and keeps local output unchanged', () => {
-  for (const { githubActions, out, res } of blockedRuns()) {
-    assert.equal(res.status, 1);
-    assert.match(
-      res.stdout,
-      /^pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
-    );
-    if (githubActions === 'true')
-      assert.match(
-        res.stdout,
-        /^::error title=pen-draft blocked::pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
-      );
-    else assert.doesNotMatch(res.stdout, /^::error/m);
-    assert.equal(
-      JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8')).blocked,
-      'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL'
-    );
-  }
-});
+test(
+  'a blocked run names secrets in CI and keeps local output unchanged',
+  assertBlockedRuns
+);
 
 test('a draft counts only when it adds the named top-level frame', () => {
   const before = { children: [{ id: 'a', name: 'pricing' }] };
