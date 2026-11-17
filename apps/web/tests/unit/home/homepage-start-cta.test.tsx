@@ -107,8 +107,8 @@ describe('homepage claim actions', { timeout: 60_000 }, () => {
     ).toBeNull();
     expect(close).toHaveTextContent(copy.claim.headline.replace('.', ''));
     expect(
-      close?.querySelector('[data-testid="homepage-close-cta"]')
-    ).toHaveAttribute('href', claim.href);
+      close?.querySelector('[data-testid="homepage-claim-entry"]')
+    ).toHaveAttribute('action', claim.href);
     expect(container.innerHTML).not.toContain(copy.invite.headline);
   });
 
