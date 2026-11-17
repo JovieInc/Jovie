@@ -112,6 +112,14 @@ class SplitHelperImportTest(unittest.TestCase):
         self.assertIn("from main_mod import SHARED_UNUSED", result)
         self.assertNotIn("SHARED_UNUSED =", result)
 
+    def test_rejects_deletion_when_another_statement_shares_the_line(self):
+        source = "SHARED = 4; UNIQUE = 5\n\ndef kept():\n    return 2\n"
+        self.assertIsNone(_strip_and_import(source, [("SHARED", "canonical_fixture_final")]))
+
+    def test_rejects_import_rewrite_when_another_statement_shares_the_line(self):
+        source = "from canonical_fixture_final import OLD; UNIQUE = 5\nSHARED = 4\n\ndef kept():\n    return 2\n"
+        self.assertIsNone(_strip_and_import(source, [("SHARED", "canonical_fixture_final")]))
+
     def test_rejects_alias_same_module_and_prose_without_git(self):
         with tempfile.TemporaryDirectory() as scratch:
             root = Path(scratch)

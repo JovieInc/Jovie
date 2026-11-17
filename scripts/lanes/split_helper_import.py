@@ -198,6 +198,21 @@ def _strip_and_import(source: str, pairs: list[tuple[str, str]]) -> str | None:
     return _add_imports(stripped, list(groups.items()))
 
 
+def _unshared_statement_lines(source: str, stmt: ast.stmt) -> bool:
+    """Whole-line edits must not erase a neighbouring top-level statement."""
+    if stmt.end_lineno is None:
+        return False
+    fields = ("lineno", "col_offset", "end_lineno", "end_col_offset")
+    identity = tuple(getattr(stmt, field) for field in fields)
+    start = min([stmt.lineno, *[decorator.lineno for decorator in getattr(stmt, "decorator_list", [])]])
+    for other in ast.parse(source).body:
+        if tuple(getattr(other, field) for field in fields) == identity:
+            continue
+        if other.end_lineno is None or (other.lineno <= stmt.end_lineno and other.end_lineno >= start):
+            return False
+    return True
+
+
 def _delete(source: str, remove: list[str]) -> str | None:
     defs = _definitions(source)
     if defs is None:
@@ -218,7 +233,7 @@ def _delete(source: str, remove: list[str]) -> str | None:
         return source
     drop = set()
     for stmt in chosen:
-        if stmt.end_lineno is None:
+        if stmt.end_lineno is None or not _unshared_statement_lines(source, stmt):
             return None
         start = min([stmt.lineno, *[decorator.lineno for decorator in getattr(stmt, "decorator_list", [])]])
         drop.update(range(start, stmt.end_lineno + 1))
@@ -243,7 +258,8 @@ def _add_imports(source: str, groups: list[tuple[str, list[str]]]) -> str | None
         if stmt == "reject":
             return None
         if isinstance(stmt, ast.ImportFrom):
-            if stmt.lineno != stmt.end_lineno or any(alias.asname for alias in stmt.names):
+            if (stmt.lineno != stmt.end_lineno or any(alias.asname for alias in stmt.names)
+                    or not _unshared_statement_lines(source, stmt)):
                 return None
             current = [alias.name for alias in stmt.names]
             lines[stmt.lineno - 1] = f"from {mod} import {', '.join(_ordered(current, names))}\n"
