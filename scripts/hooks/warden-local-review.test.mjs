@@ -13,6 +13,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
+import {
+  localHookChildEnv,
+  localHookTestsMissingCiIsolation,
+} from './local-hook-child-env.mjs';
+
 const repoRoot = resolve(import.meta.dirname, '..', '..');
 const script = resolve(repoRoot, 'scripts/hooks/warden-local-review.sh');
 const ladder = JSON.parse(
@@ -28,7 +33,12 @@ function makeWardenStub({ exitCode = 0, marker = null } = {}) {
   const wardenPath = join(bin, 'warden');
   mkdirSync(bin, { recursive: true });
   const lines = ['#!/bin/sh'];
-  if (marker) lines.push(`echo invoked >> "${marker}"`);
+  if (marker) {
+    lines.push(
+      `for arg in "$@"; do printf '%s\\n' "$arg" >> "${marker}"; done`,
+      `echo invoked >> "${marker}"`
+    );
+  }
   if (exitCode !== 0) lines.push(`exit ${exitCode}`);
   writeFileSync(wardenPath, `${lines.join('\n')}\n`);
   chmodSync(wardenPath, 0o755);
@@ -38,11 +48,7 @@ function makeWardenStub({ exitCode = 0, marker = null } = {}) {
 function runHook(mode, extraPath = '', extraEnv = {}) {
   return spawnSync('bash', [script, mode], {
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      PATH: `${extraPath}:${process.env.PATH}`,
-      ...extraEnv,
-    },
+    env: localHookChildEnv(extraEnv, extraPath),
   });
 }
 
@@ -103,7 +109,29 @@ describe('warden-local-review.sh', () => {
     const { bin } = makeWardenStub({ marker: join(logDir, 'args') });
     const result = runHook('staged', bin);
     assert.equal(result.status, 0);
-    assert.match(readFileSync(join(logDir, 'args'), 'utf8'), /invoked/);
+    const recorded = readFileSync(join(logDir, 'args'), 'utf8');
+    assert.match(recorded, /^--staged\ninvoked\n/);
+  });
+
+  it('still invokes warden when the parent process has CI set', () => {
+    const previous = process.env.CI;
+    process.env.CI = 'true';
+    const marker = join(tmpdir(), `jovie-warden-ci-${process.pid}`);
+    try {
+      const { bin } = makeWardenStub({ exitCode: 1, marker });
+      const result = runHook('branch', bin);
+      assert.equal(result.status, 0);
+      assert.match(readFileSync(marker, 'utf8'), /invoked/);
+      assert.match(result.stderr, /NOT blocked/);
+    } finally {
+      if (previous === undefined) delete process.env.CI;
+      else process.env.CI = previous;
+      rmSync(marker, { force: true });
+    }
+  });
+
+  it('requires every CI-skipping hook test to isolate ambient CI', () => {
+    assert.deepEqual(localHookTestsMissingCiIsolation(repoRoot), []);
   });
 
   it('propagates a non-zero warden exit only in strict mode', () => {
