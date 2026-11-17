@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { userSettingsNavigation } from '@/features/dashboard/dashboard-nav/config';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SettingsNavGroup } from './SettingsNavGroup';
 
 vi.mock('next/link', () => ({
@@ -34,6 +35,24 @@ function renderGroup(
 }
 
 describe('SettingsNavGroup eager navigation contract', () => {
+  it.each([
+    ['default', {}],
+    ['empty', { items: [] }],
+    ['descendant', { pathname: `${items[0].href}/sessions` }],
+    [
+      'long labels',
+      {
+        items: items.map(item => ({
+          ...item,
+          name: `${item.name} with a long navigation label`,
+        })),
+      },
+    ],
+  ] as const)('keeps the %s state accessible', async (_state, props) => {
+    const { container } = renderGroup(props);
+    await expectNoA11yViolations(container);
+  });
+
   it('renders existing destinations without Settings data, search or auth providers', () => {
     renderGroup();
     expect(screen.getAllByRole('link')).toHaveLength(items.length);
