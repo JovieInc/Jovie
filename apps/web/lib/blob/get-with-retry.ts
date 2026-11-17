@@ -26,6 +26,8 @@ const BLOB_STATUS_PATTERN = /Failed to fetch blob: (\d{3})/;
 
 export function isTransientBlobReadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError')
+    return false;
 
   const statusMatch = BLOB_STATUS_PATTERN.exec(error.message);
   if (statusMatch) {
@@ -47,19 +49,44 @@ export async function getBlobWithRetry(
   options: BlobGetOptions,
   context: string
 ): Promise<Awaited<ReturnType<typeof get>>> {
-  return executeWithRetry(() => get(pathname, options), {
-    maxRetries: BLOB_READ_RETRIES,
-    baseDelayMs: BLOB_READ_BASE_DELAY_MS,
-    maxDelayMs: BLOB_READ_MAX_DELAY_MS,
-    backoffMultiplier: 2,
-    jitterRatio: 0.2,
-    isRetryable: isTransientBlobReadError,
-    onRetry: ({ attempt, maxRetries, delayMs, error }) => {
-      logger.warn(
-        `[blob-retry] ${context}: transient blob read failure ` +
-          `(attempt ${attempt}/${maxRetries + 1}, retry in ` +
-          `${Math.round(delayMs)}ms): ${error.message}`
-      );
-    },
-  });
+  const signal = options.abortSignal;
+  signal?.throwIfAborted();
+
+  let onAbort: (() => void) | undefined;
+  const cancelled = signal
+    ? new Promise<never>((_, reject) => {
+        onAbort = () => reject(signal.reason);
+        signal.addEventListener('abort', onAbort, { once: true });
+      })
+    : undefined;
+
+  try {
+    const read = executeWithRetry(
+      () => {
+        // Cancellation during backoff must never start another SDK read.
+        signal?.throwIfAborted();
+        return get(pathname, options);
+      },
+      {
+        maxRetries: BLOB_READ_RETRIES,
+        baseDelayMs: BLOB_READ_BASE_DELAY_MS,
+        maxDelayMs: BLOB_READ_MAX_DELAY_MS,
+        backoffMultiplier: 2,
+        jitterRatio: 0.2,
+        isRetryable: error =>
+          !signal?.aborted && isTransientBlobReadError(error),
+        onRetry: ({ attempt, maxRetries, delayMs, error }) => {
+          logger.warn(
+            `[blob-retry] ${context}: transient blob read failure ` +
+              `(attempt ${attempt}/${maxRetries + 1}, retry in ` +
+              `${Math.round(delayMs)}ms): ${error.message}`
+          );
+        },
+      }
+    );
+    // The shared retry timer is bounded but cannot itself be cancelled.
+    return await (cancelled ? Promise.race([read, cancelled]) : read);
+  } finally {
+    if (signal && onAbort) signal.removeEventListener('abort', onAbort);
+  }
 }
