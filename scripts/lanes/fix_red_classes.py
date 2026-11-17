@@ -206,7 +206,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
@@ -215,7 +215,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = fix_red_size_split.legacy_hit(text, hit)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
             hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:

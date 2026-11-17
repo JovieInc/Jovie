@@ -97,14 +97,11 @@ const baseline = projectTotals(
     '--json',
   ])
 );
-let todayTotals = {};
-try {
-  todayTotals = projectTotals(
-    vercel(['usage', '--group-by', 'project', '--since', isoDay(now), '--json'])
-  );
-} catch {
-  /* no usage yet today */
-}
+// An unavailable read is not evidence of zero usage. Let the existing workflow
+// report protection failure instead of evaluating an invented empty map.
+const todayTotals = projectTotals(
+  vercel(['usage', '--group-by', 'project', '--since', isoDay(now), '--json'])
+);
 const la = new Date(
   now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
 );
