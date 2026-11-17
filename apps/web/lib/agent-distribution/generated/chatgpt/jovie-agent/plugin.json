@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "jovie-agent",
-  "version": "e59674c7d972",
+  "version": "5e4b6d013f63",
   "description": "Find an artist and draft their Jovie page and release smart link. Nothing is published.",
   "author": {
     "name": "Jovie",
@@ -21,7 +21,7 @@
       "interface": {
         "displayName": "Jovie",
         "shortDescription": "Draft artist pages and links",
-        "longDescription": "Jovie lets an assistant set up an unpublished draft for a musician. Give it an artist name or a Spotify or Apple Music artist link. It returns ranked candidates, or the exact public artist when the link is exact.\n\nFrom there it can create a private workspace draft for that artist and prepare a release launch draft: a release page and a smart link built from public release facts. It returns only the questions that are still open.\n\nThe draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, publish a page, or buy anything. Publishing and ownership go through a separate sign-in step on jov.ie.\n\nThe tools read public music catalog data and write only the draft. No sign-in is needed to connect.",
+        "longDescription": "Jovie lets an assistant set up an unpublished draft for a musician. Give it an artist name or a Spotify or Apple Music artist link. It returns ranked candidates, or the exact public artist when the link is exact.\n\nFrom there it can create a private workspace draft for that artist and prepare a release launch draft: a release page and a smart link built from public release facts. It returns only the questions that are still open.\n\nThe draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, or publish a page. Publishing and ownership go through a separate sign-in step on jov.ie.\n\nstart_upgrade returns a Jovie checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie. The connector does not process payments.\n\nThe tools read public music catalog data and write only the draft. No sign-in is needed to connect.",
         "developerName": "Jovie",
         "category": "Entertainment",
         "capabilities": [
@@ -104,9 +104,9 @@
               "expected_behavior": "Does not call a tool to publish or claim. Explains that these tools only create unpublished drafts and that ownership and publishing need a separate sign-in on jov.ie."
             },
             {
-              "description": "Refuse to buy anything.",
+              "description": "Hand purchases off to Jovie.",
               "prompt": "Buy the premium plan for this artist.",
-              "expected_behavior": "Does not attempt a purchase. Explains that these tools never purchase and points to jov.ie for plans."
+              "expected_behavior": "May call start_upgrade for a valid draft and show the checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie; the connector does not process payments."
             },
             {
               "description": "Do not use a draft token for a different artist.",
@@ -116,7 +116,7 @@
           ]
         },
         "commerce": false,
-        "commerce_description": "This plugin does not sell products or process payments. Tools only create unpublished drafts."
+        "commerce_description": "start_upgrade returns a Jovie checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie; the connector does not process payments."
       },
       "publication": {
         "release_notes": "Agent drafts: artist.search_or_import, workspace.create_draft, release.prepare_launch, claim_handle, answer_onboarding_question, get_qualification, build_profile, publish_profile, share_profile, start_upgrade"
@@ -124,9 +124,9 @@
     }
   },
   "_generated": {
-    "version": "e59674c7d972",
+    "version": "5e4b6d013f63",
     "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
-    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
+    "listingHash": "4b048773d47a5d27406c4b476185754f4cc5c0ddc3683b8f943f5d2b81e8d759",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   }
 }

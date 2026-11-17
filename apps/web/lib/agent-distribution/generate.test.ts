@@ -55,6 +55,24 @@ describe('agent distribution packages', () => {
     expect(snapshot.toolsListHash).toBe(hashTools(tools));
   });
 
+  it('describes the checkout handoff consistently in marketplace review copy', () => {
+    const { files } = buildDistribution(tools, LISTING, assets);
+    const chatgpt = JSON.parse(files['chatgpt/jovie-agent/plugin.json'])
+      .extensions['com.openai'];
+    const claude = JSON.parse(files['claude/directory-listing.json']);
+    for (const description of [
+      chatgpt.interface.longDescription,
+      chatgpt.review.commerce_description,
+      claude.description,
+      claude.reviewerInstructions,
+    ]) {
+      expect(description).toMatch(/start_upgrade.*checkout entry URL/);
+      expect(description).toMatch(/person.*completes.*purchase on Jovie/);
+      expect(description).not.toMatch(/buy anything|never purchase/);
+    }
+    expect(chatgpt.review.commerce).toBe(false);
+  });
+
   it('keeps ChatGPT and Claude listing limits', () => {
     expect(LISTING.name.length).toBeLessThanOrEqual(LIMITS.chatgpt.displayName);
     expect(LISTING.chatgptShort.length).toBeLessThanOrEqual(

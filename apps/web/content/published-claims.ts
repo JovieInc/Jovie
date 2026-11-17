@@ -181,16 +181,31 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
   'jovie.public-developer-access': {
     id: 'jovie.public-developer-access',
     statement:
-      'Jovie publishes a read-only public artist API, CLI, per-artist llms.txt, and anonymous per-artist MCP resources; owner writes require authentication and confirmation.',
+      'Jovie publishes a read-only public profile API, CLI, per-profile llms.txt, and anonymous per-profile MCP resources; owner tools require authenticated profile ownership, and publishing merch additionally requires explicit confirmation.',
     evidence: [
       'https://jov.ie/developers',
       'https://jov.ie/api/v1/openapi.json',
       'https://jov.ie/cli',
       `${JOVIE_SOURCE_ROOT}/lib/api/v1/contract.ts`,
       `${JOVIE_SOURCE_ROOT}/lib/ovie/mcp/oauth-contract.ts`,
+      'https://github.com/JovieInc/Jovie/blob/013fd293d2b470843329b840d70df33c84770bb1/apps/web/app/api/mcp/%5Busername%5D/route.ts',
     ],
     owner: 'marketing-architecture',
-    verifiedAt: '2026-10-01',
+    verifiedAt: '2026-11-17',
+    reviewAfter: '2027-01-01',
+  },
+  'jovie.agent-draft-connector': {
+    id: 'jovie.agent-draft-connector',
+    statement:
+      'The anonymous agent connector creates unpublished drafts. start_upgrade returns a Jovie checkout entry URL; the person reviews plans and completes any purchase on Jovie. The connector does not process payments.',
+    evidence: [
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/app/api/mcp/route.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-acquisition/api.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-acquisition/golden-path.server.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-distribution/generated/tools-list.snapshot.json',
+    ],
+    owner: 'marketing-architecture',
+    verifiedAt: '2026-11-15',
     reviewAfter: '2027-01-01',
   },
   'jovie.founder': {
@@ -466,7 +481,7 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/alternatives/link-in-bio':
     'bd6abd37bd0b7e84d3d409434203227f60cf1096449ad8dc706d077456c9cb15',
   '/llms.txt':
-    '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
+    '7148e79573634058f47dc074851c523c6aefbbc81e9f081ffb8731fbf660c21c',
   '/llms-full.txt':
-    'f7a5901a15cb4cb68f5552bb6d8862c1dcc0353f6624fe19b01834868725757b',
+    '415503602f96915034135178fb450e7b3266fc91536e0dcb8fb381d7d675a467',
 } as const;

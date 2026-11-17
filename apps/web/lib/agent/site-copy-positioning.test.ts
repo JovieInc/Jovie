@@ -68,7 +68,7 @@ describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
       '[Per-profile llms.txt](https://jov.ie/{username}/llms.txt)'
     );
     expect(body).toContain(
-      'the public profile API and anonymous MCP tools are read-only'
+      'the public profile API and anonymous per-profile MCP tools are read-only'
     );
   });
 

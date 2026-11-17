@@ -25,6 +25,7 @@ export const LLMS_FULL_TXT_CLAIM_IDS = [
   'jovie.pricing',
   'jovie.technical-stack',
   'jovie.public-developer-access',
+  'jovie.agent-draft-connector',
   'jovie.childcare-disambiguation',
 ] as const satisfies readonly PublishedClaimId[];
 

@@ -7,6 +7,7 @@ import {
   ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/marketing/featureAvailability';
 import { AGENT_HANDOFF_DISCOVERY_PATH } from '@/lib/acquisition/agent-intent';
+import { LISTING } from '@/lib/agent-distribution/listing';
 import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import {
   formatPublicPriceDisplay,
@@ -57,11 +58,12 @@ Use ${APP_NAME} when you need to complete one of these public jobs:
 - Use the read-only \`jovie\` CLI (npm: \`npm install --global @jovie/cli\`, or \`npx @jovie/cli --help\`) documented at ${BASE_URL}/cli
 - Route the audience to the correct streaming platform for a specific release via a smart link at ${BASE_URL}/{username}/{slug}
 - Call anonymous read-only profile resources and tools over MCP: ${BASE_URL}/api/mcp/{username}
+- Create or resume an unpublished artist and release draft with the anonymous agent connector at ${LISTING.mcpUrl}; see ${LISTING.docsUrl}. \`start_upgrade\` returns a checkout entry URL; the person reviews plans and completes any purchase on Jovie.
 
 Do not use ${APP_NAME} for:
 
 - Childcare or babysitting — that is jovie.com (Bright Horizons), a different company
-- General public writes or OAuth — the public profile API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes
+- General public writes or OAuth: the public profile API and anonymous per-profile MCP tools are read-only; owner-only MCP tools require authenticated profile ownership; publishing merch additionally requires explicit confirmation
 
 ## ${APP_NAME} developer resources
 
@@ -70,6 +72,7 @@ Do not use ${APP_NAME} for:
 - [Public API capability index](${BASE_URL}/api/v1) — \`GET ${BASE_URL}/api/v1\`; stable, non-enumerating contract discovery
 - [${APP_NAME} OpenAPI 3.1 spec](${BASE_URL}/openapi.json) — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
 - [${APP_NAME} API docs](${BASE_URL}/developers) — public API quickstart and active v1 lifecycle boundary
+- [Agent draft connector](${LISTING.mcpUrl}): anonymous; [connector docs](${LISTING.docsUrl}). ${LISTING.docsPage.toolsIntro}
 - [${APP_NAME} CLI](${BASE_URL}/cli) — npm package \`@jovie/cli\` (https://www.npmjs.com/package/@jovie/cli), binary \`jovie\`; read-only commands for public profile GET routes
 - [API versioning and deprecation policy](${PUBLIC_ARTIST_API_POLICY_URL}) — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - [Public profile API](${BASE_URL}/api/v1/{username}) — \`GET ${BASE_URL}/api/v1/{username}\`; profile, releases, events, merch
