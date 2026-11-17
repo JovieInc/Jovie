@@ -10,6 +10,8 @@ lanes status gist (doctor.publish_status), which the stage collector reads.
   `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>`.
 - incident / undetected, unfiled, open, cleared: one doctor condition generation, from
   runs/incidents.jsonl (journal_incidents, written by the doctor on every transition).
+- reason-check / queue-check, checked: one exact-release-bound native queue check,
+  from daily runs/reason-checks/YYYY-MM-DD.jsonl; never worker acceptance or job completion.
 - board-task / posted, running, closed: one mesh board task the lanes claimed, from
   runs/board-intake.jsonl (scripts/lanes/board_intake.py).
 - shipping / gate-seat and gate: a lane adopt (gate) run on `JovieInc/Jovie#<pr>`.
@@ -24,7 +26,10 @@ when the run opened a PR or pushed, abandoned otherwise; sourceReceipt =
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import os
+import re
+import stat
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import ledger_archive
@@ -180,7 +185,8 @@ def ndjson(ledger: Path, now: float) -> str:
         except OSError:
             continue
     state_dir = Path(ledger).parent.parent
-    for row in [*mirror_events(state_dir, now), *incident_events(state_dir, now), *board_events(state_dir, now)]:
+    for row in [*mirror_events(state_dir, now), *incident_events(state_dir, now), *board_events(state_dir, now),
+                *reason_check_events(state_dir, now)]:
         key = (row["sourceReceipt"], row["stage"])
         if key not in seen:
             seen.add(key)
@@ -195,6 +201,92 @@ def ndjson(ledger: Path, now: float) -> str:
             break
         kept.append(line)
     return "".join(line + "\n" for line in reversed(kept))
+
+
+# ------------------------------------------------------------------ native reason queue checks
+
+# At most 32 controls of at most 16 KiB each, plus receipt/provenance metadata.
+# One MiB leaves headroom for serialization while containing malformed-row memory.
+REASON_CHECK_MAX_LINE_BYTES = 1024 * 1024
+
+
+def _reason_check_rows(state: Path, now: float):
+    """Stream selected UTC partitions; unreadable/incomplete input aborts this feed publication."""
+    directory = Path(state) / "runs/reason-checks"
+    first = datetime.fromtimestamp(now - WINDOW_S, timezone.utc).date()
+    last = datetime.fromtimestamp(now, timezone.utc).date()
+    try:
+        paths = sorted(directory.iterdir())
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise OSError("reason-check-history-incomplete owner=reason-lane; action=restore readable daily history") from error
+    for path in paths:
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\.jsonl", path.name):
+            continue
+        try:
+            day = date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if not first <= day <= last:
+            continue
+        try:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as handle:
+                if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    raise OSError("partition is not a regular file")
+                for raw in iter(lambda: handle.readline(REASON_CHECK_MAX_LINE_BYTES + 1), b""):
+                    if len(raw) > REASON_CHECK_MAX_LINE_BYTES or not raw.endswith(b"\n"):
+                        raise ValueError("oversized or incomplete receipt row")
+                    item = json.loads(raw.decode("utf-8"))
+                    if not isinstance(item, dict):
+                        raise ValueError("receipt is not an object")
+                    yield item
+        except (OSError, UnicodeError, ValueError) as error:
+            raise OSError("reason-check-history-incomplete owner=reason-lane; action=restore complete daily receipts; "
+                          f"file={path.name}") from error
+
+
+def reason_check_events(state: Path, now: float) -> list[dict]:
+    """Qualified check execution only; never worker acceptance, job execution or publication.
+
+    Missing release provenance remains private and unqualified. Read failures abort publication;
+    the existing doctor status-feed-stale condition reports the resulting telemetry gap.
+    Identical redelivery is one sample; conflicts across all selected partitions prove no sample.
+    """
+    checks, conflicts = {}, set()
+    for item in _reason_check_rows(state, now):
+        host, check_id = item.get("host"), item.get("checkId")
+        if not isinstance(host, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", host) \
+                or not isinstance(check_id, str) or not re.fullmatch(r"[0-9a-f]{32}", check_id):
+            continue
+        key = (host, check_id)
+        if key in checks and checks[key] != item:
+            conflicts.add(key)
+        checks.setdefault(key, item)
+    rows = []
+    for (host, check_id), item in checks.items():
+        if (host, check_id) in conflicts:
+            continue
+        source = item.get("source")
+        if item.get("schema") != "jovie.reason-check/v1" or item.get("owner") != "reason-lane" \
+                or not isinstance(source, dict) or source.get("status") != "available" \
+                or source.get("producer") != "scripts/lanes/reason_dispatch.py" \
+                or any(not re.fullmatch(r"[0-9a-f]{%d}" % size, str(source.get(field) or ""))
+                       for field, size in (("sourceCommit", 40), ("bundleDigest", 64), ("laneTree", 40))):
+            continue
+        entered, exited = _epoch(item.get("startedAt")), _epoch(item.get("observedAt"))
+        if entered is None or exited is None or not entered <= exited <= now or now - exited > WINDOW_S \
+                or item.get("status") not in ("idle", "running", "spawned", "blocked", "linear-rate-limited"):
+            continue
+        failed = item["status"] in ("blocked", "linear-rate-limited") or bool(item.get("blockedOn"))
+        outcome = "failed" if failed else "completed"
+        base = {"schema": SCHEMA, "entityType": "reason-check", "entityId": f"{host}@{check_id}",
+                "actor": "reason-lane", "sourceReceipt": f"reason-check:{host}:{check_id}"}
+        rows.append({**base, "stage": "queue-check", "enteredAt": item["startedAt"],
+                     "exitedAt": item["observedAt"], "outcome": outcome})
+        rows.append({**base, "stage": "checked", "enteredAt": item["observedAt"],
+                     "exitedAt": item["observedAt"], "outcome": outcome})
+    return rows
 
 
 # ------------------------------------------------------------------ incidents (doctor conditions)
