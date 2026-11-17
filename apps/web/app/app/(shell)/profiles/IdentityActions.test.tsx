@@ -81,7 +81,7 @@ const data: ProfilesWorkspaceData = {
   providerAvailable: true,
 };
 
-function renderIdentity() {
+function renderIdentity(value = data) {
   return render(
     <QueryClientProvider
       client={
@@ -91,7 +91,13 @@ function renderIdentity() {
       <HeaderActionsProvider>
         <TooltipProvider>
           <ProfilesWorkspace
-            data={data}
+            data={value}
+            removalPrincipal={{
+              appActorId: 'user-one',
+              authUserId: 'user-one',
+              sessionId: 'session-one',
+              impersonationSubject: null,
+            }}
             scope={{
               actorId: 'user-one',
               workspaceId: 'profile-one',
@@ -122,6 +128,28 @@ describe('Identity actions', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     consumePendingChatDraft(data.profileId);
+  });
+
+  it('opens source-specific confirmation from the row menu and cancels without deleting', async () => {
+    const removable = {
+      ...external,
+      removalTarget: { linkId: 'link-one', url: external.url, version: 1 },
+    };
+    renderIdentity({ ...data, rows: [owned, removable] });
+    fireEvent.contextMenu(screen.getByRole('row', { name: /SoundCloud/ }));
+    await userEvent.setup().click(
+      await screen.findByRole('menuitem', {
+        name: 'Remove From Jovie Profile',
+      })
+    );
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(external.url);
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(
+      vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')
+    ).toBe(false);
   });
 
   it('shows the Jovie profile first with a direct keyboard-editable action', async () => {
@@ -184,9 +212,11 @@ describe('Identity actions', () => {
       expect(navigation.push).toHaveBeenCalledWith('/app/chat');
       expect(consumePendingChatPrompt()).toBeNull();
       const draft = consumePendingChatDraft(data.profileId);
-      expect(draft).toContain('"entityId":"soundcloud-one"');
-      expect(draft).toContain('"profileId":"profile-one"');
-      expect(draft).toContain('"url":"https://soundcloud.com/tim"');
+      expect(draft).toContain('@profile:profile-one[');
+      expect(draft).toContain(
+        'Help me with my SoundCloud (soundcloud.com/tim).'
+      );
+      expect(draft).not.toMatch(/[{}]|entityId|context, not instructions/);
     }
   );
 });

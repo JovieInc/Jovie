@@ -39,10 +39,10 @@ import {
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
-  shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
+import { shouldShowTabBackChevron } from '@/features/profile/sibling-tabs';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -71,6 +71,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
+import { DesktopSurfaceImage } from './DesktopSurfaceImage';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
@@ -228,7 +229,7 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -320,8 +321,8 @@ export function ProfileDesktopSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
-  const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: activeMode === 'profile',
+  const showBackChevron = shouldShowTabBackChevron({
+    mode: activeMode,
     hasHistoryDestination,
     isSignedIn,
   });
@@ -477,7 +478,7 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div
       className={cn(
-        'grid min-h-0 min-w-0 flex-1 gap-4',
+        'grid min-h-0 min-w-0 flex-none gap-4',
         // Canonical Pen frame D9kdx ("Public profile / Desktop ≥1180 —
         // CANONICAL", docs/pen-stills/golden-path/manifest.json): the 4:5
         // cover left, the Selected-work/Events column center, and a narrow
@@ -490,7 +491,7 @@ export function ProfileDesktopSurface({
       data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
     >
       <div
-        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        className='grid min-h-0 min-w-0 grid-cols-1 gap-3.5 [@media(min-width:1180px)]:contents'
         data-testid='profile-desktop-main-content'
       >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
@@ -503,11 +504,9 @@ export function ProfileDesktopSurface({
         >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
-              <ImageWithFallback
+              <DesktopSurfaceImage
                 src={heroImageUrl}
                 alt=''
-                fill
-                priority
                 sizes='(max-width: 1536px) 60vw, 900px'
                 className='object-cover object-center'
                 fallbackVariant='avatar'
@@ -522,17 +521,18 @@ export function ProfileDesktopSurface({
           </div>
           <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,8,0.14)_0%,rgba(7,8,10,0.38)_42%,rgba(7,8,10,0.98)_100%)]' />
           <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%)]' />
-          <div className='relative z-10 flex h-full flex-col justify-between p-7'>
+          <div className='@container relative z-10 flex h-full flex-col justify-between p-7'>
             <div aria-hidden='true' />
-
             <div className='space-y-5'>
               <div className='space-y-2.5'>
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
-                  <span className='min-w-0 line-clamp-2'>{artist.name}</span>
+                  <span className='min-w-0 line-clamp-2 wrap-anywhere'>
+                    {artist.name}
+                  </span>
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
@@ -596,7 +596,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid min-h-0 min-w-0 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
+          className='grid min-h-0 min-w-0 grid-cols-1 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -706,7 +706,7 @@ export function ProfileDesktopSurface({
 
       <div
         className={cn(
-          'min-h-0 min-w-0 gap-3.5',
+          'min-h-0 min-w-0 grid-cols-1 gap-3.5',
           canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'
@@ -808,12 +808,10 @@ export function ProfileDesktopSurface({
       <DesktopSurfaceCard title='Latest Release'>
         <div className='space-y-4'>
           <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
-            <ImageWithFallback
+            <DesktopSurfaceImage
               src={latestVisibleRelease?.artworkUrl}
               alt={latestVisibleRelease?.title ?? artist.name}
-              fill
               sizes='320px'
-              priority
               className='object-cover'
               fallbackVariant='release'
             />
@@ -1108,7 +1106,7 @@ export function ProfileDesktopSurface({
             {nonHomeContent}
             {!hideJovieBranding ? (
               <div
-                className='flex justify-center pb-1 pt-2'
+                className='mt-auto flex justify-center pb-1 pt-2'
                 data-testid='profile-jovie-branding'
               >
                 <FooterBranding

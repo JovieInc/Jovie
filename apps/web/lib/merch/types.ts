@@ -6,6 +6,7 @@ import type {
   MerchShippingAddress,
 } from '@/lib/db/schema/merch';
 import type { MerchMockupStatus } from './generation-contract';
+import type { MerchGenerationFailureSummary } from './generation-failures';
 
 export type MerchDesignCommand =
   | 'create_merch'
@@ -177,6 +178,7 @@ export interface MerchDesignCarouselResult {
   readonly generationId: string;
   readonly prompt?: string;
   readonly nextStep?: string;
+  readonly state?: 'concept_review_required';
   /**
    * Version of the canonical generation contract that produced these options
    * (`MERCH_GENERATION_CONTRACT_VERSION`). Optional only for pre-contract
@@ -185,6 +187,12 @@ export interface MerchDesignCarouselResult {
   readonly contractVersion?: string;
   readonly contentContractVersion?: string;
   readonly contentReviews?: readonly MerchDesignPreview['content_review'][];
+  /**
+   * Sanitized per-batch failure outcome (requested/ready/byClass). Present on
+   * every canonical-pipeline result so a zero-design batch is explainable in
+   * production telemetry and downstream error payloads.
+   */
+  readonly failureSummary?: MerchGenerationFailureSummary;
   readonly designs: readonly MerchDesignPreview[];
 }
 

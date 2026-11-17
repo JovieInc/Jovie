@@ -33,6 +33,7 @@ import {
   SCREEN_STAGES,
   screenComponents,
   screenIssues,
+  sortByPath,
 } from './lib/component-cert-screens.mjs';
 
 const { values } = parseArgs({
@@ -158,9 +159,7 @@ if (values.enroll || values.refresh) {
       if (kept.length) next[component] = debtEntry(kept);
     }
   }
-  screens.debt = Object.fromEntries(
-    Object.entries(next).sort(([a], [b]) => a.localeCompare(b))
-  );
+  screens.debt = sortByPath(next);
   write(screens);
 }
 

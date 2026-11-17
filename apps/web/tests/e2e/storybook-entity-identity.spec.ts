@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, type TestInfo, test } from '@playwright/test';
 
 for (const width of [1440, 390]) {
   test(`entity identity consumers render at ${width}px`, async ({ page }) => {
@@ -17,6 +17,221 @@ for (const width of [1440, 390]) {
       await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
       await expect(page.locator('.sb-errordisplay')).toBeHidden();
     }
+  });
+}
+
+function watchAvatarResources(page: Page) {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  page.on('response', response => {
+    if (response.status() >= 400)
+      errors.push(`HTTP ${response.status()} ${response.url()}`);
+  });
+  page.on('requestfailed', request => {
+    errors.push(`${request.failure()?.errorText} ${request.url()}`);
+  });
+  return errors;
+}
+
+async function captureAvatar(page: Page, info: TestInfo, name: string) {
+  const bounds = (await page.locator('#storybook-root').boundingBox())!;
+  const path = info.outputPath(`${name}.png`);
+  await page.screenshot({
+    path,
+    animations: 'disabled',
+    clip: {
+      x: Math.max(0, bounds.x - 8),
+      y: Math.max(0, bounds.y - 8),
+      width: bounds.width + 16,
+      height: bounds.height + 16,
+    },
+  });
+  await info.attach(name, { path, contentType: 'image/png' });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Avatar local portraits load and artwork stays complete in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    const errors = watchAvatarResources(page);
+    await page.addInitScript(value => {
+      localStorage.setItem('jovie-theme-storybook', value);
+    }, theme);
+    let releasePortrait = () => {};
+    const pendingPortrait = new Promise<void>(resolve => {
+      releasePortrait = resolve;
+    });
+    await page.route('**/images/avatars/tim-white.jpg', async route => {
+      await pendingPortrait;
+      await route.continue();
+    });
+    await page.goto(
+      '/iframe.html?id=ui-atoms-avatar--with-image&viewMode=story',
+      { waitUntil: 'domcontentloaded' }
+    );
+    const root = page.locator('#storybook-root');
+    const portrait = root.locator('img');
+    try {
+      await expect(portrait).toBeVisible();
+      const frame = root.locator('[data-shape="person"]');
+      const pendingFrame = await frame.boundingBox();
+      expect(pendingFrame).toMatchObject({ width: 32, height: 32 });
+      await expect(portrait).toHaveJSProperty('complete', false);
+      releasePortrait();
+      await page.waitForLoadState('load');
+      await expect
+        .poll(() =>
+          portrait.evaluate(
+            image =>
+              image instanceof HTMLImageElement &&
+              image.complete &&
+              image.naturalWidth > 0
+          )
+        )
+        .toBe(true);
+      expect(await frame.boundingBox()).toEqual(pendingFrame);
+      expect(
+        await frame.evaluate(node => {
+          const radius = getComputedStyle(node).borderRadius;
+          return radius.endsWith('%')
+            ? Number.parseFloat(radius) >= 50
+            : Number.parseFloat(radius) >=
+                node.getBoundingClientRect().width / 2;
+        })
+      ).toBe(true);
+    } finally {
+      releasePortrait();
+    }
+    expect(
+      new URL((await portrait.getAttribute('src'))!, page.url()).origin
+    ).toBe(new URL(page.url()).origin);
+    await expect(
+      root.getByRole('img', { name: 'online status' })
+    ).toBeVisible();
+    await expect(root.locator('[data-shape="person"]')).toHaveCSS(
+      'width',
+      '32px'
+    );
+    await expect(root.locator('[data-shape="person"]')).toHaveCSS(
+      'height',
+      '32px'
+    );
+    await expect(portrait).toHaveCSS('object-fit', 'cover');
+    await captureAvatar(page, testInfo, `avatar-portrait-${theme}`);
+
+    await page.goto(
+      '/iframe.html?id=ui-atoms-avatar--artwork-composition&viewMode=story'
+    );
+    const artwork = root.locator('img');
+    await expect(artwork).toHaveCount(2);
+    for (const image of await artwork.all()) {
+      await expect
+        .poll(() =>
+          image.evaluate(
+            node =>
+              node instanceof HTMLImageElement &&
+              node.complete &&
+              node.naturalWidth > 0
+          )
+        )
+        .toBe(true);
+      expect(
+        await image.evaluate(
+          node =>
+            node instanceof HTMLImageElement &&
+            node.naturalHeight > node.naturalWidth
+        )
+      ).toBe(true);
+      await expect(image).toHaveCSS('object-fit', 'contain');
+      const frame = image.locator('..');
+      await expect(frame).toHaveAttribute('data-shape', 'artwork');
+      await expect(frame).toHaveCSS('width', '96px');
+      await expect(frame).toHaveCSS('height', '96px');
+      expect(await frame.boundingBox()).toMatchObject({
+        width: 96,
+        height: 96,
+      });
+    }
+    await expect(page.locator('html')).toHaveClass(
+      new RegExp(`\\b${theme}\\b`)
+    );
+    await captureAvatar(page, testInfo, `avatar-artwork-${theme}`);
+    expect(errors).toEqual([]);
+  });
+
+  test(`Avatar decode failures preserve named fallback and frame in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    const errors = watchAvatarResources(page);
+    await page.addInitScript(value => {
+      localStorage.setItem('jovie-theme-storybook', value);
+      window.addEventListener(
+        'error',
+        event => {
+          if (event.target instanceof HTMLImageElement) {
+            document.documentElement.dataset.avatarNativeError = JSON.stringify(
+              {
+                src: event.target.getAttribute('src'),
+                complete: event.target.complete,
+                naturalWidth: event.target.naturalWidth,
+              }
+            );
+          }
+        },
+        true
+      );
+    }, theme);
+    for (const [story, name, initials] of [
+      ['image-failure', 'Tim White', 'TW'],
+      ['error-state', 'Alex Chen', 'AC'],
+    ]) {
+      await page.goto(
+        `/iframe.html?id=ui-atoms-avatar--${story}&viewMode=story`
+      );
+      const root = page.locator('#storybook-root');
+      await expect(root.getByRole('img', { name, exact: true })).toHaveText(
+        initials
+      );
+      await expect(root.locator('img')).toHaveCount(0);
+      const frame = root.locator('[data-shape="person"]');
+      await expect(frame).toHaveAttribute('data-ring', 'true');
+      await expect(frame).toHaveCSS('width', '32px');
+      await expect(frame).toHaveCSS('height', '32px');
+      expect(await frame.boundingBox()).toMatchObject({
+        width: 32,
+        height: 32,
+      });
+      expect(
+        await frame.evaluate(node => {
+          const radius = getComputedStyle(node).borderRadius;
+          return radius.endsWith('%')
+            ? Number.parseFloat(radius) >= 50
+            : Number.parseFloat(radius) >=
+                node.getBoundingClientRect().width / 2;
+        })
+      ).toBe(true);
+      await expect(page.locator('html')).toHaveAttribute(
+        'data-avatar-native-error',
+        /.+/
+      );
+      const nativeError = JSON.parse(
+        (await page.locator('html').getAttribute('data-avatar-native-error'))!
+      );
+      expect(nativeError).toMatchObject({ complete: true, naturalWidth: 0 });
+      expect(nativeError.src).toMatch(/^data:image\//);
+      if (story === 'image-failure')
+        await expect(
+          root.getByRole('img', { name: 'away status' })
+        ).toBeVisible();
+      await expect(page.locator('html')).toHaveClass(
+        new RegExp(`\\b${theme}\\b`)
+      );
+      await captureAvatar(page, testInfo, `avatar-${story}-${theme}`);
+    }
+    expect(errors).toEqual([]);
   });
 }
 

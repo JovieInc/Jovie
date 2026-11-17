@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { SECURITY_TARGETS } from './deepsec-policy.mjs';
 
-export const DEEPSEC_SUBSCRIPTION_VERSION = '2.3.10';
+export const DEEPSEC_SUBSCRIPTION_VERSION = '2.3.12';
 const ALLOWED_ENV = new Set([
   'PATH',
   'HOME',

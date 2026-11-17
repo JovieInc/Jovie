@@ -99,7 +99,10 @@ export async function switchActiveProfile(
       .set({ activeProfileId: profileId, updatedAt: new Date() })
       .where(eq(users.id, user.id));
 
-    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+    // Read-your-own-write: both callers are Route Handlers (updateTag is
+    // unavailable there) and the client calls router.refresh() right after, so
+    // the old selectedProfile must not be served stale-while-revalidate.
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, { expire: 0 });
 
     return { success: true };
   } catch (error) {
@@ -227,7 +230,8 @@ export async function createAdditionalProfile(input: {
       return newProfile;
     });
 
-    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+    // Read-your-own-write, same as switchActiveProfile above.
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, { expire: 0 });
 
     // Passive first-touch receipt (JOV-5036): idempotent, best-effort.
     await attachFirstTouchReceipt(user.id);

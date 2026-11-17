@@ -75,12 +75,12 @@ export function ProfileContactHeader({
           inputClassName='h-8 rounded-lg border-subtle bg-surface-0 px-2.5 text-sm font-semibold'
         />
 
-        <div className='truncate text-2xs leading-[14px] tracking-[-0.005em] text-secondary-token'>
+        <div className='truncate text-2xs leading-3.5 tracking-[-0.005em] text-secondary-token'>
           @{username || 'username'}
         </div>
 
         {metaParts.length > 0 && (
-          <p className='text-3xs leading-[14px] tracking-wide text-tertiary-token'>
+          <p className='text-3xs leading-3.5 tracking-wide text-tertiary-token'>
             {metaParts.join(' · ')}
           </p>
         )}

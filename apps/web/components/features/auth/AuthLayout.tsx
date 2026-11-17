@@ -100,7 +100,7 @@ function AuthFormColumn({
           <Link
             href={APP_ROUTES.HOME}
             className={cn(
-              'auth-quiet-target focus-ring-themed text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85',
+              'auth-quiet-target focus-ring-themed text-on-media transition-[color,opacity] duration-subtle hover:text-on-media/85',
               isKeyboardVisible && 'pointer-events-none opacity-0'
             )}
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
@@ -138,11 +138,11 @@ function AuthFormColumn({
       </div>
 
       {showFooterPrompt && !isKeyboardVisible ? (
-        <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-subtle'>
+        <p className='mt-3 text-center text-app font-normal text-on-media/58 animate-in fade-in-0 duration-subtle'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-white dark:text-white underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-on-media underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>
@@ -243,7 +243,7 @@ export function AuthLayout({
       data-auth-chrome={chrome}
       data-auth-keyboard-visible={isKeyboardVisible ? '' : undefined}
       className={cn(
-        'fixed inset-0 isolate flex flex-col items-center overflow-x-hidden overflow-y-auto overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-x-hidden overflow-y-auto overscroll-none max-w-[100dvw] text-on-media [color-scheme:dark]',
         'bg-(--color-bg-base)',
         'transition-[padding] duration-subtle ease-subtle'
       )}
@@ -270,7 +270,7 @@ export function AuthLayout({
         >
           <Link
             href={APP_ROUTES.HOME}
-            className='auth-quiet-target focus-ring-themed shrink-0 text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85'
+            className='auth-quiet-target focus-ring-themed shrink-0 text-on-media/45 transition-colors duration-subtle hover:text-on-media/85'
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}

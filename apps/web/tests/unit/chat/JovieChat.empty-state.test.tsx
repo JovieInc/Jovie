@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 
@@ -343,297 +343,42 @@ describe('JovieChat empty state', () => {
     vi.useRealTimers();
   });
 
-  it('keeps the personal welcome and drafts one useful step from the reported Insight (JOV-7150)', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-14T09:00:00'));
-    mockInsightsSummary = {
-      insights: [
-        {
-          id: 'tip-1',
-          status: 'active',
-          title: '27 tip link clicks, zero tips completed',
-          insightType: 'tip_hotspot',
-          category: 'revenue',
-          priority: 'high',
-          description: '',
-          actionSuggestion: 'Close the conversion gap.',
-          confidence: '0.90',
-          periodStart: '2026-10-01T00:00:00Z',
-          periodEnd: '2026-10-14T00:00:00Z',
-          createdAt: '2026-10-14T00:00:00Z',
-          expiresAt: '2026-10-15T00:00:00Z',
-        },
-      ],
-      totalActive: 1,
-      lastGeneratedAt: '2026-10-14T00:00:00Z',
-    };
-    renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    expect(screen.getByRole('heading')).toHaveTextContent('Good morning, Tim.');
-    expect(
-      screen.queryByText('27 tip link clicks, zero tips completed')
-    ).toBeNull();
-    expect(screen.queryByText('Close the conversion gap.')).toBeNull();
-    expect(
-      screen.getByText('Review your tip flow with Jovie')
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Review Your Profile' })
-    ).toBeNull();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Draft This With Jovie' })
-    );
-    expect(mockChatState.setInput).toHaveBeenCalledTimes(1);
-    expect(mockChatState.setInput).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Insight tip-1: 27 tip link clicks, zero tips completed'
-      )
-    );
-    expect(mockChatState.handleSuggestedPrompt).not.toHaveBeenCalled();
-    expect(mockChatState.submitMessage).not.toHaveBeenCalled();
-    expect(mockChatState.handleSubmit).not.toHaveBeenCalled();
-    vi.useRealTimers();
-  });
-
-  it('keeps the welcome pending until the insights summary has settled', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
-    mockInsightsPending = true;
-    mockInsightsLoading = false;
-    const { rerender } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Finding your next step'
-    );
-    expect(
-      screen.queryByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeNull();
-    expect(
-      screen.queryByRole('link', { name: 'Review Your Profile' })
-    ).toBeNull();
-
-    mockInsightsPending = false;
-    mockInsightsSummary = {
-      insights: [actionableInsight()],
-      totalActive: 1,
-      lastGeneratedAt: '2026-10-14T00:00:00Z',
-    };
-    rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-    expect(
-      screen.getByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(10_000));
-    expect(
-      screen.getByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeInTheDocument();
-    vi.useRealTimers();
-  });
-
-  it('offers profile review immediately when the insights query is disabled (JOV-8482)', () => {
-    mockInsightsEnabled = false;
-    mockInsightsPending = true;
-    renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    expect(screen.queryByRole('status')).toBeNull();
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toHaveAttribute('href', '/app/chat?panel=profile');
-  });
-
-  it.each([false, true])(
-    'bounds the welcome wait with undefined data and isLoading=%s (JOV-8482)',
-    isLoading => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
-      try {
-        mockInsightsPending = true;
-        mockInsightsLoading = isLoading;
-        const { rerender } = renderWithQueryClient(
-          <JovieChat profileId='profile-1' displayName='Tim White' />
-        );
-        const greeting = screen.getByRole('heading');
-        const composer = screen.getByTestId('chat-input');
-        expect(screen.getByRole('status')).toHaveTextContent(
-          'Finding your next step'
-        );
-
-        act(() => vi.advanceTimersByTime(5_000));
-        mockInsightsLoading = !isLoading;
-        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-        act(() => vi.advanceTimersByTime(4_999));
-        expect(screen.getByRole('status')).toBeInTheDocument();
-        act(() => vi.advanceTimersByTime(1));
-        expect(screen.queryByRole('status')).toBeNull();
-        expect(
-          screen.getByRole('link', { name: 'Review Your Profile' })
-        ).toHaveAttribute('href', '/app/chat?panel=profile');
-        expect(screen.getByRole('heading')).toBe(greeting);
-        expect(screen.getByTestId('chat-input')).toBe(composer);
-
-        mockInsightsLoading = false;
-        mockInsightsPending = false;
-        mockInsightsSummary = {
-          insights: [actionableInsight()],
-          totalActive: 1,
-          lastGeneratedAt: null,
-        };
-        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-        expect(
-          screen.queryByRole('button', { name: 'Draft This With Jovie' })
-        ).toBeNull();
-        expect(
-          screen.getByRole('link', { name: 'Review Your Profile' })
-        ).toBeInTheDocument();
-      } finally {
-        vi.useRealTimers();
-      }
-    }
-  );
-
-  it('keeps one welcome through delayed resolution and freezes the resolved next step', () => {
-    mockInsightsLoading = true;
-    const { rerender } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    const greeting = screen.getByRole('heading').textContent;
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Finding your next step'
-    );
-    mockInsightsLoading = false;
-    rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-    expect(screen.getByRole('heading').textContent).toBe(greeting);
-    expect(screen.getAllByTestId('chat-empty-state-next-step')).toHaveLength(1);
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toBeInTheDocument();
-    mockInsightsError = true;
-    rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-    expect(screen.getByRole('heading').textContent).toBe(greeting);
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toBeInTheDocument();
-  });
-
-  it('offers the existing profile review path on query failure without inventing readiness', () => {
-    mockInsightsError = true;
-    renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        displayName='Tim White'
-        isFirstSession
-        isProfileComplete
-      />
-    );
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toHaveAttribute('href', '/app/chat?panel=profile');
-    expect(screen.queryByText('Your profile is ready to share.')).toBeNull();
-  });
-
-  it('withdraws a selected Insight when it expires during idle', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
-    mockInsightsSummary = {
-      insights: [actionableInsight({ expiresAt: '2026-10-14T20:01:00Z' })],
-      totalActive: 1,
-      lastGeneratedAt: null,
-    };
-    renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    expect(
-      screen.getByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(60_001));
-    expect(
-      screen.queryByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeNull();
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toBeInTheDocument();
-    expect(mockChatState.setInput).not.toHaveBeenCalled();
-    vi.useRealTimers();
-  });
-
-  it('withdraws a selected Insight after dismissal without rotating to another task', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
-    mockInsightsSummary = {
-      insights: [actionableInsight()],
-      totalActive: 1,
-      lastGeneratedAt: null,
-    };
-    const { rerender } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    expect(
-      screen.getByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeInTheDocument();
-    mockInsightsSummary = {
-      insights: [
-        actionableInsight({ status: 'dismissed' }),
-        actionableInsight({ id: 'other' }),
-      ],
-      totalActive: 1,
-      lastGeneratedAt: null,
-    };
-    rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
-    expect(
-      screen.queryByRole('button', { name: 'Draft This With Jovie' })
-    ).toBeNull();
-    expect(
-      screen.getByRole('link', { name: 'Review Your Profile' })
-    ).toBeInTheDocument();
-    vi.useRealTimers();
-  });
-
-  it('does not overwrite a draft arriving before action activation', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
-    mockInsightsSummary = {
-      insights: [actionableInsight()],
-      totalActive: 1,
-      lastGeneratedAt: null,
-    };
-    renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
-    const button = screen.getByRole('button', {
-      name: 'Draft This With Jovie',
-    });
-    act(() => {
-      mockCurrentDraft.set('Keep my existing draft');
-      fireEvent.click(button);
-    });
-    expect(mockChatState.setInput).not.toHaveBeenCalled();
-    expect(mockChatState.submitMessage).not.toHaveBeenCalled();
-    vi.useRealTimers();
-  });
-
-  it('never fabricates an insight when there is no real one (JOV-7150)', () => {
+  it('shows greeting and composer only, even when an AI insight is active (Nov 14)', () => {
+    // Tim saw "Review your tip flow with Jovie" + "Draft This With Jovie":
+    // an insight type mapped to a chore for the artist. The empty state now
+    // shows only finished work on a real item, so an insight alone shows
+    // nothing under the greeting.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T09:00:00'));
     mockInsightsSummary = {
-      insights: [],
-      totalActive: 0,
+      insights: [
+        actionableInsight({
+          actionSuggestion: 'Review your tip flow.',
+          expiresAt: '2026-01-02T00:00:00Z',
+        }),
+      ],
+      totalActive: 1,
       lastGeneratedAt: null,
     };
-    const { getByTestId, queryByTestId } = renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        displayName='Tim White'
-        isFirstSession={false}
-        isProfileComplete={false}
-      />
-    );
+    const { getByTestId, queryByTestId, queryByText, queryByRole } =
+      renderWithQueryClient(
+        <JovieChat
+          profileId='profile-1'
+          displayName='Tim White'
+          isFirstSession={false}
+          isProfileComplete={false}
+        />
+      );
 
     expect(getByTestId('chat-empty-state-greeting-text').textContent).toBe(
       'Good morning, Tim.'
     );
-    expect(queryByTestId('chat-empty-state-insight')).toBeNull();
+    expect(queryByTestId('chat-empty-state-result')).toBeNull();
+    expect(queryByText(/tip flow/i)).toBeNull();
+    expect(queryByText('Finding your next step…')).toBeNull();
+    expect(queryByRole('button', { name: 'Draft This With Jovie' })).toBeNull();
+    expect(queryByRole('link', { name: 'Review Your Profile' })).toBeNull();
+    expect(getByTestId('chat-input')).toBeTruthy();
     vi.useRealTimers();
   });
 

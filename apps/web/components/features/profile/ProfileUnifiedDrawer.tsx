@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
-import { Switch } from '@jovie/ui';
+import { PlainButton, Switch } from '@jovie/ui';
 import { BellOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -432,7 +432,7 @@ export function ProfileUnifiedDrawer({
               {/* A plain destructive button: this notifications list is not
                   an ARIA menu, so the unsubscription control must not claim
                   `role="menuitem"` (axe aria-required-parent). */}
-              <button
+              <PlainButton
                 type='button'
                 className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
                 onClick={onUnsubscribe}
@@ -442,7 +442,7 @@ export function ProfileUnifiedDrawer({
                 {isUnsubscribing
                   ? 'Turning off\u2026'
                   : 'Turn off notifications'}
-              </button>
+              </PlainButton>
             </div>
           )}
 

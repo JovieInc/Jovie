@@ -1,0 +1,24 @@
+{
+  "gates": {
+    "apps/web/components/molecules/settings/SettingsRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/molecules/settings/SettingsRow.tsx": {
+      "empty": "A row is one setting with a required title; it renders no collection. A row without a description or control is the Default story with fewer props, not an empty state.",
+      "error": "The row owns no data or request, so it has no failure of its own. A page that cannot load a setting passes its message as the description, as the Sessions unavailable row does in SessionManagementCard.test.tsx.",
+      "partial": "The row renders its title, description and control together from props; it never loads in parts."
+    },
+    "apps/web/components/organisms/SettingsSidebarNav.tsx": {
+      "partial": "The rail is built from the static settings navigation config, so its groups and items arrive together; only the Profile label waits on the artist name, which falls back to Profile and is covered by LongContentArtistName.",
+      "permission-denied": "Every signed-in account sees the same settings destinations; the one optional item (Payments) is a release flag, not a permission, and the rail never shows a denied destination."
+    }
+  }
+}

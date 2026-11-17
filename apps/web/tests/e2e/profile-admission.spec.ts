@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '../../components/features/home/homepage-profile-preview-fixture';
 import {
@@ -9,11 +9,18 @@ import {
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
 import {
+  captureStill,
+  waitForSettledProfile,
+  waitForSettledProfileLayout,
+} from './utils/profile-admission-layout';
+import {
   expectDesktopSurfaceBuildMatches,
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
 } from './utils/profile-desktop-surface';
 import { certifyProfileModeHistory } from './utils/profile-mode-history';
+import { registerProfileNameAdmissionTests } from './utils/profile-name-admission';
+import { registerProfileOverviewColumnTests } from './utils/profile-overview-columns-admission';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -86,71 +93,6 @@ function intersectionArea(
       Math.max(left.y, right.y)
   );
   return width * height;
-}
-
-async function waitForSettledProfile(page: Page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    const nextFrame = () =>
-      new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    const readBoxes = () =>
-      [
-        '[data-testid="public-profile-layout-shell"]',
-        '[data-testid="profile-compact-shell"]',
-        '[data-testid="profile-desktop-shell"]',
-        '[data-testid="claim-banner-cta"]',
-      ].map(selector => {
-        const element = document.querySelector<HTMLElement>(selector);
-        if (!element) return null;
-        const rect = element.getBoundingClientRect();
-        return [rect.x, rect.y, rect.width, rect.height];
-      });
-
-    await nextFrame();
-    await nextFrame();
-    let previous = JSON.stringify(readBoxes());
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await nextFrame();
-      const current = JSON.stringify(readBoxes());
-      if (current === previous) return;
-      previous = current;
-    }
-  });
-}
-
-async function captureStill(
-  page: Page,
-  testInfo: TestInfo,
-  name: string,
-  fullPage = false
-) {
-  const path = testInfo.outputPath(name);
-  const body = await page.screenshot({ fullPage, path });
-  await testInfo.attach(name, { contentType: 'image/png', path });
-  return body;
-}
-
-async function waitForSettledProfileLayout(
-  page: import('@playwright/test').Page,
-  expectedLayout: 'compact' | 'desktop'
-) {
-  const shell = page.getByTestId('public-profile-layout-shell');
-  await expect(shell).toHaveAttribute('data-layout', expectedLayout);
-  const visibleSurface = page.getByTestId(
-    expectedLayout === 'desktop'
-      ? 'profile-desktop-surface'
-      : 'profile-compact-shell'
-  );
-  await expect(visibleSurface).toBeVisible();
-  await expect(visibleSurface).toHaveAttribute(
-    'data-interactive-ready',
-    'true'
-  );
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-  });
 }
 
 test.describe('public profile browser admission', () => {
@@ -968,6 +910,9 @@ test.describe('public profile browser admission', () => {
       'Verify & Claim for The Extraordinary Midnight Radio Orchestra'
     );
   });
+
+  registerProfileNameAdmissionTests();
+  registerProfileOverviewColumnTests();
 
   test('deliberate red detects a desktop artist name escaping its cover', async ({
     page,

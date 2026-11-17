@@ -18,6 +18,8 @@ import 'server-only';
  *   including merch content-review evidence (JOV-4740).
  */
 
+import type { MerchGenerationFailureSummary } from './generation-failures';
+
 export const MERCH_GENERATION_CONTRACT_VERSION = 'merch-generation/v1';
 
 export const MERCH_CANONICAL_PIPELINE_ID =
@@ -89,5 +91,7 @@ export interface MerchGenerationReceipt {
   }[];
   /** Final disposition of the batch: ready (options returned) or failed. */
   readonly disposition: 'ready' | 'failed';
+  /** Sanitized per-batch failure outcome (dispatch PR-1). */
+  readonly failureSummary?: MerchGenerationFailureSummary;
   readonly durationMs: number;
 }

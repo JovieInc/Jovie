@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/components/site/MarketingFooter.tsx",
+  "sha256": "fd33db06d8e3c3dea1b5bea5212f72752924cb5769dbedfd29c5167f6d6e3ebf",
+  "at": "2026-11-13T00:39:55.773Z",
+  "ref": "Removed constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER style gates from MarketingHeader and MarketingFooter; rendered output is unchanged. Verified with the MarketingHeader and MarketingFooter vitest render suites (jsdom, incl. axe), not a browser capture."
+}

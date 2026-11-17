@@ -377,6 +377,9 @@ export function parseQuarantineLedger(
   const summary = buildQuarantineLedgerSummary({
     entries,
     retryBudget,
+    // One clock for the whole parse: the summary used to re-read the wall
+    // clock, so a caller's `now` did not reach the retry budget.
+    now,
   });
 
   if (!summary.withinRetryBudget) {

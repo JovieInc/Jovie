@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
   DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
@@ -20,9 +21,9 @@ describe('DashboardHeaderActionButton', () => {
     );
   });
 
-  it('renders a labelled action that forwards clicks and pressed state', () => {
+  it('renders a labelled action that forwards clicks and pressed state', async () => {
     const onClick = vi.fn();
-    render(
+    const { container } = render(
       <DashboardHeaderActionButton
         ariaLabel='Refresh'
         icon={icon}
@@ -37,10 +38,11 @@ describe('DashboardHeaderActionButton', () => {
     expect(button.className).toContain('h-8');
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
-  it('renders an icon-only action at 32px', () => {
-    render(
+  it('renders an icon-only action at 32px', async () => {
+    const { container } = render(
       <DashboardHeaderActionButton
         ariaLabel='Copy'
         icon={icon}
@@ -55,5 +57,75 @@ describe('DashboardHeaderActionButton', () => {
     expect(button.className).toContain('h-8');
     expect(button.className).toContain('w-8');
     expect(button.className).toContain('before:h-11');
+    await expectNoA11yViolations(container);
+  });
+
+  it('falls back to the icon button when no label is passed', async () => {
+    const onClick = vi.fn();
+    const { container } = render(
+      <DashboardHeaderActionButton
+        ariaLabel='Toggle details sidebar'
+        icon={icon}
+        onClick={onClick}
+        dataTestId='details-action'
+      />
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Toggle details sidebar',
+    });
+    expect(button).toHaveAttribute('data-testid', 'details-action');
+    expect(button.className).toContain('w-8');
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a disabled action named and inert', async () => {
+    const onClick = vi.fn();
+    const { container } = render(
+      <DashboardHeaderActionButton
+        ariaLabel='Copy'
+        icon={icon}
+        iconOnly
+        disabled
+        onClick={onClick}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Copy' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long label whole and works in a right-to-left header', async () => {
+    const { container } = render(
+      <div>
+        <DashboardHeaderActionButton
+          ariaLabel='Open notification and delivery settings'
+          icon={icon}
+          label='Open notification and delivery settings'
+        />
+        <div dir='rtl' lang='ar'>
+          <DashboardHeaderActionButton
+            ariaLabel='فتح الإعدادات'
+            icon={icon}
+            label='الإعدادات'
+            hideLabelOnMobile
+          />
+        </div>
+      </div>
+    );
+
+    expect(
+      screen.getByText('Open notification and delivery settings')
+    ).toBeInTheDocument();
+    expect(screen.getByText('الإعدادات')).toHaveClass('max-sm:hidden');
+    expect(
+      screen.getByRole('button', { name: 'فتح الإعدادات' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

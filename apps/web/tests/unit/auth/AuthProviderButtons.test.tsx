@@ -108,6 +108,17 @@ describe('AuthProviderButtonSlots', () => {
     ).toEqual(['google', 'apple']);
   });
 
+  it('pins the Pen oaz9c 28px face with a visible hairline', () => {
+    const css = readFileSync(join(process.cwd(), 'styles/theme.css'), 'utf8');
+    const face = css.match(/\n\.auth-provider-face \{([^}]*)\}/)?.[1] ?? '';
+
+    expect(face).toMatch(/min-height: 28px;/);
+    expect(face).toMatch(/padding: 0 16px;/);
+    // The transparent pill has no fill, so the subtle hairline vanished.
+    expect(face).toMatch(/border: 1px solid var\(--color-border-default\);/);
+    expect(face).not.toMatch(/--color-border-subtle/);
+  });
+
   it('keeps type and geometry shared in theme.css, not per provider', () => {
     const css = readFileSync(join(process.cwd(), 'styles/theme.css'), 'utf8');
     const rules = [

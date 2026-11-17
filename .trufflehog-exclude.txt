@@ -65,3 +65,11 @@ apps/web/lib/startup/db-host-guard.test.ts
 # unmerged tim/jov-8937-* branch, whose own exclusion fix never landed on
 # main). Gitleaks still covers this path via its *.test.ts path allowlist.
 apps/web/lib/ovie/mesh/read.server.test.ts
+
+# DS certification E1-1 (#25585) WorkflowRunRow test: URI-detector bait for a
+# credentialed https link (https://user:…@github.com/…) asserting the row drops
+# credential-bearing links. The introducing commit (e1f16165) carried the
+# literal fixture; the head builds it from parts. Same class as the
+# public-work-links and db-host-guard precedents. Exact path only; approved by
+# Tim on 2026-11-15.
+apps/web/components/features/admin/agent-os/WorkflowRunRow.test.tsx
