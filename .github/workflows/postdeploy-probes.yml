@@ -754,6 +754,8 @@ jobs:
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           CRAWL_SHARD: ${{ matrix.shard }}/4
+          CRAWL_DEPLOYMENT_ID: ${{ needs.resolve-target.outputs.deployment_id }}
+          CRAWL_INVOCATION_ID: ${{ github.run_id }}.${{ github.run_attempt }}.${{ matrix.shard }}
           SHARD_INDEX: ${{ matrix.shard }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -802,7 +804,8 @@ jobs:
           # This job uploads only from the guard's producer stage, so the
           # crawl writes its receipt under the guard too. Run outside it, the
           # receipt never reached the stage and every upload was refused.
-          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+            PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
             node .github/scripts/guard-playwright-artifacts.mjs --run -- \
               node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
                 --out product-crawl-receipt "${state_args[@]}"

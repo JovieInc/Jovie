@@ -36,6 +36,8 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
       - name: Crawl production as a stranger
+        env:
+          CRAWL_INVOCATION_ID: ${{ github.run_id }}.${{ github.run_attempt }}.standalone
         run: >-
           node scripts/product-crawl/crawl.mjs --origin https://jov.ie
           --out product-crawl-receipt
