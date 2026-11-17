@@ -34,6 +34,9 @@ export function toReconcileSubscription(
     subscriptionId: sub.id,
     status: sub.status,
     priceId: item?.price?.id ?? null,
+    mappedPlan: item?.price?.id
+      ? (getPriceMappingDetails(item.price.id)?.plan ?? null)
+      : null,
     unitAmountCents: item?.price?.unit_amount ?? null,
     currency: item?.price?.currency ?? null,
     interval:
@@ -89,22 +92,14 @@ export async function runPriceLockReconcile(deps: {
     priceId => getPriceMappingDetails(priceId) !== null
   );
 
-  // Stamp verdicts (one statement per verdict, not per user).
-  for (const verdict of Object.keys(summary.counts) as Array<
-    keyof typeof summary.counts
-  >) {
-    const ids = summary.findings
-      .filter(f => f.verdict === verdict && f.verdict !== 'missing_lock')
-      .map(f => f.userId);
-    if (ids.length === 0) continue;
-    await client
-      .update(priceLocks)
-      .set({ reconcileStatus: verdict, reconciledAt: now })
-      .where(inArray(priceLocks.userId, ids));
-  }
-
+  // Preserve blocked findings when the per-run alarm cap truncates lower-severity noise.
+  const alarms = [...summary.alarms].sort(
+    (a, b) =>
+      Number(alarmSeverity(b.verdict) === 'blocked') -
+      Number(alarmSeverity(a.verdict) === 'blocked')
+  );
   let alarmed = 0;
-  for (const finding of summary.alarms.slice(0, MAX_INDIVIDUAL_ALARMS)) {
+  for (const finding of alarms.slice(0, MAX_INDIVIDUAL_ALARMS)) {
     captureRevenueSpineFailure({
       stage: 'stripe_sync',
       failureCode: 'plan_mismatch',
@@ -122,13 +117,28 @@ export async function runPriceLockReconcile(deps: {
       {
         job: 'price-lock-reconcile',
         counts: summary.counts,
-        sample: summary.alarms.slice(0, 5).map(f => ({
+        sample: alarms.slice(0, 5).map(f => ({
           userId: f.userId,
           verdict: f.verdict,
           detail: f.detail,
         })),
       }
     );
+  }
+
+  // Report observed mismatches before stamp writes; a failed write still rejects the job.
+  // Stamp verdicts (one statement per verdict, not per user).
+  for (const verdict of Object.keys(summary.counts) as Array<
+    keyof typeof summary.counts
+  >) {
+    const ids = summary.findings
+      .filter(f => f.verdict === verdict && f.verdict !== 'missing_lock')
+      .map(f => f.userId);
+    if (ids.length === 0) continue;
+    await client
+      .update(priceLocks)
+      .set({ reconcileStatus: verdict, reconciledAt: now })
+      .where(inArray(priceLocks.userId, ids));
   }
 
   return { backfill, summary, alarmed };

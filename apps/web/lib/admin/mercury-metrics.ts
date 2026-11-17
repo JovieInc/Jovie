@@ -435,9 +435,21 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
 
 export function clearAdminMercuryMetricsCache(): void {
   mercuryMetricsCache.clear();
+  lastGoodMetrics = null;
+  lastGoodAt = 0;
   lastReportedErrorKey = null;
   lastReportedErrorAt = 0;
 }
+
+/**
+ * How long a last-good snapshot may be served while refreshes fail
+ * (JOV-12733). Balances move slowly; a stale-but-real balance observed at
+ * `observedAtIso` beats reporting company cash as missing.
+ */
+const LAST_GOOD_MAX_STALE_MS = 30 * 60 * 1000;
+
+let lastGoodMetrics: AdminMercuryMetrics | null = null;
+let lastGoodAt = 0;
 
 export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
   const now = Date.now();
@@ -448,6 +460,24 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
   }
 
   const metrics = await loadAdminMercuryMetrics();
+
+  if (metrics.isAvailable) {
+    lastGoodMetrics = metrics;
+    lastGoodAt = now;
+  } else if (lastGoodMetrics && now - lastGoodAt <= LAST_GOOD_MAX_STALE_MS) {
+    // JOV-12733: a Mercury timeout (e.g. the 8s bound on /accounts) must
+    // degrade to the clearly-marked last-good snapshot, never invent $0 and
+    // never hide the failure: the refresh error is still reported.
+    const stale: AdminMercuryMetrics = {
+      ...lastGoodMetrics,
+      errorMessage: `Mercury refresh failed (${metrics.errorMessage ?? 'unknown'}); serving last-good balance observed ${lastGoodMetrics.observedAtIso}.`,
+    };
+    mercuryMetricsCache.set(MERCURY_CACHE_KEY, {
+      value: stale,
+      expiresAt: now + CACHE_TTL_MS,
+    });
+    return stale;
+  }
 
   mercuryMetricsCache.set(MERCURY_CACHE_KEY, {
     value: metrics,

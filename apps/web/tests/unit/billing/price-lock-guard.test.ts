@@ -136,9 +136,9 @@ const ALLOWED: Readonly<Record<string, { max: number; why: string }>> = {
     max: 1,
     why: 'copy coverage fixture of the public claim',
   },
-  'components/features/auth/AuthOfferSummary.tsx': {
+  'lib/billing/artist-presence-upgrade.ts': {
     max: 1,
-    why: 'pre-auth sign-up recap: a new signup is locked to this list price',
+    why: 'validates anonymous list options only when no lock exists; a supplied lock owns the expected ID and amount',
   },
 };
 

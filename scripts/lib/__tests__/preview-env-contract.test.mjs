@@ -128,10 +128,10 @@ describe('preview-env admission contract', () => {
     const receipt = buildPreviewEnvCleanupReceipt({
       kind: 'neon-branch',
       environment: 'ci-neon-run-123-1',
-      cleanupTrigger: 'pr-closed',
+      cleanupTrigger: 'heartbeat-reconciliation',
       cleanedAt: '2026-09-03T01:00:00.000Z',
       cleanupProof: 'neonctl branches delete succeeded for ci-neon-run-123-1',
-      cleanedBy: 'neon-ephemeral-branch-cleanup.yml',
+      cleanedBy: 'neon-scheduled-cleanup.yml',
     });
     expect(receipt.schema).toBe(PREVIEW_ENV_CLEANUP_SCHEMA);
     expect(validatePreviewEnvCleanupReceipt(receipt)).toEqual([]);

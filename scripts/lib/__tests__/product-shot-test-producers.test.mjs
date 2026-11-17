@@ -18,6 +18,7 @@ import ts from 'typescript';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import { ONBOARDING_TEST_PRODUCERS } from '../onboarding-test-producers.mjs';
 import { PRODUCT_SHOT_TEST_PRODUCERS } from '../product-shot-test-producers.mjs';
+import { MODULE_INIT_FILES } from '../trusted-test-planner-snapshot.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -44,6 +45,65 @@ for (const [source, producers] of PRODUCT_SHOT_TEST_PRODUCERS) {
     assert.equal(plan.mode, 'full');
   });
 }
+
+function stringConstants(source) {
+  const constants = new Map();
+  const re = /const ([A-Z0-9_]+) =\s*(?:\n\s*)?'([^']*)'/g;
+  for (const match of source.matchAll(re)) constants.set(match[1], match[2]);
+  return constants;
+}
+
+function shotSources(source) {
+  const constants = stringConstants(source);
+  const paths = [];
+  const seen = new Set();
+  for (const block of source.matchAll(/sources: \[([\s\S]*?)\]/g)) {
+    for (const raw of block[1].split(',')) {
+      const token = raw.trim();
+      if (!token) continue;
+      let path = '';
+      if (token.startsWith("'")) path = token.slice(1, -1);
+      else if (token.startsWith('`')) {
+        path = token.slice(1, -1).replace(/\$\{([A-Z0-9_]+)\}/g, (_, name) => {
+          if (!constants.has(name)) throw new Error('unknown ' + name);
+          return constants.get(name);
+        });
+      } else if (constants.has(token)) path = constants.get(token);
+      else continue;
+      if (!seen.has(path)) {
+        seen.add(path);
+        paths.push(path);
+      }
+    }
+  }
+  return paths;
+}
+
+test('declared shot sources select the freshness test', () => {
+  const freshness = 'apps/web/lib/screenshots/product-shots.manifest.test.ts';
+  const pipeline = new Set([
+    'apps/web/lib/screenshots/product-shots.ts',
+    'apps/web/lib/screenshots/product-shots.manifest.json',
+    'apps/web/scripts/product-shots/plan.ts',
+    'apps/web/scripts/product-shots/source-hash.mjs',
+  ]);
+  const declared = shotSources(
+    readFileSync(
+      join(ROOT, 'apps/web/lib/screenshots/product-shots.ts'),
+      'utf8'
+    )
+  );
+  const bound = PRODUCT_SHOT_TEST_PRODUCERS.filter(([, tests]) =>
+    tests.includes(freshness)
+  )
+    .map(([source]) => source)
+    .filter(source => !pipeline.has(source));
+  assert.deepEqual(bound.sort(), declared.sort());
+  assert.equal(
+    PRODUCT_SHOT_TEST_PRODUCERS[0][0],
+    'apps/web/lib/screenshots/product-shots.ts'
+  );
+});
 
 test('product-shot exact bindings do not admit unknown neighbors or mixed peers', () => {
   const unknown = 'apps/web/scripts/product-shots/unmapped.ts';
@@ -135,8 +195,12 @@ test('all rolling sparse bootstraps carry the real selector helper closure', asy
     }
   }
   collect('scripts/run-affected-tests.mjs');
-  // Existing sparse policy declares this module-initialization data input.
-  closure.add('scripts/invariants/latency-sensitive-execution-allowlist.json');
+  // Use the trusted snapshot's same module-initialization data closure.
+  for (const [module, files] of Object.entries(MODULE_INIT_FILES)) {
+    if (!closure.has(module)) continue;
+    required.push(...files);
+    for (const file of files) closure.add(file);
+  }
   for (let index = 0; index < sparse.length; index++) {
     await t.test(
       'bootstrap ' +
@@ -177,7 +241,7 @@ test('all rolling sparse bootstraps carry the real selector helper closure', asy
               0,
               'missing module must not load successfully'
             );
-            assert.match(negative.stderr, /ERR_MODULE_NOT_FOUND/);
+            assert.match(negative.stderr, /ERR_MODULE_NOT_FOUND|ENOENT/);
             assert.ok(!negative.stdout.includes('core-bootstrap-ok'));
           }
         } finally {

@@ -85,14 +85,45 @@ describe('resolveCheckoutPrice', () => {
     ).toEqual({ kind: 'list', priceId: 'price_forged' });
   });
 
-  it('a lock without a Stripe id for the interval falls back to list validation', () => {
-    expect(
+  it('fails closed when a covered locked amount has no Stripe price', () => {
+    expect(() =>
       resolveCheckoutPrice({
         requestedPriceId: 'price_19',
         requestedMapping: LIST_19_MONTH,
         lock: { ...LOCK_12, stripePriceIdMonthly: null },
       })
-    ).toEqual({ kind: 'list', priceId: 'price_19' });
+    ).toThrow(/locked price/);
+  });
+
+  it('requires the requested lock price when it exceeds the requested offer', () => {
+    const lock = {
+      ...LOCK_12,
+      monthlyAmountCents: 19900,
+      stripePriceIdMonthly: 'price_199',
+    };
+    expect(() =>
+      resolveCheckoutPrice({
+        requestedPriceId: 'price_12',
+        requestedMapping: { plan: 'pro', interval: 'month', amount: 1200 },
+        lock,
+      })
+    ).toThrow(/requested offer/);
+    expect(
+      resolveCheckoutPrice({
+        requestedPriceId: 'price_199',
+        requestedMapping: {
+          plan: 'pro',
+          interval: 'month',
+          amount: 19900,
+          legacy: true,
+        },
+        lock,
+      })
+    ).toMatchObject({
+      kind: 'locked',
+      priceId: 'price_199',
+      expectation: { amountCents: 19900 },
+    });
   });
 
   it('a yearly lock is charged on the yearly price, monthly stays list', () => {

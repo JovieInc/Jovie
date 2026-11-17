@@ -70,7 +70,8 @@ export function applyPriceLockToOptions<T extends PricedOption>(
     const locked = interval
       ? lock[interval === 'month' ? 'month' : 'year']
       : null;
-    if (option.plan === 'pro' && interval && locked?.priceId) {
+    if (option.plan === 'pro' && interval && locked) {
+      if (!locked.priceId) continue;
       if (handled.has(interval)) continue;
       handled.add(interval);
       out.push({

@@ -1,19 +1,11 @@
 /**
- * Billing Reconciliation Cron Job
- *
- * Runs daily to reconcile database subscription status with Stripe.
- *
- * What it does:
- * 1. Re-drives stored Stripe events that have remained unprocessed
- * 2. Fetches all users with stripeSubscriptionId from DB
- * 3. Compares DB isPro status with Stripe subscription status
- * 4. Fixes any mismatches and logs to audit table
- *
- * Schedule: Daily via the consolidated daily-maintenance cron.
+ * Daily billing reconciliation via the consolidated daily-maintenance cron:
+ * replay stored Stripe events, repair subscription status, and check price locks.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { runPriceLockReconcile } from '@/lib/billing/price-lock-reconcile.server';
 import {
   BATCH_SIZE,
@@ -75,6 +67,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     staleCustomers: 0,
   };
   const errors: string[] = [];
+  const observedSubscriptions = new Map<string, Stripe.Subscription>();
   let webhookReplay: WebhookReplaySummary = {
     processed: 0,
     blocked: [],
@@ -99,10 +92,10 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       )
     );
 
-    await reconcileUsersWithSubscriptions(stats, errors);
+    await reconcileUsersWithSubscriptions(stats, errors, observedSubscriptions);
     await reconcileProUsersWithoutSubscription(stats, errors);
     await checkStaleCustomers(stats);
-    await reconcilePriceLocksSafely(errors);
+    await reconcilePriceLocksSafely(errors, observedSubscriptions);
 
     const duration = Date.now() - startTime;
     result = {
@@ -156,11 +149,15 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
 }
 
 /** Price lock reconcile, isolated so it never masks billing reconciliation. */
-async function reconcilePriceLocksSafely(errors: string[]): Promise<void> {
+async function reconcilePriceLocksSafely(
+  errors: string[],
+  observedSubscriptions: ReadonlyMap<string, Stripe.Subscription>
+): Promise<void> {
   try {
     const result = await runPriceLockReconcile({
-      listSubscriptions: () =>
-        stripe.subscriptions.list({ status: 'all', limit: 100 }),
+      async *listSubscriptions() {
+        yield* observedSubscriptions.values();
+      },
     });
     logger.info('[billing-reconciliation] Price lock reconcile', {
       checked: result.summary.checked,
@@ -205,11 +202,7 @@ async function recordReconciliationRun(input: {
   );
 }
 
-/**
- * GET /api/cron/billing-reconciliation
- *
- * Daily cron job to reconcile billing status between DB and Stripe
- */
+/** Authenticated daily billing reconciliation endpoint. */
 export async function GET(request: Request) {
   const authError = verifyCronRequest(request, {
     route: '/api/cron/billing-reconciliation',
@@ -238,10 +231,15 @@ type UserBatch = Awaited<ReturnType<typeof fetchUserBatch>>;
 async function processUserChunk(
   userChunk: UserBatch,
   stats: ReconciliationStats,
-  errors: string[]
+  errors: string[],
+  observedSubscriptions: Map<string, Stripe.Subscription>
 ): Promise<void> {
   const results = await Promise.allSettled(
-    userChunk.map(user => processSingleUser(db, stripe, user))
+    userChunk.map(user =>
+      processSingleUser(db, stripe, user, subscription => {
+        observedSubscriptions.set(subscription.id, subscription);
+      })
+    )
   );
 
   for (let i = 0; i < results.length; i++) {
@@ -271,7 +269,8 @@ async function processUserChunk(
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
-  errors: string[]
+  errors: string[],
+  observedSubscriptions: Map<string, Stripe.Subscription>
 ): Promise<void> {
   let lastUserId: string | null = null;
   let lastBatchWasFull = false;
@@ -299,7 +298,7 @@ async function reconcileUsersWithSubscriptions(
         chunkStart,
         chunkStart + FIRST_PASS_CONCURRENCY
       );
-      await processUserChunk(userChunk, stats, errors);
+      await processUserChunk(userChunk, stats, errors, observedSubscriptions);
     }
 
     if (batch.length < BATCH_SIZE) break;

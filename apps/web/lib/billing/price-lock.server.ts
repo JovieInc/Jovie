@@ -80,11 +80,29 @@ export async function ensurePriceLockForUser(
 ): Promise<PriceLockSnapshot> {
   const existing = await getPriceLockForUser(userId, client);
   if (existing) return existing;
-  const snapshot = buildPriceLockSnapshot({
-    source,
-    now,
-    stripePriceIds: getListStripePriceIds(),
-  });
+  // Snapshot an existing subscriber before the daily backfill can race first access.
+  const [subscriber] = await client
+    .select({
+      subscriptionId: users.stripeSubscriptionId,
+      priceId: users.stripePriceId,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const mapping = subscriber?.priceId
+    ? getPriceMappingDetails(subscriber.priceId)
+    : null;
+  if (subscriber?.subscriptionId && (!subscriber.priceId || !mapping)) {
+    throw new Error('Cannot preserve an unknown subscriber price');
+  }
+  const snapshot =
+    subscriber?.subscriptionId && mapping?.plan === 'pro'
+      ? snapshotFromSubscriptionPriceId(subscriber.priceId!, now)!
+      : buildPriceLockSnapshot({
+          source,
+          now,
+          stripePriceIds: getListStripePriceIds(),
+        });
   await client
     .insert(priceLocks)
     .values({ ...snapshotToValues(snapshot), userId })
@@ -178,7 +196,12 @@ export async function resolveCheckoutPriceForUser(
   const decision = resolveCheckoutPrice({
     requestedPriceId,
     requestedMapping: mapping
-      ? { plan: mapping.plan, interval: mapping.interval }
+      ? {
+          plan: mapping.plan,
+          interval: mapping.interval,
+          amount: mapping.amount,
+          legacy: mapping.legacy,
+        }
       : null,
     lock,
   });

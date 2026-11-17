@@ -145,6 +145,44 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(self.tick()["status"], "cooldown")
 
+    def test_failed_observe_retries_soon_instead_of_a_full_interval(self):
+        # JOV-12812: the hourly summerCanary's 03:38 observe failed on 2026-11-16 and the
+        # clock idled the whole 3600s until 04:39 -- a 2-hour dark gap in monitoring.
+        canary = next(c for c in clock.CLOCKS if c.name == "summerCanary")
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        result = clock.tick(self.path, "gem", self.api, NOW, clocks=(canary,))
+        result = result["clocks"][canary.name]
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"], "TimeoutExpired")
+        state = json.loads((self.path / canary.state_file).read_text())
+        self.assertEqual(state["nextAttemptAt"], NOW + clock.UNCERTAIN_S)
+        self.assertEqual(state["lastResult"], result)
+        self.calls.clear()
+        self.get_error = None
+        # The short window re-observes (and dispatches when due) instead of idling for
+        # another full hour.
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW + clock.UNCERTAIN_S,
+                                    clocks=(canary,))["clocks"][canary.name]["status"], "dispatch-requested")
+
+    def test_failed_observe_never_waits_longer_than_the_clocks_own_interval(self):
+        # The five-minute continuity clock keeps its existing failure cadence.
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        self.assertEqual(self.tick()["status"], "failed")
+        self.assertEqual(self.saved()["nextAttemptAt"], NOW + clock.CONTINUITY.interval_s)
+
+    def test_successful_observe_keeps_the_interval_cadence(self):
+        canary = next(c for c in clock.CLOCKS if c.name == "summerCanary")
+        state = lambda: json.loads((self.path / canary.state_file).read_text())
+        # A current observation must neither shorten nor lengthen the hourly cadence.
+        self.rows = [run_row(30)]
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW, clocks=(canary,))["clocks"][canary.name]["status"], "current")
+        self.assertEqual(state()["nextAttemptAt"], NOW + canary.interval_s)
+        # A successful dispatch also returns the clock to its interval cadence.
+        self.rows = [run_row(canary.interval_s)]
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW + canary.interval_s,
+                                    clocks=(canary,))["clocks"][canary.name]["status"], "dispatch-requested")
+        self.assertEqual(state()["nextAttemptAt"], NOW + 2 * canary.interval_s)
+
     def test_nonzero_or_invalid_json_get_fails_closed(self):
         for response in (SimpleNamespace(returncode=1, stdout="secret", stderr="secret"),
                          SimpleNamespace(returncode=0, stdout="invalid", stderr="")):

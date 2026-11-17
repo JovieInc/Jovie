@@ -35,6 +35,8 @@ function RankedVideoRow({ video, showTrend = false }: RankedVideoRowProps) {
           src={video.thumbnailUrl}
           alt=''
           aria-hidden='true'
+          width={80}
+          height={48}
           className='h-12 w-20 shrink-0 rounded-md object-cover'
         />
       ) : (

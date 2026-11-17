@@ -11,6 +11,7 @@ export interface ReconcileSubscription {
   readonly subscriptionId: string;
   readonly status: string;
   readonly priceId: string | null;
+  readonly mappedPlan?: string | null;
   readonly unitAmountCents: number | null;
   readonly currency: string | null;
   readonly interval: PriceInterval | null;
@@ -36,6 +37,8 @@ export function judgeCandidate(
 ): ReconcileFinding | null {
   const { userId, lock, subscription } = candidate;
   if (!subscription || !isChargingStatus(subscription.status)) return null;
+  // This snapshot promises Pro pricing only; a different plan has no Pro lock obligation.
+  if (subscription.mappedPlan && subscription.mappedPlan !== 'pro') return null;
   const base = { userId, subscriptionId: subscription.subscriptionId };
   if (!lock) {
     return {
@@ -58,22 +61,17 @@ export function judgeCandidate(
     return { ...base, verdict: 'ok', detail: 'price id matches the lock' };
   }
   const interval = subscription.interval;
-  const lockedAmount = interval
-    ? interval === 'month'
-      ? lock.monthlyAmountCents
-      : lock.yearlyAmountCents
-    : null;
-  if (
-    lockedAmount === null ||
-    subscription.unitAmountCents === null ||
-    !interval
-  ) {
+  if (subscription.unitAmountCents === null || !interval) {
     return {
       ...base,
-      verdict: 'overcharged',
-      detail: `subscription price ${subscription.priceId ?? 'unknown'} (${interval ?? 'unknown interval'}) is not covered by lock ${lock.priceVersionId}`,
+      verdict: 'unmapped_locked_price',
+      detail: `subscription price ${subscription.priceId ?? 'unknown'} has no comparable amount or interval for lock ${lock.priceVersionId}`,
     };
   }
+  const lockedAmount =
+    interval === 'month' ? lock.monthlyAmountCents : lock.yearlyAmountCents;
+  // An interval absent from the snapshot was never price-locked.
+  if (lockedAmount === null) return null;
   if (
     subscription.unitAmountCents === lockedAmount &&
     (subscription.currency ?? lock.currency) === lock.currency

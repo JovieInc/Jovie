@@ -335,33 +335,50 @@ export function OvieLauncherRail({
           <p className='text-xs font-caption text-tertiary-token'>Launchers</p>
           <p className='text-2xs text-tertiary-token'>Human controls first</p>
         </div>
-        {isLoading && !inventory ? <LauncherRailSkeleton /> : null}
-        {inventory ? (
-          <div className='flex flex-col gap-3 lg:flex-row'>
-            <LauncherGroup
-              group='internal'
-              controls={primaryInternal}
-              onLaunch={onLaunch}
-            />
-            <LauncherGroup
-              group='external'
-              controls={primaryExternal}
-              onLaunch={onLaunch}
-            />
-          </div>
-        ) : null}
-        {observation === 'unavailable' ? (
-          <HudObservationStatus
-            state='unavailable'
-            message={
-              locked
-                ? 'Admin data is locked. Unlock with Touch ID, then retry.'
-                : 'Launcher destinations could not be loaded.'
-            }
-            onRetry={() => void fetchInventory()}
-            testId='ovie-launcher-observation'
-          />
-        ) : null}
+        {/* Reserved swap zone (JOV-12518): every inventory-less state
+            (loading, admin step-up lock, outage, empty) renders inside the
+            skeleton's geometry, so the 403 status swap cannot collapse the
+            card and shift the whole HUD below it (CLS on /hud?fs=1). While a
+            status shows, the skeleton stays mounted as invisible quiet
+            structure and the status overlays it; the fetched groups replace
+            it with the same slot geometry (see the loading-geometry test). */}
+        <div className='relative'>
+          {inventory ? (
+            <div className='flex flex-col gap-3 lg:flex-row'>
+              <LauncherGroup
+                group='internal'
+                controls={primaryInternal}
+                onLaunch={onLaunch}
+              />
+              <LauncherGroup
+                group='external'
+                controls={primaryExternal}
+                onLaunch={onLaunch}
+              />
+            </div>
+          ) : (
+            <div
+              className={isLoading ? undefined : 'invisible'}
+              aria-hidden='true'
+            >
+              <LauncherRailSkeleton />
+            </div>
+          )}
+          {observation === 'unavailable' ? (
+            <div className='absolute inset-0'>
+              <HudObservationStatus
+                state='unavailable'
+                message={
+                  locked
+                    ? 'Admin data is locked. Unlock with Touch ID, then retry.'
+                    : 'Launcher destinations could not be loaded.'
+                }
+                onRetry={() => void fetchInventory()}
+                testId='ovie-launcher-observation'
+              />
+            </div>
+          ) : null}
+        </div>
         <details className='group' data-testid='ovie-launcher-all-tools'>
           <summary className='cursor-pointer list-none rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs font-medium text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'>
             All tools

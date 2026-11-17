@@ -119,12 +119,12 @@ describe('ChatHistorySwitcher', () => {
     );
     const rows = within(menu).getAllByTestId('chat-history-row');
     expect(rows.map(row => row.textContent)).toEqual([
-      'Release Plan For Spring5m',
-      'Tour Budget3d',
-      'Merch Drop Ideas1mo',
+      'Release Plan For Spring 5m',
+      'Tour Budget 3d',
+      'Merch Drop Ideas 1mo',
     ]);
     expect(
-      within(menu).getByRole('menuitem', { name: 'Tour Budget' })
+      within(menu).getByRole('menuitem', { name: 'Tour Budget 3d' })
     ).toHaveAttribute('data-selected', 'true');
     // The rows' menu sits inside the scrolling list, under the pinned search.
     expect(
@@ -139,7 +139,7 @@ describe('ChatHistorySwitcher', () => {
     await user.type(input, 'spring');
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(1);
     expect(
-      within(menu).getByRole('menuitem', { name: 'Release Plan For Spring' })
+      within(menu).getByRole('menuitem', { name: 'Release Plan For Spring 5m' })
     ).toBeVisible();
 
     await user.clear(input);
@@ -155,9 +155,9 @@ describe('ChatHistorySwitcher', () => {
     );
 
     for (const name of [
-      'Release Plan For Spring',
-      'Tour Budget',
-      'Merch Drop Ideas',
+      'Release Plan For Spring 5m',
+      'Tour Budget 3d',
+      'Merch Drop Ideas 1mo',
     ]) {
       await user.keyboard('{ArrowDown}');
       await waitFor(() =>
@@ -193,7 +193,7 @@ describe('ChatHistorySwitcher', () => {
 
   it('selecting the open chat closes without navigating', async () => {
     const { user } = await openSwitcher();
-    await user.click(screen.getByRole('menuitem', { name: 'Tour Budget' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Tour Budget 3d' }));
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -204,7 +204,7 @@ describe('ChatHistorySwitcher', () => {
     render(<ChatHistorySwitcher title='Release' activeConversationId={null} />);
     await user.click(screen.getByTestId('chat-history-trigger'));
     const row = await screen.findByRole('menuitem', {
-      name: 'Release Plan For Spring',
+      name: 'Release Plan For Spring 5m',
     });
     expect(row).toHaveAttribute('data-selected', 'true');
     await user.click(row);
@@ -244,7 +244,7 @@ describe('ChatHistorySwitcher', () => {
     expect(tourRow).toHaveAttribute('data-unread', 'true');
 
     await user.click(
-      within(reopened).getByRole('menuitem', { name: 'Tour Budget' })
+      within(reopened).getByRole('menuitem', { name: 'Tour Budget 3d' })
     );
     expect(push).toHaveBeenCalledWith('/app/chat/c2');
     expect(

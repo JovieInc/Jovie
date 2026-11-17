@@ -142,7 +142,7 @@ export const CRON_KEEP_REASONS = Object.freeze({
   '.github/workflows/security.yml':
     'external: dependency and SAST advisories publish on their own clock (JOV-7565); pushes already scan new code',
   '.github/workflows/sentry-autofix-recurrence.yml':
-    'calendar window: resolving a quiet incident needs its post-deploy soak to elapse with no new events',
+    'calendar window: a registered Sentry observation needs its observation window to elapse with no new events',
   '.github/workflows/shipping-slo.yml':
     'calendar window: daily throughput and 7-day p50/p95 rollups with week-over-week growth',
   '.github/workflows/summer-eve-pin.yml':

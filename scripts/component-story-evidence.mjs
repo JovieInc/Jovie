@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /**
  * Story-capture producer for the component certificate's `visual` and `a11y`
- * criteria. Captures every @jovie/ui (packages/ui) story from a running
- * Storybook in light and dark and writes `jovie.component-story-evidence/v1`
- * receipts:
+ * criteria. Captures the stories of every certified component (packages/ui
+ * and apps/web) from a running Storybook in light and dark and writes
+ * `jovie.component-story-evidence/v1` receipts bound to each component's own
+ * render closure (`jovie.component-render-inputs/v2`), so a later run reuses
+ * every receipt whose inputs did not change:
  *
  *   node scripts/component-story-evidence.mjs --base-url http://localhost:6006 \
- *     --out-dir /tmp/story-evidence [--shard 1/2] [--component packages/ui/atoms/button.tsx] [--local]
+ *     --out-dir /tmp/story-evidence [--index index.json] [--reuse-dir prior] \
+ *     [--shard 1/2] [--component packages/ui/atoms/button.tsx] [--local]
+ *   node scripts/component-story-evidence.mjs --index index.json --reuse-dir prior --plan 20
+ *       (no browser: prints {shards, matrix, capture, reused, renders} as JSON)
  *   node scripts/component-story-evidence.mjs --list        (selection only, no browser)
- *   node scripts/component-story-evidence.mjs --merge --out-dir all shard-1 shard-2
+ *   node scripts/component-story-evidence.mjs --merge --reuse-dir prior \
+ *     --out-dir all [--expect N] shard-1 shard-2
  *
  * Per story × theme it fails on: no render, a Storybook render/play error,
  * any page error or console error, the preview not applying the theme, or any
@@ -27,18 +33,21 @@ import {
   listComponentsInRoot,
   REPO_ROOT,
 } from './component-ship-policy.mjs';
+import { componentRenderBindings } from './lib/component-render-closure.mjs';
+import { storybookProfile } from './lib/component-render-inputs.mjs';
 import {
   assembleEvidence,
   mergeEvidence,
   parseShard,
+  reusableReceipts,
   runnerRefusal,
   STORY_THEMES,
-  selectUiStories,
+  selectStories,
   shardComponents,
+  shardCount,
   storyUrl,
   summarizeEvidence,
   THEME_STORAGE_KEY,
-  UI_PREFIX,
 } from './lib/component-story-evidence-lib.mjs';
 
 // Same list as apps/web/lib/a11y-gates/wcag-22-aa.ts (the Storybook gate).
@@ -73,6 +82,10 @@ const { values, positionals } = parseArgs({
     local: { type: 'boolean', default: false },
     list: { type: 'boolean', default: false },
     merge: { type: 'boolean', default: false },
+    index: { type: 'string' },
+    'reuse-dir': { type: 'string' },
+    plan: { type: 'string' },
+    expect: { type: 'string' },
   },
 });
 
@@ -98,58 +111,107 @@ function writeEvidence(evidence) {
   );
 }
 
+const readJsonIn = (dir, name) => {
+  const path = join(resolve(dir), name);
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+};
+const prior = values['reuse-dir']
+  ? {
+      visual: readJsonIn(values['reuse-dir'], 'visual.json')?.components ?? {},
+      a11y: readJsonIn(values['reuse-dir'], 'a11y.json')?.components ?? {},
+    }
+  : { visual: {}, a11y: {} };
+
+const componentPaths = new Set();
+for (const coverageRoot of COVERAGE_ROOTS)
+  for (const c of listComponentsInRoot(coverageRoot, root))
+    componentPaths.add(c.sourceRel);
+
+/** Current source hash and v2 closure binding for each component path. */
+function currentInputs(paths) {
+  const { bindings, problem, stats } = componentRenderBindings(
+    root,
+    componentPaths,
+    storybookProfile(process.env)
+  );
+  if (problem) throw new Error(`render inputs unavailable: ${problem}`);
+  if (stats.global)
+    log(`${stats.global} components fall back to the global digest`);
+  const inputs = new Map();
+  for (const path of paths)
+    inputs.set(path, {
+      renderInputs: bindings.get(path),
+      sourceHash: createHash('sha256')
+        .update(readFileSync(join(root, path)))
+        .digest('hex'),
+    });
+  return inputs;
+}
+
 if (values.merge) {
-  const read = (dir, name) => {
-    const path = join(resolve(dir), name);
-    return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
-  };
-  if (!positionals.length) throw new Error('--merge needs shard directories');
+  if (!positionals.length && !values['reuse-dir'])
+    throw new Error('--merge needs shard directories or --reuse-dir');
   const shards = positionals.map(dir => ({
-    visual: read(dir, 'visual.json'),
-    a11y: read(dir, 'a11y.json'),
+    visual: readJsonIn(dir, 'visual.json'),
+    a11y: readJsonIn(dir, 'a11y.json'),
   }));
   const missing = positionals.filter(
     (_, i) => !shards[i].visual || !shards[i].a11y
   );
   if (missing.length)
     throw new Error(`shard evidence missing in ${missing.join(', ')}`);
-  writeEvidence({
-    visual: mergeEvidence(shards.map(s => s.visual)),
-    a11y: mergeEvidence(shards.map(s => s.a11y)),
+  const visual = mergeEvidence(shards.map(s => s.visual));
+  const a11y = mergeEvidence(shards.map(s => s.a11y));
+  const captured = Object.keys(visual.components).length;
+  if (values.expect !== undefined && captured !== Number(values.expect))
+    throw new Error(
+      `shards captured ${captured} components, plan expected ${values.expect}`
+    );
+  // Carry forward every prior receipt the current tree still matches.
+  const carried = [...componentPaths].filter(
+    path => !visual.components[path] && prior.visual[path]
+  );
+  const reuse = reusableReceipts(prior, currentInputs(carried));
+  for (const [path, receipts] of reuse) {
+    visual.components[path] = receipts.visual;
+    a11y.components[path] = receipts.a11y;
+  }
+  const sorted = file => ({
+    components: Object.fromEntries(
+      Object.entries(file.components).sort(([a], [b]) => a.localeCompare(b))
+    ),
   });
+  log(`merged ${captured} captured and ${reuse.size} reused components`);
+  writeEvidence({ visual: sorted(visual), a11y: sorted(a11y) });
   process.exit(0);
 }
 
-const refusal = values.list
-  ? null
-  : runnerRefusal(process.env, { local: values.local });
+const refusal =
+  values.list || values.plan
+    ? null
+    : runnerRefusal(process.env, { local: values.local });
 if (refusal) {
   log(refusal);
   process.exit(2);
 }
 
 const baseUrl = values['base-url'].replace(/\/+$/, '');
-const indexResponse = await fetch(`${baseUrl}/index.json`);
-if (!indexResponse.ok)
-  throw new Error(
-    `${baseUrl}/index.json answered HTTP ${indexResponse.status}`
-  );
-const index = await indexResponse.json();
+let index;
+if (values.index)
+  index = JSON.parse(readFileSync(resolve(values.index), 'utf8'));
+else {
+  const indexResponse = await fetch(`${baseUrl}/index.json`);
+  if (!indexResponse.ok)
+    throw new Error(
+      `${baseUrl}/index.json answered HTTP ${indexResponse.status}`
+    );
+  index = await indexResponse.json();
+}
 
-const componentPaths = new Set();
-for (const coverageRoot of COVERAGE_ROOTS.filter(r =>
-  `${r}/`.startsWith(UI_PREFIX)
-))
-  for (const c of listComponentsInRoot(coverageRoot, root))
-    componentPaths.add(c.sourceRel);
-const selection = selectUiStories(
-  index,
-  componentPaths,
-  values['storybook-cwd']
-);
-for (const storyFile of selection.unmapped)
+const selection = selectStories(index, componentPaths, values['storybook-cwd']);
+if (selection.unmapped.length)
   log(
-    `no packages/ui component for ${storyFile}; its stories are not evidence`
+    `${selection.unmapped.length} story files cover no certified component (e.g. ${selection.unmapped[0]}); not evidence`
   );
 let selected = selection.components;
 if (values.component?.length) {
@@ -159,23 +221,42 @@ if (values.component?.length) {
     if (!selected.has(path))
       log(`${path} has no stories in the Storybook index`);
 }
-selected = shardComponents(selected, parseShard(values.shard));
 
+const inputs = currentInputs(selected.keys());
+const reuse = reusableReceipts(prior, inputs);
+const pending = new Map([...selected].filter(([path]) => !reuse.has(path)));
+const renders = [...pending.values()].reduce(
+  (sum, ids) => sum + ids.length * STORY_THEMES.length,
+  0
+);
+log(
+  `${selected.size} components with stories: ${reuse.size} reused, ${pending.size} to capture (${renders} renders)`
+);
+if (values.plan) {
+  const shards = shardCount(renders, Number(values.plan) || 1);
+  console.log(
+    JSON.stringify({
+      shards,
+      matrix: Array.from({ length: shards }, (_, i) => i + 1),
+      capture: pending.size,
+      reused: reuse.size,
+      renders,
+    })
+  );
+  process.exit(0);
+}
+
+const sharded = values.shard !== undefined;
+const owned = shardComponents(pending, parseShard(values.shard));
 if (values.list) {
-  for (const [path, ids] of selected) console.log(`${path}\t${ids.join(' ')}`);
+  for (const [path, ids] of owned) console.log(`${path}\t${ids.join(' ')}`);
   process.exit(0);
 }
 
 const components = new Map(
-  [...selected].map(([path, storyIds]) => [
+  [...owned].map(([path, storyIds]) => [
     path,
-    {
-      storyIds,
-      // Bind to the exact bytes the certificate will hash.
-      sourceHash: createHash('sha256')
-        .update(readFileSync(join(root, path)))
-        .digest('hex'),
-    },
+    { storyIds, ...inputs.get(path) },
   ])
 );
 const jobs = [];
@@ -185,9 +266,23 @@ for (const { storyIds } of components.values())
 log(
   `capturing ${jobs.length} story × theme renders for ${components.size} components`
 );
-// No jobs writes nothing, so the certificate keeps its prior evidence. An
-// unfiltered index that maps no @jovie/ui story is broken, so that goes red.
-if (!jobs.length) process.exit(selection.components.size ? 0 : 1);
+/** Unsharded runs write a complete set: reused receipts plus new captures. */
+function withReuse(evidence) {
+  if (sharded) return evidence;
+  for (const [path, receipts] of reuse) {
+    evidence.visual.components[path] = receipts.visual;
+    evidence.a11y.components[path] = receipts.a11y;
+  }
+  return evidence;
+}
+// No jobs: a shard with nothing to do writes an empty, mergeable result.
+if (!jobs.length) {
+  if (!selection.components.size) process.exit(1);
+  writeEvidence(
+    withReuse({ visual: { components: {} }, a11y: { components: {} } })
+  );
+  process.exit(0);
+}
 
 const webRequire = createRequire(join(root, 'apps/web/package.json'));
 const { chromium } = webRequire('playwright');
@@ -371,4 +466,4 @@ if (jobs.length && !captures.some(c => c.rendered)) {
   log('no story rendered; Storybook or the browser is broken, writing nothing');
   process.exit(1);
 }
-writeEvidence(assembleEvidence(components, captures));
+writeEvidence(withReuse(assembleEvidence(components, captures)));

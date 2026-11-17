@@ -28,13 +28,23 @@ vi.mock('@/app/[username]/_lib/public-profile-loader', () => ({
   getProfileAndLinks: (...args: unknown[]) => getProfileAndLinksMock(...args),
 }));
 
+const {
+  getCreditedArtistsWithProfilesMock,
+  getStructuredReleaseCollaboratorsMock,
+  getReleasesForProfileLiteMock,
+} = vi.hoisted(() => ({
+  getCreditedArtistsWithProfilesMock: vi.fn(),
+  getStructuredReleaseCollaboratorsMock: vi.fn(),
+  getReleasesForProfileLiteMock: vi.fn(),
+}));
+
 vi.mock('@/lib/discography/artist-queries', () => ({
-  getCreditedArtistsWithProfiles: vi.fn(),
-  getStructuredReleaseCollaborators: vi.fn(),
+  getCreditedArtistsWithProfiles: getCreditedArtistsWithProfilesMock,
+  getStructuredReleaseCollaborators: getStructuredReleaseCollaboratorsMock,
 }));
 
 vi.mock('@/lib/discography/queries', () => ({
-  getReleasesForProfileLite: vi.fn(),
+  getReleasesForProfileLite: getReleasesForProfileLiteMock,
 }));
 
 vi.mock('@/features/profile/views/ProfileIntentPage', () => ({
@@ -79,6 +89,46 @@ describe('public profile about route', () => {
     getProfileAndLinksMock.mockReset();
     notFoundMock.mockClear();
     getProfileAndLinksMock.mockResolvedValue(NOT_FOUND_RESULT);
+    getCreditedArtistsWithProfilesMock.mockReset().mockResolvedValue([]);
+    getStructuredReleaseCollaboratorsMock.mockReset().mockResolvedValue([]);
+    getReleasesForProfileLiteMock.mockReset().mockResolvedValue([]);
+  });
+
+  it('starts the bio reads without waiting for the credits read', async () => {
+    getProfileAndLinksMock.mockResolvedValue({
+      ...NOT_FOUND_RESULT,
+      status: 'ok',
+      profile: {
+        id: 'profile-1',
+        username: 'tim',
+        display_name: 'Tim White',
+        bio: 'Producer of Never Say A Word.',
+        spotify_id: '4Uwpa6zW3zzCSQvooQNksm',
+        settings: null,
+      },
+    } as unknown as PublicProfileLoaderResult);
+
+    let releaseCredits: (value: never[]) => void = () => undefined;
+    getStructuredReleaseCollaboratorsMock.mockReturnValue(
+      new Promise<never[]>(resolve => {
+        releaseCredits = resolve;
+      })
+    );
+
+    const pending = AboutPage({ params: Promise.resolve({ username: 'tim' }) });
+
+    // The credits read is still in flight; the bio reads must already be out.
+    await vi.waitFor(() => {
+      expect(getStructuredReleaseCollaboratorsMock).toHaveBeenCalledOnce();
+      expect(getReleasesForProfileLiteMock).toHaveBeenCalledWith('profile-1');
+      expect(getCreditedArtistsWithProfilesMock).toHaveBeenCalledWith(
+        'profile-1'
+      );
+    });
+
+    releaseCredits([]);
+    const html = renderToStaticMarkup(await pending);
+    expect(html).toContain('data-handle="tim"');
   });
 
   it('renders the reserved unfazed about fixture without a profile lookup', async () => {

@@ -70,7 +70,11 @@ export function annotationFor(line) {
 }
 
 function git(repoRoot, args) {
-  const result = spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+  const result = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
   return {
     code: result.status,
     output: (result.stdout ?? '') + (result.stderr ?? ''),

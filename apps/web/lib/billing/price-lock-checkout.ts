@@ -7,6 +7,8 @@ import {
 export interface CheckoutPriceMapping {
   readonly plan: string;
   readonly interval: PriceInterval;
+  readonly amount?: number;
+  readonly legacy?: boolean;
 }
 export interface LockedCheckoutExpectation {
   readonly amountCents: number;
@@ -34,7 +36,12 @@ export function resolveCheckoutPrice(input: {
   readonly lock: PriceLockSnapshot | null;
 }): CheckoutPriceDecision {
   const { requestedPriceId, requestedMapping, lock } = input;
-  if (!lock) return { kind: 'list', priceId: requestedPriceId };
+  if (
+    !lock ||
+    (requestedMapping?.legacy && !lockOwnsPriceId(lock, requestedPriceId))
+  ) {
+    return { kind: 'list', priceId: requestedPriceId };
+  }
   // The requested id is one of the lock's own ids (possibly retired/unmapped).
   const interval: PriceInterval | null = requestedMapping
     ? requestedMapping.plan === lock.plan
@@ -47,10 +54,16 @@ export function resolveCheckoutPrice(input: {
         : null;
   if (!interval) return { kind: 'list', priceId: requestedPriceId };
   const price = resolveLockedPrice({ lock, interval });
-  if (!price?.locked || !price.stripePriceId) {
-    // The lock does not cover this interval (or has no Stripe id for it): a
-    // list id is charged at list price, an id the lock owns passes through.
-    return { kind: 'list', priceId: requestedPriceId };
+  if (!price?.locked) return { kind: 'list', priceId: requestedPriceId };
+  if (!price.stripePriceId) throw new Error('The locked price is unavailable');
+  if (
+    !lockOwnsPriceId(lock, requestedPriceId) &&
+    requestedMapping?.amount !== undefined &&
+    price.amountCents > requestedMapping.amount
+  ) {
+    throw new Error(
+      'The locked price exceeds the requested offer; select the locked price explicitly'
+    );
   }
   return {
     kind: 'locked',
