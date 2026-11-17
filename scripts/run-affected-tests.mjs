@@ -1189,6 +1189,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'pr_events',
     'remediation',
     'reason_lane',
+    'reason_dispatch',
+    'reason_publication',
     'doctor',
     'hud',
     'disk_guard',

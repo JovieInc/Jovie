@@ -15,6 +15,10 @@ forbidden for them. Non-Anthropic models keep their routes; nothing here governs
 The table also names every other pool the fleet uses (Codex, Grok, Devin, Kimi) with where its reset
 or expiry is read from; `balanced` spends the allowance that is lost first within a capability class.
 
+New autonomous assignments cannot use the protected Claude subscription until authenticated
+exact-task authorization is wired through the canonical dispatch boundary. Selectors and the
+existing command guard fail closed; direct sessions and existing processes are not changed.
+
 Runtime: `command_guard(cmd)` refuses an agent command before it starts (lane_runner.run_agent),
 `refusal(model, pool)` is the same verdict for an API call site, and both append the refusal to
 runs/model-pool-refusals.jsonl. An unreadable table refuses every Anthropic route (fail closed).
@@ -29,6 +33,9 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from capacity_registry import (AUTOMATED_PERSONAL_REASON, _iso, assignment_reason, lane_assignment_reason,
+                               pool_expiry, provider_assignment_reason)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -213,6 +220,11 @@ def command_guard(cmd, *, env=None, agent: bool | None = None, table: dict | Non
     Returns the pool for an Anthropic command that may run, else None. Only a declared executor of an allowed pool passes."""
     table = load() if table is None else table
     refused = command_refusal(cmd, env, table, agent)
+    args, index = _program(cmd)
+    if args[index + 1:index + 2] == ["run"] and lane_assignment_reason({"cmd": cmd}, table):
+        refused = {"model": next((model for model in command_models(cmd, env, agent=True) if model), "unresolved"),
+                   "pool": "claude-subscription", "site": f"command:{executor(cmd)}",
+                   "reason": AUTOMATED_PERSONAL_REASON}
     if refused:
         raise ModelPoolRefused(record_refusal(refused, state_dir))
     pool = pool_for_command(cmd, table)
@@ -225,6 +237,8 @@ def pool_for_lane(spec: dict, table: dict | None = None) -> str | None:
     table = load() if table is None else table
     spec = spec if isinstance(spec, dict) else {}
     return pool_for_signal(spec.get("accountClass"), table) or pool_for_command(spec.get("cmd"), table)
+
+
 
 
 def receipt(spec: dict, balance: dict | None = None, table: dict | None = None) -> dict:
@@ -247,55 +261,9 @@ def _epoch(value) -> float | None:
         return None
 
 
-def _iso(when: float | None) -> str | None:
-    return None if when is None else datetime.fromtimestamp(when, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def pool_expiry(pool: str | None, now: float, *, claude_state: dict | None = None, window_s: int = 5 * 3600,
-                registry: dict | None = None, live: dict | None = None, spec: dict | None = None,
-                table: dict | None = None) -> dict:
-    """When a pool's unused allowance is next lost, from data the repo already has. Nothing is invented:
-    a pool with no usable reading returns expiresAt None and says why."""
-    table = load() if table is None else table
-    row = _pools(table).get(pool or "") or {}
-    source = (row.get("expiry") or {}).get("source")
-    provider = next((item for item in (registry or {}).get("providers") or ()
-                     if isinstance(item, dict) and item.get("id") == row.get("registryProvider")), {})
-    accounts = [item for item in provider.get("accounts") or () if isinstance(item, dict)]
-    if source == "claude-lane-window":
-        runs = [item["at"] for item in (claude_state or {}).get("runs") or ()
-                if isinstance(item, dict) and isinstance(item.get("at"), (int, float)) and 0 <= now - item["at"] < window_s]
-        if not runs:  # an idle lane has no open window: nothing is about to be lost, so no expiry is made up
-            return {"pool": pool, "expiresAt": None, "basis": "claude-lane-window-not-open"}
-        return {"pool": pool, "expiresAt": _iso(min(runs) + window_s), "basis": "claude-lane-window-open"}
-    if source == "hyperagent-daily-cap-and-credits":
-        day = datetime.fromtimestamp(now, timezone.utc)
-        midnight = datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp() + 86400
-        credits = [_epoch((account.get("credits") or {}).get("expiresAt")) for account in accounts]
-        credits = [value for value in credits if value is not None and value > now]
-        basis = "hyperagent-daily-cap-utc-day" + ("+credit-expiry" if credits else "")
-        return {"pool": pool, "expiresAt": _iso(min([midnight, *credits])), "basis": basis,
-                **({"creditsExpireAt": _iso(min(credits))} if credits else {})}
-    if source == "registry-quota-reset":
-        overlay = (live or {}).get("accounts") if isinstance((live or {}).get("accounts"), dict) else {}
-        resets = []
-        for account in accounts:
-            if account.get("status", "active") != "active":
-                continue
-            quota = (overlay.get(f"{provider.get('id')}/{account.get('id')}") or {}).get("quota") or account.get("quota") or {}
-            when = _epoch(quota.get("resetsAt")) if quota.get("resetsAt") else None
-            if when is not None and when > now:
-                resets.append(when)
-        if resets:
-            return {"pool": pool, "expiresAt": _iso(min(resets)), "basis": "registry-quota-reset"}
-        return {"pool": pool, "expiresAt": None, "basis": "no-fresh-reset-reading"}
-    if source == "lane-free-window":
-        stop = ((spec or {}).get("freeOnly") or {}).get("stopBefore")
-        when = _epoch(stop) if stop else None
-        if when is not None and when > now:
-            return {"pool": pool, "expiresAt": _iso(when), "basis": "lane-free-window"}
-        return {"pool": pool, "expiresAt": None, "basis": "free-window-ended" if when else "no-expiry-data"}
-    return {"pool": pool, "expiresAt": None, "basis": "no-expiry-data"}
+
 
 
 def choose(candidates: list[dict]) -> tuple[dict | None, dict]:
@@ -305,7 +273,8 @@ def choose(candidates: list[dict]) -> tuple[dict | None, dict]:
         index, row = pair
         when = _epoch((row.get("expiry") or {}).get("expiresAt")) if (row.get("expiry") or {}).get("expiresAt") else None
         return (when is None, when or 0.0, index)
-    ranked = [row for _, row in sorted(enumerate(candidates), key=key)]
+    eligible = [row for row in candidates if assignment_reason(row.get("pool")) is None]
+    ranked = [row for _, row in sorted(enumerate(eligible), key=key)]
     chosen = ranked[0] if ranked else None
     return chosen, {"rule": "earliest-expiry", "chosenPool": chosen and chosen.get("pool"),
                     "considered": [{"lane": row.get("lane"), "model": row.get("model"), "pool": row.get("pool"),
@@ -319,6 +288,8 @@ def guarded(availability, providers: dict, table: dict | None = None):
     table = load() if table is None else table
 
     def check(lane: str, route: dict) -> dict:
+        if lane_assignment_reason(providers.get(lane) or {}, table):
+            return {"ok": False, "why": AUTOMATED_PERSONAL_REASON, "pressure": 0}
         if verdict((route or {}).get("model"), pool_for_lane(providers.get(lane) or {}, table), table):
             return {"ok": False, "why": "model-pool-refused", "pressure": 0}
         return availability(lane, route)
@@ -342,11 +313,26 @@ def balanced(decision: dict, providers: dict, expiry_of, table: dict | None = No
 
     def same(row):
         return row["lane"] == chosen["lane"] and row["model"] == chosen["model"]
+    def eligible(row):
+        return (lane_assignment_reason(providers.get(row["lane"]) or {}, table) is None
+                and verdict(row.get("model"), pool_of(row), table) is None)
     peers = [row for row in decision.get("candidates") or ()
              if row.get("available") and row.get("capability") == chosen.get("capability")
-             and (same(row) or float(row.get("pressure") or 0) < 1)
-             and verdict(row.get("model"), pool_of(row), table) is None]
-    peers = peers if any(same(row) for row in peers) else [chosen, *peers]
+             and (same(row) or float(row.get("pressure") or 0) < 1) and eligible(row)]
+    if eligible(chosen) and not any(same(row) for row in peers):
+        peers = [chosen, *peers]
+    if not eligible(chosen):
+        decision = {key: value for key, value in decision.items() if key != "pool"}
+    if not peers:
+        return {**decision, "chosen": None, "rationale": "no eligible route in the chosen capability class; held"}
+    if not eligible(chosen):
+        fallback = peers[0]
+        route = next((item for item in (providers.get(fallback["lane"]) or {}).get("routes") or ()
+                      if isinstance(item, dict) and item.get("model") == fallback["model"]), {})
+        chosen = {**chosen, **{key: fallback[key] for key in chosen if key in fallback},
+                  "alias": route.get("alias"), "costClass": route.get("costClass")}
+        decision = {**decision, "chosen": chosen,
+                    "rationale": f"{decision.get('rationale', '')}; protected or forbidden pool excluded"}
     rows = [{"lane": row["lane"], "model": row["model"], "pool": pool_of(row),
              "expiry": expiry_of(row["lane"]) if pool_of(row) else {"expiresAt": None, "basis": "undeclared-pool"}}
             for row in peers]

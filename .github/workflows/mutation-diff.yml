@@ -296,17 +296,58 @@ jobs:
           restore-keys: |
             mutation-baseline-v1-
 
+      # Reviewed source is the durable request index. Only this existing sweep
+      # writes its canonical ledger; acceptance does not create another scorer.
+      - name: Select reviewed next target
+        id: next_target
+        if: steps.capacity.outputs.run == 'true' && inputs.mode != 'ui'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/mutation-next-target-cli.mjs select
+
+      - name: Reserve immutable next-target claim
+        id: target_claim
+        if: steps.next_target.outputs.selected == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-next-claim-${{ steps.next_target.outputs.request_id }}
+          path: ${{ runner.temp }}/mutation-next/claim.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Verify immutable next-target claim
+        id: target_verified
+        if: steps.next_target.outputs.selected == 'true' && steps.target_claim.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/mutation-next-target-cli.mjs verify-claim
+
+      - name: Recheck target runner capacity
+        id: target_capacity
+        if: steps.next_target.outputs.selected == 'true' && steps.target_verified.outputs.verified == 'true'
+        env:
+          MUTATION_MAX_LOAD: '8'
+          MUTATION_MIN_DISK_GB: '15'
+        run: |
+          set +e
+          node scripts/mutation-sweep-preflight.mjs
+          code=$?
+          if [ "$code" -eq 75 ]; then echo 'run=false' >> "$GITHUB_OUTPUT"; exit 0; fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo 'run=true' >> "$GITHUB_OUTPUT"
+
       - name: Score the next modules
         id: score
-        if: steps.capacity.outputs.run == 'true'
+        if: steps.capacity.outputs.run == 'true' && steps.next_target.outputs.hold != 'true' && (steps.next_target.outputs.selected != 'true' || (steps.target_verified.outputs.verified == 'true' && steps.target_capacity.outputs.run == 'true'))
         env:
           CI: 'true'
           STRYKER_CONCURRENCY: '1'
           MUTATION_MAX_LOAD: '8'
-          MODE: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'ui' && 'sweep' || inputs.mode) || 'sweep' }}
-          MAX_FILES: ${{ steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
-          UI_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'ui' }}
-          UI_INCLUDE: ${{ steps.ui_scope.outputs.include || 'packages/ui/' }}
+          MODE: ${{ steps.next_target.outputs.selected == 'true' && 'sweep' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'ui' && 'sweep' || inputs.mode) || 'sweep') }}
+          MAX_FILES: ${{ steps.next_target.outputs.max_files || steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
+          UI_ONLY: ${{ steps.next_target.outputs.selected == 'true' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'ui') }}
+          UI_INCLUDE: ${{ steps.next_target.outputs.include || steps.ui_scope.outputs.include || 'packages/ui/' }}
+          NEXT_SELECTED: ${{ steps.next_target.outputs.selected == 'true' }}
         run: |
           set -euo pipefail
           state_dir=".cache/jovie-mutation"
@@ -316,6 +357,9 @@ jobs:
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
           echo 'admitted=true' >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ "${NEXT_SELECTED:-false}" = true ]; then
+            node .github/scripts/mutation-next-target-cli.mjs begin
+          fi
           if [ -s .cache/jovie-mutation-baseline/sweep-state.json ]; then
             node scripts/test-quality-loop.mjs merge --out "$RUNNER_TEMP/with-baseline.json" \
               "$state_dir/sweep-state.json" .cache/jovie-mutation-baseline/sweep-state.json
@@ -344,6 +388,9 @@ jobs:
             --summary "$GITHUB_STEP_SUMMARY" "${ui_extra[@]}" || ui_status=$?
           # Stryker mutates in place; a killed module must not leave a mutant for apps/web tests.
           git checkout --quiet -- packages/ui
+          if [ "${NEXT_SELECTED:-false}" = true ]; then
+            node .github/scripts/mutation-next-target-cli.mjs finish
+          fi
           if [ "$UI_ONLY" != true ]; then
             nice -n 19 node scripts/mutation-sweep.mjs \
               --touch-file "$RUNNER_TEMP/ranked.json" \
@@ -369,21 +416,6 @@ jobs:
             --state ".cache/jovie-mutation/sweep-state.json" \
             --drafts ".cache/jovie-mutation/survivor-drafts.json"
 
-      # No clock: the backlog drains by chaining. The next run starts only if
-      # this one made progress and modules remain; a busy host stops the chain
-      # (the capacity step skipped), and the next main CI completion restarts it.
-      - name: Chain the next batch
-        if: inputs.mode != 'ui' && steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          queued=$(node packages/api-client/cli.ts gh --priority default -- api "repos/$GITHUB_REPOSITORY/actions/workflows/mutation-diff.yml/runs?status=queued&branch=main&per_page=1" --jq '.total_count')
-          active=$(node packages/api-client/cli.ts gh --priority default -- api "repos/$GITHUB_REPOSITORY/actions/workflows/mutation-diff.yml/runs?status=in_progress&branch=main&per_page=1" --jq '.total_count')
-          [[ "$queued" =~ ^[0-9]+$ && "$active" =~ ^[0-9]+$ ]] || { echo "Queued sweep inventory unknown; not dispatching."; exit 1; }
-          if [ "$queued" -gt 0 ] || [ "$active" -ne 1 ]; then echo "Mutation workflow inventory is not exclusive; no duplicate dispatch."; exit 0; fi
-          node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
-
       # Snapshot even a failed score/filing attempt. The cache remains the
       # state owner; copying evidence must not rewrite or clear its history.
       # Producer provenance does not refresh per-module tested SHA or input receipts.
@@ -392,9 +424,10 @@ jobs:
         if: ${{ always() && steps.score.outputs.admitted == 'true' && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
         env:
           SCORE_SHA: ${{ steps.score.outputs.sha }}
-          UI_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'ui' }}
-          UI_INCLUDE: ${{ steps.ui_scope.outputs.include || 'packages/ui/' }}
-          MAX_FILES: ${{ steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
+          UI_ONLY: ${{ steps.next_target.outputs.selected == 'true' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'ui') }}
+          UI_INCLUDE: ${{ steps.next_target.outputs.include || steps.ui_scope.outputs.include || 'packages/ui/' }}
+          MAX_FILES: ${{ steps.next_target.outputs.max_files || steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
+          NEXT_SELECTED: ${{ steps.next_target.outputs.selected == 'true' }}
         run: |
           set -euo pipefail
           state_dir=".cache/jovie-mutation"
@@ -407,6 +440,10 @@ jobs:
           done
           if [ -d "$state_dir/survivor-tasks" ]; then
             cp -R "$state_dir/survivor-tasks" "$out_dir/"
+          fi
+          [ ! -f "$state_dir/next-target-ledger.json" ] || cp "$state_dir/next-target-ledger.json" "$out_dir/"
+          if [ "${NEXT_SELECTED:-false}" = true ] && [ -f "$state_dir/next-target-result.json" ]; then
+            cp "$state_dir/next-target-result.json" "$out_dir/"
           fi
           export SNAPSHOT_DIR="$out_dir"
           node --input-type=module <<'NODE'
@@ -432,11 +469,13 @@ jobs:
             scope: { kind: process.env.UI_ONLY === 'true' ? 'ui' : 'rolling', include: process.env.UI_INCLUDE, maxFiles },
             runtime: { node: process.versions.node },
             stateSha256: hash('sweep-state.json'), attemptsSha256: hash('sweep-state.json.runs.jsonl'),
+            nextTargetLedgerSha256: hash('next-target-ledger.json'), nextTargetResultSha256: hash('next-target-result.json'),
           };
           writeFileSync(join(process.env.SNAPSHOT_DIR, 'producer-receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`);
           NODE
 
       - name: Save sweep state
+        id: save_state
         if: ${{ always() && steps.score.outputs.admitted == 'true' && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && steps.snapshot.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -444,6 +483,7 @@ jobs:
           key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload sweep state and survivor tasks
+        id: upload_state
         if: ${{ always() && steps.snapshot.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -451,6 +491,43 @@ jobs:
           path: ${{ runner.temp }}/sweep-out/
           retention-days: 30
           if-no-files-found: error
+
+      - name: Verify canonical publication
+        id: publication
+        if: ${{ always() && steps.snapshot.outcome == 'success' && steps.save_state.outcome == 'success' && steps.upload_state.outcome == 'success' && steps.score.outputs.admitted == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_SELECTED: ${{ steps.next_target.outputs.selected == 'true' }}
+          NEXT_PENDING: 'false'
+          ROLLING_ELIGIBLE: ${{ inputs.mode != 'ui' && steps.next_target.outputs.selected != 'true' && steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0' }}
+        run: node .github/scripts/mutation-next-target-cli.mjs published
+
+      - name: Reserve immutable continuation
+        id: continuation
+        if: steps.publication.outputs.wake == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-next-wake-${{ github.run_id }}
+          path: ${{ runner.temp }}/mutation-next/outbox.json
+          retention-days: 90
+          if-no-files-found: error
+
+      # One bounded wake after publication. An uncertain POST retains its
+      # immutable reservation; a rerun cannot silently send it again.
+      - name: Chain the next batch
+        if: inputs.mode != 'ui' && steps.publication.outputs.wake == 'true' && steps.continuation.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/mutation-next-target-cli.mjs dispatch
+
+      - name: Retain continuation acknowledgement
+        if: ${{ always() && steps.continuation.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-next-wake-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mutation-next/dispatch-result.json
+          retention-days: 90
+          if-no-files-found: warn
 
       # The persistent workspace keeps node_modules for the next run; the
       # Stryker sandbox, reports and per-module coverage must not accumulate.
