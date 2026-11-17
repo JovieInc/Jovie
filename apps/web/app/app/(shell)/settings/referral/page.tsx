@@ -1,3 +1,5 @@
+import { SettingsGroup } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsRow } from '@/components/molecules/settings/SettingsRow';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
@@ -35,27 +37,32 @@ export default async function SettingsReferralPage() {
     : null;
 
   return (
-    <SettingsSection
-      id='referral'
-      title='Referral'
-      description={`Earn ${COMMISSION_PERCENT}% of every payment from artists you refer, for up to ${DEFAULT_COMMISSION_DURATION_MONTHS} months.`}
-    >
+    <SettingsSection id='referral' title='Referral'>
       {code && shareUrl ? (
-        <div className='space-y-3'>
-          <ReferralCodeCopyClient shareUrl={shareUrl} />
-          <p className='text-xs text-secondary-token'>
-            Your code{' '}
-            <span className='font-medium text-primary-token'>{code}</span> is
-            applied when someone subscribes through your link.
-          </p>
-        </div>
+        <SettingsGroup title='Your link'>
+          <SettingsRow
+            title='Referral link'
+            description={`Earn ${COMMISSION_PERCENT}% of every payment from artists you refer, for up to ${DEFAULT_COMMISSION_DURATION_MONTHS} months.`}
+          >
+            <ReferralCodeCopyClient shareUrl={shareUrl} />
+          </SettingsRow>
+          <SettingsRow
+            title='Referral code'
+            description='Applied when someone subscribes through your link.'
+            control={
+              <span className='text-xs font-medium text-primary-token'>
+                {code}
+              </span>
+            }
+          />
+        </SettingsGroup>
       ) : (
-        <div className='py-4'>
-          <p className='text-app text-secondary'>
-            Your referral code isn&apos;t available right now. Refresh the page
-            to try again.
-          </p>
-        </div>
+        <SettingsGroup title='Your link'>
+          <SettingsRow
+            title='Referral link'
+            description="Your referral code isn't available right now. Refresh the page to try again."
+          />
+        </SettingsGroup>
       )}
     </SettingsSection>
   );

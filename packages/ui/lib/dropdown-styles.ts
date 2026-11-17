@@ -74,7 +74,7 @@ export const TOOLTIP_SURFACE_BASE =
  * system instead of a one-off className restyle (JOV-6773).
  */
 export const TOOLTIP_SURFACE_DANGER =
-  'border border-error/30 bg-error-subtle text-error shadow-sm';
+  'border border-error/30 bg-error-subtle text-error-text shadow-sm';
 
 /**
  * The shared rounded rectangle used by wrapped overlay content.
@@ -404,10 +404,15 @@ export const MENU_ICON_TRIGGER_BASE =
  * narrows into it instead of overflowing the screen edge.
  */
 export function submenuViewportFitStyle(
-  menu: 'dropdown-menu' | 'context-menu'
+  menu: 'dropdown-menu' | 'context-menu',
+  preferredMinWidth?: number | string
 ): { maxWidth: string; minWidth: string } {
   const available = `var(--radix-${menu}-content-available-width)`;
-  return { maxWidth: available, minWidth: `min(12rem, ${available})` };
+  const preferred =
+    typeof preferredMinWidth === 'number'
+      ? `${preferredMinWidth}px`
+      : (preferredMinWidth ?? '12rem');
+  return { maxWidth: available, minWidth: `min(${preferred}, ${available})` };
 }
 
 export const subMenuContentClasses = [

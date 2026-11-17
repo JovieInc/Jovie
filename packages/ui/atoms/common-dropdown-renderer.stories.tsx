@@ -107,8 +107,12 @@ function RendererMenu({
             /* A text input is not an allowed child of role="menu" (axe
                aria-required-children): the searchable surface presents as a
                group and the item rows keep an inner menu, mirroring
-               CommonDropdown's composition. */
+               CommonDropdown's composition. Radix hardcodes aria-orientation
+               on the content; orientation is not an allowed aria-* attribute
+               on role="group" (axe aria-allowed-attr), so strip it here just
+               like CommonDropdown does. */
             role='group'
+            aria-orientation={undefined}
             className={cn(DROPDOWN_CONTENT_BASE, 'w-64')}
           >
             <SearchableContent

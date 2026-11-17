@@ -1,0 +1,15 @@
+/* Preserve the gallery's grid/edge bleed while reusing canonical rail controls.
+   MarketingProductStates.css stays with its existing focus-system owner. */
+.marketing-phone-gallery-shell .marketing-snap-rail__frame {
+  overflow: visible;
+}
+
+.marketing-phone-gallery-shell .marketing-phone-gallery {
+  display: block;
+}
+
+/* Captions already sit next to their preview on desktop, where every state is
+   visible. The shared mobile controls reserve space before hydration. */
+.marketing-phone-gallery-shell .marketing-snap-rail__mobile-controls {
+  margin-bottom: var(--space-4);
+}

@@ -18,6 +18,12 @@ describe('ThemeToggleSegmented', () => {
 
     const toolbar = getByRole('toolbar', { name: 'Theme' });
     expect(toolbar).toBeInTheDocument();
+    for (const name of ['System Theme', 'Light Theme', 'Dark Theme']) {
+      expect(getByRole('button', { name })).toHaveAttribute(
+        'data-slot',
+        'plain-button'
+      );
+    }
     expect(getByRole('button', { name: 'System Theme' })).toBeInTheDocument();
     expect(getByRole('button', { name: 'System Theme' })).toHaveAttribute(
       'aria-pressed',

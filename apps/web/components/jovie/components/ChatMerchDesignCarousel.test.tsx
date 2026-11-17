@@ -52,6 +52,21 @@ const result: MerchDesignCarouselResult = {
 describe('ChatMerchDesignCarousel', () => {
   beforeEach(() => mutateMock.mockReset());
 
+  it('explains a pending concept review without inviting repeated paid generation', () => {
+    render(
+      <ChatMerchDesignCarousel
+        result={{ ...result, state: 'concept_review_required', designs: [] }}
+      />
+    );
+    expect(
+      screen.getByRole('region', { name: 'Merch Ideas Awaiting Review' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Try Again' })
+    ).not.toBeInTheDocument();
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
   it('shows exactly three compact selectable concepts without carousel chrome', () => {
     render(<ChatMerchDesignCarousel result={result} />);
 

@@ -39,14 +39,14 @@ function TasksUpgradeContent({
       )}
       data-testid={testId}
     >
-      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-amber-700'>
+      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-warning-text'>
         {compact ? (
           <Lock className='h-5 w-5' aria-hidden='true' />
         ) : (
           <CheckSquare className='h-5 w-5' aria-hidden='true' />
         )}
       </div>
-      <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
+      <h2 className='text-balance text-base font-semibold tracking-[-0.025em] text-primary-token'>
         {heading}
       </h2>
       <p className='mt-2 max-w-md text-app leading-normal text-secondary-token'>

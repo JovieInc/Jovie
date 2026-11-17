@@ -1,4 +1,6 @@
 // Prose-only view of a PR body: fenced blocks and inline code removed (moved out of pr-open.mjs).
+// scrubPrText strips secrets and personal data from PR text (canon/FLEET.md#routine-writes).
+export { scrubPrText } from '../secrets/redact.mjs';
 export function proseOnly(body) {
   let fence = '';
   return body

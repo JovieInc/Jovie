@@ -16,7 +16,7 @@ export const SHELL_H2_CLASS =
   'ap-shell-h2 font-bold text-primary-token text-balance';
 
 export const SHELL_EYEBROW_CLASS =
-  'ap-shell-eyebrow text-xs font-medium uppercase text-secondary-token';
+  'ap-shell-eyebrow text-xs font-medium text-secondary-token';
 
 export const SHELL_LEAD_CLASS =
   'ap-shell-lead text-secondary-token text-pretty';

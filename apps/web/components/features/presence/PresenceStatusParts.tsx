@@ -39,7 +39,8 @@ export function PresenceStatusBadge({
       <span
         className={cn(
           'inline-flex min-h-8 items-center gap-1.5 text-xs text-tertiary-token',
-          status.tone === 'success' && 'text-success-text',
+          // Healthy is the quiet default: colour only marks the rows that
+          // need attention (Tim, Nov 14: green on every row was noise).
           // JOV-8964: warning renders neutral — the loud orange read as an alarm.
           status.tone === 'warning' && 'text-secondary-token',
           status.tone === 'error' && 'text-error-text'
