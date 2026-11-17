@@ -105,6 +105,9 @@ def repair_files(cls, action, names, logs, per_check):
     wanted = {item_cls for item_cls, _ in per_check}
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in classes.COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
+    if "design-source-cli" in wanted and action == classes.SYNC_MAIN:
+        from fix_red_failure_routing import design_source_paths
+        files = sorted({path for name in names for path in design_source_paths(logs.get(name) or "")})
     if "ci-fast-wiring" in wanted and action in {classes.WIRE_CI_FAST, classes.COMPOSE}:
         for name in names:
             found = classes.UNWIRED.search(logs.get(name) or "")
