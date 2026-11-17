@@ -65,7 +65,7 @@ export function LibraryAssetShareUrlCell({
         )}
       >
         {copied ? (
-          <Check className='h-3 w-3 text-emerald-300' strokeWidth={2.25} />
+          <Check className='h-3 w-3 text-success' strokeWidth={2.25} />
         ) : (
           <Copy className='h-3 w-3' strokeWidth={2.25} />
         )}
