@@ -11,8 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { fileKindIcon } from './file-kind-icons';
@@ -85,6 +84,8 @@ function FileManifestRow({ file }: { readonly file: PendingFile }) {
           <img
             src={file.previewUrl}
             alt={file.name}
+            width={30}
+            height={30}
             className='h-full w-full object-cover'
           />
         ) : (
@@ -303,16 +304,16 @@ export function ChatUploadManifest({
                   {`Upgrade to ${PRO_PLAN_DISPLAY_NAME} for unlimited file uploads`}
                 </p>
               </div>
-              <Button
-                variant='secondary'
-                size='sm'
-                asChild
-                className='shrink-0'
-              >
-                <Link
-                  href={APP_ROUTES.PRICING}
-                >{`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}</Link>
-              </Button>
+              <UpgradeButton asChild>
+                <Button
+                  variant='secondary'
+                  size='sm'
+                  type='button'
+                  className='shrink-0'
+                >
+                  {`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}
+                </Button>
+              </UpgradeButton>
             </div>
           </div>
         ) : null}

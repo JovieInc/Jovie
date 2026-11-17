@@ -49,10 +49,10 @@ describe('profile mode render miss boundary', () => {
       }),
     });
 
-    expect(metadata).toEqual({
-      title: 'Not Found',
-      robots: RENDER_FIXTURE_METADATA.robots,
-    });
+    // Title only: the 404 render's automatic NonIndex noindex meta (status
+    // > 400) plus an explicit robots meta emitted TWO robots tags and failed
+    // the synthetic smoke's noindex-count-1 assertion (JOV-12153).
+    expect(metadata).toEqual({ title: 'Not Found' });
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(profileMetadata).not.toHaveBeenCalled();
   });

@@ -1,0 +1,341 @@
+"""Split a new vitest file that company guards rejected for crossing 500 lines.
+
+The size ratchet fails a file that is over 500 lines and absent from
+scripts/company-guards/size-baseline.json. Baselined growth stays with the
+model. This route moves trailing top-level suites into a sibling the original
+test imports, and moves shared helpers into one fixtures module. The original
+test file stays the ci-fast entry.
+"""
+from __future__ import annotations
+
+import re
+import subprocess
+from pathlib import Path
+
+import fix_red_size_500
+from atomic_state import atomic_write_text
+from fix_red_js_scan import code_names, parse_statements
+
+LIMIT = 500
+# Company guards prints this for a file that is not in the shrink-only baseline.
+# A "grew A -> B" line is a baselined file and must not match.
+SIZE_500_NEW = re.compile(
+    r"size-500: (?P<path>[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:mjs|js)): "
+    r"\d+ lines, over 500 and not baselined"
+)
+SIZE_BASELINE_GREW = re.compile(r"size-500: [A-Za-z0-9_./-]+: grew \d+ -> \d+")
+_TEST_FILE = re.compile(r"\.(?:test|spec)\.(?P<ext>mjs|js)$")
+_IMPORT = re.compile(
+    r"import\s+(.+?)\s+from\s+(['\"][^'\"]+['\"])\s*;?\s*$",
+    re.S,
+)
+
+
+def count_lines(text: str) -> int:
+    """Match company-guards size.mjs: split length, minus one when the file ends in a newline."""
+    return len(text.split("\n")) - (1 if text.endswith("\n") else 0)
+
+
+def paths_from_log(log: str) -> list[str]:
+    """Repo-relative vitest paths from `over 500 and not baselined` lines, in order."""
+    seen: list[str] = []
+    for match in SIZE_500_NEW.finditer(str(log or "")):
+        path = match.group("path")
+        if path not in seen:
+            seen.append(path)
+    return seen
+
+
+def legacy_hit(text: str, hit):
+    """Plain legacy size logs outrank fixture quota text, never annotated validation."""
+    if not fix_red_size_500._errors(text) and (hit is None or hit[0] in {"quota-deferred", "platform-infra"}):
+        if SIZE_500_NEW.search(text):
+            return "size-500-new", "split-size-500"
+        if SIZE_BASELINE_GREW.search(text):
+            return "size-baseline-grew", "sync-main"
+    return hit
+
+
+def _name_in(name: str, text: str) -> bool:
+    return name in code_names(text)
+
+
+def _referenced(text: str, names: list[str]) -> list[str]:
+    return [name for name in names if _name_in(name, text)]
+
+
+def _parse_import(text: str) -> dict | None:
+    match = _IMPORT.match(text.strip())
+    if not match:
+        return None
+    clause, module = match.group(1).strip(), match.group(2)
+    default = None
+    names: list[tuple[str, str]] = []
+    if clause.startswith("*"):
+        found = re.match(r"\*\s+as\s+([A-Za-z_$][\w$]*)", clause)
+        if not found:
+            return None
+        return {"module": module, "default": None, "names": [], "namespace": found.group(1)}
+    if clause.startswith("{"):
+        named = clause
+    elif "," in clause:
+        default, named = clause.split(",", 1)
+        default = default.strip()
+    else:
+        return {"module": module, "default": clause.strip(), "names": [], "namespace": None}
+    inner = named.strip().removeprefix("{").removesuffix("}")
+    for part in inner.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if " as " in part:
+            imported, local = [piece.strip() for piece in part.split(" as ", 1)]
+        else:
+            imported = local = part
+        if not re.match(r"[A-Za-z_$][\w$]*$", imported) or not re.match(r"[A-Za-z_$][\w$]*$", local):
+            return None
+        names.append((imported, local))
+    return {"module": module, "default": default, "names": names, "namespace": None}
+
+
+def _format_import(parsed: dict, used: set[str]) -> str | None:
+    parts: list[str] = []
+    if parsed["default"] and parsed["default"] in used:
+        parts.append(parsed["default"])
+    if parsed["namespace"] and parsed["namespace"] in used:
+        parts.append(f"* as {parsed['namespace']}")
+    named = [(imp, loc) for imp, loc in parsed["names"] if loc in used]
+    if named:
+        rendered = ", ".join(imp if imp == loc else f"{imp} as {loc}" for imp, loc in named)
+        parts.append("{ " + rendered + " }")
+    if not parts:
+        return None
+    return f"import {', '.join(parts)} from {parsed['module']};\n"
+
+
+def _imports_for(statements: list, body: str) -> str:
+    used = code_names(body)
+    lines: list[str] = []
+    for stmt in statements:
+        if stmt.kind != "import":
+            continue
+        parsed = _parse_import(stmt.text)
+        if parsed is None:
+            if code_names(stmt.text) & used:
+                lines.append(stmt.text.strip() + "\n")
+            continue
+        rendered = _format_import(parsed, used)
+        if rendered:
+            lines.append(rendered)
+    return "".join(lines)
+
+
+def _as_export(text: str) -> str:
+    stripped = text.strip("\n")
+    if re.search(r"(?m)^[ \t]*export\s+", stripped):
+        return stripped + "\n"
+    match = re.search(
+        r"(?m)^(?P<indent>[ \t]*)(?P<kw>(?:async\s+)?(?:function|class)|const|let|var)\b",
+        stripped,
+    )
+    if not match:
+        return stripped + "\n"
+    return stripped[:match.start("kw")] + "export " + stripped[match.start("kw"):] + "\n"
+
+
+def _indent(text: str) -> str:
+    return "\n".join(("  " + line) if line.strip() else "" for line in text.strip("\n").split("\n"))
+
+
+def _finish(*parts: str) -> str:
+    return "".join(parts).strip() + "\n"
+
+
+def _closure(seed: set[str], bindings: list) -> set[str]:
+    needed = set(seed)
+    changed = True
+    by_name = {stmt.names[0]: stmt for stmt in bindings if stmt.names}
+    while changed:
+        changed = False
+        for name in list(needed):
+            stmt = by_name.get(name)
+            if stmt is None:
+                continue
+            for other in by_name:
+                if other not in needed and _name_in(other, stmt.text):
+                    needed.add(other)
+                    changed = True
+    return needed
+
+
+def split_unbaselined_vitest(text: str, filename: str) -> dict[str, str] | None:
+    """Return {owner, fixtures, cases} or None when a safe split is not possible.
+
+    Every returned file is at most LIMIT lines. Trailing suites move into the
+    cases module, which the owner imports so an existing single-file vitest
+    command still collects them.
+    """
+    if count_lines(text) <= LIMIT or not _TEST_FILE.search(filename):
+        return None
+    if filename.startswith("/") or ".." in Path(filename).parts:
+        return None
+    statements = parse_statements(text)
+    if statements is None:
+        return None
+    # Import redistribution needs modeled bindings. Side-effect and other
+    # unsupported imports must stay with the model rather than disappear.
+    if any(stmt.kind == "import" and _parse_import(stmt.text) is None for stmt in statements):
+        return None
+    suites = [stmt for stmt in statements if stmt.kind in {"describe", "suite"}]
+    bindings = [stmt for stmt in statements if stmt.kind == "binding"]
+    if len(suites) < 2:
+        return None
+    path = Path(filename)
+    stem = _TEST_FILE.sub("", path.name)
+    ext = "." + _TEST_FILE.search(filename).group("ext")
+    fixtures = str(path.with_name(stem + ".fixtures" + ext))
+    cases = str(path.with_name(stem + ".cases" + ext))
+    for count in range(1, len(suites)):
+        pieces = _assemble(
+            filename, fixtures, cases, "./" + Path(fixtures).name, "./" + Path(cases).name,
+            statements, bindings, suites[:-count], suites[-count:],
+        )
+        if pieces and all(count_lines(body) <= LIMIT for body in pieces.values()):
+            return pieces
+    return None
+
+
+def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, bindings, kept, moved):
+    mocks = [stmt for stmt in statements if stmt.kind == "mock"]
+    mock_names = code_names("".join(stmt.text for stmt in mocks))
+    # Mock factories are hoisted ahead of imports. Moving their local state
+    # into an installer or imported fixture cannot preserve its scope/timing.
+    if any(stmt.names and stmt.names[0] in mock_names for stmt in bindings):
+        return None
+    suite_text = "\n".join(stmt.text for stmt in kept + moved)
+    exported = _closure(
+        {stmt.names[0] for stmt in bindings if _name_in(stmt.names[0], suite_text)},
+        bindings,
+    )
+    export_stmts = [stmt for stmt in bindings if stmt.names and stmt.names[0] in exported]
+    export_names = {stmt.names[0] for stmt in export_stmts}
+    hook_stmts = []
+    for stmt in statements:
+        if stmt.kind == "hook" or (stmt.kind == "binding" and stmt.names and stmt.names[0] not in exported):
+            hook_stmts.append(stmt)
+        elif stmt.kind == "other":
+            # Unmodelled setup or suites cannot be dropped or repeated in both
+            # installers. Leave the original intact for the normal repair route.
+            if any(_name_in(name, stmt.text) for name in export_names):
+                return None
+            hook_stmts.append(stmt)
+    installer = ""
+    names = [stmt.names[0] for stmt in export_stmts]
+    if hook_stmts:
+        installer = "export function installSplitSuiteHooks() {\n" + "\n".join(
+            _indent(stmt.text) for stmt in hook_stmts) + "\n}\n"
+        names.append("installSplitSuiteHooks")
+    fixtures_body = _finish(_imports_for(statements, "".join(
+        _as_export(stmt.text) for stmt in export_stmts) + installer),
+        "".join(_as_export(stmt.text) for stmt in export_stmts), installer)
+
+    def suite_file(suites: list, extra_mocks: bool, *, collect_cases: bool = False) -> str:
+        body = "".join(stmt.text.strip("\n") + "\n" for stmt in suites)
+        needed = _referenced(body, names)
+        if installer and "installSplitSuiteHooks" not in needed:
+            needed.append("installSplitSuiteHooks")
+        helper = f"import {{ {', '.join(needed)} }} from '{fixture_spec}';\n" if needed else ""
+        call = "installSplitSuiteHooks();\n" if installer else ""
+        mock_text = "".join(stmt.text.strip("\n") + "\n" for stmt in mocks) if extra_mocks else ""
+        collection = (
+            "// Collected by this file's vitest command; not a second test entry.\n"
+            f"import '{cases_spec}';\n"
+        ) if collect_cases else ""
+        return _finish(_imports_for(statements, mock_text + body), helper, collection, mock_text, call, body)
+
+    import_locals: set[str] = set()
+    for stmt in statements:
+        if stmt.kind != "import":
+            continue
+        parsed = _parse_import(stmt.text)
+        if parsed is None:
+            continue
+        if parsed["default"]:
+            import_locals.add(parsed["default"])
+        if parsed["namespace"]:
+            import_locals.add(parsed["namespace"])
+        import_locals.update(local for _imported, local in parsed["names"])
+    mock_text = "".join(stmt.text for stmt in mocks)
+    moved_text = "".join(stmt.text for stmt in moved)
+    cases_mocks = any(_name_in(local, moved_text) and _name_in(local, mock_text) for local in import_locals)
+    pieces = {filename: suite_file(kept, True, collect_cases=True),
+              fixtures: fixtures_body, cases: suite_file(moved, cases_mocks)}
+    if any(not body.strip() for body in pieces.values()):
+        return None
+    return pieces
+
+
+def bind(sh, failed_logs):
+    """Keep current annotated validation authoritative when serving legacy routes."""
+    strict = fix_red_size_500.bind(sh, failed_logs)
+
+    def fix(host, pr, route, worktree, log, receipt):
+        text = fix_red_size_500._log_text(failed_logs, host, pr)
+        if fix_red_size_500._errors(text):
+            if set(paths_from_log(text)) - set(fix_red_size_500.paths(text)):
+                return None
+            return strict(host, pr, route, worktree, log, receipt)
+        files = paths_from_log(text)
+        if not files or any(path not in ((route or {}).get("files") or []) for path in files):
+            return None
+        return apply(sh, pr, worktree, log, receipt, files)
+
+    return fix
+
+
+def apply(sh, pr, worktree, log, receipt, files):
+    """Split each listed vitest file in `worktree`, then commit and push. None when nothing applies."""
+    root = Path(worktree)
+    branch = fix_red_size_500._branch_of(pr)
+    if branch is None:
+        return None
+    changed: list[str] = []
+    saved = {}
+    try:
+        for rel in files or []:
+            rel = str(rel).replace("\\", "/")
+            source = fix_red_size_500._safe(root, rel)
+            if source is None or not source.is_file():
+                continue
+            pieces = split_unbaselined_vitest(source.read_text(), rel)
+            if not pieces or any(name != rel and (root / name).exists() for name in pieces):
+                continue
+            for name, body in pieces.items():
+                dest = fix_red_size_500._safe(root, name)
+                if dest is None or count_lines(body) > LIMIT:
+                    fix_red_size_500._restore(saved)
+                    return None
+                saved.setdefault(dest, dest.read_text() if dest.is_file() else None)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(dest, body)
+                changed.append(name)
+    except OSError:
+        fix_red_size_500._restore(saved)
+        return None
+    if not changed:
+        return None
+    message = "fix(ci): split unbaselined vitest files under the 500-line guard"
+
+    def checked_sh(args, **kwargs):
+        try:
+            return sh(args, **kwargs)
+        except subprocess.TimeoutExpired:
+            # Validator failure is safe to roll back before git is touched.
+            # A git timeout has uncertain effects and must reach the caller.
+            if args[:2] != ["node", "--check"]:
+                raise
+            return subprocess.CompletedProcess(args, returncode=124)
+
+    return fix_red_size_500._land(
+        checked_sh, root, log, branch, changed, saved, receipt, "split-size-500",
+        message=message, typescript=False, splitFiles=changed)

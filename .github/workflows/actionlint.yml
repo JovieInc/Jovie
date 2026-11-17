@@ -26,6 +26,14 @@ jobs:
         --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Same main-written, sha256-verified download cache as ci-fast; read-only.
+      - name: Restore pinned actionlint downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - name: Set up Go for source-pinned actionlint
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -35,6 +43,7 @@ jobs:
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
         run: bash .github/scripts/run-actionlint.sh
       - name: Verify agent workflow hygiene
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
-import { AuthOfferSummary } from '@/components/features/auth/AuthOfferSummary';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import {
   HOMEPAGE_PROMPT_HINT_TRUNCATE,
@@ -30,11 +29,7 @@ import { sanitizeRedirectUrl } from '@/lib/auth/constants';
  * Refresh on /signup renders the full-page /signup instead (intercepts
  * don't survive reload).
  */
-export function SignupModalClient({
-  showOfferSummary = false,
-}: Readonly<{
-  readonly showOfferSummary?: boolean;
-}> = {}) {
+export function SignupModalClient() {
   const searchParams = useSearchParams();
   const [promptHint, setPromptHint] = useState<string | null>(null);
 
@@ -91,7 +86,6 @@ export function SignupModalClient({
         backButtonLabel={backLabel}
         backDestination={backDestination}
       >
-        {showOfferSummary ? <AuthOfferSummary mode='sign-up' enabled /> : null}
         <AuthShell
           mode='sign-up'
           compact

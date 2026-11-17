@@ -6,6 +6,7 @@ import { TOAST_DURATIONS } from '@/components/feedback/toast';
 interface ToasterPropsSnapshot {
   readonly theme?: string;
   readonly position?: string;
+  readonly dir?: string;
   readonly expand?: boolean;
   readonly closeButton?: boolean;
   readonly richColors?: boolean;
@@ -93,6 +94,7 @@ describe('FeedbackProvider toast viewport', () => {
     expect(props).toMatchObject({
       theme: 'dark',
       position: 'bottom-right',
+      dir: 'ltr',
       expand: true,
       closeButton: true,
       richColors: false,

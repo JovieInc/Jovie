@@ -90,3 +90,56 @@ export const OtpSequence: Story = {
     </fieldset>
   ),
 };
+
+export const PartialCode: Story = {
+  name: 'Partial (2 of 6 entered)',
+  render: OtpSequence.render,
+};
+
+export const RtlSequence: Story = {
+  name: 'Right-to-left row',
+  render: args => (
+    <fieldset dir='rtl' className='flex justify-center gap-2 border-0 p-0'>
+      <legend className='sr-only'>رمز التحقق</legend>
+      {OTP_SEQUENCE_SLOTS.map(({ slot, digit }, index) => (
+        <SegmentedDigitBox
+          {...args}
+          key={slot}
+          digit={digit}
+          index={index}
+          isFocused={index === 2}
+          ariaLabel={`Digit ${index + 1} of 6`}
+        />
+      ))}
+    </fieldset>
+  ),
+};
+
+// Only the required props: no error, paste handler, autocomplete hint or
+// described-by id.
+export const PartialRequiredPropsOnly: Story = {
+  args: {
+    digit: '7',
+  },
+};
+
+// A pasted multi-character value before the parent trims it to one digit.
+export const LongContentPastedValue: Story = {
+  args: {
+    digit: '123456',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    digit: '٤',
+    ariaLabel: 'الرقم ١ من ٦',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

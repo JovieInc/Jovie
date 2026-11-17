@@ -1,5 +1,5 @@
 import { APP_NAME } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { wordmarkGeometry } from '@/lib/brand/primitives';
 import { Artist } from '@/types/db';
 
@@ -32,7 +32,7 @@ export async function generateFooterHTML({
     >${wordmark.glyphs.map(glyph => `<path d="${glyph.d}"/>`).join('')}</svg>
   `;
 
-  const signUpLink = `/sign-up?utm_source=${utmSource}&utm_artist=${artist.handle}`;
+  const signUpLink = `${PUBLIC_ENTRY_HREF}?utm_source=${utmSource}&utm_artist=${artist.handle}`;
 
   return `
     <footer class="mt-8 border-t border-gray-200 pt-6">
@@ -48,7 +48,7 @@ export async function generateFooterHTML({
           href="${signUpLink}"
           class="text-xs text-gray-500 hover:text-indigo-600 font-medium transition-colors"
         >
-          Join the waitlist
+          Claim your profile
         </a>
 
         <div class="mt-4 pt-4 border-t border-gray-100">

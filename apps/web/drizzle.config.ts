@@ -9,6 +9,7 @@ export default defineConfig({
   schema: [
     './lib/db/schema/activation-pilot.ts',
     './lib/db/schema/index.ts',
+    './lib/db/schema/pmf-survey.ts',
     './lib/db/schema/signup-replays.ts',
     './lib/db/schema/track-daily-snapshots.ts',
   ],

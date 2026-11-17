@@ -1,5 +1,6 @@
 'use client';
 
+import { getInitials } from '@jovie/ui';
 import { type MotionProps, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { Avatar } from '@/components/molecules/Avatar';
@@ -89,7 +90,16 @@ export function ArtistCard({
     >
       <Link
         href={`/${handle}`}
-        aria-label={`View ${name}'s profile`}
+        // The no-photo fallback renders the artist's initials as visible text
+        // inside the link; the accessible name must include them or speech
+        // input pointing at the rendered glyphs cannot match (axe
+        // label-content-name-mismatch). The image path's visible text is the
+        // name itself, which the base label already carries.
+        aria-label={
+          src
+            ? `View ${name}'s profile`
+            : `View ${name}'s profile — ${getInitials(name)}`
+        }
         title={name}
         className='group block cursor-pointer'
       >

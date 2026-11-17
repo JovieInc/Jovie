@@ -9,6 +9,7 @@ import {
 import { env } from '@/lib/env-client';
 import { useVersionMonitor } from '@/lib/hooks/useVersionMonitor';
 import { getVersionUpdateTitle } from './getVersionUpdateTitle';
+import { RuntimeUpdatePill } from './RuntimeUpdatePill';
 
 interface RuntimeUpdate {
   readonly available: boolean;
@@ -19,7 +20,10 @@ interface RuntimeUpdate {
 }
 const RuntimeUpdateContext = createContext<RuntimeUpdate | null>(null);
 
-/** Keep existing updater events alive across routes; Inbox owns their display. */
+/**
+ * Keep existing updater events alive across routes and show a pending update
+ * as a quiet bottom-corner pill, outside every route's page content.
+ */
 export function RuntimeUpdateProvider({
   children,
 }: {
@@ -66,6 +70,19 @@ export function RuntimeUpdateProvider({
       value={{ available, busy, title, description, apply }}
     >
       <DesktopUpdateProvider>{children}</DesktopUpdateProvider>
+      {/* Always mounted, so screen readers announce the update when the text
+          arrives; a live region inserted with its content is often missed. */}
+      <p role='status' className='sr-only' data-testid='runtime-update-status'>
+        {available ? title : ''}
+      </p>
+      {available ? (
+        <RuntimeUpdatePill
+          title={title}
+          description={description}
+          busy={busy}
+          onApply={apply}
+        />
+      ) : null}
     </RuntimeUpdateContext.Provider>
   );
 }

@@ -148,8 +148,13 @@ def _decide_budget(state, priority, costs, now_ms, write, min_write_interval_ms,
     return decision("go", None, "breaker-probe" if probe else "admitted", probe)
 
 
-def observe(state: dict, observations, now_ms: int) -> None:
-    """Fold response headers into the shared buckets. Server truth wins."""
+def observe(state: dict, observations, now_ms: int, conservative: bool = False) -> None:
+    """Fold response headers into the shared buckets.
+
+    gh's concurrent reservations cannot be restored by a late response in the same
+    window. Keep those debits until the provider reset (60s for untimed evidence).
+    Other adapters retain their existing server-authoritative reconciliation.
+    """
     for obs in observations:
         current = state["buckets"].get(obs["resource"])
         if (current and current.get("resetAt") is not None and obs.get("resetAt") is not None
@@ -158,8 +163,16 @@ def observe(state: dict, observations, now_ms: int) -> None:
         limit = obs.get("limit")
         if limit is None and current:
             limit = current.get("limit")
-        state["buckets"][obs["resource"]] = {"limit": limit, "remaining": obs["remaining"],
-                                             "resetAt": obs.get("resetAt"), "observedAt": now_ms}
+        same_window = current and (obs.get("resetAt") is None or current.get("resetAt") is None
+                                   or current.get("resetAt") == obs.get("resetAt"))
+        live = current and now_ms < (current.get("resetAt") if current.get("resetAt") is not None
+                                     else current["observedAt"] + UNTIMED_OBSERVATION_MS)
+        retain = conservative and same_window and live
+        remaining = min(current["remaining"], obs["remaining"]) if retain else obs["remaining"]
+        reset_at = current.get("resetAt") if retain and obs.get("resetAt") is None else obs.get("resetAt")
+        state["buckets"][obs["resource"]] = {"limit": limit, "remaining": remaining,
+                                             "resetAt": reset_at,
+                                             "observedAt": current["observedAt"] if retain and reset_at is None else now_ms}
 
 
 def _open(breaker: dict, until: int, reason: str) -> dict:

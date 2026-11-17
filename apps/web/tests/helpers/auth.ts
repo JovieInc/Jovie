@@ -251,16 +251,36 @@ export async function setTestAuthBypassSession(
     persona === null && overrideUserId && !overrideUserId.startsWith('e2e-')
       ? overrideUserId
       : undefined;
-  const response = await page.request.post(
-    `${baseUrl}/api/dev/test-auth/session`,
-    {
-      data: {
-        persona: provisionedPersona,
-        ...(existingUserId ? { existingUserId } : {}),
-        ...(options?.email ? { email: options.email } : {}),
-      },
+  // JOV-12753: the standalone server occasionally resets an idle keep-alive
+  // socket under the visual suites' worker concurrency (apiRequestContext.post
+  // read ECONNRESET, flaky-recovered on retry in run 43944168912). A thrown
+  // network failure here writes a Playwright error-context artifact whose
+  // call log embeds the live session cookie — which the artifact guard then
+  // blocks as credential-text and fails the whole lane. Retry only thrown
+  // connection errors; HTTP error statuses still fail closed on the first
+  // response, and the guard is untouched.
+  const attempts = 3;
+  let response!: Awaited<ReturnType<typeof page.request.post>>;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      response = await page.request.post(
+        `${baseUrl}/api/dev/test-auth/session`,
+        {
+          data: {
+            persona: provisionedPersona,
+            ...(existingUserId ? { existingUserId } : {}),
+            ...(options?.email ? { email: options.email } : {}),
+          },
+        }
+      );
+      break;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      await new Promise(resolve => {
+        setTimeout(resolve, 250 * attempt);
+      });
     }
-  );
+  }
   const body = (await response.json().catch(() => null)) as {
     success?: boolean;
     userId?: string | null;
