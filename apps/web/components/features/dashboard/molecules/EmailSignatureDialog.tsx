@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -20,7 +20,7 @@ interface EmailSignatureDialogProps {
 }
 
 function buildPreviewDocument(signatureHtml: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;padding:16px;background:transparent;color:#0d0e12;}img{max-width:100%;}</style></head><body>${signatureHtml}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;padding:16px;background:transparent;}img{max-width:100%;}</style></head><body>${signatureHtml}</body></html>`;
 }
 
 export function EmailSignatureDialog({
@@ -37,21 +37,34 @@ export function EmailSignatureDialog({
     [signature]
   );
   const [recentCopy, setRecentCopy] = useState<CopyKind | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+  const pendingCopy = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setRecentCopy(null);
-      return;
-    }
+    return () => pendingCopy.current?.abort();
+  }, [open, signature]);
+
+  // Closing drops the copied feedback during render, so no effect has to
+  // reset state when the open prop changes.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setRecentCopy(null);
+  }
+
+  useEffect(() => {
     if (recentCopy === null) return;
     const timeout = setTimeout(() => setRecentCopy(null), 1800);
     return () => clearTimeout(timeout);
-  }, [open, recentCopy]);
+  }, [recentCopy]);
 
   const handleCopy = async (kind: CopyKind) => {
     if (!signature) return;
+    pendingCopy.current?.abort();
+    const request = new AbortController();
+    pendingCopy.current = request;
     const payload = kind === 'html' ? signature.html : signature.text;
     const ok = await copyToClipboard(payload);
+    if (request.signal.aborted) return;
     if (ok) {
       setRecentCopy(kind);
       toast.success(
