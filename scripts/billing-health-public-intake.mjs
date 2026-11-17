@@ -8,6 +8,7 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const BILLING_HEALTH_PUBLIC_KEY = 'billing-health-public';
 
@@ -88,19 +89,36 @@ export async function applyBillingHealthPublicPlan(
   });
 }
 
-async function main() {
-  const status = Number.parseInt(process.env.BILLING_HEALTH_STATUS || '', 10);
+/**
+ * Linear rate limits defer the signal (visible warning + job summary) instead
+ * of failing the probe verdict; every other failure still throws.
+ * @param {{ env?: typeof process.env, fetchImpl?: typeof fetch }} [options]
+ */
+export async function runBillingHealthPublicIntake({
+  env = process.env,
+  fetchImpl,
+} = {}) {
+  const status = Number.parseInt(env.BILLING_HEALTH_STATUS || '', 10);
   const plan = planBillingHealthPublic(
     status,
-    readBillingHealthResponse(process.env.BILLING_HEALTH_RESPONSE_FILE)
+    readBillingHealthResponse(env.BILLING_HEALTH_RESPONSE_FILE)
   );
-  const result = await applyBillingHealthPublicPlan(plan, {
-    runId: process.env.GITHUB_RUN_ID,
-  });
+  const result = await withLinearRateLimitRetry(
+    () =>
+      applyBillingHealthPublicPlan(plan, {
+        runId: env.GITHUB_RUN_ID,
+        fetchImpl,
+      }),
+    { label: 'billing health public probe' }
+  );
   if (!result.ok) {
     throw new Error(`Billing health public intake failed: ${result.reason}`);
   }
-  console.log(JSON.stringify(result));
+  return result;
+}
+
+async function main() {
+  console.log(JSON.stringify(await runBillingHealthPublicIntake()));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

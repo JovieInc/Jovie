@@ -67,8 +67,7 @@ import migration_renumber  # noqa: E402  (no-model fix for migration number coll
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
-import fix_red_compose, fix_red_mixed_repairs  # noqa: E401,E402
-import fix_red_size_split  # noqa: E402
+import fix_red_compose, fix_red_mixed_repairs, fix_red_size_split  # noqa: E401,E402
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -158,6 +157,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
+              "scripts/tests/test_reason_events.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
               "scripts/tests/test_quota_rerun.py",
@@ -226,7 +226,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-registry.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
-                  "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
+                  "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs", "scripts/invariants/screen-proof-transport.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
