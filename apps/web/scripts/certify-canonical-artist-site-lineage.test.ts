@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { CanonicalArtistSiteCliOptions } from './certify-canonical-artist-site';
 import { certifyCanonicalArtistSite } from './certify-canonical-artist-site';
 import {
@@ -393,41 +393,26 @@ describe('CLI quota deferral preserves independent failures', () => {
       }
       const history = join(directory, 'history.txt');
       writeFileSync(history, '');
-      const args = [
-        '--candidate-id',
-        kind === 'integrity' ? 'x'.repeat(201) : options.candidateId,
-        '--run-id',
-        options.runId,
-        '--source-revision',
-        'a'.repeat(40),
-        '--run-url',
-        options.runUrl,
-        '--golden-path-status',
-        'success',
-        '--claim-contract-status',
-        kind === 'claim' ? 'failure' : 'success',
-        '--waitlist-status',
-        'success',
-        '--m2-status',
-        'success',
-        '--m2-receipt',
-        options.m2ReceiptPath,
-        '--profile-status',
-        'success',
-        '--navigation-status',
-        kind === 'navigation' ? 'failure' : 'success',
-        '--profile-result',
-        options.profileResultPath,
-        '--source-history',
-        history,
-        '--git-root',
-        directory,
-        '--output',
-        options.outputPath,
+      const args = Object.entries({
+        ...options,
+        candidateId:
+          kind === 'integrity' ? 'x'.repeat(201) : options.candidateId,
+        sourceRevision: 'a'.repeat(40),
+        claimContractStatus: kind === 'claim' ? 'failure' : 'success',
+        navigationStatus: kind === 'navigation' ? 'failure' : 'success',
+        sourceHistory: history,
+        gitRoot: directory,
         ...(kind === 'journey'
-          ? ['--journey-report', join(directory, 'missing-report.json')]
-          : []),
-      ];
+          ? { journeyReportPath: join(directory, 'missing-report.json') }
+          : {}),
+      }).flatMap(([name, value]) =>
+        typeof value === 'string'
+          ? [
+              `--${name.replace(/Path$/, '').replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`,
+              value,
+            ]
+          : []
+      );
       const result = spawnSync(
         process.execPath,
         [
@@ -439,19 +424,12 @@ describe('CLI quota deferral preserves independent failures', () => {
         { cwd: process.cwd(), encoding: 'utf8' }
       );
       const certificate = JSON.parse(readFileSync(options.outputPath, 'utf8'));
-      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      try {
-        expect(
-          reportCanonicalCertificate(
-            certificate,
-            'github-quota-deferred: fixture'
-          )
-        ).toBe(exit);
-      } finally {
-        log.mockRestore();
-        error.mockRestore();
-      }
+      expect(
+        reportCanonicalCertificate(
+          certificate,
+          'github-quota-deferred: fixture'
+        )
+      ).toBe(exit);
       expect(result.status, result.stderr).toBe(exit);
       expect(certificate.status).toBe('RED');
       expect(certificate.safeToSend).toBe(false);

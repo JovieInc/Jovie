@@ -346,37 +346,25 @@ describe('revenue checks read their own spec, not the whole journey step', () =>
     );
   });
 
+  const execution = (
+    status: string,
+    expectedStatus = 'passed',
+    attempts = [status]
+  ) => ({
+    status,
+    expectedStatus,
+    results: attempts.map(status => ({ status })),
+  });
   it.each([
     { name: 'zero executed tests', tests: [] },
-    {
-      name: 'a skipped test',
-      tests: [
-        {
-          status: 'skipped',
-          expectedStatus: 'passed',
-          results: [{ status: 'skipped' }],
-        },
-      ],
-    },
+    { name: 'a skipped test', tests: [execution('skipped')] },
     {
       name: 'an expected failure',
-      tests: [
-        {
-          status: 'expected',
-          expectedStatus: 'failed',
-          results: [{ status: 'failed' }],
-        },
-      ],
+      tests: [execution('expected', 'failed', ['failed'])],
     },
     {
       name: 'a flaky retry',
-      tests: [
-        {
-          status: 'flaky',
-          expectedStatus: 'passed',
-          results: [{ status: 'failed' }, { status: 'passed' }],
-        },
-      ],
+      tests: [execution('flaky', 'passed', ['failed', 'passed'])],
     },
   ])('rejects $name even when Playwright spec.ok is true', ({ tests }) => {
     const options = fixture();
