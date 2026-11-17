@@ -8,13 +8,24 @@ import subprocess
 
 # Inherited design identities removed on main need the existing one-sync-per-head
 # route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
-DESIGN_SOURCE_CLI = re.compile(
+# failure plus a typed identity, or a zero-new-identity failure excerpt. The
+# latter fails only the trusted-base comparison; sync once before source repair.
+_DESIGN_SOURCE_CLI = re.compile(
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
     r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
     r"(?:apps/web|packages/ui)/[^\t\n]+\t"
-    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+")
+    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+|"
+    r"\[design-system-source-ratchet\] FAIL[^\n]* — \d+ identities "
+    r"\(0 new / baseline \d+\)")
+
+
+class DesignSourceCliFailure:
+    def search(self, text):
+        return _DESIGN_SOURCE_CLI.search(_ANSI.sub('', str(text or '')))
+
+
+DESIGN_SOURCE_CLI = DesignSourceCliFailure()
 
 # A local TS2307 can mean a prerequisite has landed on main while the PR is
 # BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
