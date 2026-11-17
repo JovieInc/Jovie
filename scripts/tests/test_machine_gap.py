@@ -87,7 +87,7 @@ class GateTest(unittest.TestCase):
         log = "\n".join([
             "### merge group: CI",
             "AssertionError [ERR_ASSERTION]: stub warden was invoked",
-            "Error: ENOENT: no such file or directory, open '/tmp/jovie-warden-args-SvBoGP/args'",
+            "Error: ENOENT: marker file missing",
         ])
         named = gap.check_fingerprint({
             "statusCheckRollup": [{"name": "CI", "conclusion": "SUCCESS"}],
