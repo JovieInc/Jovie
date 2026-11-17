@@ -27,12 +27,18 @@ export interface CertificationRecordBackend {
     nextValue: string,
     ttlSeconds: number
   ): Promise<boolean>;
-  /** Optional backend capability; committed packet revisions use exact-key reads. */
+  /** Optional lexically ordered prefix scan for compatible backend callers. */
   listRecords?(
     prefix: string,
     after: string | undefined,
     limit: number
   ): Promise<Array<{ key: string; value: unknown }>>;
+  /**
+   * Optional multi-get (JOV-12821): one round trip for many keys. Backends
+   * without it fall back to per-key gets; absent keys are simply missing from
+   * the returned map.
+   */
+  getMany?(keys: readonly string[]): Promise<Map<string, unknown>>;
 }
 
 export const CERTIFICATION_PERSISTENCE_TTL_SECONDS = 315_576_000;
@@ -346,7 +352,7 @@ export function createCertificationPacketStorage(config: {
     ledger: MarketingCertificationLedger;
     inlineBacklog: ReadonlySet<string>;
   }> {
-    const rows = new Map<string, unknown>();
+    let rows = new Map<string, unknown>();
     const needed = new Set(
       Object.values(hot.records)
         .filter(record => record.packet === undefined)
@@ -354,9 +360,13 @@ export function createCertificationPacketStorage(config: {
     );
     // Read only revisions committed by the hot row; abandoned and historical
     // revisions must not make projection cost grow with past writes.
-    await Promise.all(
-      [...needed].map(async key => rows.set(key, await backend.get(key)))
-    );
+    if (backend.getMany && needed.size > 0) {
+      rows = await backend.getMany([...needed]);
+    } else {
+      await Promise.all(
+        [...needed].map(async key => rows.set(key, await backend.get(key)))
+      );
+    }
     const records: Record<string, MarketingCertificationRecord> = {};
     const inlineBacklog = new Set<string>();
     for (const [id, record] of Object.entries(hot.records)) {

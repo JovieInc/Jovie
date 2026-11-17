@@ -1461,7 +1461,7 @@ describe('MarketingCertificationStore', () => {
     await store.ingestPacket(packet(FIRST), at('05:00'));
     expect(records.get(STORE_KEY)).toBe(before);
   });
-  it.each(['get', 'scan'])(
+  it.each(['get', 'batch'])(
     'fails closed for malformed shards with %s backend capability',
     async mode => {
       for (const corruption of [
@@ -1475,15 +1475,15 @@ describe('MarketingCertificationStore', () => {
       ]) {
         const records = new Map<string, unknown>();
         const backend = memoryBackend(records);
-        if (mode === 'scan')
-          backend.listRecords = async (prefix, after, limit) =>
-            [...records]
-              .filter(
-                ([key]) => key.startsWith(prefix) && (!after || key > after)
-              )
-              .sort(([left], [right]) => left.localeCompare(right))
-              .slice(0, limit)
-              .map(([key, value]) => ({ key, value }));
+        if (mode === 'batch') {
+          backend.getMany = async keys =>
+            new Map(keys.map(key => [key, records.get(key)]));
+          const get = backend.get;
+          backend.get = async key => {
+            expect(key.startsWith(SHARD_PREFIX)).toBe(false);
+            return get(key);
+          };
+        }
         const store = new Store(backend, REGISTRY);
         await store.ingestPacket(packet(FIRST), at('00:00'));
         await store.ingestPacket(packet(SECOND), at('00:01'));
