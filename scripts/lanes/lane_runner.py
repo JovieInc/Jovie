@@ -159,6 +159,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_reason_dependencies.py",
               "scripts/tests/test_quota_rerun.py",
               "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
@@ -175,6 +176,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+                  "scripts/hyperagent/hyperagent.py", "scripts/hyperagent/models.json",
                   "scripts/tests/test_size_500_stale.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",

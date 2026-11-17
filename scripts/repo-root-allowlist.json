@@ -11,6 +11,7 @@
     ".commitlintrc.json",
     ".conductor",
     ".context",
+    ".coveragerc",
     ".cursor",
     ".design-sync",
     ".design-sync-marketing",
