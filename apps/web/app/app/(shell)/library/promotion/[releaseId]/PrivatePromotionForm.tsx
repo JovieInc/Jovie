@@ -57,9 +57,7 @@ export function PrivatePromotionForm({
 
   return (
     <section className='mx-auto flex w-full max-w-2xl flex-col gap-4 p-4'>
-      <h1 className='line-clamp-2 text-xl font-medium'>
-        {title}
-      </h1>
+      <h1 className='line-clamp-2 text-xl font-medium'>{title}</h1>
       {copy === null && (
         <>
           <label htmlFor='promotion-angle'>
