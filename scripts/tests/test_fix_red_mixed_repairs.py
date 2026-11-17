@@ -125,3 +125,28 @@ class MixedRepairTest(unittest.TestCase):
         self.assertEqual(claimed, [(None, {"number": 1, "body": "## Summary\n"}, "mixed-body-repairs")])
         self.assertIsNone(ensure.call_args.kwargs.get("win_section"))
         self.assertEqual(ensure.call_args.kwargs["customer_decision"], {"releaseWorthy": False})
+
+
+class OwnedChangelogStampTest(unittest.TestCase):
+    def test_rebound_runner_cannot_replace_the_owning_publisher(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        import fix_red_mixed_repairs as mixed
+        owner = SimpleNamespace(fix_red_classes=SimpleNamespace(stamp_internal_changelog=Mock(return_value="stamped")),
+                                _publish_pr_body=Mock(return_value=False))
+        other = Mock()
+        pr_value = {"number": 7, "body": "bare"}
+        with patch.dict(sys.modules, {"lane_runner": other}):
+            self.assertFalse(mixed.stamp_changelog_decision(owner, "host", pr_value))
+        owner.fix_red_classes.stamp_internal_changelog.assert_called_once_with("bare")
+        owner._publish_pr_body.assert_called_once_with("host", pr_value, "changelog", "stamped")
+        other.assert_not_called()
+
+    def test_an_unstampable_body_never_calls_the_publisher(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import fix_red_mixed_repairs as mixed
+        owner = SimpleNamespace(fix_red_classes=SimpleNamespace(stamp_internal_changelog=Mock(return_value=None)),
+                                _publish_pr_body=Mock())
+        self.assertFalse(mixed.stamp_changelog_decision(owner, "host", {"body": "not stampable"}))
+        owner._publish_pr_body.assert_not_called()
