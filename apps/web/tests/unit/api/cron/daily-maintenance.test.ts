@@ -132,6 +132,16 @@ vi.mock('@/lib/music-resolver/resolve-parity.server', () => ({
   readShadowParitySummary: mockReadShadowParitySummary,
 }));
 
+async function runDailyMaintenance() {
+  const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+  const response = await GET(
+    new Request('http://localhost/api/cron/daily-maintenance', {
+      headers: { Authorization: 'Bearer test-secret' },
+    })
+  );
+  return { response, data: await response.json() };
+}
+
 describe('GET /api/cron/daily-maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -256,13 +266,7 @@ describe('GET /api/cron/daily-maintenance', () => {
   });
 
   it('runs all daily maintenance sub-jobs with valid auth', async () => {
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
@@ -361,13 +365,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       falseLinkAlarm: { firing: true, candidateFalseLinks: 1, rate: 1 },
       families: [],
     });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { data } = await runDailyMaintenance();
     expect(data.results.musicResolverParity.data.falseLinkAlarm.firing).toBe(
       true
     );
@@ -386,13 +384,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     );
     mockAutostartDesignPartnerAutopilot.mockRejectedValueOnce(refusal);
 
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.success).toBe(false);
@@ -422,13 +414,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       failed: 1,
     });
 
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.releaseOutcomeReconciliation).toMatchObject({
@@ -445,13 +431,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       state: 'unavailable',
       mrrCents: null,
     });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.lybDailyMrr).toMatchObject({
@@ -463,13 +443,7 @@ describe('GET /api/cron/daily-maintenance', () => {
 
   it('skips the unbound MRR feed without failing existing maintenance', async () => {
     vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', undefined);
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(200);
     expect(data.results.lybDailyMrr).toMatchObject({
@@ -488,13 +462,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       failed: 1,
     });
 
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.founderReviewUploadLeases).toMatchObject({
@@ -509,13 +477,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       healedMissingEntries: 2,
       stalePending: 1,
     });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.waitlistAdmission.success).toBe(false);
