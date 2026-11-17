@@ -11,6 +11,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 function trackedModes(pathspec) {
   return new Map(
     execFileSync('git', ['ls-files', '-s', '--', pathspec], {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: ROOT,
       encoding: 'utf8',
     })

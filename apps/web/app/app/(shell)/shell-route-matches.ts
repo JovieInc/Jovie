@@ -85,6 +85,11 @@ export function resolveAppShellLoadingPath(
   return null;
 }
 
+/** Home (`/app`) renders the Opportunity Inbox. */
+export function isInboxShellRoute(pathname: string | null): boolean {
+  return matchesExactRoute(pathname, APP_ROUTES.DASHBOARD);
+}
+
 export function isChatShellRoute(pathname: string | null): boolean {
   return (
     matchesExactRoute(pathname, APP_ROUTES.DASHBOARD) ||

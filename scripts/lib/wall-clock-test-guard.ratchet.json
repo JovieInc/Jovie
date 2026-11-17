@@ -132,7 +132,6 @@
     "scripts/tests/test_capacity_forecast.py": 5,
     "scripts/tests/test_factory_intake.py": 3,
     "scripts/tests/test_gh_retry.py": 25,
-    "scripts/tests/test_issue_routing.py": 7,
     "scripts/time-bomb/scan.test.mjs": 5,
     "scripts/version-stamp.test.mjs": 1,
     "scripts/weekly-agent-readiness.test.mjs": 1

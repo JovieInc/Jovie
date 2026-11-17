@@ -193,7 +193,10 @@ jobs:
       # bots (sentry[bot], coderabbitai[bot], ...) opened. Human threads and
       # bot threads a human replied in are never touched. Best effort: a
       # thread that will not resolve is a warning, and this runs after the
-      # undraft so it never delays it.
+      # undraft so it never delays it. An unanswered P0/P1 finding is first
+      # upserted to Linear (fleet, High) and the thread gets a reply naming
+      # it; a filing failure is logged and the thread still resolves, and
+      # without LINEAR_API_KEY the step only logs what it would file.
       - name: Prime Node toolcache
         if: ${{ !cancelled() && github.event_name == 'workflow_run' }}
         uses: ./.github/actions/prime-node-toolcache
@@ -210,6 +213,8 @@ jobs:
           REPO: ${{ github.repository }}
           TARGET_PR: ${{ github.event.workflow_run.pull_requests[0].number || '' }}
           TARGET_HEAD: ${{ github.event.workflow_run.head_sha || '' }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
         run: |
           if [ -z "$TARGET_PR" ] || [ -z "$TARGET_HEAD" ]; then
             echo "no PR association on this wake; nothing to resolve"

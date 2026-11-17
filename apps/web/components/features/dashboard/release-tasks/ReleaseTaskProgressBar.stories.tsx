@@ -37,3 +37,38 @@ export const Complete: Story = {
     total: 8,
   },
 };
+
+/** Tasks exist but none are done yet: the bar is empty, the count reads 0. */
+export const PartialNoneDone: Story = {
+  args: {
+    done: 0,
+    total: 8,
+  },
+};
+
+/** Large campaign counts with an overdue tally stay on one line. */
+export const LongContentLargeCounts: Story = {
+  args: {
+    done: 1_234,
+    total: 5_678,
+    overdueCount: 987,
+  },
+  render: args => (
+    <div className='w-48'>
+      <ReleaseTaskProgressBar {...args} />
+    </div>
+  ),
+};
+
+export const RtlProgress: Story = {
+  args: {
+    done: 2,
+    total: 8,
+    overdueCount: 1,
+  },
+  render: args => (
+    <div dir='rtl' lang='ar' className='w-72'>
+      <ReleaseTaskProgressBar {...args} />
+    </div>
+  ),
+};

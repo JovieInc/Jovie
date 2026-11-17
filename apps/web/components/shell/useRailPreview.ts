@@ -223,7 +223,17 @@ export function useRailPreview({
       // A dialog/menu that consumed Escape in capture owns this dismissal.
       if (event.key === 'Escape' && !event.defaultPrevented && isPreview) {
         event.preventDefault();
+        const focused = document.activeElement;
         dismissPreview();
+        // Collapsing can hide the focused rail item; hand focus to the toggle
+        // so keyboard users never land on <body>.
+        if (
+          inside(focused) &&
+          !focused?.matches(`[data-rail-toggle="${side}"]`)
+        )
+          document
+            .querySelector<HTMLElement>(`[data-rail-toggle="${side}"]`)
+            ?.focus();
       }
     };
     const observer = new MutationObserver(() => {

@@ -45,7 +45,11 @@ export function runRuleScopes(root, args) {
       'Use --write for explicit authoring, or --staged for index verification'
     );
   const git = argv =>
-    execFileSync('git', argv, { cwd: root, encoding: 'utf8' });
+    execFileSync('git', argv, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      encoding: 'utf8',
+    });
   const staged = args.includes('--staged');
   const files = staged
     ? git(['ls-files', '--cached', '-z', '--', '.claude/rules'])

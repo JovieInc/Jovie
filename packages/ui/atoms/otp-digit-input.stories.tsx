@@ -33,6 +33,10 @@ export const Filled: Story = {
   args: { value: '4', readOnly: true },
 };
 
+export const LongContentPastedValue: Story = {
+  args: { value: '12345678901234567890', readOnly: true },
+};
+
 export const ErrorInvalid: Story = {
   args: { value: '9', readOnly: true, 'aria-invalid': true },
 };

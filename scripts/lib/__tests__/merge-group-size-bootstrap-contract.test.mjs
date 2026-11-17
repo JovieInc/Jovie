@@ -213,7 +213,7 @@ printf '%s\\n' "$(basename "$0") $*" >> "$CALL_LOG"
         const source = spawnSync(
           'git',
           ['show', `${TRUSTED_SIZE_BOOTSTRAP_BASE}:${path}`],
-          { encoding: 'utf8' }
+          { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
         );
         if (source.status !== 0) {
           // Main-only additions are not on the pinned one-flight base.

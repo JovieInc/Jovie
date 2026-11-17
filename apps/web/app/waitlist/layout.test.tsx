@@ -10,6 +10,9 @@ import { metadata } from './layout';
 describe('waitlist layout metadata', () => {
   it('keeps /waitlist and /waitlist/invite out of search with a real title', () => {
     expect(metadata.robots).toEqual(NOINDEX_ROBOTS);
-    expect(metadata.title).toBe('Join the waitlist');
+    expect(metadata.title).toBe('Reserve your spot');
+    expect(metadata.description).toBe(
+      'Reserve your handle and we will email you when your spot opens.'
+    );
   });
 });

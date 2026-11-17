@@ -38,14 +38,28 @@ export const Disabled: Story = {
   },
 };
 
-export const RtlLayout: Story = {
+// A full code in every density: the longest content each box row can hold.
+export const LongContentFullCode: Story = {
   args: {
-    value: '12',
+    value: '123456',
+  },
+  render: args => (
+    <div className='flex flex-col items-center gap-8'>
+      <OtpInput {...args} size='default' />
+      <OtpInput {...args} size='compact' showProgressDots={false} />
+    </div>
+  ),
+};
+
+// The code itself stays left-to-right inside a right-to-left page.
+export const Rtl: Story = {
+  args: {
+    value: '123',
     'aria-label': 'رمز التحقق',
   },
   decorators: [
     Story => (
-      <div dir='rtl'>
+      <div dir='rtl' lang='ar'>
         <Story />
       </div>
     ),

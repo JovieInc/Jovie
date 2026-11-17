@@ -59,13 +59,11 @@ export function SegmentedDigitBox({
       className={cn(
         'relative flex items-center justify-center rounded-2xl border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-subtle',
         boxSizeClassName,
-        'border-(--profile-pearl-border) bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
-        // The focus ring paints in currentColor, as it always has: the
-        // --focus-ring variable the earlier class read is not defined.
+        'border-(--profile-pearl-border) bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
         isFocused
-          ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-current shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
+          ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-focus/18'
           : 'hover:bg-(--profile-pearl-bg-hover)',
-        error && 'border-error/55 bg-pearl-error ring-2 ring-error/14',
+        error && 'border-error/55 ring-2 ring-error/14',
         disabled && 'opacity-50 cursor-not-allowed',
         'active:bg-(--profile-pearl-bg-hover)'
       )}

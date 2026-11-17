@@ -60,8 +60,6 @@ These are all build-time constants (no API calls). Safe in the preview sandbox.
 | `FULL_PAGE` | `lib/featureFlags.ts` (ARTIST_PROFILE_FLAGS) | `true` | All sections except bare hero+trust |
 | `SOCIAL_PROOF` | `lib/featureFlags.ts` | `true` | ArtistProfileSocialProof section |
 | `FAQ` | `lib/featureFlags.ts` | `true` | ArtistProfileFaq section |
-| `SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO` | `lib/flags/marketing-static.ts` | `true` | PayFlowVideoSection vs MonetizationSection |
-| `SHOW_FORGEUI_MARKETING_UPDATES` | `lib/flags/marketing-static.ts` | `true` | ArtistProfileSpecWall tile set |
 
 ## What to check if a re-sync breaks
 

@@ -5,12 +5,16 @@
     {
       "dir": "pnpm-action-setup",
       "repo": "pnpm/action-setup",
-      "sha": "ea17c68df8912ef543352723c149a84f56e3d413",
+      "sha": "73e46992e05b19abd31f2f3c20e0e7370d762115",
       "files": {
         "LICENSE.md": "eb9c7f938c31b542da6906e2ac11b8996cfb2ca4afe3f7440df2b5063b52f615",
         "action.yml": "9e252c0620f3de7d239b01455c8b50b3424e347d7547d991abf71694686bf82c",
-        "dist/index.js": "fc4a334f5232afcc909722152a3427555a7360b14315b460675e40a49fe6866a"
-      }
+        "dist/index.js": "25e73ed48df2818a582501991b710d2a08c4eebfcdf2cf3387a7a5c9cae623f9"
+      },
+      "pinConsumers": [
+        ".github/actions/setup-node-pnpm/action.yml",
+        "packages/jovie-cli/scripts/npm-publish-workflow.test.ts"
+      ]
     },
     {
       "dir": "actions-cache",

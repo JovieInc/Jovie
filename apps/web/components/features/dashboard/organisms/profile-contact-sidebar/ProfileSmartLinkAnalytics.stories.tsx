@@ -53,3 +53,52 @@ export const NoVisitsYet: Story = {
 export const Unavailable: Story = {
   args: { data: undefined, isError: true },
 };
+
+/** A refetch failed after numbers loaded: the last good numbers stay. */
+export const ErrorRefetchKeepsNumbers: Story = {
+  args: { isError: true },
+};
+
+/** Views counted but no link clicks yet: both tiles still show. */
+export const PartialViewsOnly: Story = {
+  args: {
+    data: {
+      profile_views: 86,
+      total_clicks: 0,
+      top_cities: [],
+      top_countries: [],
+      top_referrers: [],
+    },
+  },
+};
+
+/** Large counts and a long profile URL stay inside the rail width. */
+export const LongContentLargeCounts: Story = {
+  args: {
+    profileUrl:
+      'https://jov.ie/the-extremely-long-artist-handle-for-a-collective-with-many-members',
+    data: {
+      profile_views: 128_456_789,
+      total_clicks: 98_765_432,
+      top_cities: [],
+      top_countries: [],
+      top_referrers: [],
+    },
+  },
+};
+
+/** Offline with no cached numbers: the query is paused, so it stays loading. */
+export const OfflineNoCache: Story = {
+  args: { loading: true, data: undefined, isFetching: false },
+};
+
+export const RtlLoaded: Story = {
+  args: { profileUrl: 'https://jov.ie/فنان' },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

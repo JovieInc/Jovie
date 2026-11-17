@@ -74,6 +74,8 @@ export function CommonDropdownItemLabel({
   readonly label: string;
   readonly description?: string;
 }) {
+  // Caching these text spans costs more initial JS than their render work.
+  'use no memo';
   if (!description) {
     return <span className='min-w-0 flex-1 truncate'>{label}</span>;
   }

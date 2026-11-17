@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Link from 'next/link';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarProvider, useSidebar } from './context';
 import { Sidebar } from './sidebar';
 
@@ -101,4 +102,48 @@ it('roams navigation rows with the arrow keys inside the rail', async () => {
   expect(screen.getByRole('link', { name: 'Audience' })).toHaveFocus();
   await user.keyboard('{ArrowUp}{Home}');
   expect(screen.getByRole('link', { name: 'Home' })).toHaveFocus();
+});
+
+it.each([
+  ['pinned rail', true, 'icon'],
+  ['compact icon rail', false, 'icon'],
+  ['static rail', true, 'none'],
+] as const)(
+  'has no axe violations for the %s',
+  async (_label, defaultOpen, collapsible) => {
+    const { container } = render(
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <Sidebar collapsible={collapsible}>
+          <nav aria-label='Primary'>
+            <Link href='/app'>Home</Link>
+            <Link href='/app/library'>
+              Release Planning for The Extraordinarily Long Album Title (Deluxe
+              Anniversary Remastered Edition)
+            </Link>
+          </nav>
+        </Sidebar>
+      </SidebarProvider>
+    );
+    await expectNoA11yViolations(container);
+  }
+);
+
+it('roams a right-to-left rail with the arrow keys without axe violations', async () => {
+  const user = userEvent.setup();
+  const { container } = render(
+    <div dir='rtl' lang='ar'>
+      <SidebarProvider defaultOpen>
+        <Sidebar collapsible='icon' side='right'>
+          <nav aria-label='التنقل الرئيسي'>
+            <Link href='/app'>الرئيسية</Link>
+            <Link href='/app/library'>المكتبة</Link>
+          </nav>
+        </Sidebar>
+      </SidebarProvider>
+    </div>
+  );
+  screen.getByRole('link', { name: 'الرئيسية' }).focus();
+  await user.keyboard('{ArrowDown}');
+  expect(screen.getByRole('link', { name: 'المكتبة' })).toHaveFocus();
+  await expectNoA11yViolations(container);
 });

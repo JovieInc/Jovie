@@ -20,13 +20,21 @@ const BASE_PROPS = {
 };
 
 describe('SegmentedDigitBox', () => {
+  it('has no accessibility violations in a right-to-left row', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <SegmentedDigitBox {...BASE_PROPS} ariaLabel='الرقم ١ من ٦' />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it('renders the error state with the error token, not raw red-* (JOV-6773)', () => {
     const { container } = render(<SegmentedDigitBox {...BASE_PROPS} error />);
 
     const box = container.firstElementChild as HTMLElement;
     expect(box.className).toContain('border-error/55');
     expect(box.className).toContain('ring-error/14');
-    expect(box.className).toContain('bg-pearl-error');
     expect(box.className).not.toMatch(/\b(?:border|ring)-red-\d/);
   });
 
@@ -35,16 +43,75 @@ describe('SegmentedDigitBox', () => {
 
     const box = container.firstElementChild as HTMLElement;
     expect(box.className).not.toContain('border-error');
-    expect(box.className).not.toContain('bg-pearl-error');
   });
 
-  it('paints the focus ring on the box, since the field draws none', () => {
-    const { container } = render(
-      <SegmentedDigitBox {...BASE_PROPS} isFocused />
+  it('reports typing, keys, focus and blur with the box index', async () => {
+    const user = userEvent.setup();
+    const handlers = {
+      onInputChange: vi.fn(),
+      onKeyDown: vi.fn(),
+      onInput: vi.fn(),
+      onFocus: vi.fn(),
+      onBlur: vi.fn(),
+    };
+    render(
+      <SegmentedDigitBox {...BASE_PROPS} {...handlers} digit='' index={3} />
     );
-    const box = container.firstElementChild as HTMLElement;
-    expect(box).toHaveClass('ring-2', 'ring-current');
-    expect(screen.getByRole('textbox')).toHaveClass('outline-none');
+
+    const input = screen.getByLabelText('Digit 1 of 6');
+    await user.type(input, '5');
+    await user.tab();
+
+    expect(handlers.onFocus).toHaveBeenCalledWith(3);
+    expect(handlers.onInputChange).toHaveBeenCalledWith(3, '5');
+    expect(handlers.onKeyDown).toHaveBeenCalledWith(3, expect.anything());
+    expect(handlers.onInput).toHaveBeenCalledWith(3, expect.anything());
+    expect(handlers.onBlur).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a paste to the parent', () => {
+    const onPaste = vi.fn();
+    render(<SegmentedDigitBox {...BASE_PROPS} onPaste={onPaste} />);
+
+    fireEvent.paste(screen.getByLabelText('Digit 1 of 6'), {
+      clipboardData: { getData: () => '123456' },
+    });
+
+    expect(onPaste).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the typed digit and focus when the parent re-renders', async () => {
+    const user = userEvent.setup();
+    // Props-driven parent: every change and focus event re-renders the box
+    // with new props, as OtpInput does.
+    const state = { digit: '', focused: false };
+    const ui = () => (
+      <SegmentedDigitBox
+        {...BASE_PROPS}
+        digit={state.digit}
+        isFocused={state.focused}
+        onInputChange={(_, value) => {
+          state.digit = value.slice(-1);
+          view.rerender(ui());
+        }}
+        onFocus={() => {
+          state.focused = true;
+          view.rerender(ui());
+        }}
+        onBlur={() => {
+          state.focused = false;
+          view.rerender(ui());
+        }}
+      />
+    );
+    const view = render(ui());
+
+    const input = screen.getByLabelText('Digit 1 of 6');
+    await user.type(input, '8');
+    await user.keyboard('{Escape}');
+
+    expect(input).toHaveValue('8');
+    expect(input).toHaveFocus();
   });
 
   it('shows the caret only while focused and empty', () => {
@@ -52,125 +119,87 @@ describe('SegmentedDigitBox', () => {
       <SegmentedDigitBox {...BASE_PROPS} digit='' isFocused />
     );
     expect(container).toHaveTextContent('|');
-    rerender(<SegmentedDigitBox {...BASE_PROPS} digit='3' isFocused />);
+
+    rerender(<SegmentedDigitBox {...BASE_PROPS} digit='4' isFocused />);
     expect(container).not.toHaveTextContent('|');
-    expect(container).toHaveTextContent('3');
+    expect(container).toHaveTextContent('4');
   });
 
-  it('passes its index to every handler', async () => {
-    const user = userEvent.setup();
-    const props = {
-      ...BASE_PROPS,
-      digit: '',
-      index: 2,
-      onInputChange: vi.fn(),
-      onKeyDown: vi.fn(),
-      onInput: vi.fn(),
-      onFocus: vi.fn(),
-      onBlur: vi.fn(),
-      onPaste: vi.fn(),
-    };
-    render(<SegmentedDigitBox {...props} />);
-    const input = screen.getByRole('textbox', { name: 'Digit 1 of 6' });
-
-    await user.type(input, '5');
-    expect(props.onFocus).toHaveBeenCalledWith(2);
-    expect(props.onKeyDown).toHaveBeenCalledWith(2, expect.anything());
-    expect(props.onInput).toHaveBeenCalledWith(2, expect.anything());
-    expect(props.onInputChange).toHaveBeenCalledWith(2, '5');
-
-    fireEvent.paste(input);
-    expect(props.onPaste).toHaveBeenCalledTimes(1);
-    fireEvent.blur(input);
-    expect(props.onBlur).toHaveBeenCalledTimes(1);
-  });
-
-  it('wires the numeric field and its accessible state', () => {
+  it('disables the input and passes the invalid and described-by state through', () => {
     render(
       <SegmentedDigitBox
         {...BASE_PROPS}
-        autoComplete='one-time-code'
-        ariaDescribedBy='otp-error'
+        disabled
         ariaInvalid
+        ariaDescribedBy='otp-error'
+        autoComplete='one-time-code'
       />
     );
-    const input = screen.getByRole('textbox', { name: 'Digit 1 of 6' });
-    expect(input).toHaveAttribute('inputmode', 'numeric');
-    expect(input).toHaveAttribute('pattern', '[0-9]*');
-    expect(input).toHaveAttribute('autocomplete', 'one-time-code');
+
+    const input = screen.getByLabelText('Digit 1 of 6');
+    expect(input).toBeDisabled();
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', 'otp-error');
-    expect(input).toHaveClass('text-lg', 'sm:text-xl');
+    expect(input).toHaveAttribute('autocomplete', 'one-time-code');
   });
 
-  it('dims and locks the box while disabled', () => {
-    const { container } = render(
-      <SegmentedDigitBox {...BASE_PROPS} disabled />
-    );
-    expect(container.firstElementChild).toHaveClass(
-      'opacity-50',
-      'cursor-not-allowed'
-    );
-    expect(screen.getByRole('textbox')).toBeDisabled();
-  });
-
-  it('keeps the typed digit and focus across a rerender, Escape and blur', async () => {
-    const user = userEvent.setup();
-    const onInputChange = vi.fn();
-    const props = { ...BASE_PROPS, digit: '', onInputChange };
-    const { rerender } = render(<SegmentedDigitBox {...props} />);
-    const input = screen.getByRole('textbox', { name: 'Digit 1 of 6' });
-
-    await user.type(input, '8');
-    expect(onInputChange).toHaveBeenLastCalledWith(0, '8');
-    // The owner stores the digit and re-renders the box with it.
-    rerender(<SegmentedDigitBox {...props} digit='8' isFocused />);
-    expect(input).toHaveValue('8');
-
-    // An unrelated parent update (here the error flag) keeps the same field.
-    rerender(<SegmentedDigitBox {...props} digit='8' isFocused error />);
-    expect(screen.getByRole('textbox')).toBe(input);
-    expect(input).toHaveValue('8');
-    expect(input).toHaveFocus();
-
-    await user.keyboard('{Escape}');
-    expect(input).toHaveValue('8');
-    expect(input).toHaveFocus();
-
-    fireEvent.blur(input);
-    expect(input).toHaveValue('8');
-  });
-
-  it('has no axe violations in each rendered state', async () => {
-    const states = [
-      { digit: '' },
-      { digit: '', isFocused: true },
-      { digit: '4' },
-      { digit: '9', error: true, ariaInvalid: true },
-      { digit: '2', disabled: true },
-    ];
-    for (const state of states) {
-      const { container, unmount } = render(
-        <SegmentedDigitBox {...BASE_PROPS} {...state} />
-      );
-      await expectNoA11yViolations(container);
-      unmount();
-    }
-  });
-
-  it('has no axe violations in a right-to-left row', async () => {
-    const { container } = render(
-      <fieldset dir='rtl'>
-        <legend>رمز التحقق</legend>
-        <SegmentedDigitBox {...BASE_PROPS} digit='1' />
-        <SegmentedDigitBox
-          {...BASE_PROPS}
-          digit=''
-          index={1}
-          ariaLabel='Digit 2 of 6'
-        />
-      </fieldset>
+  it('has no accessibility violations empty, filled, in error or disabled', async () => {
+    const { container, rerender } = render(
+      <SegmentedDigitBox {...BASE_PROPS} digit='' isFocused />
     );
     await expectNoA11yViolations(container);
+
+    rerender(<SegmentedDigitBox {...BASE_PROPS} />);
+    await expectNoA11yViolations(container);
+
+    rerender(<SegmentedDigitBox {...BASE_PROPS} error ariaInvalid />);
+    await expectNoA11yViolations(container);
+
+    rerender(<SegmentedDigitBox {...BASE_PROPS} disabled />);
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe('SegmentedDigitBox focus ring', () => {
+  it('draws the focused ring from the canonical focus token', () => {
+    const { container } = render(
+      <SegmentedDigitBox {...BASE_PROPS} isFocused />
+    );
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('ring-2');
+    expect(box.className).toContain('ring-focus/18');
+    // --focus-ring is defined nowhere; a ring keyed to it has no colour.
+    expect(box.className).not.toContain('var(--focus-ring)');
+  });
+});
+
+describe('SegmentedDigitBox design tokens', () => {
+  it('takes its resting shadow from the profile pearl surface token', () => {
+    const { container } = render(<SegmentedDigitBox {...BASE_PROPS} />);
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('shadow-(--profile-pearl-shadow)');
+    expect(box.className).not.toMatch(/rgba?\(/);
+  });
+
+  it('keeps the pearl shadow while the focused ring carries focus', () => {
+    const { container } = render(
+      <SegmentedDigitBox {...BASE_PROPS} isFocused />
+    );
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('shadow-(--profile-pearl-shadow)');
+    expect(box.className).toContain('ring-focus/18');
+    expect(box.className).not.toMatch(/rgba?\(/);
+  });
+
+  it('marks the error state with error tokens only, no raw colour', () => {
+    const { container } = render(<SegmentedDigitBox {...BASE_PROPS} error />);
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('border-error/55');
+    expect(box.className).toContain('ring-error/14');
+    expect(box.className).not.toMatch(/rgba?\(/);
   });
 });

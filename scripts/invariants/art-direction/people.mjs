@@ -98,10 +98,23 @@ export function validateRegistry(registry, exists) {
       errors.push(
         `image ${image.path}: routes is required (the routes it may render on)`
       );
-    else if (image.routes.includes('/'))
-      errors.push(
-        `image ${image.path}: / is never allowed; no real person on the homepage`
-      );
+    else if (image.routes.includes('/')) {
+      // The homepage shows a real person only when that person approved it
+      // themselves, in their own words (Tim, 2026-11-12: "use me for now").
+      const person = people.get(image.person);
+      const home = image.homepage ?? {};
+      if (person?.consent !== 'self')
+        errors.push(
+          `image ${image.path}: / admits only a person's own photos (consent self)`
+        );
+      if (
+        !String(home.inTheirWords ?? '').trim() ||
+        Number.isNaN(Date.parse(home.at ?? ''))
+      )
+        errors.push(
+          `image ${image.path}: / needs homepage.inTheirWords and homepage.at, the person's own approval for the homepage`
+        );
+    }
     if (!people.has(image.person))
       errors.push(`image ${image.path}: unknown person ${image.person}`);
     if (!exists(image.path))

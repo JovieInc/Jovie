@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -14,6 +13,18 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
+import { commandResult, stopActiveCommand } from './lib/typecheck-command.mjs';
+
+// Test seam (JOV-12511): the shared-deadline fixture injects a virtual clock
+// module via TYPECHECK_PERFORMANCE_CLOCK so the deadline arithmetic below is
+// deterministic under suite load instead of racing real runner overhead.
+// With the variable unset the script reads the real monotonic clock and
+// behaves exactly as before — budgets, timeouts and verdicts are unchanged.
+const clockModule = process.env.TYPECHECK_PERFORMANCE_CLOCK;
+const clockNow = clockModule
+  ? (await import(pathToFileURL(clockModule).href)).now
+  : () => performance.now();
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CONFIG_PATH = resolve(
@@ -23,7 +34,6 @@ const CONFIG_PATH = resolve(
 const TURBO_RUNS = resolve(ROOT, '.turbo/runs');
 const PNPM = ['corepack', 'pnpm'];
 const TURBO = [...PNPM, 'turbo', 'typecheck'];
-const MAX_BUFFER = 64 * 1024 * 1024;
 const EDITS = {
   'leaf-edit': 'apps/web/lib/hud/number-series.ts',
   'wide-edit': 'packages/ui/lib/utils.ts',
@@ -60,6 +70,10 @@ export function statistics(values) {
 }
 
 export function evaluateRatchet(samples, policy) {
+  if (samples.some(sample => sample.timedOut))
+    return { status: 'fail', reason: 'measurement-timeout' };
+  if (samples.some(sample => sample.exitCode != null && sample.exitCode !== 0))
+    return { status: 'fail', reason: 'sample-error' };
   const duration = statistics(samples.map(sample => sample.durationMs));
   if (!duration || duration.count < policy.minimumSamples) {
     return { status: 'observe', reason: 'insufficient-samples' };
@@ -82,6 +96,11 @@ function parseArgs(argv) {
     return index === -1 ? fallback : argv[index + 1];
   };
   return {
+    confirmRetries: Number(value('--confirm-retries', '1')),
+    // Leave five minutes of the CI job's 15-minute limit for setup/reporting.
+    maxDurationMs: Number(
+      value('--max-duration-ms', argv.includes('--enforce') ? '600000' : '0')
+    ),
     enforce: argv.includes('--enforce'),
     output: resolve(
       ROOT,
@@ -92,47 +111,28 @@ function parseArgs(argv) {
   };
 }
 
-function commandResult(command, env = {}) {
-  const timeArgs = process.platform === 'darwin' ? ['-l'] : ['-v'];
-  const timed = existsSync('/usr/bin/time');
-  const executable = timed ? '/usr/bin/time' : command[0];
-  const args = timed ? [...timeArgs, ...command] : command.slice(1);
-  const started = process.hrtime.bigint();
-  const result = spawnSync(executable, args, {
-    cwd: ROOT,
-    encoding: 'utf8',
-    env: { ...process.env, ...env },
-    maxBuffer: MAX_BUFFER,
-  });
-  const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
-  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-  const user = metric(output, /User time \(seconds\):\s*([\d.]+)/i);
-  const system = metric(output, /System time \(seconds\):\s*([\d.]+)/i);
-  const mac = output.match(
-    /([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys/i
-  );
-  const cpuSeconds =
-    user === null || system === null
-      ? mac
-        ? Number(mac[2]) + Number(mac[3])
-        : null
-      : user + system;
-  return {
-    durationMs,
-    exitCode: result.status ?? 1,
-    output,
-    cpuPercent:
-      cpuSeconds === null ? null : (cpuSeconds * 100_000) / durationMs,
-    peakRssKb:
-      metric(output, /Maximum resident set size \(kbytes\):\s*(\d+)/i) ??
-      ((metric(output, /(\d+)\s+maximum resident set size/i) ?? 0) / 1024 ||
-        null),
-  };
-}
-
-function metric(text, pattern) {
-  const value = Number(pattern.exec(text)?.[1]);
-  return Number.isFinite(value) ? value : null;
+// With 3 samples the enforced p95 IS the maximum, and one cold sample on a
+// shared hosted runner can swing from ~70s to ~120s+ on the same tree
+// (scheduled runs 2026-10-12..11-09 measured both clusters; checkouts, setup
+// and hook rungs stay fast on the slow days, so it is runner draw, not code).
+// A sustained regression reproduces on every measurement; a contended runner
+// draw does not. `--confirm-retries` (default 1) re-measures a breached
+// scenario with the same scenario, sample count, budgets and statistic, and
+// only a breach that reproduces keeps its fail verdict — never weaken or
+// raise the budgets to deal with this. Budgets live in
+// .github/ci-harness/typecheck-performance.json.
+export function applyConfirmations(ratchet, confirmations) {
+  const resolved = { ...ratchet };
+  for (const { scenario, verdict } of confirmations) {
+    if (
+      resolved[scenario]?.status === 'fail' &&
+      !resolved[scenario].reason &&
+      (['pass', 'warn'].includes(verdict.status) ||
+        (verdict.status === 'fail' && verdict.reason))
+    )
+      resolved[scenario] = verdict;
+  }
+  return resolved;
 }
 
 function turboSummary(previous) {
@@ -168,13 +168,14 @@ function turboSummary(previous) {
   };
 }
 
-function runCommand(command, env) {
+async function runCommand(command, env, deadline = Infinity) {
   const before = new Set(existsSync(TURBO_RUNS) ? readdirSync(TURBO_RUNS) : []);
-  const result = commandResult(command, env);
-  const turbo = turboSummary(before);
+  const result = await commandResult(command, env, deadline - clockNow());
+  const turbo = result.exitCode === 0 ? turboSummary(before) : null;
   return {
     durationMs: result.durationMs,
     exitCode: result.exitCode,
+    timedOut: result.timedOut,
     cpuPercent: result.cpuPercent,
     peakRssKb: result.peakRssKb,
     cacheHitRate: turbo?.cacheHitRate ?? null,
@@ -265,9 +266,13 @@ export function sampleEnv(index) {
   };
 }
 
-async function runScenario(name, definition, count) {
+async function runScenario(name, definition, count, deadline = Infinity) {
   if (EDITS[name])
-    runCommand([...TURBO, '--summarize', '--output-logs=errors-only']);
+    await runCommand(
+      [...TURBO, '--summarize', '--output-logs=errors-only'],
+      {},
+      deadline
+    );
   const samples = [];
   for (let index = 0; index < count; index += 1) {
     const execute = () => {
@@ -288,7 +293,8 @@ async function runScenario(name, definition, count) {
             '--pretty',
             'false',
           ],
-          sampleEnv(index)
+          sampleEnv(index),
+          deadline
         );
       return runCommand(
         [
@@ -298,7 +304,8 @@ async function runScenario(name, definition, count) {
           '--output-logs=errors-only',
           '--env-mode=loose',
         ],
-        sampleEnv(index)
+        sampleEnv(index),
+        deadline
       );
     };
     const measured = () => {
@@ -312,8 +319,9 @@ async function runScenario(name, definition, count) {
             `\nexport type __TypecheckBenchmark${index} = never;\n`,
             measured
           )
-        : measured()
+        : await measured()
     );
+    if (samples.at(-1).timedOut) break;
   }
   return { name, samples, aggregate: aggregate(samples) };
 }
@@ -322,6 +330,19 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (!Number.isInteger(options.samples) || options.samples < 1)
     throw new Error('--samples must be a positive integer');
+  if (!Number.isInteger(options.confirmRetries) || options.confirmRetries < 0)
+    throw new Error('--confirm-retries must be a non-negative integer');
+  if (
+    !Number.isSafeInteger(options.maxDurationMs) ||
+    options.maxDurationMs < 0 ||
+    (options.enforce && options.maxDurationMs === 0)
+  )
+    throw new Error(
+      '--max-duration-ms must be a positive integer when enforcing'
+    );
+  const deadline = options.maxDurationMs
+    ? clockNow() + options.maxDurationMs
+    : Infinity;
   const names = options.scenarios.includes('all')
     ? Object.keys(SCENARIOS)
     : options.scenarios;
@@ -329,18 +350,60 @@ async function main() {
   if (unknown.length)
     throw new Error(`unknown scenario(s): ${unknown.join(', ')}`);
   const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+  const ratchetFor = (samples, name) =>
+    evaluateRatchet(samples, {
+      ...config.ratchet,
+      ...config.scenarios[name],
+    });
   const scenarios = [];
   for (const name of names)
-    scenarios.push(await runScenario(name, SCENARIOS[name], options.samples));
+    scenarios.push(
+      await runScenario(name, SCENARIOS[name], options.samples, deadline)
+    );
   const ratchet = Object.fromEntries(
     scenarios.map(scenario => [
       scenario.name,
-      evaluateRatchet(scenario.samples, {
-        ...config.ratchet,
-        ...config.scenarios[scenario.name],
-      }),
+      ratchetFor(scenario.samples, scenario.name),
     ])
   );
+  const confirmations = [];
+  if (options.enforce && options.confirmRetries > 0) {
+    let pending = scenarios
+      .filter(
+        scenario =>
+          ratchet[scenario.name]?.status === 'fail' &&
+          scenario.samples.every(sample => sample.exitCode === 0)
+      )
+      .map(scenario => scenario.name);
+    for (
+      let round = 1;
+      pending.length > 0 &&
+      round <= options.confirmRetries &&
+      clockNow() < deadline;
+      round += 1
+    ) {
+      const stillFailing = [];
+      for (const name of pending) {
+        const rerun = await runScenario(
+          name,
+          SCENARIOS[name],
+          options.samples,
+          deadline
+        );
+        const verdict = ratchetFor(rerun.samples, name);
+        confirmations.push({
+          round,
+          samples: rerun.samples,
+          scenario: name,
+          verdict,
+        });
+        if (verdict.status === 'fail' && !verdict.reason)
+          stillFailing.push(name);
+      }
+      pending = stillFailing;
+    }
+  }
+  const resolvedRatchet = applyConfirmations(ratchet, confirmations);
   const report = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -351,19 +414,24 @@ async function main() {
       platform: process.platform,
     },
     scenarios,
-    ratchet,
+    confirmations,
+    maxDurationMs: options.maxDurationMs,
+    ratchet: resolvedRatchet,
   };
   mkdirSync(dirname(options.output), { recursive: true });
   writeFileSync(options.output, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (
     options.enforce &&
-    Object.values(ratchet).some(item => item.status === 'fail')
+    Object.values(resolvedRatchet).some(item => item.status === 'fail')
   )
     process.exitCode = 1;
   if (
     scenarios.some(scenario =>
       scenario.samples.some(sample => sample.exitCode !== 0)
+    ) ||
+    confirmations.some(confirmation =>
+      confirmation.samples.some(sample => sample.exitCode !== 0)
     )
   )
     process.exitCode = 1;
@@ -371,6 +439,7 @@ async function main() {
 
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => {
+    stopActiveCommand();
     activeRestore?.();
     process.exit(signal === 'SIGINT' ? 130 : 143);
   });

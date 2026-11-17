@@ -4,9 +4,11 @@
  * A receipt only counts as a pass when it proves what it claims: the producer
  * schema, a source hash, at least one captured story, and every captured story
  * rendered in both the light and dark themes. Anything less is dropped, so the
- * certificate falls back to "unknown" (visual) or unit-test axe (a11y) instead
- * of trusting a partial capture. A failing receipt always stands: fail-closed.
+ * certificate keeps either criterion "unknown" instead of trusting a partial
+ * capture. Consumers additionally require current inputs
+ * for passes AND failures; legacy observations never describe the current tree.
  */
+import { renderBindingProblem } from './component-render-inputs.mjs';
 
 export const STORY_EVIDENCE_SCHEMA = 'jovie.component-story-evidence/v1';
 export const REQUIRED_THEMES = Object.freeze(['light', 'dark']);
@@ -21,6 +23,8 @@ export function storyReceiptProblem(record) {
     !/^[0-9a-f]{64}$/.test(record.sourceHash)
   )
     return 'missing sha256 sourceHash';
+  if (renderBindingProblem(record.renderInputs))
+    return 'missing or invalid render input binding';
   const stories = Array.isArray(record.stories) ? record.stories : [];
   if (!stories.length) return 'no captured stories';
   if (record.captured !== stories.length)
@@ -59,12 +63,45 @@ export function acceptStoryReceipts(components = {}) {
 }
 
 /** A passing receipt for the given stories, each captured in light and dark. */
-export function storyReceipt(sourceHash, storyIds = ['component--default']) {
+export function storyReceipt(
+  sourceHash,
+  storyIds = ['component--default'],
+  renderInputs = null
+) {
   return {
     schema: STORY_EVIDENCE_SCHEMA,
     sourceHash,
+    renderInputs,
     status: 'pass',
     captured: storyIds.length,
     stories: storyIds.map(id => ({ id, themes: [...REQUIRED_THEMES] })),
+  };
+}
+
+/** A merged component cannot claim observations from different inputs. */
+export function assertSameRenderInputs(prior, receipt, path) {
+  if (
+    prior &&
+    JSON.stringify(prior.renderInputs) !== JSON.stringify(receipt.renderInputs)
+  )
+    throw new Error(`conflicting render inputs for ${path}`);
+}
+
+/**
+ * Join disjoint shards; conflicting bindings cannot describe the same run.
+ * @param {Array<{ components?: Record<string, any> }>} files
+ */
+export function mergeEvidence(files) {
+  const merged = {};
+  for (const file of files)
+    for (const [path, receipt] of Object.entries(file?.components ?? {})) {
+      const prior = merged[path];
+      assertSameRenderInputs(prior, receipt, path);
+      if (!prior || prior.status !== 'fail') merged[path] = receipt;
+    }
+  return {
+    components: Object.fromEntries(
+      Object.entries(merged).sort(([a], [b]) => a.localeCompare(b))
+    ),
   };
 }
