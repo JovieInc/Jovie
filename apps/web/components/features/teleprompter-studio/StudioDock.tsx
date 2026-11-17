@@ -1,4 +1,4 @@
-import { Button, Kbd } from '@jovie/ui';
+import { Button, IconButton, Kbd } from '@jovie/ui';
 import {
   Eye,
   Gauge,
@@ -93,19 +93,20 @@ export function StudioDock({
         Peek
       </Button>
 
-      <button
+      <IconButton
         ref={recordButtonRef}
-        type='button'
+        variant='outline'
+        size='xl'
         onClick={onToggleRecording}
         disabled={!canRecord}
-        aria-label={
+        ariaLabel={
           isRecording
             ? 'Stop recording'
             : between
               ? 'Record your answer'
               : 'Start recording'
         }
-        className='relative mx-1.5 grid size-11 place-items-center rounded-full border-2 border-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:opacity-45'
+        className='mx-1.5'
         data-testid='teleprompter-studio-record'
       >
         <span
@@ -115,7 +116,7 @@ export function StudioDock({
             isRecording ? 'scale-50 rounded-sm' : 'rounded-full'
           )}
         />
-      </button>
+      </IconButton>
 
       <Button
         variant={lightOpen ? 'secondary' : 'ghost'}

@@ -29,3 +29,18 @@ export const Saved: Story = {
     follow: { voice: false, label: '130 words a minute' },
   },
 };
+export const EmptyNoTakesSaved: Story = { args: { savedCount: 0 } };
+export const LongTitle: Story = {
+  args: {
+    title:
+      'Release day shout-out for Save the Night, the extended club mix with the live strings and the new spoken intro',
+    follow: { voice: false, label: '220 words a minute' },
+  },
+};
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioHeader {...args} />
+    </div>
+  ),
+};

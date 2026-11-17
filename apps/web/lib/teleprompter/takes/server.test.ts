@@ -170,6 +170,40 @@ describe('teleprompter take storage', () => {
     expect(await listTeleprompterTakes('user_other')).toEqual([]);
   });
 
+  it('keeps the newest takes inside the limit after an old one is kept', async () => {
+    const newer = '3c5f39cb-3ab2-42e3-994f-1127e4ddb538';
+    const prefix = `jovie/teleprompter/takes/${OWNER}/`;
+    store.set(`${prefix}${TAKE_ID}.webm`, {
+      body: 'video',
+      uploadedAt: new Date('2026-11-07T23:00:00Z'),
+      size: 5,
+    });
+    store.set(`${prefix}${newer}.webm`, {
+      body: 'video',
+      uploadedAt: new Date('2026-11-07T23:10:00Z'),
+      size: 5,
+    });
+    await saveTeleprompterTake(OWNER, input, new Date('2026-11-07T23:00:00Z'));
+    await saveTeleprompterTake(
+      OWNER,
+      { ...input, takeId: newer, takeNumber: 2 },
+      new Date('2026-11-07T23:10:00Z')
+    );
+    await setTeleprompterTakeKept(OWNER, TAKE_ID, true);
+    // The rewrite left the old take's sidecar newer than the new take's.
+    const sidecarAt = {
+      [TAKE_ID]: '2026-11-09T09:00:00Z',
+      [newer]: '2026-11-07T23:10:00Z',
+    };
+    for (const [takeId, at] of Object.entries(sidecarAt)) {
+      const sidecar = store.get(`${prefix}${takeId}.json`);
+      if (sidecar) sidecar.uploadedAt = new Date(at);
+    }
+
+    const takes = await listTeleprompterTakes(OWNER, 1);
+    expect(takes.map(take => take.takeNumber)).toEqual([2]);
+  });
+
   it('deletes the video and the sidecar together', async () => {
     await saveTeleprompterTake(OWNER, input);
     await deleteTeleprompterTake(OWNER, TAKE_ID);

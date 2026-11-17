@@ -24,8 +24,6 @@ export function StudioStage({
 }: StudioStageProps) {
   return (
     <>
-      <div className='absolute inset-0 bg-black/90' aria-hidden='true' />
-
       <div
         className='absolute overflow-hidden rounded-(--system-b-radius-panel-inner)'
         style={{ inset: 'var(--studio-ring-width)' }}
@@ -47,7 +45,7 @@ export function StudioStage({
             className='pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3'
           >
             {GRID_CELLS.map(cell => (
-              <span key={cell} className='border border-white/15' />
+              <span key={cell} className='border border-on-media/15' />
             ))}
           </div>
         ) : null}

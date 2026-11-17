@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { useDebouncedValue } from '@tanstack/react-pacer';
+import { useQuery } from '@tanstack/react-query';
 import {
   CircleHelp,
   Layers,
@@ -29,6 +31,7 @@ import {
   ShellListRowFrame,
 } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
+import { queryKeys } from '@/lib/queries/keys';
 import { cn } from '@/lib/utils';
 import {
   buildHeaderSearchGroups,
@@ -69,11 +72,19 @@ const EMPTY_CATALOG: HeaderSearchCatalog = {
 
 const HEADER_SEARCH_DEBOUNCE_MS = 250;
 const MIN_REMOTE_QUERY_LENGTH = 2;
+// The library is the user's own and changes as they work, so repeat queries
+// are reused only briefly.
+const HEADER_SEARCH_STALE_TIME_MS = 30_000;
+const HEADER_SEARCH_GC_TIME_MS = 5 * 60_000;
+const NO_RELEASES: readonly SearchableRelease[] = [];
 
 const headerSearchSurfaceChrome =
   'rounded-xl border border-subtle bg-surface-0 shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-border-subtle)_18%,transparent)]';
 const headerSearchSurfaceWidth =
   'w-[13.5rem] max-w-[calc(100vw-2rem)] sm:w-55 lg:w-65';
+
+/** Position of the scope key in `queryKeys.headerSearch.libraryAssets`. */
+const HEADER_SEARCH_SCOPE_KEY_INDEX = 2;
 
 function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
@@ -175,17 +186,6 @@ function HeaderGlobalSearch({
 }) {
   const [query, setQuery] = useState('');
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [remoteSearch, setRemoteSearch] = useState<{
-    readonly scopeKey: string;
-    readonly query: string;
-    readonly releases: readonly SearchableRelease[];
-    readonly status: 'idle' | 'loading' | 'success' | 'error';
-  }>({
-    scopeKey: remoteSearchScopeKey ?? '',
-    query: '',
-    releases: [],
-    status: 'idle',
-  });
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
   const normalizedQuery = query.trim();
@@ -193,33 +193,53 @@ function HeaderGlobalSearch({
   const canSearchRemotely =
     Boolean(searchLibraryAssets) &&
     normalizedQuery.length >= MIN_REMOTE_QUERY_LENGTH;
+  const [debouncedQuery] = useDebouncedValue(normalizedQuery, {
+    wait: HEADER_SEARCH_DEBOUNCE_MS,
+  });
+  // While typing is still settling the key is the empty (disabled) query, so
+  // the request for the superseded text is aborted on the next keystroke.
+  const isQuerySettled = debouncedQuery === normalizedQuery;
+  const remoteQueryText =
+    canSearchRemotely && isQuerySettled ? debouncedQuery : '';
+  const remoteQuery = useQuery({
+    queryKey: queryKeys.headerSearch.libraryAssets(
+      remoteScopeKey,
+      remoteQueryText
+    ),
+    queryFn: ({ signal }) =>
+      searchLibraryAssets
+        ? searchLibraryAssets(remoteQueryText, signal)
+        : NO_RELEASES,
+    enabled: remoteQueryText.length >= MIN_REMOTE_QUERY_LENGTH,
+    // Keep the last results on screen (re-filtered against the new text below)
+    // while the next query loads, but never across an artist switch.
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[HEADER_SEARCH_SCOPE_KEY_INDEX] === remoteScopeKey
+        ? previousData
+        : undefined,
+    staleTime: HEADER_SEARCH_STALE_TIME_MS,
+    gcTime: HEADER_SEARCH_GC_TIME_MS,
+    refetchOnWindowFocus: false,
+    // Typed search: report "Search unavailable" at once instead of retrying.
+    retry: false,
+  });
   const remoteSearchPending =
     canSearchRemotely &&
-    (remoteSearch.scopeKey !== remoteScopeKey ||
-      remoteSearch.query !== normalizedQuery ||
-      remoteSearch.status === 'loading');
+    (!isQuerySettled ||
+      remoteQuery.isFetching ||
+      remoteQuery.isPlaceholderData);
   const remoteSearchFailed =
-    canSearchRemotely &&
-    remoteSearch.scopeKey === remoteScopeKey &&
-    remoteSearch.query === normalizedQuery &&
-    remoteSearch.status === 'error';
+    canSearchRemotely && !remoteSearchPending && remoteQuery.isError;
+  const remoteReleases =
+    canSearchRemotely && !remoteQuery.isError
+      ? (remoteQuery.data ?? NO_RELEASES)
+      : NO_RELEASES;
   const effectiveCatalog = useMemo<HeaderSearchCatalog>(
     () => ({
       ...catalog,
-      releases: searchLibraryAssets
-        ? remoteSearch.scopeKey === remoteScopeKey &&
-          remoteSearch.query === normalizedQuery
-          ? remoteSearch.releases
-          : []
-        : catalog.releases,
+      releases: searchLibraryAssets ? remoteReleases : catalog.releases,
     }),
-    [
-      catalog,
-      normalizedQuery,
-      remoteScopeKey,
-      remoteSearch,
-      searchLibraryAssets,
-    ]
+    [catalog, remoteReleases, searchLibraryAssets]
   );
   const groups = useMemo(
     () => buildHeaderSearchGroups(query, effectiveCatalog),
@@ -268,57 +288,6 @@ function HeaderGlobalSearch({
       return selectableResults[0]?.id ?? null;
     });
   }, [selectableResults]);
-
-  useEffect(() => {
-    if (!searchLibraryAssets || !canSearchRemotely) {
-      setRemoteSearch({
-        scopeKey: remoteScopeKey,
-        query: normalizedQuery,
-        releases: [],
-        status: 'idle',
-      });
-      return;
-    }
-
-    const controller = new AbortController();
-    let active = true;
-    setRemoteSearch({
-      scopeKey: remoteScopeKey,
-      query: normalizedQuery,
-      releases: [],
-      status: 'loading',
-    });
-
-    const timeout = globalThis.setTimeout(async () => {
-      try {
-        const releases = await searchLibraryAssets(
-          normalizedQuery,
-          controller.signal
-        );
-        if (!active) return;
-        setRemoteSearch({
-          scopeKey: remoteScopeKey,
-          query: normalizedQuery,
-          releases,
-          status: 'success',
-        });
-      } catch {
-        if (!active || controller.signal.aborted) return;
-        setRemoteSearch({
-          scopeKey: remoteScopeKey,
-          query: normalizedQuery,
-          releases: [],
-          status: 'error',
-        });
-      }
-    }, HEADER_SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      active = false;
-      globalThis.clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [canSearchRemotely, normalizedQuery, remoteScopeKey, searchLibraryAssets]);
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return;

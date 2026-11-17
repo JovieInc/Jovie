@@ -67,6 +67,14 @@ class QueueEmptyRedTest(unittest.TestCase):
         # ...and an old red streak with nobody waiting is a quiet night, not a stall.
         recent["groupOutcomes"].update(newestEndedAt=NOW - 7 * 3600)
         self.assertEqual(judge(recent), {})
+        # Held PRs without a mostly-red streak alarm only while the newest failed group is recent: a stale red group
+        # and three PRs held for other reasons must not blame main.
+        held_only = json.loads(json.dumps(world))
+        held_only["groupOutcomes"].update(failedPrs=["24790"], decided=6, failed=1, newestEndedAt=NOW - 7 * 3600)
+        held_only["sentinel"]["supplyFlow"]["counts"] = {"held": 3}
+        self.assertEqual(judge(held_only), {})
+        held_only["groupOutcomes"].update(newestEndedAt=NOW - 1800)
+        self.assertIn("3 held", judge(held_only)["throughput-queue-empty-red"])
 
     def test_group_outcome_sampler_reads_decided_groups_of_any_age_once_per_five_minutes(self):
         calls = []

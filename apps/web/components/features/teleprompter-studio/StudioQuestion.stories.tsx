@@ -33,3 +33,19 @@ export const VoiceOn: Story = {
 export const Answering: Story = {
   render: args => <StudioAnswerCue question={args.question} />,
 };
+export const EmptyQuestion: Story = { args: { question: '' } };
+export const LongQuestion: Story = {
+  args: {
+    question:
+      'When you were driving home that night with the windows down and the city finally quiet, what was the one line you kept singing to yourself before you ever wrote the rest of the song?',
+    voiceStatus:
+      'Voice off on laptop speakers so the mic does not hear it. Plug in headphones or AirPods to hear each question read aloud.',
+  },
+};
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioQuestion {...args} />
+    </div>
+  ),
+};

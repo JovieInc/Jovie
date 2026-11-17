@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/marketing/MarketingHero.tsx",
-  "sha256": "07f6af8f2f4b2346b14fbaf1bedc26d83db343ce3bc48f3620f0d5b437c89ae9",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "0c9f7e33991d6df68ea09da7f77f03184fb91a543d0b1432762cf34c7c6a18bd",
+  "at": "2026-11-11T12:36:46.840Z",
+  "ref": "PR 24982: MarketingHero landing default primary CTA href /signup -> /start (PUBLIC_ENTRY_HREF); markup, copy and styles unchanged; pricing page passes no hero CTA, so its render is unchanged; MarketingHero unit tests pass"
 }

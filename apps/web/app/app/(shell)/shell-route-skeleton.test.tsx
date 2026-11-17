@@ -3,8 +3,10 @@ import { join } from 'node:path';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { isValidElement, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { OpportunityInboxRouteSkeleton } from '@/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
 import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { LinksPageClient } from './links/LinksPageClient';
@@ -35,6 +37,7 @@ afterEach(() => cleanup());
 
 describe('resolveShellRouteSkeleton', () => {
   it.each([
+    [APP_ROUTES.DASHBOARD, OpportunityInboxRouteSkeleton],
     [APP_ROUTES.CALENDAR, CalendarRouteSkeleton],
     [APP_ROUTES.LINKS, LinksRouteSkeleton],
     [APP_ROUTES.DASHBOARD_LINKS, LinksRouteSkeleton],
@@ -78,6 +81,16 @@ describe('resolveShellRouteSkeleton', () => {
     cleanup();
     const { container } = render(<LibraryLoadingStateLazy />);
     await vi.waitFor(() => expect(container.innerHTML).toBe(eagerHtml));
+  });
+
+  it('boots Home into the inbox skeleton, not the chat composer', () => {
+    render(<main>{resolveShellRouteSkeleton(APP_ROUTES.DASHBOARD)}</main>);
+    expect(screen.getByLabelText('Loading Inbox')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(screen.getByTestId('opportunity-inbox-loading')).toBeVisible();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('keeps the generic shell main when the destination is unknown', () => {
@@ -173,5 +186,36 @@ describe('route skeletons', () => {
     expect(
       skeleton.closest('[data-testid="settings-shell-content"]')
     ).not.toBeNull();
+  });
+});
+
+describe('resolved shell skeletons are accessible loading states', () => {
+  it.each([
+    APP_ROUTES.CHAT,
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.LIBRARY,
+    APP_ROUTES.LYRICS,
+    APP_ROUTES.TASKS,
+    APP_ROUTES.CALENDAR,
+    APP_ROUTES.LINKS,
+    APP_ROUTES.PRESENCE,
+    APP_ROUTES.TOUR_DATES,
+    APP_ROUTES.SETTINGS_ACCOUNT,
+    APP_ROUTES.EARNINGS,
+    APP_ROUTES.DASHBOARD,
+  ])('renders an axe-clean skeleton for %s', async pathname => {
+    const node = resolveShellRouteSkeleton(pathname);
+    expect(isValidElement(node)).toBe(true);
+    const { container } = render(
+      <RightPanelProvider>
+        <main>{node}</main>
+      </RightPanelProvider>
+    );
+
+    // Table skeletons load through next/dynamic, so wait for the lazy chunk.
+    await vi.waitFor(() =>
+      expect(container.querySelector('main')?.childElementCount).toBe(1)
+    );
+    await expectNoA11yViolations(container);
   });
 });

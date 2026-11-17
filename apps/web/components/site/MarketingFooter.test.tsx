@@ -31,25 +31,24 @@ vi.mock('next-themes', () => ({
   useTheme: () => themeState,
 }));
 
-// Product default: SHOW_MARKETING_FULL_FOOTER is false (clean homepage baseline).
-// Enable it here so footer content assertions exercise expanded chrome in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_FULL_FOOTER: true,
-    },
-  };
-});
-
 function footerColumnTitle(name: string) {
   return screen.getByText(name, { selector: 'p.mf-eyebrow' });
 }
 
 describe('MarketingFooter', () => {
+  it('keeps privacy choices available even with published legal links', () => {
+    render(
+      <MarketingFooter
+        legalLinks={[{ href: '/legal/privacy', label: 'Privacy' }]}
+      />
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Do Not Sell or Share My Personal Information',
+      })
+    ).toHaveAttribute('href', '/legal/privacy#privacy-choices');
+  });
+
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
     themeState.theme = 'dark';
@@ -290,7 +289,7 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('honors the expanded footer variant when the full-footer flag is enabled', () => {
+  it('renders the expanded footer when a route asks for it', () => {
     mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter variant='expanded' />);
 

@@ -37,6 +37,7 @@ export const DESKTOP_SMOKE_SPECS = [
   'shell-chat-v1-flag-off.spec.ts',
   'chat-performance-ratchet.spec.ts',
   'chat-cold-load-profile.spec.ts',
+  'library-cold-load-profile.spec.ts',
 ] as const;
 
 export const MOBILE_SMOKE_SPECS = [

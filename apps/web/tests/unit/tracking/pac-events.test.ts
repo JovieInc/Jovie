@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockTrack, mockPostJsonBeacon, mockGetConsentState } = vi.hoisted(
-  () => ({
-    mockTrack: vi.fn(),
-    mockPostJsonBeacon: vi.fn(),
-    mockGetConsentState: vi.fn(() => 'undecided'),
-  })
-);
+const {
+  mockTrack,
+  mockPostJsonBeacon,
+  mockGetConsentState,
+  mockIsAnalyticsAllowed,
+} = vi.hoisted(() => ({
+  mockTrack: vi.fn(),
+  mockPostJsonBeacon: vi.fn(),
+  mockGetConsentState: vi.fn(() => 'undecided'),
+  mockIsAnalyticsAllowed: vi.fn(() => true),
+}));
 
 vi.mock('@/lib/analytics', () => ({
   track: mockTrack,
@@ -18,6 +22,7 @@ vi.mock('@/lib/tracking/json-beacon', () => ({
 
 vi.mock('@/lib/tracking/consent', () => ({
   getConsentState: mockGetConsentState,
+  isAnalyticsAllowed: mockIsAnalyticsAllowed,
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -55,6 +60,7 @@ describe('PAC event schema (spec §8)', () => {
     mockTrack.mockClear();
     mockPostJsonBeacon.mockClear();
     mockGetConsentState.mockReturnValue('undecided');
+    mockIsAnalyticsAllowed.mockReturnValue(true);
   });
 
   it('defines 11 client events + the server back-join event', () => {
@@ -98,7 +104,7 @@ describe('PAC event schema (spec §8)', () => {
         profile_id: PROFILE_ID,
         pac_state: 'idle',
         variant_id: CONTEXT.variantId,
-        consent: 'undecided',
+        consent: 'accepted',
       });
       expect(payload?.session_id).toBeTruthy();
       expect(typeof payload?.ts).toBe('number');
@@ -151,6 +157,7 @@ describe('PAC event schema (spec §8)', () => {
 
   it('carries the current consent state on every payload', () => {
     mockGetConsentState.mockReturnValue('gpc-opted-out');
+    mockIsAnalyticsAllowed.mockReturnValue(false);
 
     const payload = trackPacClientEvent('capture_submit', {
       ...CONTEXT,
@@ -159,6 +166,17 @@ describe('PAC event schema (spec §8)', () => {
 
     expect(payload?.consent).toBe('gpc-opted-out');
   });
+
+  it.each(['accepted', 'undecided', 'rejected'])(
+    'reports analytics rejection despite legacy advertising state %s',
+    state => {
+      mockGetConsentState.mockReturnValue(state);
+      mockIsAnalyticsAllowed.mockReturnValue(false);
+      expect(trackPacClientEvent('pac_exposure', CONTEXT)?.consent).toBe(
+        'rejected'
+      );
+    }
+  );
 
   it('attaches structured extras (capture_error rule, channel, slot)', () => {
     const errorPayload = trackPacClientEvent(

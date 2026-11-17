@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { and, desc, eq } from 'drizzle-orm';
-import { getSessionContext } from '@/lib/auth/session';
+import {
+  type AuthorizedAnalyticsProfile,
+  assertAuthorizedAnalyticsProfile,
+  resolveAuthorizedAnalyticsProfile,
+} from '@/lib/analytics/authorized-profile';
 import { db } from '@/lib/db';
 import { aiCrawlerAnalyticsSnapshots } from '@/lib/db/schema/ai-crawler-analytics';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
@@ -59,15 +63,16 @@ export async function getAiCrawlerAnalyticsForUser(
   clerkUserId: string,
   options: { readonly isPro: boolean }
 ): Promise<AiCrawlerAnalyticsResponse> {
-  const { profile } = await getSessionContext({
-    clerkUserId,
-    requireUser: true,
-    requireProfile: true,
-  });
+  const scope = await resolveAuthorizedAnalyticsProfile(clerkUserId);
+  return getAiCrawlerAnalyticsForProfile(scope, options);
+}
 
-  if (!profile) {
-    return EMPTY_RESPONSE;
-  }
+/** Load the immutable, authorized profile used by the outer cache key. */
+export async function getAiCrawlerAnalyticsForProfile(
+  scope: AuthorizedAnalyticsProfile,
+  options: { readonly isPro: boolean }
+): Promise<AiCrawlerAnalyticsResponse> {
+  assertAuthorizedAnalyticsProfile(scope);
 
   const [snapshot] = await db
     .select({
@@ -80,7 +85,7 @@ export async function getAiCrawlerAnalyticsForUser(
     .from(aiCrawlerAnalyticsSnapshots)
     .where(
       and(
-        eq(aiCrawlerAnalyticsSnapshots.creatorProfileId, profile.id),
+        eq(aiCrawlerAnalyticsSnapshots.creatorProfileId, scope.profileId),
         eq(aiCrawlerAnalyticsSnapshots.periodDays, DEFAULT_PERIOD_DAYS)
       )
     )

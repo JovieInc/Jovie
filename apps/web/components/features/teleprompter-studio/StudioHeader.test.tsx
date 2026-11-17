@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StudioHeader } from './StudioHeader';
 
 const base = {
@@ -39,5 +40,19 @@ describe('StudioHeader', () => {
     expect(screen.queryByText('Follows Your Voice')).toBeNull();
     fireEvent.click(screen.getByTestId('teleprompter-studio-close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('passes axe ready, recording and saved', async () => {
+    for (const overrides of [
+      {},
+      { isRecording: true, takeNumber: 3, elapsedMs: 42_000 },
+      { savedCount: 2, follow: null },
+    ]) {
+      const { container, unmount } = render(
+        <StudioHeader {...base} {...overrides} />
+      );
+      await expectNoA11yViolations(container);
+      unmount();
+    }
   });
 });

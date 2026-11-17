@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  countLines,
+  measure,
+  parseRenames,
+  raisedEntries,
+} from './company-guards/size-ratchet.mjs';
 import { companionChecklist } from './lib/preflight-changed.mjs';
+import { tightenBaseline } from './lib/shrink-only-baseline.mjs';
 
 const source = 'apps/web/tests/e2e/profile-visual-audit.spec.ts';
 const baselinePath = 'scripts/company-guards/size-baseline.json';
@@ -93,4 +100,64 @@ test('files outside the changed set do not create size failures', () => {
     ),
     []
   );
+});
+
+test('a new scripts test listed in the planner contract list counts as wired', () => {
+  const filename = 'scripts/lib/__tests__/new-planner.test.mjs';
+  const wiring = list =>
+    companionChecklist([{ filename, status: 'added' }], path =>
+      path === 'scripts/lib/test-planner-contract-tests.mjs' ? list : ''
+    ).find(item => item.item === 'new scripts test wired into a CI lane');
+  assert.equal(wiring(`['${filename}',]`).done, true);
+  assert.equal(wiring("['scripts/lib/__tests__/other.test.mjs',]").done, false);
+});
+
+test('size-500 budgets never rise: a raise or a new entry fails', () => {
+  const base = { 'a.ts': 600, 'b.ts': 700 };
+  assert.deepEqual(raisedEntries(base, base), []);
+  assert.deepEqual(raisedEntries(base, { 'a.ts': 590, 'b.ts': 700 }), []);
+  assert.deepEqual(raisedEntries(base, { 'b.ts': 700 }), []);
+  assert.deepEqual(raisedEntries(base, { 'a.ts': 601, 'b.ts': 700 }), [
+    { file: 'a.ts', base: 600, head: 601 },
+  ]);
+  assert.deepEqual(raisedEntries(base, { ...base, 'c.ts': 520 }), [
+    { file: 'c.ts', base: null, head: 520 },
+  ]);
+});
+
+test('only a git-detected rename keeps at most its old budget', () => {
+  const base = { 'old.ts': 600, 'b.ts': 700 };
+  const head = budget => ({ 'new.ts': budget, 'b.ts': 700 });
+  const renames = parseRenames('R097\told.ts\tnew.ts\nM\tb.ts\n');
+  assert.deepEqual(renames, { 'new.ts': 'old.ts' });
+  assert.deepEqual(raisedEntries(base, head(600), renames), []);
+  assert.deepEqual(raisedEntries(base, head(650), renames), [
+    { file: 'new.ts', base: 600, head: 650 },
+  ]);
+  // Deleting old.ts frees no budget for an unrelated new file.
+  assert.deepEqual(raisedEntries(base, head(600)), [
+    { file: 'new.ts', base: null, head: 600 },
+  ]);
+});
+
+test('tightening lowers to the measured size and drops small or gone files', () => {
+  const baseline = { 'a.ts': 600, 'b.ts': 700, 'gone.ts': 900, 'c.ts': 800 };
+  const files = {
+    'a.ts': 'x\n'.repeat(550),
+    'b.ts': 'x\n'.repeat(400),
+    'c.ts': 'x\n'.repeat(800),
+  };
+  const current = measure(baseline, file => files[file] ?? null);
+  assert.deepEqual(current, {
+    'a.ts': 550,
+    'b.ts': 0,
+    'gone.ts': 0,
+    'c.ts': 800,
+  });
+  assert.deepEqual(tightenBaseline(current, baseline).baseline, {
+    'a.ts': 550,
+    'c.ts': 800,
+  });
+  assert.equal(countLines('a\nb'), 2);
+  assert.equal(countLines('a\nb\n'), 2);
 });

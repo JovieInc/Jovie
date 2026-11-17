@@ -25,6 +25,6 @@ describe('public profile brand footer', () => {
     const source = readFileSync(CLAIM_FOOTER, 'utf8');
     expect(source).toContain("'hidden w-full justify-center pt-4 md:flex'");
     expect(source).toContain("data-testid='profile-claim-footer'");
-    expect(source).toMatch(/<span className='text-white\/55'>Jovie<\/span>/);
+    expect(source).toMatch(/<span className='text-on-media\/55'>Jovie<\/span>/);
   });
 });

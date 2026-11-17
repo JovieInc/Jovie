@@ -40,6 +40,7 @@ import {
 } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { buildReleaseAlbumArtChatPrompt } from '@/lib/chat/release-chat-prompts';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDspMatchesQuery, usePlanGate } from '@/lib/queries';
@@ -592,13 +593,10 @@ export function ShellReleasesView({
   const handleGenerateAlbumArt = useCallback(
     (release: ReleaseViewModel) => {
       openChatWithPrompt(
-        `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
-          {
-            releaseId: release.id,
-            releaseTitle: release.title,
-            instruction: 'Show three options.',
-          }
-        )}`,
+        buildReleaseAlbumArtChatPrompt({
+          releaseId: release.id,
+          releaseTitle: release.title,
+        }),
         router
       );
     },

@@ -25,9 +25,15 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateBaseDesignRatchet } from './design-system-base-ratchet.mjs';
+import {
+  evaluateBaseDesignRatchet,
+  OFF_SCALE_HINT,
+  OFF_SCALE_RULE,
+} from './design-system-base-ratchet.mjs';
 
 export {
+  NUMERIC_STEP_PATTERN,
+  ON_SCALE_STEPS,
   RAW_HEX_PATTERN,
   RAW_PALETTE_PATTERN,
 } from './design-system-base-ratchet.mjs';
@@ -418,6 +424,12 @@ function main() {
     for (const issue of result.issues) console.error(issue);
     for (const identity of baseResult.newIdentities)
       console.error(`new design identity: ${identity}`);
+    if (
+      baseResult.newIdentities.some(key =>
+        key.includes(`\t${OFF_SCALE_RULE}\t`)
+      )
+    )
+      console.error(OFF_SCALE_HINT);
     process.exitCode = 1;
     return;
   }

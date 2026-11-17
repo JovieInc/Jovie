@@ -161,3 +161,75 @@ describe('outbound approval audit trail', () => {
     expect(mocks.inserted).toEqual([]);
   });
 });
+
+describe('existing-relationship hold on founder decisions', () => {
+  const DANNIC = { ...LEAD, id: 'lead-dannic', linktreeHandle: 'djdannic' };
+  const REVISION = outboundTargetRevision(outboundTargetFromLead(DANNIC));
+
+  beforeEach(() => {
+    mocks.inserted.length = 0;
+  });
+
+  it('refuses to approve the target or the copy, and writes nothing', async () => {
+    for (const decision of [
+      { kind: 'target' as const, decision: 'yes' as const },
+      { kind: 'copy' as const, decision: 'yes' as const, copy: COPY },
+      { kind: 'copy' as const, decision: 'unsure' as const, copy: COPY },
+    ])
+      await expect(
+        recordOutboundDecision({
+          lead: DANNIC,
+          actorUserId: 'tim',
+          decision: { ...decision, expectedTargetRevision: REVISION },
+        })
+      ).resolves.toEqual({ ok: false, reason: 'existing_relationship' });
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('still records a hold or a reject on the held artist', async () => {
+    await expect(
+      recordOutboundDecision({
+        lead: DANNIC,
+        actorUserId: 'tim',
+        decision: {
+          kind: 'target',
+          decision: 'no',
+          reason: 'has_team',
+          expectedTargetRevision: REVISION,
+        },
+      })
+    ).resolves.toMatchObject({ ok: true });
+    expect(reviewRows()).toHaveLength(1);
+  });
+
+  it('holds by bio without storing the bio in the ledger snapshot', async () => {
+    const lead = { ...LEAD, bio: 'Management: Sorted Management' };
+    const revision = outboundTargetRevision(outboundTargetFromLead(lead));
+    expect(revision).toBe(TARGET_REVISION);
+    await expect(
+      recordOutboundDecision({
+        lead,
+        actorUserId: 'tim',
+        decision: {
+          kind: 'target',
+          decision: 'yes',
+          expectedTargetRevision: revision,
+        },
+      })
+    ).resolves.toEqual({ ok: false, reason: 'existing_relationship' });
+    await recordOutboundDecision({
+      lead,
+      actorUserId: 'tim',
+      decision: {
+        kind: 'target',
+        decision: 'unsure',
+        expectedTargetRevision: revision,
+      },
+    });
+    const snapshot = reviewRows()[0]?.candidateSnapshot as {
+      target: Record<string, unknown>;
+    };
+    expect(snapshot.target.bio).toBeUndefined();
+    expect(snapshot.target.handle).toBe('ada');
+  });
+});

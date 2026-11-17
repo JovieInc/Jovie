@@ -80,7 +80,9 @@ def judge(obs: dict) -> dict[str, str]:
         mostly_red = failed >= EMPTY_RED_MIN_FAILED and failed * 2 > decided \
             and len(groups.get("failedPrs") or []) >= EMPTY_RED_MIN_PRS
         recent = now - (groups.get("newestEndedAt") or 0) < EMPTY_RED_FRESH_S
-        if (mostly_red and (recent or waiting)) or held >= EMPTY_RED_HELD:
+        # Held PRs alone count only while the newest failed group is recent: a stale red group plus PRs held for
+        # other reasons (an operator hold, a lane-fix-red label) is not evidence that main is red now.
+        if (mostly_red and (recent or waiting)) or (held >= EMPTY_RED_HELD and recent):
             alerts["throughput-queue-empty-red"] = (
                 f"stage queued->merged: the merge queue is empty and nothing merged in the last 60 min, but {failed} of the last "
                 f"{decided} decided merge groups failed (PRs {', '.join('#' + n for n in (groups.get('failedPrs') or [])[:6]) or 'unknown'}; "

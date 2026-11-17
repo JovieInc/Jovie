@@ -88,6 +88,10 @@ vi.mock('@/lib/ovie/summer-cards.server', () => ({
   applySummerCardDefaults: mockApplySummerCardDefaults,
 }));
 
+vi.mock('@/lib/founder-welcome/server', () => ({
+  founderWelcomeJob: vi.fn(async () => ({ filed: 0 })),
+}));
+
 vi.mock(
   '@/lib/connectors/workflows/reconcile-orphaned-approved-actions',
   () => ({
@@ -274,19 +278,14 @@ describe('GET /api/cron/frequent', () => {
       filed: [],
       skipped: false,
     });
-    mockGetAuthSignupOnboardingCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
-    }));
-    mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
-    }));
+    const freshReceipt = async () => ({ runAt: new Date().toISOString() });
+    mockGetAuthSignupOnboardingCanaryStatus.mockImplementation(freshReceipt);
+    mockGetPublicProfileCanaryStatus.mockImplementation(freshReceipt);
+    mockGetReleaseEmailCanaryStatus.mockImplementation(freshReceipt);
     mockRunReleaseEmailCanary.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
       status: 'failed',
       failureReason: 'not_configured',
-    }));
-    mockGetReleaseEmailCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
     }));
     mockApplySummerCardDefaults.mockResolvedValue({
       checked: 2,
@@ -352,6 +351,7 @@ describe('GET /api/cron/frequent', () => {
       success: true,
       data: { defaulted: 1, approvedByDefault: 1 },
     });
+    expect(body.results.founderWelcome?.data).toEqual({ filed: 0 });
 
     mockApplySummerCardDefaults.mockRejectedValueOnce(new Error('kv down'));
     const campaignsBefore = mockProcessCampaigns.mock.calls.length;

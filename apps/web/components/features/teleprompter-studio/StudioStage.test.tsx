@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StudioStage } from './StudioStage';
 
 describe('StudioStage', () => {
@@ -27,5 +28,17 @@ describe('StudioStage', () => {
     expect(
       screen.getByTestId('teleprompter-studio-camera').className
     ).toContain('opacity-100');
+  });
+
+  it('passes axe dim, between takes with the grid, and peeking', async () => {
+    for (const props of [
+      { peek: false, between: false, grid: false },
+      { peek: false, between: true, grid: true },
+      { peek: true, between: false, grid: false },
+    ]) {
+      const { container, unmount } = render(<StudioStage {...props} />);
+      await expectNoA11yViolations(container);
+      unmount();
+    }
   });
 });

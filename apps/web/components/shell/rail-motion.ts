@@ -82,3 +82,11 @@ export const SHELL_RAIL_LABEL_OVERLAY =
  */
 export const SHELL_RAIL_BLOCK_LABEL =
   'max-h-8 overflow-hidden transition-[max-height,margin,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:max-h-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+
+/**
+ * Collapsed-rail icon box for the account row. When the sidebar collapses to
+ * icons, the row centres itself in a 28px square with no padding or gap, so
+ * the account button and its loading placeholder share one footprint.
+ */
+export const SHELL_RAIL_ICON_BOX =
+  'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0';

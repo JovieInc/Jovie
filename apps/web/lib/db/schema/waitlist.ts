@@ -70,7 +70,7 @@ export const waitlistEntries = pgTable(
     // free text; the person's words live in capability_wants.
     decisionReason: text('decision_reason'),
     decisionRuleVersion: text('decision_rule_version'),
-    decidedAt: timestamp('decided_at'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
     decidedBy: text('decided_by'),
     adminActorId: text('admin_actor_id'),
     primarySocialFollowerCount: integer('primary_social_follower_count'),
@@ -199,7 +199,9 @@ export const capabilityWants = pgTable(
     source: text('source').notNull(),
     sourceTurnId: text('source_turn_id'),
     questionVariant: text('question_variant'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   table => ({
     entryCreatedAtIndex: index('idx_capability_wants_entry_created_at').on(

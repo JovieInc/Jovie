@@ -23,7 +23,13 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Light: Story = {
-  parameters: { themes: { themeOverride: 'light' } },
+  decorators: [
+    Story => (
+      <div data-proof-theme='light' style={{ colorScheme: 'light' }}>
+        <Story />
+      </div>
+    ),
+  ],
 };
 export const Empty: Story = {
   args: { progress: 0, details: 'Starting download' },

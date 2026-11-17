@@ -73,6 +73,25 @@ describe('fixForRow', () => {
     expect(fix?.requiresApproval).toBe(true);
     expect(fix && fixChatHref(fix)).toContain('/app/chat?q=');
   });
+  it('carries the clicked channel into the chat task', () => {
+    const fix = fixForRow(
+      row({
+        platform: 'youtube',
+        label: 'YouTube',
+        url: 'https://www.youtube.com/@timwhite',
+        lastObservedAt: '2026-09-01T00:00:00Z',
+        linksOut: true,
+      }),
+      'personal',
+      NOW
+    );
+    expect(fix?.issue.kind).toBe('stale_check');
+    const task = new URL(fixChatHref(fix!), 'https://jov.ie').searchParams.get(
+      'q'
+    );
+    expect(task).toContain('YouTube (youtube.com/@timwhite)');
+    expect(task).not.toContain('lifestyle_only');
+  });
   it('proposes nothing for healthy or unowned rows (no dead ends)', () => {
     expect(fixForRow(row({ linksOut: true }), 'personal', NOW)).toBeNull();
     expect(

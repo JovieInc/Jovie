@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StudioCameraBlocked } from './StudioCameraBlocked';
 
 describe('StudioCameraBlocked', () => {
@@ -29,5 +30,25 @@ describe('StudioCameraBlocked', () => {
     expect(screen.queryByText('Try Again')).toBeNull();
     fireEvent.click(screen.getByText('Back To Chat'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('passes axe for every camera error', async () => {
+    for (const error of [
+      'denied',
+      'no-device',
+      'in-use',
+      'unsupported',
+      'unknown',
+    ] as const) {
+      const { container, unmount } = render(
+        <StudioCameraBlocked
+          error={error}
+          onRetry={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+      await expectNoA11yViolations(container);
+      unmount();
+    }
   });
 });

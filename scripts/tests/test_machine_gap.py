@@ -34,6 +34,35 @@ class GateTest(unittest.TestCase):
         self.assertEqual(pair, "fix-red-6c3efaf400")
         self.assertNotEqual(solo, pair)
 
+    def test_a_superseded_cancelled_run_is_not_its_own_fix_red_class(self):
+        # 2026-11-11 #24646: Fleet Rules Evidence cancelled at 20:57:09Z and succeeded
+        # at 20:57:46Z. The rollup stayed FAILURE and hashed fix-red-72d43f8ba6.
+        superseded = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:46Z"},
+        ]}
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        fleet = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence").hexdigest()[:10]
+        self.assertEqual(gap.check_fingerprint(superseded), empty)
+        self.assertNotEqual(empty, fleet)
+        later = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "FAILURE",
+             "completedAt": "2026-11-11T21:00:00Z"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(later), fleet)
+        import fix_red_classes
+        self.assertEqual(fix_red_classes.real_failures(superseded), [])
+        self.assertEqual(fix_red_classes.real_failures(later)[0]["conclusion"], "FAILURE")
+        same_stamp = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED", "completedAt": "t"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS", "completedAt": "t"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(same_stamp), empty)
+
     def test_an_advisory_sibling_does_not_define_a_second_fix_red_class(self):
         import pr_events
         self.assertEqual(gap.ADVISORY_CHECKS, pr_events.NON_REQUIRED_CHECKS)

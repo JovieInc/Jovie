@@ -804,7 +804,7 @@ test('shipped CLI uses real gh and unzip for admission and the final actual Git 
         'fixture',
       ],
     ])
-      execFileSync('git', args, { env: gitEnv });
+      execFileSync('git', args, { maxBuffer: 256 * 1024 * 1024, env: gitEnv });
     const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {
       env: gitEnv,
       encoding: 'utf8',

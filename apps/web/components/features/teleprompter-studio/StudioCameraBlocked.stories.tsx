@@ -18,7 +18,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Denied: Story = {};
-export const NoCamera: Story = { args: { error: 'no-device' } };
-export const InUse: Story = { args: { error: 'in-use' } };
-export const Unsupported: Story = { args: { error: 'unsupported' } };
+export const PermissionDenied: Story = {};
+export const ErrorNoCamera: Story = { args: { error: 'no-device' } };
+export const ErrorInUse: Story = { args: { error: 'in-use' } };
+export const ErrorUnsupported: Story = { args: { error: 'unsupported' } };
+export const ErrorUnknown: Story = { args: { error: 'unknown' } };
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioCameraBlocked {...args} />
+    </div>
+  ),
+};

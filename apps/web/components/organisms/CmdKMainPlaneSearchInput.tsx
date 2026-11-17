@@ -85,7 +85,7 @@ export function CmdKMainPlaneSearchInput({
         aria-controls={listId}
         aria-activedescendant={activeRowId ?? undefined}
         aria-describedby={descriptionId}
-        aria-expanded
+        aria-expanded={open}
         data-testid='command-palette-header-input'
       />
       <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>

@@ -156,7 +156,11 @@ export async function listTeleprompterTakes(
   limit = 50
 ): Promise<TeleprompterTakeRecord[]> {
   const prefix = teleprompterTakeBlobPrefix(ownerId);
-  const metadata: { pathname: string; uploadedAt: Date }[] = [];
+  const metadata: { pathname: string; uploadedAt: Date; takeKey: string }[] =
+    [];
+  // Keeping a take rewrites its sidecar, so order by the video upload, which
+  // never changes, to keep the newest takes inside the limit.
+  const videoUploadedAt = new Map<string, number>();
   let cursor: string | undefined;
   do {
     const page = await list({
@@ -166,14 +170,23 @@ export async function listTeleprompterTakes(
       ...getBlobCommandOptions(),
     });
     for (const blob of page.blobs) {
+      const takeKey = blob.pathname.replace(/\.[^./]+$/, '');
       if (blob.pathname.endsWith('.json')) {
-        metadata.push({ pathname: blob.pathname, uploadedAt: blob.uploadedAt });
+        metadata.push({
+          pathname: blob.pathname,
+          uploadedAt: blob.uploadedAt,
+          takeKey,
+        });
+      } else {
+        videoUploadedAt.set(takeKey, blob.uploadedAt.getTime());
       }
     }
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
 
-  metadata.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+  const createdAt = (entry: (typeof metadata)[number]) =>
+    videoUploadedAt.get(entry.takeKey) ?? entry.uploadedAt.getTime();
+  metadata.sort((a, b) => createdAt(b) - createdAt(a));
   const records = await Promise.all(
     metadata.slice(0, limit).map(entry => readRecord(entry.pathname))
   );

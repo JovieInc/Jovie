@@ -33,9 +33,9 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
-| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
-| Certification JSON conflicts: component waivers that only add rows keep main's order, then head-only keys. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
+| Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -133,11 +133,10 @@ origin fails without changing existing bytes. New heads require new receipts;
 neither repair nor review/finalizer receipts rewrite origin history.
 
 The Dependabot metadata-certified producer and atomic pin-sync writer emit after
-their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+their final heads are known. Shipping SLO (snapshot and ratchet),
 Screenshots (new and updated PR), Production Controller customer notes, Desktop
 Release stamps, and both coverage/nightly report publishers use the same
-`shipping_origin.py emit-automation` boundary after publication. Sentry records
-the evidenced Claude provider, without inventing a model from its routing tier.
+`shipping_origin.py emit-automation` boundary after publication.
 
 Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
 days. The existing lanes dispatch tick reads artifacts from both reporting
@@ -959,6 +958,37 @@ Also in the same module and companions:
   Each pass records, per lane, free seats, seats fed and the reason any seat stayed idle
   (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
   the old routing; `observe` records what it would do and claims as before.
+
+## Observed admission capacity
+
+`pr_wip.py admit` and `new_issue_budget` use the caller's matched shared quota ledger
+and the fresh runner backlog in `release-flow.json`. Producer PR counts and the
+November 1 WIP targets remain diagnostic. Historical merge dwell and quota-deferred
+head counts cannot hold new work after the current constraint clears.
+
+A known zero remains blocked until its provider reset. A passed reset needs a fresh
+observation; it does not imply a refilled bucket. An existing admission invocation may
+make one quota-free `/rate_limit` refresh through the shared client. Unknown quota or
+CI evidence retains the existing bounded base and repair seats and prevents growth.
+Actual calls reserve at the shared client, and PR creation makes one bounded attempt.
+Caller quota does not certify a separate Actions installation. Recorded WIP overrides
+cannot override real quota or CI saturation.
+
+After its normal body and diff qualification, `pr:open` uses the existing `repair`
+request priority for corrections with red-before-green evidence on the canonical CI,
+agent-control-plane, identity, payment or proxy risk surfaces. The same priority reaches
+the prospective gate and the single creation attempt. It can use the existing repair
+reserve; it cannot spend an empty bucket or override CI backlog.
+
+`pr:open open --no-repair-reserve` explicitly declines that reserve and uses `default`
+for both capacity admission and the single creation request. It is a boolean downgrade,
+not a free-form priority setting; automatic selection stays unchanged when omitted.
+The existing publication receipt records the automatic and effective priorities.
+Every quota, CI, source, body and publication-head gate still applies.
+
+Ship now: use observed capacity with the existing event and lanes invocation paths.
+Re-evaluate when: JOV-7514 runtime receipts show idle capacity or a wrong-bucket hold.
+Then: repair that evidence path under JOV-8754; do not add another controller.
 
 ## Tests
 

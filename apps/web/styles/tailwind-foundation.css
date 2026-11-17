@@ -11,6 +11,10 @@
  */
 
 @custom-variant dark (&:is(.dark *));
+/* Link's declared preview state leaves hover/press and native history intact. */
+@custom-variant link-visited (
+  &[data-variant="link"][data-state="visited"]:not(:hover):not(:active)
+);
 
 @theme {
   /* Consolidated type scale (Tim 2026-09-27, Pen text-* steps): UI text sits
@@ -252,6 +256,9 @@
   --color-verified: var(--color-verified);
   --color-verified-backing: var(--color-verified-backing);
   --color-on-media: var(--color-on-media);
+  --color-header-text-link: var(--color-header-text-link);
+  --color-header-text-link-hover: var(--color-header-text-link-hover);
+  --color-ink-on-media: var(--color-ink-on-media);
   --color-sidebar: rgb(var(--sidebar-background));
   --color-sidebar-foreground: rgb(var(--sidebar-foreground));
   --color-sidebar-primary: rgb(var(--sidebar-primary));
