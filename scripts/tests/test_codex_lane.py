@@ -17,7 +17,9 @@ import unittest
 from unittest.mock import ANY, patch
 from types import SimpleNamespace
 from pathlib import Path
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
+
+from scripts.lanes.__tests__.codex_quota_cases import CodexQuotaCases
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -1219,7 +1221,9 @@ class CompletionBankTest(Isolated):
         self.assertNotIn("exhaustedUntil", state["beta"])
 
 
-class SubscriptionPoolTest(Isolated):
+class SubscriptionPoolTest(CodexQuotaCases, Isolated):
+    codex = codex
+    current_snapshot = staticmethod(current_snapshot)
     NOW = 1_000_000
 
     def setUp(self):
@@ -1563,6 +1567,7 @@ class SubscriptionPoolTest(Isolated):
             with patch.object(codex, "current_login_available", return_value=True), \
                     patch.object(codex, "current_subscription_snapshot", side_effect=lambda name, **_: self.snapshot(name)), \
                     patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset authority")), \
+                    patch.object(codex, "LEASE_WAIT_S", 0), \
                     patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
                 code = codex.run(SimpleNamespace(prompt_file=str(prompt),cwd=self.tmp.name,model=None,reasoning_effort=None))
             self.assertEqual(code, codex.NO_ACCOUNT_EXIT)
@@ -1744,26 +1749,6 @@ class SubscriptionPoolTest(Isolated):
             with patch.dict(os.environ,{"CODEX_LANE_SUBSCRIPTION_PROFILES":json.dumps(changed)}):
                 with self.assertRaises(ValueError):codex.lease("renamed-pro")
         finally:handle.close()
-
-    def test_natural_reset_refreshes_once_and_failed_refresh_retains_hourly_throttle(self):
-        def near_reset(name):
-            value=self.snapshot(name)
-            if name=="lyb-pro":value["rateLimits"]["rateLimits"]["primary"]["resetsAt"]=self.NOW+30
-            return value
-        codex.reconcile(self.NOW,fetch=near_reset)
-        self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW+31))
-        seen=[]
-        def refresh(name):seen.append(name);return self.snapshot(name)
-        result=codex.reconcile(self.NOW+31,fetch=refresh)
-        self.assertEqual(seen,["lyb-pro"])
-        self.assertTrue(result["profiles"]["lyb-pro"]["reconciled"])
-        self.assertTrue(codex.available("lyb-pro",codex.read_state(),self.NOW+31))
-        codex.write_state({});codex.reconcile(self.NOW,fetch=near_reset)
-        seen=[]
-        def fail(name):seen.append(name);raise ValueError("unavailable")
-        codex.reconcile(self.NOW+31,fetch=fail);codex.reconcile(self.NOW+32,fetch=fail)
-        self.assertEqual(seen,["lyb-pro"])
-
 
     # ---- burn before reset (Tim 2026-11-01): use-it-or-lose-it order, 1% floor, failover, one proposal
 
