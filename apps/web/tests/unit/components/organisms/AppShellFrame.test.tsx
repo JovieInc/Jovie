@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
@@ -13,6 +13,10 @@ describe('AppShellFrame', () => {
   it('mounts exactly one deferred titlebar in the desktop shell', async () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
     render(<AppShellFrame sidebar={null} main={<div>Desktop content</div>} />);
+
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
 
     const titlebar = await screen.findByTestId('electron-titlebar-row');
     expect(
