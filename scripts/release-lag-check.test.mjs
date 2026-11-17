@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateReleaseLag, findBlocker } from './release-lag-check.mjs';
+import {
+  evaluateReleaseLag,
+  findBlocker,
+  readBuildInfo,
+} from './release-lag-check.mjs';
 
 const H = 3_600_000;
 const base = {
@@ -50,4 +54,43 @@ test('names the failing job and step of the newest failed run', () => {
     findBlocker([{ databaseId: 3, conclusion: 'success' }], jobs),
     /superseded/
   );
+});
+
+test('readBuildInfo retries transient network errors and returns the receipt', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls < 3) throw new Error('fetch failed: read ECONNRESET');
+    return { ok: true, json: async () => ({ commitSha: 'c'.repeat(40) }) };
+  };
+  const info = await readBuildInfo(
+    'https://jov.ie/api/health/build-info',
+    fetchImpl,
+    [0, 0]
+  );
+  assert.equal(calls, 3);
+  assert.deepEqual(info, { commitSha: 'c'.repeat(40) });
+});
+test('readBuildInfo retries 5xx and 429 but treats a 4xx as the answer', async () => {
+  let status = 503;
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return { ok: false, status, json: async () => ({}) };
+  };
+  await assert.rejects(readBuildInfo('u', fetchImpl, [0, 0]), /HTTP 503/);
+  assert.equal(calls, 3);
+  calls = 0;
+  status = 404;
+  await assert.rejects(readBuildInfo('u', fetchImpl, [0, 0]), /HTTP 404/);
+  assert.equal(calls, 1);
+});
+test('readBuildInfo rethrows after the last retry so the dead-man stays red', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    throw new Error('read ECONNRESET');
+  };
+  await assert.rejects(readBuildInfo('u', fetchImpl, [0, 0]), /ECONNRESET/);
+  assert.equal(calls, 3);
 });

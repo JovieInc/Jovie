@@ -24,4 +24,8 @@ describe('AiPage', () => {
     expect(source).toContain('COMPANY_IDENTITY.xHandle');
     expect(source).not.toContain('@jovieapp');
   });
+
+  it('declares its own canonical now that the root layout no longer sets one', () => {
+    expect(metadata.alternates?.canonical).toBe('/ai');
+  });
 });

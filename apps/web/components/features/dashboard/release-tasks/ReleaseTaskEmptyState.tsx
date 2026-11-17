@@ -25,7 +25,7 @@ export function ReleaseTaskEmptyState({
       <EmptyState
         icon={<ListChecks className='h-5 w-5' aria-hidden='true' />}
         heading='Your Release Playbook'
-        description='20 battle-tested tasks to maximize your release — from DSP pitching to fan notifications.'
+        description='A checklist of 20 tasks, from editorial pitching to fan notifications.'
         action={{
           label: isLoading ? 'Generating...' : 'Generate Release Plan',
           onClick: onSetUp,

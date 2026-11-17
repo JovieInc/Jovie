@@ -29,6 +29,12 @@ describe('TableIssueSummary', () => {
     trigger.focus();
     await user.keyboard('{Enter}');
     expect(screen.getByText('No artwork')).toBeVisible();
+    // Issue rows must render with the WCAG-AA error text token
+    // (text-error-text), not the raw accent red — 4.37:1 fails AA on the
+    // elevated dark popover surface.
+    expect(screen.getByText('No artwork').closest('li')).toHaveClass(
+      'text-error-text'
+    );
     expect(
       screen.getByText('A long issue that must remain available')
     ).toBeVisible();

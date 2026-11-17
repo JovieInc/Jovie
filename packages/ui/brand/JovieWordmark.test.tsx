@@ -26,7 +26,9 @@ describe('JovieWordmark', () => {
     const o = container.querySelector('[data-glyph="o"] svg');
     // text master seam is wider than display (46 u vs 16 u)
     const seam = Number(
-      o?.querySelector('mask path[stroke="#000"]')?.getAttribute('stroke-width')
+      o
+        ?.querySelector('mask path[stroke]:not(.jo-tail)')
+        ?.getAttribute('stroke-width')
     );
     expect(seam).toBeGreaterThan(5);
   });

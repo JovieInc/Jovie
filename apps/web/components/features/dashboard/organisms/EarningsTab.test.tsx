@@ -35,9 +35,24 @@ vi.mock('@/lib/utils/qr-code', () => ({
 vi.mock('@/components/organisms/table', () => ({
   UnifiedTable: (props: Record<string, unknown>) => {
     tableProps.last = props;
-    return <div data-testid='tippers-table' />;
+    return (
+      <div data-testid='tippers-table'>
+        {props.emptyState as React.ReactNode}
+      </div>
+    );
   },
-  TableEmptyState: () => null,
+  TableEmptyState: ({
+    heading,
+    description,
+  }: {
+    readonly heading: string;
+    readonly description?: string;
+  }) => (
+    <div data-testid='tippers-empty-state'>
+      <h3>{heading}</h3>
+      <p>{description}</p>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
@@ -100,6 +115,16 @@ describe('EarningsTab', () => {
     expect(screen.queryByText('Total Revenue')).toBeNull();
     expect(container.querySelectorAll('[aria-hidden="true"].p-3')).toHaveLength(
       3
+    );
+  });
+
+  it('says what the empty tippers table is for in one line', () => {
+    renderTab();
+
+    const empty = screen.getByTestId('tippers-empty-state');
+    expect(empty).toHaveTextContent('No Tips Yet');
+    expect(empty).toHaveTextContent(
+      'Fans who tip you through your profile show up here.'
     );
   });
 

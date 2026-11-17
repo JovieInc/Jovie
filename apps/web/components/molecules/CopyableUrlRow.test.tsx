@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CopyableUrlRow } from './CopyableUrlRow';
 
 describe('CopyableUrlRow', () => {
@@ -13,5 +14,13 @@ describe('CopyableUrlRow', () => {
     render(<CopyableUrlRow url='https://jov.ie/tim/song' showOpen={false} />);
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Open link' })).toBeNull();
+  });
+
+  it('has no axe violations with its copy and open actions', async () => {
+    const { container } = render(
+      <CopyableUrlRow url='https://jov.ie/tim' displayValue='jov.ie/tim' />
+    );
+    expect(screen.getByText('jov.ie/tim')).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

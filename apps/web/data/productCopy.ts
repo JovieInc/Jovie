@@ -7,7 +7,7 @@ import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
  */
 export const PRODUCT_COPY = {
   seo: {
-    title: 'Your living identity on the internet',
+    title: 'Product',
     description:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
   },

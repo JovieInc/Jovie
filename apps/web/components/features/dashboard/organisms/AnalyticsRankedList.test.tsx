@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Globe } from 'lucide-react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AnalyticsRankedList, formatRankedLabel } from './AnalyticsRankedList';
 
 describe('AnalyticsRankedList', () => {
@@ -21,6 +21,12 @@ describe('AnalyticsRankedList', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('1Instagram42');
     expect(rows[1]).toHaveTextContent('2São Paulo7');
+    // Rank digits right-align in a fixed tabular column.
+    expect(screen.getByText('1')).toHaveClass(
+      'w-4',
+      'text-right',
+      'tabular-nums'
+    );
   });
 
   it('keeps one height across loading, empty and loaded states', () => {
@@ -45,6 +51,32 @@ describe('AnalyticsRankedList', () => {
     );
     expect(container.firstElementChild).toHaveClass('min-h-49');
     expect(screen.getByText('No source data yet')).toBeInTheDocument();
+  });
+
+  it('draws the designed empty anatomy at the same height when given one', () => {
+    const onClick = vi.fn();
+    const { container } = render(
+      <AnalyticsRankedList
+        icon={Globe}
+        loading={false}
+        emptyMessage='No City Data Yet'
+        emptyState={{
+          description: 'Cities appear as visitors open your profile.',
+          action: { label: 'View Countries', onClick },
+        }}
+        items={[]}
+      />
+    );
+
+    expect(container.firstElementChild).toHaveClass('min-h-49');
+    expect(
+      screen.getByRole('heading', { name: 'No City Data Yet' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Cities appear as visitors open your profile.')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Countries' }));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it('falls back to the raw label when it is not valid URI encoding', () => {

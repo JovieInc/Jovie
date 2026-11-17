@@ -29,3 +29,10 @@ export const Default: Story = {
     onClose: () => {},
   },
 };
+
+// The token shadow and ring are lighter in light mode; this story keeps
+// that theme in the visual matrix.
+export const Light: Story = {
+  args: Default.args,
+  parameters: { themes: { themeOverride: 'light' } },
+};

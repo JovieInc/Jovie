@@ -11,8 +11,12 @@
 import { z } from 'zod';
 import { gateway, generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
+import type { EnforcedArtistRule } from '@/lib/artist-rules/gate';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
-import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
+import {
+  assertArtistRulesFloor,
+  assertCustomerVoiceFloor,
+} from '@/lib/copy/outbound-floor';
 import {
   buildPitchDraftSystemPrompt,
   buildPitchDraftUserPrompt,
@@ -115,8 +119,10 @@ export async function generatePitchDraft(params: {
   readonly destination: PitchDestination;
   readonly instructions?: string;
   readonly identity?: AiTelemetryIdentity;
+  /** The artist's active rules; a pitch that breaks a hard one is refused. */
+  readonly artistRules?: readonly EnforcedArtistRule[];
 }): Promise<PitchDraftGenerationResult> {
-  const { input, destination, instructions, identity } = params;
+  const { input, destination, instructions, identity, artistRules } = params;
   const { object, usage } = await generateObject({
     model: gateway(PITCH_MODEL),
     schema: pitchDraftResponseSchema,
@@ -148,6 +154,11 @@ export async function generatePitchDraft(params: {
     });
   }
   assertCustomerVoiceFloor(body, 'pitch-draft:body');
+  assertArtistRulesFloor(
+    `${subjectLine ?? ''}\n${body}`,
+    artistRules,
+    'pitch-draft'
+  );
 
   return {
     pitch: {

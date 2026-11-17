@@ -182,4 +182,14 @@ describe('ProgressBar accessibility', () => {
 
     await expectNoA11yViolations(container);
   });
+
+  it('mirrors only the indeterminate track for right-to-left layouts', () => {
+    const { rerender } = render(
+      <ProgressBar indeterminate label='Importing' />
+    );
+    expect(screen.getByRole('progressbar')).toHaveClass('rtl:-scale-x-100');
+
+    rerender(<ProgressBar value={40} label='Importing' />);
+    expect(screen.getByRole('progressbar')).not.toHaveClass('rtl:-scale-x-100');
+  });
 });

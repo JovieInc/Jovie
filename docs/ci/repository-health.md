@@ -76,6 +76,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 | New repository-root entries | Only names in `scripts/repo-root-allowlist.json` |
+| Orphan review images | Zero images under `docs/screenshots/` or `docs/pen-stills/` that nothing outside their folder references |
 
 The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.json` records the 10,014 exact-main total, 9,945 old compatibility count, and legacy findings by rule/area. Receipts show the current total and delta. Existing PR-size, generated-placement, payload, binary, and visual gates still fail normally; there is no `continue-on-error`.
 
@@ -166,6 +167,22 @@ The four wide public-profile baselines are the flag-on
 entry for that surface. No unreferenced file remained. Resulting tree: 112
 files (~8.2 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget).
 
+Approved raise (measured 2026-11-15, visual-baseline auto-refresh PR #25751):
+`maxSnapshotFiles` 121 → 133 (+10%, the per-raise cap). Exact `origin/main`
+measured 119 canonical baselines — 98.3% of the prior budget — leaving 2
+slots. `storybook-chat-history-switcher.spec.ts` requests 14 new pngs (closed,
+open, searching, no-matches, empty, unread, and after-close, each in light and
+dark), so this refresh cannot land inside 121. Counts on `origin/main`: 100
+files on 2026-08-17, 106 on 2026-10-16, 119 on 2026-11-15 (8,524,351 bytes of
+the unchanged 12 MiB byte budget). 29 commits and 2 contributors touched that
+tree in those 90 days. A consumer audit against `ADMIN_RENDER_SURFACES` and
+`ADMIN_MOBILE_SNAPSHOT_SURFACES` found five unreferenced admin pngs
+(`admin-needs-you-desktop`, `admin-needs-you-mobile`, `admin-growth-mobile`,
+`admin-ops-mobile`, `admin-product-mobile`); no spec requests those names, so
+they are pruned here. Every remaining file, including the 14 new switcher
+baselines, is named by a live `toHaveScreenshot`. Resulting tree: 128 files.
+The publisher refuses a refresh whose canonical directory would exceed this cap.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive
@@ -177,6 +194,10 @@ Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/
 2026-10-20 hygiene pass: pruned `0117`–`0136` snapshots (16 files, ~16 MiB) back to the 8-snapshot cap after main drifted to 24; the cap test had been failing on main.
 
 2026-10-26 hygiene pass: main was 198.00 MiB of 198 MiB and the drizzle cap test failing (12 snapshots, cap 8) after #23277 and neighbours. Pruned 0137-0140 (4 files, ~4.6 MiB) per the JOV-6671 rule; 0141-0148 remain. Tracked bytes 198.00 -> 193.54 MiB (4.46 MiB headroom). The vendored actions (JOV-8754, #22504, already merged) stay vendored: they exist to avoid GITHUB_TOKEN REST calls and are hash-verified against upstream, so deduping the two actions-cache bundles would need a custom build; budget unchanged.
+
+### Review images: PR evidence stays on the PR
+
+One-off PR evidence (before/after captures, QA stills, review screenshots) belongs on the PR as an attachment or an uploaded CI artifact, not in the tree. Committed copies outlive the review, nothing points at them, and they spend the shrink-only tracked-bytes budget; 2026-11 removed 55 such files (#25003). `scripts/lib/orphan-screenshot-guard.mjs`, run by `scripts/repo-hygiene-guard.mjs` (pre-commit and PR Size Guard), fails any `png`/`jpg`/`jpeg`/`webp`/`gif` under `docs/screenshots/` or `docs/pen-stills/` that no tracked file outside the image's own folder references by path or file name. An evidence bundle still counts as referenced: an image listed by a sibling file (README, `capture.json`, `holdout.json`) is live when a tracked file outside the folder names the folder (surface-census evidence, a test that reads the folder). A README inside the folder alone is not a reference. To fix a failure, delete the image and attach it to the PR, or link it from the doc, census entry or test that actually needs it. Tests: `scripts/lib/__tests__/orphan-screenshot-guard.test.mjs`.
 
 ### Repository-root allowlist
 
@@ -206,6 +227,20 @@ All must hold for two consecutive 30-day windows:
 
 Otherwise keep the monorepo and address the measured payload, build, or ownership problem directly.
 
+## CI event fan-out budget
+
+One event should start a known, small number of runs. Workflow chains (`workflow_run`) and pull-request metadata triggers (`edited`, `labeled`, `unlabeled`) multiply runs, and every run, even a skipped one, spends the shared GitHub event pipeline and run list; cancelled and successful bookkeeping runs also take the hosted job slots (about 60) and the shared `GITHUB_TOKEN` bucket that merge-gate jobs need.
+
+Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in #25018, which took the declared total from 269.3 to 256.3.
+
+Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at 300, about 10% above the measured 269 to 277 (the week moves with merge volume), so a nightly measurement is not red from its first run. It only goes down toward the target.
+
+- Registry: `scripts/ci-trigger-registry.json` lists every workflow file, the exact triggers that may start it (`event`, `event:type`, or `workflow_run:<upstream>`) and its expected `runsPerMergedPr`. `budget.runsPerMergedPr` is the target; `budget.ceiling` caps the declared total.
+- Gate: `scripts/ci-workflow-topology.test.mjs` fails when a workflow or trigger is not registered (fan-out triggers are named in the error), when a registered trigger no longer exists, when `runsPerMergedPr` is missing, or when the declared total passes the ceiling.
+- Adding a trigger: run `node scripts/ci-trigger-registry.mjs --write`, which syncs triggers and leaves a new workflow's `runsPerMergedPr` null, then fill in the measured or estimated number. A new `workflow_run`, `edited` or `labeled` trigger needs a reason in the PR body. Prefer an event filter (`types`, `branches`, `paths`) or a reusable call from a workflow that already wakes on the event over a job-level `if:` that skips.
+- Nightly measurement: the `fan-out-budget` job in CI Duration Ratchet (its existing 06:25 UTC schedule, so no new clock) runs `scripts/ci-trigger-budget.mjs` with the job's own read-only `GITHUB_TOKEN` through the shared client at `report` priority, about 200 calls. It fails when the measured 7-day runs per merged PR pass `budget.ceiling`, or when a workflow with 5+ skipped runs in a 6-hour sample skipped every job in more than 95% of its runs over both that sample and 7 days. It is not a PR check.
+- Lowering the ceiling: after a fan-out cut lands, re-measure and lower `budget.ceiling` and the affected `runsPerMergedPr` in the same PR.
+
 ## Safe cleanup playbook
 
 1. Run `node scripts/repo-hygiene-guard.mjs --diff-base origin/main --report repo-health-receipt.json` from exact main.
@@ -216,3 +251,7 @@ Otherwise keep the monorepo and address the measured payload, build, or ownershi
 6. Run focused tests, typecheck/lint, hygiene, and Knip; retain the receipt and write durable decisions to GBrain.
 
 2026-10-29 hygiene pass (ratchet): main was 197.49 MiB of 198 MiB. Pruned drizzle snapshots 0141-0149 (9 files, 10.29 MiB) and kept only the newest (`0151`), per the JOV-6671 rule; retention cap lowered 8 -> 3 (`MAX_RETAINED_DRIZZLE_SNAPSHOTS`). Tracked bytes 197.49 -> 187.20 MiB (about 10.8 MiB headroom); the budget stays 198 MiB and the `maxTrackedBytes` comment marks it as a ratchet. The clean line of `repo-hygiene-guard` now prints the budget and remaining headroom. New guard: tracked `*.gen.json` files over 1 MiB fail unless listed in `GEN_JSON_SIZE_ALLOWLIST`; none exist today (largest generated JSON is 216 KiB). Not touched: docs/screenshots evidence (moving off-repo in #23631), the investor-deck PDF and demo video (served at runtime), the vendored actions, and the registry-driven screenshot catalog.
+
+2026-11-08 hygiene pass (ratchet): main was 207,612,930 of 207,618,048 bytes (about 5 KB headroom) and the drizzle cap test failing (8 snapshots, cap 3). Pruned drizzle snapshots 0151, 0160-0164 and 0177 (7 files) and kept only the newest (`0178`), per the JOV-6671 rule; every reader (`drizzle-kit generate`, the library migration tests, `scripts/lanes/migration_renumber.py`) reads the newest snapshot on the tip or older ones from git history. Budget unchanged.
+
+2026-11-15 hygiene pass (ratchet): main was 207,147,754 of 207,618,048 bytes (about 470 KB headroom) with 4 drizzle snapshots (cap 3), and merge groups of queued PRs crossed the combined-tree budget, so the queue ejected members (#25591). Pruned drizzle snapshots 0178-0180 (3 files, about 3.69 MB) and kept only the newest (`0181`), per the JOV-6671 rule. Budget unchanged.

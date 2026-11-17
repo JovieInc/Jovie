@@ -65,12 +65,6 @@
     "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": {
       "z-50": 1
     },
-    "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx": {
-      "z-50": 1
-    },
-    "apps/web/components/features/dashboard/molecules/ProfileLiveCelebration.tsx": {
-      "z-50": 1
-    },
     "apps/web/components/features/dashboard/molecules/universal-link-input/UniversalLinkInput.tsx": {
       "z-100": 1
     },

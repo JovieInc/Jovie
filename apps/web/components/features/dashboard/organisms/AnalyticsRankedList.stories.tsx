@@ -41,3 +41,15 @@ export const Loading: Story = {
 export const Empty: Story = {
   args: { icon: Globe, items: [], emptyMessage: 'No source data yet' },
 };
+
+export const EmptyCities: Story = {
+  args: {
+    items: [],
+    emptyMessage: 'No City Data Yet',
+    emptyState: {
+      description:
+        'Cities appear as visitors with a known location open your profile.',
+      action: { label: 'View Countries', onClick: () => {} },
+    },
+  },
+};

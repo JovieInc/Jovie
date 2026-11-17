@@ -325,8 +325,8 @@ export function EarningsTab() {
           emptyState={
             <TableEmptyState
               icon={<Users className='h-5 w-5' />}
-              heading='No tips yet'
-              description='Share your tip link to get started.'
+              heading='No Tips Yet'
+              description='Fans who tip you through your profile show up here.'
             />
           }
         />

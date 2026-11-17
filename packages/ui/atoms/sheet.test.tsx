@@ -131,6 +131,38 @@ describe('Sheet', () => {
       expect(content.className).toContain('max-h-sheet-viewport');
     });
 
+    it('opens at the inline end by default so RTL documents mirror it', () => {
+      // Deliberate-red: the default used to be the physical right side.
+      render(
+        <Sheet open={true}>
+          <SheetContent>Default sheet</SheetContent>
+        </Sheet>
+      );
+      const content = screen.getByTestId('sheet-content');
+      expect(content).toHaveAttribute('data-side', 'end');
+      expect(content).toHaveClass(
+        'end-0',
+        'border-s',
+        'data-[state=open]:slide-in-from-end'
+      );
+      expect(content.className).not.toContain('right-0');
+    });
+
+    it('renders on the inline start side', () => {
+      render(
+        <Sheet open={true}>
+          <SheetContent side='start'>Start sheet</SheetContent>
+        </Sheet>
+      );
+      const content = screen.getByTestId('sheet-content');
+      expect(content).toHaveAttribute('data-side', 'start');
+      expect(content).toHaveClass(
+        'start-0',
+        'border-e',
+        'data-[state=open]:slide-in-from-start'
+      );
+    });
+
     it('renders on bottom side', () => {
       render(<TestSheet open={true} side='bottom' />);
       const content = screen.getByTestId('sheet-content');
@@ -166,6 +198,16 @@ describe('Sheet', () => {
     it('renders with default test id', () => {
       render(<TestSheet open={true} />);
       expect(screen.getByTestId('sheet-header')).toBeInTheDocument();
+    });
+
+    it('mirrors the header gutter and close control in RTL (logical insets)', () => {
+      render(<TestSheet open={true} />);
+      const header = screen.getByTestId('sheet-header');
+      expect(header).toHaveClass('pe-10', 'text-start');
+      expect(header).not.toHaveClass('pr-10', 'text-left');
+      const close = screen.getByTestId('sheet-close-button');
+      expect(close).toHaveClass('end-4');
+      expect(close).not.toHaveClass('right-4');
     });
 
     it('contains title and description', () => {
@@ -261,7 +303,7 @@ describe('Sheet', () => {
 
       expect(
         container.querySelector('[data-slot="sheet-content"]')
-      ).toHaveAttribute('data-side', 'right');
+      ).toHaveAttribute('data-side', 'end');
       expect(
         container.querySelector('[data-slot="sheet-overlay"]')
       ).toHaveClass('custom-overlay');

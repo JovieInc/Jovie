@@ -67,6 +67,11 @@ run_test() {
 }
 
 run_affected() {
+  # Certified source/owner edits need renewed browser evidence on this branch.
+  # Catch stale census digests before typecheck, rather than in the merge group.
+  pnpm design:authority:check
+  # Catch the same merged/head byte limits as PR Size Guard before slow checks.
+  node scripts/lib/projected-tree-budget.mjs --local
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
   run_lint
@@ -86,6 +91,7 @@ run_affected() {
 }
 
 run_publication() {
+  node scripts/lib/projected-tree-budget.mjs --local
   # Draft publication is a feedback start, not a promotion qualification.
   # Keep the committed diff safe, then let rolling CI evaluate the broader
   # affected surface while implementation continues.

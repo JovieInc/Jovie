@@ -121,7 +121,19 @@ describe('proposeFix', () => {
       'personal'
     );
     expect(fix.copyRule).toBe('lifestyle_only');
-    expect(fix.agentTask).toContain('lifestyle_only');
+    // The rule travels in words the model understands, never as a rule id.
+    expect(fix.agentTask).not.toContain('lifestyle_only');
+    expect(fix.agentTask).toContain('never a pitch for Jovie');
+  });
+  it('names the exact profile so chat never asks which one', () => {
+    const fix = proposeFix(
+      { kind: 'stale_check', platform: 'youtube', severity: 'low' },
+      'personal',
+      { label: 'YouTube', url: 'https://www.youtube.com/@timwhite/' }
+    );
+    expect(fix.agentTask).toContain('YouTube (youtube.com/@timwhite)');
+    expect(fix.agentTask).toContain('do not publish');
+    expect(fix.title).toBe('Re-check this profile (YouTube)');
   });
 });
 

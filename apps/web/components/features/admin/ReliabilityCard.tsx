@@ -31,8 +31,8 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
   ) {
     return {
       label: 'Critical',
-      labelClassName: 'text-error',
-      iconClassName: 'text-error',
+      labelClassName: 'text-error-text',
+      iconClassName: 'text-error-text',
     };
   }
 
@@ -44,15 +44,15 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
   ) {
     return {
       label: 'Needs Attention',
-      labelClassName: 'text-warning',
-      iconClassName: 'text-warning',
+      labelClassName: 'text-warning-text',
+      iconClassName: 'text-warning-text',
     };
   }
 
   return {
     label: 'Healthy',
-    labelClassName: 'text-success',
-    iconClassName: 'text-success',
+    labelClassName: 'text-success-text',
+    iconClassName: 'text-success-text',
   };
 }
 
@@ -86,7 +86,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <ContentSurfaceCard className='h-full overflow-hidden'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Reliability'
         subtitle='System health metrics'
@@ -115,7 +115,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           value={incidentsLabel}
           icon={summary.incidents24h > 0 ? AlertTriangle : CheckCircle2}
           iconClassName={
-            summary.incidents24h > 0 ? tone.iconClassName : 'text-success'
+            summary.incidents24h > 0 ? tone.iconClassName : 'text-success-text'
           }
         />
         <ContentMetricRow
@@ -125,14 +125,16 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           iconClassName={
             summary.unresolvedSentryIssues24h > 0
               ? tone.iconClassName
-              : 'text-success'
+              : 'text-success-text'
           }
         />
         <ContentMetricRow
           label='Redis'
           value={redisLabel}
           icon={summary.redisAvailable ? CheckCircle2 : HardDrive}
-          iconClassName={summary.redisAvailable ? 'text-success' : 'text-error'}
+          iconClassName={
+            summary.redisAvailable ? 'text-success-text' : 'text-error-text'
+          }
         />
         <ContentMetricRow
           label='Deploys'

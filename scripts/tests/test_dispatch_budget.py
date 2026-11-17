@@ -60,8 +60,9 @@ class DispatchBudgetTest(unittest.TestCase):
 
     def test_fix_red_claims_with_the_dispatch_reservation(self):
         source = inspect.getsource(lane._fix_red_pr)
-        self.assertIn('min_reservation={"spend": 1, "mutations": 1}', source)
+        self.assertIn('min_reservation={"spend": 1, "mutations": 1 + (len(conflict_resolvers()) if pr.get("mergeStateStatus") == "DIRTY" else 0)}', source)  # DIRTY: resolvers then dispatch
         self.assertIn('{"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch"', source)
+        self.assertIn('"mutations": MAX_FIX_ATTEMPTS * (len(conflict_resolvers()) + 1),', source)  # the cap holds that reservation per attempt
 
 
 if __name__ == "__main__":

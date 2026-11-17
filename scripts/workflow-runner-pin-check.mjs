@@ -24,17 +24,30 @@ export const FLOATING = /(?<![\w-])ubuntu-latest(?![\w.-])/u;
 const INSTALLS_PLAYWRIGHT =
   /playwright['"]?\s*,?\s*['"]?install\b|playwright\s+install\b/u;
 
-/** @param {string} run @param {string} repoRoot */
+/**
+ * Scripts a step runs through any interpreter (node, tsx, bash, python), plus
+ * the relative modules they import one level down, may install Playwright.
+ * @param {string} run @param {string} repoRoot
+ */
 function runsPlaywrightScript(run, repoRoot) {
-  for (const [, file] of run.matchAll(/\bnode\s+(\S+\.[cm]?js)\b/gu)) {
+  const seen = new Set();
+  const scan = (/** @type {string} */ file, depth) => {
     const full = path.join(repoRoot, file);
-    if (
-      existsSync(full) &&
-      INSTALLS_PLAYWRIGHT.test(readFileSync(full, 'utf8'))
-    )
-      return true;
-  }
-  return false;
+    if (seen.has(full) || !existsSync(full)) return false;
+    seen.add(full);
+    const text = readFileSync(full, 'utf8');
+    if (INSTALLS_PLAYWRIGHT.test(text)) return true;
+    if (depth > 0) return false;
+    const dir = path.dirname(file);
+    return [...text.matchAll(/from\s+['"](\.{1,2}\/[^'"]+)['"]/gu)].some(m =>
+      scan(path.join(dir, m[1]), depth + 1)
+    );
+  };
+  return [
+    ...run.matchAll(
+      /\b(?:node|tsx|bash|sh|python3?)\s+(?:--\S+\s+)*([\w./-]+\.(?:[cm]?[jt]s|sh|py))\b/gu
+    ),
+  ].some(([, file]) => scan(file, 0));
 }
 
 function usesPlaywright(job, repoRoot) {

@@ -1,7 +1,95 @@
+'use client';
+
+import { EmptyCell } from '@/components/atoms/EmptyCell';
+import { AdminDataTable } from '@/components/features/admin/table/AdminDataTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelStageRows } from '@/lib/admin/types';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
+
+type FounderFunnelStageRow = FounderFunnelStageRows['rows'][number];
+
+// Pinned to UTC so the server render and the browser show the same day.
+function formatSignupDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+const columnHelper = createColumnHelper<FounderFunnelStageRow>();
+
+/**
+ * The people a funnel stage counted, on the shared table: one PersonCell
+ * (name with email as its quiet secondary fact) and the signup date, in the
+ * dense 32px row every people table uses.
+ */
+const FOUNDER_FUNNEL_COLUMNS = [
+  columnHelper.display({
+    id: 'person',
+    header: 'Person',
+    size: 360,
+    minSize: 240,
+    cell: ({ row }) => {
+      const { displayName, email } = row.original;
+      // A blank display name falls back to the email, like a missing one.
+      const shownName = displayName?.trim() || null;
+      const name = shownName ?? email;
+      if (!name) return <EmptyCell />;
+      return (
+        <PersonCell
+          name={name}
+          secondary={shownName && email ? email : undefined}
+        />
+      );
+    },
+  }),
+  columnHelper.accessor('enteredAt', {
+    id: 'enteredAt',
+    header: 'Signed Up',
+    // The drawer shows at most the first page of a stage, so a client sort
+    // would reorder only the loaded subset.
+    enableSorting: false,
+    size: 140,
+    minSize: 120,
+    meta: { align: 'right' },
+    cell: ({ getValue }) => {
+      const value = getValue();
+      return value ? (
+        <span className='tabular-nums text-secondary-token'>
+          {formatSignupDate(value)}
+        </span>
+      ) : (
+        <EmptyCell />
+      );
+    },
+  }),
+] as ColumnDef<FounderFunnelStageRow, unknown>[];
+
+function FounderFunnelDrilldownTable({
+  rows,
+  stageLabel,
+}: Readonly<{
+  rows: FounderFunnelStageRows['rows'];
+  stageLabel: string;
+}>) {
+  return (
+    <AdminDataTable
+      data={rows}
+      columns={FOUNDER_FUNNEL_COLUMNS}
+      rowMode='dense'
+      enableVirtualization={false}
+      getRowId={row => row.id}
+      minWidth='0'
+      caption={`${stageLabel} records`}
+    />
+  );
+}
 
 interface FounderFunnelDrilldownProps {
   readonly result: FounderFunnelStageRows;
@@ -13,15 +101,6 @@ const RANGE_LABELS = {
   '30d': 'last 30 days',
   all: 'all time',
 } as const;
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 /**
  * Founder funnel stage drill-down (JOV-7484): lists exactly the records the
@@ -63,46 +142,19 @@ export function FounderFunnelDrilldown({
           {result.errors.join('; ')}
         </p>
       ) : result.rows.length === 0 ? (
-        <p className='px-3 py-4 text-xs text-secondary-token'>
-          No records in this stage for the selected window.
-        </p>
+        <TableEmptyState
+          testId='founder-funnel-drilldown-empty'
+          heading='No Records In This Stage'
+          description='Nothing in this stage for the selected window.'
+        />
       ) : (
-        <div className='overflow-x-auto px-3 pb-3 pt-2'>
-          <table className='w-full text-left text-xs'>
-            <thead>
-              <tr className='border-b border-subtle text-tertiary-token'>
-                <th className='whitespace-nowrap py-1.5 pr-4 font-medium'>
-                  Name
-                </th>
-                <th className='whitespace-nowrap py-1.5 pr-4 font-medium'>
-                  Email
-                </th>
-                <th className='whitespace-nowrap py-1.5 font-medium'>
-                  Signed up
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.rows.map(row => (
-                <tr
-                  key={row.id}
-                  className='border-b border-subtle last:border-b-0'
-                >
-                  <td className='py-1.5 pr-4 text-primary-token'>
-                    {row.displayName ?? '—'}
-                  </td>
-                  <td className='py-1.5 pr-4 text-secondary-token'>
-                    {row.email ?? '—'}
-                  </td>
-                  <td className='py-1.5 text-secondary-token tabular-nums'>
-                    {formatDate(row.enteredAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className='overflow-x-auto pb-3 pt-2'>
+          <FounderFunnelDrilldownTable
+            rows={result.rows}
+            stageLabel={result.stageLabel}
+          />
           {result.total > result.rows.length ? (
-            <p className='pt-2 text-2xs text-tertiary-token'>
+            <p className='px-3 pt-2 text-2xs text-tertiary-token'>
               Showing first {result.rows.length.toLocaleString('en-US')} of{' '}
               {result.total.toLocaleString('en-US')} records.
             </p>

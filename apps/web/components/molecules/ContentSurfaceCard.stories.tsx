@@ -66,3 +66,41 @@ export const SemanticAndInteractive: Story = {
     </div>
   ),
 };
+
+/** Partial: a surface holding only a heading, before its body content arrives. */
+export const PartialHeadingOnly: Story = {
+  render: () => (
+    <ContentSurfaceCard className='p-4'>
+      <p className='text-sm font-medium'>Claim your artist profile</p>
+    </ContentSurfaceCard>
+  ),
+};
+
+/** Long content: unbroken copy wraps inside the surface instead of overflowing it. */
+export const LongContentWraps: Story = {
+  render: () => (
+    <ContentSurfaceCard className='space-y-2 p-4'>
+      <p className='text-sm font-medium'>
+        The Extraordinary Midnight Radio Orchestra and Friends Live From Los
+        Angeles
+      </p>
+      <p className='break-words text-sm text-secondary-token'>
+        jov.ie/theextraordinarymidnightradioorchestraandfriendsliveinlosangeles
+      </p>
+    </ContentSurfaceCard>
+  ),
+};
+
+/** RTL: the surface and its nested card follow a right-to-left document. */
+export const RtlNested: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <ContentSurfaceCard className='space-y-3 p-4'>
+        <p className='text-sm font-medium'>المطالبة بملفك الشخصي</p>
+        <ContentSurfaceCard surface='nested' className='p-3'>
+          <p className='text-sm text-secondary-token'>نور الهدى</p>
+        </ContentSurfaceCard>
+      </ContentSurfaceCard>
+    </div>
+  ),
+};

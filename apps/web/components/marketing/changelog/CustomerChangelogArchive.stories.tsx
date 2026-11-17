@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { CustomerChangelogMonthGroup } from '@/lib/customer-changelog';
 import { CustomerChangelogArchive } from './CustomerChangelogArchive';
+import '@/app/(marketing)/changelog/changelog-day-row.css';
 import '@/app/(marketing)/changelog/changelog-editorial.css';
 
 const BOUNDED_MONTHS: readonly CustomerChangelogMonthGroup[] = [
@@ -65,7 +66,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Deterministic, static reduced-motion state for the customer-outcome changelog archive (JOV-6203 Wave 1), rebuilt to the founder-locked pen entry master (sticky date rail, text-first entries with at most one approved media region) plus the YgxYz archive jump nav. Two neutral month groups bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
+          'Deterministic, static reduced-motion state for the public changelog feed: day posts newest first with a sticky date rail and a reading column. Each day leads with its outcome posts (headline, lead, at most one approved media frame, availability chip, next step) and folds the same-day fixes into one quiet Fixes and polish list. The production route owns the page header and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
       },
     },
   },
@@ -106,6 +107,49 @@ export const WithMedia: Story = {
             },
           },
           BOUNDED_MONTHS[1].entries[0],
+        ],
+      },
+    ],
+  },
+};
+
+const DAY_LEAD = BOUNDED_MONTHS[0].entries[0];
+
+export const DayWithFixesAndPolish: Story = {
+  name: 'day post with fixes and polish',
+  args: {
+    months: [
+      {
+        ...BOUNDED_MONTHS[0],
+        entries: [
+          {
+            ...DAY_LEAD,
+            availability: 'limited',
+            prerequisites: ['Available on eligible profiles'],
+            supporting: [
+              'Each deal shows the buyer and the budget.',
+              'Reply from the same thread.',
+            ],
+            action: { label: 'Try It', href: '/pricing' },
+          },
+          {
+            ...DAY_LEAD,
+            id: 'customer-update:fix-one',
+            slug: 'update-fix-one',
+            title: 'Send stays visible with larger text',
+            explanation:
+              'The message composer keeps Send fully visible when you enlarge page text.',
+            category: 'fixed',
+          },
+          {
+            ...DAY_LEAD,
+            id: 'customer-update:fix-two',
+            slug: 'update-fix-two',
+            title: 'Pricing comparisons read cleanly on phones',
+            explanation:
+              'Plan names and feature descriptions no longer clip on small screens.',
+            category: 'fixed',
+          },
         ],
       },
     ],

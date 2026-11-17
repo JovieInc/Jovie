@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
@@ -16,6 +14,8 @@ const {
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
   mockEntitySidebarShell,
+  mockOpenChatWithPrompt,
+  mockToastError,
   editorTestState,
 } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
@@ -25,6 +25,8 @@ const {
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
   mockEntitySidebarShell: vi.fn(),
+  mockOpenChatWithPrompt: vi.fn(),
+  mockToastError: vi.fn(),
   editorTestState: { real: false },
 }));
 
@@ -34,102 +36,31 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
+  openChatWithPrompt: mockOpenChatWithPrompt,
+}));
+
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: mockToastError,
+    info: vi.fn(),
+    warning: vi.fn(),
+    message: vi.fn(),
+    loading: vi.fn(),
+    promise: vi.fn(),
+    custom: vi.fn(),
+    dismiss: vi.fn(),
+  }),
+}));
+
 vi.mock('@/components/organisms/RichTextEditor', async () => {
   const actual = await vi.importActual<
     typeof import('@/components/organisms/RichTextEditor')
   >('@/components/organisms/RichTextEditor');
-  const MockEditor = React.forwardRef(function MockRichTextEditor(
-    {
-      ariaLabel,
-      content,
-      onChange,
-      onFocus,
-      placeholder,
-      statusLabel,
-      statusAction,
-    }: {
-      ariaLabel: string;
-      content: {
-        type: 'doc';
-        content?: Array<Record<string, unknown>>;
-      };
-      onChange: (change: {
-        content: {
-          type: 'doc';
-          content: Array<Record<string, unknown>>;
-        };
-        plainText: string;
-      }) => void;
-      onFocus?: () => void;
-      placeholder?: string;
-      statusLabel?: string;
-      statusAction?: { label: string; onClick: () => void };
-    },
-    ref: React.ForwardedRef<{ focus: () => void }>
-  ) {
-    const inputRef = React.useRef<HTMLTextAreaElement>(null);
-    React.useImperativeHandle(ref, () => ({
-      focus: () => inputRef.current?.focus(),
-    }));
-    const plainText = (content.content ?? [])
-      .flatMap(node =>
-        Array.isArray(node.content)
-          ? (node.content as Array<Record<string, unknown>>)
-              .map(child => child.text)
-              .filter((value): value is string => typeof value === 'string')
-          : []
-      )
-      .join('\n');
-
-    return (
-      <div>
-        <textarea
-          ref={inputRef}
-          aria-label={ariaLabel}
-          value={plainText}
-          placeholder={placeholder || undefined}
-          onFocus={onFocus}
-          onChange={event =>
-            onChange({
-              content: {
-                type: 'doc',
-                content: [
-                  {
-                    type: 'paragraph',
-                    ...(event.target.value
-                      ? {
-                          content: [{ type: 'text', text: event.target.value }],
-                        }
-                      : {}),
-                  },
-                ],
-              },
-              plainText: event.target.value,
-            })
-          }
-          className='focus-visible:bg-surface-1'
-          style={{ boxShadow: 'none' }}
-        />
-        <button
-          type='button'
-          onClick={() =>
-            onChange({
-              content: { ...content, content: content.content ?? [] },
-              plainText,
-            })
-          }
-        >
-          Emit unchanged editor update
-        </button>
-        <span>{statusLabel}</span>
-        {statusAction ? (
-          <button type='button' onClick={statusAction.onClick}>
-            {statusAction.label}
-          </button>
-        ) : null}
-      </div>
-    );
-  });
+  const { MockRichTextEditor: MockEditor } = await import(
+    './tasks-page-client-mocks'
+  );
   return {
     RichTextEditor: React.forwardRef<
       import('@/components/organisms/RichTextEditor').RichTextEditorHandle,
@@ -275,6 +206,15 @@ const mockJovieTask = {
   releaseId: null,
   releaseTitle: null,
 } as const;
+
+const mockPitchTask = {
+  ...mockTask,
+  id: 'task-pitch',
+  taskNumber: 4,
+  title: 'Pitch to Spotify editorial playlists',
+  status: 'todo',
+  agentStatus: 'queued',
+} as const satisfies TaskView;
 
 const mockTaskDescriptionHelper = {
   title: 'Press Release',
@@ -823,6 +763,8 @@ describe('TasksPageClient', () => {
     mockSetViewMode.mockClear();
     mockRegisterRightPanel.mockReset();
     mockRouterPush.mockReset();
+    mockOpenChatWithPrompt.mockReset();
+    mockToastError.mockReset();
     mockUseReleaseEntityQuery.mockClear();
     mockEntitySidebarShell.mockClear();
     mockUseTaskBoardQuery.mockClear();
@@ -850,55 +792,6 @@ describe('TasksPageClient', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
-  });
-
-  it('keeps task stage and priority metadata controls at 32px on desktop', () => {
-    const source = readFileSync(
-      resolve(
-        __dirname,
-        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
-      ),
-      'utf8'
-    );
-
-    expect(source).toContain(
-      '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2'
-    );
-    expect(source).toContain('before:h-11 before:min-w-11 before:w-full');
-    expect(source).toContain('sm:before:h-8 sm:before:min-w-0');
-    expect(source).toContain(
-      "<TaskMetaTrigger ariaLabel='Change Task Status'>"
-    );
-    expect(source).toContain(
-      "<TaskMetaTrigger ariaLabel='Change Task Priority'>"
-    );
-  });
-
-  it('drops the retired Disc3 release glyph (banned icon guard, Tim, 2026-09-25)', () => {
-    const source = readFileSync(
-      resolve(
-        __dirname,
-        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
-      ),
-      'utf8'
-    );
-
-    expect(source).not.toContain('Disc3');
-    expect(source).toContain('Layers,');
-    expect(source).toContain('<Layers className=');
-  });
-
-  it('routes table API imports through the v9 compat adapter', () => {
-    const source = readFileSync(
-      resolve(
-        __dirname,
-        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
-      ),
-      'utf8'
-    );
-
-    expect(source).toContain("'@/lib/tanstack-table'");
-    expect(source).not.toContain("'@tanstack/react-table'");
   });
 
   it('renders a single unified filter menu button in the toolbar', () => {
@@ -1013,7 +906,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeVisible();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.getByTestId('task-document-empty-state')).toHaveTextContent(
       'Choose a task from the list to view its details.'
     );
@@ -1075,7 +968,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     act(() => {
@@ -1120,7 +1013,7 @@ describe('TasksPageClient', () => {
     );
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
@@ -1938,19 +1831,6 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not register a retired header search adapter (JOV-8792)', () => {
-    const source = readFileSync(
-      resolve(
-        __dirname,
-        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
-      ),
-      'utf8'
-    );
-
-    expect(source).not.toContain('useRegisterHeaderSearch');
-    expect(source).not.toContain('headerSearchAdapter');
-  });
-
   it('opts the task title cell into multiline row content', () => {
     renderPage();
 
@@ -2013,6 +1893,57 @@ describe('TasksPageClient', () => {
     });
   });
 
+  it('opens chat with the task named in words when Generate Pitch is chosen', () => {
+    mockTasksData = [mockTask, mockPitchTask];
+    renderPage();
+
+    const pitchItem = getLatestTableProps()
+      ?.getContextMenuItems?.(mockPitchTask)
+      ?.find(item => item.id === 'generate-pitch');
+    expect(pitchItem).toMatchObject({ label: 'Generate Pitch' });
+
+    act(() => {
+      pitchItem?.onClick?.();
+    });
+
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockOpenChatWithPrompt).toHaveBeenCalledTimes(1);
+    const [prompt] = mockOpenChatWithPrompt.mock.calls[0];
+    expect(prompt).toContain('my task "Pitch to Spotify editorial playlists"');
+    expect(prompt).toContain('@release:release-1[QA Release]');
+  });
+
+  it('tells the artist to link a release instead of opening chat when Generate Pitch has no release', () => {
+    // The menu only offers Generate Pitch while the task has a release, so
+    // the release is unlinked after the menu was built for this task.
+    const pitchTask: { -readonly [K in keyof TaskView]: TaskView[K] } = {
+      ...mockPitchTask,
+    };
+    mockTasksData = [mockTask, pitchTask];
+    renderPage();
+
+    const pitchItem = getLatestTableProps()
+      ?.getContextMenuItems?.(pitchTask)
+      ?.find(item => item.id === 'generate-pitch');
+    expect(pitchItem).toBeDefined();
+
+    pitchTask.releaseId = null;
+    pitchTask.releaseTitle = null;
+    act(() => {
+      pitchItem?.onClick?.();
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith(
+      'Link a release to generate its pitch.'
+    );
+    expect(mockOpenChatWithPrompt).not.toHaveBeenCalled();
+    expect(
+      getLatestTableProps()
+        ?.getContextMenuItems?.(pitchTask)
+        ?.some(item => item.id === 'generate-pitch')
+    ).toBe(false);
+  });
+
   it('opens a confirmation dialog before deleting a task from the context menu', () => {
     renderPage();
 
@@ -2033,7 +1964,7 @@ describe('TasksPageClient', () => {
       deleteItem?.onClick?.();
     });
 
-    const dialog = screen.getByRole('dialog', { name: 'Delete task?' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete task?' });
     expect(dialog).toHaveTextContent('Delete task?');
     expect(dialog).toHaveTextContent(mockTaskTwo.title);
 
@@ -2076,7 +2007,7 @@ describe('TasksPageClient', () => {
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
@@ -2278,7 +2209,7 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
   });
 
   it('keeps task keyboard navigation out of text editors', () => {

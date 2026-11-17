@@ -11,9 +11,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  REAL_GH_HARNESS_TIMEOUT_MS,
+  realGhHarnessTimeoutMs,
   realGhOnlyDirectory,
   realGhVersion,
   resolveRealGh,
@@ -176,6 +178,43 @@ describe('real gh directory selection', () => {
     expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
     expect(realGhOnlyDirectory(join(bin, 'missing'), 'darwin')).toBeNull();
   });
+});
+
+describe('real gh harness watchdog', () => {
+  it('sizes the budget for CI and honours an explicit override', () => {
+    expect(realGhHarnessTimeoutMs({})).toBe(REAL_GH_HARNESS_TIMEOUT_MS.local);
+    expect(realGhHarnessTimeoutMs({ CI: 'false' })).toBe(20_000);
+    expect(realGhHarnessTimeoutMs({ CI: 'true' })).toBe(90_000);
+    const override = { CI: 'true', REAL_GH_HARNESS_TIMEOUT_MS: ' 1500 ' };
+    expect(realGhHarnessTimeoutMs(override)).toBe(1500);
+    for (const bad of ['0', '-5', '1e3', 'soon'])
+      expect(() =>
+        realGhHarnessTimeoutMs({ REAL_GH_HARNESS_TIMEOUT_MS: bad })
+      ).toThrow(/positive integer/);
+  });
+
+  it.skipIf(!gh)(
+    'names a fired watchdog instead of a bare null exit',
+    async () => {
+      const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      try {
+        const run = await runWithRealGh({
+          script: 'exec sleep 30',
+          route: () => null,
+          gh,
+          timeoutMs: 200,
+        });
+        expect(run.code).toBeNull();
+        expect(run.timedOut).toBe(true);
+        const note = 'real-gh harness killed after 200 ms';
+        expect(run.stderr).toContain(note);
+        const said = write.mock.calls.some(([c]) => String(c).includes(note));
+        expect(said).toBe(true);
+      } finally {
+        write.mockRestore();
+      }
+    }
+  );
 });
 
 describe.skipIf(!gh)('staging receipt fetch under the real gh CLI', () => {

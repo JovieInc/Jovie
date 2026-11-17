@@ -68,3 +68,10 @@ export const NoVisitsYet: Story = {
     },
   },
 };
+
+export const DidNotLoad: Story = {
+  args: {
+    data: undefined,
+    onRetry: () => {},
+  },
+};

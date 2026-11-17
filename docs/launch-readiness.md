@@ -17,7 +17,7 @@ Last audited: 2026-10-24. Owner of the audit: the golden-path blocking stream (l
 
 "Blocks merge" means the check is in the merge-queue `PR Ready` aggregate (or another required context) and a failure keeps the change out of `main`. "Blocks release" means a failure stops promotion to jov.ie or withholds the Production Verified marker. "Rolls back" means the controller reverts production on failure. "Alerts on drift" means something pages when production changes without a deploy (data edits, provider changes, expired secrets).
 
-Required contexts on `main`: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard`. `PR Ready` on a pull request is a light aggregate (path changes, risk classifier, `ci-fast`, exact-head coverage, secret scan, Golden Path Lock, visual compare). `PR Ready` on a merge group adds unit tests, build and layout, Lighthouse for launch-gate paths, and database certification. Before this work, no browser journey was in either aggregate.
+Required contexts on `main`: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard`, `Company guards`. `PR Ready` on a pull request is a light aggregate (path changes, risk classifier, `ci-fast`, exact-head coverage, secret scan, Golden Path Lock, visual compare). `PR Ready` on a merge group adds unit tests, build and layout, Lighthouse for launch-gate paths, and database certification. Before this work, no browser journey was in either aggregate.
 
 ### Before (main at 2026-10-24)
 

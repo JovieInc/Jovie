@@ -63,9 +63,13 @@ export function ancestorJson(repoRoot, relPath) {
     };
   }
   const spec = `origin/main:${relPath}`;
-  const exists = spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot });
+  const exists = spawnSync('git', ['cat-file', '-e', spec], {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: repoRoot,
+  });
   if (exists.status !== 0) return { ok: true, ancestor: null };
   const show = spawnSync('git', ['show', spec], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
   });

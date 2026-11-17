@@ -29,7 +29,7 @@ import {
   EntityCard,
 } from '@/components/organisms/entity-card';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import type { EntityKind } from '@/lib/chat/tokens';
+import { ENTITY_KIND_LABEL, type EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
@@ -41,13 +41,6 @@ const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
 let activeInspection: { owner: object; close: () => void } | null = null;
 let lastInspectionAt = 0;
-
-const KIND_PREFIX: Record<EntityKind, string> = {
-  release: 'Release',
-  artist: 'Artist',
-  track: 'Track',
-  event: 'Event',
-};
 
 interface EntityChipPopoverProps {
   readonly kind: EntityKind;
@@ -92,6 +85,9 @@ export function EntityChipPopover({
   const label = sourceFact
     ? 'Inspect source'
     : (entity?.label ?? 'Unavailable reference');
+  const srOnlyName = sourceFact
+    ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
+    : `${ENTITY_KIND_LABEL[kind]}: ${label} — `;
   const mobile = useMediaQuery('(max-width: 639px)');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -282,11 +278,6 @@ export function EntityChipPopover({
           type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
-          aria-label={
-            sourceFact
-              ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'}`
-              : `${KIND_PREFIX[kind]}: ${label}`
-          }
           onPointerDown={() => {
             pointerDown.current = true;
           }}
@@ -310,6 +301,9 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
+          {/* Acc name = sr-only prefix + rendered chip: the visible text must
+              stay in the name (label-content-name-mismatch). */}
+          <span className='sr-only'>{srOnlyName}</span>
           {entity || sourceFact || pending ? (
             children
           ) : (
@@ -404,10 +398,12 @@ function toMentionInput(
 ): ChatEntityMentionInput {
   const meta = entity?.meta;
   const base: ChatEntityMentionInput = {
-    kind,
+    // The creator's own profile reads as them, the artist.
+    kind: kind === 'profile' ? 'artist' : kind,
     id,
     label: entity?.label ?? label,
     thumbnail: entity?.thumbnail ?? null,
+    isYou: kind === 'profile' || undefined,
   };
 
   if (!meta) return base;
@@ -468,7 +464,7 @@ function EntityChipPopoverBody({
         }
       : canOpen
         ? {
-            label: `Open ${KIND_PREFIX[kind]}`,
+            label: `Open ${ENTITY_KIND_LABEL[kind]}`,
             onClick: onOpenEntity,
           }
         : null;
