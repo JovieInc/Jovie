@@ -51,7 +51,9 @@ describe('DspLinksLanding', () => {
 
     for (const service of DSP_LINKS_FIXTURE.services) {
       if (!service.href) continue;
-      const row = within(list).getByRole('link', { name: service.label });
+      const row = within(list).getByRole('link', {
+        name: `${service.label} ${displayDspUrl(service.href)}`,
+      });
       expect(row).toHaveAttribute('href', service.href);
       expect(row).toHaveAttribute('data-dsp-row', 'linked');
       // The saved URL is visible, not just a bare service name.
