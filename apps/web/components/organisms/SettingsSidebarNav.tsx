@@ -165,7 +165,9 @@ export function SettingsNavigation({
         variant='ghost'
         size={state === 'closed' && !isMobile ? 'icon-sm' : 'sm'}
         aria-label={signingOut ? 'Signing Out…' : 'Sign Out'}
-        className='justify-start group-data-[collapsible=icon]:justify-center'
+        className={
+          state === 'closed' && !isMobile ? 'justify-center' : 'justify-start'
+        }
         disabled={signingOut}
         onClick={() => {
           setSigningOut(true);
