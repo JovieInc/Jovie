@@ -2195,7 +2195,7 @@ def repair_inventory_pr():
 def repair_inventory_process(root, role, entered, release, preclaim, done, output, scenario="bulk"):
     try:
         os.environ.update(LANES_STATE=root, LANES_EXECUTION_BACKEND='offline-claim-audit',
-                          SYMPHONY_AUTOSCALE='off', PYTHONDONTWRITEBYTECODE='1')
+                          SYMPHONY_AUTOSCALE='off', PYTHONDONTWRITEBYTECODE='1', LANES_WORKTREE_HOSTS=socket.gethostname())
         # A separate process summary and actual current definitions: no inherited test stubs.
         spec = importlib.util.spec_from_file_location('claim_inventory_fixture', ROOT/'scripts/lanes/lane_runner.py')
         lane = importlib.util.module_from_spec(spec)
