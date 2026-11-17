@@ -111,6 +111,8 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
+import { SettingsGroup } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsRow } from '@/components/molecules/settings/SettingsRow';
 import { ActionPill } from '@/components/shell/ActionPill';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
@@ -150,7 +152,6 @@ import type {
   FilterPill,
 } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
-import { SettingsRow } from '@/components/shell/SettingsRow';
 import {
   type EntityPopoverData,
   ShellDropdown,
@@ -4591,24 +4592,22 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
       </h1>
       <p className='mt-1.5 text-xs text-tertiary-token'>{meta.description}</p>
 
-      {/* Single card per section. Rows stack inside with hairline
-          dividers — no per-row card chrome. Danger keeps the same
-          neutral shell; only the action buttons carry the rose
-          accent so the page doesn't shout. */}
-      <div className='mt-6 rounded-xl border border-(--app-shell-border)/70 bg-(--surface-0)/40 overflow-hidden'>
-        {rows.map((row, i) => (
-          <SettingsRow key={row.label} {...row} divider={i > 0} />
-        ))}
+      <div className='mt-6'>
+        <SettingsGroup>
+          {rows.map(row => (
+            <SettingsRow key={row.title} {...row} />
+          ))}
+        </SettingsGroup>
       </div>
     </article>
   );
 }
 
 function settingsRowsFor(id: SettingsSectionId): Array<{
-  label: string;
+  title: string;
   description?: string;
   control: React.ReactNode;
-  tone?: 'default' | 'danger';
+  tone?: 'default' | 'destructive';
 }> {
   const valueText = (value: string) => (
     <span className='text-xs text-tertiary-token tabular-nums'>{value}</span>
@@ -4625,17 +4624,17 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'account':
       return [
         {
-          label: 'Email',
+          title: 'Email',
           description: 'For sign-in and account notifications',
           control: valueText('tim@timwhite.co'),
         },
         {
-          label: 'Password',
+          title: 'Password',
           description: 'Change password or reset',
           control: editBtn,
         },
         {
-          label: 'Two-factor Authentication', // ui-casing-allow: hyphenated settings label
+          title: 'Two-factor Authentication', // ui-casing-allow: hyphenated settings label
           description: 'Required for production workspaces',
           control: (
             <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--app-shell-border)'>
@@ -4645,7 +4644,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Active Sessions',
+          title: 'Active Sessions',
           description: '3 devices · 1 in this browser',
           control: editBtn,
         },
@@ -4653,21 +4652,21 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'profile':
       return [
         {
-          label: 'Handle',
+          title: 'Handle',
           description: 'jov.ie/timwhite — public artist URL', // ui-casing-allow: public URL copy
           control: valueText('@timwhite'),
         },
         {
-          label: 'Display Name',
+          title: 'Display Name',
           control: valueText('Tim White'),
         },
         {
-          label: 'Bio',
+          title: 'Bio',
           description: 'Up to 280 characters, plain text',
           control: editBtn,
         },
         {
-          label: 'External Links',
+          title: 'External Links',
           description: '5 links · drag to reorder',
           control: editBtn,
         },
@@ -4675,23 +4674,23 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'workspace':
       return [
         {
-          label: 'Workspace Name',
+          title: 'Workspace Name',
           control: valueText('Tim White Music'),
         },
         {
-          label: 'Members',
+          title: 'Members',
           description: '1 owner · 0 collaborators · invite up to 4 more',
           control: editBtn,
         },
         {
-          label: 'Default Release Timezone',
+          title: 'Default Release Timezone',
           control: valueText('Pacific Time'),
         },
       ];
     case 'billing':
       return [
         {
-          label: 'Plan',
+          title: 'Plan',
           description: 'Free during reverse trial · 14 days left',
           control: (
             <button
@@ -4703,11 +4702,11 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Payment Method',
+          title: 'Payment Method',
           control: valueText('—'),
         },
         {
-          label: 'Invoices',
+          title: 'Invoices',
           description: 'Receipts for any past charges',
           control: editBtn,
         },
@@ -4715,7 +4714,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'channels':
       return [
         {
-          label: 'Spotify For Artists',
+          title: 'Spotify For Artists',
           description: 'Auto-pitch playlists, push Canvas, sync streams', // ui-casing-allow: feature list copy
           control: (
             <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--app-shell-border)'>
@@ -4725,7 +4724,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Apple Music For Artists',
+          title: 'Apple Music For Artists',
           description: 'Pull listener insights, schedule promo content',
           control: (
             <button
@@ -4737,7 +4736,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Instagram + TikTok',
+          title: 'Instagram + TikTok',
           description: 'Cross-post reels and lyric clips from the library',
           control: (
             <button
@@ -4752,7 +4751,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'danger':
       return [
         {
-          label: 'Reset Workspace',
+          title: 'Reset Workspace',
           description: 'Wipe all releases, tracks, and tasks. Cannot undo.',
           control: (
             <button
@@ -4762,10 +4761,10 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
               Reset workspace
             </button>
           ),
-          tone: 'danger',
+          tone: 'destructive',
         },
         {
-          label: 'Delete Account',
+          title: 'Delete Account',
           description: 'Permanently delete your Jovie account. Cannot undo.', // ui-casing-allow: destructive action copy
           control: (
             <button
@@ -4775,7 +4774,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
               Delete account
             </button>
           ),
-          tone: 'danger',
+          tone: 'destructive',
         },
       ];
     default:

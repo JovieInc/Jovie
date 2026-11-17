@@ -10,9 +10,9 @@
       "kind": "suite"
     },
     {
-      "key": "node --test .github/scripts/dependency-parity-evidence.test.mjs",
+      "key": "node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs",
       "part": "operationsParts",
-      "seconds": 0.6,
+      "seconds": 1.43,
       "kind": "suite"
     },
     {

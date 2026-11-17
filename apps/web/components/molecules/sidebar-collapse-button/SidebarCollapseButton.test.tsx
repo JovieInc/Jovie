@@ -66,4 +66,16 @@ describe('SidebarCollapseButton', () => {
     expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
     sidebar.isPreview = false;
   });
+
+  it('passes a glyph size through so the sidebar header can match its row', () => {
+    render(
+      <SidebarCollapseButton iconClassName='size-(--app-shell-sidebar-icon-size)' />
+    );
+    expect(screen.getByTestId('sidebar-rail-toggle-icon')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(screen.getByTestId('sidebar-rail-toggle-icon')).not.toHaveClass(
+      'size-3.5'
+    );
+  });
 });

@@ -30,7 +30,10 @@ export function TableIssueSummary({
       <PopoverContent align='start' aria-label='Issues' className='w-64'>
         <ul className='space-y-2 p-2 text-xs'>
           {issues.map(issue => (
-            <li key={issue.label} className='flex items-start gap-2 text-error'>
+            <li
+              key={issue.label}
+              className='flex items-start gap-2 text-error-text'
+            >
               {issue.icon}
               {issue.label}
             </li>

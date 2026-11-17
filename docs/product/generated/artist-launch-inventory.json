@@ -1030,6 +1030,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
+      "kind": "page",
+      "route": "/[username]/tip/thank-you",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/@auth/(.)signin/page.tsx",
       "kind": "page",
       "route": "/signin",
@@ -1967,6 +1975,14 @@
       "methods": ["GET"],
       "surface": "billing-management",
       "classification": "A"
+    },
+    {
+      "source": "apps/web/app/api/billing/price-lock/route.ts",
+      "kind": "handler",
+      "route": "/api/billing/price-lock",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/api/billing/status/route.ts",
@@ -3396,6 +3412,14 @@
       "source": "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/dogfood-judge-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/fix-deploy-stamp/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/fix-deploy-stamp",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"

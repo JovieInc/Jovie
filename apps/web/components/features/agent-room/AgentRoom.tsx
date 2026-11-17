@@ -1,5 +1,3 @@
-'use client';
-
 import type {
   AgentRoomEventView,
   AgentRoomView,
@@ -15,6 +13,8 @@ import { AgentRoster } from './AgentRoster';
  * Jovie customer's own agents can render through it later. Presentational
  * only. It takes the projected view and never fetches, so the same view
  * always draws the same room. Relative times use the view's own clock.
+ * Render the roster and feed on the server; interactive children keep their
+ * own client boundaries without shipping this presentation code to the browser.
  *
  * Scroll ownership (JOV-12641): the room fills the bounded canvas its host
  * gives it; each pane owns its own scrolling, so the shared navigation and

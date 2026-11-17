@@ -22,6 +22,7 @@ import {
   validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
+import { HOMEPAGE_FRONT_DOOR_CTA as CTA } from '@/data/homepageLaunchCopy';
 import {
   MARKETING_COMPONENT_REGISTRY,
   MARKETING_ROUTE_MANIFEST,
@@ -1138,7 +1139,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      21, 39,
+      20, 39, 2, 2,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({
@@ -1489,9 +1490,8 @@ describe('canonical shared source atom registry', () => {
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Get started', 'Request Access']);
-    // Each instance carries only its independent label override; none
-    // claims a leading-icon slot the Pen master does not expose.
+    ).toEqual(['Download for Mac', 'Get started', CTA.primary.label]);
+    // Each instance carries only its independent label override.
     for (const ref of refs) {
       expect(ref.overrides).toHaveLength(1);
     }

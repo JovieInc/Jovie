@@ -1,10 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
 
-vi.mock('@/lib/hooks/useReducedMotion', () => ({
-  useReducedMotion: () => true,
-}));
+beforeEach(() => {
+  vi.spyOn(globalThis, 'matchMedia').mockReturnValue({
+    matches: true,
+  } as MediaQueryList);
+});
+afterEach(() => vi.restoreAllMocks());
 
 describe('MarketingSnapRail', () => {
   it('renders a snap horizon with prev/next controls and children', () => {
@@ -59,7 +62,7 @@ describe('MarketingSnapRail', () => {
     scroller.scrollBy = scrollBy as typeof scroller.scrollBy;
     fireEvent(window, new Event('resize'));
 
-    const previousButton = screen.getAllByLabelText('Scroll Left')[0]!;
+    const previousButton = screen.getAllByLabelText('Previous')[0]!;
     const nextButton = screen.getAllByLabelText('Next cards')[0]!;
     expect(previousButton).toBeDisabled();
     expect(nextButton).toBeEnabled();
@@ -103,5 +106,81 @@ describe('MarketingSnapRail', () => {
         .getByLabelText('Show Next Profile State')
         ?.closest('.marketing-snap-rail__mobile-controls')
     ).toHaveClass('md:hidden');
+  });
+
+  it('uses the current motion preference for each activation without rerendering', () => {
+    render(
+      <MarketingSnapRail ariaLabel='Live motion preference'>
+        One
+      </MarketingSnapRail>
+    );
+    const rail = screen.getByRole('region', { name: 'Live motion preference' });
+    Object.defineProperty(rail, 'clientWidth', { value: 400 });
+    Object.defineProperty(rail, 'scrollWidth', { value: 1200 });
+    rail.scrollBy = vi.fn();
+    fireEvent(globalThis.window, new Event('resize'));
+    const next = screen.getAllByRole('button', { name: 'Next' })[0]!;
+
+    vi.mocked(globalThis.matchMedia).mockReturnValue({
+      matches: false,
+    } as MediaQueryList);
+    fireEvent.click(next);
+    expect(rail.scrollBy).toHaveBeenLastCalledWith({
+      left: 320,
+      behavior: 'smooth',
+    });
+
+    vi.mocked(globalThis.matchMedia).mockReturnValue({
+      matches: true,
+    } as MediaQueryList);
+    fireEvent.click(next);
+    expect(rail.scrollBy).toHaveBeenLastCalledWith({
+      left: 320,
+      behavior: 'auto',
+    });
+    expect(globalThis.matchMedia).toHaveBeenLastCalledWith(
+      '(prefers-reduced-motion: reduce)'
+    );
+  });
+
+  it('advances and returns through a native right-to-left rail', () => {
+    render(
+      <MarketingSnapRail
+        ariaLabel='Preview states'
+        previousLabel='Previous preview'
+        nextLabel='Next preview'
+        showMobileControls
+        showDesktopControls={false}
+      >
+        <article>First preview</article>
+        <article>Last preview</article>
+      </MarketingSnapRail>
+    );
+    const rail = screen.getByRole('region', { name: 'Preview states' });
+    rail.style.direction = 'rtl';
+    Object.defineProperty(rail, 'clientWidth', { value: 400 });
+    Object.defineProperty(rail, 'scrollWidth', { value: 800 });
+    rail.scrollBy = vi.fn();
+    fireEvent(globalThis.window, new Event('resize'));
+
+    const next = screen.getByRole('button', { name: 'Next preview' });
+    const previous = screen.getByRole('button', { name: 'Previous preview' });
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    fireEvent.click(next);
+    expect(rail.scrollBy).toHaveBeenLastCalledWith({
+      left: -320,
+      behavior: 'auto',
+    });
+
+    rail.scrollLeft = -400;
+    fireEvent.scroll(rail);
+    expect(next).toBeDisabled();
+    expect(previous).toBeEnabled();
+    fireEvent.click(previous);
+    expect(rail.scrollBy).toHaveBeenLastCalledWith({
+      left: 320,
+      behavior: 'auto',
+    });
   });
 });

@@ -89,6 +89,7 @@ web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.t
 web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
 web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
+web.tip-checkout-return|web|tip-checkout-return|apps/web/app/[username]/tip/thank-you/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
@@ -108,6 +109,9 @@ web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mob
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
+web.tour-dates|web|tour-dates|apps/web/app/app/(shell)/tour-dates/page.tsx|desktop,mobile
+web.chats|web|chats|apps/web/app/app/(shell)/chats/page.tsx|desktop,mobile
+web.insights|web|insights|apps/web/app/app/(shell)/insights/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile
@@ -150,6 +154,9 @@ web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-audience|web|screen.settings.audience|apps/web/app/app/(shell)/settings/audience/page.tsx|desktop,mobile
+web.settings-account|web|screen.settings.account|apps/web/app/app/(shell)/settings/account/page.tsx|desktop,mobile
+web.settings-analytics|web|screen.settings.analytics|apps/web/app/app/(shell)/settings/analytics/page.tsx|desktop,mobile
+web.settings-payments|web|screen.settings.payments|apps/web/app/app/(shell)/settings/payments/page.tsx|desktop,mobile
 web.settings-usage|web|screen.settings.usage|apps/web/app/app/(shell)/settings/usage/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
 web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile

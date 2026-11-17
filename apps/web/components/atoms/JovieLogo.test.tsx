@@ -48,4 +48,12 @@ describe('JovieLogo', () => {
     expect(mark).toHaveAttribute('height', '16');
     expect(mark.querySelectorAll('path').length).toBeGreaterThan(1);
   });
+
+  it('colours the dark variant with the on-media token, not raw white', () => {
+    render(<JovieLogo href='' variant='dark' showText />);
+
+    const label = screen.getByText('Jovie');
+    expect(label).toHaveClass('text-on-media');
+    expect(label.className).not.toMatch(/text-white/);
+  });
 });

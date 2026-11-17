@@ -48,6 +48,38 @@ class MixedRepairTest(unittest.TestCase):
         noise = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual(noise["repairs"], [])
 
+    def test_a_red_body_beside_only_sync_main_classes_syncs_main(self):
+        red = 'red-before-green: this repair PR has no "## Red-before-green" section'
+        summary = (
+            " FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+            " > design-system source identity ratchet (JOV-5301)"
+            " > exits zero from the CLI on the live tree\n"
+        )
+        names = ("PR Fleet Rules", "Source Validation")
+        logs = {"PR Fleet Rules": red, "Source Validation": summary}
+        bare = classes.classify({**pr(*names), "body": "## Summary\n"}, logs)
+        self.assertEqual((bare["cls"], bare["action"]), ("mixed", "sync-main"))
+        self.assertEqual(bare["repairs"], ["red-before-green"])
+        self.assertEqual(bare["actions"], ["sync-main"])
+        behind = classes.classify({**pr(*names, merge="BEHIND"), "body": "## Summary\n"}, logs)
+        self.assertEqual((behind["cls"], behind["action"]), ("mixed", "sync-main"))
+        self.assertEqual(behind["repairs"], ["red-before-green"])
+        complete = (
+            "## Summary\n\n## Red-before-green\n\n"
+            "- Failing command: `node scripts/design-system-source-ratchet.mjs`\n"
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/43692020331\n\n"
+            "```text\nFAIL design-system-source-ratchet\n```\n"
+        )
+        done = classes.classify({**pr(*names), "body": complete}, logs)
+        self.assertEqual(done["repairs"], [])
+        self.assertEqual((done["cls"], done["action"]), ("mixed", "sync-main"))
+        assertion = classes.classify(
+            {**pr(*names), "body": "## Summary\n"},
+            {"PR Fleet Rules": red, "Source Validation": "AssertionError: expected 1"},
+        )
+        self.assertEqual((assertion["cls"], assertion["action"]), ("mixed", "agent"))
+        self.assertEqual(assertion["repairs"], ["red-before-green"])
+
     def test_a_measured_win_failure_is_one_deterministic_class(self):
         win = ("win: this PR needs a measured win "
                "(metric, before, after, method, evidence).")
@@ -64,6 +96,21 @@ class MixedRepairTest(unittest.TestCase):
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
         self.assertEqual(mixed["repairs"], ["repair-win"])
 
+    def test_measured_win_and_stale_design_source_use_body_repair_then_main_sync(self):
+        win = "win: this PR needs a measured win (metric, before, after, method, evidence)."
+        design = (
+            "[design-system-source-ratchet] FAIL — 1895 identities (0 new / baseline 1907)\n"
+            "new design identity: apps/web/components/shell/SettingsRow.tsx"
+            "\traw-palette-class\ttext-rose-300\n"
+        )
+        logs = {"PR Fleet Rules": win, "Source Validation": design}
+        for state in ("BLOCKED", "BEHIND"):
+            with self.subTest(state=state):
+                route = classes.classify(pr(*logs, merge=state), logs)
+                self.assertEqual((route["cls"], route["action"]), ("mixed", "sync-main"))
+                self.assertEqual(route["actions"], ["sync-main"])
+                self.assertEqual(route["repairs"], ["repair-win"])
+
     def test_a_failed_win_measurement_still_stamps_the_changelog(self):
         from unittest.mock import patch
         import fix_red_mixed_repairs as mixed
@@ -78,3 +125,28 @@ class MixedRepairTest(unittest.TestCase):
         self.assertEqual(claimed, [(None, {"number": 1, "body": "## Summary\n"}, "mixed-body-repairs")])
         self.assertIsNone(ensure.call_args.kwargs.get("win_section"))
         self.assertEqual(ensure.call_args.kwargs["customer_decision"], {"releaseWorthy": False})
+
+
+class OwnedChangelogStampTest(unittest.TestCase):
+    def test_rebound_runner_cannot_replace_the_owning_publisher(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        import fix_red_mixed_repairs as mixed
+        owner = SimpleNamespace(fix_red_classes=SimpleNamespace(stamp_internal_changelog=Mock(return_value="stamped")),
+                                _publish_pr_body=Mock(return_value=False))
+        other = Mock()
+        pr_value = {"number": 7, "body": "bare"}
+        with patch.dict(sys.modules, {"lane_runner": other}):
+            self.assertFalse(mixed.stamp_changelog_decision(owner, "host", pr_value))
+        owner.fix_red_classes.stamp_internal_changelog.assert_called_once_with("bare")
+        owner._publish_pr_body.assert_called_once_with("host", pr_value, "changelog", "stamped")
+        other.assert_not_called()
+
+    def test_an_unstampable_body_never_calls_the_publisher(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import fix_red_mixed_repairs as mixed
+        owner = SimpleNamespace(fix_red_classes=SimpleNamespace(stamp_internal_changelog=Mock(return_value=None)),
+                                _publish_pr_body=Mock())
+        self.assertFalse(mixed.stamp_changelog_decision(owner, "host", {"body": "not stampable"}))
+        owner._publish_pr_body.assert_not_called()

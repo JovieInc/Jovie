@@ -5,6 +5,7 @@
 // receipts into the one receipt ready-gate.mjs judges.
 import { overlayWalkSummary } from './overlay-walk.mjs';
 import { rankFindings } from './ready-gate.mjs';
+import { mergeTrafficEvidence } from './traffic-evidence.mjs';
 
 /** "2/4" -> { index: 2, count: 4 }. Empty means the whole crawl (1/1). */
 export function parseShard(spec = '') {
@@ -81,7 +82,14 @@ export function mergeReceipts(receipts) {
     overlayWalks: {
       walks: receipts.flatMap(r => r.overlayWalks?.walks ?? []),
       left: sum(receipts, r => r.overlayWalks?.left),
+      ...(receipts.some(r => r.overlayWalks?.skipped)
+        ? { skipped: receipts.flatMap(r => r.overlayWalks?.skipped ?? []) }
+        : {}),
     },
+    measurementReuses: sum(receipts, r => r.measurementReuses),
+    ...(receipts.some(r => r.traffic)
+      ? { traffic: mergeTrafficEvidence(receipts) }
+      : {}),
     pages: receipts.flatMap(r => r.pages ?? []),
   };
 }
@@ -94,12 +102,14 @@ export function summaryLines(receipt, verdict) {
   return [
     `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
     '',
-    `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.${receipt.shards > 1 ? ` Crawled in ${receipt.shards} parallel shards.` : ''}`,
+    `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page observations as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.${receipt.shards > 1 ? ` Crawled in ${receipt.shards} parallel shards.` : ''}`,
     '',
     overlayWalkSummary(
       receipt.overlayWalks ?? { walks: [], left: 0 },
       receipt.signedIn
     ),
+    `${receipt.measurementReuses ?? 0} cold measurements reused within this crawl.`,
+    ...(receipt.traffic ? [trafficSummary(receipt.traffic)] : []),
     '',
     `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
     '',
@@ -126,4 +136,9 @@ export function summaryLines(receipt, verdict) {
       ];
     }),
   ];
+}
+
+function trafficSummary(t) {
+  const o = t.observed;
+  return `Observed request attempts ${o.attempted}: pages ${o.pages}, assets ${o.assets}, other ${o.other}; redirects ${o.redirects}, explicit retries ${t.admission.explicitRetries}, failures ${o.failures}. Available response sizes: body ${o.responseBodyBytes} B, headers ${o.responseHeaderBytes} B (${o.requestsWithSizes} sized, ${o.requestsWithoutSizes} unknown). Includes logical service-worker deliveries; this is not a wire total. Admission: ${t.admission.admitted}/${t.admission.maxInterceptedRequests} page network hops/direct fetches, ${t.admission.blocked} blocked, ${t.admission.visitsNotStarted} visits not started; ${t.admission.pageIntervalMs} ms per-shard page spacing. Worker/browser-process admission is incomplete; automatic service-worker update counts/bytes and browser retries are unknown. Absolute all-network cap: false. Estimated cost and billed usage: unknown.`;
 }
