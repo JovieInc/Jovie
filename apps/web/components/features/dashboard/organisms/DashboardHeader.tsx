@@ -97,102 +97,116 @@ export function DashboardHeader({
   const showInlineSearch = Boolean(searchSurface);
 
   return (
-    <header
-      data-testid='dashboard-header'
-      data-grid-anchor='desktop-content'
-      data-top-spacing-owner='shell-header'
-      data-electron-drag-region='true'
-      className={cn(
-        'z-20',
-        // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
-        // opts into transparent so its owned ambient wash remains full bleed.
-        transparent ? 'bg-transparent' : 'bg-(--app-shell-content-surface)',
-        className
-      )}
-    >
-      {/* Keep responsive chrome in one DOM owner. Breakpoint classes change
-          presentation without duplicating headings, search, or actions in the
-          accessibility tree. */}
-      <div
+    // JOV-7207: the reservation wrapper owns the window-controls overlap
+    // padding (globals.css) so the drag box below starts past the titlebar
+    // controls. Electron resolves app-region rects in document order,
+    // ignoring z-index, and this header renders after the window controls:
+    // while the rail is collapsed, a drag region whose border box includes
+    // that padding stretches under the titlebar's sidebar toggle (and its
+    // nav pill) and swallows their clicks. Keeping the reservation one level
+    // above the box preserves the certified elevation contract -- the header
+    // box is still the drag region (storybook-elevation asserts it computes
+    // -webkit-app-region: drag) -- while its border box begins at the
+    // controls' right edge, clear of the toggle in every rail state.
+    <div data-top-spacing-owner='shell-header'>
+      <header
+        data-testid='dashboard-header'
+        data-grid-anchor='desktop-content'
+        data-electron-drag-region='true'
         className={cn(
-          'relative flex w-full items-center gap-2',
-          MOBILE_HEADER_PADDING,
-          'sm:h-(--app-shell-header-height) sm:px-(--app-shell-header-padding-x) sm:py-0'
+          'z-20',
+          // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
+          // opts into transparent so its owned ambient wash remains full bleed.
+          transparent ? 'bg-transparent' : 'bg-(--app-shell-content-surface)',
+          className
         )}
       >
-        {leading ? (
-          <div className='max-sm:hidden flex items-center'>{leading}</div>
-        ) : null}
-        {sidebarTrigger ? (
-          <div
-            data-web-sidebar-control='true'
-            className='max-lg:hidden items-center lg:flex'
-          >
-            {sidebarTrigger}
-          </div>
-        ) : null}
-        {showDivider && sidebarTrigger && action ? (
-          <div
-            data-web-sidebar-control='true'
-            className='max-lg:hidden lg:flex items-center'
-          >
-            <VerticalDivider />
-          </div>
-        ) : null}
+        {/* Keep responsive chrome in one DOM owner. Breakpoint classes change
+            presentation without duplicating headings, search, or actions in the
+            accessibility tree. */}
         <div
-          className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
-          data-search-active={isSearchActive ? 'true' : 'false'}
+          data-testid='dashboard-header-row'
+          data-electron-drag-region='true'
+          className={cn(
+            'relative flex w-full items-center gap-2',
+            MOBILE_HEADER_PADDING,
+            'sm:h-(--app-shell-header-height) sm:px-(--app-shell-header-padding-x) sm:py-0'
+          )}
         >
-          <div
-            className='order-first flex min-w-0 flex-1 items-center gap-2'
-            data-testid='dashboard-header-title-slot'
-          >
-            {commandPaletteHeader ? (
-              <div
-                className='flex h-full min-w-0 flex-1 items-center'
-                data-testid='dashboard-command-palette-header'
-              >
-                {commandPaletteHeader}
-              </div>
-            ) : (
-              <HeaderTitle
-                usesSectionTitleLayout={usesSectionTitleLayout}
-                currentLabel={currentLabel}
-                rootLabel={rootLabel}
-                breadcrumbSuffix={breadcrumbSuffix}
-              />
-            )}
-          </div>
-          {showInlineSearch ? (
-            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start p-0.5 max-sm:w-app-control-sm sm:ml-1.5'>
-              {searchSurface}
+          {leading ? (
+            <div className='max-sm:hidden flex items-center'>{leading}</div>
+          ) : null}
+          {sidebarTrigger ? (
+            <div
+              data-web-sidebar-control='true'
+              className='max-lg:hidden items-center lg:flex'
+            >
+              {sidebarTrigger}
             </div>
           ) : null}
-          {/* The control must remain visually after title/search even if a
-              caller's wrapper changes DOM order. Its fixed footprint prevents
-              search or rail state from shifting the workspace title. */}
+          {showDivider && sidebarTrigger && action ? (
+            <div
+              data-web-sidebar-control='true'
+              className='max-lg:hidden lg:flex items-center'
+            >
+              <VerticalDivider />
+            </div>
+          ) : null}
           <div
-            className='order-last flex h-7 w-7 shrink-0 items-center justify-center'
-            data-testid='dashboard-header-rail-slot'
+            className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
+            data-search-active={isSearchActive ? 'true' : 'false'}
           >
-            {railToggle}
+            <div
+              className='order-first flex min-w-0 flex-1 items-center gap-2'
+              data-testid='dashboard-header-title-slot'
+            >
+              {commandPaletteHeader ? (
+                <div
+                  className='flex h-full min-w-0 flex-1 items-center'
+                  data-testid='dashboard-command-palette-header'
+                >
+                  {commandPaletteHeader}
+                </div>
+              ) : (
+                <HeaderTitle
+                  usesSectionTitleLayout={usesSectionTitleLayout}
+                  currentLabel={currentLabel}
+                  rootLabel={rootLabel}
+                  breadcrumbSuffix={breadcrumbSuffix}
+                />
+              )}
+            </div>
+            {showInlineSearch ? (
+              <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start p-0.5 max-sm:w-app-control-sm sm:ml-1.5'>
+                {searchSurface}
+              </div>
+            ) : null}
+            {/* The control must remain visually after title/search even if a
+                caller's wrapper changes DOM order. Its fixed footprint prevents
+                search or rail state from shifting the workspace title. */}
+            <div
+              className='order-last flex h-7 w-7 shrink-0 items-center justify-center'
+              data-testid='dashboard-header-rail-slot'
+            >
+              {railToggle}
+            </div>
           </div>
+          {action ? (
+            <div
+              className={cn(
+                'ml-auto flex items-center gap-1',
+                'max-sm:[&_button]:h-8 max-sm:[&_button]:rounded-full max-sm:[&_button]:shadow-none max-sm:[&_button>svg]:h-4 max-sm:[&_button>svg]:w-4'
+              )}
+            >
+              {action}
+            </div>
+          ) : searchSurface ? null : (
+            <div className='flex items-center gap-2 sm:hidden'>
+              {mobileProfileSlot}
+            </div>
+          )}
         </div>
-        {action ? (
-          <div
-            className={cn(
-              'ml-auto flex items-center gap-1',
-              'max-sm:[&_button]:h-8 max-sm:[&_button]:rounded-full max-sm:[&_button]:shadow-none max-sm:[&_button>svg]:h-4 max-sm:[&_button>svg]:w-4'
-            )}
-          >
-            {action}
-          </div>
-        ) : searchSurface ? null : (
-          <div className='flex items-center gap-2 sm:hidden'>
-            {mobileProfileSlot}
-          </div>
-        )}
-      </div>
-    </header>
+      </header>
+    </div>
   );
 }

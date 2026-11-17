@@ -72,9 +72,9 @@
     "setup-share-profile": {
       "width": 764,
       "height": 568,
-      "sourceHash": "be7a556a2a368640557a393c61d9d6a31986f8fe7dde62412f0ef0787a4622a8",
+      "sourceHash": "e4898ca748cf2032e179aff8da077113b933a569fbe242f7996d26584f4d6978",
       "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
-      "renderedAt": "2026-11-05T19:26:56.132Z",
+      "renderedAt": "2026-11-16T07:17:03.451Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/demo/demo-profile-showcase-states.ts",

@@ -419,7 +419,7 @@ describe('UnifiedSidebar library route', () => {
     const settingsNav = screen.getByRole('navigation', {
       name: 'settings navigation',
     });
-    for (const label of ['Account', 'Artist']) {
+    for (const label of ['Personal', 'Artist']) {
       const group = within(settingsNav)
         .getAllByText(label)
         .find(node => node.className.includes('font-caption'));

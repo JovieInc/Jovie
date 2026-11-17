@@ -151,6 +151,9 @@ web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-audience|web|screen.settings.audience|apps/web/app/app/(shell)/settings/audience/page.tsx|desktop,mobile
+web.settings-account|web|screen.settings.account|apps/web/app/app/(shell)/settings/account/page.tsx|desktop,mobile
+web.settings-analytics|web|screen.settings.analytics|apps/web/app/app/(shell)/settings/analytics/page.tsx|desktop,mobile
+web.settings-payments|web|screen.settings.payments|apps/web/app/app/(shell)/settings/payments/page.tsx|desktop,mobile
 web.settings-usage|web|screen.settings.usage|apps/web/app/app/(shell)/settings/usage/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
 web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile

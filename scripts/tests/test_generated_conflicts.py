@@ -71,11 +71,16 @@ class LockfileConflictTest(unittest.TestCase):
         self.git("fetch", "-q", "origin", cwd=work)
         return origin, work
 
-    def run_resolve(self, work: Path):
+    def run_resolve(self, work: Path, *, timed_out=False):
         real, calls = lane.sh, []
+        self.timeouts = {}
 
         def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False):
             calls.append(args)
+            self.timeouts[tuple(args)] = timeout
+            if timed_out and args == list(lane.fix_red_source_edits.SHIPPING_SNAPSHOT_COMMAND):
+                (Path(cwd) / "docs/metrics/blog-publish-latency-latest.json").write_text("partial\n")
+                raise subprocess.TimeoutExpired(args, timeout)
             if args[:2] == ["pnpm", "install"]:
                 (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -122,6 +127,47 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
+    def test_shipping_snapshots_regenerate_once_from_main_and_fast_forward(self):
+        paths = [f"docs/metrics/{name}-latest.json" for name in
+                 ("blog-publish-latency", "review-escapes", "shipping-slo", "stage-timings")]
+        generator = "scripts/shipping-slo-report.mjs"
+        script = (
+            "import {readFileSync,writeFileSync} from 'node:fs';\n"
+            f"const paths = {json.dumps(paths)};\n"
+            "if(process.argv[2] !== 'refresh-latest') throw Error('wrong command');\n"
+            "for(const p of paths) {\n"
+            "  if(readFileSync(p,'utf8') !== 'main\\n') throw Error('must restore main');\n"
+            "  writeFileSync(p,'regenerated\\n');\n"
+            "}\n"
+        )
+        for conflicts, fails, timed_out in ((1, False, False), (4, False, False), (1, True, False), (4, True, False), (1, True, True)):
+            with self.subTest(conflicts=conflicts, fails=fails, timed_out=timed_out), tempfile.TemporaryDirectory() as tmp:
+                changes = {p: "pr\n" if i < conflicts else "main\n" for i, p in enumerate(paths)}
+                workflow = ".github/workflows/shipping-slo.yml"
+                changes[workflow] = "jobs:\n  measure:\n    timeout-minutes: 35\n"
+                changes[generator] = (
+                    "import {writeFileSync} from 'node:fs';\n"
+                    f"writeFileSync({json.dumps(paths[0])}, 'partial\\n'); process.exit(1);\n"
+                ) if fails else script
+                origin, work = self.repo(Path(tmp), changes,
+                                         main_changes={**{p: "main\n" for p in paths}, "a.ts": "main\n",
+                                                       workflow: "jobs:\n  measure:\n    timeout-minutes: 35\n"})
+                before = self.git("rev-parse", "HEAD", cwd=work)
+                ok, calls = self.run_resolve(work, timed_out=timed_out)
+                self.assertEqual(ok, not fails)
+                self.assertEqual(calls.count(["node", generator, "refresh-latest"]), 1)
+                self.assertEqual(self.timeouts[("node", generator, "refresh-latest")], 35 * 60)
+                for path in paths:
+                    self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
+                                     changes[path].strip() if fails else "regenerated")
+                if fails:
+                    self.assertFalse(any(cmd[:2] == ["git", "push"] for cmd in calls))
+                    self.assertEqual(self.git("rev-parse", "HEAD", cwd=work), before)
+                    self.assertEqual(self.git("status", "--porcelain", cwd=work), "")
+                else:
+                    self.git("merge-base", "--is-ancestor", before, "HEAD", cwd=work)
+                    self.git("merge-base", "--is-ancestor", "origin/main", "HEAD", cwd=work)
 
     def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
         """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""

@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
+  successfulPrWake,
+  workflowConcurrency,
+} from './lib/__tests__/helpers/green-enroll-concurrency.mjs';
+import {
   ADMISSION_STEP,
   applyMergeGroupFailure,
 } from './merge-group-failure-hold.mjs';
@@ -27,7 +31,7 @@ const run = new AsyncFunction(
  * assert on how long a run took: a loaded runner turns that into a flake.
  * `recordTimers` captures every delay the script under test asks for, so a
  * "must not sleep" check asserts on the requested delay, not elapsed time.
- * `withFakeClock` freezes Date.now so a budget is spent by advancing it.
+ * Date-only mock timers advance the sweep budget without delaying the event loop.
  */
 async function recordTimers(fn) {
   const realSetTimeout = globalThis.setTimeout;
@@ -42,18 +46,6 @@ async function recordTimers(fn) {
     return { value: await fn(), delays };
   } finally {
     globalThis.setTimeout = realSetTimeout;
-  }
-}
-async function withFakeClock(fn) {
-  const realNow = Date.now;
-  let now = realNow();
-  Date.now = () => now;
-  try {
-    return await fn(ms => {
-      now += ms;
-    });
-  } finally {
-    Date.now = realNow;
   }
 }
 const sha = 'a'.repeat(40);
@@ -813,7 +805,7 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
   );
 });
 
-test('a sweep goes longest-waiting first and stops at its budget', async () => {
+test('a sweep goes longest-waiting first and stops at its budget', async context => {
   const roster = [
     { ...candidate(3), updated_at: '2026-10-12T12:00:00Z' },
     { ...candidate(1), updated_at: '2026-10-12T10:00:00Z' },
@@ -826,17 +818,19 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
   );
   // Each read "takes" 600 ms of fake time, so the budget is spent
   // deterministically regardless of runner load.
-  const spent = await withFakeClock(advance =>
-    fixture({
-      roster,
-      eventName: 'push',
-      env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
-      readCurrentSnapshot: async number => {
-        advance(600);
-        return current(number);
-      },
-    })
-  );
+  context.mock.timers.enable({
+    apis: ['Date'],
+    now: Date.parse('2026-10-12T12:00:00Z'),
+  });
+  const spent = await fixture({
+    roster,
+    eventName: 'push',
+    env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
+    readCurrentSnapshot: async number => {
+      context.mock.timers.tick(600);
+      return current(number);
+    },
+  });
   // Prefetch stops at half the budget; the loop reads PR 2 itself, then stops.
   assert.deepEqual(
     spent.mutations.map(m => m.id),
@@ -1709,65 +1703,53 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
 // GitHub keeps only one pending run per concurrency group. Evaluate the
 // actual YAML expression so a repository-wide group cannot silently replace
 // another PR's final wake.
-function formatExpression(template, ...args) {
-  return template.replace(/\{(\d+)\}/g, (_whole, index) =>
-    String(args[Number(index)] ?? '')
-  );
-}
-
-function evalWorkflowExpr(expression, github) {
-  const js = expression
-    .replaceAll(
-      'github.event.pull_request.number',
-      'github.event.pull_request?.number'
-    )
-    .replaceAll(
-      'github.event.workflow_run.pull_requests[0].number',
-      'github.event.workflow_run?.pull_requests?.[0]?.number'
-    )
-    .replaceAll(
-      'github.event.workflow_run.head_sha',
-      'github.event.workflow_run?.head_sha'
-    )
-    .replaceAll(
-      'github.event.workflow_run.name',
-      'github.event.workflow_run?.name'
-    )
-    .replaceAll('github.event.workflow_run.id', 'github.event.workflow_run?.id')
-    .replaceAll(
-      'github.event.workflow_run.conclusion',
-      'github.event.workflow_run?.conclusion'
-    )
-    .replaceAll(
-      'github.event.workflow_run.event',
-      'github.event.workflow_run?.event'
-    );
-  return new Function('github', 'inputs', 'format', `return (${js});`)(
-    github,
-    github.inputs ?? {},
-    formatExpression
-  );
-}
-
-function concurrencyGroup(github) {
-  const group = workflow.concurrency.group;
-  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) =>
-    evalWorkflowExpr(expression, github)
-  );
-}
-
-function cancelInProgress(github) {
-  const value = workflow.concurrency['cancel-in-progress'];
-  if (typeof value !== 'string') return value;
-  const match = value.match(/^\$\{\{([\s\S]*)\}\}$/);
-  if (!match) return value;
-  return evalWorkflowExpr(match[1].trim(), github);
-}
+const { concurrencyGroup, cancelInProgress } = workflowConcurrency(workflow);
 
 const wake = (number, id) => ({
   event_name: 'workflow_run',
   event: { workflow_run: { id, pull_requests: number ? [{ number }] : [] } },
   run_id: id + 1000,
+});
+
+for (const slot of ['running', 'pending']) {
+  test(`a late old-head success cannot replace the current ${slot} admission wake`, async () => {
+    const currentWake = successfulPrWake(sha, 101);
+    const staleWake = successfulPrWake('b'.repeat(40), 102, 7, 'PR Size Guard');
+    const survivors = new Map([[concurrencyGroup(currentWake), currentWake]]);
+    // The pending slot always replaces its predecessor. Running slots replace
+    // only when the incoming event has cancel-in-progress enabled.
+    if (slot === 'running' && cancelInProgress(staleWake))
+      survivors.delete(concurrencyGroup(staleWake));
+    survivors.set(concurrencyGroup(staleWake), staleWake);
+
+    const mutations = [];
+    for (const event of survivors.values()) {
+      const result = await fixture({
+        eventName: event.event_name,
+        payload: event.event,
+      });
+      mutations.push(...result.mutations);
+    }
+    assert.deepEqual(mutations, [{ id: 'PR_7', oid: sha }]);
+  });
+}
+
+test('success wake identity coalesces only the same PR and exact source head', () => {
+  const current = successfulPrWake(sha, 101);
+  assert.equal(
+    concurrencyGroup(current),
+    concurrencyGroup(successfulPrWake(sha, 102, 7, 'PR Size Guard'))
+  );
+  for (const independent of [
+    successfulPrWake('b'.repeat(40), 103),
+    successfulPrWake(sha, 104, 8),
+    successfulPrWake('', 105),
+  ])
+    assert.notEqual(concurrencyGroup(current), concurrencyGroup(independent));
+  assert.notEqual(
+    concurrencyGroup(successfulPrWake('', 105)),
+    concurrencyGroup(successfulPrWake('', 106))
+  );
 });
 
 test('independent PR wakes survive replacement of GitHub pending runs', async () => {

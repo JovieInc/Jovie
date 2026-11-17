@@ -75,12 +75,13 @@ apps/docs/scripts/*.test.mjs
 !apps/docs/lib/help-nav.mjs
 !apps/docs/lib/help-search.mjs
 
-# Build-critical web postbuild script
+# Build-critical web build and postbuild scripts
 !apps/web/scripts/
 !apps/web/scripts/sync-standalone-assets.mjs
 !apps/web/scripts/ensure-sharp-runtime-traces.mjs
 !apps/web/scripts/resolve-package-json.mjs
 !apps/web/scripts/stage-runtime-data.mjs
+!apps/web/scripts/write-profile-mode-prerender-set.mjs
 !apps/web/scripts/fix-standalone-loopback-hostname.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.

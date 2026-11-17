@@ -111,13 +111,25 @@ describe('DashboardHeader', () => {
     expect(source).not.toContain('sm:h-(--app-shell-header-height-compact)');
   });
 
-  it('exposes the header row as an Electron drag region', () => {
+  it('exposes the header box past the controls reservation as an Electron drag region', () => {
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 
+    // JOV-7207 + the certified elevation contract: the header box is the
+    // drag region (storybook-elevation asserts it computes
+    // -webkit-app-region: drag), but the window-controls reservation padding
+    // lives on the wrapper above it, so the box's border box starts past
+    // the titlebar controls and cannot swallow the sidebar toggle.
     expect(screen.getByTestId('dashboard-header')).toHaveAttribute(
       'data-electron-drag-region',
       'true'
     );
+    expect(screen.getByTestId('dashboard-header-row')).toHaveAttribute(
+      'data-electron-drag-region',
+      'true'
+    );
+    expect(
+      screen.getByTestId('dashboard-header').parentElement
+    ).toHaveAttribute('data-top-spacing-owner', 'shell-header');
   });
 
   it('keeps build diagnostics out of the header', () => {
