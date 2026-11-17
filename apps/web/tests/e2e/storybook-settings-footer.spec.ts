@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { controls } from './utils/shell-rail-controls';
 
 // The Storybook session is a local synthetic identity; no customer account is used.
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
@@ -27,21 +28,22 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       name: 'Sign Out',
       exact: true,
     });
+    const toggle = controls(page, 'left');
+    await expect(toggle).toHaveCount(1);
+    if ((await toggle.getAttribute('aria-pressed')) === 'false')
+      await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     for (let cycle = 0; cycle < 3; cycle++) {
-      const collapse = page.getByRole('button', {
-        name: 'Collapse sidebar',
-        exact: true,
-      });
-      await collapse.click();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
       await expect(logout).toBeVisible();
       await expect(logout).toBeEnabled();
       await logout.focus();
       await expect(logout).toBeFocused();
-      const expand = page.getByRole('button', {
-        name: 'Expand sidebar',
-        exact: true,
-      });
-      await expand.click();
+      // Focus may reveal the unpinned rail, whose action is then "Pin sidebar".
+      // The canonical control's pinned state is stable across both faces.
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
       await expect(
         page.getByRole('link', { name: /^Public Profile/ })
       ).toBeVisible();
