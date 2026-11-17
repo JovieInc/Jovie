@@ -8,6 +8,7 @@ only shrinks, so the repair moves the trailing test class into a sibling
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import subprocess
@@ -56,23 +57,28 @@ def peel(text: str, limit: int) -> tuple[str, str]:
         raise ValueError("size baseline limit must be a positive int")
     if text.count("\n") <= limit:
         return text, ""
-    classes = list(_CLASS.finditer(text))
+    lines = text.splitlines(keepends=True)
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line))
+    classes = [offsets[min([node.lineno, *(item.lineno for item in node.decorator_list)]) - 1]
+               for node in ast.parse(text).body if isinstance(node, ast.ClassDef)]
     if len(classes) < 2:
         raise ValueError("refusing to peel the only class")
     trailer = ""
     body = text
     mains = list(_MAIN.finditer(text))
-    if mains and mains[-1].start() > classes[-1].start():
+    if mains and mains[-1].start() > classes[-1]:
         trailer = text[mains[-1].start():]
         body = text[: mains[-1].start()]
-        classes = [item for item in classes if item.start() < len(body)]
+        classes = [item for item in classes if item < len(body)]
     if len(classes) < 2:
         raise ValueError("refusing to peel the only class")
     peeled: list[str] = []
     while body.count("\n") + trailer.count("\n") > limit:
         if len(classes) < 2:
             raise ValueError(f"cannot reach {limit} newlines by peeling trailing classes")
-        cut = classes[-1].start()
+        cut = classes[-1]
         peeled.append(body[cut:])
         body = body[:cut]
         classes.pop()
@@ -82,14 +88,18 @@ def peel(text: str, limit: int) -> tuple[str, str]:
     kept = body + trailer
     if kept.count("\n") > limit:
         raise ValueError(f"cannot reach {limit} newlines")
+    ast.parse(kept)
+    ast.parse(chunk)
     return kept, chunk
 
 
-def rebase(chunk: str) -> str:
-    """Point a single custom base at ``_src`` so unittest does not recollect it."""
+def rebase(chunk: str, moved=()) -> str:
+    """Use ``_src`` only for bases retained there, never for co-moved classes."""
+    moved = set(moved) | {node.name for node in ast.parse(chunk).body
+                          if isinstance(node, ast.ClassDef)}
     def repl(match: re.Match) -> str:
         name, base = match.group(1), match.group(2).strip()
-        if base in {"unittest.TestCase", "TestCase"} or base.startswith("_src."):
+        if base in {"unittest.TestCase", "TestCase", "object"} | moved or base.startswith("_src."):
             return match.group(0)
         if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", base):
             return f"class {name}(_src.{base}):"
@@ -116,6 +126,7 @@ del _drop_inherited_tests
 
 def preamble(src_rel: str) -> str:
     module = src_rel[:-3].replace("/", ".")
+    root_depth = len(Path(src_rel).parts) - 1
     return f'''"""Tests peeled from {src_rel} so that file stays within the size-500 baseline."""
 from __future__ import annotations
 
@@ -124,7 +135,7 @@ import sys
 import unittest
 from pathlib import Path
 
-_root = Path(__file__).resolve().parents[2]
+_root = Path(__file__).resolve().parents[{root_depth}]
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 _src = importlib.import_module("{module}")
@@ -182,17 +193,20 @@ def apply_root(root, rels) -> list[str]:
                 kept += "\n"
             dest_rel = overflow_rel(rel)
             dest = root / dest_rel
-            piece = rebase(chunk)
+            existing = dest.read_text() if dest.exists() else ""
+            moved = {node.name for node in ast.parse(existing).body if isinstance(node, ast.ClassDef)}
+            piece = rebase(chunk, moved)
             if not piece.endswith("\n"):
                 piece += "\n"
             piece += footer()
-            if dest.exists():
-                existing = dest.read_text()
-                if not existing.endswith("\n"):
-                    existing += "\n"
-                atomic_write_text(dest, existing + "\n" + piece)
+            if existing:
+                generated = existing.rstrip("\n") + "\n\n" + piece
             else:
-                atomic_write_text(dest, preamble(rel) + piece)
+                generated = preamble(rel) + piece
+            # Refuse an invalid split before either source file can be changed.
+            ast.parse(kept, filename=rel)
+            ast.parse(generated, filename=dest_rel)
+            atomic_write_text(dest, generated)
             atomic_write_text(path, kept)
             written.extend([rel, dest_rel])
     finally:

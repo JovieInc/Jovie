@@ -1,7 +1,10 @@
 """The size-500 peel: classify the company-guards log, move trailing tests, never the baseline."""
 from __future__ import annotations
 
+import ast
 import json
+import subprocess
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -75,6 +78,94 @@ class SizeBaselineRepairTest(unittest.TestCase):
         self.assertIn("class Move", (tests / "test_sample_overflow.py").read_text())
         self.assertEqual((lanes / "lane_runner.py").read_text(), "class Prod:\n    pass\n" * 5)
         self.assertEqual(baseline_path.read_bytes(), before)
+
+    def test_peel_keeps_a_class_decorator_attached_to_the_moved_class(self):
+        source = ("import unittest\nclass Keep(unittest.TestCase):\n    pass\n\n"
+                  "@unittest.skip(\n    \"fixture\")\n"
+                  "class Move(unittest.TestCase):\n    pass\n")
+        kept, chunk = repair.peel(source, 4)
+        ast.parse(kept)
+        ast.parse(chunk)
+        self.assertNotIn("@unittest.skip", kept)
+        self.assertTrue(chunk.startswith("@unittest.skip("))
+
+    def test_generated_overflow_imports_nested_files_and_co_moved_bases(self):
+        source = ("import unittest\nclass Keep(unittest.TestCase):\n"
+                  "    def test_keep(self):\n        self.assertTrue(True)\n\n"
+                  "class Base(unittest.TestCase):\n"
+                  "    def test_base(self):\n        self.assertTrue(True)\n\n"
+                  "class Child(Base):\n"
+                  "    def test_child(self):\n        self.assertTrue(True)\n")
+        for rel in ("scripts/tests/test_sample.py", "scripts/fleet-gate/tests/test_deep.py"):
+            with self.subTest(rel=rel), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                path = root / rel
+                path.parent.mkdir(parents=True)
+                path.write_text(source)
+                baseline = root / repair.BASELINE_REL
+                baseline.parent.mkdir(parents=True, exist_ok=True)
+                baseline.write_text(json.dumps({rel: 5}))
+                before = baseline.read_bytes()
+                self.assertEqual(repair.apply_root(root, [rel]), [rel, repair.overflow_rel(rel)])
+                checked = subprocess.run([sys.executable, "-I", "-c", \
+                    "import runpy,sys,unittest,types; ns=runpy.run_path(sys.argv[1]); "
+                    "suite=unittest.defaultTestLoader.loadTestsFromModule(types.SimpleNamespace(**ns)); "
+                    "assert suite.countTestCases()==2,suite.countTestCases(); "
+                    "result=unittest.TextTestRunner().run(suite); assert result.wasSuccessful()",
+                    str(root / repair.overflow_rel(rel))], cwd=root, capture_output=True, text=True)
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                self.assertEqual(baseline.read_bytes(), before)
+
+    def test_rebase_reuses_bases_already_in_the_overflow(self):
+        rewritten = repair.rebase("class NewChild(MovedBase):\n    pass\n",
+                                  {"MovedBase"})
+        self.assertIn("class NewChild(MovedBase):", rewritten)
+
+    def test_apply_reuses_a_base_from_an_existing_overflow_module(self):
+        rel = "scripts/tests/test_sample.py"
+        source = ("import unittest\nclass Keep(unittest.TestCase):\n    pass\n\n"
+                  "class NewChild(MovedBase):\n"
+                  "    def test_child(self):\n        self.assertTrue(True)\n")
+        existing = (repair.preamble(rel) + "class MovedBase(unittest.TestCase):\n"
+                    "    def test_base(self):\n        self.assertTrue(True)\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / rel
+            path.parent.mkdir(parents=True)
+            path.write_text(source)
+            dest = root / repair.overflow_rel(rel)
+            dest.write_text(existing.rstrip("\n"))
+            baseline = root / repair.BASELINE_REL
+            baseline.parent.mkdir(parents=True)
+            baseline.write_text(json.dumps({rel: 4}))
+            repair.apply_root(root, [rel])
+            checked = subprocess.run([sys.executable, "-I", "-c",
+                "import runpy,sys,unittest,types; ns=runpy.run_path(sys.argv[1]); "
+                "suite=unittest.defaultTestLoader.loadTestsFromModule(types.SimpleNamespace(**ns)); "
+                "assert suite.countTestCases()==2,suite.countTestCases(); "
+                "assert unittest.TextTestRunner().run(suite).wasSuccessful()", str(dest)],
+                cwd=root, capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+            self.assertIn("class MovedBase(unittest.TestCase):", dest.read_text())
+            self.assertIn("class NewChild(MovedBase):", dest.read_text())
+
+    def test_invalid_generated_modules_leave_both_files_and_baseline_unchanged(self):
+        source = ("class Keep(unittest.TestCase):\n    pass\n\n"
+                  "class Move(unittest.TestCase):\n    pass\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "scripts/tests/test_sample.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(source)
+            dest = path.with_name("test_sample_overflow.py")
+            dest.write_text("def invalid(:\n")
+            baseline = root / repair.BASELINE_REL
+            baseline.parent.mkdir(parents=True)
+            baseline.write_text(json.dumps({"scripts/tests/test_sample.py": 3}))
+            before = [p.read_bytes() for p in (path, dest, baseline)]
+            with self.assertRaises(SyntaxError):
+                repair.apply_root(root, ["scripts/tests/test_sample.py"])
+            self.assertEqual([p.read_bytes() for p in (path, dest, baseline)], before)
 
     def test_shrink_pushes_without_force(self):
         calls = []
