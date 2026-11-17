@@ -1,6 +1,7 @@
 import { and, asc, desc, sql as drizzleSql, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
+import { creatorDocuments } from '@/lib/db/schema/creator-documents';
 import { libraryRelationships } from '@/lib/db/schema/library-content-graph';
 
 export class CatalogSelectionUnavailable extends Error {}
@@ -60,26 +61,31 @@ export function promotionCaptureSql(profileId: string, releaseId: string) {
   };
 }
 
-export async function hasCapturedPromotion(
+export async function findCapturedPromotion(
   profileId: string,
-  documentId: string,
+  captureKey: string,
   releaseId: string
-): Promise<boolean> {
+): Promise<string | null> {
   const links = libraryRelationships;
   const [match] = await db
-    .select({ id: links.subjectId })
-    .from(links)
+    .select({ id: creatorDocuments.id })
+    .from(creatorDocuments)
+    .innerJoin(
+      links,
+      eq(links.subjectId, drizzleSql`${creatorDocuments.id}::text`)
+    )
     .where(
       and(
+        eq(creatorDocuments.creatorProfileId, profileId),
+        eq(creatorDocuments.captureIdempotencyKey, captureKey),
         eq(links.creatorProfileId, profileId),
         eq(links.kind, 'release_context'),
         eq(links.subjectType, 'creator_document'),
-        eq(links.subjectId, documentId),
         eq(links.objectType, 'release'),
         eq(links.objectId, releaseId),
         eq(links.status, 'active')
       )
     )
     .limit(1);
-  return Boolean(match);
+  return match?.id ?? null;
 }
