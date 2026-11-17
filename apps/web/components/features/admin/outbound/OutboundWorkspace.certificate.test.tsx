@@ -123,7 +123,7 @@ describe('OutboundWorkspace certificate states', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('names the empty view and follows the view tabs', async () => {
+  it('names the empty view and follows the compact view menu', async () => {
     const user = userEvent.setup();
     mockQueue(outboundFixtureQueue([SENT]));
     const { container } = renderWorkspace();
@@ -132,11 +132,17 @@ describe('OutboundWorkspace certificate states', () => {
 
     const views = screen.getByRole('toolbar', { name: 'Outbound Views' });
     expect(views).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^Sent/ }));
+    await user.click(
+      screen.getByRole('button', { name: /All Outbound views/ })
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: /^Sent/ }));
     expect(screen.getByText('Cy')).toBeInTheDocument();
     expect(screen.queryByText('Nobody in Ready to certify')).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: /^Held/ }));
+    await user.click(
+      screen.getByRole('button', { name: /All Outbound views/ })
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: /^Held/ }));
     expect(screen.getByText('Nobody in Held')).toBeInTheDocument();
   });
 

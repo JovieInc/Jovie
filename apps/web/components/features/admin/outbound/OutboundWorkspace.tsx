@@ -545,17 +545,16 @@ export function OutboundWorkspace() {
           }
           end={
             <>
-              {bulk.size ? (
-                <span
-                  className={cn(
-                    PAGE_TOOLBAR_META_TEXT_CLASS,
-                    'min-w-24 text-right'
-                  )}
-                  data-testid='outbound-bulk-count'
-                >
-                  {`${bulk.size} selected · h hold · r reject`}
-                </span>
-              ) : null}
+              <span
+                hidden={bulk.size === 0}
+                className={cn(
+                  PAGE_TOOLBAR_META_TEXT_CLASS,
+                  'min-w-24 text-right'
+                )}
+                data-testid='outbound-bulk-count'
+              >
+                {bulk.size ? `${bulk.size} selected · h hold · r reject` : ''}
+              </span>
               <PageToolbarTabButton
                 active={showReadiness}
                 onClick={() => setShowReadiness(current => !current)}
