@@ -1,8 +1,8 @@
 // @coverage-via apps/web/tests/components/dashboard/organisms/OnboardingPlanOffer.test.tsx
 
+import { requireClaim } from '@/lib/billing/offer';
 import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
-import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
-import { formatAmount } from '@/lib/utils/format-number';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 
 export function OnboardingPlanOffer() {
   return (
@@ -11,8 +11,7 @@ export function OnboardingPlanOffer() {
         {ARTIST_VISIBILITY_OFFER.pro.displayName}
       </p>
       <p className='mt-2 text-sm tabular-nums text-secondary-token'>
-        {formatAmount(toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd))}
-        /mo
+        {requireClaim('price.pro_compact')}
       </p>
       <ul
         aria-label={ARTIST_VISIBILITY_OFFER.pro.displayName}

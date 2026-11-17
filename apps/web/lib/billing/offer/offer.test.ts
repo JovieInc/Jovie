@@ -53,6 +53,29 @@ describe('registered claims', () => {
     );
   });
 
+  it.each([
+    { interval: 'month', amountCents: 1200, expected: '$12.00/mo' },
+    { interval: 'year', amountCents: 12000, expected: '$120.00/yr' },
+    { interval: 'month', amountCents: 1250, expected: '$12.50/mo' },
+  ])('renders the compact $interval price from offer facts', entry => {
+    const offer = {
+      ...OFFER,
+      plans: {
+        ...OFFER.plans,
+        pro: {
+          ...OFFER.plans.pro,
+          amountCents: entry.amountCents,
+          interval: entry.interval,
+        },
+      },
+    } as unknown as Offer;
+    expect(requireClaim('price.pro_compact', offer)).toBe(entry.expected);
+    expect(allClaims(offer)).toContainEqual({
+      id: 'price.pro_compact',
+      text: entry.expected,
+    });
+  });
+
   it('every rendered claim passes the forbidden-shape check', () => {
     for (const c of allClaims()) {
       expect(forbiddenShapeViolations(c.text), c.id).toEqual([]);

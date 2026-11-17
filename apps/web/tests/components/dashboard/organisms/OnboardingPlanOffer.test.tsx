@@ -4,6 +4,7 @@ import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCh
 import { OnboardingPlanOffer } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingPlanOffer';
 import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { requireClaim } from '@/lib/billing/offer';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import type { ArtistSearchState } from '@/lib/queries/useArtistSearchQuery';
 import { formatAmount } from '@/lib/utils/format-number';
@@ -257,6 +258,9 @@ describe('Paid offer consistency', () => {
       plan => plan.id === 'pro'
     )!.features;
     render(<OnboardingPlanOffer />);
+    expect(
+      screen.getByText(requireClaim('price.pro_compact'))
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole('list', { name: offer.displayName }))
         .getAllByRole('listitem')
