@@ -107,9 +107,9 @@ class SplitSizeTest(unittest.TestCase):
             self.assertEqual(receipt['resolution'], 'split-size-500')
             self.assertEqual(calls[-1], ['git', 'push', '-q', 'origin', 'HEAD:glm/test'])
 
-    def test_invalid_generated_syntax_or_missing_validator_restores_all_outputs(self):
-        for missing_node in (False, True):
-            with self.subTest(missing_node=missing_node), tempfile.TemporaryDirectory() as temp:
+    def test_failed_or_unavailable_validator_restores_all_outputs(self):
+        for failure in ('invalid-syntax', 'missing-node', 'timeout'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 source = root / 'example.test.mjs'
                 original = _fat()
@@ -120,8 +120,10 @@ class SplitSizeTest(unittest.TestCase):
 
                 def shell(args, **kwargs):
                     calls.append(args)
-                    if missing_node:
+                    if failure == 'missing-node':
                         raise FileNotFoundError('node')
+                    if failure == 'timeout':
+                        raise subprocess.TimeoutExpired(args, 120)
                     if args[:2] == ['node', '--check']:
                         return subprocess.run(args, cwd=kwargs['cwd'], capture_output=True)
                     return SimpleNamespace(returncode=0)
@@ -132,6 +134,26 @@ class SplitSizeTest(unittest.TestCase):
                 self.assertEqual(source.read_text(), original)
                 self.assertEqual(list(root.iterdir()), [source])
                 self.assertFalse(any(args[0] == 'git' for args in calls))
+
+    def test_uncertain_git_timeout_does_not_roll_back_or_publish_a_receipt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'example.test.mjs'
+            source.write_text(_fat())
+            receipt = {}
+            calls = []
+
+            def shell(args, **kwargs):
+                calls.append(args)
+                if args[0] == 'git':
+                    raise subprocess.TimeoutExpired(args, 120)
+                return SimpleNamespace(returncode=0)
+
+            with self.assertRaises(subprocess.TimeoutExpired):
+                split.apply(shell, {'headRefName': 'glm/test'}, root, None, receipt, [source.name])
+            self.assertEqual(calls[-1][:2], ['git', 'add'])
+            self.assertEqual(len(list(root.iterdir())), 3)
+            self.assertEqual(receipt, {})
 
     def test_over_500_moves_trailing_suites_and_keeps_titles(self):
         text = _fat()

@@ -9,6 +9,7 @@ test file stays the ci-fast entry.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import fix_red_size_500
@@ -326,6 +327,17 @@ def apply(sh, pr, worktree, log, receipt, files):
     if not changed:
         return None
     message = "fix(ci): split unbaselined vitest files under the 500-line guard"
+
+    def checked_sh(args, **kwargs):
+        try:
+            return sh(args, **kwargs)
+        except subprocess.TimeoutExpired:
+            # Validator failure is safe to roll back before git is touched.
+            # A git timeout has uncertain effects and must reach the caller.
+            if args[:2] != ["node", "--check"]:
+                raise
+            return subprocess.CompletedProcess(args, returncode=124)
+
     return fix_red_size_500._land(
-        sh, root, log, branch, changed, saved, receipt, "split-size-500",
+        checked_sh, root, log, branch, changed, saved, receipt, "split-size-500",
         message=message, typescript=False, splitFiles=changed)
