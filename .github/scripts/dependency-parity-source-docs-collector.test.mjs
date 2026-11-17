@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   collectDependencyParity,
@@ -8,12 +11,108 @@ import {
   base,
   classifierFixture,
   digest,
+  docsPath,
   fixture,
+  proseEntries,
   scope,
   scopeFixture,
   sha,
   sourceHead,
 } from './fixtures/dependency-parity-evidence.mjs';
+
+const unsafeProse = [
+  ['executable mode', Buffer.from('Measured research.\n'), '100755'],
+  ['BOM shebang', Buffer.from('\ufeff#!/bin/sh\nprintf unsafe\n'), '100644'],
+  ['NUL', Buffer.from('Research\0notes\n'), '100644'],
+  ['invalid UTF-8', Buffer.from([0xff]), '100644'],
+  ['HTML/JS', Buffer.from('<script>alert(1)</script>\n'), '100644'],
+  ['fenced instruction', Buffer.from('~~~shell\npnpm deploy\n~~~\n'), '100644'],
+];
+for (const [name, bytes, mode] of unsafeProse) {
+  test(`unsafe source HEAD cannot redeem benign group content: ${name}`, t => {
+    const root = classifierFixture(t);
+    mkdirSync(join(root, 'docs/research'), { recursive: true });
+    writeFileSync(join(root, docsPath), 'Benign group content.\n');
+    const f = scopeFixture(root);
+    const sha = createHash('sha1')
+      .update(`blob ${bytes.length}\0`)
+      .update(bytes)
+      .digest('hex');
+    Object.assign(f.proseTree.tree[0], { mode, sha, size: bytes.length });
+    Object.assign(f.proseBlob, {
+      sha,
+      size: bytes.length,
+      content: bytes.toString('base64'),
+    });
+    f.sourceComparison.files[0].sha = sha;
+    assert.throws(
+      () => collectDependencyParity(f.input),
+      /prose|encoded data/iu
+    );
+    assert.throws(
+      () =>
+        compareDependencyDigests(
+          digest(),
+          [{ prNumber: 123, scope: scope() }],
+          {
+            root,
+            readProseEntries: () => [
+              { path: docsPath, mode, type: 'blob', sha, bytes },
+            ],
+          }
+        ),
+      /prose|encoded data/iu
+    );
+  });
+}
+
+test('server source trees and blobs are exact and bounded before decoding', t => {
+  for (const mutation of [
+    f => {
+      f.sourceComparison.commits[0].commit.tree.sha = base;
+    },
+    f => {
+      f.proseTree.truncated = true;
+    },
+    f => {
+      f.proseTree.tree = [];
+    },
+    f => {
+      f.proseTree.tree[0].size = 128 * 1024 + 1;
+    },
+    f => {
+      f.proseBlob.content =
+        Buffer.from('Unrelated contents').toString('base64');
+    },
+    f => {
+      f.proseBlob.content += '!';
+    },
+  ]) {
+    const f = scopeFixture(classifierFixture(t));
+    mutation(f);
+    assert.throws(() => collectDependencyParity(f.input));
+  }
+});
+test('unverified paths or main ancestry cannot select tree/blob downloads', t => {
+  for (const mismatch of ['paths', 'main']) {
+    const f = scopeFixture(classifierFixture(t));
+    if (mismatch === 'paths')
+      f.scope = scope({ paths: ['docs/research/unlisted-notes.md'] });
+    else {
+      f.pr.base.sha = 'd'.repeat(40);
+      f.mainAncestry.status = 'diverged';
+      f.mainAncestry.behind_by = 1;
+    }
+    const reads = [];
+    const api = f.input.api;
+    f.input.api = path => {
+      if (/\/git\/(?:trees|blobs)\//u.test(path)) reads.push(path);
+      return api(path);
+    };
+    assert.throws(() => collectDependencyParity(f.input));
+    assert.deepEqual(reads, [], mismatch);
+  }
+});
 
 test('docs scope is independently verified and reports no installed source graph', t => {
   const f = scopeFixture(classifierFixture(t));
@@ -76,7 +175,10 @@ test('a PR-only intermediate proof base and rewritten main ancestry cannot autho
 });
 
 test('mixed scope and installed sources still validate the actual combined graph', t => {
-  const options = { root: classifierFixture(t) };
+  const options = {
+    root: classifierFixture(t),
+    readProseEntries: proseEntries,
+  };
   const sources = [
     { prNumber: 123, scope: scope() },
     { prNumber: 124, digest: digest({ event: 'pull_request' }) },

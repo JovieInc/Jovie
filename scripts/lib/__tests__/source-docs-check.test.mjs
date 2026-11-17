@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -12,6 +13,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { main, planSourceDocs } from '../../source-docs-check.mjs';
+import {
+  assertInertSourceProse,
+  MAX_PROSE_FILE_BYTES,
+  readSourceProseEntries,
+} from '../source-prose.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const classify = paths => ({
@@ -101,6 +107,99 @@ test('a diverged exact base retains full validation', t => {
   assert.equal(
     planSourceDocs({ root: f.root, baseSha, headSha, classify }).reasons[0],
     'base-not-ancestor'
+  );
+});
+for (const [name, bytes, executable] of [
+  ['executable mode', Buffer.from('# Research notes\n'), true],
+  ['shell shebang', Buffer.from('#!/bin/sh\nprintf unsafe\n')],
+  [
+    'multiple-BOM shebang',
+    Buffer.from('\ufeff\ufeff#!/bin/sh\nprintf unsafe\n'),
+  ],
+  ['NUL', Buffer.from('Research\0notes\n')],
+  ['invalid UTF-8', Buffer.from([0x23, 0x20, 0xff, 0x0a])],
+  ['active HTML', Buffer.from('<script>alert(1)</script>\n')],
+  ['executable fence', Buffer.from('```sh\npnpm -w deploy\n```\n')],
+  ['nested indented instruction', Buffer.from('>     pnpm deploy\n')],
+  ['active URI', Buffer.from('[Open](javascript:alert(1))\n')],
+]) {
+  test(`non-inert Markdown retains full validation: ${name}`, t => {
+    const f = fixture(t);
+    writeFileSync(join(f.root, 'docs/research/notes.md'), bytes);
+    if (executable) chmodSync(join(f.root, 'docs/research/notes.md'), 0o755);
+    f.git('add', '.');
+    f.git('commit', '-qm', 'exact boundary fixture');
+    assert.equal(f.plan(f.git('rev-parse', 'HEAD')).eligible, false, name);
+  });
+}
+test('exact Git mode wins over a benign checkout and an unchanged blob OID', t => {
+  const f = fixture(t);
+  const path = 'docs/research/notes.md';
+  writeFileSync(join(f.root, path), 'Measured research.\n');
+  f.git('add', path);
+  f.git('commit', '-qm', 'regular prose');
+  const baseSha = f.git('rev-parse', 'HEAD');
+  const blob = f.git('rev-parse', `HEAD:${path}`);
+  f.git('config', 'core.filemode', 'false');
+  f.git('update-index', '--chmod=+x', path);
+  f.git('commit', '-qm', 'mode only');
+  assert.equal(f.git('status', '--porcelain'), '');
+  assert.equal(f.git('rev-parse', `HEAD:${path}`), blob);
+  assert.equal(
+    planSourceDocs({
+      root: f.root,
+      baseSha,
+      headSha: f.git('rev-parse', 'HEAD'),
+      classify,
+    }).eligible,
+    false
+  );
+});
+test('oversized and unavailable exact blobs cannot qualify', t => {
+  const f = fixture(t);
+  const path = 'docs/research/notes.md';
+  writeFileSync(join(f.root, path), Buffer.alloc(MAX_PROSE_FILE_BYTES + 1, 32));
+  f.git('add', path);
+  f.git('commit', '-qm', 'oversized prose');
+  const headSha = f.git('rev-parse', 'HEAD');
+  const blob = f.git('rev-parse', `HEAD:${path}`);
+  assert.throws(
+    () => readSourceProseEntries({ root: f.root, headSha, paths: [path] }),
+    /bound/
+  );
+  rmSync(join(f.root, '.git/objects', blob.slice(0, 2), blob.slice(2)));
+  assert.throws(() =>
+    readSourceProseEntries({ root: f.root, headSha, paths: [path] })
+  );
+});
+test('the bounded prose pilot retains full validation for thirteen files', t => {
+  const f = fixture(t);
+  for (let i = 0; i < 13; i++)
+    writeFileSync(join(f.root, `docs/research/note-${i}.md`), 'Research.\n');
+  f.git('add', '.');
+  f.git('commit', '-qm', 'bounded prose');
+  assert.equal(f.plan(f.git('rev-parse', 'HEAD')).eligible, false);
+});
+test('native object reader preserves valid Unicode prose and rejects forged bytes', t => {
+  const f = fixture(t);
+  const path = 'docs/research/notes.md';
+  writeFileSync(
+    join(f.root, path),
+    '# Findings\n\nListeners prefer Sigur Rós. [Details](https://example.invalid/report).\n'
+  );
+  f.git('add', path);
+  f.git('commit', '-qm', 'inert prose');
+  const entries = readSourceProseEntries({
+    root: f.root,
+    headSha: f.git('rev-parse', 'HEAD'),
+    paths: [path],
+  });
+  assert.doesNotThrow(() => assertInertSourceProse([path], entries));
+  assert.throws(() =>
+    assertInertSourceProse(
+      [path],
+      [{ ...entries[0], bytes: Buffer.from('Different bytes') }]
+    )
   );
 });
 test('oversized native diffs retain full validation before classification', t => {

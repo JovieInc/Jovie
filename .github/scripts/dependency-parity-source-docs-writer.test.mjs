@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -114,6 +115,35 @@ function scopeWriterFixture(t) {
     environment,
     writeEvent,
   };
+}
+
+for (const [name, bytes, mode] of [
+  ['executable mode', Buffer.from('Measured research.\n'), 0o755],
+  ['BOM shebang', Buffer.from('\ufeff#!/bin/sh\nprintf unsafe\n'), 0o644],
+  ['NUL', Buffer.from('Research\0notes\n'), 0o644],
+  ['invalid UTF-8', Buffer.from([0xff]), 0o644],
+  ['active HTML/JS', Buffer.from('<script>alert(1)</script>\n'), 0o644],
+  ['fenced instruction', Buffer.from('```sh\npnpm deploy\n```\n'), 0o644],
+]) {
+  test(`writer cannot issue a receipt for non-inert HEAD: ${name}`, t => {
+    const f = scopeWriterFixture(t);
+    writeFileSync(join(f.root, docsPath), bytes);
+    chmodSync(join(f.root, docsPath), mode);
+    f.git('add', docsPath);
+    f.git('commit', '-qm', 'boundary revision');
+    f.event.pull_request.head.sha = f.git('rev-parse', 'HEAD');
+    f.writeEvent();
+    if (mode === 0o755)
+      assert.equal(
+        f.git('rev-parse', `${f.headSha}:${docsPath}`),
+        f.git('rev-parse', `HEAD:${docsPath}`)
+      );
+    assert.throws(
+      () => writeSourceDocsScope(f.environment),
+      /prose|encoded data/iu
+    );
+    assert.equal(existsSync(join(f.receipts, 'source-docs-scope.json')), false);
+  });
 }
 
 test('native write-scope binds exact event and real git range without measuring an installed graph', t => {

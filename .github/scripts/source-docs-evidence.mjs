@@ -4,6 +4,13 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifySourceDocs } from '../../scripts/lib/source-docs-scope.mjs';
+import {
+  assertInertSourceProse,
+  MAX_PROSE_FILE_BYTES,
+  MAX_PROSE_FILES,
+  MAX_PROSE_TOTAL_BYTES,
+  readSourceProseEntries,
+} from '../../scripts/lib/source-prose.mjs';
 
 const REPO = 'JovieInc/Jovie';
 const SHA = /^[a-f0-9]{40}$/;
@@ -35,7 +42,7 @@ function receiptPath(name, environment = process.env) {
   mkdirSync(directory, { recursive: true });
   return join(directory, name);
 }
-export function validateSourceDocsScope(scope, { root = repoRoot } = {}) {
+export function validateSourceDocsScopeIdentity(scope) {
   fact(
     scope &&
       typeof scope === 'object' &&
@@ -65,6 +72,22 @@ export function validateSourceDocsScope(scope, { root = repoRoot } = {}) {
       scope.pathsDigest === pathsDigest(scope.paths),
     'Invalid source docs scope identity or paths'
   );
+  return scope;
+}
+export function validateSourceDocsScope(
+  scope,
+  { root = repoRoot, readProseEntries = readSourceProseEntries } = {}
+) {
+  validateSourceDocsScopeIdentity(scope);
+  assertInertSourceProse(
+    scope.paths,
+    readProseEntries({
+      root,
+      headSha: scope.headSha,
+      baseSha: scope.baseSha,
+      paths: scope.paths,
+    })
+  );
   const classification = classifySourceDocs(scope.paths, { root });
   fact(
     classification.eligible &&
@@ -72,6 +95,72 @@ export function validateSourceDocsScope(scope, { root = repoRoot } = {}) {
     `Ineligible source docs scope: ${classification.reasons.join(', ')}`
   );
   return scope;
+}
+
+/** Independent fallback when the combined checkout lacks constituent objects. */
+export function readServerSourceProseEntries({
+  headSha,
+  paths,
+  comparison,
+  api,
+}) {
+  fact(
+    Array.isArray(paths) && paths.length > 0 && paths.length <= MAX_PROSE_FILES,
+    'Source prose file count exceeds its bound'
+  );
+  const head = comparison?.commits?.at(-1);
+  const treeSha = head?.commit?.tree?.sha;
+  fact(
+    head?.sha === headSha && SHA.test(treeSha),
+    'Unbound source prose head tree'
+  );
+  const tree = api(`repos/${REPO}/git/trees/${treeSha}?recursive=1`);
+  fact(
+    tree?.sha === treeSha &&
+      tree.truncated === false &&
+      Array.isArray(tree.tree),
+    'Incomplete source prose head tree'
+  );
+  let total = 0;
+  const selected = paths.map(path => {
+    const matches = tree.tree.filter(entry => entry.path === path);
+    fact(matches.length === 1, 'Missing or ambiguous source prose tree entry');
+    const entry = matches[0];
+    total += entry.size;
+    fact(
+      entry.mode === '100644' &&
+        entry.type === 'blob' &&
+        SHA.test(entry.sha) &&
+        Number.isSafeInteger(entry.size) &&
+        entry.size >= 0 &&
+        entry.size <= MAX_PROSE_FILE_BYTES &&
+        total <= MAX_PROSE_TOTAL_BYTES,
+      'Source prose mode or byte bound is ineligible'
+    );
+    return entry;
+  });
+  const blobs = new Map();
+  return selected.map(entry => {
+    if (!blobs.has(entry.sha)) {
+      const blob = api(`repos/${REPO}/git/blobs/${entry.sha}`);
+      fact(
+        blob?.sha === entry.sha &&
+          blob.encoding === 'base64' &&
+          blob.size === entry.size &&
+          typeof blob.content === 'string' &&
+          blob.content.length <= 2 * MAX_PROSE_FILE_BYTES + 1024,
+        'Unbound or oversized source prose blob'
+      );
+      const encoded = blob.content.replace(/[\t\r\n ]/gu, '');
+      const bytes = Buffer.from(encoded, 'base64');
+      fact(
+        bytes.length === entry.size && bytes.toString('base64') === encoded,
+        'Malformed source prose blob encoding'
+      );
+      blobs.set(entry.sha, bytes);
+    }
+    return { ...entry, bytes: blobs.get(entry.sha) };
+  });
 }
 export function writeSourceDocsScope(
   environment = process.env,

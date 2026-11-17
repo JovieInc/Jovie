@@ -15,8 +15,11 @@ import {
   resolveMergeGroupMembers,
   validateMergeGroupEvent,
 } from '../../scripts/lib/merge-group-member-policy.mjs';
+import { readSourceProseEntries } from '../../scripts/lib/source-prose.mjs';
 import {
+  readServerSourceProseEntries,
   validateSourceDocsScope,
+  validateSourceDocsScopeIdentity,
   verifySourceDocsComparison,
   verifySourceDocsMainAncestry,
   writeSourceDocsScope,
@@ -136,7 +139,7 @@ export function writeDependencyDigest(
 export function compareDependencyDigests(
   group,
   sources,
-  { root = repoRoot } = {}
+  { root = repoRoot, readProseEntries = readSourceProseEntries } = {}
 ) {
   validateDependencyDigest(group);
   fact(
@@ -154,7 +157,10 @@ export function compareDependencyDigests(
       'Dependency source evidence missing or ambiguous'
     );
     if (source.scope) {
-      const scope = validateSourceDocsScope(source.scope, { root });
+      const scope = validateSourceDocsScope(source.scope, {
+        root,
+        readProseEntries,
+      });
       fact(
         positive(source.prNumber) && scope.prNumber === source.prNumber,
         'Dependency source docs member mismatch'
@@ -282,6 +288,32 @@ export function collectDependencyParity({
   download = readDigestArtifact,
   root = repoRoot,
 }) {
+  const comparisons = new Map();
+  const sourceComparison = scope => {
+    const key = `${scope.baseSha}...${scope.headSha}`;
+    if (!comparisons.has(key))
+      comparisons.set(key, api(`repos/${REPO}/compare/${key}`));
+    return comparisons.get(key);
+  };
+  // Immutable object reads are shared only within this collection invocation.
+  const prose = new Map();
+  const readProseEntries = source => {
+    const key = `${source.headSha}:${JSON.stringify(source.paths)}`;
+    if (!prose.has(key)) {
+      let entries;
+      try {
+        entries = readSourceProseEntries({ ...source, root });
+      } catch {
+        entries = readServerSourceProseEntries({
+          ...source,
+          comparison: sourceComparison(source),
+          api,
+        });
+      }
+      prose.set(key, entries);
+    }
+    return prose.get(key);
+  };
   const identity = validateMergeGroupEvent(event);
   fact(
     identity.repository === REPO && group.headSha === identity.headSha,
@@ -340,8 +372,14 @@ export function collectDependencyParity({
     );
     const isScope = artifact.name === scopeName;
     const evidence = download(artifact);
+    fact(
+      evidence?.headSha === sourceHead &&
+        evidence.runId === run.id &&
+        evidence.runAttempt === runAttempt,
+      'Unbound dependency source digest'
+    );
     const value = isScope
-      ? validateSourceDocsScope(evidence, { root })
+      ? validateSourceDocsScopeIdentity(evidence)
       : validateDependencyDigest(evidence);
     fact(
       value.headSha === sourceHead &&
@@ -351,12 +389,7 @@ export function collectDependencyParity({
     );
     if (isScope) {
       verifySourceDocsMainAncestry(value, pr, baseSnapshot, api);
-      verifySourceDocsComparison(
-        value,
-        pr,
-        api(`repos/${REPO}/compare/${value.baseSha}...${sourceHead}`),
-        root
-      );
+      verifySourceDocsComparison(value, pr, sourceComparison(value), root);
       if (Array.isArray(run.pull_requests) && run.pull_requests.length > 0) {
         fact(
           run.pull_requests.some(
@@ -368,6 +401,7 @@ export function collectDependencyParity({
           'Unbound source docs run pull request'
         );
       }
+      validateSourceDocsScope(value, { root, readProseEntries });
     }
     assertSourceRun(
       api(`repos/${REPO}/actions/runs/${run.id}`),
@@ -392,7 +426,7 @@ export function collectDependencyParity({
       ? { prNumber: member.number, scope: value }
       : { prNumber: member.number, digest: value };
   });
-  return compareDependencyDigests(group, sources, { root });
+  return compareDependencyDigests(group, sources, { root, readProseEntries });
 }
 export function main() {
   if (process.argv[2] === 'write') return writeDependencyDigest();

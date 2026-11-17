@@ -19,6 +19,21 @@ export const sha = 'a'.repeat(40),
   sourceHead = 'c'.repeat(40);
 const resolved = { 'js-yaml': ['4.1.0'] };
 export const docsPath = 'docs/research/source-validation-fastpath-notes.md';
+export function proseEntries({ paths }) {
+  return paths.map(path => {
+    const bytes = Buffer.from('Measured research.\n');
+    return {
+      path,
+      mode: '100644',
+      type: 'blob',
+      sha: createHash('sha1')
+        .update(`blob ${bytes.length}\0`)
+        .update(bytes)
+        .digest('hex'),
+      bytes,
+    };
+  });
+}
 export const hashPaths = paths =>
   createHash('sha256').update(JSON.stringify(paths)).digest('hex');
 export function fixtureGitEnvironment() {
@@ -111,8 +126,26 @@ export function scopeFixture(root) {
     merge_base_commit: { sha: base },
     ahead_by: 1,
     total_commits: 1,
-    commits: [{ sha: sourceHead }],
-    files: [{ filename: docsPath, status: 'modified' }],
+    commits: [{ sha: sourceHead, commit: { tree: { sha: 'e'.repeat(40) } } }],
+    files: [
+      {
+        filename: docsPath,
+        status: 'modified',
+        sha: proseEntries({ paths: [docsPath] })[0].sha,
+      },
+    ],
+  };
+  const entry = proseEntries({ paths: [docsPath] })[0];
+  f.proseTree = {
+    sha: 'e'.repeat(40),
+    truncated: false,
+    tree: [{ ...entry, bytes: undefined, size: entry.bytes.length }],
+  };
+  f.proseBlob = {
+    sha: entry.sha,
+    encoding: 'base64',
+    size: entry.bytes.length,
+    content: entry.bytes.toString('base64'),
   };
   f.mainAncestry = {
     status: 'ahead',
@@ -126,6 +159,10 @@ export function scopeFixture(root) {
   };
   const api = f.input.api;
   f.input.api = path => {
+    if (path === `repos/JovieInc/Jovie/git/trees/${'e'.repeat(40)}?recursive=1`)
+      return f.proseTree;
+    if (path === `repos/JovieInc/Jovie/git/blobs/${f.proseBlob.sha}`)
+      return f.proseBlob;
     if (
       path === `repos/JovieInc/Jovie/compare/${f.scope.baseSha}...${sourceHead}`
     )

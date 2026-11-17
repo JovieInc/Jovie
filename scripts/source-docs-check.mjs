@@ -10,6 +10,10 @@ import {
   runDocFreshnessLint,
 } from './lib/doc-freshness.mjs';
 import { classifySourceDocs } from './lib/source-docs-scope.mjs';
+import {
+  assertInertSourceProse,
+  readSourceProseEntries,
+} from './lib/source-prose.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -77,6 +81,17 @@ export function planSourceDocs({
     ])
   ) {
     return { ...full('deleted-or-renamed-input'), paths: [...paths].sort() };
+  }
+  try {
+    assertInertSourceProse(
+      paths,
+      readSourceProseEntries({ root, headSha, paths })
+    );
+  } catch (error) {
+    return {
+      ...full(`non-inert-source-prose:${error.message}`),
+      paths: [...paths].sort(),
+    };
   }
   const classification = classify(paths, { root });
   return { ...classification, baseSha, headSha };
