@@ -1,6 +1,6 @@
 import { defaultCopyText, defaultOpenUrl } from './library-browser-actions';
-import { buildPrivatePromotionAction } from './library-promotion-action';
 import { buildLibraryAskJovieDraft } from './library-chat-context';
+import { buildPrivatePromotionAction } from './library-promotion-action';
 
 export { buildLibraryAskJovieDraft } from './library-chat-context';
 
@@ -444,7 +444,11 @@ export function buildLibraryEntityActions({
     },
   });
 
-  const promotionAction = buildPrivatePromotionAction(asset, profileId, openUrl);
+  const promotionAction = buildPrivatePromotionAction(
+    asset,
+    profileId,
+    openUrl
+  );
   if (promotionAction) actions.push(promotionAction);
 
   const lifecycleAction = buildLifecycleAction({

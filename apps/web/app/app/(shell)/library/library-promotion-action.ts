@@ -16,6 +16,7 @@ export function buildPrivatePromotionAction(
     authority: 'profile-owner',
     disabled: false,
     destructive: false,
-    onExecute: () => open(`${APP_ROUTES.LIBRARY}/promotion/${encodeURIComponent(asset.id)}`),
+    onExecute: () =>
+      open(`${APP_ROUTES.LIBRARY}?promotion=${encodeURIComponent(asset.id)}`),
   };
 }

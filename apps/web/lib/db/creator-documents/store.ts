@@ -1,5 +1,4 @@
 import { and, desc, sql as drizzleSql, eq, lt, or } from 'drizzle-orm';
-import { CatalogSelectionUnavailable, promotionCaptureSql } from './catalog-promotion';
 import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import {
   hashRevision,
@@ -16,6 +15,10 @@ import {
   creatorDocumentRevisions,
   creatorDocuments,
 } from '@/lib/db/schema/creator-documents';
+import {
+  CatalogSelectionUnavailable,
+  promotionCaptureSql,
+} from './catalog-promotion';
 
 export class CreatorDocumentConflictError extends Error {
   constructor(
@@ -144,12 +147,19 @@ export async function captureCreatorIdea(input: {
   readonly title: string;
   readonly body: string;
   readonly idempotencyKey: string;
-  readonly catalogSelection?: { readonly releaseId: string; readonly profileId: string };
+  readonly catalogSelection?: {
+    readonly releaseId: string;
+    readonly profileId: string;
+  };
 }): Promise<{ readonly documentId: string; readonly deduplicated: boolean }> {
   const selected = input.catalogSelection;
-  if (selected && selected.profileId !== input.creatorProfileId) throw new CatalogSelectionUnavailable();
-  const source = selected && promotionCaptureSql(input.creatorProfileId, selected.releaseId);
-  const key = selected ? `promo:${selected.releaseId}:${input.idempotencyKey}` : input.idempotencyKey;
+  if (selected && selected.profileId !== input.creatorProfileId)
+    throw new CatalogSelectionUnavailable();
+  const source =
+    selected && promotionCaptureSql(input.creatorProfileId, selected.releaseId);
+  const key = selected
+    ? `promo:${selected.releaseId}:${input.idempotencyKey}`
+    : input.idempotencyKey;
   const content = ideaContent(input.body);
   const contentHash = hashRevision({
     title: input.title,
