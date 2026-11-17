@@ -77,6 +77,9 @@ export const MissingReadOnly: Story = {
 
 /** Both clipboard paths refuse in this isolated story; restore browser APIs afterward. */
 export const ErrorClipboardRefused: Story = {
+  // The catalog default /test is a public-profile route, which correctly
+  // suppresses app feedback. This inspector error belongs to the app shell.
+  parameters: { nextjs: { navigation: { pathname: '/app/library' } } },
   beforeEach: () => {
     const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     const originalExecCommand = document.execCommand;
