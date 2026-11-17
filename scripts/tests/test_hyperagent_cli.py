@@ -170,10 +170,12 @@ class HyperagentCliTest(unittest.TestCase):
         forbidden.assert_not_called()
 
     def test_incompatible_legacy_cli_cannot_reach_queue_claim_or_model_budget(self):
+        from scripts.tests.test_release_fixtures import canned_reason_config
         reason = runpy.run_path(str(ROOT / "scripts/lanes/reason_lane.py"))
-        config = json.loads((ROOT / "scripts/lanes/reason.json").read_text())
+        config = canned_reason_config(json.loads((ROOT / "scripts/lanes/reason.json").read_text()))
         # Captured native contract: models-only succeeds, but --role is unknown.
         def legacy_cli(args, **_kwargs):
+            args = ["hyperagent", *args[1:]] if args[0] == "hyperagent_fixture" else args
             if args == ["hyperagent", "models", "--json"]:
                 return SimpleNamespace(returncode=0, stdout='{"models": {}}', stderr="")
             return SimpleNamespace(returncode=2, stdout="",
