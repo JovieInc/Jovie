@@ -182,7 +182,6 @@ class SchedulingTest(unittest.TestCase):
     def test_fixture_import_preserves_native_multiprocessing_targets_with_both_module_names(self):
         code = """
 import importlib, pickle, sys
-import scripts.tests.conftest
 native = importlib.import_module('scripts.tests.test_lane_runner')
 target = native.repair_inventory_process
 importlib.import_module('scripts.tests.test_binding_turns')
