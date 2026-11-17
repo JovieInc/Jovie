@@ -1,3 +1,4 @@
+// @vitest-environment node
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ideaContent } from '@/lib/creator-documents/domain';
