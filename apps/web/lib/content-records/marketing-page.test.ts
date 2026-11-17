@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { assignExperimentArm, experimentArmBody } from './experiment';
 import { validateContentRecord } from './kind';
@@ -215,7 +217,6 @@ describe('spec section registry', () => {
 
 describe('migration for the retired spec revision (JOV-12824)', () => {
   const retiredRecord = {
-    schemaVersion: 0,
     sections: [
       {
         section: 'hero',
@@ -286,6 +287,84 @@ describe('migration for the retired spec revision (JOV-12824)', () => {
       MARKETING_PAGE_KIND.migrate?.({ sections: [{ section: 42 }] })
     ).toBeNull();
   });
+
+  it.each([
+    { sections: [{ section: 'unknown' }] },
+    { sections: [retiredRecord.sections[0], null] },
+    {
+      sections: [
+        retiredRecord.sections[0],
+        { section: 'feature-split', variant: 'phone-right', copy: {} },
+      ],
+    },
+    { sections: [retiredRecord.sections[0], retiredRecord.sections[0]] },
+    { sections: [...retiredRecord.sections].reverse() },
+    { ...retiredRecord, unexpected: true },
+    { ...retiredRecord, experiment: { id: 'broken' } },
+  ])(
+    'rejects unrecognized or damaged content without dropping it: %j',
+    record => {
+      expect(MARKETING_PAGE_KIND.migrate?.(record)).toBeNull();
+    }
+  );
+
+  it('preserves experiment attribution, arm copy and the immutable input', () => {
+    const record = {
+      sections: retiredRecord.sections,
+      experiment: {
+        id: 'home-gallery-headline',
+        hypothesis: 'A different gallery headline lifts claim completion.',
+        metric: { funnel: 'artist_signup', step: 'claim_complete' },
+        status: 'running',
+        variants: [{ id: 'alternate', weight: 35, body: cleanSpec().sections }],
+      },
+    };
+    const before = clone(record);
+    const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+    expect(migrated?.experiment).toEqual(record.experiment);
+    expect(record).toEqual(before);
+    expect(MARKETING_PAGE_KIND.migrate?.(migrated)).toEqual(migrated);
+    expect(MARKETING_PAGE_KIND.migrate?.(cleanSpec())).toEqual(cleanSpec());
+  });
+
+  it.each(['centered-none', 'split-claim-card'])(
+    'recognizes the historical %s hero and canonical invitation close',
+    variant => {
+      const spec = cleanSpec();
+      const hero = spec.sections[0];
+      const record = {
+        sections: [
+          {
+            section: 'hero',
+            variant,
+            copy:
+              variant === 'centered-none' && hero?.section === 'hero'
+                ? hero.copy
+                : {
+                    subhead: 'Your catalog in one place.',
+                    claimAction: getClaimProfileIntent().label,
+                  },
+          },
+          ...spec.sections.slice(1, -1),
+          {
+            section: 'cta',
+            variant: 'final-single-claim',
+            copy: {
+              headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
+              subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+            },
+          },
+        ],
+      };
+      const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+      expect(validate(migrated).ok).toBe(true);
+      expect(migrated?.sections.at(-1)?.copy).toEqual({
+        headline: HOMEPAGE_EDITORIAL_COPY.claim.headline,
+        subhead: HOMEPAGE_EDITORIAL_COPY.claim.subhead,
+      });
+      expect(migrated?.sections[1]).toEqual(spec.sections[1]);
+    }
+  );
 });
 
 describe('experiment assignment', () => {

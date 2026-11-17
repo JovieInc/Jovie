@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   table: vi.fn(),
   rows: vi.fn(),
   captureWarning: vi.fn(),
+  atomicOperation: vi.fn(),
   // Mirrors the Data Cache: a returned value is stored with no expiry, a
   // thrown error is not stored.
   store: new Map<string, unknown>(),
@@ -32,7 +33,7 @@ vi.mock('@/lib/db', () => {
   return { doesTableExist: mocks.table, db: { select: () => builder } };
 });
 vi.mock('@/lib/db/legacy-transaction', () => ({
-  runAtomicDbOperation: vi.fn(),
+  runAtomicDbOperation: mocks.atomicOperation,
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mocks.captureWarning,
@@ -57,6 +58,7 @@ beforeEach(() => {
   mocks.table.mockReset().mockResolvedValue(true);
   mocks.rows.mockReset().mockResolvedValue([liveRow()]);
   mocks.captureWarning.mockReset();
+  mocks.atomicOperation.mockReset();
   mocks.store.clear();
 });
 
@@ -110,6 +112,153 @@ describe('read-time migration for a retired record (JOV-12824)', () => {
       fallbackReason: 'incompatible',
     });
     expect(mocks.captureWarning).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('read-time migration integrity', () => {
+  it.each([-1, 1])(
+    'does not use a migration to accept unsupported stored revision offset %i',
+    async offset => {
+      const migrate = vi.fn(() => DEFAULT_HOME_SPEC);
+      mocks.rows.mockResolvedValue([
+        {
+          ...liveRow(),
+          schemaVersion: MARKETING_PAGE_KIND.schemaVersion + offset,
+        },
+      ]);
+      const live = await getLiveContent(
+        { ...MARKETING_PAGE_KIND, migrate },
+        'home'
+      );
+      expect(live).toMatchObject({
+        source: 'default',
+        versionId: null,
+        fallbackReason: 'incompatible',
+      });
+      expect(migrate).not.toHaveBeenCalled();
+      expect(mocks.captureWarning).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('keeps an unsupported new renderer revision incompatible', async () => {
+    const migrate = vi.fn(() => DEFAULT_HOME_SPEC);
+    const live = await getLiveContent(
+      {
+        ...MARKETING_PAGE_KIND,
+        schemaVersion: MARKETING_PAGE_KIND.schemaVersion + 1,
+        migrate,
+      },
+      'home'
+    );
+    expect(live).toMatchObject({
+      source: 'default',
+      versionId: null,
+      fallbackReason: 'incompatible',
+    });
+    expect(migrate).not.toHaveBeenCalled();
+  });
+
+  it('preserves current published content and experiment without migration', async () => {
+    const data = structuredClone(DEFAULT_HOME_SPEC);
+    data.experiment = {
+      id: 'home-copy',
+      hypothesis: 'A different profile headline increases claim completions.',
+      metric: { funnel: 'artist_signup', step: 'claim_complete' },
+      status: 'running',
+      variants: [
+        { id: 'alternate', weight: 25, body: structuredClone(data.sections) },
+      ],
+    };
+    const original = structuredClone(data);
+    const migrate = vi.fn(() => DEFAULT_HOME_SPEC);
+    mocks.rows.mockResolvedValue([{ ...liveRow(), data }]);
+    const live = await getLiveContent(
+      { ...MARKETING_PAGE_KIND, migrate },
+      'home'
+    );
+    expect(live).toEqual({
+      data: original,
+      source: 'live',
+      versionId: 'v5',
+      version: 5,
+      publishedAt: '2026-10-28T01:00:00.000Z',
+    });
+    expect(data).toEqual(original);
+    expect(migrate).not.toHaveBeenCalled();
+    expect(mocks.captureWarning).not.toHaveBeenCalled();
+    expect(mocks.atomicOperation).not.toHaveBeenCalled();
+  });
+
+  it('migrates repeated cached reads without changing raw content or selected version', async () => {
+    const data = structuredClone(DEFAULT_HOME_SPEC) as unknown as {
+      sections: { variant: string }[];
+    };
+    data.sections[0]!.variant = 'centered-none';
+    const original = structuredClone(data);
+    mocks.rows.mockResolvedValueOnce([{ ...liveRow(), data }]);
+    mocks.rows.mockResolvedValue([
+      { ...liveRow(), versionId: 'v6', version: 6 },
+    ]);
+    for (let read = 0; read < 2; read++) {
+      expect(await getLiveContent(MARKETING_PAGE_KIND, 'home')).toEqual({
+        data: DEFAULT_HOME_SPEC,
+        source: 'live',
+        versionId: 'v5',
+        version: 5,
+        publishedAt: '2026-10-28T01:00:00.000Z',
+      });
+      expect(data).toEqual(original);
+    }
+    expect(mocks.rows).toHaveBeenCalledTimes(1);
+    expect(mocks.captureWarning).not.toHaveBeenCalled();
+    expect(mocks.atomicOperation).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['unrecognized', () => null],
+    ['schema-invalid', () => ({ ...DEFAULT_HOME_SPEC, sections: [] })],
+    [
+      'rule-invalid',
+      () => ({
+        ...DEFAULT_HOME_SPEC,
+        sections: [
+          ...DEFAULT_HOME_SPEC.sections,
+          DEFAULT_HOME_SPEC.sections[0]!,
+        ],
+      }),
+    ],
+    [
+      'throwing',
+      () => {
+        throw new Error('migration failed');
+      },
+    ],
+  ] as const)('falls back when the migration is %s', async (_name, migrate) => {
+    mocks.rows.mockResolvedValue([{ ...liveRow(), data: { retired: true } }]);
+    await expect(
+      getLiveContent({ ...MARKETING_PAGE_KIND, migrate }, 'home')
+    ).resolves.toMatchObject({
+      source: 'default',
+      versionId: null,
+      fallbackReason: 'incompatible',
+    });
+    expect(mocks.captureWarning).toHaveBeenCalledTimes(1);
+    expect(mocks.atomicOperation).not.toHaveBeenCalled();
+  });
+
+  it('does not migrate or publish a missing record', async () => {
+    const migrate = vi.fn(() => DEFAULT_HOME_SPEC);
+    mocks.rows.mockResolvedValue([]);
+    expect(
+      await getLiveContent({ ...MARKETING_PAGE_KIND, migrate }, 'home')
+    ).toMatchObject({
+      source: 'default',
+      versionId: null,
+      fallbackReason: 'unpublished',
+    });
+    expect(migrate).not.toHaveBeenCalled();
+    expect(mocks.captureWarning).not.toHaveBeenCalled();
+    expect(mocks.atomicOperation).not.toHaveBeenCalled();
   });
 });
 

@@ -26,8 +26,8 @@ import type { ContentKindDefinition } from './kind';
 
 // 2026-11-07: the editorial invite-only homepage replaced the artist-profile
 // claim sections. A record stored with the old section variants no longer
-// validates, so `getLiveContent` serves the code default below (source
-// 'incompatible') until a valid version is published.
+// validates. Known retired slots migrate on read; unrecognized records keep
+// the incompatible default until a valid version is published.
 const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
 
 const line = (max: number) =>
@@ -151,59 +151,111 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/**
- * Read-time migration for records published before the 2026-11-07 editorial
- * spec revision (JOV-12824, Sentry 7850723501): the retired centered-handle
- * hero and the invitation close fail the current schema, so every read of the
- * stale live record re-warned to Sentry and served the code default.
- *
- * A stored section that still validates against the current schema passes
- * through untouched (published copy is preserved); the retired hero and the
- * invitation close are replaced by the approved editorial copy (open-signup
- * claim actions, per Tim 2026-11-12: "Switch it"). Returns null when the
- * stored data is not a recognizable section spec, leaving the store's
- * incompatible fallback and warning untouched.
- */
+// These shapes were retired without a schema-version bump. Recognize the
+// complete record before replacing retired slots; never discard unknown data.
+const RetiredHeroSection = z
+  .object({
+    section: z.literal('hero'),
+    variant: z.literal('centered-handle-claim'),
+    copy: z
+      .object({
+        eyebrow: line(90).optional(),
+        headline: line(90),
+        subhead: line(220),
+      })
+      .strict(),
+  })
+  .strict();
+const LegacySectionsSchema = z
+  .array(
+    z.union([
+      MarketingPageSectionSchema,
+      RetiredHeroSection,
+      HeroSection.extend({ variant: z.literal('centered-none') }),
+      HeroSection.extend({
+        variant: z.literal('split-claim-card'),
+        copy: z.object({ subhead: line(220), claimAction: line(24) }).strict(),
+      }),
+      ProductGallerySection.extend({
+        variant: z.literal('profile-grid'),
+        copy: z.object({ headline: line(90) }).strict(),
+      }),
+      CtaSection.extend({
+        copy: CtaSection.shape.copy.extend({ plansLinkLabel: line(32) }),
+      }),
+    ])
+  )
+  .min(1)
+  .max(12);
+const LegacySpecSchema = z
+  .object({
+    sections: LegacySectionsSchema,
+    experiment: experimentSchema(LegacySectionsSchema).optional(),
+  })
+  .strict();
+
+function migrateSections(
+  stored: z.infer<typeof LegacySectionsSchema>
+): MarketingPageSections | null {
+  const ids = stored.map(entry => entry.section);
+  if (
+    ids[0] !== 'hero' ||
+    new Set(ids).size !== ids.length ||
+    (ids.includes('cta') && ids.at(-1) !== 'cta')
+  )
+    return null;
+  const sections = stored.map(entry => {
+    const parsed = MarketingPageSectionSchema.safeParse(entry);
+    const inviteClose =
+      entry.section === 'cta' &&
+      entry.copy.headline === HOMEPAGE_EDITORIAL_COPY.invite.headline &&
+      entry.copy.subhead === HOMEPAGE_EDITORIAL_COPY.invite.subhead;
+    return parsed.success && !inviteClose
+      ? parsed.data
+      : structuredClone(
+          DEFAULT_HOME_SPEC.sections.find(
+            section => section.section === entry.section
+          )!
+        );
+  });
+  for (const fallback of DEFAULT_HOME_SPEC.sections) {
+    if (ids.includes(fallback.section)) continue;
+    const close = sections.findIndex(entry => entry.section === 'cta');
+    sections.splice(
+      close === -1 ? sections.length : close,
+      0,
+      structuredClone(fallback)
+    );
+  }
+  return sections;
+}
+
+/** Pure compatibility for known retired slots, preserving each experiment arm. */
 export function migrateMarketingPageSpec(
   stored: unknown
 ): MarketingPageSpec | null {
+  const current = MarketingPageSpecSchema.safeParse(stored);
   if (
-    stored === null ||
-    typeof stored !== 'object' ||
-    Array.isArray(stored) ||
-    !Array.isArray((stored as { sections?: unknown }).sections)
-  ) {
-    return null;
-  }
-  const storedSections = (stored as { sections: unknown[] }).sections.filter(
-    section =>
-      section !== null &&
-      typeof section === 'object' &&
-      !Array.isArray(section) &&
-      typeof (section as { section?: unknown }).section === 'string'
-  );
-  if (storedSections.length === 0) return null;
-  const stillValid: MarketingPageSection[] = [];
-  for (const section of storedSections) {
-    const parsed = MarketingPageSectionSchema.safeParse(section);
-    if (parsed.success) stillValid.push(parsed.data);
-  }
-  const findStored = (section: MarketingPageSection['section']) =>
-    stillValid.find(entry => entry.section === section);
-  const approved = (section: MarketingPageSection['section']) =>
-    DEFAULT_HOME_SPEC.sections.find(entry => entry.section === section);
-  // Hero first, cta last (the order rules `sectionsViolations` enforces); a
-  // stored hero on a retired variant or the invitation close do not survive.
-  const sections: MarketingPageSection[] = [
-    findStored('hero') ?? approved('hero')!,
-    findStored('feature-split') ?? approved('feature-split')!,
-    findStored('product-gallery') ?? approved('product-gallery')!,
-    findStored('cta') ?? approved('cta')!,
-  ];
-  const spec = MarketingPageSpecSchema.safeParse({ sections });
-  if (!spec.success) return null;
-  if (marketingPageViolations(spec.data, 'home').length > 0) return null;
-  return spec.data;
+    current.success &&
+    marketingPageViolations(current.data, 'home').length === 0
+  )
+    return current.data;
+  const legacy = LegacySpecSchema.safeParse(stored);
+  if (!legacy.success) return null;
+  const sections = migrateSections(legacy.data.sections);
+  if (!sections) return null;
+  const experiment = legacy.data.experiment;
+  const variants = experiment?.variants.map(variant => ({
+    ...variant,
+    body: migrateSections(variant.body),
+  }));
+  const spec = MarketingPageSpecSchema.safeParse({
+    sections,
+    ...(experiment ? { experiment: { ...experiment, variants } } : {}),
+  });
+  return spec.success && marketingPageViolations(spec.data, 'home').length === 0
+    ? spec.data
+    : null;
 }
 
 /** The code default: the editorial story, ending in the claim close. */

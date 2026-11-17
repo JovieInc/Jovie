@@ -124,25 +124,31 @@ export async function getLiveContent<T>(
 
   const validated = validateContentRecord(definition, key, stored.data);
   if (!validated.ok || stored.schemaVersion !== definition.schemaVersion) {
-    // A record published under a retired schema revision migrates forward on
-    // the read path (JOV-12824): the store keeps history and rollback, and the
-    // stale-record warning stays reserved for records no migration recognizes.
-    const migrated = definition.migrate?.(stored.data);
-    if (migrated !== null && migrated !== undefined) {
-      const migratedValidated = validateContentRecord(
-        definition,
-        key,
-        migrated
-      );
-      if (migratedValidated.ok) {
-        return {
-          data: migratedValidated.data,
-          source: 'live',
-          versionId: stored.versionId,
-          version: stored.version,
-          publishedAt: stored.publishedAt,
-        };
+    // Retired shapes shared this revision. A hook must never authorize an
+    // unsupported stored/renderer revision merely because its output validates.
+    try {
+      const migrated =
+        stored.schemaVersion === definition.schemaVersion
+          ? definition.migrate?.(stored.data)
+          : null;
+      if (migrated !== null && migrated !== undefined) {
+        const migratedValidated = validateContentRecord(
+          definition,
+          key,
+          migrated
+        );
+        if (migratedValidated.ok) {
+          return {
+            data: migratedValidated.data,
+            source: 'live',
+            versionId: stored.versionId,
+            version: stored.version,
+            publishedAt: stored.publishedAt,
+          };
+        }
       }
+    } catch {
+      // Failed compatibility is still an incompatible read, never a write.
     }
     await captureWarning(
       'Live content record no longer validates',
