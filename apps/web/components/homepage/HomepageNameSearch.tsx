@@ -159,9 +159,9 @@ export function HomepageNameSearch({
         state === 'limited' ||
         state === 'error' ? (
           <p>
-            <a href='/start' className='focus-ring-themed'>
+            <Link href='/start' prefetch={false} className='focus-ring-themed'>
               {HOMEPAGE_SEARCH_COPY.claim}
-            </a>
+            </Link>
             {' · '}
             <Link href='/signin' className='focus-ring-themed'>
               {HOMEPAGE_SEARCH_COPY.signin}
