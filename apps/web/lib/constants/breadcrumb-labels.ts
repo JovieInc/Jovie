@@ -44,9 +44,8 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   feedback: 'Feedback',
   'visibility-audit': 'Visibility Audit',
 
-  // Root routes
-  // The root route is the Inbox rail destination (shell-ia.md: the breadcrumb
-  // name must equal the active rail label — the rail names /app "Inbox").
+  // Root routes. `/app` is the Inbox: the header bell is its shell entry
+  // and is named Inbox, so the header, tab title, breadcrumb, and bell agree.
   app: 'Inbox',
 } as const;
 

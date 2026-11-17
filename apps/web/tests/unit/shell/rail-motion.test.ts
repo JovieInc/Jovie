@@ -6,6 +6,8 @@ import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_MOTION_MS,
   SHELL_RAIL_SHEET,
+  SHELL_RAIL_STAGE,
+  SHELL_RAIL_STAGE_CONTROLS,
 } from '@/components/shell/rail-motion';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 
@@ -182,6 +184,27 @@ describe('shell rail-motion tokens (JOV-4522)', () => {
       expect(classes).toContain('duration-cinematic');
       expect(classes).toContain('ease-cinematic');
       expect(classes).toContain('motion-reduce:transition-none');
+    }
+  });
+
+  it('clips staged controls only while collapsed so expanded focus rings paint in full', () => {
+    const always = SHELL_RAIL_STAGE_CONTROLS.split(' ').filter(
+      token => !token.includes(':')
+    );
+    expect(always).not.toContain('overflow-hidden');
+    expect(always).toContain('overflow-visible');
+    expect(SHELL_RAIL_STAGE_CONTROLS).toContain(
+      'group-data-[collapsible=icon]:overflow-hidden'
+    );
+    // Same motion as the text-only stage.
+    for (const token of [
+      'duration-cinematic',
+      'ease-cinematic',
+      'motion-reduce:transition-none',
+      'group-data-[collapsible=icon]:max-w-0',
+    ]) {
+      expect(SHELL_RAIL_STAGE).toContain(token);
+      expect(SHELL_RAIL_STAGE_CONTROLS).toContain(token);
     }
   });
 });

@@ -53,11 +53,15 @@ for (const theme of ['dark', 'light']) {
       page.viewportSize()!.height,
       0
     );
-    // The Inbox row (canonical `home` destination), not the slot's Inbox bell.
-    const home = nav
-      .getByRole('link', { name: 'Inbox', exact: true })
-      .and(page.locator('[data-navigation-item-id="home"]'));
-    const row = await home.boundingBox();
+    // The header bell owns `/app`, so the rail has no Inbox row; measure a
+    // canonical destination row instead.
+    await expect(nav.locator('[data-navigation-item-id="home"]')).toHaveCount(
+      0
+    );
+    const work = nav
+      .getByRole('link', { name: 'Work', exact: true })
+      .and(page.locator('[data-navigation-item-id="library"]'));
+    const row = await work.boundingBox();
     expect(row!.height).toBe(28);
     const create = nav.getByRole('link', { name: 'New Chat' });
     await expect(create).toHaveCount(1);

@@ -95,10 +95,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses the rail label as the static dashboard title for the app root', async () => {
+  it('titles the app root Inbox, matching the header bell and breadcrumb', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
+    // Rendered tab title is "Inbox | Jovie" via the root title template.
     expect(metadata.title).toBe('Inbox');
   });
 

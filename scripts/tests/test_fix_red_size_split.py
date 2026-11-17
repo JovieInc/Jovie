@@ -51,6 +51,46 @@ describe('kept suite', () => {
 
 
 class SplitSizeTest(unittest.TestCase):
+    def test_division_preserves_operand_references_and_regexes_stay_opaque(self):
+        for expression in ('done / total', 'done/total', 'object.return / total', 'done /* note */ / total'):
+            with self.subTest(expression=expression):
+                names = scan.code_names('const ratio = ' + expression + '; const re = /opaque/; function f() { return /hidden/.test(total); }')
+                self.assertIn('total', names)
+                self.assertNotIn('opaque', names)
+                self.assertNotIn('hidden', names)
+        text = _fat().replace("const label = 'main';", 'const divisor = 2;')
+        text = text.replace("expect(label).toBe('main');", 'expect(4 / divisor).toBe(2);')
+        pieces = split.split_unbaselined_vitest(text, 'example.test.mjs')
+        self.assertIsNotNone(pieces)
+        self.assertIn('export const divisor = 2;', pieces['example.fixtures.mjs'])
+        for name in ('example.test.mjs', 'example.cases.mjs'):
+            imports = ''.join(stmt.text for stmt in scan.parse_statements(pieces[name]) if stmt.kind == 'import')
+            self.assertIn('divisor', imports)
+
+    def test_module_bindings_used_by_mock_factories_refuse_without_writes(self):
+        text = _fat().replace("const label = 'main';", "const label = 'main';\nconst state = vi.hoisted(() => ({ answer: 42 }));\nvi.mock('./mod.mjs', () => ({ main: () => state.answer }));")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'example.test.mjs'
+            source.write_text(text)
+            shell = Mock()
+            self.assertIsNone(split.apply(shell, {'headRefName': 'glm/test'}, root, None, {}, [source.name]))
+            self.assertEqual(source.read_text(), text)
+            self.assertEqual(list(root.iterdir()), [source])
+            shell.assert_not_called()
+        literal = _fat().replace("const label = 'main';", "const label = 'main';\nvi.mock('./mod.mjs', () => ({ main: () => 42 }));")
+        self.assertIsNotNone(split.split_unbaselined_vitest(literal, 'example.test.mjs'))
+
+    def test_cases_import_stays_top_level_and_template_fixture_is_unchanged(self):
+        marker = 'const sample = `before\nimport phantom\nafter`;'
+        text = _fat().replace("    expect(helper().name).toBe('box');", marker + "\n    expect(helper().name).toBe('box');")
+        pieces = split.split_unbaselined_vitest(text, 'example.test.mjs')
+        self.assertIsNotNone(pieces)
+        owner = pieces['example.test.mjs']
+        self.assertIn(marker, owner)
+        imports = [stmt.text for stmt in scan.parse_statements(owner) if stmt.kind == 'import']
+        self.assertEqual(sum("import './example.cases.mjs';" in stmt for stmt in imports), 1)
+
     def test_unmodelled_setup_and_suites_preserve_the_original_by_refusing_a_split(self):
         markers = ["label = 'main';", "expect(label).toBe('main');",
                    "describe.each([1])('matrix', () => { it('keeps matrix', () => expect(label).toBe('main')); });",

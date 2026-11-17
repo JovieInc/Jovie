@@ -36,6 +36,7 @@ import {
   withMutation,
   writeStageMetrics,
 } from './lib/native-typecheck-evidence.mjs';
+import { createRedirectCapture } from './lib/native-typecheck-redirect.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 export const BOUNDS = Object.freeze({
@@ -89,6 +90,12 @@ export async function runQualification({
   const initialTools = json(pins);
   const start = monotonic();
   const deadline = start + BOUNDS.suiteMs;
+  const captureRedirects = createRedirectCapture({
+    root,
+    tools,
+    deadline,
+    cpus: allocation.selected,
+  });
   const equivalent = (a, b, label, diagnostics = true) =>
     assertEquivalent(a, b, label, { deadline, diagnostics });
   const receipt = {
@@ -221,6 +228,7 @@ export async function runQualification({
       output,
       `${stem}.tsbuildinfo`
     );
+    entry.redirectProof = captureRedirects(entry, config);
     save(resolve(output, `${stem}.json`), entry);
     return entry;
   };

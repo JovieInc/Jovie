@@ -206,6 +206,12 @@ def split_unbaselined_vitest(text: str, filename: str) -> dict[str, str] | None:
 
 
 def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, bindings, kept, moved):
+    mocks = [stmt for stmt in statements if stmt.kind == "mock"]
+    mock_names = code_names("".join(stmt.text for stmt in mocks))
+    # Mock factories are hoisted ahead of imports. Moving their local state
+    # into an installer or imported fixture cannot preserve its scope/timing.
+    if any(stmt.names and stmt.names[0] in mock_names for stmt in bindings):
+        return None
     suite_text = "\n".join(stmt.text for stmt in kept + moved)
     exported = _closure(
         {stmt.names[0] for stmt in bindings if _name_in(stmt.names[0], suite_text)},
@@ -223,7 +229,6 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
             if any(_name_in(name, stmt.text) for name in export_names):
                 return None
             hook_stmts.append(stmt)
-    mocks = [stmt for stmt in statements if stmt.kind == "mock"]
     installer = ""
     names = [stmt.names[0] for stmt in export_stmts]
     if hook_stmts:
@@ -234,7 +239,7 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
         _as_export(stmt.text) for stmt in export_stmts) + installer),
         "".join(_as_export(stmt.text) for stmt in export_stmts), installer)
 
-    def suite_file(suites: list, extra_mocks: bool) -> str:
+    def suite_file(suites: list, extra_mocks: bool, *, collect_cases: bool = False) -> str:
         body = "".join(stmt.text.strip("\n") + "\n" for stmt in suites)
         needed = _referenced(body, names)
         if installer and "installSplitSuiteHooks" not in needed:
@@ -242,7 +247,11 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
         helper = f"import {{ {', '.join(needed)} }} from '{fixture_spec}';\n" if needed else ""
         call = "installSplitSuiteHooks();\n" if installer else ""
         mock_text = "".join(stmt.text.strip("\n") + "\n" for stmt in mocks) if extra_mocks else ""
-        return _finish(_imports_for(statements, mock_text + body), helper, mock_text, call, body)
+        collection = (
+            "// Collected by this file's vitest command; not a second test entry.\n"
+            f"import '{cases_spec}';\n"
+        ) if collect_cases else ""
+        return _finish(_imports_for(statements, mock_text + body), helper, collection, mock_text, call, body)
 
     import_locals: set[str] = set()
     for stmt in statements:
@@ -259,19 +268,8 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
     mock_text = "".join(stmt.text for stmt in mocks)
     moved_text = "".join(stmt.text for stmt in moved)
     cases_mocks = any(_name_in(local, moved_text) and _name_in(local, mock_text) for local in import_locals)
-    owner_body = suite_file(kept, True)
-    # The cases module is a side-effect import so the owner's vitest command still collects it.
-    side_effect = (
-        "// Collected by this file's vitest command; not a second test entry.\n"
-        f"import '{cases_spec}';\n"
-    )
-    owner_lines = owner_body.split("\n")
-    last_import = max((index for index, line in enumerate(owner_lines) if line.startswith("import ")), default=-1)
-    owner_lines.insert(last_import + 1, side_effect.rstrip("\n"))
-    owner_body = "\n".join(owner_lines)
-    if not owner_body.endswith("\n"):
-        owner_body += "\n"
-    pieces = {filename: owner_body, fixtures: fixtures_body, cases: suite_file(moved, cases_mocks)}
+    pieces = {filename: suite_file(kept, True, collect_cases=True),
+              fixtures: fixtures_body, cases: suite_file(moved, cases_mocks)}
     if any(not body.strip() for body in pieces.values()):
         return None
     return pieces

@@ -71,14 +71,17 @@ describe('runtime updates in the shell corner pill', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('announces an update in the shell corner pill beside the navigation', () => {
+  it('announces an update in the corner pill, not on the shell Inbox bell', () => {
     state.available = true;
     state.downloaded = true;
-    renderDashboardNav({
+    const { queryByRole } = renderDashboardNav({
       renderFn: ui =>
         render(<RuntimeUpdateProvider>{ui}</RuntimeUpdateProvider>),
       overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
     });
+    expect(
+      queryByRole('link', { name: /App Update Available/i })
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Restart Jovie to update' })
     ).toBeEnabled();
@@ -88,6 +91,21 @@ describe('runtime updates in the shell corner pill', () => {
   it('does not show a notification without a real update', () => {
     render(<Surface />);
     expect(screen.queryByTestId('runtime-update-pill')).not.toBeInTheDocument();
+  });
+
+  it('keeps one live status region mounted so the update is announced', () => {
+    const { rerender } = render(<Surface />);
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    state.available = true;
+    state.downloaded = true;
+    rerender(<Surface />);
+    // Same node, now with text: assistive tech announces the change.
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).not.toBeEmptyDOMElement();
+    expect(
+      screen.getByTestId('runtime-update-pill').getAttribute('aria-live')
+    ).toBeNull();
   });
   it('renders update status outside the page content area', () => {
     state.available = true;

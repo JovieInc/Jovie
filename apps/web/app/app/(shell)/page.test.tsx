@@ -22,7 +22,7 @@ vi.mock('./OpportunityInboxRoute', () => ({
 import AppRootPage, { generateMetadata } from './page';
 
 describe('Inbox direct route', () => {
-  it('uses the same Inbox title as its navigation destination', () => {
+  it('titles /app Inbox so the header bell, breadcrumb, and tab agree', () => {
     expect(generateMetadata()).toEqual({
       title: 'Inbox',
       description:

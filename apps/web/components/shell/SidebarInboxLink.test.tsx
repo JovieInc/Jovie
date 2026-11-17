@@ -22,6 +22,7 @@ vi.mock('./RuntimeUpdateProvider', () => ({
 }));
 
 import { SidebarInboxLink } from './SidebarInboxLink';
+import { SIDEBAR_HEADER_ICON_BUTTON_CLASS } from './sidebar-header-icon-button';
 
 describe('central Inbox bell', () => {
   it('keeps the destination visible without inventing an unavailable count', () => {
@@ -199,5 +200,18 @@ describe('central Inbox bell', () => {
     } finally {
       runtimeUpdate.available = false;
     }
+  });
+
+  it('uses the shared sidebar header icon-button box and 16px glyph', () => {
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    for (const token of SIDEBAR_HEADER_ICON_BUTTON_CLASS.split(' ')) {
+      expect(link).toHaveClass(token);
+    }
+    expect(link.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
   });
 });
