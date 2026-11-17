@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { LogOut, MoreHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -110,17 +111,16 @@ function useCloseOnEscapeOrOutside(
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
+    // Aborting removes both listeners and blocks a late outside-click one.
+    const listeners = new AbortController();
+    const { signal } = listeners;
+    document.addEventListener('keydown', handleEscape, { signal });
     // Small delay prevents immediate close when opening via click
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside, { signal });
     }, 10);
 
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => listeners.abort();
   }, [ref, isOpen, onClose]);
 }
 
@@ -337,7 +337,7 @@ export function LiquidGlassMenu({
           {/* Backdrop */}
           <div
             data-modal-backdrop
-            className='fixed inset-0 z-50 bg-black/20 backdrop-blur-sm'
+            className='fixed inset-0 z-50 bg-ink-on-media/20 backdrop-blur-sm'
             onClick={closeMenuAndRestoreFocus}
             aria-hidden='true'
           />
@@ -418,7 +418,7 @@ export function LiquidGlassMenu({
                 {onSignOut && (
                   <>
                     <div className='my-2 mx-1 border-t border-default/30' />
-                    <button
+                    <PlainButton
                       type='button'
                       onClick={onSignOut}
                       className='flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
@@ -428,7 +428,7 @@ export function LiquidGlassMenu({
                         aria-hidden='true'
                       />
                       <span className='flex-1 text-left'>Sign out</span>
-                    </button>
+                    </PlainButton>
                   </>
                 )}
               </div>
@@ -510,7 +510,7 @@ export function LiquidGlassMenu({
           })}
 
           {/* More menu toggle with label */}
-          <button
+          <PlainButton
             ref={moreButtonRef}
             type='button'
             onClick={toggleMenu}
@@ -533,11 +533,11 @@ export function LiquidGlassMenu({
             >
               More
             </span>
-          </button>
+          </PlainButton>
 
           {/* Search button */}
           {onSearchClick && (
-            <button
+            <PlainButton
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
@@ -545,7 +545,7 @@ export function LiquidGlassMenu({
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>
-            </button>
+            </PlainButton>
           )}
         </div>
       </nav>

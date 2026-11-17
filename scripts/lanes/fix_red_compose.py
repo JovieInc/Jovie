@@ -18,7 +18,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     import fix_red_render_modes
 
     order = (
-        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
+        classes.SYNC_MAIN, classes.STAMP_REPAIR, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
         fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
@@ -59,6 +59,7 @@ def deterministic_fixer(lane, action: str):
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
     import fix_red_size_500
     table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
+    table[fix_red_size_500.ACTION_EXTRACT] = fix_red_size_500.bind_self_growth(lane.sh, lane.failed_logs)
     import fix_red_biome
     table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
     return table.get(action)
@@ -74,7 +75,10 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     agent = None
     done = []
     for action in actions:
-        if action == classes.STAMP_CHANGELOG:
+        if action == classes.STAMP_REPAIR:
+            if lane.stamp_fleet_body(host, pr) is None:
+                return None
+        elif action == classes.STAMP_CHANGELOG:
             if not lane.pr_events.ensure_red_before_green(
                     pr, customer_decision={"releaseWorthy": False},
                     sh=lambda args: lane.gh_call(args, priority="repair")):
@@ -128,6 +132,10 @@ def repair_files(cls, action, names, logs, per_check):
         import fix_red_size_500
         files = sorted(set(files) | set(fix_red_size_500.paths(
             "\n".join(logs.get(name) or "" for name in names))))
+    if cls == "size-500-self-growth":
+        from fix_red_source_edits import size_500_grew
+        grew = size_500_grew("\n".join(logs.get(name) or "" for name in names)) or []
+        files = sorted(set(files) | {path for path, _baseline in grew})
     if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
         from fix_red_biome import cited_paths
         files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))
