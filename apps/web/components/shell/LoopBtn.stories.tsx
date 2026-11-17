@@ -33,3 +33,16 @@ export const LoopSection: Story = {
     mode: 'section',
   },
 };
+
+export const Rtl: Story = {
+  args: {
+    mode: 'track',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

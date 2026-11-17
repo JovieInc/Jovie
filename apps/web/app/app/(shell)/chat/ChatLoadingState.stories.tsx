@@ -6,7 +6,7 @@ const meta = {
   component: ChatLoading,
   parameters: { layout: 'fullscreen' },
   render: () => (
-    <div className='relative h-[40rem] overflow-hidden bg-base'>
+    <div className='relative h-160 overflow-hidden bg-base'>
       <ChatLoading />
     </div>
   ),
@@ -15,8 +15,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Desktop: Story = {};
+export const LoadingDesktop: Story = {};
 
-export const Narrow: Story = {
+export const LoadingNarrow: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
+};
+
+/** In a right-to-left document the greeting line and composer stubs mirror. */
+export const RtlMirrored: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar' className='relative h-160 overflow-hidden bg-base'>
+      <ChatLoading />
+    </div>
+  ),
 };

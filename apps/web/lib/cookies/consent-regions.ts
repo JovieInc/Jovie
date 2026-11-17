@@ -45,9 +45,7 @@ const CONSENT_REQUIRED_COUNTRIES = new Set([
  * When the region is unknown (null), the banner is shown as a safe fallback.
  */
 const CONSENT_REQUIRED_REGIONS = new Map<string, ReadonlySet<string>>([
-  // US: California (CCPA/CPRA), Colorado (CPA), Virginia (VCDPA),
-  // Connecticut (CTDPA), Utah (UCPA)
-  ['US', new Set(['CA', 'CO', 'VA', 'CT', 'UT'])],
+  // US visitors use opt-out privacy choices; GPC always overrides tracking.
   // Canada: Quebec (Law 25)
   ['CA', new Set(['QC'])],
 ]);

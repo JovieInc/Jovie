@@ -99,6 +99,7 @@ async function waitForClerkAuthUi(
           authUnavailable ||
           bodyText.includes('sign in to jovie') ||
           bodyText.includes('request access') ||
+          bodyText.includes('request an invite') ||
           bodyText.includes('create your')
         );
       },
@@ -236,6 +237,7 @@ test.describe('/signup — OAuth walk with testing token', () => {
           hasEmailInput > 0 ||
           bodyLower.includes('google') ||
           bodyLower.includes('request access') ||
+          bodyLower.includes('request an invite') ||
           bodyLower.includes('create your') ||
           bodyLower.includes('continue');
         expect(hasAuthContent).toBe(true);

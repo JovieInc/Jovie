@@ -419,7 +419,7 @@ describe('UnifiedSidebar library route', () => {
     const settingsNav = screen.getByRole('navigation', {
       name: 'settings navigation',
     });
-    for (const label of ['Account', 'Artist']) {
+    for (const label of ['Personal', 'Artist']) {
       const group = within(settingsNav)
         .getAllByText(label)
         .find(node => node.className.includes('font-caption'));
@@ -718,6 +718,7 @@ describe('UnifiedSidebar library route', () => {
       )
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ov-nav-section-tools').className).toBe('');
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();

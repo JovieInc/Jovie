@@ -36,6 +36,15 @@ describe('tracking consent', () => {
     });
   });
 
+  it('never forwards advertising events when only analytics is accepted', () => {
+    setConsentState('accepted');
+    localStorage.setItem(
+      'jv_cc',
+      JSON.stringify({ essential: true, analytics: true, marketing: false })
+    );
+    expect(isTrackingAllowed()).toBe(false);
+  });
+
   describe('isGPCEnabled', () => {
     it('returns false when navigator.globalPrivacyControl is undefined', () => {
       expect(isGPCEnabled()).toBe(false);
@@ -254,6 +263,10 @@ describe('tracking consent', () => {
 
   describe('isTrackingAllowed', () => {
     it('returns true only when consent state is "accepted"', () => {
+      // Opt-out region: accepted consent with no granular advertising
+      // rejection allows tracking. Consent-required regions also need
+      // an affirmative marketing choice (covered above).
+      setCookie('jv_cc_required=0');
       localStorage.setItem('jovie_tracking_consent', 'accepted');
       expect(isTrackingAllowed()).toBe(true);
     });

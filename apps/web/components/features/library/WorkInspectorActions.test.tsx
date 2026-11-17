@@ -125,14 +125,10 @@ describe('WorkInspectorActions', () => {
         'profile-1',
       ]);
     }
-    expect(
-      JSON.parse(onAskJovie.mock.calls[0][0].split('\n')[1])
-    ).toMatchObject({
-      kind: 'merch',
-      id: 'merch-7',
-      profileId: 'profile-1',
-      revision: '2026-11-10T00:00:00Z',
-    });
+    expect(onAskJovie.mock.calls[0][0]).toBe(
+      `Help me with my merch item "${asset.title}".`
+    );
+    expect(onAskJovie.mock.calls[0][0]).not.toContain('{');
   });
 
   it('offers Share page for a live public work', () => {

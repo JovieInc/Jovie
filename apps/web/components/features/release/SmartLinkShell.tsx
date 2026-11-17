@@ -28,8 +28,8 @@ import { cn } from '@/lib/utils';
 
 /** Shared menu item styling for smart link and profile drawers */
 export const SMART_LINK_MENU_ITEM_CLASS =
-  'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
-export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
+  'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-on-media/88 transition-colors duration-subtle active:bg-on-media/[0.06]';
+export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-on-media/40';
 // Title and artist render below clean square art, never over it ("no text on
 // text", docs/design-system/DETAILS.md). 24/32 title, 14/20 artist, 4px between.
 export const SMART_LINK_HERO_TITLE_CLASS =
@@ -122,7 +122,7 @@ function SmartLinkHeaderRightSlot({
 
   return (
     <span
-      className='flex h-8 w-8 items-center justify-center text-white/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+      className='flex h-8 w-8 items-center justify-center text-on-media/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
       data-testid='smart-link-brand-mark'
     >
       <Mark size={17} className='h-4 w-4' />

@@ -51,6 +51,54 @@ describe('Summer bounded Linear coordination', () => {
     expect(deps.readIssue).toHaveBeenCalledWith('issue_1');
   });
 
+  it('passes a structured priority through on create', async () => {
+    const deps = depsWith();
+    await coordinateLinearWork(
+      {
+        action: 'create',
+        title: 'Founder capability request',
+        body: 'Asked inside Jovie chat.',
+        teamId: 'team_1',
+        founderIntentRef: 'jovie-chat:conv_1',
+        sourceRefs: ['jovie-chat:conv_1'],
+        author: 'jovie-chat',
+        priority: 1,
+      },
+      deps
+    );
+    expect(deps.createIssue).toHaveBeenCalledWith({
+      title: 'Founder capability request',
+      description: 'Asked inside Jovie chat.',
+      teamId: 'team_1',
+      priority: 1,
+    });
+  });
+
+  it('keeps the created issue when the readback throws', async () => {
+    const deps = depsWith({
+      readIssue: vi.fn(async () => {
+        throw new Error('Linear timeout');
+      }),
+    });
+    const result = await coordinateLinearWork(
+      {
+        action: 'create',
+        title: 'Bounded recovery follow-up',
+        body: 'Track remaining human decision after Cursor recovery.',
+        teamId: 'team_1',
+        founderIntentRef: 'intent:founder:recovery-followup',
+        sourceRefs: ['receipt:cursor-recovery#run_1'],
+        author: 'summer',
+      },
+      deps
+    );
+    expect(result).toMatchObject({
+      status: 'failed',
+      code: 'readback-missing',
+      mutated: { id: 'issue_1', identifier: 'JOV-9001' },
+    });
+  });
+
   it('updates an issue with readback', async () => {
     const deps = depsWith();
     const result = await coordinateLinearWork(

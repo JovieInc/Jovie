@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from contextlib import redirect_stderr
 from pathlib import Path
 
@@ -275,6 +276,20 @@ class StoreTest(unittest.TestCase):
             cache.set(f"k{i + 2}", to_cached(200, headers, "{}", now))
         self.assertIsNone(cache.get("old"))
         self.assertFalse(cacheable(200, {"cache-control": "no-store"}, "{}"))
+
+
+class ModelPoolGateTest(unittest.TestCase):
+    def test_an_anthropic_model_request_never_reaches_the_gateway(self):
+        sent = []
+        client = ApiClient("ai-gateway", "key", store=MemoryLedgerStore(), log=quiet,
+                           transport=lambda *args: sent.append(args) or (200, {}, "{}"))
+        url = "https://ai-gateway.vercel.sh/v1/chat/completions"
+        with tempfile.TemporaryDirectory() as state, unittest.mock.patch.dict(os.environ, {"LANES_STATE": state}):
+            with self.assertRaisesRegex(RuntimeError, "may not run on"):
+                client.request(url, method="POST", body={"model": "anthropic/claude-opus-5.5"}, priority="report")
+            self.assertEqual((sent, client.state()), ([], None))
+            client.request(url, method="POST", body={"model": "openai/gpt-6.1-sol"}, priority="report")
+        self.assertEqual(len(sent), 1)
 
 
 if __name__ == "__main__":

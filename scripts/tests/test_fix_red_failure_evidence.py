@@ -78,6 +78,27 @@ def lane_harness():
 
 
 class FleetBodyRouteTest(unittest.TestCase):
+    def test_fleet_evidence_composes_with_main_fixers_and_keeps_their_paths(self):
+        route = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
+            "Fleet Rules Evidence": "##[error]red-before-green: this repair PR has no section",
+            "Source Validation": "Unwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",
+        })
+        self.assertEqual((route["cls"], route["action"]), ("composed", "compose"))
+        self.assertEqual(route["actions"], ["stamp-repair-evidence", "wire-ci-fast"])
+        self.assertEqual(route["files"], ["scripts/a.test.mjs"])
+
+    def test_annotated_measured_win_cannot_enter_a_composed_repair(self):
+        win = "win: this PR needs a measured win (metric, before, after, method, evidence)."
+        generic = classes.classify(pr("Source Validation"), {"Source Validation": win})
+        self.assertEqual((generic["cls"], generic["action"]), ("measured-win", "repair-win"))
+        route = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
+            "Fleet Rules Evidence": "##[error]" + win,
+            "Source Validation": "Unwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",
+        })
+        self.assertEqual((route["cls"], route["action"]), ("mixed", "agent"))
+        self.assertEqual(route["actions"], [])
+        self.assertEqual(route["repairs"], [])
+
     def test_annotated_red_stamps_and_a_win_stays_with_the_model(self):
         red = "##[error]red-before-green: this repair PR has no section"
         win = "##[error]win: this PR needs a measured win"
