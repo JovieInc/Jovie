@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { document } from './creator-document-test-fixture';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { CreatorDocumentsWorkspace as CreatorDocumentsWorkspaceComponent } from './CreatorDocumentsWorkspace';
 
@@ -84,16 +85,6 @@ vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
   ),
 }));
 
-const document = {
-  id: '11111111-1111-4111-8111-111111111111',
-  title: 'A durable idea',
-  kind: 'idea' as const,
-  stage: 'private_draft' as const,
-  currentRevision: 1,
-  content: { type: 'doc' as const, content: [] },
-  plainText: 'Body',
-  updatedAt: '2026-08-16T00:00:00.000Z',
-};
 
 describe('CreatorDocumentsWorkspace', () => {
   beforeEach(() => {
