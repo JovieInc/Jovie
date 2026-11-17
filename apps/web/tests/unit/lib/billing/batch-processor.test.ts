@@ -1,12 +1,75 @@
-import { describe, expect, it } from 'vitest';
+import type Stripe from 'stripe';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BATCH_SIZE,
   type ProcessUserResult,
+  processSingleUser,
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import type { DbOrTransaction } from '@/lib/db';
 
 describe('batch-processor', () => {
+  describe('observed subscription reuse', () => {
+    const user = {
+      id: 'user_1',
+      clerkId: null,
+      isPro: true,
+      stripeSubscriptionId: 'sub_1',
+      stripeCustomerId: 'cus_1',
+    };
+    const db = {} as DbOrTransaction;
+    it('passes the exact successfully retrieved subscription to the observer', async () => {
+      const subscription = {
+        id: 'sub_1',
+        status: 'active',
+      } as Stripe.Subscription;
+      const retrieve = vi.fn().mockResolvedValue(subscription);
+      const stripe = { subscriptions: { retrieve } } as unknown as Stripe;
+      const observed = vi.fn();
+      expect(await processSingleUser(db, stripe, user, observed)).toEqual({
+        action: 'no_mismatch',
+      });
+      expect(retrieve).toHaveBeenCalledExactlyOnceWith('sub_1');
+      expect(observed).toHaveBeenCalledExactlyOnceWith(subscription);
+    });
+    it('observes before status handling and never observes failed or missing retrievals', async () => {
+      const failure = new Error(
+        'fixture observer stopped before status handling'
+      );
+      const retrieve = vi
+        .fn()
+        .mockResolvedValue({ id: 'sub_1', status: 'canceled' });
+      const stripe = { subscriptions: { retrieve } } as unknown as Stripe;
+      const observed = vi.fn(() => {
+        throw failure;
+      });
+      await expect(processSingleUser(db, stripe, user, observed)).rejects.toBe(
+        failure
+      );
+      expect(observed).toHaveBeenCalledTimes(1);
+      observed.mockClear();
+      retrieve
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error('fixture unavailable'));
+      expect(await processSingleUser(db, stripe, user, observed)).toEqual({
+        action: 'skipped',
+      });
+      expect(await processSingleUser(db, stripe, user, observed)).toEqual({
+        action: 'error',
+        error: 'fixture unavailable',
+      });
+      expect(
+        await processSingleUser(
+          db,
+          stripe,
+          { ...user, stripeSubscriptionId: null },
+          observed
+        )
+      ).toEqual({ action: 'skipped' });
+      expect(observed).not.toHaveBeenCalled();
+    });
+  });
   describe('BATCH_SIZE', () => {
     it('should be 100', () => {
       expect(BATCH_SIZE).toBe(100);
