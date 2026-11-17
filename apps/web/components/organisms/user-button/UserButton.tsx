@@ -3,17 +3,22 @@
 // @coverage-via apps/web/tests/components/user-button.test.tsx
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Badge, Button, CommonDropdown, PlainButton } from '@jovie/ui';
+import {
+  Button,
+  CommonDropdown,
+  INSET_PANEL_SECTION_LABEL,
+  INSET_PANEL_SEPARATOR,
+  PlainButton,
+} from '@jovie/ui';
 import {
   ArrowDownToLine,
+  BookOpen,
   CircleAlert,
   Cookie,
   CreditCard,
-  Eye,
-  EyeOff,
   FileCheck2,
-  HelpCircle,
   Keyboard,
+  LifeBuoy,
   LogOut,
   MessageSquare,
   Monitor,
@@ -46,11 +51,26 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import {
+  ACCOUNT_MENU_HEADER_ROW_CLASS,
+  AccountMenuHeader,
+} from './AccountMenuHeader';
+import { AccountMenuShortcut } from './AccountMenuShortcut';
+import { ACCOUNT_MENU_ROW_CLASS } from './account-menu-row';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
+import {
+  HideEarningsMenuRow,
+  hideEarningsAccessibleName,
+} from './HideEarningsMenuRow';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
+import {
+  BillingLoadingRow,
+  UserButtonLoadingPlaceholder,
+  UserButtonTriggerAvatar,
+} from './UserButtonLoading';
 import { useUserButton } from './useUserButton';
 
 const DashboardFeedbackModal = dynamic(
@@ -77,6 +97,7 @@ interface BuildDropdownItemsParams {
   displayName: string;
   userInitials: string;
   formattedUsername: string | null;
+  contactEmail: string | undefined;
   handleProfile: () => void;
   handleHelp: () => void;
   handleSettings: () => void;
@@ -115,7 +136,6 @@ const USER_MENU_SIDEBAR_CONTENT_CLASS =
  */
 export const USER_MENU_MAX_HEIGHT =
   'var(--radix-dropdown-menu-content-available-height)';
-const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
 
@@ -151,11 +171,12 @@ export function buildDesktopUpdateMenuItem(
       label: entry.label,
       icon: entry.icon,
       onClick: openModal,
+      className: ACCOUNT_MENU_ROW_CLASS,
     },
     {
       type: 'separator',
       id: 'sep-update',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
   ];
 }
@@ -178,6 +199,7 @@ function buildDropdownItems({
   displayName,
   userInitials,
   formattedUsername,
+  contactEmail,
   handleProfile,
   handleHelp,
   handleSettings,
@@ -197,72 +219,29 @@ function buildDropdownItems({
   const updateItems = desktopUpdate
     ? buildDesktopUpdateMenuItem(desktopUpdate.state, desktopUpdate.openModal)
     : [];
-
   const items: CommonDropdownItem[] = [
     ...updateItems,
     {
-      type: 'action-row',
-      id: 'profile-help',
-      className:
-        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1',
-      items: [
-        {
-          type: 'action',
-          id: 'profile-card',
-          label: `Open profile for ${displayName}`,
-          onClick: handleProfile,
-          className: 'min-h-12 min-w-0 gap-2.5 px-1.5 py-1.5',
-          content: (
-            <>
-              <Avatar
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                name={displayName || userInitials}
-                size='xs'
-                className='shrink-0'
-              />
-              <div className='min-w-0 flex-1'>
-                <div className='flex min-w-0 items-center gap-2'>
-                  <span
-                    title={displayName}
-                    className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
-                  >
-                    {displayName}
-                  </span>
-                  {billingStatus.isPro && (
-                    <Badge
-                      variant='secondary'
-                      size='sm'
-                      className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
-                    >
-                      Pro
-                    </Badge>
-                  )}
-                </div>
-                <p
-                  aria-hidden={formattedUsername ? undefined : true}
-                  className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
-                >
-                  {formattedUsername ?? '\u00A0'}
-                </p>
-              </div>
-            </>
-          ),
-        },
-        {
-          type: 'action',
-          id: 'help',
-          label: 'Help',
-          icon: HelpCircle,
-          onClick: handleHelp,
-          className: 'min-h-8 shrink-0 px-2',
-        },
-      ],
+      type: 'action',
+      id: 'profile-card',
+      label: `Open profile for ${displayName}`,
+      onClick: handleProfile,
+      className: ACCOUNT_MENU_HEADER_ROW_CLASS,
+      content: (
+        <AccountMenuHeader
+          displayName={displayName}
+          userInitials={userInitials}
+          userImageUrl={userImageUrl}
+          formattedUsername={formattedUsername}
+          contactEmail={contactEmail}
+          isPro={billingStatus.isPro}
+        />
+      ),
     },
     {
       type: 'separator',
       id: 'sep-1',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
     {
       type: 'action',
@@ -270,7 +249,8 @@ function buildDropdownItems({
       label: 'Settings',
       icon: Settings,
       onClick: handleSettings,
-      shortcut: 'G S',
+      className: ACCOUNT_MENU_ROW_CLASS,
+      trailing: <AccountMenuShortcut keys={['G', 'S']} />,
     },
     {
       type: 'custom',
@@ -297,6 +277,7 @@ function buildDropdownItems({
           sanitizeInstallUrl(iosAlphaAccess.installUrl) ?? APP_ROUTES.DOWNLOAD;
         window.open(href, '_blank', 'noopener,noreferrer');
       },
+      className: ACCOUNT_MENU_ROW_CLASS,
     });
   }
 
@@ -309,6 +290,7 @@ function buildDropdownItems({
       onClick: () => {
         window.open(APP_ROUTES.DOWNLOAD, '_blank', 'noopener,noreferrer');
       },
+      className: ACCOUNT_MENU_ROW_CLASS,
     });
   }
 
@@ -322,7 +304,7 @@ function buildDropdownItems({
       label: 'Keyboard Shortcuts',
       icon: Keyboard,
       onClick: handleOpenShortcuts,
-      shortcut: `${GLYPH_CMD} /`,
+      trailing: <AccountMenuShortcut keys={[GLYPH_CMD, '/']} />,
     });
   }
 
@@ -373,34 +355,34 @@ function buildDropdownItems({
     type: 'submenu',
     id: 'learn-more',
     label: 'Learn More',
-    icon: HelpCircle,
-    items: learnMoreItems,
+    icon: BookOpen,
+    className: ACCOUNT_MENU_ROW_CLASS,
+    items: learnMoreItems.map(item =>
+      item.type === 'action'
+        ? { ...item, className: ACCOUNT_MENU_ROW_CLASS }
+        : item
+    ),
   };
-  items.push(learnMoreSubmenu);
 
   // Add billing item based on status
   if (billingStatus.loading) {
     items.push({
       type: 'custom',
       id: 'billing-loading',
-      render: () => (
-        <div className='cursor-default px-2.5 py-2 text-app h-9'>
-          <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
-          </div>
-        </div>
-      ),
+      render: () => <BillingLoadingRow />,
     });
   } else if (billingStatus.isPro) {
     items.push({
       type: 'action',
       id: 'manage-billing',
-      label: loading.manageBilling ? 'Opening…' : 'Manage billing',
+      label: loading.manageBilling ? 'Opening…' : 'Manage Billing',
       icon: CreditCard,
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
-      className: 'disabled:cursor-not-allowed disabled:opacity-70',
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
     });
   } else {
     items.push({
@@ -410,18 +392,16 @@ function buildDropdownItems({
       icon: Sparkles,
       onClick: handleUpgrade,
       disabled: loading.upgrade,
-      className: 'disabled:cursor-not-allowed disabled:opacity-70',
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
     });
   }
 
   // Ovie privacy lock is opt-in and server-owned; money visibility remains a
   // separate customer preference.
   items.push(
-    {
-      type: 'separator',
-      id: 'sep-privacy',
-      className: USER_MENU_GROUP_SPACER_CLASS,
-    },
     ...(showWorkspaceLock
       ? [
           {
@@ -438,9 +418,10 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'toggle-money',
-      label: moneyHidden ? 'Show money' : 'Hide money',
-      icon: moneyHidden ? Eye : EyeOff,
+      label: hideEarningsAccessibleName(moneyHidden),
       onClick: () => setMoneyHidden(!moneyHidden),
+      className: ACCOUNT_MENU_ROW_CLASS,
+      content: <HideEarningsMenuRow hidden={moneyHidden} />,
     }
   );
 
@@ -450,32 +431,55 @@ function buildDropdownItems({
     {
       type: 'separator',
       id: 'sep-support',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
+    {
+      type: 'action',
+      id: 'help',
+      label: 'Help',
+      icon: LifeBuoy,
+      onClick: handleHelp,
+      className: ACCOUNT_MENU_ROW_CLASS,
+    },
+    learnMoreSubmenu,
     {
       type: 'action',
       id: 'feedback',
       label: 'Send Feedback',
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
+      className: ACCOUNT_MENU_ROW_CLASS,
     },
     {
       type: 'separator',
       id: 'sep-2',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
+    },
+    {
+      type: 'action',
+      id: 'sign-out',
+      label: loading.signOut ? 'Signing Out…' : 'Sign Out',
+      icon: LogOut,
+      onClick: handleSignOut,
+      disabled: loading.signOut,
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-60'
+      ),
+      trailing: <AccountMenuShortcut keys={[GLYPH_OPT, GLYPH_SHIFT, 'Q']} />,
     },
     {
       type: 'custom',
       id: 'version',
       render: () => (
         <div
-          className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'
+          className={cn(INSET_PANEL_SECTION_LABEL, 'select-none font-normal')}
           data-testid='app-build-diagnostics'
         >
           {isElectronRuntime ? (
             <DesktopReleaseIdentity />
           ) : (
-            <span>
+            <span className='truncate'>
               Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
               {process.env.NEXT_PUBLIC_BUILD_SHA
                 ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
@@ -484,21 +488,6 @@ function buildDropdownItems({
           )}
         </div>
       ),
-    },
-    {
-      type: 'separator',
-      id: 'sep-signout',
-      className: USER_MENU_GROUP_SPACER_CLASS,
-    },
-    {
-      type: 'action',
-      id: 'sign-out',
-      label: loading.signOut ? 'Signing out…' : 'Sign out',
-      icon: LogOut,
-      onClick: handleSignOut,
-      disabled: loading.signOut,
-      className: 'disabled:cursor-not-allowed disabled:opacity-60',
-      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
     }
   );
 
@@ -569,8 +558,13 @@ export function UserButton({
     loading,
   } = menuActions;
 
-  const { userImageUrl, displayName, userInitials, formattedUsername } =
-    userInfo;
+  const {
+    userImageUrl,
+    displayName,
+    userInitials,
+    formattedUsername,
+    contactEmail,
+  } = userInfo;
 
   const handleHelp = useCallback(() => {
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
@@ -645,28 +639,8 @@ export function UserButton({
       );
     }
 
-    return showUserInfo ? (
-      <div
-        data-testid='user-button-loading'
-        className={cn(
-          'flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
-          // Founder lock 2026-09-25: single compact 32px row.
-          calm && 'h-8'
-        )}
-      >
-        <div className='h-6 w-6 shrink-0 rounded-full bg-interactive-hover animate-pulse motion-reduce:animate-none' />
-        <div
-          data-user-button-loading-copy
-          className={cn('flex-1', SHELL_RAIL_STAGE)}
-        >
-          <div className='h-3 w-20 rounded-sm bg-interactive-hover animate-pulse motion-reduce:animate-none' />
-        </div>
-      </div>
-    ) : (
-      <div
-        data-testid='user-button-loading'
-        className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none'
-      />
+    return (
+      <UserButtonLoadingPlaceholder showUserInfo={showUserInfo} calm={calm} />
     );
   }
 
@@ -677,6 +651,7 @@ export function UserButton({
     displayName,
     userInitials,
     formattedUsername,
+    contactEmail,
     handleProfile,
     handleHelp,
     handleSettings,
@@ -706,20 +681,21 @@ export function UserButton({
           // name only (no workspace subtitle line). The 44px touch target is
           // an invisible hit container, not the visible row height (DS
           // Foundation V1 touch-target rule) — enlarge before:, not h-8.
+          // No inner inset and the nav icon gap, so the avatar centres on the
+          // nav icon column and the name starts on the nav label edge.
           calm &&
-            'relative h-8 px-0.5 gap-(--space-2-5) before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
+            'relative h-8 px-0 gap-2 before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
         )}
       >
         {dockStatus ? (
           <span className='sr-only'>Open user menu · {dockStatus.label} </span>
         ) : null}
         {dockStatus?.badges}
-        <Avatar
+        <UserButtonTriggerAvatar
+          calm={calm}
           src={userImageUrl}
-          alt={displayName || 'User avatar'}
           name={displayName || userInitials}
-          size={calm ? 'sm' : 'xs'}
-          className='shrink-0'
+          alt={displayName || 'User avatar'}
         />
         <div
           data-user-button-display-name
@@ -740,10 +716,13 @@ export function UserButton({
         <Icon
           name='ChevronRight'
           data-user-button-chevron
+          data-state={isMenuOpen ? 'open' : 'closed'}
           className={cn(
-            'size-3 text-sidebar-item-icon transition-opacity duration-subtle group-data-[collapsible=icon]:hidden',
+            'size-3 text-sidebar-item-icon transition duration-subtle motion-reduce:transition-none group-data-[collapsible=icon]:hidden',
+            // Open state: the chevron stays visible and turns to point up,
+            // the way the menu opens from the sidebar footer.
             isMenuOpen
-              ? 'opacity-100'
+              ? '-rotate-90 opacity-100'
               : 'opacity-0 group-hover/user-button:opacity-100 group-focus-visible/user-button:opacity-100'
           )}
           aria-hidden='true'
@@ -766,18 +745,20 @@ export function UserButton({
       </Button>
     ));
 
+  const isSidebarRow = showUserInfo && !trigger;
   const dropdown = (
     <CommonDropdown
       variant='dropdown'
       items={dropdownItems}
       trigger={triggerElement}
       align={trigger || showUserInfo ? 'start' : 'end'}
+      // The sidebar row sits in the footer, so its menu opens upward; Radix
+      // still flips it if there is no room above.
+      side={isSidebarRow ? 'top' : 'bottom'}
       open={isMenuOpen}
       onOpenChange={setIsMenuOpen}
       contentClassName={
-        showUserInfo && !trigger
-          ? USER_MENU_SIDEBAR_CONTENT_CLASS
-          : USER_MENU_CONTENT_CLASS
+        isSidebarRow ? USER_MENU_SIDEBAR_CONTENT_CLASS : USER_MENU_CONTENT_CLASS
       }
       maxHeight={USER_MENU_MAX_HEIGHT}
     />

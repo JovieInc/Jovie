@@ -123,6 +123,30 @@ function coldRow(
 }
 
 describe('cold composition selection', () => {
+  it.each([true, false])(
+    'preserves an existing-relationship hold with cold drafts enabled and judge passed=%s',
+    passed => {
+      const lead = facts({
+        linktreeHandle: 'djdannic',
+        displayName: 'Dannic',
+        certified: true,
+      });
+      expect(
+        coldRow({
+          facts: lead,
+          target: target(lead),
+          dogfoodGate: { passed, blocks: passed ? [] : ['artifact_failed'] },
+        })
+      ).toMatchObject({
+        view: 'held',
+        nextAction: 'none',
+        message: null,
+        relationshipHold:
+          'Existing relationship: flag to Tim, no cold outreach',
+      });
+    }
+  );
+
   it('uses certified catalog facts and the composer first touch, never a scraped first name', () => {
     const step = composeColdSequence(coldContext().artifact, NOW).steps[0];
     expect(coldRow().message).toEqual({

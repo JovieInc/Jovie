@@ -252,9 +252,8 @@ export const HoverableInteractive: Story = {
 };
 
 export const PartialData: Story = {
-  // The partial state dims the whole card via --state-partial-opacity; on the
-  // default light canvas that blend drops text below WCAG AA. Render on the
-  // dark base the card is designed for so axe measures the intended context.
+  // Cached content remains subdued while its informational copy stays
+  // readable on the supported light and dark canvases.
   render: args => (
     <div className='bg-base p-8'>
       <Card {...args} />

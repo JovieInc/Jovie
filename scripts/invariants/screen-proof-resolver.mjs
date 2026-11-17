@@ -96,6 +96,18 @@ const equal = (left, right) =>
 // (every other screen) still requires an exactly empty search string —
 // this only widens what an exact, caller-declared query can additionally
 // match, never what an empty one does.
+// Bare-path receipt finalPaths (JOV-7973 seam: /waitlist -> /start).
+const receiptFinalPathMatches = (finalPath, route) => {
+  if (typeof finalPath !== 'string' || typeof route !== 'string') return false;
+  const url = new URL(finalPath, 'http://localhost');
+  const expected = new URL(route, 'http://localhost');
+  return (
+    url.protocol === 'http:' &&
+    ['localhost', '127.0.0.1'].includes(url.hostname) &&
+    finalPathMatches(url, expected) &&
+    url.hash === ''
+  );
+};
 const validLocalFinalUrl = (value, expectedRoute) => {
   if (typeof value !== 'string' || typeof expectedRoute !== 'string')
     return false;
@@ -337,7 +349,7 @@ function decodeMarketingProof(bytes, context, meta) {
     if (
       receipt.route !== context.marketingRoute ||
       receipt.fixturePath !== context.marketingRoute ||
-      receipt.finalPath !== context.marketingRoute
+      !receiptFinalPathMatches(receipt.finalPath, context.marketingRoute)
     )
       return fail(
         'marketing receipt does not match the registered screen route'

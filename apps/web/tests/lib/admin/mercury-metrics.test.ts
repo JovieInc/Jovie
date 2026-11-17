@@ -382,4 +382,117 @@ describe('getAdminMercuryMetrics', () => {
     expect(cached.observedAtIso).toBe(first.observedAtIso);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('serves the last-good balance marked stale when a refresh times out', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T23:00:00.000Z'));
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transactions: [] }),
+      });
+
+    const good = await getAdminMercuryMetrics();
+    expect(good.isAvailable).toBe(true);
+
+    // Past the cache TTL, the /accounts call hits the 8s bound (JOV-12733).
+    vi.setSystemTime(new Date('2026-11-14T23:06:00.000Z'));
+    fetchMock.mockRejectedValueOnce(
+      new ServerFetchTimeoutError(
+        'External request timed out after 8000ms',
+        8000,
+        'External request'
+      )
+    );
+
+    const stale = await getAdminMercuryMetrics();
+
+    expect(stale.isAvailable).toBe(true);
+    expect(stale.balanceUsd).toBe(2500);
+    expect(stale.burnRateAvailable).toBe(true);
+    expect(stale.observedAtIso).toBe(good.observedAtIso);
+    expect(stale.errorMessage).toContain('Mercury refresh failed');
+    // The timeout is still reported; stale serving must not hide it.
+    expect(mockCaptureError).toHaveBeenCalledOnce();
+
+    // The stale snapshot is itself cached for the TTL window.
+    const again = await getAdminMercuryMetrics();
+    expect(again).toEqual(stale);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns unavailable once the last-good snapshot exceeds the staleness window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T23:00:00.000Z'));
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transactions: [] }),
+      });
+
+    await getAdminMercuryMetrics();
+
+    // 35 minutes later, still failing: the stale window has passed.
+    vi.setSystemTime(new Date('2026-11-14T23:35:00.000Z'));
+    fetchMock.mockRejectedValueOnce(new Error('Network error'));
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.balanceUsd).toBe(0);
+    expect(metrics.burnRateAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('Mercury API error');
+  });
+
+  it('clearAdminMercuryMetricsCache also drops the last-good snapshot', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transactions: [] }),
+      });
+
+    await getAdminMercuryMetrics();
+    clearAdminMercuryMetricsCache();
+
+    fetchMock.mockRejectedValueOnce(new Error('Network error'));
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.balanceUsd).toBe(0);
+    expect(metrics.errorMessage).toContain('Mercury API error');
+  });
 });

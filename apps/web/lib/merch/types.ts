@@ -178,6 +178,7 @@ export interface MerchDesignCarouselResult {
   readonly generationId: string;
   readonly prompt?: string;
   readonly nextStep?: string;
+  readonly state?: 'concept_review_required';
   /**
    * Version of the canonical generation contract that produced these options
    * (`MERCH_GENERATION_CONTRACT_VERSION`). Optional only for pre-contract

@@ -112,6 +112,37 @@ describe('OutboundRail', () => {
     expect(box).toHaveTextContent('Needs evidence: dsp, search.');
   });
 
+  it('prioritizes the existing-relationship hold over unavailable cold draft inputs', () => {
+    const hold = 'Existing relationship: flag to Tim, no cold outreach';
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'held',
+        flags: ['existing_relationship', 'cold_draft_unavailable'],
+        relationshipHold: hold,
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      hold
+    );
+    expect(screen.getByTestId('outbound-relationship-hold')).toHaveTextContent(
+      hold
+    );
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('shows a relationship tag beside a draft that stays approvable', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        relationshipNotes: ["Relationship: Armada Music, Tim's vocalist deals"],
+      }),
+    });
+    expect(screen.getByTestId('outbound-eligibility')).toHaveTextContent(
+      "Relationship: Armada Music, Tim's vocalist deals"
+    );
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+  });
+
   it('blocks approval until the current facts are certified', () => {
     const props = renderRail({ certification: certification('needs_review') });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();

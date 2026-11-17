@@ -112,12 +112,12 @@ describe('DesktopTitlebar', () => {
     expect(screen.getByTestId('electron-traffic-light-safe-area')).toHaveClass(
       'w-(--electron-traffic-light-safe-width)'
     );
-    expect(
-      screen.getByTestId('electron-titlebar-sidebar-cell')
-    ).toContainElement(screen.getByTestId('electron-nav-back'));
-    expect(
-      screen.getByTestId('electron-titlebar-sidebar-cell')
-    ).toContainElement(screen.getByTestId('electron-nav-forward'));
+    for (const arrow of ['electron-nav-back', 'electron-nav-forward']) {
+      const button = screen.getByTestId(arrow);
+      const cell = screen.getByTestId('electron-titlebar-sidebar-cell');
+      expect(cell).toContainElement(button);
+      expect(button).toHaveClass('hover:bg-sidebar-accent');
+    }
 
     expect(
       screen.queryByTestId('update-available-pill')

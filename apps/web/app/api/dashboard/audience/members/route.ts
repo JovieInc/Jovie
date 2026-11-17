@@ -9,11 +9,13 @@ import {
   or,
   type SQL,
 } from 'drizzle-orm';
+import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { applyShareGate } from '@/lib/audience/share-gate';
 import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { createAudienceDataTag } from '@/lib/cache/tags';
 import {
   buildCursorCondition,
   decodeCursor,
@@ -380,7 +382,8 @@ const deleteSchema = z.object({
  */
 export async function DELETE(request: NextRequest) {
   try {
-    return await withDbSessionTx(async (tx, clerkUserId) => {
+    const removed: { profileId: string | null } = { profileId: null };
+    const response = await withDbSessionTx(async (tx, clerkUserId) => {
       const parsedBody = await parseJsonBody<z.infer<typeof deleteSchema>>(
         request,
         {
@@ -434,12 +437,19 @@ export async function DELETE(request: NextRequest) {
         memberId,
         profileId,
       });
+      removed.profileId = profileId;
 
       return NextResponse.json(
         { success: true },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
+    // After the delete commits, expire the server-rendered audience cache so
+    // the removed member does not reappear on reload.
+    if (removed.profileId) {
+      revalidateTag(createAudienceDataTag(removed.profileId), { expire: 0 });
+    }
+    return response;
   } catch (error) {
     logger.error('[Dashboard Audience] Failed to remove member', error);
     if (error instanceof Error && error.message === 'Unauthorized') {

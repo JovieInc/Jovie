@@ -53,24 +53,24 @@ describe('Eve installation contract', () => {
     };
     const lockfile = readFileSync(resolve(pilotRoot, 'pnpm-lock.yaml'), 'utf8');
 
-    // Keep these pins in lockstep with package.json; dependabot bumps edit
-    // the manifest but not this test.
-    const EVE_PIN = '0.72.1';
-    const MICROSANDBOX_PIN = '0.7.13';
-
     expect(packageJson.packageManager).toBe('pnpm@9.15.9');
-    expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
-    expect(lockfile).toContain(
-      `      ai:\n        specifier: ${packageJson.dependencies?.ai}\n`
-    );
-    expect(lockfile).toContain(`  ai@${packageJson.dependencies?.ai}:`);
-    expect(packageJson.dependencies?.microsandbox).toBe(MICROSANDBOX_PIN);
-    expect(lockfile).toContain(
-      `      microsandbox:\n        specifier: ${packageJson.dependencies?.microsandbox}\n        version: ${packageJson.dependencies?.microsandbox}\n`
-    );
-    expect(lockfile).toContain(
-      `  microsandbox@${packageJson.dependencies?.microsandbox}:`
-    );
+    // The manifest owns each exact pin. Check the frozen resolution and actual
+    // installation against it so dependency updates need no duplicate test edits.
+    for (const name of ['ai', 'eve', 'microsandbox'] as const) {
+      const pin = packageJson.dependencies?.[name];
+      expect(pin).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(lockfile).toContain(
+        `      ${name}:\n        specifier: ${pin}\n        version: ${pin}`
+      );
+      expect(lockfile).toContain(`  ${name}@${pin}:`);
+      const installed = JSON.parse(
+        readFileSync(
+          resolve(pilotRoot, 'node_modules', name, 'package.json'),
+          'utf8'
+        )
+      ) as { version: string };
+      expect(installed.version).toBe(pin);
+    }
     expect(lockfile).toContain(
       `      '@microsandbox/types': ${packageJson.dependencies?.microsandbox}`
     );

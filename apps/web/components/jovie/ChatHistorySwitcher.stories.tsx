@@ -66,13 +66,25 @@ async function openMenu(canvasElement: HTMLElement) {
   await userEvent.click(
     within(canvasElement).getByTestId('chat-history-trigger')
   );
-  return within(document.body).findByRole('menu');
+  // A searchable menu presents its content as a group — a text input is not
+  // an allowed child of role="menu" (axe aria-required-children) — with the
+  // item rows in an inner menu. Scope to the group so the pinned search
+  // field is inside the queried container.
+  return within(document.body).findByRole('group');
 }
 
 const meta = {
   title: 'Chat/ChatHistorySwitcher',
   component: ChatHistorySwitcher,
-  args: { title: 'Tour Budget For The Fall Run', activeConversationId: 'tour' },
+  args: {
+    title: 'Tour Budget For The Fall Run',
+    activeConversationId: 'tour',
+    // `modal: false`: a modal Radix menu `hideOthers`-ARIA-hides the story
+    // canvas around the portaled content, which fails axe aria-hidden-focus
+    // on the focusable trigger. Non-modal is visually identical for demos
+    // (AudienceRowActionsMenu stories follow the same convention).
+    modal: false,
+  },
   decorators: [withHistory(HISTORY)],
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof ChatHistorySwitcher>;

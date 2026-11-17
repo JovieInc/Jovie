@@ -1138,7 +1138,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      21, 39,
+      20, 39, 2, 2,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({
@@ -1768,7 +1768,7 @@ vi.mock('next/link', async () => {
 it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
   const { container } = render(createElement(HomepageV2Route));
   const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
-  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('href', '/start');
   expect(auth).toHaveAttribute('data-test-prefetch', 'false');
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');

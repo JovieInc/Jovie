@@ -1,4 +1,16 @@
 /** Exact product-shot producers; unknown paths and missing tests stay full-suite. */
+
+const FRESHNESS_TEST =
+  'apps/web/lib/screenshots/product-shots.manifest.test.ts';
+
+/**
+ * Declared shot sources. A change to one must select the freshness test at
+ * PR time. The merge-group suite is too late (setup-share-profile, #25599).
+ * @param {string} source
+ * @returns {[string, string[]]}
+ */
+const shotSource = source => [source, [FRESHNESS_TEST]];
+
 /** @type {Array<[string, string[]]>} */
 export const PRODUCT_SHOT_TEST_PRODUCERS = [
   [
@@ -36,4 +48,21 @@ export const PRODUCT_SHOT_TEST_PRODUCERS = [
       'apps/web/scripts/product-shots/render.test.ts',
     ],
   ],
+  ...[
+    'apps/web/lib/tim-white.ts',
+    'apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx',
+    'apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts',
+    'apps/web/components/features/demo/DemoShowcaseSurface.tsx',
+    'apps/web/components/features/onboarding/OnboardingExperienceShell.tsx',
+    'apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx',
+    'apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx',
+    'apps/web/components/features/demo/demo-profile-showcase-states.ts',
+    'apps/web/components/features/profile/ProfileUnifiedDrawer.tsx',
+    'apps/web/components/features/share/PublicShareMenu.tsx',
+    'apps/web/components/features/home/homepage-profile-preview-fixture.ts',
+    'apps/web/components/features/home/home-surface-seed.ts',
+    'apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx',
+    'apps/web/components/features/profile/ProfileIdentityHeader.tsx',
+    'apps/web/components/features/profile/pac/ProfilePacCard.tsx',
+  ].map(shotSource),
 ];

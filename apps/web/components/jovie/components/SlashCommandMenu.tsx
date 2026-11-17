@@ -30,7 +30,7 @@ import {
   InlinePalette,
 } from '@/components/organisms/SharedCommandPalette';
 import { shouldHideAlbumArtChatSuggestion } from '@/lib/chat/album-art-capability';
-import type { EntityKind } from '@/lib/chat/tokens';
+import { ENTITY_KIND_LABEL, type EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
@@ -61,6 +61,7 @@ const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
   artist: UserCircle,
   track: Music2,
   event: Calendar,
+  profile: UserCircle,
 };
 
 /**
@@ -117,10 +118,7 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 }
 
 function entityKindLabel(kind: EntityKind): string {
-  if (kind === 'release') return 'Release';
-  if (kind === 'artist') return 'Artist';
-  if (kind === 'event') return 'Event';
-  return 'Track';
+  return ENTITY_KIND_LABEL[kind];
 }
 
 export function pickerEntityKind(state: PickerState): EntityKind | null {

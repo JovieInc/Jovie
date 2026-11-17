@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export interface ArtistProfileMode {
   readonly id: 'upcoming-release' | 'release-day' | 'touring' | 'live-support';
@@ -396,9 +397,8 @@ export interface ArtistProfileLandingCopy {
 }
 
 /**
- * The animated audience visual is also used by the notifications landing page.
- * Keep its contract limited to the fields that visual actually renders so the
- * artist-profile narrative can evolve without forcing unrelated page copy.
+ * Shared with notifications; expose only fields the audience visual renders
+ * so artist-profile narrative edits do not require unrelated copy changes.
  */
 export type ArtistProfileCaptureVisualCopy = Omit<
   ArtistProfileLandingCopy['capture'],
@@ -757,7 +757,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
       },
       shareAnywhere: {
-        url: 'jov.ie/tim',
+        url: TIM_WHITE_PROFILE.publicProfileDisplay,
         title: 'Share-ready',
         subtitle: 'Bio, QR, stories, and shows.',
       },
@@ -1119,7 +1119,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       searchValue: 'Tim White',
       resultName: 'Tim White',
       resultSubtitle: 'Spotify artist',
-      profilePath: 'jov.ie/tim',
+      profilePath: TIM_WHITE_PROFILE.publicProfileDisplay,
       ctaLabel: 'Claim',
     },
     sync: {
@@ -1146,7 +1146,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
     share: {
       url: 'https://jov.ie/tim',
-      displayValue: 'jov.ie/tim',
+      displayValue: TIM_WHITE_PROFILE.publicProfileDisplay,
       qrLabel: 'QR code',
       deepLinksLabel: 'Deep links',
       deepLinks: [
