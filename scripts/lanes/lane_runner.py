@@ -106,6 +106,7 @@ import binding_refill, pr_wip, pool_feed  # noqa: E401,E402  (Backlog -> Todo re
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
+import worktree_hosts, worktree_retirement  # noqa: E401,E402  (gem-default hosts)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -153,7 +154,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py", "scripts/tests/test_cert_stub_sync.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py", "scripts/tests/test_cert_stub_sync.py", "scripts/tests/test_worktree_hosts.py", "scripts/tests/test_size_baseline_repair.py", "scripts/tests/test_lane_runner_overflow.py", "scripts/tests/test_worktree_sweep_overflow.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
@@ -3260,6 +3261,21 @@ class DiskAdmissionError(RuntimeError):
     pass
 
 
+def worktree_count_run(args, **kwargs): return sh(args, timeout=kwargs.get("timeout", 60))
+
+
+def ledger_host_hold(host, receipt, runs, *, checkout_held=None, result=False, before_ledger=None):
+    reason = checkout_held or worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if not reason:
+        return False
+    receipt.update(verdict="worktree-host-held", reasons=[reason], endedAt=now_iso(), **(
+        {"result": {"verdict": "worktree-host-held", "pr": None, "commit": None}} if result else {}))
+    if before_ledger:
+        before_ledger()
+    append_json_object(runs / "ledger.jsonl", receipt)
+    return True
+
+
 def require_disk(host: Host, stage: str) -> None:
     report = disk_guard.check(host)
     if not report.get("admitted"):
@@ -3529,6 +3545,15 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
     if name == "hyperagent":
         return run_hyperagent_issue(host, spec, issue, linear)
+    try:
+        with worktree_hosts.reserve_checkout(HOST, host.repo, worktree_count_run) as release:
+            return _run_issue(host, name, spec, linear, issue, release_checkout=release)
+    except worktree_hosts.WorktreeHostHeld as error:
+        return _run_issue(host, name, spec, linear, issue, checkout_held=str(error))
+
+
+def _run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue, *,
+               release_checkout=lambda: None, checkout_held=None) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -3557,6 +3582,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
         append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
+    if ledger_host_hold(host, receipt, runs, checkout_held=checkout_held, result=True):
         return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
@@ -3588,7 +3615,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     if cloud is not None:
         return cloud_lane_dispatch.record_receipt(THIS, runs, receipt, cloud)
     receipt["offer"]["accepted"] = True
-    with open(runs / f"{run_id}.log", "w") as log:
+    with open(runs / f"{run_id}.log", "a") as log:
         try:
             def revoke_run(error) -> None:
                 """Any kill of this run — timeout, guard hold, operator signal — permanently
@@ -3607,9 +3634,11 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             # an incremental no-op instead of ~5 minutes of per-file linking.
             receipt["worktreeSource"] = worktree_pool.take(host.repo, worktree, branch, "origin/main",
                                                            log=log, sh=sh)
+            release_checkout()
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
-            worktree_pool.refill_in_background(host.repo)
+            if worktree_hosts.role(HOST) == "primary":
+                worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prior_attempts = prior_attempts_context(host, linear, issue)
             prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts,
@@ -5236,6 +5265,8 @@ def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None =
     spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
     is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
     now = time.time() if now is None else now
+    if worktree_hosts.admission(HOST, host.repo, worktree_count_run):
+        return []  # no lane worktree may be created here: not a worktree host, or at its cap
     path = host.state / "deterministic-conflict.json"
     visits = read_json(path)
     acted = []
@@ -5270,14 +5301,17 @@ def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None =
             preserve, added = False, False
             try:
                 fetched = sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, timeout=600)
-                added = fetched.returncode == 0 and sh(
-                    ["git", "worktree", "add", "-q", "--detach", str(worktree), f"origin/{pr['headRefName']}"],
-                    cwd=host.repo).returncode == 0
+                if fetched.returncode == 0:
+                    with worktree_hosts.reserve_checkout(HOST, host.repo, worktree_count_run):
+                        added = sh(["git", "worktree", "add", "-q", "--detach", str(worktree),
+                                    f"origin/{pr['headRefName']}"], cwd=host.repo).returncode == 0
                 if added and sh(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip() == pr["headRefOid"]:
                     with open(os.devnull, "a") as log:
                         guard = lambda: require_fix_target(pr, "deterministic-conflict", worktree=worktree, repair=True)
                         outcome = "resolved" if resolve_generated_conflict(
                             worktree, pr["headRefName"], log, guard=guard) else "failed"
+            except worktree_hosts.WorktreeHostHeld:
+                outcome = "worktree-host-held"
             except RepairStopped:
                 preserve, outcome = True, "target-changed"
             finally:
@@ -7367,6 +7401,8 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
     no work — 19 repairs in 24h on 2026-10-11 (JOV-8191). Stops after the agent ran
     or source changed keep their charge."""
     verdict = receipt.get("verdict")
+    if verdict == "worktree-host-held":
+        return str((receipt.get("reasons") or [verdict])[0])
     if verdict == "recovery-handoff":
         return str((receipt.get("reasons") or ["recovery-handoff"])[0])
     if verdict == "skipped":
@@ -7390,7 +7426,8 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun",
+    "worktree-cap", "worktree-admission-busy", "worktree-count-unavailable", "worktree-lock-unavailable", "worktree-host-not-allowed"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -7831,7 +7868,7 @@ UNRESUMABLE_PRESERVED = pr_events.UNRESUMABLE_PRESERVED
 PRESERVED_ARCHIVE_REF = "refs/jovie-preserved/"
 PRESERVED_ARCHIVE_AFTER_S = 6 * 3600
 # Verdicts that stop a run before it finishes; its checkout may be resumed or reconciled.
-INTERRUPTED_VERDICTS = frozenset({"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"})
+INTERRUPTED_VERDICTS = frozenset({"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff", "worktree-host-held"})
 
 
 def _ended_on_its_own_terms(host: Host, run_id) -> bool:
@@ -7986,6 +8023,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
+    if ledger_host_hold(host, receipt, runs, before_ledger=(
+            (lambda: end_local_fix_attempt(host, pr, receipt)) if branch_held else None)):
+        return receipt
     receipt["targetStateReads"] = 1
     try:
         live = require_fix_target(pr, "before-execution-claim", repair=True)
@@ -8261,6 +8301,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
+        except worktree_hosts.WorktreeHostHeld as error:
+            receipt.update(verdict="worktree-host-held", reasons=[str(error)])
         except WorktreeUnavailable as error:
             # Usually the PR merged or closed between listing and this run: nothing to fix.
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
@@ -8368,6 +8410,8 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
                "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
                "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
                "startedAt": now_iso()}
+    if ledger_host_hold(host, receipt, runs):
+        return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             live = require_fix_target(pr, "before-adopt-checkout")
@@ -8381,6 +8425,8 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
             receipt.update(gate_pr(host, pr, worktree, log, sensitive=sensitive or SENSITIVE_PR_LABEL in labels, claim=claim))
         except RepairStopped as error:
             receipt.update(verdict="gate-deferred", reasons=[str(error)], stage=error.stage)
+        except worktree_hosts.WorktreeHostHeld as error:
+            receipt.update(verdict="worktree-host-held", reasons=[str(error)])
         except WorktreeUnavailable as error:
             receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
@@ -9247,6 +9293,8 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
 
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
+    if not worktree_hosts.spawn_allowed(HOST, spec):
+        return 0  # a checkout lane on a host that may not create lane worktrees (JOV-10172)
     limit = host.slots(name, spec.get("slots", 1))
     if not spec.get("enabled", True):
         return 0
@@ -9581,6 +9629,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         record_idle_exit(host, name, "disk-unobservable")
         slot.release()
         return 1
+    if reason := worktree_hosts.checkout_denial(HOST, host.repo, worktree_count_run, spec):
+        record_idle_exit(host, name, reason)
+        slot.release()
+        return 1
     # Extra repository bindings (LYB) share this seat, alternating with pending Jovie work (binding_turns).
     pending, bound = jovie_repair_pending(host), None  # a binding fault never blocks the Jovie path
     try:
@@ -9841,7 +9893,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if verdict in epics.SETTLED_VERDICTS:
         slot.release()
         return reexec(host, name)
-    if verdict == "disk-held":
+    if verdict in {"disk-held", "worktree-host-held"}:
         linear.move(issue.id, "Todo")
         slot.release()
         return 1  # do not charge the issue's retry budget or re-exec into pressure
@@ -10126,6 +10178,10 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
+        try:
+            tick["worktreeHosts"] = worktree_hosts.status(HOST, host.repo, worktree_count_run)
+        except Exception as error:  # the policy row never takes dispatch down
+            tick["worktreeHosts"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             if not os.environ.get("LANES_SELFTEST"):
                 try:
@@ -10225,6 +10281,8 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
                 if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
                     continue
+                if not worktree_hosts.spawn_allowed(HOST, spec):
+                    continue  # a checkout lane on a host that may not create lane worktrees
                 quota = quota_pressure(host, name, spec, time.time())
                 if not quota["ok"]:
                     tick["quotaBlocked"][name] = quota["why"]
@@ -10366,7 +10424,8 @@ class WorktreeUnavailable(Exception):
 
 
 def add_worktree(host: Host, args: list[str], log) -> None:
-    added = sh(["git", "worktree", "add", "-q", *args], cwd=host.repo, log=log)
+    with worktree_hosts.reserve_checkout(HOST, host.repo, worktree_count_run):
+        added = sh(["git", "worktree", "add", "-q", *args], cwd=host.repo, log=log)
     if added.returncode != 0:
         raise WorktreeUnavailable((added.stderr or f"git exit {added.returncode}").strip()[:200])
 
@@ -10385,66 +10444,7 @@ def record_worktree_disposition(host: Host, worktree: Path, verdict: str, reason
 
 
 def remove_worktree(host: Host, worktree: Path) -> bool:
-    """True only when clean, published source retired; retained work keeps its branch."""
-    if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
-        return False
-    # A maintenance child started before this config was in effect still holds
-    # index.lock. Wait for it to leave; do not treat that writer as unpublished source.
-    git_housekeeping.quiesce(worktree)
-    busy = worktree_busy(worktree)
-    if busy:
-        record_worktree_disposition(host, worktree, "preserved", busy)
-        preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-not-idle:{busy}"]})
-        return False
-    status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
-    if status.returncode or status.stdout.strip():
-        record_worktree_disposition(host, worktree, "preserved", "source-unverified")
-        preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})
-        return False
-    reason = "publication-unverified"
-    try:
-        # Local refs (including HEAD itself) are not publication. Refresh every
-        # origin branch atomically and prune deleted refs before trusting ancestry.
-        fetched = sh(["git", "fetch", "-q", "--atomic", "--prune", "--no-tags",
-                      "--no-recurse-submodules", "origin", "+refs/heads/*:refs/remotes/origin/*"],
-                     cwd=worktree, timeout=30)
-        head = (sh(["git", "rev-parse", "--verify", "HEAD"], cwd=worktree, timeout=30)
-                if fetched.returncode == 0 else None)
-        unpushed = (sh(["git", "rev-list", "--count", head.stdout.strip(), "--not", "--remotes=origin"],
-                       cwd=worktree, timeout=30)
-                    if head is not None and head.returncode == 0 and head.stdout.strip() else None)
-        if unpushed is not None and unpushed.returncode == 0:
-            count = unpushed.stdout.strip()
-            if count == "0":
-                reason = None
-            elif count.isdecimal():
-                reason = "unpublished-work"
-    except (OSError, subprocess.SubprocessError):
-        pass  # unknown publication is never permission to destroy source
-    if reason:
-        record_worktree_disposition(host, worktree, "preserved", reason)
-        preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-{reason}"]})
-        return False
-    # The origin read may have taken time; recheck live ownership and source.
-    git_housekeeping.quiesce(worktree)
-    busy = worktree_busy(worktree)
-    status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
-    current_head = sh(["git", "rev-parse", "--verify", "HEAD"], cwd=worktree, timeout=30)
-    if (busy or status.returncode or status.stdout.strip() or current_head.returncode or
-            current_head.stdout.strip() != head.stdout.strip()):
-        reason = f"cleanup-not-idle:{busy}" if busy else "cleanup-source-unverified"
-        record_worktree_disposition(host, worktree, "preserved", reason)
-        preserve_repair(worktree, {"runId": worktree.name, "reasons": [reason]})
-        return False
-    # Proven clean and published: hand it to the next run installed, instead of spending
-    # minutes deleting ~230k node_modules files (JOV-7723).
-    slot = worktree_pool.recycle(host.repo, worktree)
-    record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
-    if not slot:
-        removed, _error = git_housekeeping.remove_linked_worktree(
-            lambda args: sh(["git", *args], cwd=host.repo, timeout=120), worktree)
-        return removed
-    return True
+    return worktree_retirement.remove_worktree(THIS, host, worktree)
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:

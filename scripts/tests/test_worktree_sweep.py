@@ -201,7 +201,7 @@ class SweepTest(unittest.TestCase):
         path = self.worktree("clean")
         report = self.sweep()
         self.assertFalse(path.exists())
-        self.assertEqual(report["removed"], [{"path": str(path), "reason": "idle"}])
+        self.assertEqual(report["removed"], [{"path": str(path), "reason": "clean-idle"}])
         self.assertEqual(self.remote_snapshots(), [])
 
     def test_public_archive_rejected_even_with_clean_scanners(self):
