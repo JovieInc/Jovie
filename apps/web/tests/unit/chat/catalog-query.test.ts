@@ -334,10 +334,7 @@ describe('resolveChatRelease precedence', () => {
     expect(selectMock).not.toHaveBeenCalled();
   });
 
-  it.each([
-    new Error('owned catalog denied'),
-    new DOMException('cancelled', 'AbortError'),
-  ])(
+  it.each([new Error('owned catalog denied'), AbortSignal.abort().reason])(
     'propagates lookup failure %s instead of selecting a local fallback',
     async error => {
       selectMock.mockImplementationOnce(() => {
