@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, resolve } from 'node:path';
 import { load } from 'js-yaml';
@@ -15,6 +23,84 @@ const workflow =
 const step = workflow.jobs.measure.steps.find(
   step => step.name === 'Open latest snapshot PR'
 );
+
+it('refreshes the snapshot family using main history and preserves the SLO baseline', () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'shipping-slo-refresh-'));
+  const run = (file, args) => {
+    const result = spawnSync(file, args, { cwd: dir, encoding: 'utf8' });
+    expect(result.status, result.stderr).toBe(0);
+    return result;
+  };
+  try {
+    mkdirSync(resolve(dir, 'scripts'));
+    mkdirSync(resolve(dir, 'docs/metrics'), { recursive: true });
+    for (const file of ['shipping-slo-report.mjs', 'review-escapes.mjs'])
+      copyFileSync(
+        resolve(root, 'scripts', file),
+        resolve(dir, 'scripts', file)
+      );
+    symlinkSync(resolve(root, 'scripts/lib'), resolve(dir, 'scripts/lib'));
+    for (const file of ['shipping-slo-baseline.json', 'stage-manifest.json'])
+      copyFileSync(
+        resolve(root, 'docs/metrics', file),
+        resolve(dir, 'docs/metrics', file)
+      );
+    const baselinePath = resolve(
+      dir,
+      'docs/metrics/shipping-slo-baseline.json'
+    );
+    const before = readFileSync(baselinePath, 'utf8');
+    run('git', ['init', '-q', '-b', 'main']);
+    run('git', [
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '--allow-empty',
+      '-qm',
+      'feat: main snapshot fixture (#1234)',
+    ]);
+    run('git', ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    run('git', ['checkout', '-q', '--orphan', 'old-pr']);
+    run('git', [
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '--allow-empty',
+      '-qm',
+      'stale PR',
+    ]);
+    const collectedAt = new Date().toISOString();
+    writeFileSync(
+      resolve(dir, 'raw.json'),
+      JSON.stringify({ collectedAt, runs: {}, mergedPrs: [], stages: {} })
+    );
+    run(process.execPath, [
+      'scripts/shipping-slo-report.mjs',
+      'refresh-latest',
+      '--input',
+      'raw.json',
+    ]);
+    const read = name =>
+      JSON.parse(
+        readFileSync(resolve(dir, `docs/metrics/${name}-latest.json`), 'utf8')
+      );
+    expect(read('review-escapes').mergedPrs).toBe(1);
+    expect(read('shipping-slo').escapes.mergedPrs).toBe(1);
+    const generatedAt = read('shipping-slo').at;
+    expect(Date.parse(generatedAt)).toBeGreaterThanOrEqual(
+      Date.parse(collectedAt)
+    );
+    expect(read('blog-publish-latency').generatedAt).toBe(collectedAt);
+    expect(read('stage-timings').generatedAt).toBe(generatedAt);
+    expect(readFileSync(baselinePath, 'utf8')).toBe(before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function publishSnapshot(lines, unchanged = false) {
   const dir = mkdtempSync(resolve(tmpdir(), 'shipping-slo-snapshot-'));
