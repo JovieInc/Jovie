@@ -254,9 +254,9 @@ describe('refreshLeadProfileEvidence', () => {
   });
 
   it('keeps the other durable receipt when one enqueue is canceled', async () => {
-    mocks.musicFetch.mockRejectedValue(
-      new DOMException('private cancellation detail', 'AbortError')
-    );
+    const canceled = new Error('private cancellation detail');
+    canceled.name = 'AbortError';
+    mocks.musicFetch.mockRejectedValue(canceled);
 
     const result = await refreshLeadProfileEvidence('profile-1', {
       id: 'lead-1',
