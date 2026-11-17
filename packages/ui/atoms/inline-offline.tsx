@@ -31,7 +31,7 @@ export function InlineOfflineNotice({
       data-state='offline'
       className={cn(
         'flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-app',
-        'border-warning/30 bg-warning-subtle text-warning',
+        'border-warning/30 bg-warning-subtle text-warning-text',
         className
       )}
       {...props}

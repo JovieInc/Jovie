@@ -94,6 +94,7 @@ export function releasePrEligibleForWriterProof({
   body,
   headSha,
   prNumber,
+  actualHeadSha = '',
 }) {
   if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
     return { eligible: false, reason: 'pr-unavailable' };
@@ -109,6 +110,14 @@ export function releasePrEligibleForWriterProof({
   }
   if (!String(body ?? '').includes(CHANGELOG_PR_BODY_MARKER)) {
     return { eligible: false, reason: 'missing-body-marker' };
+  }
+  // The receipt binds the head the caller claims; refuse a PR whose real head
+  // already moved (a receipt bound to a stale head is useless and misleading).
+  if (
+    actualHeadSha &&
+    String(actualHeadSha).toLowerCase() !== String(headSha).toLowerCase()
+  ) {
+    return { eligible: false, reason: 'head-mismatch' };
   }
   return { eligible: true, reason: 'release-pr-shape' };
 }
@@ -200,7 +209,14 @@ function attachOnce(
   const authorLogin = pr.user?.login ?? '';
   const body = pr.body ?? '';
   const branch = pr.head?.ref ?? '';
-  const context = { prNumber, headSha, authorLogin, branch, body };
+  const context = {
+    prNumber,
+    headSha,
+    authorLogin,
+    branch,
+    body,
+    actualHeadSha: pr.head?.sha,
+  };
 
   const eligibility = releasePrEligibleForWriterProof(context);
   if (!eligibility.eligible) {

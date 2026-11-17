@@ -81,7 +81,12 @@ export function ProfileAdmissionFixtureClient({
       {['public', 'preview'].includes(searchParams.get('layout') ?? '') ? (
         <div className='h-dvh w-full' data-testid='marketing-render-surface'>
           <PublicProfileFixture
+            displayName={
+              searchParams.get('name') === 'unmarked' ? 'UNMARKED' : undefined
+            }
+            fanCapture={searchParams.get('rail') === 'on'}
             longName={searchParams.get('name') === 'long'}
+            longTitles={searchParams.get('titles') === 'long'}
             preview={searchParams.get('layout') === 'preview'}
             state={searchParams.get('state')}
             tourDates={searchParams.get('events') === 'empty' ? [] : undefined}

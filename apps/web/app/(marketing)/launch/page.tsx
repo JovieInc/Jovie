@@ -21,7 +21,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -470,8 +470,8 @@ export default function LaunchPage() {
                 </p>
                 <div className='system-b-launch-hero-actions'>
                   <Link
-                    href={APP_ROUTES.SIGNUP}
-                    prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+                    href={PUBLIC_ENTRY_HREF}
+                    prefetch={resolveMarketingAuthPrefetch(PUBLIC_ENTRY_HREF)}
                     className='system-b-launch-primary-link'
                   >
                     Request access
@@ -859,8 +859,8 @@ export default function LaunchPage() {
             </h2>
             <div>
               <Link
-                href={APP_ROUTES.SIGNUP}
-                prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+                href={PUBLIC_ENTRY_HREF}
+                prefetch={resolveMarketingAuthPrefetch(PUBLIC_ENTRY_HREF)}
               >
                 Request access
               </Link>

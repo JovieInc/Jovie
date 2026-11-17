@@ -37,7 +37,7 @@ export function PublicSurfaceShell({
               className='object-cover opacity-28 blur-[84px] saturate-[0.88] sm:scale-[1.05]'
             />
           </div>
-          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
+          <div className='absolute inset-0 bg-(image:--public-surface-ambient-scrim)' />
         </div>
       ) : null}
 

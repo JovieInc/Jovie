@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, type TestInfo } from '@playwright/test';
+import { inspectImageContrast } from '../e2e/utils/image-contrast-detector';
 import {
   inspectRouteDom,
   MARKETING_TASTE_FINDING_KINDS,
@@ -197,3 +198,41 @@ export const plane = (inner: string) =>
   `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
 export const axisSection = (align: string, attrs = '') =>
   `<section ${attrs} style="text-align:${align}"><h2>Heading ${align}</h2><p>A lede that is long enough to count as copy.</p></section>`;
+
+// Exercise the production capture path with real browser pixels and sibling boxes.
+export async function expectAtomicContrastCapture(page: Page): Promise<void> {
+  await page.setContent(
+    '<main><div style="position:fixed;inset:0;background-image:linear-gradient(#050505,#050505)"></div>' +
+      '<a style="position:relative;display:flex;align-items:center;gap:16px;width:300px;height:80px;color:white;text-decoration:underline;text-decoration-thickness:12px">' +
+      '<span data-testid="credit" style="font:24px monospace">Made with</span>' +
+      '<svg width="80" height="60"><rect width="80" height="60" fill="white" /></svg>' +
+      '<span data-testid="brand" style="font:32px monospace">Jovie</span></a></main>'
+  );
+  const expectedBoxes = await Promise.all(
+    ['credit', 'brand'].map(id => page.getByTestId(id).boundingBox())
+  );
+  const capture = page.screenshot.bind(page);
+  let captureCount = 0;
+  page.screenshot = async options => {
+    expect(options?.style).toContain('text-decoration: none !important');
+    captureCount++;
+    return capture(options);
+  };
+
+  const snapshot = await inspectImageContrast(page);
+  expect(captureCount).toBe(1);
+  expect(snapshot.findings).toEqual([]);
+  for (const [index, text] of ['Made with', 'Jovie'].entries()) {
+    const receipt = snapshot.receipts.find(item => item.text === text);
+    expect(receipt).toBeDefined();
+    expect(receipt?.box.width).toBeCloseTo(
+      expectedBoxes[index]?.width ?? -1,
+      1
+    );
+    expect(receipt?.backgroundLuminance.p90).toBeLessThan(0.01);
+  }
+  await expect(page.getByTestId('credit')).toHaveCSS(
+    'color',
+    'rgb(255, 255, 255)'
+  );
+}

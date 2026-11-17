@@ -177,7 +177,7 @@ for (const viewport of [
   { width: 768, height: 1024, fontSize: 16 },
   { width: 390, height: 615, fontSize: 32 },
 ]) {
-  test(`sign-in keeps its target stable while its label arrives at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
+  test(`onboarding options keep their target stable while the icon arrives at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
@@ -185,13 +185,12 @@ for (const viewport of [
       '/iframe.html?id=features-onboarding-onboardingshell--visitor&viewMode=story',
       { waitUntil: 'domcontentloaded' }
     );
-    const signIn = page
+    const options = page
       .getByTestId('onboarding-sign-in-header')
-      .getByRole('link', { name: 'Sign in', exact: true });
-    await expect(signIn).toBeVisible();
-    // Prove this build resolves the current shared Link owner, including in
-    // isolated worktrees whose dependency links can point at another checkout.
-    await expect(signIn).toHaveAttribute('data-reserved-label', 'Sign in');
+      .getByRole('button', { name: 'Onboarding options', exact: true });
+    await expect(options).toBeVisible();
+    // The existing IconButton owns stable compact geometry and an accessible name.
+    await expect(options).toHaveAttribute('aria-label', 'Onboarding options');
     await page.evaluate(async fontSize => {
       document.documentElement.style.fontSize = `${fontSize}px`;
       await document.fonts.ready;
@@ -203,7 +202,7 @@ for (const viewport of [
       'font-size',
       `${viewport.fontSize}px`
     );
-    const geometry = await signIn.evaluate(async link => {
+    const geometry = await options.evaluate(async link => {
       const nodes = Array.from(link.childNodes);
       const frame = () =>
         new Promise<void>(resolve =>
@@ -213,8 +212,8 @@ for (const viewport of [
         const rect = link.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
       };
-      // The opening anchor and its attributes can paint before its label
-      // arrives. Restore the same nodes; do not replace the real control.
+      // The icon may arrive after its named control. Restore the same nodes;
+      // do not replace the real control.
       link.replaceChildren();
       await frame();
       const pending = box();
@@ -222,7 +221,7 @@ for (const viewport of [
       await frame();
       return { pending, complete: box() };
     });
-    await testInfo.attach('sign-in-label-arrival.json', {
+    await testInfo.attach('onboarding-options-icon-arrival.json', {
       body: JSON.stringify(geometry),
       contentType: 'application/json',
     });
@@ -232,15 +231,20 @@ for (const viewport of [
         1
       );
     }
-    await expect(signIn).toHaveAttribute('href', APP_ROUTES.SIGNIN);
-    await expect(signIn).toHaveText('Sign in');
-    await signIn.focus();
-    await expect(signIn).toBeFocused();
-    const screenshot = testInfo.outputPath('sign-in-label-arrival.png');
+    await options.click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', APP_ROUTES.SIGNIN);
+    await page.keyboard.press('Escape');
+    await options.focus();
+    await expect(options).toBeFocused();
+    const screenshot = testInfo.outputPath(
+      'onboarding-options-icon-arrival.png'
+    );
     await page
       .getByTestId('onboarding-sign-in-header')
       .screenshot({ path: screenshot });
-    await testInfo.attach('sign-in-label-arrival.png', {
+    await testInfo.attach('onboarding-options-icon-arrival.png', {
       path: screenshot,
       contentType: 'image/png',
     });

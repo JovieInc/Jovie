@@ -13,6 +13,11 @@ import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileComp
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface PublicProfileFixtureProps {
+  readonly displayName?: string;
+  /** Turns fan capture on so the desktop Get-updates/Payments rail mounts. */
+  readonly fanCapture?: boolean;
+  /** Swaps in release titles far wider than any desktop overview column. */
+  readonly longTitles?: boolean;
   readonly longName?: boolean;
   readonly preview?: boolean;
   readonly state?: string;
@@ -28,6 +33,9 @@ export interface PublicProfileFixtureProps {
  * desktop/mobile ownership contract without depending on a database row.
  */
 export function PublicProfileFixture({
+  displayName,
+  fanCapture = false,
+  longTitles = false,
   longName = false,
   preview = false,
   state = 'unclaimed',
@@ -36,7 +44,9 @@ export function PublicProfileFixture({
   const artist = {
     ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
     id: '123e4567-e89b-12d3-a456-426614174000',
-    name: longName ? 'The Extraordinary Midnight Radio Orchestra' : 'Unfazed',
+    name:
+      displayName ??
+      (longName ? 'The Extraordinary Midnight Radio Orchestra' : 'Unfazed'),
     handle: 'unfazed',
   };
 
@@ -47,7 +57,7 @@ export function PublicProfileFixture({
       socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
       contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
       showPayButton
-      allowFanCapture={false}
+      allowFanCapture={fanCapture}
       latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
       profileSettings={{ showOldReleases: true }}
       genres={artist.genres ?? []}
@@ -55,7 +65,14 @@ export function PublicProfileFixture({
       pressPhotos={[]}
       allowPhotoDownloads={false}
       tourDates={[...tourDates]}
-      releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+      releases={HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES.map(release =>
+        longTitles
+          ? {
+              ...release,
+              title: `${release.title} (Extended Midnight Radio Orchestra Remix)`,
+            }
+          : release
+      )}
       releaseCredits={[
         {
           role: 'producer',

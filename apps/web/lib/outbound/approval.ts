@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import {
+  type ExistingRelationshipHold,
+  existingRelationshipHold,
+  existingRelationshipNotes,
+} from '@/lib/leads/existing-relationships';
 import { denyAudienceEffect } from './audience-effect-policy';
 import type {
   OutboundChannel,
@@ -32,6 +37,34 @@ export interface OutboundTarget {
   readonly instagramHandle: string | null;
   readonly creatorProfileId: string | null;
   readonly claimUrl: string | null;
+  /**
+   * Source handle and public bio. Read only by the existing-relationship
+   * hold; neither is part of the target revision.
+   */
+  readonly handle?: string | null;
+  readonly bio?: string | null;
+}
+
+function relationshipInput(target: OutboundTarget) {
+  return {
+    handle: target.handle ?? null,
+    displayName: target.displayName,
+    contactEmail: target.contactEmail,
+    instagramHandle: target.instagramHandle,
+    bio: target.bio ?? null,
+  };
+}
+
+/** The existing-relationship hold on a target, or null. */
+export function outboundRelationshipHold(
+  target: OutboundTarget
+): ExistingRelationshipHold | null {
+  return existingRelationshipHold(relationshipInput(target));
+}
+
+/** Relationship tags for a target that stays eligible; never a hold. */
+export function outboundRelationshipNotes(target: OutboundTarget): string[] {
+  return existingRelationshipNotes(relationshipInput(target));
 }
 
 function digest(value: unknown): string {
@@ -86,6 +119,10 @@ export interface OutboundApprovalState {
   readonly sendableCopy: (OutboundCopy & { readonly revision: string }) | null;
   readonly approvedAt: string | null;
   readonly approvedBy: string | null;
+  /** Set when an existing relationship holds this target; see `target`. */
+  readonly relationshipHold: string | null;
+  /** Relationship tags Tim sees on an eligible target; never a hold. */
+  readonly relationshipNotes: readonly string[];
 }
 
 function time(value: Date | string): number {
@@ -163,6 +200,11 @@ export function resolveOutboundApproval(
   else if (copyRow?.decision === 'yes' && copyRow.actorUserId)
     copyState = 'approved';
 
+  // Hard gate: an existing relationship outranks every ledger row. The target
+  // reads as held and no copy is sendable, whatever Tim approved earlier.
+  const relationship = outboundRelationshipHold(target);
+  if (relationship) targetState = 'held';
+
   const claimLinkPresent =
     !target.claimUrl || Boolean(parsed?.body.includes(target.claimUrl));
   const sendable =
@@ -186,10 +228,13 @@ export function resolveOutboundApproval(
         ? new Date(time(copyRow.createdAt)).toISOString()
         : null,
     approvedBy: sendable && copyRow ? copyRow.actorUserId : null,
+    relationshipHold: relationship?.reason ?? null,
+    relationshipNotes: outboundRelationshipNotes(target),
   };
 }
 
 export type OutboundSendRefusal =
+  | 'existing_relationship'
   | 'audience_delivery_disabled'
   | 'target_not_approved'
   | 'copy_not_approved'
@@ -211,6 +256,9 @@ export function evaluateOutboundSend(input: {
   readonly channel: OutboundChannel;
   readonly rows: readonly OutboundLedgerRow[];
 }): OutboundSendPermission {
+  // Final defense: a held artist is refused even if delivery is reopened.
+  if (outboundRelationshipHold(input.target))
+    return { allowed: false, reason: 'existing_relationship' };
   const policy = denyAudienceEffect(
     input.channel === 'email' ? 'audience.email.send' : 'audience.dm.send'
   );
@@ -243,6 +291,13 @@ export function evaluateOutboundHistoryRecord(input: {
   readonly rows: readonly OutboundLedgerRow[];
 }): OutboundHistoryRecordPermission {
   const state = resolveOutboundApproval(input.target, input.rows);
+  if (state.relationshipHold) {
+    return {
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'existing_relationship',
+    };
+  }
   if (state.target !== 'approved') {
     return {
       historyRecordAllowed: false,

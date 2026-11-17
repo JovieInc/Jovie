@@ -47,6 +47,19 @@ def app_access_token(state_dir: Path) -> str | None:
         return None
 
 
+def app_token_status(state_dir: Path, now: float, available: bool) -> dict:
+    """Allowlisted metadata from the existing status view; never mint or return a token."""
+    import linear_app_token
+    try:
+        view = linear_app_token.status(state_dir, now=now) or {}
+    except (OSError, ValueError, TypeError, OverflowError):
+        view = {}
+    return {"schema": "jovie.linear-app-status/v1", "observedAt": _iso(now),
+            "available": available, "scopeMatches": view.get("scope") == linear_app_token.SCOPE,
+            "expiresInS": view.get("expiresInS"),
+            "mintFailed": view.get("mintFailedAt") is not None or bool(view.get("mintError"))}
+
+
 def receipt_path(home: Path | None = None) -> Path:
     return (Path.home() if home is None else home) / ".local/state/jovie-registry/credentials-runs.jsonl"
 
@@ -126,6 +139,8 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
         access = (linear_token or app_access_token)(state_dir)
     except Exception:  # filing is optional; the check and its receipt still run
         access = None
+    # Observe AFTER the existing filing-token lookup, which may have renewed the cache.
+    env["LANES_LINEAR_APP_STATUS"] = json.dumps(app_token_status(state_dir, now, bool(access)))
     if access:
         env["LINEAR_ACCESS_TOKEN"] = access
         args.append("--file-linear")

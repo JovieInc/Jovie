@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import {
   type ProfileEditPreview,
@@ -47,11 +48,47 @@ describe('ProfileEditPreviewCard', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders current and new values', () => {
-    renderCard();
+  it('renders current and new values', async () => {
+    const { container } = renderCard();
 
     expect(screen.getByText('Old Name')).toBeInTheDocument();
     expect(screen.getByText('New Name')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows provenance, a reason, and placeholders for unset values', async () => {
+    const { container } = renderCard({
+      field: 'genres',
+      fieldLabel: 'Genres',
+      currentValue: null,
+      newValue: [],
+      reason: 'Matched from your press kit',
+      sourceUrl: 'https://www.example.com/press',
+    });
+
+    expect(screen.getByText('Not set')).toBeInTheDocument();
+    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(screen.getByText('Matched from your press kit')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'example.com' })).toHaveAttribute(
+      'href',
+      'https://www.example.com/press'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('hides provenance when the source URL cannot be parsed', () => {
+    renderCard({ ...basePreview, sourceUrl: 'not a url' });
+
+    expect(screen.queryByText(/imported from/i)).not.toBeInTheDocument();
+  });
+
+  it('locks both actions while the edit is being applied', async () => {
+    mutationState = { isPending: true };
+    const { container } = renderCard();
+
+    expect(screen.getByRole('button', { name: /applying/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
+    await expectNoA11yViolations(container);
   });
 
   it('applies the edit through the mutation on Apply', () => {
@@ -101,7 +138,7 @@ describe('ProfileEditPreviewCard', () => {
       options?.onSuccess?.();
     });
 
-    renderCard();
+    const { container } = renderCard();
 
     fireEvent.click(screen.getByRole('button', { name: /apply/i }));
 
@@ -109,14 +146,25 @@ describe('ProfileEditPreviewCard', () => {
       expect(screen.getByText(/updated/i)).toBeInTheDocument();
     });
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
+    await expectNoA11yViolations(container);
   });
 
-  it('transitions to the cancelled state on Cancel', () => {
-    renderCard();
+  it('transitions to the cancelled state on Cancel', async () => {
+    const onCancel = vi.fn();
+    const { container } = fastRender(
+      <ProfileEditPreviewCard
+        preview={basePreview}
+        profileId='profile-123'
+        onCancel={onCancel}
+      />
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(mockMutate).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
   });
 });

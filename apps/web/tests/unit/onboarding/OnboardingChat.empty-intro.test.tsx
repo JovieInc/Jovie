@@ -378,7 +378,7 @@ describe('OnboardingChat empty intro', () => {
     expect(composer).toHaveFocus();
   });
 
-  it('shows welcome intro on a blank /start visit', () => {
+  it('shows welcome intro on a blank /start visit and mounts zero conversation renderers (JOV-12023)', () => {
     render(
       <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
     );
@@ -390,7 +390,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
-    expect(screen.queryByTestId(/^onboarding-profile-rail/)).toBeNull();
+    expect(screen.queryByTestId(/profile-rail|chat-message/)).toBeNull();
   });
 
   it('keeps a validated starter as a draft while verification is pending', () => {

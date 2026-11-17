@@ -1,14 +1,14 @@
 {
   "schema": "jovie-review-escapes/v1",
   "windowDays": 30,
-  "mergedPrs": 977,
+  "mergedPrs": 937,
   "escapedPrs": 38,
-  "escapeRate": 0.0389,
+  "escapeRate": 0.0406,
   "byLayer": {
     "preflight": 0,
     "unit_test": 14,
-    "ci_guard": 17,
-    "risk_tier_review": 6,
+    "ci_guard": 18,
+    "risk_tier_review": 5,
     "production_cert": 2
   },
   "guardRate": 0.9744,
@@ -20,6 +20,54 @@
     }
   ],
   "escapes": [
+    {
+      "originPr": 25587,
+      "fixPr": 25630,
+      "kind": "fix",
+      "hours": 1.1,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 25377,
+      "fixPr": 25387,
+      "kind": "fix",
+      "hours": 1.7,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 25222,
+      "fixPr": 25308,
+      "kind": "fix",
+      "hours": 5.6,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 25013,
+      "fixPr": 25091,
+      "kind": "fix",
+      "hours": 1.8,
+      "layer": "unit_test",
+      "guardAdded": true
+    },
+    {
+      "originPr": 24886,
+      "fixPr": 24909,
+      "kind": "fix",
+      "hours": 3.4,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 24903,
+      "fixPr": 24909,
+      "kind": "fix",
+      "hours": 1.1,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
     {
       "originPr": 24577,
       "fixPr": 24572,
@@ -283,55 +331,7 @@
       "hours": 1.7,
       "layer": "ci_guard",
       "guardAdded": true
-    },
-    {
-      "originPr": 21536,
-      "fixPr": 21608,
-      "kind": "fix",
-      "hours": 6.3,
-      "layer": "risk_tier_review",
-      "guardAdded": true
-    },
-    {
-      "originPr": 21539,
-      "fixPr": 21592,
-      "kind": "fix",
-      "hours": 4.3,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 21360,
-      "fixPr": 21434,
-      "kind": "fix",
-      "hours": 0.6,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 21304,
-      "fixPr": 21323,
-      "kind": "fix",
-      "hours": 3.5,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 20767,
-      "fixPr": 21267,
-      "kind": "fix",
-      "hours": 4.2,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 21207,
-      "fixPr": 21214,
-      "kind": "fix",
-      "hours": 0.8,
-      "layer": "unit_test",
-      "guardAdded": true
     }
   ],
-  "generatedAt": "2026-11-09T17:35:38.916Z"
+  "generatedAt": "2026-11-16T23:53:29.752Z"
 }

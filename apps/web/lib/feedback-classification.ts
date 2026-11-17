@@ -12,6 +12,26 @@ import type { FeedbackClassification } from '@/lib/db/schema/feedback';
  * classifier only routes candidates.
  */
 
+/**
+ * Wants a /start visitor named that no capability serves today. Each one is
+ * a build request, never a bug report: bug reports throttle admissions.
+ * Agent-recorded, so it stays out of the customer-voice (founder text) path.
+ */
+export const ONBOARDING_WANT_FEEDBACK_SOURCE = 'onboarding_want';
+
+/**
+ * Closed-loop routing only applies to free-text feedback intakes
+ * (JOV-6433). Other `feedback_items` writers — abuse reports, inbox-decision
+ * learning rows — have their own disposition machinery and are left
+ * unclassified (disposition stays 'pending', no ledger rows).
+ */
+export const CLOSED_LOOP_SOURCES: ReadonlySet<string> = new Set([
+  'dashboard',
+  'chat',
+  'agent_cli',
+  ONBOARDING_WANT_FEEDBACK_SOURCE,
+]);
+
 type Signal = { readonly k: string; readonly m: 'substr' | 'wordStart' };
 
 const sub = (k: string): Signal => ({ k, m: 'substr' });
@@ -125,6 +145,9 @@ export function classifyFeedbackMessage(
   message: string,
   input: FeedbackClassificationContext = {}
 ): FeedbackClassification {
+  if (input.source === ONBOARDING_WANT_FEEDBACK_SOURCE) {
+    return 'feature_or_change';
+  }
   const text = message.toLowerCase().trim();
 
   const ctx = input.context ?? {};

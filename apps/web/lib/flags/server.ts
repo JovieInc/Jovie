@@ -43,7 +43,8 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // owner-only financial data must stay dark for everyone — including
       // admins — until the privacy/correctness matrix is certified.
       flagName !== 'CREATOR_FINANCE' &&
-      flagName !== 'VISIBILITY_AUDIT_OFFER'
+      flagName !== 'VISIBILITY_AUDIT_OFFER' &&
+      flagName !== 'OUTBOUND_DOGFOOD_GATE'
   )
 );
 
@@ -91,7 +92,9 @@ export async function getAppFlagValue(
     const envOverrides = await getFlagOverrideMap();
     envOverride = envOverrides[flagName];
   } catch {
-    // Retain registry/default behavior when the override store is unavailable.
+    // Draft gating fails closed even if the cache wrapper itself is unreadable.
+    if (flagName === 'OUTBOUND_DOGFOOD_GATE') return true;
+    // Retain registry/default behavior for other flags.
   }
   if (envOverride === false) {
     return false;
@@ -119,6 +122,10 @@ export async function getAppFlagValue(
   // The mock release planner is a local demo. Keep it available in dev and
   // preview, and fail closed in production unless an override above published it.
   if (flagName === 'RELEASE_PLAN_DEMO' && !isProductionRuntime()) {
+    return true;
+  }
+
+  if (flagName === 'OUTBOUND_DOGFOOD_GATE' && process.env.NODE_ENV === 'test') {
     return true;
   }
 
