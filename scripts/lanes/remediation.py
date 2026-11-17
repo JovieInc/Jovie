@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timezone
 
 import machine_gap
+from fix_red_source_edits import GENERATED_RESOLVERS
 import model_pools
 import revert_first
 
@@ -61,16 +62,6 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
-# Generated conflicts restore main's copy, then regenerate from merged sources
-# (JOV-6837/JOV-7594). Each output keeps its canonical generator.
-GENERATED_RESOLVERS = {
-    "docs/REPOSITORY_SOURCES.md": ("python3", "scripts/repository_docs.py", "--write"),
-    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
-    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
-    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
-    # Integrity record of the scoped rule files: recomputed from the merged rule bodies.
-    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
-}
 # Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
 # conflict is never a model's call.
 UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
