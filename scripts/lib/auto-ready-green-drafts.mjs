@@ -2,9 +2,10 @@
 /**
  * Green-source draft undraft authorization.
  *
- * Every wake requires persisted writer-owned proof for the live author and
- * exact head, as well as successful required checks and clean mergeability.
- * Green source checks alone never express the active writer's readiness.
+ * Every wake requires the live author's ship intent for the exact head (a
+ * trusted writer ships on green unless it parks; any other author needs
+ * persisted writer-owned proof, see auto-ready-provenance.mjs), as well as
+ * successful required checks and clean mergeability.
  *
  * This path never enables native auto-merge and never enrolls the merge
  * queue. Auto-Enroll / jovie-bot own admission after ready_for_review.

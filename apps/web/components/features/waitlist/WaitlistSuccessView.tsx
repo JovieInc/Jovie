@@ -59,7 +59,7 @@ export function WaitlistSuccessView({
 
   return (
     <AuthLayout
-      formTitle='Request Access'
+      formTitle='Your handle is reserved. You’re on the waitlist.'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='stack'

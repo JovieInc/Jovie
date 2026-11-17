@@ -1,7 +1,7 @@
 'use server';
 
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
+import { updateTag } from 'next/cache';
 
 import {
   markProfileHasAudienceBlocks,
@@ -90,7 +90,7 @@ export async function blockAudienceMember(
     return;
   }
 
-  revalidateTag(createAudienceDataTag(profileId), 'max');
+  updateTag(createAudienceDataTag(profileId));
 }
 
 /**
@@ -126,7 +126,7 @@ export async function unblockAudienceMember(blockId: string) {
     throw new Error('Block not found');
   }
 
-  revalidateTag(createAudienceDataTag(result[0].profileId), 'max');
+  updateTag(createAudienceDataTag(result[0].profileId));
 
   const [profile] = await db
     .select({ username: creatorProfiles.username })

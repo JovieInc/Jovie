@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnSelect } from '@jovie/ui';
 import { Fragment, useState } from 'react';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
@@ -110,7 +111,7 @@ export function PricingComparisonChart() {
       data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
     >
       <div className='system-b-pricing-mobile-selector'>
-        <select
+        <HostDrawnSelect
           aria-label='Select Plan To Compare'
           value={selectedPlan}
           onChange={event => {
@@ -119,14 +120,13 @@ export function PricingComparisonChart() {
               setSelectedPlan(value as PlanColumn);
             }
           }}
-          className='system-b-pricing-select'
         >
           {planOptions.map(option => (
             <option key={option.id} value={option.id}>
               {option.name} - {option.price}
             </option>
           ))}
-        </select>
+        </HostDrawnSelect>
       </div>
 
       <div className='system-b-pricing-table-shell' data-variant='desktop'>

@@ -50,29 +50,54 @@ async function expectReadableMatteHero(page: Page, viewportWidth: number) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+/**
+ * The index header is text only, and the newest headline is already on the
+ * first screen (the phone header used to push it below the fold).
+ */
+async function expectReadableIndexHeader(
+  page: Page,
+  viewport: { readonly width: number; readonly height: number }
+) {
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Changelog' })
+  ).toBeVisible();
+  await expect(page.locator('.marketing-editorial-hero-photo')).toHaveCount(0);
+
+  const headline = page.locator('.changelog-post__title').first();
+  await expect(headline).toBeVisible();
+  const bounds = await headline.boundingBox();
+  if (!bounds) throw new Error('The newest headline must have rendered bounds');
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
 test.describe('changelog newest first', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   for (const viewport of VIEWPORTS) {
-    test(`orders entries newest first on a readable matte page at ${viewport.width}px`, async ({
+    test(`orders days newest first under a compact header at ${viewport.width}px`, async ({
       page,
     }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.goto('/changelog');
 
-      const entries = page.locator('article.changelog-entry');
-      await expect(entries.first()).toBeVisible();
+      const days = page.locator('.changelog-day');
+      await expect(days.first()).toBeVisible();
 
-      const dates = await entries
-        .locator('.changelog-entry__date')
-        .allTextContents();
-      const instants = dates.map(text => Date.parse(text.trim()));
+      const dates = await days
+        .locator('.changelog-day__date time')
+        .evaluateAll(nodes => nodes.map(node => node.getAttribute('datetime')));
+      const instants = dates.map(date => Date.parse(date ?? ''));
       for (const instant of instants) expect(Number.isNaN(instant)).toBe(false);
       expect(instants).toEqual([...instants].sort((a, b) => b - a));
 
-      const subscription = page.getByRole('complementary', {
-        name: 'Subscribe To Changelog Updates',
-      });
+      const subscription = page.locator('#changelog-subscribe');
       await expect(
         subscription.getByRole('textbox', { name: 'Email address' })
       ).toBeVisible();
@@ -80,9 +105,11 @@ test.describe('changelog newest first', () => {
         subscription.getByRole('button', { name: 'Subscribe', exact: true })
       ).toBeVisible();
       await expect(
-        subscription.getByRole('link', { name: 'RSS Feed' })
+        page
+          .getByRole('toolbar', { name: 'Filter Updates By Category' })
+          .getByRole('link', { name: 'RSS feed' })
       ).toHaveAttribute('href', '/changelog/feed.xml');
-      await expectReadableMatteHero(page, viewport.width);
+      await expectReadableIndexHeader(page, viewport);
       await testInfo.attach(`changelog-index-${viewport.width}px`, {
         body: await page.screenshot({ animations: 'disabled' }),
         contentType: 'image/png',
@@ -129,10 +156,8 @@ test.describe('changelog newest first', () => {
         .getByRole('link', { name: '/changelog', exact: true })
         .click();
       await expect(page).toHaveURL(/\/changelog$/);
-      await expect(
-        page.locator('article.changelog-entry').first()
-      ).toBeVisible();
-      await expectReadableMatteHero(page, viewport.width);
+      await expect(page.locator('.changelog-day').first()).toBeVisible();
+      await expectReadableIndexHeader(page, viewport);
     });
   }
 

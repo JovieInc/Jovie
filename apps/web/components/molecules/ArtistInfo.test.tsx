@@ -85,4 +85,22 @@ describe('ArtistInfo', () => {
     );
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
+
+  it('keeps the fallback initials inside the profile link accessible name', () => {
+    render(
+      <ArtistInfo
+        artist={{ ...artist, image_url: undefined, tagline: undefined }}
+      />
+    );
+
+    const link = screen.getByRole('link', {
+      name: /Go to Jordan Lee's profile/,
+    });
+    // The initials are the link's only visible text without a photo; the
+    // accessible name must contain them (axe label-content-name-mismatch).
+    expect(link).toHaveAttribute(
+      'aria-label',
+      "Go to Jordan Lee's profile — JL"
+    );
+  });
 });

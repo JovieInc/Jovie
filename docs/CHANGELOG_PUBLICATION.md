@@ -15,10 +15,35 @@ Source Validation requires an explicit decision for customer-code PRs created fr
 <!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","availability":{"status":"ga","prerequisites":[]},"evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
 ```
 
-Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
+Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs, written as `Headline: explanation` (see Headlines).
 Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves; authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
 Optional `details` (up to 3 claim-mapped bullets, each at most 240 customer-safe characters) explain what changed and why it matters beyond the one-line outcome.
 Optional `action` (`{"label":"…","href":"…"}`, label at most 80 characters) gives the entry one next step. The destination must be an internal path or `https` on jov.ie/docs.jov.ie — a working example, setup, or help route a signed-out visitor can actually open. Unsafe or unverifiable destinations fail validation; omit `action` rather than linking a placeholder or the generic homepage.
+
+## Headlines
+
+Every entry leads with a short outcome headline. Write the marker `text` as `Headline: explanation`.
+
+- Headline: what the customer can now do, sentence case, at most 60 characters, no trailing punctuation. Not a product-area label (`Artist profiles:`), not a PR title.
+- Explanation: one or two full sentences that start with a capital letter.
+- No internal words (PR, deploy, CI, flag, API, endpoint, regression, staging, issue ids, vendor names such as Redis or Sentry) and no apologetic phrasing (again, finally, was broken, no longer crashes, bug). Say what works now.
+
+Good: `Play release previews on a profile: Tap play and the preview starts in place.` Bad: `Artist profiles: the footer bug no longer crashes after the last deploy.`
+
+Source Validation lints this for release-worthy markers in PRs created from 2026-11-14 UTC (`customerNoteCopyProblems` in `scripts/lib/changelog-filter-rules.mjs`); the failure lists each line to fix. Older PRs keep the contract they were admitted under. `pnpm pr:open` runs the same lint before the PR exists.
+
+### Editorial overlay
+
+`apps/web/data/customer-changelog-editorial.json` is keyed by the permanent `entryId` and applied inside the projection, so `/changelog`, the feeds, date pages and What's New agree. It never changes what shipped; receipts stay the authority.
+
+| Field | Use |
+|---|---|
+| `headline` | Outcome headline under the rule above. The approved explanation (or the whole approved sentence) becomes the lead. |
+| `lead` | Replaces the lead only when the approved sentence is no longer true or reads as internal. |
+| `media` | One visual: `{kind, src, alt}` with `src` under `/images/changelog/`. |
+| `hide` + `reason` | Withdraws an entry whose claim is no longer true. Its permalinks resolve to "no longer published", never to another entry. |
+
+Without an overlay headline the page falls back to the split; a bare area label is never promoted to a headline (the whole sentence is shown instead). `node scripts/check-customer-changelog-editorial.mjs` (run in Scripts CI by `scripts/lib/__tests__/changelog-source-guard.test.mjs`) fails when an overlay key is not a published `entryId`, a headline breaks the rule, or an entry from the newest 30 days of publication has neither a compliant split nor an overlay headline. The fix is one line in the overlay.
 
 ## Release path
 

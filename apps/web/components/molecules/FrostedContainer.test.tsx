@@ -22,4 +22,17 @@ describe('FrostedContainer', () => {
     );
     expect(screen.getByText('profile body')).toBeInTheDocument();
   });
+
+  it('paints the page and solid card with the surface token, not raw white', () => {
+    const { container } = render(
+      <FrostedContainer variant='solid' backgroundPattern='none'>
+        <p>solid body</p>
+      </FrostedContainer>
+    );
+    expect(container.firstElementChild).toHaveClass('bg-surface-1');
+    expect(container.firstElementChild).not.toHaveClass('bg-white');
+    expect(screen.getByText('solid body').parentElement).toHaveClass(
+      'bg-surface-1'
+    );
+  });
 });

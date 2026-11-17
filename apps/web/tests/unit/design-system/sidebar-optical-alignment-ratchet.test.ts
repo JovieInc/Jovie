@@ -107,7 +107,12 @@ describe('sidebar optical alignment ratchet (shrink-only)', () => {
   });
 
   it('keeps the Electron titlebar on flex with a calculated traffic-light reserve', () => {
-    const css = readFileSync(resolve(appRoot, 'app/globals.css'), 'utf8');
+    const globals = readFileSync(resolve(appRoot, 'app/globals.css'), 'utf8');
+    expect(globals).toContain('@import "../styles/electron-chrome.css";');
+    const css = [
+      globals,
+      readFileSync(resolve(appRoot, 'styles/electron-chrome.css'), 'utf8'),
+    ].join('\n');
     expect(css).toMatch(
       /\[data-electron-titlebar="true"\] \{[^}]*display:\s*flex;/s
     );

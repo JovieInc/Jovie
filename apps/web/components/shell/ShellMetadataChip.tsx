@@ -11,8 +11,8 @@ export type ShellMetadataChipTone =
 const TONE_CLASSES: Record<ShellMetadataChipTone, string> = {
   neutral:
     'border-(--app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token',
-  soon: 'border-cyan-300/40 bg-cyan-500/10 text-cyan-200/90',
-  warning: 'border-amber-500/20 bg-amber-500/5 text-amber-300/90',
+  soon: 'border-accent/40 bg-accent/10 text-accent-text/90',
+  warning: 'border-warning/20 bg-warning/5 text-warning-text/90',
   danger: 'border-error/20 bg-error/5 text-primary-token',
   muted: 'border-(--app-shell-border)/45 bg-transparent text-quaternary-token',
 };

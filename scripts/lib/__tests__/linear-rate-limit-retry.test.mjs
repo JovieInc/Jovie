@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { runBillingHealthPublicIntake } from '../../billing-health-public-intake.mjs';
 import { runBillingSyncIntake } from '../../billing-sync-intake.mjs';
 import { intakeDocsDeploy } from '../../docs-deploy-intake.mjs';
@@ -11,70 +11,28 @@ import {
 } from '../../lib/linear-rate-limit-retry.mjs';
 import { runSyntheticMonitoringIntake } from '../../synthetic-monitoring-intake.mjs';
 import { runWebAiHealthIntake } from '../../web-ai-health-intake.mjs';
+import {
+  captureWarnings,
+  env,
+  fetchCommentFailure,
+  fetchImpl,
+  ISSUE,
+  installPartialProgressFixture,
+  installRetryFixture,
+  NOW,
+  summaryEnv,
+  syntheticFixture,
+} from './linear-rate-limit-retry.fixtures.mjs';
 
-const NOW = 1_795_000_000_000;
 const FAR_RESET = NOW + 60 * 60 * 1000;
-let testDirectory;
+const getTestDirectory = installRetryFixture();
+const withSummaryEnv = run => summaryEnv(run, getTestDirectory());
 
-beforeEach(() => {
-  testDirectory = mkdtempSync(join(tmpdir(), 'linear-rate-limit-retry-'));
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(NOW);
-  vi.stubEnv('LINEAR_API_KEY', `lin_api_fixture_${basename(testDirectory)}`);
-  vi.stubEnv('REMEDIATION_TRIGGERS_DISABLED', '');
-  vi.stubEnv('LINEAR_COOLDOWN_STATE_DIR', join(testDirectory, 'cooldown'));
-  vi.stubEnv('LINEAR_COOLDOWN_FALLBACK_DIR', join(testDirectory, 'fallback'));
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
-  rmSync(testDirectory, { recursive: true, force: true });
-});
 const RATE_LIMITED = resetAt => ({
   ok: false,
   reason: 'linear_rate_limited',
   resetAt,
 });
-
-function response(status, body, headers = {}) {
-  const text = typeof body === 'string' ? body : JSON.stringify(body);
-  return new Response(text, {
-    status,
-    headers: { 'content-type': 'application/json', ...headers },
-  });
-}
-
-function fetchImpl(routes) {
-  return async url => {
-    const href = String(url);
-    const route = Object.entries(routes).find(([needle]) =>
-      href.includes(needle)
-    );
-    if (!route) throw new Error(`unexpected ${href}`);
-    return response(route[1].status, route[1].body, route[1].headers);
-  };
-}
-
-function withSummaryEnv(run) {
-  const summaryPath = join(testDirectory, 'summary.md');
-  vi.stubEnv('GITHUB_STEP_SUMMARY', summaryPath);
-  return Promise.resolve(run()).finally(() => {
-    vi.unstubAllEnvs();
-    rmSync(summaryPath, { force: true });
-  });
-}
-
-async function captureWarnings(run) {
-  const warnings = [];
-  const original = console.warn;
-  console.warn = message => warnings.push(String(message));
-  try {
-    return { result: await run(), warnings };
-  } finally {
-    console.warn = original;
-  }
-}
 
 describe('withLinearRateLimitRetry', () => {
   it('returns an ok result untouched without sleeping', async () => {
@@ -288,7 +246,7 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
       // cannot short-circuit this call before it reaches the transport.
       vi.stubEnv(
         'LINEAR_API_KEY',
-        `lin_api_error_probe_${basename(testDirectory)}`
+        `lin_api_error_probe_${basename(getTestDirectory())}`
       );
       await expect(
         runBillingSyncIntake({
@@ -309,7 +267,7 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
   });
 
   it('billing health public probe defers on a real 429', async () => {
-    const responseFile = join(testDirectory, 'billing-health.json');
+    const responseFile = join(getTestDirectory(), 'billing-health.json');
     rmSync(responseFile, { force: true });
     writeFileSync(responseFile, JSON.stringify({ checks: {} }));
     try {
@@ -343,43 +301,6 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
 
   it('synthetic monitoring: a real comment failure after filing stays best-effort', async () => {
     try {
-      const fetchByQuery = async (url, init) => {
-        const query = String(JSON.parse(init?.body ?? '{}')?.query ?? '');
-        if (query.includes('FindIssueByFingerprint'))
-          return response(200, {
-            data: {
-              team: { states: { nodes: [] }, labels: { nodes: [] } },
-              issues: { nodes: [] },
-            },
-          });
-        if (query.includes('FindIssueByRemediationLabel'))
-          return response(200, { data: { issues: { nodes: [] } } });
-        if (query.includes('issueLabelCreate'))
-          return response(200, {
-            data: {
-              issueLabelCreate: {
-                success: true,
-                issueLabel: { id: 'label-1' },
-              },
-            },
-          });
-        if (query.includes('issueCreate'))
-          return response(200, {
-            data: {
-              issueCreate: {
-                success: true,
-                issue: {
-                  id: 'lin-1',
-                  identifier: 'JOV-1',
-                  url: 'https://linear.app/jovie/issue/JOV-1',
-                },
-              },
-            },
-          });
-        if (query.includes('commentCreate'))
-          return response(500, { errors: [{ message: 'boom' }] });
-        throw new Error(`unexpected ${query.slice(0, 60)}`);
-      };
       // The issue is filed; a failing evidence comment must not red the job.
       const result = await runSyntheticMonitoringIntake({
         env: {
@@ -388,7 +309,7 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
           PREVIOUS_CONCLUSION: 'failure',
           GITHUB_RUN_ID: 'run-1',
         },
-        fetchImpl: fetchByQuery,
+        fetchImpl: fetchCommentFailure,
       });
       expect(result).toEqual({
         ok: true,
@@ -403,7 +324,7 @@ describe('sibling scheduled monitors share the deferred-not-failed behavior', ()
   });
 
   it('web AI health intake defers on a real 429', async () => {
-    const receiptFile = join(testDirectory, 'web-ai-receipt.json');
+    const receiptFile = join(getTestDirectory(), 'web-ai-receipt.json');
     writeFileSync(
       receiptFile,
       JSON.stringify({
@@ -470,5 +391,92 @@ describe('deferLinearRateLimited', () => {
       );
       expect(summary).toContain('probe signal');
     });
+  });
+});
+
+describe('synthetic monitoring partial Linear progress', () => {
+  const partial = installPartialProgressFixture();
+  it('retains the filed issue and an accurate unknown receipt after comment 429', async () => {
+    const { counts, fetchImpl } = syntheticFixture();
+    const result = await runSyntheticMonitoringIntake({ env, fetchImpl });
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'defer',
+      reason: 'linear_rate_limited',
+      resetAt: NOW + 3_600_000,
+      completedAction: 'created',
+      id: ISSUE.id,
+      identifier: ISSUE.identifier,
+      url: ISSUE.url,
+    });
+    expect(counts).toEqual({ created: 1, updated: 0, comments: 1 });
+    const warning = partial.warnings().mock.calls.flat().join('\n');
+    const summary = await readFile(
+      join(partial.directory(), 'summary.md'),
+      'utf8'
+    );
+    for (const receipt of [warning, summary]) {
+      expect(receipt).toContain(ISSUE.identifier);
+      expect(receipt).toContain('created');
+      expect(receipt).toContain('unknown');
+      expect(receipt).not.toContain('No Linear issue was filed or resolved');
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reuses the one fingerprinted issue when replayed after the published cooldown', async () => {
+    const { counts, fetchImpl } = syntheticFixture();
+    expect(
+      await runSyntheticMonitoringIntake({ env, fetchImpl })
+    ).toMatchObject({
+      action: 'defer',
+      id: ISSUE.id,
+    });
+    vi.setSystemTime(NOW + 3_600_001);
+    expect(
+      await runSyntheticMonitoringIntake({ env, fetchImpl })
+    ).toMatchObject({
+      ok: true,
+      action: 'updated',
+      id: ISSUE.id,
+    });
+    expect(counts).toEqual({ created: 1, updated: 1, comments: 2 });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('retains known issue identity when a later retry rate-limits before metadata', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        reason: 'linear_rate_limited',
+        resetAt: NOW + 1_000,
+        issue: { ...ISSUE, action: 'created' },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        reason: 'linear_rate_limited',
+        resetAt: NOW + 3_600_000,
+      });
+    const sleep = vi.fn(async () => {});
+    const result = await withLinearRateLimitRetry(run, {
+      sleep,
+      now: () => NOW,
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledExactlyOnceWith(1_000);
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'defer',
+      reason: 'linear_rate_limited',
+      resetAt: NOW + 3_600_000,
+      completedAction: 'created',
+      id: ISSUE.id,
+      identifier: ISSUE.identifier,
+      url: ISSUE.url,
+    });
+    expect(partial.warnings().mock.calls.flat().join('\n')).toContain(
+      ISSUE.identifier
+    );
   });
 });

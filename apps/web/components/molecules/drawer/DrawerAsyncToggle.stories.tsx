@@ -46,7 +46,7 @@ export const CompactDensity: Story = {
   },
 };
 
-export const RejectedToggleRevertsState: Story = {
+export const ErrorRejectedToggleReverts: Story = {
   args: {
     onToggle: fn(() => Promise.reject(new Error('save failed'))),
   },
@@ -58,4 +58,55 @@ export const RejectedToggleRevertsState: Story = {
       expect(toggle).toHaveAttribute('aria-checked', 'false')
     );
   },
+};
+
+/** The save never settles: the switch shows the new value and stays
+ *  disabled while the request is pending. */
+export const LoadingSave: Story = {
+  args: {
+    onToggle: fn(() => new Promise<void>(() => undefined)),
+  },
+  play: async ({ canvasElement }) => {
+    const toggle = within(canvasElement).getByRole('switch');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toBeDisabled());
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  },
+};
+
+/** The network is down: the save rejects like a failed fetch, the switch
+ *  reverts and the row is usable again. */
+export const OfflineSaveReverts: Story = {
+  args: {
+    checked: true,
+    onToggle: fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+  },
+  play: async ({ canvasElement }) => {
+    const toggle = within(canvasElement).getByRole('switch');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+    await waitFor(() => expect(toggle).toBeEnabled());
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    label:
+      'Notify fans by email and SMS when this release goes live on every streaming service',
+    ariaLabel: 'Notify fans when this release goes live',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    label: 'إظهار في الملف الشخصي',
+    ariaLabel: 'إظهار في الملف الشخصي',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };

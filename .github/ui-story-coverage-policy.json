@@ -210,10 +210,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/dsp-presence/MismatchCard.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -418,10 +414,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/profile/DesktopQrOverlayClient.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/profile/ProfileAboutShare.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -431,10 +423,6 @@
     },
     {
       "path": "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -462,31 +450,11 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatFeedbackControl.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatPinnedOpportunityHeader.tsx",
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatProvidersRegistrar.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChipTray.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/FileAttachmentChip.tsx",
       "linearIssue": "JOV-8847"
     },
     {

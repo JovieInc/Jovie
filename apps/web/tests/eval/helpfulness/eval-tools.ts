@@ -5,8 +5,11 @@
  * data and never writes, calls a provider or touches the DB.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { CHAT_ROUTE_TOOL_IDS } from '@/lib/chat/chat-tool-inventory';
+import { findChatSkill, parseSkillFile } from '@/lib/chat/skills/registry';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import type { EvalFixture } from './fixtures';
 
@@ -18,11 +21,6 @@ const ROUTE_ONLY_TOOLS: Record<
     description:
       "Show the artist's top audience, release, track, and monetization signals as structured insight cards. Call ONLY when the artist is asking about performance, growth, audience, signals, analytics, what is working, or what to focus on next. Do NOT call for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other unrelated topics.",
     input: z.object({}),
-  },
-  createPromoStrategy: {
-    description:
-      'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
-    input: z.object({ releaseTitle: z.string().optional() }),
   },
   writeWorldClassBio: {
     description:
@@ -43,20 +41,15 @@ const ROUTE_ONLY_TOOLS: Record<
       releaseDate: z.string().optional(),
     }),
   },
-  suggestRelatedArtists: {
+  useSkill: {
     description:
-      'Suggest related artists for collaboration, playlist adjacency, or support slots based on the artist’s genres and audience.',
-    input: z.object({ goal: z.string().optional() }),
+      'Load the full steps of one Jovie skill before doing work it covers. The skills and when to use each are listed under Skills in your instructions.',
+    input: z.object({ name: z.string() }),
   },
   checkCanvasStatus: {
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
     input: z.object({}),
-  },
-  generateCanvasPlan: {
-    description:
-      'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Use this when an artist wants to create a canvas for a specific release.',
-    input: z.object({ releaseTitle: z.string().optional() }),
   },
 };
 
@@ -68,18 +61,37 @@ export interface EvalToolSpec {
   readonly execute: (input: unknown) => unknown;
 }
 
-function stubResult(name: string, fixture: EvalFixture): unknown {
+function stubResult(
+  name: string,
+  fixture: EvalFixture,
+  input?: unknown
+): unknown {
   switch (name) {
     case 'showTopInsights':
       return fixture.insights;
-    case 'suggestRelatedArtists':
-      return {
-        success: true,
-        artists: [
-          { name: 'Fictional Artist A', reason: 'shared ambient playlists' },
-          { name: 'Fictional Artist B', reason: 'similar audience size' },
-        ],
-      };
+    case 'useSkill': {
+      const wanted =
+        typeof input === 'object' && input !== null && 'name' in input
+          ? String(input.name)
+          : '';
+      const skill = findChatSkill(wanted);
+      const steps = skill
+        ? parseSkillFile(
+            readFileSync(
+              join(
+                import.meta.dirname,
+                '../../../lib/chat/skills/library',
+                skill.name,
+                'SKILL.md'
+              ),
+              'utf8'
+            )
+          )?.body
+        : undefined;
+      return skill && steps
+        ? { success: true, name: skill.name, steps }
+        : { success: false, error: `No skill named "${wanted}".` };
+    }
     case 'checkCanvasStatus':
       return {
         success: true,
@@ -113,7 +125,7 @@ export function buildEvalToolSpecs(fixture: EvalFixture): EvalToolSpec[] {
       name,
       description,
       parameters,
-      execute: () => stubResult(name, fixture),
+      execute: input => stubResult(name, fixture, input),
     });
   }
   return specs;

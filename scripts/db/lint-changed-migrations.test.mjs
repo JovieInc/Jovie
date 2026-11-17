@@ -141,7 +141,12 @@ test('a git diff lints the new file and leaves the base migration alone', async 
     Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
   );
   const git = (...args) => {
-    const result = spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(result.status, 0, result.stderr);
   };
   const write = (path, body) => {
@@ -171,7 +176,12 @@ test('a git diff lints the new file and leaves the base migration alone', async 
     stdio: 'pipe',
     run: (bin, args) => {
       if (bin === 'git') {
-        return spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
+        return spawnSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
+          cwd: root,
+          env,
+          encoding: 'utf8',
+        });
       }
       seen.push(args);
       return { status: 0 };

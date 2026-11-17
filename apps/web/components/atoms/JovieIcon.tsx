@@ -12,7 +12,10 @@ export function JovieIcon({ className, size = 24 }: JovieIconProps) {
       height={size}
       viewBox='0 0 32 32'
       xmlns='http://www.w3.org/2000/svg'
-      className={cn('text-black dark:text-white transition-colors', className)}
+      className={cn(
+        'text-ink-on-media dark:text-on-media transition-colors',
+        className
+      )}
       fill='currentColor'
       aria-hidden='true'
       shapeRendering='geometricPrecision'

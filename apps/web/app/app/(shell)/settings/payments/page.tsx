@@ -28,11 +28,7 @@ export default async function SettingsPaymentsPage() {
   }
 
   return (
-    <SettingsSection
-      id='payments'
-      title='Payments'
-      description='Stripe payouts from fans.'
-    >
+    <SettingsSection id='payments' title='Payments'>
       <SettingsPaymentsSection />
     </SettingsSection>
   );

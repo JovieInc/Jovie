@@ -74,12 +74,26 @@ function parseSmartLinkSlug(slug: string): {
   return { releaseSlug, profileId };
 }
 
+// creator_profiles.id is a uuid column. Postgres throws 22P02 when a non-UUID
+// string is compared against it, so a malformed legacy smart-link id must be
+// rejected before it reaches the query (it could never match a row anyway).
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
+
 /**
  * Fetch release data with provider links and creator info.
  * Wrapped with React.cache() to deduplicate calls between generateMetadata and page render.
  * Uses Promise.all() to parallelize independent queries.
  */
 const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
+  if (!isUuid(profileId)) {
+    return null;
+  }
+
   // Fetch release and creator in parallel (both only need profileId)
   const [releaseResult, creatorResult] = await Promise.all([
     db
