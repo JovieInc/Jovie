@@ -336,3 +336,22 @@ test('completed legacy reply survives upgrade without dispatch', async () => {
   });
   assert.equal(calls[0].body.body, 'already generated');
 });
+
+test('rejected ack on a redelivered message is logged, not crashed', async () => {
+  const calls = [];
+  responses([{ ok: true }, { ok: true }], calls);
+  assert.equal(
+    await worker.processMessage(message('claude:ack-crash'), async () => ({
+      code: 0,
+      text: 'real result',
+    })),
+    true
+  );
+  // Redelivery: the message is already in `done`, so the only hub call is the
+  // ack. A rejected ack must not reject processMessage (loop() fires it
+  // without await; a rejection here used to escape as an unhandled error).
+  globalThis.fetch = async () => {
+    throw Error('hub unreachable');
+  };
+  assert.equal(await worker.processMessage(message('claude:ack-crash')), true);
+});

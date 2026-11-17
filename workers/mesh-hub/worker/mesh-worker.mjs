@@ -312,7 +312,13 @@ export async function handle(message, execute = runtime) {
 
 export async function processMessage(message, execute = runtime) {
   if (done.has(message.id)) {
-    await hub('POST', '/v1/ack', { ids: [message.id] });
+    // Redelivery ack (JOV-12868): a rejected ack here used to escape as an
+    // unhandled rejection and crash the worker; log it and move on instead.
+    try {
+      await hub('POST', '/v1/ack', { ids: [message.id] });
+    } catch (error) {
+      log('ack.error', { id: message.id, error: String(error) });
+    }
     return true;
   }
   if (inFlight.has(message.id)) return false;
@@ -346,7 +352,12 @@ export async function loop({
         capsRegistered = true;
       }
       const box = await hub('GET', '/v1/mailbox?wait=25');
-      for (const message of box.messages ?? []) processMessage(message);
+      // processMessage is fire-and-forget; catch so a rejection can never
+      // escape the poll loop as an unhandled rejection (JOV-12868).
+      for (const message of box.messages ?? [])
+        processMessage(message).catch(error =>
+          log('process.error', { id: message.id, error: String(error) })
+        );
     } catch (error) {
       log('poll.error', { error: String(error) });
       await wait(2_000 + Math.random() * 8_000);
