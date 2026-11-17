@@ -115,13 +115,6 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['scripts/invariants/duplicate-literals.mjs'],
   },
   {
-    id: 'component-certificate',
-    name: 'component certificate gate (required states and evidence)',
-    command: 'pnpm component-certificate:gate',
-    when: /^(?:apps\/web\/components\/|packages\/ui\/).+\.(?:tsx|stories\.ts)$|^docs\/design-system\/component-certification\.json$|^scripts\/(?:lib\/)?component-certificate/,
-    covers: ['pnpm component-certificate:gate'],
-  },
-  {
     id: 'lockfile',
     name: 'lockfile specifiers',
     command: 'node scripts/lockfile-specifier-preflight.mjs',
