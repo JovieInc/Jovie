@@ -118,13 +118,17 @@ describe('lanes coverage matrix legs', () => {
   });
 
   it('keeps the shared export as the single source for the combined report', () => {
-    expect(LANES_COVERAGE_FLOORS).toHaveLength(26);
+    expect(LANES_COVERAGE_FLOORS).toHaveLength(27);
+    expect(LANES_COVERAGE_FLOORS).toContainEqual({
+      include: '*/scripts/lanes/worker_resources.py',
+      floor: 95,
+    });
     for (const { include, floor } of LANES_COVERAGE_FLOORS) {
       expect(LANES_COVERAGE_COMMAND).toContain(
         `--include="${include}" --fail-under=${floor}`
       );
     }
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(27);
   });
 
   it('runs no leg command and reports a clean skip on a web-only head', async () => {

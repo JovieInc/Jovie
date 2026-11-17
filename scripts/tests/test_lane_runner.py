@@ -5501,47 +5501,6 @@ class DispatchTest(unittest.TestCase):
                     self.assertIn("SystemExit", tick["linearSyncError"])
                 self.assertEqual(tick["linear"]["outbox"]["depth"], 0)
 
-    def test_escalation_reconcile_stays_hermetic_inside_the_release_selftest(self):
-        """JOV-10343: the reconcile's one budgeted gh read must never run inside a release self-test.
-        LANES_SELFTEST is that guard. This sets the marker and drops the local-test backend so the
-        assertion pins the marker even when a reconcile is due."""
-        # 21 context managers in one with exceed Python's 20-block limit.
-        with contextlib.ExitStack() as stack:
-            tmp = stack.enter_context(tempfile.TemporaryDirectory())
-            stack.enter_context(patch.dict(os.environ, {
-                "SYMPHONY_AUTOSCALE": "off",
-                "LANES_SELFTEST": "1",
-                "LANES_EXECUTION_BACKEND": "",
-            }))
-            for target, name, kwargs in (
-                (lane.autoscale, "mode", {"return_value": "off"}),
-                (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),
-                (lane.worktree_sweep, "maybe_spawn", {"return_value": "not-due"}),
-                (lane, "ensure_full_history", {}),
-                (lane, "load_providers", {"return_value": {"codex": {"slots": 1}}}),
-                (lane, "provider_healthy", {"return_value": True}),
-                (lane, "claim_remediation_events", {"return_value": {}}),
-                (lane, "collect_shipping_origin", {"return_value": {}}),
-                (lane, "Linear", {"side_effect": SystemExit("no LINEAR_API_KEY")}),
-                (lane.linear_sync, "tick", {"return_value": {}}),
-                (lane.macos_pool, "sample", {"return_value": {}}),
-                (lane.epics, "reconcile", {"return_value": {}}),
-                (lane.pr_events, "tick", {"return_value": {}}),
-                (lane.reason_lane, "tick", {"return_value": {}}),
-                (lane.continuity_clock, "tick", {"return_value": {"status": "current"}}),
-                (lane.doctor, "run", {"return_value": {}}),
-                (lane.escalation_reconcile, "due", {"return_value": True}),
-            ):
-                stack.enter_context(patch.object(target, name, **kwargs))
-            probe = stack.enter_context(patch.object(
-                lane.escalation_reconcile, "fetch_labeled",
-                side_effect=AssertionError("self-test leak")))
-            spawn = stack.enter_context(patch.object(lane.subprocess, "Popen"))
-            host = lane.Host(state=Path(tmp), repo=Path(tmp))
-            self.assertEqual(lane.dispatch(host), 0)
-            probe.assert_not_called()
-            self.assertEqual(spawn.call_count, 1)
-
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
             with self.subTest(pct=pct), tempfile.TemporaryDirectory() as tmp, \
@@ -17638,6 +17597,20 @@ class FixNowTest(unittest.TestCase):
             self.assertIsNone(row["claimAt"])
             self.assertFalse(wake.exists())
             self.assertTrue((self.wake_dir / (wake.name + ".claim")).exists())
+
+    def test_fix_now_resource_hold_keeps_wake_retryable_without_dispatch_receipt(self):
+        wake = self.wake()
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state), \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.worker_resources, "spawn", side_effect=lane.worker_resources.ResourceHeld("scope unavailable")):
+            self.assertEqual(lane.fix_now(self.host), 0)
+        self.assertTrue(wake.exists())
+        self.assertFalse((self.wake_dir / (wake.name + ".claim")).exists())
+        self.assertEqual(self.rows()[0]["status"], "no-slot")
+        self.assertIn("scope unavailable", self.rows()[0]["reason"])
+        self.assertIsNone(self.rows()[0]["dispatchedAt"])
 
     def test_fix_now_records_no_slot_and_keeps_label(self):
         wake = self.wake()

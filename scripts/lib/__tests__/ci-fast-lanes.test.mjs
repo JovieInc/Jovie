@@ -237,6 +237,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain(
       '--include="*/scripts/lanes/epics.py" --fail-under=90'
     );
+    expect(command).toContain('scripts/tests/test_worker_resources.py');
+    expect(command).toContain(
+      '*/scripts/lanes/worker_resources.py" --fail-under=95'
+    );
     expect(command).toContain('scripts/tests/test_worktree_pool.py');
     expect(command).toContain(
       '*/scripts/lanes/worktree_pool.py" --fail-under=85'
@@ -1428,7 +1432,7 @@ describe('structural command pool', () => {
     expect(started).toEqual([LANES_COVERAGE_COMMAND]);
     // Every per-module coverage floor still runs, after the shards combine.
     expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(27);
     expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane*.py" --fail-under=90');
     expect(LANES_COVERAGE_COMMAND).toContain(
       'priority_admission.py" --fail-under=80'
