@@ -266,5 +266,3 @@ class CodexQuotaCases:
         def fail(name):seen.append(name);raise ValueError("unavailable")
         self.codex.reconcile(self.NOW+31,fetch=fail);self.codex.reconcile(self.NOW+32,fetch=fail)
         self.assertEqual(seen,["lyb-pro"])
-
-
