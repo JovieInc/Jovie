@@ -18,10 +18,10 @@ describe('CopyToggleIcon', () => {
     expect(svg?.getAttribute('class')).toContain('lucide-circle-check');
   });
 
-  it('applies cyan tint to the check icon for copied state', () => {
+  it('uses the accent token for the copied state', () => {
     const { container } = render(<CopyToggleIcon copied={true} />);
     const svg = container.querySelector('svg');
-    expect(svg?.getAttribute('class')).toContain('text-cyan-300');
+    expect(svg?.getAttribute('class')).toContain('text-accent-blue');
   });
 
   it('forwards className to the rendered icon', () => {
