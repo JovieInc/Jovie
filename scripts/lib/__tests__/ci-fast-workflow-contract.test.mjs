@@ -449,8 +449,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(51);
+    expect(LANES_PYTEST_FILES).toHaveLength(52);
     expect(whole).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(whole).toContain('scripts/tests/test_reason_dependencies.py');
     expect(whole).toContain('scripts/tests/test_reason_publication.py');
     expect(whole).toContain('scripts/tests/test_pr_events_blast_radius.py');
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
@@ -475,7 +476,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
-      `python3 -m coverage combine ${shards.map(shard => `"${shard.data}"`).join(' ')}`
+      `python3 -m coverage combine --rcfile=scripts/tests/coverage.ini ${shards.map(shard => `"${shard.data}"`).join(' ')}`
     );
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(

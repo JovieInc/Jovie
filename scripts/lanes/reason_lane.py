@@ -17,7 +17,7 @@ before code preparation; the existing per-host drain processes one job at a time
      Linear webhook that wakes Summer to consume it.
 
 `decisionType: research` skips steps 2-4 and runs the Hyperagent research backend instead.
-Budgets: jobs per UTC day, research per day, a context cap and a per-job spend cap.
+Local limits: jobs per UTC day, research per day and a context cap; spend authority is external.
 
   reason_lane.py drain          # run queued jobs (the dispatch tick starts this)
   reason_lane.py run JOV-123    # run one job now, whatever its state (operator use)
@@ -40,6 +40,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
 import reason_dispatch as _reason_dispatch  # noqa: E402
+import reason_dependencies as _dependencies  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
@@ -511,7 +512,7 @@ def load_env_file(path: str | None) -> dict:
 
 def healthy(spec: dict, run=lifecycle.run) -> bool:
     try:
-        result = run(spec["health"], capture_output=True, text=True, timeout=60,
+        result = _dependencies.invoke(spec["health"], runner=run, probe=True, capture_output=True, text=True, timeout=60,
                      env={**os.environ, **load_env_file(spec.get("env"))})
     except (OSError, subprocess.SubprocessError):
         return False
@@ -527,7 +528,7 @@ def run_model(spec: dict, prompt: str, schema: dict | None, required: tuple[str,
               "model": spec.get("model", ""), "max_budget_usd": str(spec.get("maxBudgetUsd", 3))}
     cmd = [arg.format(**values) for arg in spec["cmd"]]
     try:
-        result = run(cmd, input=prompt if spec.get("stdin") else None, capture_output=True, text=True,
+        result = _dependencies.invoke(cmd, runner=run, input=prompt if spec.get("stdin") else None, capture_output=True, text=True,
                      timeout=int(spec.get("timeoutS", 900)), env={**os.environ, **load_env_file(spec.get("env"))})
         raw = (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
         value, error = parse_model_output(result.stdout or "", required)
@@ -704,9 +705,6 @@ def render_comment(record: dict, proposal: dict | None, review: dict | None, res
     return "\n".join(lines)
 
 
-
-
-
 # ---------------------------------------------------------------- one job
 
 def judgment_receipt(run_out: dict, seconds: float) -> dict:
@@ -779,7 +777,7 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
 def run_research(spec: dict, prompt: str, run=lifecycle.run) -> dict:
     """The research backend answers in prose: the wrapper's {"ok","text"} envelope, or raw text."""
     try:
-        result = run([arg.format(prompt=prompt) for arg in spec["cmd"]], capture_output=True, text=True,
+        result = _dependencies.invoke([arg.format(prompt=prompt) for arg in spec["cmd"]], runner=run, capture_output=True, text=True,
                      timeout=int(spec.get("timeoutS", 1900)))
     except (subprocess.TimeoutExpired, OSError) as failure:
         return {"ok": False, "error": f"{type(failure).__name__}", "text": None}
@@ -815,6 +813,7 @@ def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -
                                              None, None, config["proposer"]["model"], None, None), run=run)
     if recovered is not None:
         return recovered
+    if held := _dependencies.readiness(config, state, issue, env_loader=load_env_file, job=job): return held
     if expired(job):
         record = result_record(job, {"confidence": "failed", "agreement": 0.0, "reasons": ["deadline passed"]},
                                None, None, config["proposer"]["model"], None, None)
@@ -837,7 +836,7 @@ def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -
     context = f"{prior_art_context(prior_art)}\n\n{context}"[:config["maxContextChars"]]
     spend_budget(state, job["decisionType"] == "research")
     source_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    outcome = execute(job, config, context, state, run=run, prior_art=prior_art)
+    outcome = _dependencies.execute(execute, job, config, context, state, run=run, prior_art=prior_art)
     record = outcome["record"]
     if outcome["retry"]:
         failures = failure_count(state, job["identifier"]) + 1
@@ -851,7 +850,7 @@ def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -
         linear.move(issue["id"], "Canceled")
         return record
     return publish_result(linear, issue, job, config, state, outcome, context, source_digest,
-                          render=render_comment, is_expired=is_expired, run=run)
+                          render=render_comment, is_expired=is_expired, run=run, backend_source=outcome.get("backendSource"))
 
 
 def failure_count(state: Path, identifier: str) -> int:
@@ -882,11 +881,13 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
         return {"status": status, "done": done, **({"blocked": blocked} if blocked else {}), **details}
     try:
         # Research runs on its own model, so a logged-out proposer must not block it (and vice versa).
-        ready = {"decision": healthy(config["proposer"], run=run), "research": healthy(config["research"], run=run)}
+        held = _dependencies.readiness(config, host.state, env_loader=load_env_file)
+        if held and not (host.state / "reason-results").exists(): return held
+        ready, held = _dependencies.health(config, host.state, healthy, run=run, env_loader=load_env_file, held=held)
         linear = lane.Linear(host.linear_env)
         if not any(ready.values()) and (not (host.state / "reason-results").exists()
                 or not any(pending_publication(host.state, issue) for issue in queued_jobs(linear, config["label"]))):
-            return {"status": "proposer-unhealthy"}
+            return held or {"status": "proposer-unhealthy"}
 
         def runnable(job: dict) -> bool:
             research = parse_job(job["identifier"], job["title"], job.get("description") or "")["decisionType"] == "research"
@@ -900,6 +901,9 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
             if issue is None:
                 waiting = [job for job in jobs if job["identifier"] not in attempted]
                 return result("budget-exhausted" if waiting else "publication-blocked" if blocked else "idle")
+            held = _dependencies.readiness(config, host.state, issue, env_loader=load_env_file, job=parse_job(issue["identifier"], issue["title"], issue.get("description") or ""))
+            if held:
+                blocked.append({"job": issue["identifier"], **held}); attempted.add(issue["identifier"]); continue
             claim = lane.Locked(host.state / "claim.lock", blocking=True)
             try:
                 if lifecycle.draining(host.state):
@@ -939,7 +943,7 @@ def schedule_tick(host, lane, spawn=None) -> dict:
 
 
 def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen) -> dict:
-    return _reason_dispatch.tick(host, lane, linear_factory, config or load_config(), queued_jobs=queued_jobs, spawn=spawn)
+    return _dependencies.dispatch_tick(_reason_dispatch.tick, host, lane, linear_factory, config or load_config(), env_loader=load_env_file, queued_jobs=queued_jobs, spawn=spawn)
 
 
 def checked_tick(host, lane, linear_factory) -> dict:
@@ -970,6 +974,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     team, number = args.identifier.upper().split("-")
     node = linear.gql('query($t:String!,$n:Float!){issues(first:1,filter:{team:{key:{eq:$t}},number:{eq:$n}})'
                       '{nodes{id identifier title description}}}', {"t": team, "n": float(number)})["issues"]["nodes"][0]
+    if held := _dependencies.readiness(config, host.state, node, env_loader=load_env_file, job=parse_job(node["identifier"], node["title"], node.get("description") or "")): print(json.dumps(held)); return 75
     lease = _ownership().acquire_run_lease(host.state, node["id"], node["identifier"], "reason")
     linear.move(node["id"], "In Progress", owner="reason-run-lease")
     try:

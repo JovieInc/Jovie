@@ -51,7 +51,7 @@ class ReasonDispatchTest(unittest.TestCase):
 
         def spawn(args, **kwargs):
             if args[-1] == "tick":
-                child = threading.Thread(target=lambda: lane.reason_lane.tick(host, lane, lambda: None))
+                child = threading.Thread(target=lambda: lane.reason_lane.tick(host, lane, lambda: None, config=CONFIG))
                 workers.append(child)
                 child.start()
                 self.assertTrue(entered.wait(2))

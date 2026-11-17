@@ -157,7 +157,10 @@ def _valid_publication(saved, issue: dict) -> bool:
 
 
 def _blocked_publication(record: dict, reason: str) -> dict:
-    action = ("The incumbent must reconcile the retained result and obtain current deadline authority before "
+    action = ("The incumbent must review the retained output and original operative control identity, then record "
+              "an authorized disposition before publication. Repair does not requalify this produced result; "
+              "do not rerun the model." if reason == "reason-produced-dependency-unqualified" else
+              "The incumbent must reconcile the retained result and obtain current deadline authority before "
               "any publication; do not rerun the model." if reason == "reason-result-deadline-passed" else
               "Reconcile this exact saved result and its destination readback; resume the existing job without "
               "another model run. Changed input or corrupt state requires the incumbent to preserve and reconcile "
@@ -221,6 +224,9 @@ def _publish_saved(linear, issue: dict, saved: dict, path: Path, run, is_expired
             raise RuntimeError("reason-result-deadline-passed")
         return actual
     try:
+        backend = (record.get("provenance") or {}).get("backend") or {}
+        if backend.get("status") == "blocked":
+            raise RuntimeError("reason-produced-dependency-unqualified")
         current()
         if record.get("gbrainSlug"):
             title = saved["memoTitle"]
@@ -242,7 +248,7 @@ def _publish_saved(linear, issue: dict, saved: dict, path: Path, run, is_expired
         safe = str(error) if str(error) in {"reason-memo-readback-unverified", "reason-result-input-changed-or-unavailable",
             "reason-result-owner-state-changed", "reason-comment-readback-unavailable", "reason-comment-readback-mismatch",
             "reason-comment-readback-unconfirmed", "reason-result-terminal-state-unconfirmed",
-            "reason-result-deadline-passed"} else "reason-publication-unavailable"
+            "reason-result-deadline-passed", "reason-produced-dependency-unqualified"} else "reason-publication-unavailable"
         blocked = _blocked_publication(record, safe)
         saved["publication"].update(blocked["publication"])
         _save_publication(path, saved)
@@ -281,7 +287,7 @@ def resume_result(linear, issue: dict, state: Path, *, is_expired, invalid_recor
 
 
 def publish_result(linear, issue: dict, job: dict, config: dict, state: Path, outcome: dict,
-                   context: str, source_digest: str, *, render, is_expired, run) -> dict:
+                   context: str, source_digest: str, *, render, is_expired, run, backend_source=None) -> dict:
     """Seal complete produced bytes, then verify the authorized destinations."""
     path = publication_path(state, issue)
     record = outcome["record"]
@@ -290,6 +296,8 @@ def publish_result(linear, issue: dict, job: dict, config: dict, state: Path, ou
     provenance = {"inputDigest": digest, "configDigest": _digest(config),
                   "contextDigest": hashlib.sha256(context.encode()).hexdigest(),
                   "sourceDigest": source_digest}
+    if backend_source is not None:
+        provenance["backend"] = backend_source
     record["provenance"] = provenance
     if record.get("gbrainSlug"):
         record["gbrainSlug"] += "-" + digest[:12]

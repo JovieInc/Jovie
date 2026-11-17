@@ -158,7 +158,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
-              "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py", "scripts/tests/test_reason_dependencies.py",
               "scripts/tests/test_quota_rerun.py",
               "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
@@ -187,7 +187,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "apps/web/lib/ai/routing.json",
                   # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
-                  "packages/api-client/providers.json",
+                  "packages/api-client/providers.json", "scripts/hyperagent/hyperagent.py", "scripts/hyperagent/models.json",
                   "scripts/lib/github-rate-limit.mjs",
                   # The shipped failure-hold module uses the canonical Node client.
                   "packages/api-client/gh.ts", "packages/api-client/client.ts",

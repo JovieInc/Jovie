@@ -21,6 +21,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def canned_reason_config(value):
+    """Explicit local test transports; never disable production dependency verification."""
+    if isinstance(value, dict):
+        return {key: canned_reason_config(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return (["hyperagent_fixture", *value[1:]] if value and value[0] == "hyperagent"
+                else [canned_reason_config(item) for item in value])
+    return value
+
+
 def release_lists(path=ROOT / "scripts/lanes/lane_runner.py"):
     """LANE_TESTS and RELEASE_EXTRAS as lane_runner.py declares them (literals, read without importing)."""
     found = {}

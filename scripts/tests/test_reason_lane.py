@@ -26,11 +26,10 @@ sys.modules["reason_lane"] = reason
 SPEC.loader.exec_module(reason)
 
 REAL_CONFIG = reason.load_config()
-# Execution tests drive the proposer through a stdin stub so each test controls its replies. The shipped
-# proposer (Hyperagent, never a subscription login) is asserted separately in ShippedRoutesTest.
+# Explicit canned transports test execution; REAL_CONFIG separately asserts shipped routes.
 STUB = {"name": "stub", "model": "stub-model", "timeoutS": 60, "stdin": True, "health": ["proposer_stub", "status"],
         "healthy": ".", "cmd": ["proposer_stub", "{schema}", "{max_budget_usd}"]}
-CONFIG = {**REAL_CONFIG, "proposer": STUB}
+CONFIG = importlib.import_module("scripts.tests.test_release_fixtures").canned_reason_config({**REAL_CONFIG, "proposer": STUB})
 PROPOSAL = {"summary": "Ship the $199 upsell first", "confidence": 0.8, "assumptions": ["artists convert"],
             "risks": ["no traffic"],
             "precedentDisposition": "adapt", "materialDifference": "Jovie serves independent artists",
@@ -58,6 +57,7 @@ class Runner:
         self.routes, self.calls = routes, []
 
     def __call__(self, args, **kw):
+        args = ["hyperagent", *args[1:]] if args[0] == "hyperagent_fixture" else args
         self.calls.append((args, kw))
         reply = self.routes.get(args[0], done())
         if isinstance(reply, list):
@@ -1513,7 +1513,7 @@ class ShippedRoutesTest(unittest.TestCase):
         return reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": esc}))
 
     def test_judgment_runs_the_opus_agent_and_writes_the_receipt(self):
-        config = {**CONFIG, "judgmentProposer": {**REAL_CONFIG["judgmentProposer"], "agentId": "agent_opus_1"}}
+        config = {**CONFIG, "judgmentProposer": {**CONFIG["judgmentProposer"], "agentId": "agent_opus_1"}}
         envelope = {"ok": True, "thread_id": "thr_42", "text": json.dumps(PROPOSAL)}
         run = Runner(hyperagent=[done(json.dumps(envelope)), done("", 1)], grok=done("not logged", 1))
         with tempfile.TemporaryDirectory() as tmp:
