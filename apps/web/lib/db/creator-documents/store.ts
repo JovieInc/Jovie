@@ -17,7 +17,7 @@ import {
 } from '@/lib/db/schema/creator-documents';
 import {
   CatalogSelectionUnavailable,
-  hasCapturedPromotion,
+  findCapturedPromotion,
   promotionCaptureSql,
 } from './catalog-promotion';
 
@@ -205,20 +205,18 @@ export async function captureCreatorIdea(input: {
       on inserted_revision."document_id" = target_document."id"
   `);
   const result = captured.rows[0];
-  if (!result?.documentId) {
-    if (selected) throw new CatalogSelectionUnavailable();
-    throw new Error('Idea capture did not persist');
-  }
-  // A competing insert may have committed while the upsert was waiting.
-  // Read its relationship in a fresh snapshot before confirming the replay.
-  if (selected && !result.created) {
-    const linked = await hasCapturedPromotion(
+  // A prior capture remains readable when the release has since been archived.
+  // A fresh snapshot also sees competing captures that committed during the upsert.
+  if (selected && !result?.created) {
+    const documentId = await findCapturedPromotion(
       input.creatorProfileId,
-      result.documentId,
+      key,
       selected.releaseId
     );
-    if (!linked) throw new CatalogSelectionUnavailable();
+    if (!documentId) throw new CatalogSelectionUnavailable();
+    return { documentId, deduplicated: true };
   }
+  if (!result?.documentId) throw new Error('Idea capture did not persist');
   return { documentId: result.documentId, deduplicated: !result.created };
 }
 
