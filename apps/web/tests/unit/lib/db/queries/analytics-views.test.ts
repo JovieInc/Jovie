@@ -63,7 +63,8 @@ describe('getUserDashboardAnalytics view metrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.getSessionContextMock.mockResolvedValue({
-      profile: { id: 'profile-123' },
+      user: { id: 'user_123' },
+      profile: { id: 'profile-123', userId: 'user_123' },
     });
     hoisted.setupDbSessionMock.mockResolvedValue(undefined);
     hoisted.doesTableExistMock.mockResolvedValue(true);

@@ -6,6 +6,7 @@ const mockInsert = vi.hoisted(() => vi.fn());
 const mockSelect = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockHandleCheckout = vi.hoisted(() => vi.fn());
+const mockHandlePaymentFailed = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/env-server', () => ({
   env: { STRIPE_WEBHOOK_SECRET_MERCH: 'whsec_test' },
 }));
@@ -27,6 +28,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 vi.mock('@/lib/merch/orders', () => ({
   handleMerchCheckoutCompleted: mockHandleCheckout,
+  handleMerchCheckoutPaymentFailed: mockHandlePaymentFailed,
   handleMerchChargeRefunded: vi.fn(),
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureCriticalError: vi.fn() }));
@@ -144,5 +146,74 @@ describe('POST /api/webhooks/stripe-merch claim', () => {
       expect.objectContaining({ processedAt: expect.any(Date) })
     );
     expect(sets).toContainEqual({ processingStartedAt: null });
+  });
+});
+
+function makeMerchPostRequest() {
+  return new NextRequest('http://localhost/api/webhooks/stripe-merch', {
+    method: 'POST',
+    body: '{}',
+    headers: { 'stripe-signature': 'sig_test' },
+  });
+}
+
+describe('POST /api/webhooks/stripe-merch async payment routing (JOV-12769)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInsert.mockReturnValue({
+      values: () => ({
+        onConflictDoNothing: () => ({
+          returning: () => Promise.resolve([{ id: 'row_1' }]),
+        }),
+      }),
+    });
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ id: 'row_1', processedAt: null }]),
+        }),
+      }),
+    });
+    mockUpdate.mockReturnValue({
+      set: () => ({
+        where: () => ({ returning: () => Promise.resolve([{ id: 'row_1' }]) }),
+      }),
+    });
+  });
+
+  it('routes checkout.session.async_payment_succeeded to the merch checkout handler', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_async_paid',
+      type: 'checkout.session.async_payment_succeeded',
+      created: 1_700_000_000,
+      data: {
+        object: { id: 'cs_async', metadata: { merch_order_id: 'order_1' } },
+      },
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(makeMerchPostRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockHandleCheckout).toHaveBeenCalledTimes(1);
+    expect(mockHandlePaymentFailed).not.toHaveBeenCalled();
+  });
+
+  it('routes checkout.session.async_payment_failed to the payment-failed handler', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_async_failed',
+      type: 'checkout.session.async_payment_failed',
+      created: 1_700_000_000,
+      data: {
+        object: { id: 'cs_async', metadata: { merch_order_id: 'order_1' } },
+      },
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(makeMerchPostRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockHandlePaymentFailed).toHaveBeenCalledTimes(1);
+    expect(mockHandleCheckout).not.toHaveBeenCalled();
   });
 });

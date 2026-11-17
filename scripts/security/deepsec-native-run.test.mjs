@@ -17,6 +17,7 @@ import {
   nativeSourceState,
   runNativeSubscriptionScan,
 } from './deepsec-native-run.mjs';
+import { DEEPSEC_SUBSCRIPTION_VERSION } from './deepsec-subscription.mjs';
 
 const roots = [];
 afterEach(() => {
@@ -71,7 +72,8 @@ function fixture() {
   let findings = [];
   const execute = async (command, options) => {
     calls.push({ command, options });
-    if (command[1] === '--version') return { status: 0, stdout: '2.3.10\n' };
+    if (command[1] === '--version')
+      return { status: 0, stdout: `${DEEPSEC_SUBSCRIPTION_VERSION}\n` };
     if (command[0] === 'codex')
       return { status: 0, stderr: 'Logged in using ChatGPT\n' };
     if (command[1] === 'process') return processResult;

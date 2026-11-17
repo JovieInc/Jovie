@@ -1,0 +1,54 @@
+{
+  "gates": {
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileOutcomeDuo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/engineering/EngineeringPublication.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx": {
+      "permission-denied": "The public landing page has no gated action or permission input; the detector matched the logo-permissions import and the comment \"Renders only logos with a permission for this page\", which is about which partner logos the page may show, decided by HomeTrustSection."
+    }
+  }
+}

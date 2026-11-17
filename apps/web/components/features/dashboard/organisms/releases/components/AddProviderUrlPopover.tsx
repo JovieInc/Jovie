@@ -3,11 +3,7 @@
 import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import {
-  DrawerButton,
-  DrawerFormField,
-  DrawerSurfaceCard,
-} from '@/components/molecules/drawer';
+import { DrawerButton, DrawerFormField } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey } from '@/lib/discography/types';
 
@@ -91,16 +87,14 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
+        aria-label={`Add ${providerLabel} link`}
         className='w-70 rounded-xl border border-subtle bg-(--app-shell-content-surface) p-0 shadow-popover'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
         }}
       >
-        <DrawerSurfaceCard
-          variant='card'
-          className='rounded-xl border-0 bg-transparent p-2.5'
-        >
+        <div className='p-2.5'>
           <form onSubmit={handleSubmit} className='space-y-2.5'>
             <div className='flex items-center gap-2'>
               <span
@@ -158,7 +152,7 @@ export function AddProviderUrlPopover({
               </DrawerButton>
             </div>
           </form>
-        </DrawerSurfaceCard>
+        </div>
       </PopoverContent>
     </Popover>
   );

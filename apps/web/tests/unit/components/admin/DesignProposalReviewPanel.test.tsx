@@ -67,13 +67,13 @@ describe('DesignProposalReviewPanel', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
-          result: { dispatchTriggered: true, linearUpdated: true },
+          result: { dispatchTriggered: true, linearUpdated: false },
         })
       )
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
-          result: { dispatchTriggered: false, linearUpdated: true },
+          result: { dispatchTriggered: false, linearUpdated: false },
         })
       );
     vi.stubGlobal('fetch', fetchMock);
@@ -110,6 +110,10 @@ describe('DesignProposalReviewPanel', () => {
         }),
       })
     );
+    expect(toast.success).toHaveBeenCalledWith(
+      'Taste proposal approved. Dispatch request accepted; execution is unconfirmed.'
+    );
+    expect(toast.error).not.toHaveBeenCalled();
 
     await user.click(
       within(rejectCard).getByRole('button', { name: 'Reject' })
@@ -139,6 +143,34 @@ describe('DesignProposalReviewPanel', () => {
         }),
       })
     );
+    expect(screen.getByText('No pending taste proposals.')).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledWith(
+      'Linear issue status could not be updated.'
+    );
+  });
+
+  it('reports unconfirmed dispatch separately from a saved approval', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ proposals: [proposal({})] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          result: { dispatchTriggered: false, linearUpdated: false },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<DesignProposalReviewPanel />);
+
+    await user.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Taste proposal approved. Dispatch could not be confirmed.'
+      );
+    });
+    expect(toast.error).not.toHaveBeenCalled();
     expect(screen.getByText('No pending taste proposals.')).toBeInTheDocument();
   });
 

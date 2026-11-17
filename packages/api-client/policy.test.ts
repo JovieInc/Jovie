@@ -52,6 +52,21 @@ describe('conformance: backoff', () => {
 });
 
 describe('conformance: admission scenarios', () => {
+  it('bounds untimed conservative debt and preserves a known reset when omitted', () => {
+    const state = credentialState(emptyLedger('github'), 'c', 0);
+    const observation = (remaining: number, resetAt: number | null) => [
+      { resource: 'core', limit: 100, remaining, resetAt },
+    ];
+    observe(state, observation(0, null), 0);
+    observe(state, observation(100, null), 59999, true);
+    expect(state.buckets.core!.remaining).toBe(0);
+    observe(state, observation(100, null), 60000, true);
+    expect(state.buckets.core!.remaining).toBe(100);
+    observe(state, observation(0, 120000), 60001);
+    observe(state, observation(100, null), 60002, true);
+    expect(state.buckets.core).toMatchObject({ remaining: 0, resetAt: 120000 });
+  });
+
   for (const scenario of policyCases.scenarios) {
     it(scenario.name, () => {
       const ledger = emptyLedger('test');

@@ -48,9 +48,12 @@ export const EmptyNoUsage: Story = {
 export const LongContentNinetyDays: Story = {
   args: { points: longUsagePoints },
   play: async ({ canvasElement }) => {
-    await expect(
-      await within(canvasElement).findByText((2_098_705).toLocaleString())
-    ).toBeVisible();
+    // Current DAU and Peak Day carry the same value for a strictly
+    // increasing series, so the stat text intentionally matches twice.
+    const [stat] = await within(canvasElement).findAllByText(
+      (2_098_705).toLocaleString()
+    );
+    await expect(stat).toBeVisible();
   },
 };
 

@@ -125,7 +125,7 @@ export const MARKETING_CERTIFICATION_COMMAND =
 export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
 export const ACQUISITION_CERTIFICATION_COMMAND =
-  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts lib/acquisition/learning-feedback.test.ts lib/acquisition/learning-feedback-safety.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/learning-feedback.ts --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
 export const CODEX_BOOTSTRAP_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/codex-cloud-setup.mjs --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100 scripts/codex-cloud-setup.test.mjs';
 
@@ -591,6 +591,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
+    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Existing ones are baselined per file and may only go down.
+    id: 'test-hygiene',
+    command:
+      'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
+    inputs:
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
     // when the diff loosens a blocking gate. Pull requests only.
     id: 'gate-weakening-detector',
@@ -863,6 +874,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-certification-config.test.mjs',
+  'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -878,12 +890,16 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',
   'scripts/pr-open.test.mjs',
+  'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
+  'scripts/typecheck-native-qualification.test.mjs',
+  'scripts/lib/native-typecheck-evidence.test.mjs',
+  'scripts/lib/native-typecheck-graph.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -995,6 +1011,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
   '.github/scripts/testflight-release-lease.test.mjs',
+  '.github/scripts/mutation-next-target.test.mjs',
+  '.github/scripts/mutation-next-target-cli.test.mjs',
+  '.github/scripts/mutation-next-target-workflow.test.mjs',
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
@@ -1074,7 +1093,7 @@ export const DEPRECATION_COVERAGE_COMMAND =
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
-  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs';
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs';
 
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
@@ -1092,12 +1111,12 @@ export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
 export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
 export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/github-pull-snapshots.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
 // Keep scanner-heavy script contracts outside V8 instrumentation; cover document helpers in a small separate process.
 // Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
 // files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
 export const RELEASE_LINEAGE_CONTRACT_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-lineage-yield-outputs.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -1127,16 +1146,18 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
-  'scripts/lib/__tests__/mutation-diff.test.mjs',
+  'scripts/lib/__tests__/mutation-diff.test.mjs scripts/lib/__tests__/mutation-evidence-score.test.mjs scripts/lib/__tests__/mutation-evidence-inputs.test.mjs scripts/lib/__tests__/mutation-evidence-report.test.mjs scripts/lib/__tests__/mutation-evidence.test.mjs scripts/lib/__tests__/mutation-inputs.test.mjs scripts/lib/__tests__/mutation-survivor-drafts.test.mjs',
   'scripts/lib/__tests__/mutation-source.test.mjs',
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
-  'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
+  'scripts/lib/__tests__/mutation-diff-workflow.test.mjs scripts/lib/__tests__/mutation-ui-target-workflow.test.mjs',
+  'scripts/lib/__tests__/component-certificate-admission.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
   'scripts/lib/__tests__/component-certificate-ordering.test.mjs',
   'scripts/lib/__tests__/component-certificate-producer.test.mjs',
   'scripts/lib/__tests__/component-story-completion.test.mjs',
+  'scripts/lib/__tests__/component-story-completion.size500-2.test.mjs',
   'scripts/lib/__tests__/storybook-certification-matrix.test.mjs',
   'scripts/lib/__tests__/mutation-sweep.test.mjs',
   'scripts/lib/__tests__/mutation-lifecycle.test.mjs',
@@ -1263,6 +1284,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-snapshot.test.mjs',
   'scripts/lib/__tests__/shipping-slo-history.test.mjs',
   'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
@@ -1285,6 +1307,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
+  'scripts/lib/__tests__/visual-baseline-refresh.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
   'scripts/lib/__tests__/ci-unit-selection.test.mjs',

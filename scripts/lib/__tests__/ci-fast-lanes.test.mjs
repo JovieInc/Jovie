@@ -2376,6 +2376,9 @@ describe('source-read guard selection', () => {
         ? ['lanes-selftest-changed-tests']
         : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
+      ...(/\.(?:test|spec)\.(?:ts|tsx|mjs|js)$/u.test(path)
+        ? ['test-hygiene']
+        : []),
       'gate-weakening-detector',
     ]);
   });
@@ -2482,6 +2485,7 @@ describe('source-read guard selection', () => {
       'domain-write-guard',
       'copy-leak',
       'jump-policy-pin',
+      'test-hygiene',
     ];
     expect(selected('workflow_dispatch', ['README.md'])).toEqual(failClosed);
     expect(selected('', ['README.md'])).toEqual(all);
