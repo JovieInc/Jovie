@@ -226,6 +226,75 @@ describe('refreshLeadProfileEvidence', () => {
     );
   });
 
+  it('does not reuse earlier acceptance when a repeated refresh has no receipt', async () => {
+    mocks.musicFetch
+      .mockResolvedValueOnce('existing-music-job')
+      .mockResolvedValueOnce(null);
+    mocks.dsp
+      .mockResolvedValueOnce('existing-dsp-job')
+      .mockResolvedValueOnce(null);
+    const lead = { id: 'lead-1', spotifyUrl: ARTIST_URL };
+    const first = await refreshLeadProfileEvidence('profile-1', lead);
+    const repeated = await refreshLeadProfileEvidence('profile-1', lead);
+
+    expect(first).toMatchObject({ status: 'accepted' });
+    expect(repeated).toMatchObject({
+      status: 'partial',
+      musicFetch: false,
+      dspDiscovery: false,
+      jobs: {
+        musicFetch: { status: 'not_accepted', jobId: null },
+        dspDiscovery: { status: 'not_accepted', jobId: null },
+      },
+    });
+    expect(first.jobs).toEqual({
+      musicFetch: { status: 'accepted', jobId: 'existing-music-job' },
+      dspDiscovery: { status: 'accepted', jobId: 'existing-dsp-job' },
+    });
+  });
+
+  it('keeps the other durable receipt when one enqueue is canceled', async () => {
+    mocks.musicFetch.mockRejectedValue(
+      new DOMException('private cancellation detail', 'AbortError')
+    );
+
+    const result = await refreshLeadProfileEvidence('profile-1', {
+      id: 'lead-1',
+      spotifyUrl: ARTIST_URL,
+    });
+
+    expect(result).toMatchObject({
+      status: 'partial',
+      musicFetch: false,
+      dspDiscovery: true,
+      jobs: {
+        musicFetch: { status: 'failed', jobId: null },
+        dspDiscovery: { status: 'accepted', jobId: 'dsp-job' },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('private cancellation detail');
+  });
+
+  it('rejects a stale removed profile before repeating any accepted work', async () => {
+    const lead = { id: 'lead-1', spotifyUrl: ARTIST_URL };
+    await expect(
+      refreshLeadProfileEvidence('profile-1', lead)
+    ).resolves.toMatchObject({
+      status: 'accepted',
+    });
+    mocks.profile = [];
+    mocks.reconcile.mockClear();
+    mocks.musicFetch.mockClear();
+    mocks.dsp.mockClear();
+
+    await expect(refreshLeadProfileEvidence('profile-1', lead)).rejects.toThrow(
+      'Lead profile not found'
+    );
+    expect(mocks.reconcile).not.toHaveBeenCalled();
+    expect(mocks.musicFetch).not.toHaveBeenCalled();
+    expect(mocks.dsp).not.toHaveBeenCalled();
+  });
+
   it('accepts a DSP-only refresh when the profile has an ID but no URL', async () => {
     mocks.profile = [{ spotifyUrl: null, spotifyId: 'profile-artist' }];
     await expect(

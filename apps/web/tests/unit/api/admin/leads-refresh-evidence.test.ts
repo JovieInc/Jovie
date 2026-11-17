@@ -76,6 +76,7 @@ describe('POST /api/admin/leads/[id]/refresh-evidence', () => {
   it('denies non-admins', async () => {
     mocks.access.mockResolvedValue({ isAuthenticated: true, isAdmin: false });
     expect((await call()).status).toBe(403);
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
   it.each(['partial', 'failed'] as const)(
     'does not return HTTP success for %s work',
