@@ -1,8 +1,12 @@
 """Certification TODO stubs sync main only when main already filled them."""
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import cert_stub_sync as sync  # noqa: E402
 import fix_red_classes as classes  # noqa: E402
+import git_housekeeping  # noqa: E402
 
 PATHS = (
     "goldenPath.stages[0].oracle",
@@ -56,6 +61,28 @@ def show_clear(_app):
     return json.dumps(CLEAR)
 
 
+@contextlib.contextmanager
+def certification_main(document, *, publish=True):
+    """An actual origin/main independent of the source or installed archive."""
+    with tempfile.TemporaryDirectory() as directory:
+        repo = Path(directory)
+        config = repo / sync.CONFIG.format(app="jovie-ios")
+        config.parent.mkdir(parents=True)
+        config.write_text(document if isinstance(document, str) else json.dumps(document))
+        commands = [
+            ["init", "-q", "-b", "main"], ["add", "."],
+            ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+             "commit", "-qm", "certification fixture"],
+        ]
+        if publish:
+            commands.append(["update-ref", "refs/remotes/origin/main", "HEAD"])
+        for arguments in commands:
+            subprocess.run(["git", *arguments], cwd=repo, check=True, capture_output=True,
+                           env=git_housekeeping.apply_fixture_env(os.environ))
+        with contextlib.chdir(repo):
+            yield config
+
+
 class CertStubSyncTest(unittest.TestCase):
     def test_blocked_certification_syncs_main_when_main_filled_the_stubs(self):
         with patch.object(sync, "main_clear", return_value=True) as clear:
@@ -99,12 +126,32 @@ class CertStubSyncTest(unittest.TestCase):
             self.assertFalse(sync.main_clear([("jovie-ios", "waste.appId")]))
 
     def test_origin_main_already_cleared_the_recorded_jovie_ios_stubs(self):
-        self.assertEqual(sync.hit(COMPANY_LOG), ("cert-todo-stub", "sync-main"))
-        self.assertEqual(sync.hit(PUBLIC_LOG), ("cert-todo-stub", "sync-main"))
-        got = classes.classify(
-            pr(COMPANY, PUBLIC), {COMPANY: COMPANY_LOG, PUBLIC: PUBLIC_LOG})
-        self.assertEqual((got["cls"], got["action"], got["files"]), (
-            "cert-todo-stub", "sync-main", ["canon/certification/jovie-ios.json"]))
+        # Installed releases deliberately carry neither .git nor canon/. Test
+        # the real Git reader against our own ref, not the ambient checkout.
+        with certification_main(CLEAR) as config:
+            self.assertEqual(sync.hit(COMPANY_LOG), ("cert-todo-stub", "sync-main"))
+            self.assertEqual(sync.hit(PUBLIC_LOG), ("cert-todo-stub", "sync-main"))
+            got = classes.classify(
+                pr(COMPANY, PUBLIC), {COMPANY: COMPANY_LOG, PUBLIC: PUBLIC_LOG})
+            self.assertEqual((got["cls"], got["action"], got["files"]), (
+                "cert-todo-stub", "sync-main", ["canon/certification/jovie-ios.json"]))
+            config.write_text(json.dumps({"waste": {"appId": "TODO"}}))
+            self.assertEqual(sync.hit(COMPANY_LOG), ("cert-todo-stub", "sync-main"))
+
+    def test_real_git_missing_malformed_or_still_stubbed_main_stays_with_the_model(self):
+        stale = json.loads(json.dumps(CLEAR))
+        stale["waste"]["appId"] = "TODO: fill"
+        for document, publish in ((CLEAR, False), ("{", True), (stale, True)):
+            with self.subTest(document=document, publish=publish), \
+                    certification_main(document, publish=publish) as config:
+                # A clear working tree cannot substitute for the recorded ref.
+                config.write_text(json.dumps(CLEAR))
+                got = classes.classify(pr(COMPANY), {COMPANY: COMPANY_LOG})
+                self.assertEqual((got["cls"], got["action"]), ("cert-todo-stub", "agent"))
+
+    def test_an_installed_archive_without_git_evidence_stays_with_the_model(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):
+            self.assertEqual(sync.hit(COMPANY_LOG), ("cert-todo-stub", "agent"))
 
 
 if __name__ == "__main__":
