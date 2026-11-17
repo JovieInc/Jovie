@@ -7,9 +7,9 @@ import {
 } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { document } from './creator-document-test-fixture';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { CreatorDocumentsWorkspace as CreatorDocumentsWorkspaceComponent } from './CreatorDocumentsWorkspace';
+import { document } from './creator-document-test-fixture';
 
 function CreatorDocumentsWorkspace({
   creatorProfileId = '22222222-2222-4222-8222-222222222222',
@@ -84,7 +84,6 @@ vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
     </aside>
   ),
 }));
-
 
 describe('CreatorDocumentsWorkspace', () => {
   beforeEach(() => {

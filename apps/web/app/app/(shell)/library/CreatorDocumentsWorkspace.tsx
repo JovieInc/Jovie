@@ -623,7 +623,9 @@ export function CreatorDocumentsWorkspace({
   const [listStatus, setListStatus] = useState<'idle' | 'loading' | 'error'>(
     initialLoadFailed ? 'error' : 'idle'
   );
-  const [selectedId, setSelectedId] = useState<string | null>(initialDocumentId);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialDocumentId
+  );
   const [showCapture, setShowCapture] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
