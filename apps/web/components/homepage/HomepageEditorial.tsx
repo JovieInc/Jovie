@@ -1,4 +1,5 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
+import { Button, Input } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
@@ -326,14 +327,32 @@ function ClaimCloseBody() {
         <h2 className='hv3-statement text-balance'>{lines(claim.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{claim.subhead}</p>
         <div className='hv3-form'>
-          <Link
-            href={intent.href}
-            prefetch={false}
-            className='hv3-btn hv3-btn--primary'
-            data-testid='homepage-close-cta'
+          <form
+            method='get'
+            action={intent.href}
+            data-testid='homepage-claim-entry'
+            className='hv3-claim'
           >
-            {intent.label}
-          </Link>
+            <label
+              className='hv3-claim__label'
+              htmlFor='homepage-claim-entry-handle'
+            >
+              {claim.handleLabel}
+            </label>
+            <Input
+              id='homepage-claim-entry-handle'
+              name='handle'
+              type='text'
+              autoComplete='off'
+              spellCheck={false}
+              maxLength={30}
+              placeholder={claim.handlePlaceholder}
+              aria-label={claim.handleLabel}
+            />
+            <Button type='submit' data-testid='homepage-close-cta'>
+              {intent.label}
+            </Button>
+          </form>
         </div>
         <Steps steps={claim.steps} />
       </div>
