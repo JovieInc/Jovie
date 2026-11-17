@@ -18,7 +18,6 @@ import 'server-only';
 import type Stripe from 'stripe';
 
 import type { LockedCheckoutExpectation } from '@/lib/billing/price-lock-checkout';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -29,22 +28,9 @@ import {
   getPriceMappingDetails,
   type PlanType,
 } from './config';
-import { assertCheckoutPriceContract } from './price-contract';
+import { assertCheckoutPriceContract, getPlanDetails } from './price-contract';
 
 const retrievePrice = (id: string) => stripe.prices.retrieve(id);
-
-function getTargetPriceDetails(
-  priceId: string,
-  lockedPrice?: LockedCheckoutExpectation
-) {
-  const mapped = getPriceMappingDetails(priceId);
-  if (mapped || !lockedPrice) return mapped;
-  return {
-    plan: 'pro' as const,
-    interval: lockedPrice.interval,
-    description: getPlanDisplayName('pro'),
-  };
-}
 
 /**
  * Plan hierarchy for determining upgrade vs downgrade
@@ -254,7 +240,7 @@ export async function previewPlanChange(
 
     const currentPriceId = currentItem.price.id;
     const currentPriceDetails = getPriceMappingDetails(currentPriceId);
-    const newPriceDetails = getTargetPriceDetails(newPriceId, lockedPrice);
+    const newPriceDetails = getPlanDetails(newPriceId, lockedPrice);
 
     if (!currentPriceDetails || !newPriceDetails) {
       logger.warn('Cannot find price details for plan change', {
@@ -396,7 +382,7 @@ export async function executePlanChange(
 
     const currentPriceId = currentItem.price.id;
     const currentPriceDetails = getPriceMappingDetails(currentPriceId);
-    const newPriceDetails = getTargetPriceDetails(newPriceId, lockedPrice);
+    const newPriceDetails = getPlanDetails(newPriceId, lockedPrice);
 
     if (!currentPriceDetails || !newPriceDetails) {
       return {

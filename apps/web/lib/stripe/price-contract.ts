@@ -1,7 +1,22 @@
 import 'server-only';
 import type Stripe from 'stripe';
 import type { LockedCheckoutExpectation } from '@/lib/billing/price-lock-checkout';
-import { ACTIVE_PRICE_MAPPINGS } from './config';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { ACTIVE_PRICE_MAPPINGS, getPriceMappingDetails } from './config';
+
+/** Trusted lock metadata, used only after assertCheckoutPriceContract succeeds. */
+export function getPlanDetails(
+  priceId: string,
+  lockedPrice?: LockedCheckoutExpectation
+) {
+  const mapped = getPriceMappingDetails(priceId);
+  if (mapped || !lockedPrice) return mapped;
+  return {
+    plan: 'pro' as const,
+    interval: lockedPrice.interval,
+    description: getPlanDisplayName('pro'),
+  };
+}
 
 /** Stripe's billable object must match the displayed offer before any mutation. */
 export async function assertCheckoutPriceContract(

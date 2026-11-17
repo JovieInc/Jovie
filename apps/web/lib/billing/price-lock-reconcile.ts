@@ -90,17 +90,14 @@ export function reconcilePriceLocks(
     candidate => judgeCandidate(candidate, isPriceMapped) ?? []
   );
   for (const finding of findings) counts[finding.verdict] += 1;
+  const alarms = findings.filter(f => f.verdict !== 'ok');
   return {
     checked: findings.length,
     counts: counts as Readonly<Record<PriceLockVerdict, number>>,
     findings: findings as readonly ReconcileFinding[],
-    alarms: findings.filter(
-      f => f.verdict !== 'ok'
-    ) as readonly ReconcileFinding[],
+    alarms: alarms as readonly ReconcileFinding[],
   } as const;
 }
-export function alarmSeverity(
-  verdict: PriceLockVerdict
-): 'blocked' | 'degraded' {
+export function alarmSeverity(verdict: PriceLockVerdict) {
   return verdict === 'overcharged' ? 'blocked' : 'degraded';
 }

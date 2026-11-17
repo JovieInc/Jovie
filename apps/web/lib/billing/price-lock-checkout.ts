@@ -5,19 +5,18 @@ import {
   type ResolvedLockedPrice,
   resolveLockedPrice,
 } from './price-versions';
-export interface CheckoutPriceMapping {
-  readonly plan: string;
-  readonly interval: PriceInterval;
-  readonly amount?: number;
-  readonly legacy?: boolean;
-}
 export type LockedCheckoutExpectation = Pick<
   ResolvedLockedPrice,
   'amountCents' | 'currency' | 'interval'
 >;
 export function resolveCheckoutPrice(input: {
   readonly requestedPriceId: string;
-  readonly requestedMapping: CheckoutPriceMapping | null;
+  readonly requestedMapping: {
+    readonly plan: string;
+    readonly interval: PriceInterval;
+    readonly amount?: number;
+    readonly legacy?: boolean;
+  } | null;
   readonly lock: PriceLockSnapshot | null;
 }) {
   const { requestedPriceId, requestedMapping, lock } = input;

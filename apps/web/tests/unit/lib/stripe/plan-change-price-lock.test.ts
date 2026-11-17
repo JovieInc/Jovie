@@ -121,7 +121,10 @@ function makeSubscription(overrides: Record<string, unknown> = {}) {
       ],
     },
     ...overrides,
-  } as unknown as Stripe.Subscription;
+  } as unknown as Stripe.Subscription & {
+    current_period_start: number;
+    current_period_end: number;
+  };
 }
 
 describe('@critical plan-change price lock', () => {
