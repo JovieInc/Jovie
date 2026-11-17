@@ -3,18 +3,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PrivatePromotionForm } from './PrivatePromotionForm';
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigate }) }));
 vi.mock('@jovie/ui', () => ({ Button: 'button' }));
 
 afterEach(() => vi.unstubAllGlobals());
 
 it('saves edited copy for the exact selected work and reopens the returned private document', async () => {
-  const assign = vi.fn();
+  navigate.mockClear();
   const request = vi
     .fn()
     .mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ documentId: 'persisted-draft' }));
   vi.stubGlobal('fetch', request);
-  vi.stubGlobal('location', { assign });
   render(
     <PrivatePromotionForm
       profileId='owner'
@@ -37,10 +38,12 @@ it('saves edited copy for the exact selected work and reopens the returned priva
   fireEvent.change(copy, { target: { value: 'An edited private caption' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save private draft' }));
   await screen.findByRole('alert');
-  expect(assign).not.toHaveBeenCalled();
+  expect(navigate).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Save private draft' }));
   await waitFor(() =>
-    expect(assign).toHaveBeenCalledWith('/app/library?document=persisted-draft')
+    expect(navigate).toHaveBeenCalledWith(
+      '/app/library?document=persisted-draft'
+    )
   );
   const [url, options] = request.mock.calls[0];
   expect(url).toBe('/api/library/documents');
