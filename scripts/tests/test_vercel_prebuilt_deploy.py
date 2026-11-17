@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.tests.staging_controller_contract import assert_staging_controller_contract
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -30,17 +32,7 @@ ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
 
 def test_staging_controller_is_independent_and_exact_sha() -> None:
-    staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
-    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
-    assert "workflows: [CI]" in staging
-    assert "group: staging-mutation" in staging
-    assert "outcome=not_applicable" in staging
-    assert "product-lane-release-${candidate_sha}-${candidate_attempt}" in staging
-    assert "release_mode: staging" in staging
-    assert "fleet-promotion" not in staging
-    assert "release_mode: production" in production
-    assert 'staging_receipt_sha="$web_evidence_sha"' in production
-    assert "https://staging.jov.ie/api/health/build-info" in production
+    assert_staging_controller_contract(REPO_ROOT)
 
 
 def test_blocked_fleet_deployment_fails_the_production_controller() -> None:

@@ -20,6 +20,15 @@ const BASE_PROPS = {
 };
 
 describe('SegmentedDigitBox', () => {
+  it('has no accessibility violations in a right-to-left row', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <SegmentedDigitBox {...BASE_PROPS} ariaLabel='الرقم ١ من ٦' />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it('renders the error state with the error token, not raw red-* (JOV-6773)', () => {
     const { container } = render(<SegmentedDigitBox {...BASE_PROPS} error />);
 

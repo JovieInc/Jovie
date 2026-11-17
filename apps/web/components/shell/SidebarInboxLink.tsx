@@ -7,6 +7,10 @@ import {
   formatInboxPendingWorkLabel,
   type InboxNavigationAvailability,
 } from '@/lib/inbox/navigation-availability';
+import {
+  SIDEBAR_HEADER_ICON_BUTTON_CLASS,
+  SIDEBAR_HEADER_ICON_CLASS,
+} from './sidebar-header-icon-button';
 import { Tooltip } from './Tooltip';
 
 /**
@@ -18,9 +22,11 @@ export function SidebarInboxLink({
 }: {
   readonly availability?: InboxNavigationAvailability;
 }) {
-  const pending = availability?.state === 'available';
+  const pendingCount = availability?.pendingCount;
+  const pending =
+    availability?.state === 'available' && typeof pendingCount === 'number';
   const label = pending
-    ? `Inbox — ${formatInboxPendingWorkLabel(availability?.pendingCount ?? 0)}`
+    ? `Inbox — ${formatInboxPendingWorkLabel(pendingCount)}`
     : availability?.state === 'empty'
       ? 'Inbox — all caught up'
       : 'Inbox';
@@ -31,14 +37,15 @@ export function SidebarInboxLink({
         prefetch={false}
         aria-label={label}
         data-inbox-attention={
-          pending ? 'available' : (availability?.state ?? 'unknown')
+          pending
+            ? 'available'
+            : availability?.state === 'empty'
+              ? 'empty'
+              : 'unknown'
         }
-        className='focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
+        className={SIDEBAR_HEADER_ICON_BUTTON_CLASS}
       >
-        <Bell
-          className='size-(--app-shell-sidebar-icon-size)'
-          aria-hidden='true'
-        />
+        <Bell className={SIDEBAR_HEADER_ICON_CLASS} aria-hidden='true' />
         {pending ? (
           <span
             data-inbox-unread='true'

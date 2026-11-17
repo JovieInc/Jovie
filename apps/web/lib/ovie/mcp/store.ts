@@ -75,12 +75,12 @@ export type RecordBackend = {
     records: Array<{ key: string; value: unknown }>,
     ttlSeconds: number
   ): Promise<boolean>;
-  /** Lexically ordered records confined to prefix, exclusive of after. */
   listRecords?(
     prefix: string,
     after: string | undefined,
     limit: number
   ): Promise<Array<{ key: string; value: unknown }>>;
+  getMany?(keys: readonly string[]): Promise<Map<string, unknown>>;
   lpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
 };
