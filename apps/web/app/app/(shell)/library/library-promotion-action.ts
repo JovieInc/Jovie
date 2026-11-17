@@ -4,7 +4,7 @@ import type { LibraryReleaseAsset } from './library-data';
 import type { LibraryEntityAction } from './library-entity-actions';
 
 export function buildPrivatePromotionAction(
-  asset: LibraryReleaseAsset,
+  asset: Pick<LibraryReleaseAsset, 'id' | 'itemKind' | 'status' | 'lifecycleStatus'>,
   profileId: string | null,
   open: (url: string) => void
 ): LibraryEntityAction | null {
