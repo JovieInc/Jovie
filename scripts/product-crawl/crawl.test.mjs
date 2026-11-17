@@ -19,7 +19,7 @@ import { appendFile } from 'node:fs/promises';
 const fixture = process.env.CRAWL_TEST_FIXTURE;
 if (fixture === 'signal-exit')
   process.on('exit', () => process.kill(process.pid, 'SIGTERM'));
-const mkCtx = () => {
+const mkCtx = options => {
   const routeHandlers = [];
   let current = '${origin}/';
   return {
@@ -31,6 +31,7 @@ const mkCtx = () => {
         url() { return current; },
         async goto(target) {
           current = target;
+          appendFileSync('loads.jsonl', JSON.stringify({ target, ...options }) + '\\n');
           assert.equal(routeHandlers.length, fixture === 'no-bypass' ? 0 : 1);
           for (const { match, handler } of routeHandlers) {
             assert.equal(match(new URL(target)), true);
@@ -69,7 +70,7 @@ const mkCtx = () => {
 };
 export const chromium = {
   async launch() {
-    return { async newContext() { return mkCtx(); }, async close() {} };
+    return { async newContext(options) { return mkCtx(options); }, async close() {} };
   },
 };
 `;
@@ -83,14 +84,14 @@ const INVENTORY = {
 
 // Copy real crawl modules, including current-main helpers after reconciliation.
 // All browser work is synthetic and fetch is intercepted before crawl imports.
-async function buildTree() {
+async function buildTree(inventory = INVENTORY) {
   const root = await mkdtemp(join(tmpdir(), 'product-crawl-test-'));
   await cp(here, join(root, 'scripts/product-crawl'), { recursive: true });
   await mkdir(join(root, 'docs/product/generated'), { recursive: true });
   await mkdir(join(root, 'node_modules/playwright'), { recursive: true });
   await writeFile(
     join(root, 'docs/product/generated/artist-launch-inventory.json'),
-    JSON.stringify(INVENTORY)
+    JSON.stringify(inventory)
   );
   await writeFile(
     join(root, 'synthetic-state.json'),
@@ -235,6 +236,70 @@ test('a rejected continuation preserves the original stranger-only receipt asser
   assert.deepEqual(verdict.reasons, ['not crawled signed in']);
   assert.equal(verdict.findings.length, 0);
   assert.match(summary, /^## Product crawl: not ready/m);
+});
+
+test('discovery supplies one cold measurement without sharing identity or viewport', async t => {
+  const root = await buildTree({
+    inventory: [{ kind: 'page', route: '/[username]' }],
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const result = await runCrawl(root, 'success');
+  assert.equal(result.error, null, result.stderr);
+  const loads = (await readFile(join(root, 'loads.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line));
+  const cold = loads.filter(load => new URL(load.target).pathname === '/tim');
+  assert.equal(
+    cold.length,
+    4,
+    'one cold load for each identity and viewport, including discovery'
+  );
+  assert.equal(
+    cold.filter(load => load.viewport.width === 1440 && !load.storageState)
+      .length,
+    1
+  );
+  assert.equal(
+    cold.filter(load => load.viewport.width === 1440 && load.storageState)
+      .length,
+    1
+  );
+  const receipt = JSON.parse(
+    await readFile(join(root, 'out/receipt.json'), 'utf8')
+  );
+  assert.equal(
+    receipt.pages.filter(page => page.route === '/[username]').length,
+    6,
+    'both fixture handles keep their required coverage'
+  );
+});
+
+test('route aliases reuse a cold load while preserving every route and fixture observation', async t => {
+  const root = await buildTree({
+    inventory: [
+      { kind: 'page', route: '/[username]' },
+      { kind: 'page', route: '/tim' },
+    ],
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const result = await runCrawl(root, 'success');
+  assert.equal(result.error, null, result.stderr);
+  const loads = (await readFile(join(root, 'loads.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line));
+  assert.equal(
+    loads.filter(load => new URL(load.target).pathname === '/tim').length,
+    4
+  );
+  const receipt = JSON.parse(
+    await readFile(join(root, 'out/receipt.json'), 'utf8')
+  );
+  assert.equal(receipt.pages.length, 10);
+  assert.equal(receipt.pages.filter(page => page.route === '/tim').length, 4);
+  assert.equal(receipt.pages.filter(page => page.expectClaimBanner).length, 2);
+  assert.ok(receipt.measurementReuses >= 5);
 });
 
 test('receipt files do not hide a signal-terminated crawl', async t => {
