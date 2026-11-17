@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { RightPanelProvider, useRightPanel } from '@/contexts/RightPanelContext';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
 import { document } from './creator-document-test-fixture';
 
@@ -7,7 +10,11 @@ function RegisteredEditor() {
   return useRightPanel();
 }
 
-const older = { ...document, id: '20000000-0000-4000-8000-000000000001', title: 'Earlier private caption' };
+const older = {
+  ...document,
+  id: '20000000-0000-4000-8000-000000000001',
+  title: 'Earlier private caption',
+};
 const recent = Array.from({ length: 50 }, (_, index) => ({
   ...document,
   id: `recent-${index}`,
