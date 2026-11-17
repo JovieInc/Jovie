@@ -8,7 +8,12 @@ export function buildPrivatePromotionAction(
   profileId: string | null,
   open: (url: string) => void
 ): LibraryEntityAction | null {
-  if (!profileId || (asset.itemKind ?? 'release') !== 'release') return null;
+  if (
+    !profileId ||
+    (asset.itemKind ?? 'release') !== 'release' ||
+    asset.status === 'draft' ||
+    asset.lifecycleStatus === 'archived'
+  ) return null;
   return {
     id: 'draft-promotion',
     label: 'Draft Private Promotion',
