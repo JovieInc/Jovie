@@ -1,5 +1,6 @@
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AcquisitionCapture } from './AcquisitionCapture';
 
 const consent = vi.hoisted(() => ({
@@ -67,6 +68,21 @@ describe('AcquisitionCapture', () => {
     expect(consent.onChange).not.toHaveBeenCalled();
   });
 
+  it('does not persist or send a checkout return URL, even after consent changes', () => {
+    runtime.pathname = '/artist/tip/thank-you';
+    globalThis.history.replaceState(
+      {},
+      '',
+      `${runtime.pathname}?session_id=cs_test_private`
+    );
+    render(<AcquisitionCapture />);
+    const reconcileConsent = consent.onChange.mock.calls[0][0];
+    act(() => reconcileConsent());
+    expect(fetch).not.toHaveBeenCalled();
+    expect(consent.getOrCreateAcquisitionId).not.toHaveBeenCalled();
+    expect(globalThis.localStorage.length).toBe(0);
+  });
+
   afterEach(() => {
     globalThis.JVConsent = undefined;
     vi.unstubAllGlobals();
@@ -125,6 +141,44 @@ describe('AcquisitionCapture', () => {
     act(() => reconcileConsent());
 
     expect(consent.clearAcquisitionId).toHaveBeenCalledOnce();
+  });
+
+  it('resubscribes to consent changes when the consent manager announces it is ready', async () => {
+    const lateUnsubscribe = vi.fn();
+    render(<AcquisitionCapture />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(consent.onChange).toHaveBeenCalledTimes(1);
+
+    consent.onChange.mockReturnValue(lateUnsubscribe);
+    fireEvent(globalThis.window, new Event('jvconsent:ready'));
+
+    expect(consent.unsubscribe).toHaveBeenCalledOnce();
+    expect(consent.onChange).toHaveBeenCalledTimes(2);
+
+    const reconcileConsent = consent.onChange.mock.calls[1][0];
+    act(() => reconcileConsent());
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  });
+
+  it('swallows a failed acquisition request without remembering an identity', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    consent.rememberAcquisitionId.mockClear();
+
+    const { container } = render(<AcquisitionCapture />);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(consent.rememberAcquisitionId).not.toHaveBeenCalled();
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders no markup and has no axe violations', async () => {
+    const { container } = render(<AcquisitionCapture />);
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
   });
 });
 

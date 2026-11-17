@@ -211,3 +211,70 @@ export const HighPriority: Story = {
     },
   },
 };
+
+// Partial identity: no image and no display name
+export const PartialNoNameOrImage: Story = {
+  args: {
+    src: null,
+    alt: 'Unknown artist',
+    size: 'lg',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'With neither an image nor a display name the avatar keeps its frame and shows a neutral question mark.',
+      },
+    },
+  },
+};
+
+// Long display names
+export const LongContentName: Story = {
+  render: () => (
+    <div className='flex items-center gap-3'>
+      <Avatar
+        src={null}
+        alt='Maria Fernanda de la Cruz Hernández Villanueva'
+        name='Maria Fernanda de la Cruz Hernández Villanueva'
+        size='lg'
+        verified
+      />
+      <span className='w-48 truncate text-sm text-primary-token'>
+        Maria Fernanda de la Cruz Hernández Villanueva
+      </span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Long names reduce to two initials, so the avatar never grows; the neighbouring label owns truncation.',
+      },
+    },
+  },
+};
+
+// Right-to-left names
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='flex items-center gap-3'>
+      <Avatar
+        src={null}
+        alt='فرقة الأصوات العربية'
+        name='فرقة الأصوات العربية'
+        size='lg'
+        verified
+      />
+      <span className='text-sm text-primary-token'>فرقة الأصوات العربية</span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic names produce grapheme-safe initials inside a right-to-left row.',
+      },
+    },
+  },
+};

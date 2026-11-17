@@ -30,8 +30,19 @@ function LinkInspector({
   readonly onUnmount: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const copiedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => onUnmount, [onUnmount]);
+
+  // The copy-feedback reset must never outlive the inspector: a dangling
+  // timer fires setCopied after teardown and crashes non-DOM test
+  // environments as an unhandled ReferenceError (run 42701166354).
+  useEffect(
+    () => () => {
+      if (copiedResetRef.current !== null) clearTimeout(copiedResetRef.current);
+    },
+    []
+  );
 
   return (
     <EntitySidebarShell
@@ -63,7 +74,13 @@ function LinkInspector({
               onClick={async () => {
                 if (await copyToClipboard(row.jovieUrl)) {
                   setCopied(true);
-                  setTimeout(() => setCopied(false), 1200);
+                  if (copiedResetRef.current !== null) {
+                    clearTimeout(copiedResetRef.current);
+                  }
+                  copiedResetRef.current = setTimeout(
+                    () => setCopied(false),
+                    1200
+                  );
                 }
               }}
             >

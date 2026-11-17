@@ -200,3 +200,135 @@ export const BlockingFlow: Story = {
     ),
   },
 };
+
+export const Empty: Story = {
+  args: {
+    open: true,
+    onClose: () => console.log('Close'),
+    size: 'md',
+    children: (
+      <>
+        <DialogTitle>Import releases</DialogTitle>
+        <DialogDescription>
+          Nothing has been added to this dialog yet.
+        </DialogDescription>
+        <DialogBody />
+        <DialogActions>
+          <Button variant='outline'>Done</Button>
+        </DialogActions>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'An empty DialogBody keeps the title, description and actions in their slots without collapsing the frame.',
+      },
+    },
+  },
+};
+
+export const PartialTitleOnly: Story = {
+  args: {
+    open: true,
+    onClose: () => console.log('Close'),
+    size: 'sm',
+    children: <DialogTitle>Saving your changes</DialogTitle>,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required title is supplied: no description, body or actions. The close control still sits clear of the title.',
+      },
+    },
+  },
+};
+
+const LONG_TITLE =
+  'Transfer ownership of the Midnight Sessions Vol. 2 (Deluxe Extended Anniversary Edition) release and every linked smart link';
+const LONG_DESCRIPTION =
+  'The new owner receives full control of the release, its 48 tracks, all pre-save campaigns, every smart link and the fan contact list collected from them. You keep read-only access to past analytics.';
+const LONG_URL =
+  'https://jov.ie/midnightsessions/midnight-sessions-vol-2-deluxe-extended-anniversary-edition-remastered-bonus-tracks-live-from-the-hollywood-bowl';
+
+export const LongContent: Story = {
+  args: {
+    open: true,
+    onClose: () => console.log('Close'),
+    size: 'md',
+    children: (
+      <>
+        <DialogTitle>{LONG_TITLE}</DialogTitle>
+        <DialogDescription>{LONG_DESCRIPTION}</DialogDescription>
+        <DialogBody>
+          <div className='space-y-3 text-secondary'>
+            <p>
+              Smart link: <span className='break-all'>{LONG_URL}</span>
+            </p>
+            <p>
+              Ownership transfers apply immediately. Scheduled release-day
+              emails, pre-save reminders and countdown pages move with the
+              release, and collaborators invited by you will be asked to accept
+              the new owner before their access continues. Payouts already in
+              flight finish on the current account; future payouts follow the
+              new owner&apos;s connected distributor.
+            </p>
+          </div>
+        </DialogBody>
+        <DialogActions>
+          <Button variant='outline'>Keep ownership of this release</Button>
+          <Button variant='destructive'>
+            Transfer release and all smart links
+          </Button>
+        </DialogActions>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long title, description, unbroken URL and long action labels wrap inside the dialog without horizontal overflow.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <Dialog open onClose={() => console.log('Close')} size='md'>
+        <DialogTitle dir='rtl'>
+          تعديل الملف الشخصي للفنان وروابط الإصدارات
+        </DialogTitle>
+        <DialogDescription dir='rtl'>
+          حدّث اسمك المعروض وصورتك ونبذتك التعريفية. تظهر هذه التغييرات فورًا على
+          صفحتك العامة وعلى جميع الروابط التي شاركتها مع جمهورك.
+        </DialogDescription>
+        <DialogBody dir='rtl'>
+          <p className='text-secondary'>
+            رابط الإصدار:{' '}
+            <span className='break-all'>
+              https://jov.ie/midnightsessions/midnight-sessions-vol-2-deluxe-edition
+            </span>
+          </p>
+        </DialogBody>
+        <DialogActions dir='rtl'>
+          <Button variant='outline'>إلغاء</Button>
+          <Button variant='primary'>حفظ التغييرات</Button>
+        </DialogActions>
+      </Dialog>
+    </div>
+  ),
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic copy and a long link wrap inside each dialog slot, and the actions follow the reading direction.',
+      },
+    },
+  },
+};

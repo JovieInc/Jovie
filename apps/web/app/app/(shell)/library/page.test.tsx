@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   listCreatorDocuments: vi.fn(),
   listLibraryPostReleaseBundle: vi.fn(),
   listLibraryRelationshipsForProfile: vi.fn(),
+  listTeleprompterTakes: vi.fn(),
   listVideosForLibraryProjection: vi.fn(),
   loadAppShellRouteContext: vi.fn(),
   loadArchivedReleaseMatrixForProfile: vi.fn(),
@@ -57,6 +58,9 @@ vi.mock('@/lib/artist-rules/store', () => ({
 vi.mock('@/lib/library/profile-visibility.server', () => ({
   getLibraryProfileStateMapForProfile:
     mocks.getLibraryProfileStateMapForProfile,
+}));
+vi.mock('@/lib/teleprompter/takes/server', () => ({
+  listTeleprompterTakes: mocks.listTeleprompterTakes,
 }));
 vi.mock('@/lib/merch/service', () => ({
   getLibraryMerchCardsForProfile: mocks.getLibraryMerchCardsForProfile,
@@ -155,6 +159,7 @@ describe('LibraryPage private document boundary', () => {
     mocks.getLibraryProfileStateMapForProfile.mockResolvedValue(new Map());
     mocks.loadArtistHandleForProfile.mockResolvedValue(null);
     mocks.getLibraryAssetShareMapForProfile.mockResolvedValue(new Map());
+    mocks.listTeleprompterTakes.mockResolvedValue([]);
   });
 
   it('authorizes the selected profile before listing private documents', async () => {
@@ -325,5 +330,54 @@ describe('LibraryPage private document boundary', () => {
       creatorDocuments: [privateDocument],
       creatorDocumentsLoadFailed: false,
     });
+  });
+
+  it("lists the signed-in creator's studio takes without blob paths", async () => {
+    mocks.listTeleprompterTakes.mockResolvedValueOnce([
+      {
+        schemaVersion: 1,
+        takeId: 'take_1',
+        takeNumber: 2,
+        title: 'Save the Night intro',
+        kind: 'promo',
+        source: 'answer',
+        question: 'Why this song?',
+        contentType: 'video/webm',
+        sizeBytes: 1024,
+        durationMs: 30_000,
+        videoPathname: 'jovie/teleprompter/takes/user_1/take_1.webm',
+        ownerId: 'user_1',
+        kept: true,
+        createdAt: '2026-11-08T00:00:00.000Z',
+        updatedAt: '2026-11-08T00:00:00.000Z',
+      },
+    ]);
+
+    const result = await renderLibraryPage();
+
+    expect(mocks.listTeleprompterTakes).toHaveBeenCalledWith('user_1');
+    const takes = getClientProps(result).teleprompterTakes as unknown[];
+    expect(takes).toEqual([
+      expect.objectContaining({
+        takeId: 'take_1',
+        kept: true,
+        question: 'Why this song?',
+        mediaUrl: '/api/teleprompter/takes/take_1/media',
+      }),
+    ]);
+    expect(JSON.stringify(takes)).not.toContain('videoPathname');
+  });
+
+  it('still renders Work when the takes listing fails', async () => {
+    mocks.listTeleprompterTakes.mockRejectedValueOnce(new Error('blob down'));
+
+    const result = await renderLibraryPage();
+
+    expect(getClientProps(result)).toMatchObject({ teleprompterTakes: [] });
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      'Studio takes load failed on library page',
+      expect.any(Error),
+      expect.anything()
+    );
   });
 });

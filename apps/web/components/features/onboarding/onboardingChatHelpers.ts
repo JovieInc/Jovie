@@ -19,10 +19,6 @@ import { readOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { readOnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
-import type {
-  OnboardingProfileArtist,
-  OnboardingProfileBuilderState,
-} from './OnboardingProfileRail';
 import {
   type ArtistConfirmedOutput,
   type ArtistPickerOutput,
@@ -30,6 +26,10 @@ import {
   type OnboardingArtistSelection,
   type SocialLinkOutput,
 } from './OnboardingToolArtifacts';
+import type {
+  OnboardingProfileArtist,
+  OnboardingProfileBuilderState,
+} from './onboardingProfileRailState';
 
 export const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 

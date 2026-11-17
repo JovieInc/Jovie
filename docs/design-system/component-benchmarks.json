@@ -48,17 +48,39 @@
     },
     "packages/ui/atoms/badge.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "9bb70aca71858d8bb1cf7bc81fbf2fff38b3c6a8a6de2271641cb201a7bd921a",
+      "sourceHash": "cc4d9293f33f5532e7479471bc00a09d7a24b496fe1faeda89a37b42deddbb57",
       "reference": "shadcn/ui Badge (static text; no APG widget pattern)",
-      "checked": "static span, variants, forwardRef, no interactive role",
+      "checked": "Compared current shadcn Radix Badge span/optional asChild API, HTML props and refs, static role/keyboard contract, variant/state text, RTL/long labels and externally supplied props (no controlled state); retained non-interactive composition decision. Existing Chromium/axe evidence measures permission, info and accent text in both themes.",
       "gaps": [
         {
           "item": "asChild polymorphism (shadcn Badge)",
           "decision": "skip",
           "reason": "Badge is non-interactive here; interactive chips compose Link or Button",
           "reference": "shadcn/ui Badge"
+        },
+        {
+          "item": "Readable permission-restricted, info and accent status text in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe exact-node ratios: permission 5.69/6.88, info 4.97/13.38, accent 5.28/7.54 (light/dark); no violations or incomplete contrast checks."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/bases/radix/ui/badge.tsx",
+        "https://www.w3.org/WAI/ARIA/apg/practices/structural-roles/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "evidence": [
+        "packages/ui/atoms/badge.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/button.tsx": {
       "libraryVersion": 1,
@@ -76,23 +98,52 @@
     },
     "packages/ui/atoms/card.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "3b9e96ff809a39685518c01c88da54a39d3077303f767addab66df36d4d7c917",
+      "sourceHash": "c84a4c25697387019edfef7255534953e67a69b60052d23bccae5bc5140a3f5e",
       "reference": "shadcn/ui Card (structural container; no APG widget pattern)",
-      "checked": "asChild on every part, aria-busy for partial, focus ring on hoverable, forwardRef",
+      "checked": "Compared current shadcn Radix Card generic div parts (no current upstream asChild)/optional layout APIs, native HTML/Slot semantics and refs on all Jovie parts, caller-owned Link/Button keyboard behavior, external contentState and aria-busy override, native heading choice, long/RTL content, background-color exclusion from transitions, and light/dark partial-description/nested-status text. No internal controlled/uncontrolled state.",
       "gaps": [
         {
           "item": "hoverable variant is not operable by itself",
           "decision": "skip",
-          "reason": "interaction comes from asChild onto Link or Button, as with shadcn; Card adds no role",
-          "reference": "shadcn/ui Card"
+          "reason": "Interaction comes from Jovie's asChild composition onto native Link or Button; Card adds no role. Current pinned shadcn Card is structural and does not expose asChild.",
+          "reference": "shadcn/ui Card",
+          "priorReason": "interaction comes from asChild onto Link or Button, as with shadcn; Card adds no role"
         },
         {
           "item": "CardTitle fixed to h3",
           "decision": "skip",
           "reason": "asChild lets callers pick the heading level",
           "reference": "shadcn/ui Card"
+        },
+        {
+          "item": "Current shadcn CardAction, size=sm and card-spacing layout APIs",
+          "decision": "skip",
+          "reason": "These optional layout conveniences do not add widget behavior; Jovie retains its System B spacing and existing Header/Content/Footer plus className/Slot composition. No API parity is claimed.",
+          "reference": "shadcn/ui Radix Card at e62c9435fff729a175f38983dee73b2cb4f6a069"
+        },
+        {
+          "item": "Readable partial description and nested offline status in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe ratios (light/dark): partial description 9.16/11.06 at actual 0.8 partial opacity; nested offline status 5.69/5.93. Background color is excluded from Card transitions."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/bases/radix/ui/card.tsx",
+        "https://www.w3.org/WAI/ARIA/apg/practices/structural-roles/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "evidence": [
+        "packages/ui/atoms/card.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/checkbox.tsx": {
       "libraryVersion": 1,
@@ -142,16 +193,24 @@
           "reference": "Radix DropdownMenu"
         },
         {
-          "item": "aria-required-children: the search header (textbox + clear button) and the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "item": "aria-required-children: the loading/empty role=status nodes render as direct children of role=menu, so a loading or empty menu owns no menuitem (renderer)",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "loading and empty rows are disabled menuitems that arrow keys skip, each holding the polite status; common-dropdown.children.test.tsx checks owned roles and axe"
+        },
+        {
+          "item": "aria-required-children: the search header (textbox + clear button) renders inside role=menu, which may own only items, groups and separators, and axe also rejects it inside a group; in-menu search needs the APG Combobox shape (field outside a listbox) (renderer)",
           "decision": "adopt",
           "status": "open",
-          "reference": "APG Menu"
+          "reference": "APG Combobox"
         },
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror (common-dropdown-renderer, item renderers)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         },
         {
           "item": "context variant cannot be opened programmatically",
@@ -177,15 +236,16 @@
     },
     "packages/ui/atoms/context-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "5e0f2c2ff604a9fe0af83107752fe8a2a10784a7639b3e534562513e9951aa06",
+      "sourceHash": "a003a96f72ea05c32ea8e995eb437325c5de4a19b407b9a43ac4f85d6ceadeb8",
       "reference": "WAI-ARIA APG Menu; Radix ContextMenu; shadcn/ui ContextMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui ContextMenu"
+          "status": "done",
+          "reference": "shadcn/ui ContextMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -211,15 +271,16 @@
     },
     "packages/ui/atoms/dropdown-menu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "8d740b212d5d5d1b88584518c68879be6dd2d0f0f5d64114e413aa72fa5c4738",
+      "sourceHash": "06f601787e582942746d68b82e23acdf3cc77e827e777f198bcb9418ce692461",
       "reference": "WAI-ARIA APG Menu Button and Menu; Radix DropdownMenu; shadcn/ui DropdownMenu",
       "checked": "Radix roles and keys, dir passthrough, RTL indicators and chevron",
       "gaps": [
         {
           "item": "RTL: menu rows, inset labels, item indicators and the submenu chevron use physical pl-/pr-/left-/ml-auto (here and in lib/dropdown-styles MENU_ITEM_BASE); the chevron does not mirror",
           "decision": "adopt",
-          "status": "open",
-          "reference": "shadcn/ui DropdownMenu"
+          "status": "done",
+          "reference": "shadcn/ui DropdownMenu",
+          "resolution": "rows, inset labels, check and radio indicators, shortcuts and trailing slots use logical ps-/pe-/start-/ms-auto (here and in lib/dropdown-styles), and the submenu chevron mirrors with rtl:rotate-180; physical overrides from callers still win in LTR because Tailwind emits physical utilities after logical ones"
         }
       ]
     },
@@ -259,31 +320,58 @@
     },
     "packages/ui/atoms/icon-button.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "7f91c924aff09e580bb30798448b29a15940d77e0bbd2f0d9df5f592ada07aec",
+      "sourceHash": "1598c93b73d57dc48a68f84707c0d71ce8e30ab3a72c7e93d0573e0e5db1b508",
       "reference": "WAI-ARIA APG Button (icon-only needs an accessible name); shadcn/ui Button size icon",
       "checked": "accessible name, 44px target, destructive state, forwardRef",
       "gaps": [
         {
           "item": "Accessible name is optional in the types and unchecked at runtime, so an icon-only button can render nameless",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Button"
+          "status": "done",
+          "reference": "APG Button",
+          "resolution": "IconButtonProps requires ariaLabel, aria-label or aria-labelledby (IconButtonName union); the web typecheck compiles expect-error cases that fail if an unnamed icon button type-checks again"
         }
       ]
     },
     "packages/ui/atoms/inline-offline.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "12e8ddf0765f448feda2ef8202ca1162bc429464d35a8cf4eaf6038c2112f499",
+      "sourceHash": "947a16192f78ccc80c32efdd9a4da19ef5f0806319d626ac1c8242a23b11a776",
       "reference": "library offline-degraded; WAI-ARIA status live region",
-      "checked": "role=status polite atomic, retry button, logical text-start",
+      "checked": "Compared benchmark-library v1 offline-degraded, its current Linear/Things offline documentation, and WAI-ARIA status semantics: polite/atomic advisory region without focus management; optional native type=button retry with canonical Button, caller-owned callback/message, no local controlled state, logical RTL/wrapping, with/without-action states and light/dark text. No ref/asChild API or queue implementation is claimed.",
       "gaps": [
         {
           "item": "writes queued or clearly blocked (offline-degraded)",
           "decision": "skip",
           "reason": "the notice reports state; queuing belongs to the data owner",
           "reference": "library offline-degraded"
+        },
+        {
+          "item": "Readable offline status text with and without retry in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe exact-node ratios 5.69 light / 6.88 dark for both action states; no violations or incomplete contrast checks."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "docs/design-system/benchmark-library.json#offline-degraded",
+        "https://www.w3.org/TR/wai-aria-1.2/#status",
+        "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html",
+        "https://www.w3.org/WAI/ARIA/apg/patterns/button/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+        "https://linear.app/docs/get-the-app",
+        "https://culturedcode.com/things/cloud/"
+      ],
+      "evidence": [
+        "packages/ui/atoms/inline-offline.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/inline-subscribe.tsx": {
       "libraryVersion": 1,
@@ -372,16 +460,52 @@
     },
     "packages/ui/atoms/link.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "1c2fc40c2af23f21c48d9c705e38ee900c7a273eb2d41e0a34baf1f26fc8ae53",
+      "sourceHash": "55e4951efb85c7341b6333792520c2a506385c37fa27b945c191123ce189be78",
       "reference": "WAI-ARIA APG Link; Radix Slot (asChild); shadcn/ui Button link variant",
-      "checked": "anchor semantics, asChild Slot, aria-disabled blocks activation, aria-current via active, 44px target, forwardRef",
+      "checked": "Compared native anchor semantics with APG Link and current shadcn link/Slot composition; reviewed forwarded DOM props/ref and caller-provided aria-current, data-state precedence, disabled activation, target/RTL/reserved-label and reduced-motion contracts. Twelve Chromium story/theme observations cover six Link states, and two computed-color sequences check visited idle, keyboard focus, hover, press and restoration. Native :visited selectors remain; no history inspection was added.",
       "gaps": [
         {
           "item": "disabled links stay in the tab order",
           "decision": "skip",
           "reason": "aria-disabled with activation blocked is the APG-accepted form for a disabled link",
           "reference": "APG Link"
+        },
+        {
+          "item": "Readable default, active, visited, composed-child, long-content and state-matrix text in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Real Chromium/axe light ratios: default/composed/long 4.97, active 6.89, visited 7.10. Dark controls: default 8.39, active 10.24, visited 4.68. All 12 observations have zero violations or incomplete contrast checks. Existing semantic text tokens are reused; fills and borders are unchanged."
+        },
+        {
+          "item": "Declared visited preview follows its semantic token without overriding hover or native press",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Link; existing Link visited prop and native :visited contract",
+          "evidence": "Two Chromium computed-color regressions fail before and pass after: idle/focus use visited, hover/press use the interactive token, leaving restores visited. The named Link-scoped semantic state requires the existing component/state attributes; native history selectors and the existing disabled tab-order skip are unchanged. The final 16-case replay passes without any identity allowlist or baseline change."
         }
+      ],
+      "judge": "OpenAI Codex (source/reference/browser review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Fetched APG and current shadcn source; read the current implementation and executed focused unit and Chromium regressions. The combined unit batch passed 148 tests with one inherited jsdom mouse-leave skip; color proof comes from the browser. No external model invocation.",
+      "reviewSource": "962a117b844f3fd11f469867b5b5a5f06818e276",
+      "references": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/link/",
+        "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/button.tsx",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "referenceBlobs": {
+        "shadcn-ui/ui/apps/v4/registry/bases/radix/ui/button.tsx": "e6266ffa1f7d2a694f2abad0d51c215c8248c245"
+      },
+      "reviewedDependencies": {
+        "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252",
+        "apps/web/styles/tailwind-foundation.css": "0d1d8b2b77e51ce80246d8044168e5c90d95b9577a15d3c55c16da0b3cc3b913"
+      },
+      "evidence": [
+        "packages/ui/atoms/link.test.tsx",
+        "apps/web/tests/e2e/storybook-input.spec.ts",
+        "https://github.com/JovieInc/Jovie/commit/962a117b844f3fd11f469867b5b5a5f06818e276"
       ]
     },
     "packages/ui/atoms/native-select.tsx": {
@@ -458,7 +582,7 @@
     },
     "packages/ui/atoms/searchable-submenu.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "bc3b9d298ae39871e653d518c59ce4215abc92feb9dd6c62784ef7409516ee15",
+      "sourceHash": "e7e85aeb85a570cfae30c4725ac0557ebd7e52e58a78934841223b1288becfef",
       "reference": "WAI-ARIA APG Combobox (listbox popup) inside APG Menu; Radix DropdownMenu.Sub",
       "checked": "combobox ARIA, activedescendant target, live regions, submenu keys, RTL search chrome",
       "gaps": [
@@ -477,22 +601,24 @@
         {
           "item": "two polite status regions announce loading at once (sr-only summary and the loading row)",
           "decision": "adapt",
-          "status": "open",
-          "reference": "WAI-ARIA live regions"
+          "status": "done",
+          "reference": "WAI-ARIA live regions",
+          "resolution": "the loading row is now visual only (its spinner aria-hidden); the one sr-only status region announces loading, results and empty"
         },
         {
           "item": "trigger row uses the physical MENU_ITEM_BASE padding (lib/dropdown-styles)",
           "decision": "adopt",
-          "status": "open",
-          "reference": "APG Menu"
+          "status": "done",
+          "reference": "APG Menu",
+          "resolution": "MENU_ITEM_BASE pads both edges equally (px-2.5) and the touch target centres with translate, so the trigger row is direction-neutral; the chevron already mirrors"
         }
       ]
     },
     "packages/ui/atoms/segment-control.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "a697b4edc6981ea591718333ac770d3484507d55add801df06609a1f1b05ae28",
+      "sourceHash": "e51cd7fe7241a604da6976613c526dedccb649a1d79e432e5d344425c13af87e",
       "reference": "WAI-ARIA APG Tabs (automatic activation); Radix Tabs; shadcn/ui Tabs",
-      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship",
+      "checked": "tablist naming, arrow/Home/End keys, dir, disabled tabs, panel relationship, radio-group semantics",
       "gaps": [
         {
           "item": "dir was not honored: arrow keys ran LTR in RTL; now a dir prop reaches Radix Tabs",
@@ -503,8 +629,15 @@
         {
           "item": "standalone use exposes tabs whose aria-controls target empty, aria-hidden panels; for a pure choice APG Radio Group (or toggle-group) semantics fit",
           "decision": "adapt",
+          "status": "done",
+          "reference": "APG Tabs",
+          "resolution": "semantics='radio' renders a named Radix radio group with no tabpanels and nothing pointing at one; keys, dir and styling match the tab form"
+        },
+        {
+          "item": "app callers that offer a pure choice (time range, filters, modes) still use the tab form; move each to semantics='radio'",
+          "decision": "adopt",
           "status": "open",
-          "reference": "APG Tabs"
+          "reference": "APG Radio Group"
         },
         {
           "item": "controlled only (no defaultValue)",
@@ -649,10 +782,44 @@
     },
     "packages/ui/atoms/tooltip.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "6320ebfaa71e85e6e14daacc5067c11e2c19a8ba927796ac069ab964247cea70",
+      "sourceHash": "852f275c1f7853a26bd58637e47d255928c547d9d11253c8f159c4b9809ccb0a",
       "reference": "WAI-ARIA APG Tooltip; Radix Tooltip; shadcn/ui Tooltip",
-      "checked": "Radix hover/focus open, Escape, provider delays, collision padding, reduced motion",
-      "gaps": []
+      "checked": "Compared APG Tooltip and current Radix/shadcn provider, trigger and portalled-content APIs; reviewed inherited delays, controlled/uncontrolled open/change forwarding, Radix Escape delegation, anchor-detachment/collision safety, refs, RTL and reduced-motion contracts. Focused units retain existing behavior; Chromium measures actual Danger foreground/background in both themes. This shared-style consumer was re-reviewed although this patch does not change its component bytes.",
+      "gaps": [
+        {
+          "item": "Readable Danger text on the existing semantic error surface in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum); APG Tooltip",
+          "evidence": "Real Chromium/axe improves light Danger from 3.29 to 4.99 and dark from 4.82 to 6.20. Both observations have zero violations or incomplete contrast checks. Existing error-text replaces fill-color text; error-subtle background, border, geometry and behavior are unchanged."
+        }
+      ],
+      "reviewReason": "The previous source judgment was already stale; the current component and changed shared surface received a fresh reference/source/behavior review.",
+      "judge": "OpenAI Codex (source/reference/browser review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Fetched APG and current shadcn source; read current Tooltip and shared style behavior, ran focused unit regressions and two strict Danger Chromium observations. The inherited jsdom mouse-leave skip remains disclosed and unchanged. No external model invocation.",
+      "reviewSource": "962a117b844f3fd11f469867b5b5a5f06818e276",
+      "references": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/",
+        "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/tooltip.tsx",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "referenceBlobs": {
+        "shadcn-ui/ui/apps/v4/registry/bases/radix/ui/tooltip.tsx": "2b6c4e049259e7318d52e85e93e8079304fb67b5"
+      },
+      "reviewedDependencies": {
+        "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252",
+        "apps/web/styles/tailwind-foundation.css": "0d1d8b2b77e51ce80246d8044168e5c90d95b9577a15d3c55c16da0b3cc3b913"
+      },
+      "evidence": [
+        "packages/ui/atoms/tooltip.test.tsx",
+        "packages/ui/atoms/tooltip-anchor.test.tsx",
+        "packages/ui/atoms/tooltip-collision.test.tsx",
+        "packages/ui/atoms/tooltip-shortcut.test.tsx",
+        "apps/web/tests/e2e/storybook-input.spec.ts",
+        "https://github.com/JovieInc/Jovie/commit/962a117b844f3fd11f469867b5b5a5f06818e276"
+      ]
     },
     "packages/ui/atoms/tooltip-shortcut.tsx": {
       "libraryVersion": 1,

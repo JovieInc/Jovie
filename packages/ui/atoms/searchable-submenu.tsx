@@ -434,16 +434,12 @@ export function SearchableSubmenu({
             aria-hidden='true'
           >
             {isLoading && (
-              <div
-                role='status'
-                aria-live='polite'
-                className={MENU_LOADING_STATE_BASE}
-              >
+              // Visual only: the sr-only status above announces loading.
+              <div className={MENU_LOADING_STATE_BASE}>
                 <Loader2
                   aria-hidden='true'
                   className='h-5 w-5 animate-spin text-tertiary-token motion-reduce:animate-none'
                 />
-                <span className='sr-only'>Loading results</span>
               </div>
             )}
             {!isLoading && !hasResults && (

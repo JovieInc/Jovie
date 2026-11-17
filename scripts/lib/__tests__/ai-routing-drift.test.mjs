@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  budgetExhaustedResult,
   declaredCeilings,
   declaredGatewayModels,
   evaluateRouting,
@@ -80,6 +81,27 @@ describe('evaluateRouting', () => {
       severity: 'high',
       subject: 'jovie-golden-path-review',
       usdPerDay: 1.4,
+    });
+  });
+
+  it('reports the request volume next to the spend so call-count drift is visible', () => {
+    const result = evaluateRouting({
+      ...calm,
+      keyRows: [
+        {
+          api_key_name: 'jovie-golden-path-review',
+          total_cost: 2.8,
+          request_count: 3000,
+        },
+      ],
+    });
+    expect(result.byKey['jovie-golden-path-review']).toMatchObject({
+      usdPerDay: 1.4,
+      requestsPerDay: 1500,
+    });
+    expect(result.findings[0]).toMatchObject({
+      type: 'gateway-over-ceiling',
+      requestsPerDay: 1500,
     });
   });
 
@@ -218,5 +240,29 @@ describe('subsidy pool ledger', () => {
     const live = `[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=subscription-pool\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES=${quoted}"\n`;
     expect(profilesFromDropIns([older, live])).toEqual(hostProfiles);
     expect(profilesFromDropIns(['[Service]\nEnvironment=A=1\n'])).toBeNull();
+  });
+});
+
+describe('budgetExhaustedResult (JOV-12620)', () => {
+  it('reports an exhausted Gateway budget as a runway finding, not drift', () => {
+    const result = budgetExhaustedResult({ days: 2, reason: 'HTTP 402' });
+    expect(result.schema).toBe('jovie.ai-routing-check/v1');
+    expect(result.budgetExhausted).toBe(true);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({
+      type: 'gateway-runway',
+      severity: 'critical',
+    });
+    expect(result.findings[0].message).toContain('budget exhausted (HTTP 402)');
+  });
+
+  it('marks a measured run as not budget-exhausted', () => {
+    const result = evaluateRouting({
+      routing,
+      keyRows: [],
+      modelRows: [],
+      days: 2,
+    });
+    expect(result.budgetExhausted).toBe(false);
   });
 });

@@ -27,6 +27,7 @@ import {
   MENU_SEARCH_INPUT_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
+  MENU_TRAILING_SLOT_BASE,
   OVERLAY_COLLISION_PADDING,
   OVERLAY_CONTENT_RADIUS,
   OVERLAY_ITEM_FOCUS,
@@ -240,8 +241,10 @@ describe('dropdown-styles', () => {
       expect(MENU_ITEM_COMPACT_DESTRUCTIVE).toBe(MENU_ITEM_DESTRUCTIVE);
     });
 
-    it('CHECKBOX_RADIO_ITEM_BASE has left padding for indicator', () => {
-      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pl-7');
+    it('CHECKBOX_RADIO_ITEM_BASE pads the start edge for the indicator', () => {
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('ps-7');
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pe-2');
+      expect(CHECKBOX_RADIO_ITEM_BASE).not.toMatch(/\bp[lr]-/);
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('leading-4');
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('min-h-8');
     });
@@ -268,8 +271,12 @@ describe('dropdown-styles', () => {
       expect(MENU_SEPARATOR_BASE).not.toContain('border-t');
     });
 
-    it('MENU_SHORTCUT_BASE uses ml-auto alignment', () => {
-      expect(MENU_SHORTCUT_BASE).toContain('ml-auto');
+    it('MENU_SHORTCUT_BASE and MENU_TRAILING_SLOT_BASE push to the end edge', () => {
+      expect(MENU_SHORTCUT_BASE).toContain('ms-auto');
+      expect(MENU_TRAILING_SLOT_BASE).toContain('ms-auto');
+      expect(`${MENU_SHORTCUT_BASE} ${MENU_TRAILING_SLOT_BASE}`).not.toContain(
+        'ml-auto'
+      );
     });
   });
 

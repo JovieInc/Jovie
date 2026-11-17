@@ -9,9 +9,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
  * stay absolute or the announcement doubles.
  */
 const ROUTES = [
-  { path: '/compare', title: 'Compare — Jovie' },
+  { path: '/compare', title: 'Compare | Jovie' },
   { path: '/pricing', title: 'Pricing | Jovie' },
-  { path: '/cli', title: 'CLI — Jovie' },
+  { path: '/cli', title: 'CLI | Jovie' },
   { path: '/integrations', title: 'Integrations | Jovie' },
   { path: '/compare/linktree', title: 'Jovie vs Linktree' },
 ] as const;

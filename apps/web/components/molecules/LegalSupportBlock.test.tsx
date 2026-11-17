@@ -22,4 +22,11 @@ describe('LegalSupportBlock', () => {
       'px-3'
     );
   });
+
+  it('uses the secondary text token instead of neutral palette classes', () => {
+    render(<LegalSupportBlock description='We can help.' email='a@jov.ie' />);
+    const description = screen.getByText('We can help.');
+    expect(description).toHaveClass('text-secondary-token');
+    expect(description.className).not.toMatch(/neutral-\d/);
+  });
 });

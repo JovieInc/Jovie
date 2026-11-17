@@ -9,7 +9,7 @@ name: Pen draft missing frames
 # before code. This drafts one frame per brief in docs/design-system/pen-briefs
 # from the canonical workspace and uploads the drafts for review. A push
 # drafts only the briefs it changed (every brief when the drafter changed),
-# one job per frame, so no frame waits on another's 15-minute budget. It never
+# one job per frame, so no frame waits on another's retry budget. It never
 # writes back to the canonical file or approves anything in pen-bindings.json.
 # A run without the Pen secrets fails and says which one is missing.
 
@@ -19,6 +19,16 @@ on:
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-trim.mjs'
+      - '.github/workflows/pen-draft.yml'
+  # A brief change drafts on its own PR too, so the frames are in review
+  # before merge and nobody has to start a run by hand.
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'docs/design-system/pen-briefs/**'
+      - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-trim.mjs'
       - '.github/workflows/pen-draft.yml'
   workflow_dispatch:
     inputs:
@@ -31,13 +41,16 @@ permissions: {}
 
 # One group per commit: a push drafts only the briefs its own commit changed,
 # so a shared group would let GitHub drop a queued run and those briefs with it.
+# PRs share their own group; each PR plan includes every brief.
 concurrency:
-  group: pen-draft-${{ github.event_name }}-${{ github.sha }}
+  group: pen-draft-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: false
 
 jobs:
   plan:
     name: Plan Pen frames
+    # Fork PRs get no secrets; skip planning and its dependent draft jobs.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -88,8 +101,15 @@ jobs:
     needs: plan
     if: ${{ needs.plan.outputs.frames != '[]' }}
     runs-on: ubuntu-24.04
-    # pen-draft.mjs gives each frame 15 minutes; the rest is setup and upload.
+    # pen-draft.mjs budgets 23 minutes: one attempt, or a retry after an early
+    # failure. Setup and upload take under a minute, so two are reserved.
     timeout-minutes: 25
+    # Share the editor lease across PRs, main pushes and manual runs. Native
+    # queueing retains up to 100 pending jobs instead of replacing the oldest.
+    concurrency:
+      group: pen-draft-canonical-editor
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     strategy:
@@ -117,7 +137,13 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The Pen agent is Claude Code: run it on the paid subscription, never a
+          # metered API key (Tim, 2026-11-10). The metered key ran out of credit
+          # and every draft since failed with billing_error.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Blank drafts on the script's default, Fable 5.2. Set the repository
+          # variable to move drafts to another model without a code change.
+          PEN_DRAFT_MODEL: ${{ vars.PEN_DRAFT_MODEL }}
           FRAME: ${{ matrix.frame }}
         run: node scripts/design/pen-draft.mjs --out "$RUNNER_TEMP/pen-draft" --only "$FRAME"
 

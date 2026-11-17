@@ -2,8 +2,17 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink } from '@jovie/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  Link as JovieLink,
+} from '@jovie/ui';
 import type { UIMessage } from 'ai';
+import { Ellipsis } from 'lucide-react';
 import NextLink from 'next/link';
 import {
   type ReactNode,
@@ -27,20 +36,23 @@ import {
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
-import {
-  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
-  type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
-  resolvePreviewArtist,
-} from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import {
   isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
 import { endsInTerminalNextStep } from './onboardingChatHelpers';
+import { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 import { useOnboardingClaim } from './useOnboardingClaim';
 import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
+
+export { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
 
 const SIGN_IN_LABEL = 'Sign in';
 
@@ -74,35 +86,6 @@ export interface OnboardingShellProps {
   readonly turnstileTestMode?: boolean;
   /** The real page behind `?handle=`, shown before the visitor types. */
   readonly entryProfile?: StartEntryProfile | null;
-}
-
-/** Preview state for a prebuilt, unclaimed page so the rail shows it on first paint. */
-export function buildEntryProfileBuilderState(
-  entryProfile: StartEntryProfile | null | undefined
-): OnboardingProfileBuilderState {
-  // An open name still seeds the draft panel (Pen R6As7U): the visitor sees
-  // jov.ie/<handle> taking shape before the first message.
-  if (entryProfile?.status === 'available') {
-    return {
-      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
-      handle: entryProfile.handle,
-    };
-  }
-  if (entryProfile?.status !== 'claimable') {
-    return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
-  }
-  return {
-    artist: {
-      id: entryProfile.spotifyId ?? `handle-${entryProfile.handle}`,
-      name: entryProfile.displayName,
-      url: entryProfile.spotifyUrl ?? '',
-      imageUrl: entryProfile.avatarUrl,
-      genres: entryProfile.genres,
-    },
-    artistConfirmed: false,
-    handle: entryProfile.handle,
-    socialLinks: entryProfile.socialLinks,
-  };
 }
 
 /** The /start frame runs dark; the restore state reuses it so nothing repaints. */
@@ -291,41 +274,12 @@ export function OnboardingShell({
                   onLogout={onLogout}
                   disabled={actionPending || controlsDisabled}
                 >
-                  {onRestart && hasConversation ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onRestart}
-                    >
-                      Start Over
-                    </Button>
-                  ) : null}
-                  {isSignedIn && onLogout ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onLogout}
-                    >
-                      Log Out
-                    </Button>
-                  ) : null}
-                  {!isSignedIn ? (
-                    <JovieLink
-                      asChild
-                      variant='compact'
-                      touchTarget
-                      reserveLabel={SIGN_IN_LABEL}
-                      className='shrink-0 whitespace-nowrap'
-                    >
-                      <NextLink href={APP_ROUTES.SIGNIN}>
-                        {SIGN_IN_LABEL}
-                      </NextLink>
-                    </JovieLink>
-                  ) : null}
+                  <OnboardingOverflowMenu
+                    isSignedIn={isSignedIn}
+                    onRestart={hasConversation ? onRestart : undefined}
+                    onLogout={onLogout}
+                    disabled={actionPending || controlsDisabled}
+                  />
                 </OnboardingIdentityConflict>
               ) : null}
               <OnboardingChat
@@ -372,6 +326,46 @@ export function OnboardingShell({
         }
       />
     </SidebarProvider>
+  );
+}
+
+/** Presentation only: the shell's existing callbacks retain action authority. */
+export function OnboardingOverflowMenu({
+  isSignedIn,
+  onRestart,
+  onLogout,
+  disabled = false,
+}: Readonly<{
+  isSignedIn: boolean;
+  onRestart?: () => void;
+  onLogout?: () => void;
+  disabled?: boolean;
+}>) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <IconButton ariaLabel='Onboarding options' variant='ghost' size='sm'>
+          <Ellipsis aria-hidden='true' />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end'>
+        {onRestart ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onRestart}>
+            Start over
+          </DropdownMenuItem>
+        ) : null}
+        {isSignedIn && onLogout ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onLogout}>
+            Log out
+          </DropdownMenuItem>
+        ) : null}
+        {!isSignedIn ? (
+          <DropdownMenuItem asChild>
+            <NextLink href={APP_ROUTES.SIGNIN}>{SIGN_IN_LABEL}</NextLink>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -2,6 +2,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY as COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -57,14 +58,15 @@ async function gotoHomepage(page: PlaywrightPage) {
 }
 
 // Editorial homepage (Tim, 2026-11-03): the music-line hero, the profile and
-// releases chapters, then the role waitlist form. Invite-only, no prices.
+// releases chapters, then the claim-your-profile close into /start (Tim,
+// 2026-11-12: "Switch it"). No prices.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the locked headline with one invite action and a live-profile link', async ({
+  test('renders the locked headline with one claim action and a live-profile link', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -73,9 +75,10 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
 
+    const claim = getClaimProfileIntent();
     const cta = page.getByTestId('homepage-primary-cta');
-    await expect(cta).toHaveText(COPY.hero.primaryAction);
-    await expect(cta).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    await expect(cta).toHaveText(claim.label);
+    await expect(cta).toHaveAttribute('href', claim.href);
     const live = page.getByTestId('homepage-hero-live-profile');
     await expect(live).toHaveText(COPY.hero.secondaryAction);
     await expect(live).toHaveAttribute(
@@ -85,36 +88,38 @@ test.describe('Homepage', () => {
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
   });
 
-  test('offers no signup path and no prices while invite-only', async ({
+  test('sends every claim action to /start and shows no prices', async ({
     page,
   }) => {
     await expect(
       page.locator(
-        'main a:visible[href*="/signup"], main a:visible[href*="/start"], main a:visible[href*="/claim"]'
+        'main a:visible[href*="/signup"], main a:visible[href*="/claim"]'
       )
     ).toHaveCount(0);
+    const startLinks = page.locator('main a:visible[href^="/start"]');
+    expect(await startLinks.count()).toBeGreaterThan(0);
+    for (const href of await startLinks.evaluateAll(links =>
+      links.map(link => link.getAttribute('href'))
+    )) {
+      expect(href).toBe('/start');
+    }
     await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
     await expect(page.locator('main')).not.toContainText(/\$\d/);
   });
 
-  test('the hero action scrolls to the role waitlist form', async ({
-    page,
-  }) => {
-    await page.getByTestId('homepage-primary-cta').click();
-    await expect(page).toHaveURL(new RegExp(`#${HOMEPAGE_INVITE_ANCHOR}$`));
-    const form = page
-      .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-      .getByTestId('waitlist-role-form');
-    await expect(form).toBeInViewport();
-    await expect(form.getByRole('radio').first()).toBeVisible();
-    expect(await form.getByRole('radio').count()).toBeGreaterThan(1);
-    await expect(form.getByLabel('Email address')).toBeVisible();
+  test('closes on the claim action into /start', async ({ page }) => {
+    const close = page.locator(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    await close.scrollIntoViewIfNeeded();
     await expect(
-      form.getByRole('heading', { name: COPY.invite.headline })
+      close.getByRole('heading', { name: COPY.claim.headline })
     ).toBeVisible();
+    await expect(close.getByTestId('waitlist-role-form')).toHaveCount(0);
+    const cta = close.getByTestId('homepage-close-cta');
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute('href', getClaimProfileIntent().href);
   });
 
-  test('mounts hero, profile, releases, and the invitation close in order', async ({
+  test('mounts hero, profile, releases, and the claim close in order', async ({
     page,
   }) => {
     const headings = await page
@@ -124,7 +129,7 @@ test.describe('Homepage', () => {
       COPY.hero.headline,
       COPY.profile.headline,
       COPY.releases.headline,
-      COPY.invite.headline,
+      COPY.claim.headline,
     ]);
     await expect(
       page.getByRole('img', { name: COPY.profile.alt })
@@ -153,10 +158,10 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    // Invite-only: the header action scrolls to the on-page invitation form.
+    // The header action enters /start with the shared claim intent.
     await expect(
-      header.getByRole('link', { name: 'Request an Invite' })
-    ).toHaveAttribute('href', `/#${HOMEPAGE_INVITE_ANCHOR}`);
+      header.getByRole('link', { name: getClaimProfileIntent().label })
+    ).toHaveAttribute('href', getClaimProfileIntent().href);
     await expect(
       header.getByRole('link', { name: 'Request access' })
     ).toHaveCount(0);
@@ -271,6 +276,92 @@ test.describe('Homepage', () => {
     }
   });
 
+  test('keeps every section and mockup inside the one content box', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // Static geometry: the scroll-driven fade-ups scale what they reveal.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 1024, height: 900 },
+      { width: 1280, height: 900 },
+      { width: 1440, height: 900 },
+      { width: 1512, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+      const report = await page.evaluate(() => {
+        const out: string[] = [];
+        const desktop = window.innerWidth >= 1024;
+        const sections = document.querySelectorAll<HTMLElement>('.hv3');
+        if (sections.length < 4) out.push(`only ${sections.length} sections`);
+        for (const section of sections) {
+          const rule = section.querySelector<HTMLElement>(':scope > .hv3-rule');
+          if (!rule) continue;
+          const side = Number.parseFloat(getComputedStyle(rule).paddingLeft);
+          const box = section.getBoundingClientRect();
+          const left = box.left + side;
+          const right = box.right - side;
+          const name = section.className;
+          // Everything a reader sees as a pane or a column stays in the box.
+          for (const el of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage, .hv3-window, .hv3-lift, .hv3-plate, .hv3-phone, .hv3-captions, .hv3-moment, .hv3-sheet, .hv3-steps, .hv3-index'
+          )) {
+            if (
+              el.closest('[hidden]') ||
+              getComputedStyle(el).display === 'none'
+            )
+              continue;
+            const r = el.getBoundingClientRect();
+            if (r.width === 0) continue;
+            // On phones a stage crops its mockup at the box: measure the
+            // visible part.
+            const clip = el.closest<HTMLElement>('.hv3-stage');
+            const c = clip && clip !== el ? clip.getBoundingClientRect() : null;
+            const l = c ? Math.max(r.left, c.left) : r.left;
+            const rr = c ? Math.min(r.right, c.right) : r.right;
+            if (l < left - 1 || rr > right + 1) {
+              out.push(
+                `${name} ${el.className}: ${l.toFixed(1)}-${rr.toFixed(1)} outside ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // A full-width stage is the box itself, edge to edge.
+          for (const stage of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage--hero, .hv3-stage--releases'
+          )) {
+            const r = stage.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${stage.className}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} is not the box ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // On desktop the hero window and the release panes fill the box.
+          if (!desktop) continue;
+          for (const sel of [
+            '.hv3-rig--hero .hv3-window',
+            '.hv3-rig--releases',
+          ]) {
+            const el = section.querySelector<HTMLElement>(sel);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${sel}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} does not fill ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+        }
+        return out;
+      });
+      expect(report, `${viewport.width}px`).toEqual([]);
+    }
+  });
+
   test('keeps layout shift under 0.1 while the hero loads', async ({
     page,
   }) => {
@@ -348,9 +439,9 @@ test.describe('Homepage', () => {
   });
 });
 
-// The anchor must work from the server-rendered HTML alone.
+// The claim actions must work from the server-rendered HTML alone.
 test.describe('Homepage without JavaScript', () => {
-  test('keeps the hero action and the invitation form reachable', async ({
+  test('keeps the hero action and the claim close reachable', async ({
     browser,
     baseURL,
   }) => {
@@ -367,13 +458,13 @@ test.describe('Homepage without JavaScript', () => {
       });
       await expect(page.getByTestId('homepage-primary-cta')).toHaveAttribute(
         'href',
-        `#${HOMEPAGE_INVITE_ANCHOR}`
+        getClaimProfileIntent().href
       );
       await expect(
         page
           .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-          .getByTestId('waitlist-role-form')
-      ).toBeAttached();
+          .getByTestId('homepage-close-cta')
+      ).toHaveAttribute('href', getClaimProfileIntent().href);
     } finally {
       await context.close();
     }

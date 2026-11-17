@@ -1,5 +1,6 @@
 'use client';
 
+import * as RadixRadioGroup from '@radix-ui/react-radio-group';
 import * as RadixTabs from '@radix-ui/react-tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
@@ -59,6 +60,8 @@ const segmentTriggerVariants = cva(
     'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token',
     // Active state
     'data-[state=active]:border-subtle data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token data-[state=active]:shadow-none',
+    // Radio semantics mark the chosen item checked instead of active
+    'aria-checked:border-subtle aria-checked:bg-surface-0 aria-checked:text-primary-token aria-checked:shadow-none',
   ],
   {
     variants: {
@@ -68,7 +71,7 @@ const segmentTriggerVariants = cva(
         'linear-pill': cn(
           linearPillLabelClassName,
           linearPillFocusClassName,
-          'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:bg-transparent data-[state=active]:text-(--linear-btn-primary-fg)'
+          'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:bg-transparent data-[state=active]:text-(--linear-btn-primary-fg) aria-checked:bg-transparent aria-checked:text-(--linear-btn-primary-fg)'
         ),
       },
       layout: {
@@ -157,6 +160,13 @@ export interface SegmentControlProps<T extends string = string>
    * Set false when triggers control an external tabpanel via ariaControls.
    */
   readonly renderHiddenPanels?: boolean;
+  /**
+   * `tabs` (default) is a tablist for a control that switches a tabpanel.
+   * `radio` is a radio group for a pure choice with no panel (a filter, a
+   * range, a mode): no tabpanels are rendered and nothing points at an empty
+   * one. Arrow keys, Home/End and `dir` behave the same in both.
+   */
+  readonly semantics?: 'tabs' | 'radio';
 }
 
 /**
@@ -198,6 +208,7 @@ export function SegmentControl<T extends string = string>({
   triggerClassName,
   indicatorClassName,
   renderHiddenPanels = true,
+  semantics = 'tabs',
 }: SegmentControlProps<T>) {
   const resolvedVariant = variant ?? 'default';
   const listRef = React.useRef<HTMLDivElement | null>(null);
@@ -280,67 +291,107 @@ export function SegmentControl<T extends string = string>({
   const linearPillTriggerSizeClassName =
     resolvedVariant === 'linear-pill' ? linearPillSizeClassNames[size] : null;
 
+  const rootProps = {
+    dir,
+    value,
+    onValueChange: onValueChange as (value: string) => void,
+    'data-layout': layout,
+    'data-size': size,
+    'data-variant': resolvedVariant,
+    'data-semantics': semantics,
+    className: cn(
+      segmentControlVariants({ variant: resolvedVariant }),
+      resolvedVariant === 'linear-pill'
+        ? null
+        : segmentControlSurfaceSizeClassNames[size],
+      layout === 'fill' ? 'w-full' : 'max-w-full',
+      className
+    ),
+  };
+  const listClass = cn(
+    'relative flex items-center',
+    layout === 'fill' ? 'w-full' : 'w-fit max-w-full',
+    listClassName
+  );
+  const indicator =
+    resolvedVariant === 'linear-pill' && indicatorLayout ? (
+      <div
+        aria-hidden='true'
+        className={cn(linearPillIndicatorClassName, indicatorClassName)}
+        style={{
+          transform: `translateX(${indicatorLayout.x}px)`,
+          width: `${indicatorLayout.width}px`,
+        }}
+      />
+    ) : null;
+  const triggerProps = (option: SegmentControlOption<T>) => ({
+    value: option.value,
+    disabled: option.disabled,
+    ...(option.id ? { id: option.id } : {}),
+    ...(option.disabled ? { 'aria-disabled': true } : {}),
+    ...(option.ariaLabel ? { 'aria-label': option.ariaLabel } : {}),
+    ...(option.title ? { title: option.title } : {}),
+    ref: (node: HTMLButtonElement | null) => {
+      triggerRefs.current[option.value] = node;
+    },
+    className: cn(
+      segmentTriggerVariants({ layout, variant: resolvedVariant }),
+      linearPillTriggerSizeClassName ?? segmentTriggerSizeClassNames[size],
+      triggerClassName
+    ),
+  });
+  const triggerLabel = (option: SegmentControlOption<T>) => (
+    <span className='min-w-0 overflow-hidden text-ellipsis whitespace-nowrap'>
+      {option.label}
+    </span>
+  );
+
+  if (semantics === 'radio') {
+    // Same two layers as the tabs branch: the track (surface, padding) wraps
+    // the group, so the indicator's inset sits inside the track padding.
+    const {
+      value: groupValue,
+      onValueChange: onGroupValueChange,
+      ...trackProps
+    } = rootProps;
+    return (
+      <div {...trackProps}>
+        <RadixRadioGroup.Root
+          ref={listRef}
+          dir={dir}
+          value={groupValue}
+          onValueChange={onGroupValueChange}
+          aria-label={ariaLabel}
+          className={listClass}
+        >
+          {indicator}
+          {options.map(option => (
+            <RadixRadioGroup.Item key={option.value} {...triggerProps(option)}>
+              {triggerLabel(option)}
+            </RadixRadioGroup.Item>
+          ))}
+        </RadixRadioGroup.Root>
+      </div>
+    );
+  }
+
   return (
-    <RadixTabs.Root
-      dir={dir}
-      value={value}
-      onValueChange={onValueChange as (value: string) => void}
-      data-layout={layout}
-      data-size={size}
-      data-variant={resolvedVariant}
-      className={cn(
-        segmentControlVariants({ variant: resolvedVariant }),
-        resolvedVariant === 'linear-pill'
-          ? null
-          : segmentControlSurfaceSizeClassNames[size],
-        layout === 'fill' ? 'w-full' : 'max-w-full',
-        className
-      )}
-    >
+    <RadixTabs.Root {...rootProps}>
       <RadixTabs.List
         ref={listRef}
         aria-label={ariaLabel}
-        className={cn(
-          'relative flex items-center',
-          layout === 'fill' ? 'w-full' : 'w-fit max-w-full',
-          listClassName
-        )}
+        className={listClass}
       >
-        {resolvedVariant === 'linear-pill' && indicatorLayout ? (
-          <div
-            aria-hidden='true'
-            className={cn(linearPillIndicatorClassName, indicatorClassName)}
-            style={{
-              transform: `translateX(${indicatorLayout.x}px)`,
-              width: `${indicatorLayout.width}px`,
-            }}
-          />
-        ) : null}
+        {indicator}
         {options.map(option => (
           <RadixTabs.Trigger
             key={option.value}
-            value={option.value}
-            disabled={option.disabled}
-            {...(option.id ? { id: option.id } : {})}
+            {...triggerProps(option)}
             {...(option.ariaControls
               ? { 'aria-controls': option.ariaControls }
               : {})}
-            {...(option.disabled ? { 'aria-disabled': true } : {})}
-            {...(option.ariaLabel ? { 'aria-label': option.ariaLabel } : {})}
-            {...(option.title ? { title: option.title } : {})}
-            ref={node => {
-              triggerRefs.current[option.value] = node;
-            }}
-            className={cn(
-              segmentTriggerVariants({ layout, variant: resolvedVariant }),
-              linearPillTriggerSizeClassName ??
-                segmentTriggerSizeClassNames[size],
-              triggerClassName
-            )}
           >
-            <span className='min-w-0 overflow-hidden text-ellipsis whitespace-nowrap'>
-              {option.label}
-            </span>
+            {triggerLabel(option)}
           </RadixTabs.Trigger>
         ))}
       </RadixTabs.List>

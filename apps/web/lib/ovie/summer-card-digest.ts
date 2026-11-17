@@ -35,6 +35,10 @@ export function summerCardPayloadDigest(input: SummerCardInput): string {
       : []),
     // Appended only when filed, for the same replay reason.
     ...(input.facts?.length ? [input.facts] : []),
+    // Appended only when declared, for the same replay reason.
+    ...(input.risk || input.confidence
+      ? [input.risk ?? null, input.confidence ?? null]
+      : []),
   ]);
   return createHash('sha256').update(canonical).digest('hex');
 }

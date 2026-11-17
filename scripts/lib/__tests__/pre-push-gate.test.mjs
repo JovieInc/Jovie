@@ -89,6 +89,7 @@ describe('resolve-repo-node.sh', () => {
         PATH: `${nodeBin}:/usr/bin:/bin`,
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
+        JOVIE_NODE_AUTOFETCH: '0',
       },
     });
     return { nvmRoot, result };
@@ -241,8 +242,7 @@ describe('publication range failures', () => {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
       // HOME is the fixture so scanners cannot write into the user home.
-      // The node pin still has to resolve from the host nvm, or a machine
-      // whose ambient Node is behind .nvmrc exits before the scan.
+      // Resolve pinned Node from host nvm so older ambient Node reaches the scan.
       NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
@@ -288,9 +288,9 @@ describe('publication range failures', () => {
     for (const file of [
       'scripts/ci-branching-guard.mjs',
       'scripts/company-guards/size.mjs',
-      'scripts/lib/projected-tree-budget.mjs',
       'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
+      'scripts/lib/projected-tree-budget.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
       'scripts/preflight-changed.mjs',
       'scripts/hooks/prepush-preflight.mjs',
@@ -446,4 +446,55 @@ it('discovers publication behavior tests in CI for source-only guard edits', () 
       'scripts/lib/__tests__/pre-push-gate.test.mjs'
     );
   }
+});
+
+describe('company size inventory', () => {
+  it('checks oversized files even when tracked paths exceed the default child buffer', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'size-inventory-'));
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+    );
+    const git = (args, input) => {
+      const result = spawnSync('git', args, {
+        cwd: root,
+        env,
+        input,
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    try {
+      git(['init', '-q']);
+      const blob = git(['hash-object', '-w', '--stdin'], '');
+      const paths = Array.from(
+        { length: 6000 },
+        (_, index) => `fixture/${index}-${'x'.repeat(185)}.ts`
+      );
+      git(
+        ['update-index', '--index-info'],
+        [...paths, 'grown.ts'].map(file => `100644 ${blob}\t${file}\n`).join('')
+      );
+      expect(paths.join('\n').length).toBeGreaterThan(1024 * 1024);
+      writeFileSync(resolve(root, 'grown.ts'), 'source\n'.repeat(501));
+      const module = new URL('../../company-guards/size.mjs', import.meta.url)
+        .href;
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import {run} from ${JSON.stringify(module)}; console.log(JSON.stringify(run()));`,
+        ],
+        { cwd: root, env, encoding: 'utf8', maxBuffer: 1 << 26 }
+      );
+      expect(result.status, result.stderr.slice(0, 1500)).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        fails: ['grown.ts: 501 lines, over 500 and not baselined'],
+        count: 1,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

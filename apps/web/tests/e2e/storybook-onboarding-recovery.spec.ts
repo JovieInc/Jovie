@@ -20,6 +20,59 @@ const cases = [
 ] as const;
 
 for (const scenario of cases) {
+  test(`onboarding overflow preserves draft and keyboard focus: ${scenario.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: scenario.width, height: 720 });
+    await page.emulateMedia({ reducedMotion: scenario.reducedMotion });
+    await page.goto(
+      '/iframe.html?id=features-onboarding-onboardingshell--overflow-actions&viewMode=story'
+    );
+    await page.evaluate(theme => {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }, scenario.theme);
+    const trigger = page.getByRole('button', { name: 'Onboarding options' });
+    const input = page.getByRole('textbox', { name: 'Chat message' });
+    // Let the story's own keyboard play finish before checking the mounted UI.
+    await expect(trigger).toBeFocused();
+    await input.fill('My unfinished reply');
+    const before = await input.boundingBox();
+    await trigger.click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', '/signin');
+    const box = await menu.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(scenario.width);
+    expect(await input.boundingBox()).toEqual(before);
+    await testInfo.attach(
+      `onboarding-options-${scenario.name.replaceAll(' ', '-')}.png`,
+      {
+        body: await page.screenshot(),
+        contentType: 'image/png',
+      }
+    );
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(input).toHaveValue('My unfinished reply');
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('menuitem', { name: 'Start over' })
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Sign in' })).toBeFocused();
+    // The open menu may cover the input center on narrow screens.
+    // Click its visible left edge to exercise a real outside dismissal.
+    await input.click({ position: { x: 4, y: 4 } });
+    await expect(menu).toBeHidden();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('My unfinished reply');
+  });
+
   test(`artist confirmation keeps the handle turn reachable: ${scenario.name}`, async ({
     page,
   }) => {
@@ -80,9 +133,15 @@ for (const scenario of cases) {
       page.getByRole('textbox', { name: 'Proposed handle' })
     ).toBeVisible();
     await expect(input).toHaveValue('');
-    await expect(
-      page.getByRole('link', { name: 'Sign in', exact: true })
-    ).toBeVisible();
+    const options = page.getByRole('button', { name: 'Onboarding options' });
+    await options.click();
+    const signIn = page.getByRole('menuitem', { name: 'Sign in', exact: true });
+    await expect(signIn).toBeVisible();
+    await expect(signIn).toHaveAttribute('href', '/signin');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toBeHidden();
+    await expect(options).toBeFocused();
+    await expect(input).toHaveValue('');
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth

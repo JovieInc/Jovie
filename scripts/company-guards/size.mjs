@@ -84,6 +84,9 @@ export function run({ cwd = process.cwd() } = {}) {
   const files = execFileSync('git', ['ls-files'], {
     cwd: root,
     encoding: 'utf8',
+    // Match the adjacent size-ratchet Git reader: this repo's path list
+    // already exceeds Node's default 1 MiB buffer.
+    maxBuffer: 1 << 26,
   })
     .split('\n')
     .filter(Boolean);

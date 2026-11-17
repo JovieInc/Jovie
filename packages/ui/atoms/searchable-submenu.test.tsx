@@ -324,7 +324,7 @@ describe('SearchableList', () => {
   describe('Empty State', () => {
     it('shows empty message for empty items array', () => {
       render(<SearchableList items={[]} onSelect={vi.fn()} />);
-      expect(screen.getByText('No results found')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('0 results.');
     });
   });
 

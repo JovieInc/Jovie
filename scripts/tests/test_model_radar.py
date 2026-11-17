@@ -188,6 +188,8 @@ class CatalogTests(unittest.TestCase):
         self.assertIn(("triage", "@cf/cloudflare/clairic", False), got)
         self.assertIn(("chain", "spacexai/grok-4.7", True), got)
         self.assertIn(("chain", "@cf/cloudflare/clairic", True), got)
+        parked = {**REGISTRY, "tasks": [{**t, "status": "inactive"} if t["id"] == "chain" else t for t in REGISTRY["tasks"]]}
+        self.assertNotIn("chain", {r["task"] for r in radar.screen(parked, catalog, {"zai/glm-5.3-flash"})})
 
 
 class AdoptionTests(unittest.TestCase):

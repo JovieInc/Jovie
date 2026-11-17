@@ -177,8 +177,14 @@ describe('performance route manifest shell slice coverage', () => {
     expect(route.readySelectors.shell).toContain(
       '[data-testid="profile-header"]'
     );
+    expect(route.readySelectors.shell).toContain(
+      '[data-testid="profile-desktop-top-chrome"]'
+    );
     expect(route.readySelectors.content).toContain(
       '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
+    );
+    expect(route.readySelectors.content).toContain(
+      '[data-testid="profile-desktop-surface"][data-interactive-ready="true"]'
     );
     expect(getRouteTimingBudgets(route)).toContainEqual({
       metric: 'usable-alias-result',
@@ -312,6 +318,7 @@ describe('public-profile alias usable-result guard', () => {
     expect(config).toEqual({
       contentSelectors: [
         '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+        '[data-testid="profile-desktop-surface"][data-interactive-ready="true"]',
       ],
       destinationSelectors: [
         '[data-testid="profile-primary-tab-releases"]',
@@ -319,7 +326,10 @@ describe('public-profile alias usable-result guard', () => {
       ],
       expectedPaths: ['/dualipa?mode=listen'],
       sampleKey: 'sample-key',
-      shellSelectors: ['[data-testid="profile-header"]'],
+      shellSelectors: [
+        '[data-testid="profile-header"]',
+        '[data-testid="profile-desktop-top-chrome"]',
+      ],
     });
   });
 
@@ -354,10 +364,44 @@ describe('public-profile alias usable-result guard', () => {
     expect(aliasGuardRoute.readySelectors.content).toContain(
       '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
     );
+    expect(aliasGuardRoute.readySelectors.content).toContain(
+      '[data-testid="profile-desktop-surface"][data-interactive-ready="true"]'
+    );
+    expect(aliasGuardRoute.readySelectors.shell).toContain(
+      '[data-testid="profile-header"]'
+    );
+    expect(aliasGuardRoute.readySelectors.shell).toContain(
+      '[data-testid="profile-desktop-top-chrome"]'
+    );
     expect(aliasGuardRoute.aliasUsableResult?.destinationAffordances).toContain(
       '[data-testid="profile-primary-tab-listen"]'
     );
   });
+
+  it.each(['public-profile-subscribe', 'public-profile-tip'])(
+    'keeps a desktop-visible destination affordance for %s',
+    routeId => {
+      const route = requireRoute(routeId);
+      const affordances = route.aliasUsableResult?.destinationAffordances;
+
+      // The compact affordance stays first-class on the compact surface.
+      if (routeId === 'public-profile-subscribe') {
+        expect(affordances).toContain(
+          '[data-testid="profile-primary-tab-subscribe"]'
+        );
+        expect(affordances).toContain(
+          '[data-testid="profile-desktop-get-updates"]'
+        );
+      } else {
+        expect(affordances).toContain(
+          '[data-testid="profile-mode-drawer-pay"]'
+        );
+        expect(affordances).toContain(
+          '[data-testid="profile-desktop-open-payments"]'
+        );
+      }
+    }
+  );
 
   it('fails a slow max sample even when the usable-result median passes', () => {
     const result = createPageResult(

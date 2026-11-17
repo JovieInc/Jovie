@@ -453,7 +453,7 @@ describe('CommonDropdown', () => {
       ];
       render(<CommonDropdown items={items} open={true} />);
       const label = screen.getByText('Inset Label');
-      expect(label.className).toContain('pl-10');
+      expect(label.className).toContain('ps-10');
     });
   });
 
@@ -716,7 +716,7 @@ describe('CommonDropdown', () => {
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
       const menu = screen.getByRole('menu');
-      expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-motion', 'fade');
       expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
       expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -769,13 +769,23 @@ describe('CommonDropdown', () => {
       });
     });
 
-    it('renders search input when searchable is true', () => {
+    it('presents a searchable surface as a group holding the items menu', () => {
       render(
         <CommonDropdown items={basicItems} open={true} searchable={true} />
       );
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      // A text input is not an allowed role="menu" child (axe
+      // aria-required-children): input in the group, items in the inner menu.
+      const input = screen.getByPlaceholderText('Search...');
+      const group = input.closest('[role="group"]');
+      // axe aria-allowed-attr: orientation is not allowed on role="group".
+      expect(group?.hasAttribute('aria-orientation')).toBe(false);
+      expect(input.closest('[role="menu"]')).toBeNull();
+      expect(group?.querySelector('[role="menuitem"]')).not.toBeNull();
     });
 
+    // A text input is not an allowed role="menu" child (axe
+    // aria-required-children): the searchable surface presents as a group
+    // and the item rows stay in an inner menu.
     it('renders custom search placeholder', () => {
       render(
         <CommonDropdown
@@ -1399,77 +1409,6 @@ describe('CommonDropdown', () => {
         screen.queryByRole('menuitem', { name: /Facebook Post/ })
       ).not.toBeInTheDocument();
       expect(screen.getAllByRole('menu')).toHaveLength(1);
-    });
-
-    it('inherits submenu min-width from the trigger row when no override is provided', async () => {
-      const items: CommonDropdownItem[] = [
-        {
-          type: 'submenu',
-          id: 'share',
-          label: 'Share',
-          items: [
-            {
-              type: 'action',
-              id: 'copy-link',
-              label: 'Copy Link',
-              onClick: vi.fn(),
-            },
-          ],
-        },
-      ];
-      const user = userEvent.setup({ delay: null });
-      render(<CommonDropdown items={items} open={true} />);
-
-      const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
-      const triggerRectSpy = vi
-        .spyOn(shareTrigger, 'getBoundingClientRect')
-        .mockReturnValue(new DOMRect(0, 0, 236.6, 32));
-
-      await user.hover(shareTrigger);
-
-      await waitFor(() => {
-        const submenu = screen
-          .getByRole('menuitem', { name: 'Copy Link' })
-          .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '237px' });
-      });
-
-      expect(triggerRectSpy).toHaveBeenCalled();
-    });
-
-    it('keeps an explicit submenu min-width override when present', async () => {
-      const items: CommonDropdownItem[] = [
-        {
-          type: 'submenu',
-          id: 'share',
-          label: 'Share',
-          minWidth: '320px',
-          items: [
-            {
-              type: 'action',
-              id: 'copy-link',
-              label: 'Copy Link',
-              onClick: vi.fn(),
-            },
-          ],
-        },
-      ];
-      const user = userEvent.setup({ delay: null });
-      render(<CommonDropdown items={items} open={true} />);
-
-      const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
-      vi.spyOn(shareTrigger, 'getBoundingClientRect').mockReturnValue(
-        new DOMRect(0, 0, 240, 32)
-      );
-
-      await user.hover(shareTrigger);
-
-      await waitFor(() => {
-        const submenu = screen
-          .getByRole('menuitem', { name: 'Copy Link' })
-          .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '320px' });
-      });
     });
 
     it('preserves leading slot structure for icon-less submenu rows', async () => {

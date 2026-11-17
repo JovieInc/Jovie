@@ -28,12 +28,19 @@ export interface HomeLoopCanvasProps {
   readonly stages: readonly string[];
   readonly constraint: HomeLoopConstraint | null;
   readonly pulse: readonly HomeLoopTile[];
+  readonly reservePulseSourceCaption?: boolean;
   readonly asks: readonly HomeLoopAsk[];
   readonly rows: readonly HomeLoopRow[];
   readonly done: readonly HomeLoopDoneItem[];
   readonly doneSummary?: string | null;
   /** Status of the shipping read (constraint, pulse, in flight, done). */
   readonly loopStatus: HomeLoopSectionStatus;
+  /**
+   * Status of the constraint's own read, when it does not come from the
+   * shipping read (Ovie Home leads with the revenue blocker). Defaults to
+   * `loopStatus`. An `error` shows `copy.constraintUnknown`, never the all-clear.
+   */
+  readonly constraintStatus?: HomeLoopSectionStatus;
   readonly asksStatus: HomeLoopSectionStatus;
   /** Partial source failure while some or no asks are still shown. */
   readonly asksNotice?: string | null;
@@ -78,11 +85,13 @@ export function HomeLoopCanvas({
   stages,
   constraint,
   pulse,
+  reservePulseSourceCaption = false,
   asks,
   rows,
   done,
   doneSummary,
   loopStatus,
+  constraintStatus,
   asksStatus,
   asksNotice,
   asksNoticeHref,
@@ -107,13 +116,19 @@ export function HomeLoopCanvas({
   ).length;
   // The banner never claims the all-clear while the loop read is not ready
   // or no metric is measured; unknown renders as unknown (JOV-9019).
+  const bannerStatus = constraintStatus ?? loopStatus;
+  const unknownCopy = copy.constraintUnknown ?? 'Shipping status is unknown';
   const bannerUnknown =
-    loopStatus === 'loading'
+    bannerStatus === 'loading'
       ? null
-      : loopStatus === 'error'
-        ? copy.inFlightError
-        : constraint === null && !pulse.some(tile => tile.measured)
-          ? (copy.constraintUnknown ?? 'Shipping status is unknown')
+      : bannerStatus === 'error'
+        ? constraintStatus
+          ? unknownCopy
+          : copy.inFlightError
+        : constraintStatus === undefined &&
+            constraint === null &&
+            !pulse.some(tile => tile.measured)
+          ? unknownCopy
           : null;
   return (
     <div
@@ -134,9 +149,9 @@ export function HomeLoopCanvas({
         </section>
       ) : null}
       <HomeLoopConstraintBanner
-        constraint={loopStatus === 'ready' ? constraint : null}
+        constraint={bannerStatus === 'ready' ? constraint : null}
         emptyLabel={copy.constraintClear}
-        loading={loopStatus === 'loading'}
+        loading={bannerStatus === 'loading'}
         unknownLabel={bannerUnknown}
       />
       {pulseCaption ? (
@@ -147,7 +162,11 @@ export function HomeLoopCanvas({
           {pulseCaption}
         </h2>
       ) : null}
-      <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
+      <HomeLoopPulse
+        tiles={pulse}
+        loading={loopStatus === 'loading'}
+        reserveSourceCaption={reservePulseSourceCaption}
+      />
       {strip ? (
         <HomeLoopStageStrip
           title={copy.latencyTitle ?? 'Stage Time'}

@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/billing/offer-truth';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   buildProofClaimHref,
@@ -41,28 +40,20 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
   });
 
-  it('enters the /start qualify chat and reserves the name when access is limited (JOV-3379)', () => {
-    const cta = resolveProofClaimCta(true);
-    expect(cta.label).toBe('Claim yours');
-    expect(cta.limited).toBe(true);
-    expect(cta.note).toContain('Reserve');
-    expect(cta.href.startsWith(`${APP_ROUTES.START}?`)).toBe(true);
-    expect(cta.href).toContain(`campaign=${PROOF_CLAIM_CAMPAIGN_KEY}`);
-    expect(cta.href).not.toContain(APP_ROUTES.WAITLIST);
-    expect(cta.href).not.toContain('/tim/claim');
-  });
-
   it('routes the open door through the same qualify chat before Pro', () => {
     const href = buildProofClaimHref();
     expect(href.startsWith(`${APP_ROUTES.START}?`)).toBe(true);
     expect(href).toContain(`campaign=${PROOF_CLAIM_CAMPAIGN_KEY}`);
     expect(href).not.toContain(APP_ROUTES.SIGNUP);
-    expect(resolveProofClaimCta(false).href).toBe(href);
+    expect(resolveProofClaimCta().href).toBe(href);
     expect(
       new URL(href, 'https://jov.ie').searchParams.get('starter_prompt')
     ).toBe(PROOF_CLAIM_STARTER_PROMPT);
-    expect(resolveProofClaimCta(false).label).toBe('Get yours');
-    expect(resolveProofClaimCta(false).note).toContain('$12/mo');
+    expect(href).not.toContain(APP_ROUTES.WAITLIST);
+    expect(href).not.toContain('/tim/claim');
+    expect(resolveProofClaimCta().label).toBe('Get yours');
+    expect(resolveProofClaimCta().limited).toBe(false);
+    expect(resolveProofClaimCta().note).toContain('$12/mo');
   });
 
   it('keeps funnel event names stable and queryable', () => {
@@ -110,9 +101,8 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     });
   });
 
-  it('keeps the live limited-access claim without rewriting the homepage (HOLD #17156)', () => {
-    expect(FEATURE_FLAGS.WAITLIST_ENABLED).toBe(true);
-    expect(resolveProofClaimCta().label).toBe('Claim yours');
+  it('keeps the open proof claim without rewriting the homepage (HOLD #17156)', () => {
+    expect(resolveProofClaimCta().label).toBe('Get yours');
     const homepage = readFileSync(
       path.join(
         path.dirname(fileURLToPath(import.meta.url)),

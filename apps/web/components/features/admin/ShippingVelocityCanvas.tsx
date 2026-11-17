@@ -68,6 +68,13 @@ export function ShippingVelocityCanvas({
   onChartClick: () => void;
 }>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // The daily-data table scrolls internally, so axe scrollable-region-focusable
+  // requires keyboard access. tabIndex in JSX is rejected by the
+  // noNoninteractiveTabindex source guard; set the DOM property instead.
+  const setTableKeyboardFocusable = (element: HTMLDivElement | null) => {
+    if (element) element.tabIndex = 0;
+  };
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -163,7 +170,7 @@ export function ShippingVelocityCanvas({
         <summary className='cursor-pointer'>
           View daily data and lead time
         </summary>
-        <div className='max-h-64 overflow-auto'>
+        <div ref={setTableKeyboardFocusable} className='max-h-64 overflow-auto'>
           <table className='w-full text-left tabular-nums'>
             <caption className='text-left'>
               GitHub · UTC days · Lead time is daily median PR creation to

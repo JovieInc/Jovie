@@ -98,8 +98,8 @@
       "sources": [
         {
           "path": ".nvmrc",
-          "documentValue": "24.22.2",
-          "sha256": "9185b9f67843cabfa8054f65ce47ce0b52036b0bfe07ae5a6b834d97cc127140"
+          "documentValue": "24.22.3",
+          "sha256": "584f19ccde29925286e32f566a2aa06c89efb4e2eb2bb2fc9ea5d56e2d190ac4"
         },
         {
           "path": "package.json",
@@ -398,7 +398,7 @@
     "CODEX.md": {
       "owner": "@itstimwhite",
       "claim": "Local hooks reference canonical setup and cleanup wrappers, with Node pinned locally.",
-      "documentSha256": "a0b18c22687bddba54b71ff4ad36e3394a0eacb5ec0ff78778e0287dfee6151e",
+      "documentSha256": "a324500cc3b47e449585de073233e699f7cc34c9fb4fd4b821a863af18f99ea4",
       "sources": [
         {
           "path": ".codex/hooks.json",
@@ -406,8 +406,8 @@
         },
         {
           "path": ".nvmrc",
-          "documentValue": "24.22.2",
-          "sha256": "9185b9f67843cabfa8054f65ce47ce0b52036b0bfe07ae5a6b834d97cc127140"
+          "documentValue": "24.22.3",
+          "sha256": "584f19ccde29925286e32f566a2aa06c89efb4e2eb2bb2fc9ea5d56e2d190ac4"
         }
       ]
     },
@@ -444,7 +444,7 @@
       "sources": [
         {
           "path": ".github/CODEOWNERS",
-          "sha256": "51df591ca0045febc8611492d07951a35202d46af197143e8ab18af914fb21e5"
+          "sha256": "6f9aab9b9bfc8514963f6e8399ed43578225bd48ed15ace615698287d34e2da2"
         }
       ]
     },

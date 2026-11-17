@@ -14,6 +14,7 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import { captureOnboardingWant } from '@/lib/chat/tools/onboarding-want-capture';
 import {
   type CanonicalArtistMetrics,
   normalizeArtistMetrics,
@@ -55,7 +56,7 @@ import type {
  * Implementation strategy by tool type:
  *
  *   Deterministic (real logic now):
- *     - recordInterviewSignal  → appends to in-memory signal accumulator
+ *     - recordInterviewSignal  → appends to accumulator; logs unmet wants
  *     - proposeNextStep        → runs decideOnboardingAccess against accumulator
  *
  *   Pass-throughs to existing APIs (real logic now):
@@ -602,13 +603,12 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.recordInterviewSignal.inputSchema,
       execute: async (signal: z.infer<typeof interviewSignalSchema>) => {
         state.signals.push(signal);
-        const recordedAt = new Date().toISOString();
-        // Keep this silent in the UI; the accumulator feeds proposeNextStep
-        // within the same turn.
+        await captureOnboardingWant(state.sessionId, signal.want);
+        // Silent in the UI; the accumulator feeds proposeNextStep this turn.
         return {
           action: 'signal_recorded' as const,
           signal,
-          recordedAt,
+          recordedAt: new Date().toISOString(),
           signalCount: state.signals.length,
           summary: 'Signal noted.',
         };

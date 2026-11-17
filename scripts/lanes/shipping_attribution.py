@@ -349,6 +349,29 @@ def company_report(evidence_by_repository: dict, ledger: dict, generated_at: flo
             "complete": complete, "mergeCount": total, "projects": projects}
 
 
+_TRANSPORT = (RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError)
+
+
+def _gh_api(endpoint):
+    """Read one GitHub REST path. A failed call keeps gh's stderr on the error."""
+    try:
+        result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
+                                timeout=20, check=False)
+    except subprocess.TimeoutExpired as error:
+        raw = error.stderr or error.stdout or "timed out"
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", "replace")
+        raise RuntimeError(
+            f"origin-read-failed: {endpoint}: timeout: {' '.join(str(raw).split())[:300]}") from error
+    if result.returncode != 0:
+        detail = " ".join((result.stderr or result.stdout or "").split())[:300]
+        raise RuntimeError(f"origin-read-failed: {endpoint}: exit {result.returncode}: {detail}")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"origin-read-failed: {endpoint}: invalid json") from error
+
+
 def validate_origin_receipt(receipt: dict) -> None:
     if (not isinstance(receipt, dict) or type(receipt.get("pr")) is not int or receipt["pr"] < 1
             or not isinstance(receipt.get("repository"), str)
@@ -367,16 +390,26 @@ def resolve_origin_head(repository: str, number: int, expected_head: str, *, fet
     A just-pushed SHA can be missing from the pull and the git ref for a short
     window. Poll until both equal ``expected_head``. Repository, pull number,
     and base repo mismatches are rejected on the first read. A head that is
-    still different after the bounded wait is still a mismatch.
+    still different after the bounded wait is still a mismatch. A failed
+    repository read is transport and is retried; a disallowed repository is not.
     """
-    def remote(endpoint):
-        result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
-                                timeout=20, check=True)
-        return json.loads(result.stdout)
-    read = fetch or remote
+    read = fetch or _gh_api
     pause = sleep or time.sleep
     tries = ORIGIN_HEAD_READ_ATTEMPTS if attempts is None else attempts
-    canonical = read(f"repos/{repository}")["full_name"]
+    budget = max(tries, 1)
+    canonical = None
+    for attempt in range(budget):
+        try:
+            canonical = read(f"repos/{repository}")["full_name"]
+            break
+        except ValueError:
+            raise
+        except _TRANSPORT as error:
+            if attempt + 1 >= budget:
+                raise
+            print(f"origin repository read failed for {repository} "
+                  f"(attempt {attempt + 1}/{budget}): {error}", file=sys.stderr)
+            pause(ORIGIN_HEAD_RETRY_DELAYS[min(attempt, len(ORIGIN_HEAD_RETRY_DELAYS) - 1)])
     if canonical not in {project["repository"] for project in PROJECTS}:
         raise ValueError("origin-repository-not-allowed")
     for attempt in range(max(tries, 0)):

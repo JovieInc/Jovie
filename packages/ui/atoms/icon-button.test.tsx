@@ -393,3 +393,30 @@ describe('IconButton accessibility', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('IconButton accessible name', () => {
+  it('takes its name from aria-labelledby', () => {
+    render(
+      <>
+        <span id='icon-button-name'>Archive release</span>
+        <IconButton aria-labelledby='icon-button-name'>
+          <svg aria-hidden='true' />
+        </IconButton>
+      </>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Archive release' })
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to aria-label when the ariaLabel alias is blank', () => {
+    render(
+      <IconButton ariaLabel='  ' aria-label='Close panel'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Close panel' })
+    ).toBeInTheDocument();
+  });
+});

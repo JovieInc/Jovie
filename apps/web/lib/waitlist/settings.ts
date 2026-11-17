@@ -374,8 +374,13 @@ export async function releaseAutoAcceptSlot(
     .where(eq(waitlistSettings.id, SETTINGS_ROW_ID));
 }
 
+/**
+ * `dailyLimit` is the support-load-narrowed budget when the caller has one;
+ * the stored limit stays the ceiling either way.
+ */
 export async function tryReserveAutoAcceptSlot(
-  dbOrTx?: DbOrTransaction
+  dbOrTx?: DbOrTransaction,
+  options: { readonly dailyLimit?: number } = {}
 ): Promise<{
   shouldAutoAccept: boolean;
   reason: 'auto_accept_disabled' | 'capacity_full' | 'reserved';
@@ -387,7 +392,11 @@ export async function tryReserveAutoAcceptSlot(
     return { shouldAutoAccept: false, reason: 'auto_accept_disabled' };
   }
 
-  if (settings.autoAcceptedToday >= settings.autoAcceptDailyLimit) {
+  const limit = Math.min(
+    settings.autoAcceptDailyLimit,
+    Math.max(0, Math.trunc(options.dailyLimit ?? settings.autoAcceptDailyLimit))
+  );
+  if (settings.autoAcceptedToday >= limit) {
     return { shouldAutoAccept: false, reason: 'capacity_full' };
   }
 
@@ -402,7 +411,7 @@ export async function tryReserveAutoAcceptSlot(
       and(
         eq(waitlistSettings.id, SETTINGS_ROW_ID),
         eq(waitlistSettings.autoAcceptEnabled, true),
-        drizzleSql`${waitlistSettings.autoAcceptedToday} < ${waitlistSettings.autoAcceptDailyLimit}`
+        drizzleSql`${waitlistSettings.autoAcceptedToday} < least(${waitlistSettings.autoAcceptDailyLimit}, ${limit})`
       )
     )
     .returning({ id: waitlistSettings.id });

@@ -1,20 +1,17 @@
 #!/usr/bin/env node
-// api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
-// api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 import { spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { proseOnly } from './lib/pr-prose.mjs';
+import { shipIntent } from './lib/auto-ready-provenance.mjs';
+import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
+import {
+  runGithub as gh,
+  publicationPriority,
+  recordPublication,
+} from './lib/pr-publication.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
@@ -88,6 +85,11 @@ export function evidenceFromBody(body = '') {
   const red = section(body, 'Red-before-green');
   return {
     metric,
+    metricAfter:
+      metric && parts[4] !== '' && Number.isFinite(Number(parts[4]))
+        ? parts[4]
+        : undefined,
+    verifyLink: value(win, 'Verify'),
     claim: value(win, 'Claim'),
     area: value(win, 'Area'),
     theme: value(win, 'Theme'),
@@ -153,7 +155,7 @@ function blastRadius(paths) {
 
 /** @param {{
  *   title: string, files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
- *   labels?: string[], summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
+ *   labels?: string[], summary?: string, metric?: string, metricAfter?: string, verifyLink?: string, claim?: string, area?: string, theme?: string,
  *   perMerge?: boolean, failingCommand?: string, failingRun?: string, customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
  * }} input */
 export function draftBody({
@@ -162,6 +164,8 @@ export function draftBody({
   labels = [],
   summary,
   metric,
+  metricAfter,
+  verifyLink,
   claim,
   area,
   theme,
@@ -187,7 +191,7 @@ export function draftBody({
     const parts = (metric ?? '').split('|').map(s => s.trim());
     const [name, unit, better, before, source, ...query] = parts;
     const line = metric
-      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ? | ${source} | ${query.join('|')}`
+      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ${metricAfter ?? '?'} | ${source} | ${query.join('|')}`
       : '';
     out.push(
       [
@@ -203,9 +207,9 @@ export function draftBody({
             .toLowerCase()
         }`,
         line,
-        `- Verify: ${prUrl}`,
+        `- Verify: ${verifyLink || prUrl}`,
         ...(perMerge ? ['- Per-merge: yes'] : []),
-        '- Pending: yes',
+        ...(metricAfter === undefined ? ['- Pending: yes'] : []),
       ].join('\n')
     );
   } else out.push('## Win\n\nn/a');
@@ -270,20 +274,6 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
 
-/** @type {Command} */
-const gh = (cwd, args, opts = {}) =>
-  spawnSync(
-    'node',
-    [
-      path.join(cwd, 'packages/api-client/cli.ts'),
-      'gh',
-      '--priority',
-      'default',
-      '--',
-      ...args,
-    ],
-    { cwd, encoding: 'utf8', ...opts }
-  );
 /** @type {Command} */
 const run = (cmd, args, opts = {}) =>
   spawnSync(cmd, args, { encoding: 'utf8', ...opts });
@@ -379,6 +369,8 @@ function parse(argv) {
     else if (f === '--summary') a.summary = v();
     else if (f === '--label') a.labels.push(v());
     else if (f === '--metric') a.metric = v();
+    else if (f === '--metric-after') a.metricAfter = v();
+    else if (f === '--verify-link') a.verifyLink = v();
     else if (f === '--claim') a.claim = v();
     else if (f === '--area') a.area = v();
     else if (f === '--theme') a.theme = v();
@@ -389,25 +381,17 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
+    else if (f === '--park') a.park = true;
+    else if (f === '--on-green') a.onGreen = true;
     else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
+    else if (f === '--no-repair-reserve') a.noRepairReserve = true;
+    else if (f.startsWith('--no-repair-reserve='))
+      a.priorityError = '--no-repair-reserve takes no value';
     else if (!f.startsWith('--')) a.number = f;
   }
   return a;
-}
-
-function record(row) {
-  try {
-    const dir = path.join(homedir(), '.local/state/jovie-lanes');
-    mkdirSync(dir, { recursive: true });
-    appendFileSync(
-      path.join(dir, 'pr-open.jsonl'),
-      `${JSON.stringify({ at: new Date().toISOString(), ...row })}\n`
-    );
-  } catch {
-    /* metric write is best effort */
-  }
 }
 
 const PR_FIELDS =
@@ -558,12 +542,9 @@ export async function refreshBodyChecks(
       );
   };
   try {
-    // A body or title change emits its own edited event carrying the exact
-    // final body, so one PATCH is one fresh flight. The marker round-trip is
-    // kept only for a byte-identical update, where GitHub emits no event at
-    // all and a forced mutation is the only way to request fresh checks
-    // (JOV-10354: the unconditional double PATCH doubled every update's
-    // Source Validation flights).
+    // A changed body/title emits its own edited event, so one PATCH is one fresh
+    // flight. A byte-identical update emits none, so only it gets the marker
+    // round-trip (JOV-10354: an unconditional double PATCH doubled flights).
     if (body === pr.body && title === pr.title) {
       edit(
         `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
@@ -605,9 +586,14 @@ export async function main(
     execute = run,
     diagnose = console.error,
     pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+    record = recordPublication,
   } = {}
 ) {
   const a = parse(argv);
+  if (a.priorityError) {
+    log(`FAIL  priority: ${a.priorityError}`);
+    return 2;
+  }
   const git = (args, options = {}) =>
     execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
@@ -692,7 +678,7 @@ export async function main(
             f.filename,
           ]).stdout;
     }
-    const title = a.title || pr?.title || subjects[0] || '';
+    const title = scrubPrText(a.title || pr?.title || subjects[0] || '');
     const labels = [
       ...new Set([
         ...(pr?.labels ?? []).map(l => (typeof l === 'string' ? l : l.name)),
@@ -709,6 +695,11 @@ export async function main(
           ? {}
           : evidenceFromBody(pr.body);
       }
+    }
+    // A replacement baseline needs its own after-value and verification source.
+    if (a.metric !== undefined) {
+      derived.metricAfter = undefined;
+      derived.verifyLink = undefined;
     }
     const input = {
       ...derived,
@@ -729,9 +720,10 @@ export async function main(
           ? `${title}\n\nChanges: ${commonDirectories(files.map(f => f.filename)).join(', ')}.`
           : subjects.join('; ') || undefined),
     };
-    const body = a.bodyFile
+    const raw = a.bodyFile
       ? readFileSync(a.bodyFile, 'utf8')
       : draftBody(input);
+    const body = scrubPrText(shipIntent(raw, a, pr?.body));
     const identity = a.number ? targetErrors(body, a.number, true) : [];
     const needs = a.bodyFile ? [] : missingEvidence(input);
     if (needs.length)
@@ -785,12 +777,31 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
-    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
-      execute,
-      log,
-      record,
+    const { automaticPriority, priority: capacityPriority } =
+      publicationPriority({
+        title,
+        body,
+        labels,
+        files,
+        evidence: evidenceFromBody(body),
+        noRepairReserve: a.noRepairReserve,
+      });
+    record({
+      cmd: 'publication-priority',
+      automaticPriority,
+      priority: capacityPriority,
+      noRepairReserve: a.noRepairReserve === true,
     });
-    if (wip.refused) return 3;
+    const wip = wipGate(
+      { ...a, capacityPriority },
+      git(['branch', '--show-current']).stdout.trim(),
+      {
+        execute,
+        log,
+        record,
+      }
+    );
+    if (wip.refused) return wip.deferred ? 75 : 3;
     if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
@@ -815,9 +826,8 @@ export async function main(
         });
         if (push.status !== 0) return push.status ?? 1;
       }
-      // A narrow origin.fetch may not map this branch to @{upstream}, even
-      // after a successful push. Prove the intended remote head, then name it
-      // explicitly; never recover by pushing again or bypassing publication gates.
+      // A narrow origin.fetch may not map this branch to @{upstream}: prove the
+      // remote head and name it; never re-push or bypass publication gates.
       const remoteRef = `refs/heads/${branch}`;
       const published = git(
         ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
@@ -839,22 +849,26 @@ export async function main(
         throw new Error(
           `publication-head: remote head does not match the intended commit for ${branch}`
         );
-      const made = github(a.repo, [
-        'pr',
-        'create',
-        '--head',
-        branch,
-        '--repo',
-        REPOSITORY,
-        '--base',
-        a.base,
-        '--title',
-        title,
-        '--body-file',
-        bodyFile,
-        ...(a.draft ? ['--draft'] : []),
-        ...labels.flatMap(l => ['--label', l]),
-      ]);
+      const made = github(
+        a.repo,
+        [
+          'pr',
+          'create',
+          '--head',
+          branch,
+          '--repo',
+          REPOSITORY,
+          '--base',
+          a.base,
+          '--title',
+          title,
+          '--body-file',
+          bodyFile,
+          ...(a.draft ? ['--draft'] : []),
+          ...labels.flatMap(l => ['--label', l]),
+        ],
+        { once: true, priority: capacityPriority }
+      );
       log((made.stdout || made.stderr).trim());
       const url = made.stdout.trim().split('\n').pop();
       if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {

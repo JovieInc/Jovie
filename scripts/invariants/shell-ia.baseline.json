@@ -22,7 +22,6 @@
     "apps/web/components/features/admin/capacity/CapacityBoard.tsx": 1,
     "apps/web/components/features/admin/certifications/CertificationWalkthrough.tsx": 1,
     "apps/web/components/features/admin/layout/OperatorRouteTabs.tsx": 1,
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": 1,
     "apps/web/components/features/chat/navigation-rail/ChatThreadNavigationRail.tsx": 1,
     "apps/web/components/features/dashboard/organisms/LiquidGlassMenu.tsx": 2,
     "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": 1,

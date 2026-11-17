@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import fs, { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -96,4 +97,62 @@ test('the funnel rubric contract depends on the lead DM template (#20922)', () =
       'apps/web/lib/leads/constants.ts'
     )
   );
+});
+
+test('one selection parses shared cyclic imports once and preserves grouped input order', t => {
+  const root = fixture({
+    'scripts/a.test.mjs': "import './shared.mjs';",
+    'scripts/b.test.mjs': "import './shared.mjs';",
+    'scripts/shared.mjs':
+      "import './cycle.mjs'; readFileSync('docs/guide.md');",
+    'scripts/cycle.mjs': "import './shared.mjs';",
+    'docs/guide.md': '# guide',
+  });
+  let sharedReads = 0;
+  const read = fs.readFileSync;
+  t.mock.method(fs, 'readFileSync', (file, options) => {
+    if (String(file) === join(root, 'scripts/shared.mjs')) sharedReads++;
+    return read(file, options);
+  });
+  syncBuiltinESMExports();
+  try {
+    const tests = [
+      'scripts/b.test.mjs scripts/missing.test.mjs',
+      'scripts/a.test.mjs',
+      'scripts/b.test.mjs',
+    ];
+    assert.deepEqual(testsAffectedBy(tests, ['docs/guide.md'], root), tests);
+    assert.equal(sharedReads, 1);
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('separate selections reread changed modules and newly created or removed input files', () => {
+  const root = fixture({
+    'scripts/a.test.mjs': "import './shared.mjs';",
+    'scripts/shared.mjs': "readFileSync('docs/old.md');",
+    'docs/old.md': '# old',
+    'docs/new.md': '# new',
+  });
+  const tests = ['scripts/a.test.mjs'];
+  try {
+    assert.deepEqual(testsAffectedBy(tests, ['docs/old.md'], root), tests);
+    writeFileSync(
+      join(root, 'scripts/shared.mjs'),
+      "readFileSync('docs/new.md'); readFileSync('docs/later.md');"
+    );
+    assert.deepEqual(testsAffectedBy(tests, ['docs/old.md'], root), []);
+    assert.deepEqual(testsAffectedBy(tests, ['docs/new.md'], root), tests);
+    assert.ok(!testDependencies(tests[0], root).has('docs/later.md'));
+    writeFileSync(join(root, 'docs/later.md'), '# later');
+    assert.deepEqual(testsAffectedBy(tests, ['docs/later.md'], root), tests);
+    rmSync(join(root, 'docs/later.md'));
+    assert.deepEqual(testsAffectedBy(tests, ['docs/later.md'], root), []);
+    assert.ok(!testDependencies(tests[0], root).has('docs/later.md'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
