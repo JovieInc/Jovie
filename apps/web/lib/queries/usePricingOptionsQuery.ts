@@ -11,7 +11,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
-import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
 
@@ -45,25 +44,6 @@ export interface PricingOptionsResponse {
   priceLock: PriceLockView | null;
 }
 
-const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
-  '/api/stripe/pricing-options'
-);
-
-async function fetchPricingOptions({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<PricingOptionsResponse> {
-  // Apply the lock here; a lock read failure fails the query, never a list price.
-  const raw = fetchPricingOptionsRaw({ signal });
-  return Promise.all([
-    raw,
-    import('./usePriceLockQuery').then(module =>
-      module.lockPricing(raw, signal)
-    ),
-  ]).then(([, pricing]) => pricing);
-}
-
 /**
  * Query hook for fetching available pricing options.
  *
@@ -84,7 +64,10 @@ export const pricingOptionsQueryOptions = {
   get queryKey() {
     return queryKeys.billing.pricingOptions();
   },
-  queryFn: fetchPricingOptions,
+  queryFn: (context: { signal?: AbortSignal }) =>
+    import('./usePriceLockQuery').then(module =>
+      module.fetchPricingOptions(context)
+    ),
   ...STABLE_CACHE,
   retry: createClassifiedRetry(0),
 };

@@ -1,30 +1,19 @@
 'use client';
-
-/** Reads the signed-in person's price lock for client pricing surfaces. */
-
 import {
   applyPriceLockToOptions,
   type PriceLockView,
 } from '@/lib/billing/price-lock-view';
-import { FetchError, fetchWithTimeout } from './fetch';
-import type { PricingOptionsRawResponse } from './usePricingOptionsQuery';
+import { createQueryFn, FetchError, fetchWithTimeout } from './fetch';
+import type {
+  PricingOptionsRawResponse,
+  PricingOptionsResponse,
+} from './usePricingOptionsQuery';
 
-export async function lockPricing(
-  pending: Promise<PricingOptionsRawResponse>,
-  signal?: AbortSignal
-) {
-  const lockRead = fetchPriceLock({ signal });
-  const [raw, priceLock] = await Promise.all([pending, lockRead]);
-  const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
-  return { options: applyPriceLockToOptions(listed, priceLock), priceLock };
-}
-
+type PricingFetchContext = { signal?: AbortSignal };
 /** Null when there is no lock to apply; any outage fails the query. */
 export async function fetchPriceLock({
   signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<PriceLockView | null> {
+}: PricingFetchContext): Promise<PriceLockView | null> {
   try {
     const data = await fetchWithTimeout<{ readonly priceLock: PriceLockView }>(
       '/api/billing/price-lock',
@@ -43,4 +32,23 @@ export async function fetchPriceLock({
     }
     throw error;
   }
+}
+const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
+  '/api/stripe/pricing-options'
+);
+
+export async function fetchPricingOptions({
+  signal,
+}: PricingFetchContext): Promise<PricingOptionsResponse> {
+  const [raw, priceLock] = await Promise.all([
+    fetchPricingOptionsRaw({ signal }),
+    fetchPriceLock({ signal }),
+  ]);
+  return {
+    options: applyPriceLockToOptions(
+      [...(raw.pricingOptions ?? []), ...(raw.options ?? [])],
+      priceLock
+    ),
+    priceLock,
+  };
 }
