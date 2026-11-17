@@ -7,6 +7,11 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     page,
   }) => {
     await page.emulateMedia({ reducedMotion });
+    await page.addInitScript(() => {
+      (
+        window as Window & { __settingsMatchMedia?: typeof window.matchMedia }
+      ).__settingsMatchMedia = window.matchMedia.bind(window);
+    });
     await page.goto(
       '/iframe.html?id=organisms-unifiedsidebar--settings&viewMode=story',
       { waitUntil: 'domcontentloaded' }
@@ -15,6 +20,22 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       name: 'settings navigation',
     });
     await expect(settings).toBeVisible({ timeout: 60_000 });
+    // Exercise the product's CSS motion and actual media query. Storybook's
+    // snapshot fixture otherwise forces reduced motion in both scenarios.
+    await page.evaluate(() => {
+      document.querySelector('[data-jovie-storybook-fixtures]')?.remove();
+      const original = (
+        window as Window & { __settingsMatchMedia?: typeof window.matchMedia }
+      ).__settingsMatchMedia;
+      if (original) window.matchMedia = original;
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => matchMedia('(prefers-reduced-motion: reduce)').matches
+        )
+      )
+      .toBe(reducedMotion === 'reduce');
     await expect(page.locator('[data-sidebar="footer"]')).toHaveCount(1);
     await expect(
       page.getByRole('link', { name: /^Public Profile/ })
