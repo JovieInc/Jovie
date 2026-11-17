@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
-
 import { SidebarMenu } from '@/components/organisms/sidebar';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
