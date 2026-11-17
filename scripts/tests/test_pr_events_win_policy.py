@@ -1,13 +1,14 @@
 """Canonical Win insertion/replacement rejection and explicit pending evidence."""
 import unittest
 
-from .test_pr_events_repair_evidence import RedBeforeGreenEvidenceTests as EvidenceCases
-from .test_pr_events_repair_evidence import events
+from . import test_pr_events_repair_evidence as evidence
+
+events = evidence.events
 
 
 class WinPolicyTests(unittest.TestCase):
-    PR = EvidenceCases.PR
-    WIN = EvidenceCases.WIN
+    PR = evidence.RedBeforeGreenEvidenceTests.PR
+    WIN = evidence.RedBeforeGreenEvidenceTests.WIN
 
     def test_new_win_is_validated_by_canonical_policy_before_publication(self):
         body = events.red_before_green_block(self.PR)
