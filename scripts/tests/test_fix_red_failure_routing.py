@@ -55,6 +55,20 @@ class DesignSourceCliTest(unittest.TestCase):
         with patch.object(lane, 'failed_logs', return_value={'Source Validation': 'API rate limit exceeded'}):
             self.assertEqual(lane.infra_only_red(None, pr), 'api-rate-limit-exceeded')
 
+    def test_truncated_zero_growth_failure_uses_main_sync_without_infra_retry(self):
+        header = '[design-system-source-ratchet] FAIL — 1888 identities (0 new / baseline 1907)'
+        for prefix in ('AssertionError: ', '##[error]AssertionError: '):
+            diagnostic = prefix + header
+            pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+            logs = {'Source Validation': 'passing fixture: API rate limit exceeded\n' + diagnostic}
+            with patch.object(lane, 'failed_logs', return_value=logs):
+                self.assertIsNone(lane.infra_only_red(None, pr))
+                self.assertEqual(lane.route_fix_red(None, pr)['action'], 'sync-main')
+        for diagnostic in (header, 'AssertionError: ' + header.replace('FAIL', 'PASS'),
+                           'AssertionError: ' + header.replace('0 new', '1 new')):
+            got = classes.classify(red('Source Validation'), {'Source Validation': diagnostic})
+            self.assertNotEqual(got['action'], 'sync-main')
+
     def test_direct_identity_diagnostic_uses_existing_main_sync_route(self):
         header = '[design-system-source-ratchet] FAIL — 1900 identities (0 new / baseline 1907)\n'
         identity = ('new design identity: apps/web/components/shell/StatusBadge.tsx'
