@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HomeStatQuoteSection } from './HomeStatQuoteSection';
 
 describe('HomeStatQuoteSection', () => {
-  it('renders the stat, supporting copy and source as one heading', () => {
-    render(<HomeStatQuoteSection />);
+  it('renders the stat, supporting copy and source as one heading', async () => {
+    const { container } = render(<HomeStatQuoteSection />);
     const heading = screen.getByRole('heading', { level: 3 });
     expect(heading).toHaveTextContent('Jovie delivers 2.9x');
     expect(heading).toHaveTextContent(
@@ -16,6 +17,34 @@ describe('HomeStatQuoteSection', () => {
     expect(
       screen.getByText('Indie release benchmark, 2026')
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('paints the fixed-dark band with the ink-on-media token', () => {
+    const { container } = render(<HomeStatQuoteSection />);
+    const section = container.querySelector('section');
+    expect(section).toHaveClass('bg-ink-on-media');
+    expect(section?.className).not.toMatch(/\bbg-black\b/);
+  });
+
+  it('renders a stat with no supporting line axe-clean', async () => {
+    const { container } = render(
+      <HomeStatQuoteSection stat='3x' body='' source='Pilot cohort' />
+    );
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(
+      'Jovie delivers 3x'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders Arabic copy in a right-to-left document axe-clean', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <HomeStatQuoteSection body='إصدارات أسرع.' source='معيار 2026' />
+      </div>
+    );
+    expect(screen.getByText('معيار 2026')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('renders caller-provided stat, body and source', () => {
