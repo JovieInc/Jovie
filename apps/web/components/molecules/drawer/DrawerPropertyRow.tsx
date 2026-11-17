@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
@@ -52,7 +51,7 @@ export function DrawerPropertyRow({
   copyable,
   copyText,
 }: DrawerPropertyRowProps) {
-  const Wrapper = interactive ? PlainButton : 'div';
+  const Wrapper = interactive ? 'button' : 'div';
   const PropertyLabel = definitionList ? 'dt' : 'span';
   const Value = definitionList ? 'dd' : 'span';
 
@@ -101,7 +100,7 @@ export function DrawerPropertyRow({
   );
 
   const valueContent = isCopyable ? (
-    <PlainButton
+    <button
       type='button'
       aria-label={`Copy ${typeof label === 'string' ? label : 'value'}: ${value}`}
       title='Click to copy'
@@ -111,8 +110,9 @@ export function DrawerPropertyRow({
         void copy(copyText ?? value);
       }}
       className={cn(
-        'group/copy inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm text-left',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+        'group/copy relative inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm text-left',
+        'before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page'
       )}
     >
       <span className='min-w-0 truncate'>{value}</span>
@@ -127,7 +127,7 @@ export function DrawerPropertyRow({
           aria-hidden='true'
         />
       )}
-    </PlainButton>
+    </button>
   ) : (
     value
   );

@@ -65,11 +65,7 @@ describe('central Inbox bell', () => {
     expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
     expect(link).toHaveAttribute('data-prefetch', 'false');
-    expect(link.querySelector('span')).toHaveClass(
-      'absolute',
-      'min-w-3.5',
-      'tabular-nums'
-    );
+    expect(link.querySelector('span')).toHaveClass('app-shell-count-badge');
     expect(link.querySelector('span')).not.toHaveClass('top-1');
     await userEvent.tab();
     expect(link).toHaveFocus();
@@ -103,10 +99,7 @@ describe('central Inbox bell', () => {
     expect(link.querySelectorAll('[data-inbox-count]')).toHaveLength(1);
     expect(link.querySelector('[data-inbox-count]')).toHaveTextContent('3');
     expect(link.querySelector('[data-inbox-count]')).toHaveClass(
-      'absolute',
-      'min-w-3.5',
-      'tabular-nums',
-      'bg-accent'
+      'app-shell-count-badge'
     );
   });
 

@@ -32,7 +32,7 @@ import remediation
 from reviewable_split import measured_changes, reviewable_split
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs, promote_body_and_sync  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, PLAIN_BUTTON_SCOPE, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, ROUTE_JS_INITIAL, TREE_BYTE_BUDGET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_biome import BIOME_FORMAT_TEXT
@@ -164,6 +164,9 @@ SIGNATURES = (
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     ("render-mode-snapshot", RENDER_MODE_SNAPSHOT, SYNC_MAIN),
+    # Before route-budget-growth: a ships-N-KB line is source shrink, not a stale ceiling.
+    ("route-js-initial-growth", ROUTE_JS_INITIAL, AGENT),
+    ("plain-button-scope", PLAIN_BUTTON_SCOPE, AGENT),
     ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
     ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
     ("tree-byte-budget", TREE_BYTE_BUDGET, SYNC_MAIN),

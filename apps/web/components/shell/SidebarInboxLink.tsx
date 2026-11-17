@@ -52,7 +52,7 @@ export function SidebarInboxLink({
           <span
             data-inbox-count='true'
             aria-hidden='true'
-            className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent tabular-nums text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
+            className='app-shell-count-badge'
           >
             {Math.min(pendingCount, 99)}
           </span>

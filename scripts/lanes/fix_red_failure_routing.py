@@ -97,6 +97,63 @@ class RouteBudgetGrowth:
 ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
 
 
+# `routes.X grew A -> B` is a stale ceiling and syncs main. This annotation is
+# the route-js ratchet: the head shipped more gzip than the baseline. Raising
+# the baseline is gate-weakening. Shrink the shared client module instead.
+_ROUTE_JS_SHIP = re.compile(
+    r'(?:##\[error\]|::error::)\s*(?P<route>/\S+) ships (?P<measured>\d+) KB gzip initial JS; '
+    r'its baseline is (?P<baseline>\d+) KB \(\+(?P<delta>\d+) KB\)')
+_PLAIN_BUTTON_SCOPE = re.compile(
+    r'Use Button from @jovie/ui\. PlainButton is only for the approved files')
+
+
+class RouteJsInitialGrowth:
+    """Shared-route gzip growth is a source shrink. Never raise the baseline."""
+
+    def search(self, text):
+        match = _ROUTE_JS_SHIP.search(_ANSI.sub('', str(text or '')))
+        if match is None or int(match['measured']) <= int(match['baseline']):
+            return None
+        return match
+
+
+class PlainButtonScopeFailure:
+    """An unapproved PlainButton is replaced in place. Never grow the allowlist."""
+
+    def search(self, text):
+        return _PLAIN_BUTTON_SCOPE.search(_ANSI.sub('', str(text or '')))
+
+
+ROUTE_JS_INITIAL = RouteJsInitialGrowth()
+PLAIN_BUTTON_SCOPE = PlainButtonScopeFailure()
+
+
+def route_js_shrink_decision(text):
+    """Repair record for a ships-N-KB annotation. None when it is not that failure."""
+    match = ROUTE_JS_INITIAL.search(text)
+    if match is None:
+        return None
+    return {
+        'route': match['route'],
+        'measuredKb': int(match['measured']),
+        'baselineKb': int(match['baseline']),
+        'deltaKb': int(match['delta']),
+        'repair': 'shrink-client-js',
+        'forbid': 'raise-baseline',
+    }
+
+
+def plain_button_decision(text):
+    """Repair record for the PlainButton scope guard. None when it did not fail.
+
+    Button cannot take a headless row's classes (shadcn/no-restyle), and
+    plain-button-scope.json is already at maxFiles. Use the native button.
+    """
+    if PLAIN_BUTTON_SCOPE.search(text) is None:
+        return None
+    return {'repair': 'replace-with-native-button', 'forbid': 'grow-allowlist'}
+
+
 # Exact-head Coverage compares apps/web/scripts/route-render-modes.json with
 # origin/main. A stale head keeps HTML bytes or a mode main already tightened
 # (#25599). Sync once; a loss that remains is a real regression, and claim_route
