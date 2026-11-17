@@ -126,7 +126,7 @@ export function useDesktopSurfaceModule(enabled: boolean): {
       },
       () => {
         // Keep the server-painted navigation usable if this optional chunk
-        // fails. Re-entering the desktop viewport can retry the import.
+        // fails. The compact surface and server-painted links remain usable.
       }
     );
     return () => {
