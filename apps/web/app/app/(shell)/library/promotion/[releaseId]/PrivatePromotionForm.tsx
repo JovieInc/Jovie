@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -21,6 +22,7 @@ export function PrivatePromotionForm({
   title,
   context,
 }: PromotionProps) {
+  const router = useRouter();
   const [angle, setAngle] = useState('');
   const [copy, setCopy] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle');
@@ -45,7 +47,7 @@ export function PrivatePromotionForm({
       });
       if (!response.ok) throw new Error('Private save failed');
       const saved = (await response.json()) as { documentId: string };
-      globalThis.location.assign(
+      router.push(
         `${APP_ROUTES.LIBRARY}?document=${encodeURIComponent(saved.documentId)}`
       );
     } catch {
