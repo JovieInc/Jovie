@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
@@ -14,6 +14,8 @@ import {
   type MarketingPageSpec,
   SPEC_SECTION_REGISTRY,
 } from './marketing-page';
+
+afterEach(() => vi.unstubAllEnvs());
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -308,9 +310,12 @@ describe('migration for the retired spec revision (JOV-12824)', () => {
     }
   );
 
-  it.each([cleanSpec().sections, cleanSpec().sections.slice(0, 1)])(
+  it.each([
+    { body: cleanSpec().sections },
+    { body: cleanSpec().sections.slice(0, 1) },
+  ])(
     'preserves experiment attribution, arm copy and the immutable input: %j',
-    body => {
+    ({ body }) => {
       const record = {
         sections: retiredRecord.sections,
         experiment: {
@@ -327,6 +332,32 @@ describe('migration for the retired spec revision (JOV-12824)', () => {
       expect(record).toEqual(before);
       expect(MARKETING_PAGE_KIND.migrate?.(migrated)).toEqual(migrated);
       expect(MARKETING_PAGE_KIND.migrate?.(cleanSpec())).toEqual(cleanSpec());
+    }
+  );
+
+  it.each([false, true])(
+    'uses canonical fallback and migration copy for closed signup=%s',
+    closed => {
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', String(closed));
+      const fallback = MARKETING_PAGE_KIND.defaultRecord('home');
+      const migrated = MARKETING_PAGE_KIND.migrate?.(retiredRecord, fallback);
+      for (const spec of [fallback, migrated]) {
+        expect(validate(spec).ok).toBe(true);
+        expect(spec?.sections[0]).toMatchObject({
+          copy: {
+            primaryAction: closed
+              ? HOMEPAGE_EDITORIAL_COPY.hero.primaryAction
+              : getClaimProfileIntent().label,
+          },
+        });
+        expect(spec?.sections.at(-1)).toMatchObject({
+          copy: {
+            headline: closed
+              ? HOMEPAGE_EDITORIAL_COPY.invite.headline
+              : HOMEPAGE_EDITORIAL_COPY.claim.headline,
+          },
+        });
+      }
     }
   );
 

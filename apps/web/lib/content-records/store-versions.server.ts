@@ -129,7 +129,7 @@ export async function getLiveContent<T>(
     try {
       const migrated =
         stored.schemaVersion === definition.schemaVersion
-          ? definition.migrate?.(stored.data)
+          ? definition.migrate?.(stored.data, definition.defaultRecord(key))
           : null;
       if (migrated !== null && migrated !== undefined) {
         const migratedValidated = validateContentRecord(

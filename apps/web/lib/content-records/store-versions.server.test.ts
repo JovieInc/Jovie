@@ -216,14 +216,14 @@ describe('read-time migration integrity', () => {
   });
 
   it.each([
-    ['unrecognized', () => null],
+    ['unrecognized', (): null => null],
     [
       'schema-invalid',
       (): MarketingPageSpec => ({ ...DEFAULT_HOME_SPEC, sections: [] }),
     ],
     [
       'rule-invalid',
-      () => ({
+      (): MarketingPageSpec => ({
         ...DEFAULT_HOME_SPEC,
         sections: [
           ...DEFAULT_HOME_SPEC.sections,
@@ -233,7 +233,7 @@ describe('read-time migration integrity', () => {
     ],
     [
       'throwing',
-      () => {
+      (): never => {
         throw new Error('migration failed');
       },
     ],

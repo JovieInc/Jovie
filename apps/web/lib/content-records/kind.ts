@@ -26,9 +26,10 @@ export interface ContentKindDefinition<T> {
    * Read-time migration for a retired shape within the same schema revision.
    * Pure: returns a record valid under the current schema, or null when not
    * recognizable. A successful migration is served in place of the stale
-   * record without the "no longer validates" warning (JOV-12824).
+   * record without the "no longer validates" warning (JOV-12824). The
+   * supplied code default carries the renderer’s existing mode selection.
    */
-  readonly migrate?: (stored: unknown) => T | null;
+  readonly migrate?: (stored: unknown, codeDefault?: T) => T | null;
   /**
    * Cross-record rules a schema cannot express (registry membership, locked
    * fields, legal guards). Returns human-readable violations; empty = valid.

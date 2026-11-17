@@ -2,6 +2,7 @@ import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { isHomepageStartCtaEnabled } from '@/data/homepageStartCta';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
@@ -195,7 +196,8 @@ const LegacySpecSchema = z
   .strict();
 
 function migrateSections(
-  stored: z.infer<typeof LegacySectionsSchema>
+  stored: z.infer<typeof LegacySectionsSchema>,
+  codeDefault: MarketingPageSpec
 ): MarketingPageSections | null {
   const current = MarketingPageSpecSchema.safeParse({ sections: stored });
   if (
@@ -220,12 +222,12 @@ function migrateSections(
     return parsed.success && !inviteClose
       ? parsed.data
       : structuredClone(
-          DEFAULT_HOME_SPEC.sections.find(
+          codeDefault.sections.find(
             section => section.section === entry.section
           )!
         );
   });
-  for (const fallback of DEFAULT_HOME_SPEC.sections) {
+  for (const fallback of codeDefault.sections) {
     if (ids.includes(fallback.section)) continue;
     const close = sections.findIndex(entry => entry.section === 'cta');
     sections.splice(
@@ -239,7 +241,8 @@ function migrateSections(
 
 /** Pure compatibility for known retired slots, preserving each experiment arm. */
 export function migrateMarketingPageSpec(
-  stored: unknown
+  stored: unknown,
+  codeDefault: MarketingPageSpec = DEFAULT_HOME_SPEC
 ): MarketingPageSpec | null {
   const current = MarketingPageSpecSchema.safeParse(stored);
   if (
@@ -249,12 +252,12 @@ export function migrateMarketingPageSpec(
     return current.data;
   const legacy = LegacySpecSchema.safeParse(stored);
   if (!legacy.success) return null;
-  const sections = migrateSections(legacy.data.sections);
+  const sections = migrateSections(legacy.data.sections, codeDefault);
   if (!sections) return null;
   const experiment = legacy.data.experiment;
   const variants = experiment?.variants.map(variant => ({
     ...variant,
-    body: migrateSections(variant.body),
+    body: migrateSections(variant.body, codeDefault),
   }));
   const spec = MarketingPageSpecSchema.safeParse({
     sections,
@@ -421,7 +424,30 @@ export const MARKETING_PAGE_KIND: ContentKindDefinition<MarketingPageSpec> = {
   schemaVersion: MARKETING_PAGE_SPEC_SCHEMA_VERSION,
   schema: MarketingPageSpecSchema,
   keys: MARKETING_PAGE_KEYS,
-  defaultRecord: () => DEFAULT_HOME_SPEC,
+  defaultRecord: () =>
+    isHomepageStartCtaEnabled()
+      ? DEFAULT_HOME_SPEC
+      : {
+          sections: DEFAULT_HOME_SPEC.sections.map(entry => {
+            if (entry.section === 'hero')
+              return {
+                ...entry,
+                copy: {
+                  ...entry.copy,
+                  primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
+                },
+              };
+            if (entry.section === 'cta')
+              return {
+                ...entry,
+                copy: {
+                  headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
+                  subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+                },
+              };
+            return entry;
+          }),
+        },
   validate: (spec, key) => marketingPageViolations(spec, key),
   migrate: migrateMarketingPageSpec,
   livePaths: key => (key === 'home' ? ['/'] : []),
