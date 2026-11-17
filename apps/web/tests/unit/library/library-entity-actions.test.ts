@@ -146,6 +146,7 @@ describe('library entity actions', () => {
       'open-primary',
       'copy',
       'ask-jovie',
+      'draft-promotion',
     ]);
   });
 
