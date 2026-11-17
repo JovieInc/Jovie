@@ -197,6 +197,13 @@ const LegacySpecSchema = z
 function migrateSections(
   stored: z.infer<typeof LegacySectionsSchema>
 ): MarketingPageSections | null {
+  const current = MarketingPageSpecSchema.safeParse({ sections: stored });
+  if (
+    current.success &&
+    marketingPageViolations(current.data, 'home').length === 0
+  ) {
+    return current.data.sections;
+  }
   const ids = stored.map(entry => entry.section);
   if (
     ids[0] !== 'hero' ||

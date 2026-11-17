@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MarketingPageSpec } from './marketing-page';
 
 /**
  * The live-content cache has no expiry, so only real store answers may be
@@ -216,7 +217,10 @@ describe('read-time migration integrity', () => {
 
   it.each([
     ['unrecognized', () => null],
-    ['schema-invalid', () => ({ ...DEFAULT_HOME_SPEC, sections: [] })],
+    [
+      'schema-invalid',
+      (): MarketingPageSpec => ({ ...DEFAULT_HOME_SPEC, sections: [] }),
+    ],
     [
       'rule-invalid',
       () => ({

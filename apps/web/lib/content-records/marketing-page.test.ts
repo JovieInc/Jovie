@@ -308,23 +308,47 @@ describe('migration for the retired spec revision (JOV-12824)', () => {
     }
   );
 
-  it('preserves experiment attribution, arm copy and the immutable input', () => {
+  it.each([cleanSpec().sections, cleanSpec().sections.slice(0, 1)])(
+    'preserves experiment attribution, arm copy and the immutable input: %j',
+    body => {
+      const record = {
+        sections: retiredRecord.sections,
+        experiment: {
+          id: 'home-gallery-headline',
+          hypothesis: 'A different gallery headline lifts claim completion.',
+          metric: { funnel: 'artist_signup', step: 'claim_complete' },
+          status: 'running',
+          variants: [{ id: 'alternate', weight: 35, body }],
+        },
+      };
+      const before = clone(record);
+      const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+      expect(migrated?.experiment).toEqual(record.experiment);
+      expect(record).toEqual(before);
+      expect(MARKETING_PAGE_KIND.migrate?.(migrated)).toEqual(migrated);
+      expect(MARKETING_PAGE_KIND.migrate?.(cleanSpec())).toEqual(cleanSpec());
+    }
+  );
+
+  it('migrates legacy experiment bodies without changing attribution or weights', () => {
     const record = {
       sections: retiredRecord.sections,
       experiment: {
-        id: 'home-gallery-headline',
-        hypothesis: 'A different gallery headline lifts claim completion.',
+        id: 'home-copy',
+        hypothesis: 'A revised homepage lifts claim completion.',
         metric: { funnel: 'artist_signup', step: 'claim_complete' },
         status: 'running',
-        variants: [{ id: 'alternate', weight: 35, body: cleanSpec().sections }],
+        variants: [{ id: 'legacy', weight: 35, body: retiredRecord.sections }],
       },
     };
-    const before = clone(record);
     const migrated = MARKETING_PAGE_KIND.migrate?.(record);
-    expect(migrated?.experiment).toEqual(record.experiment);
-    expect(record).toEqual(before);
-    expect(MARKETING_PAGE_KIND.migrate?.(migrated)).toEqual(migrated);
-    expect(MARKETING_PAGE_KIND.migrate?.(cleanSpec())).toEqual(cleanSpec());
+    expect(validate(migrated).ok).toBe(true);
+    expect(migrated?.experiment?.variants[0]).toEqual({
+      id: 'legacy',
+      weight: 35,
+      body: migrated?.sections,
+    });
+    expect(record.experiment.variants[0]?.body).toEqual(retiredRecord.sections);
   });
 
   it.each(['centered-none', 'split-claim-card'])(
