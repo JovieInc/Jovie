@@ -79,8 +79,11 @@ describe('ArtistCard', () => {
     );
 
     expect(
-      screen.getByRole('link', { name: "View Rising Star's profile" })
+      // The no-photo fallback renders the initials as visible text, so the
+      // accessible name carries them too (axe label-content-name-mismatch).
+      screen.getByRole('link', { name: "View Rising Star's profile — RS" })
     ).toHaveAttribute('href', '/risingstar');
+    // The image path keeps the base label without initials.
     expect(
       screen.getByRole('link', { name: `View ${longName}'s profile` })
     ).toBeInTheDocument();
