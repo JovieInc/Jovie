@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import {
   ArrowUpRight,
@@ -79,7 +80,7 @@ function QrPreviewPanel({
           width={isDrawer ? 132 : 124}
           height={isDrawer ? 132 : 124}
           unoptimized
-          className='h-full w-full rounded-lg bg-white dark:bg-surface-1 object-contain'
+          className='h-full w-full rounded-lg bg-on-media dark:bg-surface-1 object-contain'
         />
       ) : (
         <div className='space-y-2 text-center'>
@@ -315,7 +316,7 @@ export function ProfilePaySurface({
           </div>
 
           {summary.tipVisits > 0 && onViewAnalytics ? (
-            <button
+            <PlainButton
               type='button'
               onClick={onViewAnalytics}
               className='inline-flex w-fit items-start gap-1.5 text-left text-xs font-caption text-secondary-token transition-colors hover:text-primary-token'
@@ -325,7 +326,7 @@ export function ProfilePaySurface({
                 className='mt-0.5 h-3.5 w-3.5 shrink-0'
                 aria-hidden='true'
               />
-            </button>
+            </PlainButton>
           ) : null}
 
           <p
