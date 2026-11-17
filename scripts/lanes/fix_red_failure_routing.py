@@ -290,6 +290,33 @@ def _current_queue_failure(pr, read, repository):
                              'combinedHead': run['head_sha'], 'jobId': job_id}
 
 
+def stuck_sync_claim(pr, routes, synced) -> bool:
+    """True when this head's sync-main claim has no synced.json receipt.
+
+    claim_route records the head before sync_main. A crash between them leaves
+    the claim and no row, so the next pass would dispatch a model. A finished
+    sync writes ``from`` equal to this head whether it succeeded or failed, and
+    that row is the one attempt. The caller still requires a clean merge-tree.
+    """
+    if not isinstance(pr, dict) or type(pr.get("number")) is not int:
+        return False
+    if not isinstance(routes, dict) or not isinstance(synced, dict):
+        return False
+    head = pr.get("headRefOid")
+    if not isinstance(head, str) or _SHA.fullmatch(head) is None:
+        return False
+    claimed = routes.get(str(pr["number"]))
+    if not isinstance(claimed, dict) or claimed.get("sync-main") != head:
+        return False
+    receipt = synced.get(str(pr["number"]))
+    return not (isinstance(receipt, dict) and receipt.get("from") == head)
+
+
+def stuck_sync_is_clean(pr, routes, synced, merge_clean) -> bool:
+    """Retry only a missing-receipt sync-main claim, and only when main merges cleanly."""
+    return stuck_sync_claim(pr, routes, synced) and merge_clean is True
+
+
 def classify_repair(host, pr, read_logs, classify, read, repository):
     """Use own-head failures first; legacy queue excerpts alone carry no routing authority."""
     if pr.get('mergeStateStatus') == 'DIRTY' or pr.get('reviewDecision') == 'CHANGES_REQUESTED':

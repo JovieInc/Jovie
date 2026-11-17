@@ -453,5 +453,52 @@ class RouteBudgetRoutingTest(unittest.TestCase):
             self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
 
 
+class StuckSyncRetryTest(unittest.TestCase):
+    """A consumed sync-main claim with no receipt must sync again when main is clean."""
+
+    def setUp(self):
+        self.head = 'a' * 40
+        self.pr = {'number': 25257, 'headRefOid': self.head}
+        self.routes = {'25257': {'sync-main': self.head}}
+
+    def test_missing_receipt_is_clean_only_for_this_head(self):
+        claim = lane.fix_red_failure_routing.stuck_sync_is_clean
+        self.assertTrue(claim(self.pr, self.routes, {}, True))
+        self.assertTrue(claim(self.pr, self.routes, {'25257': {'from': 'b' * 40, 'ok': True}}, True))
+        self.assertFalse(claim(self.pr, self.routes, {}, False))
+        self.assertFalse(claim(self.pr, self.routes, {}, None))
+        self.assertFalse(claim(self.pr, {}, {}, True))
+        self.assertFalse(claim(self.pr, {'25257': {'sync-main': 'c' * 40}}, {}, True))
+        self.assertFalse(claim(self.pr, self.routes, {'25257': {'from': self.head, 'ok': False}}, True))
+        self.assertFalse(claim({'number': '25257', 'headRefOid': self.head}, self.routes, {}, True))
+        self.assertFalse(claim(self.pr, self.routes, [], True))
+
+    def test_route_retries_sync_once_when_the_merge_is_clean(self):
+        host = types.SimpleNamespace(state=Path('/tmp/stuck-sync'))
+        route = {'action': 'sync-main', 'cls': 'design-source-cli'}
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[self.routes, {}]), \
+                patch.object(lane, 'conflict_files', return_value=[]) as merged, \
+                patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
+            reason = lane.deterministic_route_taken(host, self.pr, route)
+        self.assertEqual(reason, 'infra-rerun:design-source-cli')
+        merged.assert_called_once()
+        sync.assert_called_once()
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[self.routes, {'25257': {'from': self.head, 'ok': False}}]), \
+                patch.object(lane, 'conflict_files') as merged, \
+                patch.object(lane.pr_events, 'sync_main') as sync:
+            self.assertIsNone(lane.deterministic_route_taken(host, self.pr, route))
+        merged.assert_not_called()
+        sync.assert_not_called()
+        with patch.object(lane, 'claim_route', return_value=False), \
+                patch.object(lane, 'read_json', side_effect=[self.routes, {}]), \
+                patch.object(lane, 'conflict_files', return_value=['apps/web/a.tsx']) as merged, \
+                patch.object(lane.pr_events, 'sync_main') as sync:
+            self.assertIsNone(lane.deterministic_route_taken(host, self.pr, route))
+        merged.assert_called_once()
+        sync.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
