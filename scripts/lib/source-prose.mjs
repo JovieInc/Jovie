@@ -145,11 +145,17 @@ export function readSourceProseEntries({ root, headSha, paths }) {
   }
   if (sizes.length !== entries.length)
     throw new Error('Unexpected prose sizes');
-  const batch = execFileSync('git', [...prefix, 'cat-file', '--batch'], {
+  /** @type {import('node:child_process').ExecFileSyncOptionsWithBufferEncoding} */
+  const binaryOptions = {
     ...options,
     input,
     encoding: null,
-  });
+  };
+  const batch = execFileSync(
+    'git',
+    [...prefix, 'cat-file', '--batch'],
+    binaryOptions
+  );
   let cursor = 0;
   for (const entry of entries) {
     const end = batch.indexOf(10, cursor);
