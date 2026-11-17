@@ -1,9 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_SPECS_COPY } from '@/data/homepageProductUi';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { collectStrings, isClaimBearing, resolvesToClaim } from './claim-audit';
 import { listProductTruthClaims } from './claims';
@@ -263,6 +265,18 @@ describe('golden-path proof audit', () => {
 });
 
 describe('golden-path claim inventory', () => {
+  it('inventories every canonical paid checkout benefit', () => {
+    const checkoutBenefits = GOLDEN_PATH_CLAIMS.filter(
+      claim =>
+        claim.step === 'upgrade' &&
+        claim.route === APP_ROUTES.ONBOARDING_CHECKOUT &&
+        claim.nature === 'capability'
+    );
+    expect(checkoutBenefits.map(claim => claim.copy)).toEqual(
+      getPaidPlanAdditionNames()
+    );
+  });
+
   it('quotes every claim verbatim from the file that renders it', () => {
     for (const claim of GOLDEN_PATH_CLAIMS) {
       const source = readFileSync(path.join(REPO_ROOT, claim.source), 'utf8');
