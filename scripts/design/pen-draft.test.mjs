@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import {
   ATTEMPTS,
   attemptTimeout,
@@ -24,6 +23,7 @@ import {
   useTrimmedInput,
   writeCanonical,
 } from './pen-draft.mjs';
+import { blockedRuns } from './pen-draft-annotation.fixtures.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
   for (const b of loadBriefs())
@@ -309,21 +309,7 @@ test('a frame without its .pen or preview is not drafted', () => {
 });
 
 test('a blocked run names secrets in CI and keeps local output unchanged', () => {
-  for (const githubActions of ['true', 'false']) {
-    const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
-    const res = spawnSync(
-      process.execPath,
-      [
-        fileURLToPath(new URL('./pen-draft.mjs', import.meta.url)),
-        '--out',
-        out,
-      ],
-      {
-        encoding: 'utf8',
-        cwd: fileURLToPath(new URL('../..', import.meta.url)),
-        env: { PATH: process.env.PATH, GITHUB_ACTIONS: githubActions },
-      }
-    );
+  for (const { githubActions, out, res } of blockedRuns()) {
     assert.equal(res.status, 1);
     assert.match(
       res.stdout,
