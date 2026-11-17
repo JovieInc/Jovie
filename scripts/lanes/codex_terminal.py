@@ -61,11 +61,36 @@ def pending_terminal_observation(entry: dict, ledger: dict, now: float) -> str |
     return None if type(last) in (int, float) and stamp < last else identity
 
 def terminal_context(output: str) -> str:
-    """Use the last closing failure, so an earlier quoted reset cannot win."""
+    """Keep a closing failure's details when a generic transport error follows."""
     lines = output[-20000:].splitlines()[-30:]
     for index in range(len(lines) - 1, -1, -1):
         if LIMIT.search(lines[index]) or AUTH.search(lines[index]):
-            return "\n".join(lines[index:])
+            closing = "\n".join(lines[index:])
+            if (USAGE.search(lines[index]) or AUTH.search(lines[index])
+                    or RESET_IN.search(closing) or RESET_AT.search(closing)):
+                return closing
+            # A trailing generic 429 is part of the same CLI failure, not a
+            # replacement for its usage/reset detail. Require a preceding
+            # error anchor; orphan reset text and quoted transcript cannot join.
+            anchor = None
+            reset_detail = False
+            for prior in range(index - 1, -1, -1):
+                detail = re.sub(r"^(?:error|stream error)\s*:\s*", "", lines[prior].strip(), flags=re.I)
+                reset = RESET_IN.match(detail) or RESET_AT.match(detail)
+                if reset:
+                    if detail[reset.end():].strip(" ."):
+                        break
+                    reset_detail = True
+                    continue
+                if not detail or re.fullmatch(r"retrying\s+\d+/\d+(?:\.\.\.)?", detail, re.I):
+                    continue
+                if (AUTH.search(detail) or not LIMIT.search(detail)
+                        or not re.match(r"(?:you(?:'ve| have)?\s+hit\b|usage limit\b|rate limit\b|quota\b|too many requests\b|429\b)", detail, re.I)):
+                    break
+                anchor = prior
+                if USAGE.search(detail) or reset_detail or RESET_IN.search(detail) or RESET_AT.search(detail):
+                    break
+            return "\n".join(lines[anchor:]) if anchor is not None else closing
     return "\n".join(lines)
 
 def terminal_observation(output: str, kind: str, code: int, now: float, until: float) -> dict:

@@ -231,6 +231,7 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
     .join('\n');
   const root = mkdtempSync(join(tmpdir(), 'stage-carryover-routing-'));
   try {
+    symlinkSync(resolve('.github'), join(root, '.github'), 'dir');
     mkdirSync(join(root, 'product-lane-release'));
     writeFileSync(
       join(root, 'product-lane-release/release.json'),
@@ -248,9 +249,7 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
       join(root, 'git'),
       '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
     );
-    // Fresh production: the anti-starvation policy keeps the old supersession
-    // (its stale-production carryover is covered by
-    // staging-supersession-policy.test.mjs and staging-controller-supersession.test.mjs).
+    // Fresh production keeps supersession; the supersession suites cover stale carryover.
     writeFileSync(
       join(root, 'staging-supersession-policy.mjs'),
       'console.log(JSON.stringify({outcome:"superseded",replacementSha:process.env.CURRENT_MAIN_SHA,reason:"production is fresh"}));\n'
@@ -291,6 +290,7 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
           TEST_MAIN: main,
           TEST_RELATION: relation,
           TEST_CURL_FAILURE: failedCurl,
+          STAGING_IDENTITY_BACKOFF_SECONDS: '0',
           RESOLVE_MAIN_RETRY_SECONDS: '0',
           TEST_IDENTITY: JSON.stringify({
             commitSha: current,
