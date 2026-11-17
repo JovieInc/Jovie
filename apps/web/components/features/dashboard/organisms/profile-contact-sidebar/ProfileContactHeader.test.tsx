@@ -104,3 +104,17 @@ describe('ProfileContactHeader', () => {
     await expectNoA11yViolations(rtl.container);
   });
 });
+
+describe('ProfileContactHeader scale tokens', () => {
+  it('keeps type and size utilities on scale tokens instead of arbitrary values', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'ProfileContactHeader.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/leading-\[14px\]/);
+    expect(source).toContain('leading-3.5');
+  });
+});

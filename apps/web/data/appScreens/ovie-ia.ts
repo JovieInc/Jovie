@@ -39,6 +39,7 @@ export const OVIE_PAGE_IA: Readonly<Record<string, OviePageSpec>> = {
     subnav: 'route-views',
     views: 'operations',
   },
+  [`${ADMIN}/room/page.tsx`]: { subnav: 'route-views', views: 'operations' },
   [`${ADMIN}/system/page.tsx`]: {
     subnav: 'route-views',
     views: 'operations',

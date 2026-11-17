@@ -76,3 +76,14 @@ export const DesktopControls: Story = {
     showDesktopControls: true,
   },
 };
+
+/** Logical navigation follows the document direction, including RTL scrollLeft. */
+export const RightToLeft: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+};

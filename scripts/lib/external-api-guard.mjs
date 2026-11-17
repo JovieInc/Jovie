@@ -121,7 +121,7 @@ export function buildRules(providers) {
         `\\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\\(\\s*['"\`]gh\\b|\`gh\\s+(?:${GH_SUBCOMMANDS})\\b`,
         'g'
       ),
-      fix: 'use runGh() or createGitHubClient() from packages/api-client',
+      fix: 'use runGh() or createGitHubClient() from packages/api-client. Documentation examples are scanned too; describe commands in prose',
     },
     {
       id: 'gh-shell',
@@ -316,6 +316,7 @@ export function loadProviders(repoRoot) {
 export function baseProvidersAt(ref, repoRoot) {
   if (!ref) return null;
   const shown = spawnSync('git', ['show', `${ref}:${PROVIDERS_PATH}`], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
   });

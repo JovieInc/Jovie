@@ -212,7 +212,8 @@ describe('CapacityBoard', () => {
       /57% used/
     );
     const lapsed = screen.getByTestId('capacity-account-tim-jov-ie');
-    expect(within(lapsed).getByText('lapsed')).toBeTruthy();
+    const lapsedChip = within(lapsed).getByText('Lapsed');
+    expect(lapsedChip).not.toHaveClass('uppercase');
     expect(lapsed.textContent).toMatch(/lapsed: not routable/);
     expect(lapsed.textContent).not.toMatch(/Ahead of pace/);
     expect(screen.getByText(/Decision pending \(2026-10-29\)/)).toBeTruthy();
@@ -266,5 +267,29 @@ describe('CapacityBoard', () => {
       screen.getByTestId(`capacity-provider-${view.providers[0]?.id}`)
     ).toBeTruthy();
     expect(screen.getByText(/Delegation order for agents/)).toBeTruthy();
+  });
+});
+
+describe('CapacityBoard scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(
+        import.meta.dirname,
+        '..',
+        '..',
+        '..',
+        'components',
+        'features',
+        'admin',
+        'capacity',
+        'CapacityBoard.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
   });
 });

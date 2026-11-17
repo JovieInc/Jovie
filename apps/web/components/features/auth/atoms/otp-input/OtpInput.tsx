@@ -60,7 +60,7 @@ export function OtpInput({
     hero: {
       fieldset: 'flex justify-center gap-1 border-0 p-0 m-0 relative z-10',
       boxSize:
-        'h-8 w-7 rounded-lg border-white/14 bg-white/[0.06] text-app text-white dark:text-white shadow-none',
+        'h-8 w-7 rounded-lg border-on-media/14 bg-on-media/[0.06] text-app text-on-media dark:text-on-media shadow-none',
       textSize: 'text-app',
     },
     compact: {

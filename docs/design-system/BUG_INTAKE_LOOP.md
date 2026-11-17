@@ -26,7 +26,7 @@ intake (any source) -> normalize -> source weight -> Jev scores
 | Source | Entry point today | Change |
 | --- | --- | --- |
 | Users (web app) | `POST /api/feedback` into `feedback_items` (`apps/web/lib/feedback.ts`), plus a Slack notification | Add bug classification and triage fields; keep the route contract |
-| Sentry | `POST /api/webhooks/sentry` into `repository_dispatch`, `.github/workflows/sentry-autofix.yml`, closed by `sentry-autofix-recurrence.yml` | Keep the autofix path. Mirror each dispatched issue as a bug report so priority and metrics are unified. No second dispatcher |
+| Sentry | `POST /api/webhooks/sentry` into `repository_dispatch` (`sentry-issue`), normalized by `.github/workflows/lane-fix-relay.yml` | Keep the relay path. Mirror each dispatched issue as a bug report so priority and metrics are unified. No second dispatcher |
 | Agents | Ovie MCP `coordinate_linear_work` (`apps/web/lib/ovie/linear-coordination.ts`) | Route agent-found bugs through intake first, then file with the same coordinator |
 | Dogfood | Failed `jovie.dogfood-receipt/v1` receipts; `human_signal` replies (dogfood spec sections 4 and 7) | Failed receipts and defect-classified replies become bug reports |
 | Advisors and pools | Replies ingested through Ovie outbound threads (dogfood spec section 7) | Same as dogfood |
@@ -134,7 +134,7 @@ refit the weights and Jev's influence to his overrides.
 ## 8. What is not changing
 
 - Feature certification rules. Tim's earlier answers stand for features.
-- The Sentry autofix and recurrence workflows stay the Sentry repair path.
+- The Sentry webhook's `sentry-issue` dispatch to Lane Fix Relay stays the Sentry repair path.
 - The `/api/feedback` request and response contract.
 - Linear as system of record; `linear-sync-on-merge.yml` owns Done.
 - No outbound message to anyone but Tim without an Ovie card or an earned

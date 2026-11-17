@@ -63,7 +63,7 @@ main.jov.ie  jov.ie
 **Features:**
 
 - ✅ **Path-based job skipping** - Only run relevant jobs based on file changes
-- ✅ **Ephemeral Neon branches** - Auto-created per PR, auto-deleted on close
+- ✅ **Ephemeral Neon branches** - Auto-created per run, expire on their own Neon TTL
 - ✅ **Database migrations** - Run automatically on main deploys
 - ✅ **Canary health checks** - Verify deployment success
 - ✅ **Auto-merge support** - Safe changes merge automatically
@@ -104,31 +104,7 @@ main.jov.ie  jov.ie
 
 ---
 
-### 3. **Neon Ephemeral Branch Cleanup** (`neon-ephemeral-branch-cleanup.yml`)
-
-**Purpose:** Automatic cleanup of ephemeral Neon database branches
-
-**Triggers:**
-
-- PR closed events
-- Manual dispatch
-
-**Process:**
-
-1. Sanitize branch name (same logic as creation)
-2. Guard against deleting protected branches (`main`, `production`)
-3. Delete ephemeral Neon branch via API
-4. Verify deletion success
-
-**Protected Branches:**
-
-- ❌ `production` - Never deleted
-- ❌ `main` - Never deleted
-- ✅ All other branches - Eligible for cleanup
-
----
-
-### 4. **CodeQL Security Analysis** (`codeql.yml`)
+### 3. **CodeQL Security Analysis** (`codeql.yml`)
 
 **Purpose:** Automated security vulnerability scanning
 
@@ -152,7 +128,7 @@ main.jov.ie  jov.ie
 
 ---
 
-### 5. **Dependabot Auto-Approve** (`dependabot-auto-approve.yml`)
+### 4. **Dependabot Auto-Approve** (`dependabot-auto-approve.yml`)
 
 **Purpose:** Auto-approve safe Dependabot updates to speed up auto-merge
 
@@ -168,7 +144,7 @@ main.jov.ie  jov.ie
 
 ---
 
-### 6. **CodeRabbit Autofix** (`coderabbit-autofix.yml`)
+### 5. **CodeRabbit Autofix** (`coderabbit-autofix.yml`)
 
 **Purpose:** Automatically fix PRs blocked by CodeRabbit review feedback
 

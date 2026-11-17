@@ -128,12 +128,12 @@ Found **X high-priority improvements** not tracked in Linear:
 - [qual-002] Split large API handler file
 - [qual-005] Extract duplicated validation logic
 
-Would you like me to create Linear issues for these?
+Creating Linear issues for these now.
 ```
 
-### 4.2 Create Linear Issues (on approval)
+### 4.2 Create Linear Issues
 
-For each approved finding:
+For each high-priority, non-duplicate finding:
 
 ```
 mcp__claude_ai_Linear__create_issue:
@@ -193,7 +193,7 @@ mcp__claude_ai_Linear__create_issue:
 
 1. **Check Linear First** - Always query existing issues before running ideation
 2. **No Duplicates** - Skip ideas that match existing Linear issues
-3. **Ask Before Creating** - Never auto-create Linear issues without user approval
+3. **Create, Don't Ask** - Create Linear issues for new, non-duplicate ideas; routine Linear writes are pre-approved (canon/FLEET.md#routine-writes)
 4. **Parallel Execution** - Run sub-agents in parallel when `type: all`
 5. **Aggregate Properly** - Create summary.json after all agents complete
 6. **Reference Files** - Each idea must include specific file paths

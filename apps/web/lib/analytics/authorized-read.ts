@@ -1,11 +1,12 @@
 import 'server-only';
 
+import { resolveAuthorizedAnalyticsProfile } from '@/lib/analytics/authorized-profile';
 import {
   clampRangeToRetention,
   isAnalyticsRange,
 } from '@/lib/analytics/time-range';
 import { cacheQuery, invalidateCache } from '@/lib/db/cache';
-import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
+import { getDashboardAnalyticsForProfile } from '@/lib/db/queries/analytics';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import type {
   AnalyticsRange,
@@ -73,6 +74,10 @@ export async function readAuthorizedDashboardAnalytics(input: {
     throw new Error('Unauthorized');
   }
 
+  // Capture the authorized profile before cache/entitlement awaits. A later
+  // active-profile switch cannot change either this key or its origin query.
+  const scope = await resolveAuthorizedAnalyticsProfile(input.userId);
+
   const requestedRange: AnalyticsRange =
     input.range && isAnalyticsRange(input.range) ? input.range : DEFAULT_RANGE;
   const view: DashboardAnalyticsView =
@@ -82,7 +87,7 @@ export async function readAuthorizedDashboardAnalytics(input: {
     retentionDays === null
       ? requestedRange
       : clampRangeToRetention(requestedRange, retentionDays);
-  const cacheKey = `dashboard-analytics:${input.userId}:${view}:${range}`;
+  const cacheKey = `dashboard-analytics:v2:${scope.userId}:${scope.profileId}:${view}:${range}`;
 
   if (input.forceRefresh) {
     await invalidateCache(cacheKey);
@@ -92,7 +97,7 @@ export async function readAuthorizedDashboardAnalytics(input: {
     cacheKey,
     async () =>
       normalizeAnalytics(
-        await getUserDashboardAnalytics(input.userId, range, view)
+        await getDashboardAnalyticsForProfile(scope, range, view)
       ),
     { ttlSeconds: ANALYTICS_CACHE_TTL_SECONDS }
   );

@@ -74,27 +74,54 @@ export interface FilterSettingsAdmissionsOptions {
   readonly isAdmin?: boolean;
 }
 
+function settingsSearchWords(value: string): string[] {
+  return (
+    value
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  );
+}
+
+/** Match every query word against the visible label, description or user job. */
+export function matchesSettingsSearchQuery(
+  query: string,
+  fields: readonly (string | undefined)[]
+): boolean {
+  if (!query.trim()) return true;
+
+  const queryWords = settingsSearchWords(query);
+  // Punctuation alone is not a request to reveal every destination.
+  if (queryWords.length === 0) return false;
+
+  const words = fields.flatMap(field =>
+    field ? settingsSearchWords(field) : []
+  );
+  return queryWords.every(queryWord =>
+    words.some(word => word.startsWith(queryWord))
+  );
+}
+
 export function filterSettingsAdmissions(
   groups: readonly SettingsAdmissionGroup[],
   query: string,
   options: FilterSettingsAdmissionsOptions = {}
 ): SettingsAdmissionGroup[] {
-  const normalized = query.trim().toLowerCase();
-
   return groups
     .map(group => {
-      const groupMatches = group.label.toLowerCase().includes(normalized);
+      const groupMatches = matchesSettingsSearchQuery(query, [group.label]);
       const items = group.items.filter(item => {
         if (item.adminOnly && !options.isAdmin) {
           return false;
         }
-        if (!normalized) {
-          return true;
-        }
         return (
           groupMatches ||
-          item.label.toLowerCase().includes(normalized) ||
-          item.admission.userJob.toLowerCase().includes(normalized)
+          matchesSettingsSearchQuery(query, [
+            item.label,
+            item.title,
+            item.admission.userJob,
+          ])
         );
       });
 

@@ -1,4 +1,8 @@
 import { lintCopy } from '@jovie/copy';
+import {
+  EXISTING_RELATIONSHIP_LABEL,
+  existingRelationshipHold,
+} from '@/lib/leads/existing-relationships';
 import { COLD_SEQUENCE, type ColdStepKind } from './sequence';
 
 /**
@@ -19,6 +23,8 @@ export const COLD_TEMPLATE_VERSION = 'cold-draft/v1';
 export interface ColdArtifactFacts {
   /** The artist name exactly as their catalog shows it. */
   readonly artistName: string;
+  /** The artist's source handle, when known; read by the relationship hold. */
+  readonly handle?: string | null;
   /** A first name only when the person's own public page states it. */
   readonly firstName: string | null;
   /** The private claim link for the draft we built. */
@@ -200,11 +206,29 @@ function checkIn(
   };
 }
 
-/** Compose the full sequence from artifact facts. Deterministic. */
+/** Thrown instead of a draft for an artist Tim already works with. */
+export class ExistingRelationshipDraftError extends Error {
+  constructor() {
+    super(EXISTING_RELATIONSHIP_LABEL);
+    this.name = 'ExistingRelationshipDraftError';
+  }
+}
+
+/**
+ * Compose the full sequence from artifact facts. Deterministic. Refuses to
+ * draft for an artist held by the existing-relationship registry.
+ */
 export function composeColdSequence(
   facts: ColdArtifactFacts,
   now: Date
 ): ColdDraft {
+  if (
+    existingRelationshipHold({
+      handle: facts.handle ?? null,
+      displayName: facts.artistName,
+    })
+  )
+    throw new ExistingRelationshipDraftError();
   const claims: { text: string; fact: string }[] = [];
   const steps: ColdDraftStep[] = COLD_SEQUENCE.map(step => {
     let copy: { subject: string; body: string };

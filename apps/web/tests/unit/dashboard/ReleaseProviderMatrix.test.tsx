@@ -29,6 +29,7 @@ import {
 
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
+const mockOpenChatWithPrompt = vi.fn();
 const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
 const mockInstantiateReleaseTasksFromCatalog = vi
   .fn()
@@ -83,6 +84,10 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
+}));
+
+vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
+  openChatWithPrompt: mockOpenChatWithPrompt,
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -180,35 +185,9 @@ vi.mock('@/features/dashboard/atoms/DashboardHeaderActionButton', () => ({
 
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction',
-  () => ({
-    NewReleaseHeaderAction: ({
-      canCreateManualReleases,
-      onCreateManual,
-      onSyncSpotify,
-    }: {
-      canCreateManualReleases: boolean;
-      onCreateManual: () => void;
-      onSyncSpotify: () => void;
-    }) => (
-      <div>
-        {canCreateManualReleases ? (
-          <button
-            type='button'
-            aria-label='Create A New Release'
-            onClick={onCreateManual}
-          >
-            Create A New Release
-          </button>
-        ) : null}
-        <button
-          type='button'
-          aria-label='Sync releases from Spotify'
-          onClick={onSyncSpotify}
-        >
-          Sync from Spotify
-        </button>
-      </div>
-    ),
+  async () => ({
+    NewReleaseHeaderAction: (await import('./release-provider-matrix-mocks'))
+      .MockNewReleaseHeaderAction,
   })
 );
 
@@ -224,21 +203,35 @@ vi.mock(
     ReleaseTable: ({
       releases,
       onEdit,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
     }: {
       releases: Array<{ id: string; title?: string }>;
       onEdit?: (release: { id: string; title?: string }) => void;
+      canGenerateAlbumArt?: boolean;
+      onGenerateAlbumArt?: (release: { id: string; title?: string }) => void;
     }) => (
       <div data-testid='release-table'>
         ids:{releases.map(release => release.id).join(',')}
         {releases.map(release => (
-          <button
-            key={release.id}
-            type='button'
-            data-testid={`edit-release-${release.id}`}
-            onClick={() => onEdit?.(release)}
-          >
-            edit-{release.id}
-          </button>
+          <React.Fragment key={release.id}>
+            <button
+              type='button'
+              data-testid={`edit-release-${release.id}`}
+              onClick={() => onEdit?.(release)}
+            >
+              edit-{release.id}
+            </button>
+            {canGenerateAlbumArt && onGenerateAlbumArt ? (
+              <button
+                type='button'
+                aria-label={`Generate Album Art For ${release.title}`}
+                onClick={() => onGenerateAlbumArt(release)}
+              >
+                Generate Album Art
+              </button>
+            ) : null}
+          </React.Fragment>
         ))}
       </div>
     ),
@@ -336,76 +329,9 @@ vi.mock(
 
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard',
-  () => ({
-    ReleasePlanWizard: ({
-      open,
-      releaseTitle,
-      isGateLoading,
-      canGenerateReleasePlans,
-      isGeneratingReleasePlan,
-      onClose,
-      onSubmit,
-    }: {
-      open: boolean;
-      releaseTitle: string | null;
-      isGateLoading: boolean;
-      canGenerateReleasePlans: boolean;
-      isGeneratingReleasePlan: boolean;
-      onClose: () => void;
-      onSubmit: (ctx: unknown) => void;
-    }) =>
-      open ? (
-        <div role='dialog' aria-modal='true'>
-          <h2>
-            {isGateLoading
-              ? 'Release Plan'
-              : canGenerateReleasePlans
-                ? 'Generate Release Plan'
-                : 'Upgrade to Generate a Release Plan'}
-          </h2>
-          <p>
-            {isGateLoading
-              ? 'Checking whether this workspace can generate tasks for the release plan.'
-              : canGenerateReleasePlans
-                ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
-                : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
-          </p>
-          <p>{releaseTitle ?? 'This release'} is ready.</p>
-          <button
-            type='button'
-            onClick={onClose}
-            disabled={isGeneratingReleasePlan}
-          >
-            Maybe Later
-          </button>
-          {isGateLoading ? (
-            <button type='button' disabled>
-              Loading...
-            </button>
-          ) : canGenerateReleasePlans ? (
-            <button
-              type='button'
-              onClick={() =>
-                onSubmit({
-                  releaseFormat: 'single',
-                  distribution: 'diy',
-                  genre: 'pop',
-                  primaryGoal: 'streams',
-                  territory: ['GLOBAL'],
-                  hasPublisher: false,
-                })
-              }
-              disabled={isGeneratingReleasePlan}
-            >
-              {isGeneratingReleasePlan
-                ? 'Generating...'
-                : 'Generate Release Plan'}
-            </button>
-          ) : (
-            <button type='button'>Upgrade to Pro</button>
-          )}
-        </div>
-      ) : null,
+  async () => ({
+    ReleasePlanWizard: (await import('./release-provider-matrix-mocks'))
+      .MockReleasePlanWizard,
   })
 );
 
@@ -766,6 +692,38 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(banner).toHaveAttribute('aria-hidden', 'false');
       expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
+    });
+  });
+
+  describe('release row actions', () => {
+    it('opens chat with the release chip when Generate Album Art is clicked', () => {
+      const albumArtGate = { ...mockUsePlanGate(), canGenerateAlbumArt: true };
+      mockUsePlanGate.mockReturnValue(albumArtGate);
+      const releases = ['r1', 'r2'].map(id => ({
+        ...makeRelease(id),
+        status: 'released' as const,
+      }));
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={releases}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Generate Album Art For Test Release r2',
+        })
+      );
+
+      expect(mockOpenChatWithPrompt).toHaveBeenCalledTimes(1);
+      const [prompt, router] = mockOpenChatWithPrompt.mock.calls[0];
+      expect(prompt).toContain('@release:r2[Test Release r2]');
+      expect(prompt).not.toContain('{');
+      expect(router).toMatchObject({ push: mockRouterPush });
     });
   });
 

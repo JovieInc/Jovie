@@ -701,9 +701,7 @@ jobs:
           IS_FORK="${IS_FORK_PULL_REQUEST}"
           # Determine changed files
           if [[ "${EVENT_NAME}" == "merge_group" ]]; then
-            # JOV-4446: never fall through to github.base_ref / event.before —
-            # those push/PR-only fields are empty on merge_group and produce
-            # "Could not resolve origin/" + false docs-only classification.
+            # JOV-4446: merge_group must use its exact SHAs; PR/push fields are empty.
             MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"
             MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"
             if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
@@ -933,9 +931,7 @@ jobs:
             echo "run_storybook_a11y=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Screenshot-only product exports live under public/product-screenshots and
-          # must not force public Lighthouse + Neon on main (they are marketing assets,
-          # not route code). Filter that tree out before matching public/* paths.
+          # Exclude screenshot exports (marketing assets) from public Lighthouse + Neon.
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
           if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
@@ -944,7 +940,7 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*))$'
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*)|scripts/ci/wait-background-build\.sh)$'
           dash_lh=false
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
           echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
@@ -988,7 +984,7 @@ jobs:
           fi
 
           # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
+          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json|scripts/ci/wait-background-build\.sh)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
@@ -1779,6 +1775,11 @@ jobs:
     # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. Snapshot refresh
     # stays on visual-regression.yml. JOV-5960: changed homepage source also
     # renders and compares the committed homepage baselines on the source lane.
+    # Merge-time split (move 2): this job now builds ONCE with exactly the same
+    # env and turbo task as before and publishes the standalone build as an
+    # artifact; the rendered suites (homepage compare, marketing DOM
+    # certification, marketing route capture) run in parallel sibling jobs that
+    # download this build instead of waiting on each other.
     needs: [ci-path-changes, ci-merge-group-workspace]
     if: >-
       always() &&
@@ -1794,18 +1795,6 @@ jobs:
       actions: read
       contents: read
     timeout-minutes: 25
-    env:
-      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
-      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
-      # The homepage render uses mock keys only, so its screenshots are public.
-      # Without this the producer guard omits every image and a failed compare
-      # uploads no -actual.png, leaving an intentional homepage change no
-      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
-      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
-      # A failed compare also writes Playwright's error-context.md. Without
-      # this the guard blocks it as an unknown binary and uploads nothing
-      # (run 36347764603). Markdown is still redacted and credential-scanned.
-      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1820,8 +1809,6 @@ jobs:
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         with:
           reuse_merge_group_workspace: 'true'
-      - uses: ./.github/actions/setup-playwright
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
       # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
       # (PR run 36197543391). Restore the Build + Layout Turbopack cache that
       # only trusted push-to-main runs write; this job never saves it. The path
@@ -1866,6 +1853,129 @@ jobs:
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
+      # Fail closed on a partial tree before the suites download it: remote
+      # cache hits or artifact truncation can leave apps/web/.next present
+      # without the files the rendered suites actually run (same contract as
+      # Build + Layout's packaging check).
+      - name: Verify standalone build output
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          for required in \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/standalone/apps/web/server.js \
+            apps/web/.next/standalone/apps/web/.next/BUILD_ID; do
+            if [ ! -f "$required" ]; then
+              echo "::error::Build output missing $required — visual compare build cannot be published"
+              exit 1
+            fi
+          done
+          echo "Visual compare build verified: $(du -sh apps/web/.next | cut -f1)"
+      - name: Package visual compare build
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        # Ship only what the standalone server needs. The restored Turbopack
+        # cache under .next/cache is compiler state for the BUILD, never read
+        # by the served runtime, and can dwarf the standalone output.
+        run: |
+          tar -cf "${{ runner.temp }}/visual-compare-build.tar" --exclude='.next/cache' -C apps/web .next
+          echo "Visual compare build artifact: $(du -sh "${{ runner.temp }}/visual-compare-build.tar" | cut -f1)"
+      # Verify the extracted runtime actually starts: unpack the archive to a
+      # scratch dir and boot the standalone server from THAT tree (not the
+      # build tree) before any suite can download it. Fail closed pre-upload.
+      - name: Smoke the packaged build
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          set -euo pipefail
+          SMOKE_ROOT="$RUNNER_TEMP/visual-compare-smoke/apps/web"
+          mkdir -p "$SMOKE_ROOT"
+          tar -xf "$RUNNER_TEMP/visual-compare-build.tar" -C "$SMOKE_ROOT"
+          export HOSTNAME=localhost
+          PORT=3231 node "$SMOKE_ROOT/.next/standalone/apps/web/server.js" > "$RUNNER_TEMP/visual-compare-smoke-server.log" 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          SMOKE_READY=false
+          SMOKE_DEADLINE=$((SECONDS + 45))
+          while [ "$SECONDS" -lt "$SMOKE_DEADLINE" ]; do
+            # A dead server must fail the smoke immediately, never ride the
+            # full deadline: probe liveness first, readiness second.
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              wait "$SERVER_PID" 2>/dev/null || true
+              cat "$RUNNER_TEMP/visual-compare-smoke-server.log"
+              echo "::error::Packaged visual compare build server exited during the smoke probe."
+              exit 1
+            fi
+            if curl -sf --connect-timeout 2 --max-time 5 http://localhost:3231 > /dev/null 2>&1; then
+              SMOKE_READY=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$SMOKE_READY" = "false" ]; then
+            cat "$RUNNER_TEMP/visual-compare-smoke-server.log"
+            echo "::error::Packaged visual compare build did not serve within the deadline; refusing to publish."
+            exit 1
+          fi
+          echo "Packaged visual compare build serves on localhost:3231."
+      # Sibling suite jobs start only after this upload completed (same
+      # producer/consumer contract as nextjs-build-*); a failed upload fails
+      # this job, and every suite fails closed on a missing artifact.
+      - name: Upload visual compare build
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-compare-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/visual-compare-build.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  ci-visual-snapshot-homepage:
+    name: Visual Snapshot Compare (homepage)
+    # Rendered homepage compare suite (JOV-5960). Downloads the exact build
+    # ci-visual-snapshot-compare produced — same NEXT_* env, same turbo task —
+    # and runs the identical spec/config/grep/flags the monolithic job ran.
+    # Own runner, own port: the build bakes http://localhost:3230 as its public
+    # origin, so every suite serves on 3230.
+    needs: [ci-path-changes, ci-merge-group-workspace, ci-visual-snapshot-compare]
+    if: >-
+      always() &&
+      needs.ci-visual-snapshot-compare.result == 'success' &&
+      needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      # A failed compare also writes Playwright's error-context.md. Without
+      # this the guard blocks it as an unknown binary and uploads nothing
+      # (run 36347764603). Markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - uses: ./.github/actions/setup-playwright
+      - name: Download visual compare build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: visual-compare-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/visual-compare-build-download
+      - name: Extract visual compare build
+        run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
       - name: Render and compare homepage snapshots
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
         run: |
@@ -1925,6 +2035,65 @@ jobs:
       # misaligned stacks, orphans, layout shift, placeholder copy, contrast)
       # block the merge queue. Taste kinds ratchet via
       # route-dom-marketing-baseline.json; other kinds are zero-tolerance.
+      - name: Upload homepage visual failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: 'true'
+          public-images: 'true'
+          allow-markdown: 'true'
+
+  ci-visual-marketing-dom:
+    name: Visual Snapshot Compare (marketing DOM)
+    # Rendered marketing DOM certification suite. Downloads the exact build
+    # ci-visual-snapshot-compare produced and runs the identical spec/config/
+    # grep/flags the monolithic job ran.
+    needs: [ci-path-changes, ci-merge-group-workspace, ci-visual-snapshot-compare]
+    if: >-
+      always() &&
+      needs.ci-visual-snapshot-compare.result == 'success' &&
+      needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - uses: ./.github/actions/setup-playwright
+      - name: Download visual compare build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: visual-compare-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/visual-compare-build-download
+      - name: Extract visual compare build
+        run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
+      # Rendered marketing design invariants (route DOM detector: nested
+      # surfaces, stranded copy, heading hierarchy, clipped headings,
+      # misaligned stacks, orphans, layout shift, placeholder copy, contrast)
+      # block the merge queue. Taste kinds ratchet via
+      # route-dom-marketing-baseline.json; other kinds are zero-tolerance.
+      # --workers stays 1: playwright.config.screenshots.ts pins
+      # fullyParallel: false and the whole selection lives in this one spec
+      # file, so extra workers cannot parallelize it — and the suite shares
+      # module-level certification state (output root, taste baseline) that
+      # stays sequential for deterministic DOM evidence. Job-level parallelism
+      # against the homepage and marketing-routes siblings is the speedup.
       - name: Certify marketing route DOM invariants
         if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: |
@@ -1972,6 +2141,61 @@ jobs:
       # re-reddened main. Run the same spec, config and flags here, on the
       # build above, for every PR and merge-group head that selects marketing
       # inputs. No route or axe check is skipped; the spec is unchanged.
+      - name: Upload marketing DOM failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: marketing-dom-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: 'true'
+          allow-markdown: 'true'
+
+  ci-visual-marketing-routes:
+    name: Visual Snapshot Compare (marketing routes)
+    # Exact marketing route capture suite. Downloads the exact build
+    # ci-visual-snapshot-compare produced and runs the identical spec/config/
+    # flags the monolithic job ran, including the exact-head provenance and
+    # clean-tree check before capture.
+    needs: [ci-path-changes, ci-merge-group-workspace, ci-visual-snapshot-compare]
+    if: >-
+      always() &&
+      needs.ci-visual-snapshot-compare.result == 'success' &&
+      needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - uses: ./.github/actions/setup-playwright
+      - name: Download visual compare build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: visual-compare-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/visual-compare-build-download
+      - name: Extract visual compare build
+        run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
+      # The exact-route capture (console errors, axe quality checks, HTTP
+      # failures per registered marketing route) used to run only on main push
+      # in screenshots.yml, so a route that failed it merged untested and
+      # re-reddened main. Run the same spec, config and flags here, on the
+      # downloaded build, for every PR and merge-group head that selects
+      # marketing inputs. No route or axe check is skipped; the spec is
+      # unchanged.
       - name: Capture exact marketing routes (marketing-routes.spec.ts)
         if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: |
@@ -2020,17 +2244,17 @@ jobs:
           NEXT_PUBLIC_AUTH_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
-      - name: Upload homepage visual failure evidence
-        if: ${{ failure() && (needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true') && hashFiles('apps/web/test-results/**') != '' }}
+      - name: Upload marketing routes failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          name: marketing-routes-visual-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           if-no-files-found: error
           retention-days: 14
           allow-images: 'true'
-          public-images: 'true'
           allow-markdown: 'true'
+
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
@@ -2422,6 +2646,7 @@ jobs:
             echo "desktop_update=false"
             echo "dsp=false"
             echo "smart_link=false"
+            echo "account_surface=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2431,9 +2656,12 @@ jobs:
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
-          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdate(Modal|Control)(\.stories)?\.tsx|lib/desktop/desktop-update-control-state\.ts|tests/e2e/storybook-desktop-update-(modal|control)\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
+          # Account menu, What's new banner and sidebar footer: light/dark,
+          # desktop/mobile captures land in the browser evidence.
+          ACCOUNT_SURFACE_STORYBOOK_PATTERN='^(packages/ui/(atoms/inset-panel(\.stories)?\.tsx|lib/inset-panel-styles\.ts)|apps/web/(components/organisms/user-button/(UserButton|UsageMenuItem)(\.stories)?\.tsx|components/organisms/user-button/account-loading-fill\.ts|components/organisms/sidebar-identity-group/SidebarIdentityGroup\.tsx|components/shell/SidebarDock(Cards)?(\.stories)?\.tsx|tests/e2e/storybook-account-surface\.spec\.ts))$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2479,6 +2707,12 @@ jobs:
           if grep -qE "$SMART_LINK_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "smart_link=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$ACCOUNT_SURFACE_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "account_surface=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2575,6 +2809,7 @@ jobs:
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
           RUN_SMART_LINK: ${{ steps.storybook-browser.outputs.smart_link }}
+          RUN_ACCOUNT_SURFACE: ${{ steps.storybook-browser.outputs.account_surface }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2603,12 +2838,16 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+            specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)
           fi
           if [[ "$RUN_DSP" == 'true' ]]; then
             specs+=(tests/e2e/storybook-dsp-details.spec.ts)
           fi
           if [[ "${RUN_SMART_LINK:-false}" == 'true' ]]; then
             specs+=(tests/e2e/storybook-smart-link-reachability.spec.ts)
+          fi
+          if [[ "${RUN_ACCOUNT_SURFACE:-false}" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-account-surface.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -3580,6 +3819,12 @@ jobs:
         # Deterministic gzip sizes from the build manifests; a few seconds.
         # Ratchet lives in apps/web/scripts/route-js-budgets.json.
         run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
+      - name: Enforce route render modes and HTML weight
+        # Reads prerender-manifest.json from the build above (no server, no
+        # network): fails when a route loses cacheability (static -> ISR ->
+        # dynamic) or its prerendered HTML grows past the allowance. Ratchet
+        # lives in apps/web/scripts/route-render-modes.json.
+        run: node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next
       - name: Certify marketing SEO against prerendered HTML
         # JOV-7277: reads .next/server/app/*.html from the build above (no
         # server, no network) and ratchets against the shrink-only
@@ -3891,10 +4136,12 @@ jobs:
                   tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
+                  tests/e2e/storybook-status-copy.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
+                  tests/e2e/storybook-scoped-theme.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-profile-claim-name.spec.ts \
@@ -3904,6 +4151,7 @@ jobs:
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-desktop-update-control.spec.ts \
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
@@ -4928,47 +5176,15 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      - name: Setup Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/setup-playwright
-
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
-
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        id: resolve-dashboard-neon-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
-      - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
-          ALLOW_PROD_MIGRATIONS: 'true'
-
-      # Same read-only Turbopack compiler cache Build + Layout restores (writer:
-      # next-build-cache-warm.yml; keep the key scheme identical). This job
-      # now compiles twice, base then head, and head reuses base's state.
+      # Relative budgets compile the merge-group base in this workspace, then
+      # head. Restore the read-only Turbopack cache first so both compiles
+      # start warm (writer: next-build-cache-warm.yml; this job never saves).
+      # Head's compile starts only after the workspace is back on the exact
+      # head, in the background, so it overlaps Playwright, the Neon branch
+      # and migrations. Those steps do not read or write apps/web/.next.
+      # A built baseline never uses the prebuilt artifact. An artifact hit
+      # never starts a second build. The two writers of apps/web/.next stay
+      # mutually exclusive.
       - name: Resolve Next build cache hour (Lighthouse)
         id: next-build-cache-hour
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -5022,16 +5238,98 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
-      # With a baseline, head is always built here: same command and env as
-      # the base build, so the two differ only by the change.
-      - name: Build app fallback for dashboard Lighthouse
+      # Same command and env as the base build, so the two differ only by the
+      # change. setsid puts the build in its own process group so the wait
+      # step and the job-end cleanup can kill the whole pnpm/next tree. The
+      # status file is written atomically (tmp + mv) and the wait step fails
+      # closed on a nonzero status, a process that died without one, or a
+      # timeout.
+      - name: Start fallback build in background
+        id: background-build-start
         if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
-        run: pnpm --filter=@jovie/web run build
+        shell: bash
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/next-build-fallback.log"
+          exit_file="$RUNNER_TEMP/next-build-fallback.exit"
+          pid_file="$RUNNER_TEMP/next-build-fallback.pid"
+          rm -f "$log" "$exit_file" "$exit_file.tmp" "$pid_file"
+          setsid bash -c "
+            pnpm --filter=@jovie/web run build > '$log' 2>&1
+            status=\$?
+            printf '%s' \"\$status\" > '$exit_file.tmp'
+            mv '$exit_file.tmp' '$exit_file'
+          " >/dev/null 2>&1 &
+          echo "$!" > "$pid_file"
+          echo "started=true" >> "$GITHUB_OUTPUT"
+          echo "Background fallback build started (pid $(cat "$pid_file")); log: $log"
+
+      # A change limited to scripts/ci/wait-background-build.sh selects this
+      # job, but unit shards require run_web and scripts/** routes to
+      # operations lanes. Run the helper contracts here, on the path that
+      # launches the build, while that build compiles.
+      - name: Run background-build helper contract tests
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
+        shell: bash
+        run: >-
+          pnpm --filter @jovie/web exec vitest run
+          tests/unit/ci/lighthouse-launch-gates.test.ts
+          tests/unit/ci/lighthouse-background-build.test.ts
+
+      - name: Setup Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-playwright
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve-dashboard-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      # Runs whenever the background build was launched, after migrations.
+      # The wait protocol lives in scripts/ci/wait-background-build.sh.
+      - name: Wait for background fallback build
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/wait-background-build.sh \
+            "$(cat "$RUNNER_TEMP/next-build-fallback.pid")" \
+            "$RUNNER_TEMP/next-build-fallback.exit" \
+            "$RUNNER_TEMP/next-build-fallback.log"
 
       - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -5159,6 +5457,22 @@ jobs:
             apps/web/.lighthouseci/relative/
           if-no-files-found: ignore
           retention-days: 3
+
+      - name: Kill background build process group (if still alive)
+        # Best-effort job-end backstop: the wait step already kills the
+        # group on timeout, but a cancelled or failed job can leave the
+        # setsid build tree running. Every kill is guarded, so this step
+        # can never fail the job.
+        if: (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true')
+        shell: bash
+        run: |
+          pid_file="$RUNNER_TEMP/next-build-fallback.pid"
+          if [ -f "$pid_file" ]; then
+            pid="$(cat "$pid_file" 2>/dev/null || true)"
+            if [ "$pid" -ge 1 ] 2>/dev/null; then
+              kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+            fi
+          fi
 
       - name: Cleanup ephemeral Neon branch
         if: (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != '')
@@ -7221,7 +7535,7 @@ jobs:
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
-        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c 'exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT"' && cat "$PROFILE_RESULT"
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
@@ -8083,6 +8397,9 @@ jobs:
         ci-secret-scan,
         ci-golden-path-lock,
         ci-visual-snapshot-compare,
+        ci-visual-snapshot-homepage,
+        ci-visual-marketing-dom,
+        ci-visual-marketing-routes,
         drizzle-migration-guard,
         neon-db,
         ci-lighthouse-dashboard-pr,
@@ -8124,6 +8441,10 @@ jobs:
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"
+          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"
+          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"
+          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
           RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
@@ -8178,6 +8499,9 @@ jobs:
             echo "| Secret Scan | $SECRET_RESULT |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
+            echo "| Visual Snapshot Compare (homepage) | $VISUAL_HOMEPAGE_RESULT |"
+            echo "| Visual Snapshot Compare (marketing DOM) | $VISUAL_MARKETING_DOM_RESULT |"
+            echo "| Visual Snapshot Compare (marketing routes) | $VISUAL_MARKETING_ROUTES_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo "| Database Certification (isolated Neon) | $DATABASE_CERTIFICATION_RESULT |"
             echo "| Dashboard Lighthouse (launch-gate paths) | $DASHBOARD_LIGHTHOUSE_RESULT |"
@@ -8264,6 +8588,9 @@ jobs:
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
             "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
+            "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \
+            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \
+            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT" \
             "Dashboard Lighthouse:$RUN_LAUNCH_GATE:$DASHBOARD_LIGHTHOUSE_RESULT" \
             "Onboarding Lighthouse:$RUN_LAUNCH_GATE:$ONBOARDING_LIGHTHOUSE_RESULT"; do
             name="${selected_gate%%:*}"
@@ -8322,7 +8649,7 @@ jobs:
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes, ci-pen-diff, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -8343,6 +8670,9 @@ jobs:
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"
+          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"
+          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"
           RUN_PEN_DIFF="${{ needs.ci-path-changes.outputs.run_pen_diff }}"
           PEN_DIFF_RESULT="${{ needs.ci-pen-diff.result }}"
           BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
@@ -8363,7 +8693,10 @@ jobs:
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
-            echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (build) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (homepage) | $VISUAL_HOMEPAGE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (marketing DOM) | $VISUAL_MARKETING_DOM_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (marketing routes) | $VISUAL_MARKETING_ROUTES_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo "| Pen Diff (bound or scope route PRs) | $PEN_DIFF_RESULT | \`node scripts/invariants/pen-diff.mjs --base origin/main --base-url <url>\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
@@ -8409,13 +8742,26 @@ jobs:
           fi
 
           # JOV-5960: on homepage PRs the visual snapshot compare runs on the
-          # source lane and skipped is not green (JOV-5960).
+          # source lane and skipped is not green (JOV-5960). The shared build
+          # and every selected rendered suite must pass individually.
           if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Visual Snapshot Compare did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_COMPARE_RESULT)"
             exit 1
           fi
+          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_HOMEPAGE_RESULT" != "success" ]]; then
+            echo "❌ Homepage visual compare suite did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_HOMEPAGE_RESULT)"
+            exit 1
+          fi
           if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_COMPARE_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_MARKETING_DOM_RESULT" != "success" ]]; then
+            echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_MARKETING_DOM_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_MARKETING_ROUTES_RESULT" != "success" ]]; then
+            echo "❌ Marketing exact-route capture did not pass on a marketing PR; skipped is not green (result: $VISUAL_MARKETING_ROUTES_RESULT)"
             exit 1
           fi
 

@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '../test-utils/a11y';
@@ -36,15 +37,26 @@ describe('SimpleTooltip', () => {
       expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
     });
 
-    it.skip('shows content on hover', () => {
-      // Skipped: userEvent.hover doesn't reliably trigger Radix tooltips in jsdom
-      // This behavior is tested through controlled mode in other tests
-      expect(true).toBe(true);
-    });
+    it('opens on keyboard focus and closes on Escape', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TestWrapper>
+          <SimpleTooltip content='Tooltip text'>
+            <span>Focus me</span>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
 
-    it.skip('hides content on mouse leave', () => {
-      // Skipped: userEvent.unhover doesn't reliably work with Radix in jsdom
-      expect(true).toBe(true);
+      await user.tab();
+      expect(screen.getByText('Focus me')).toHaveFocus();
+      expect(await screen.findByTestId('tooltip-content')).toHaveTextContent(
+        'Tooltip text'
+      );
+
+      await user.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+      });
     });
   });
 

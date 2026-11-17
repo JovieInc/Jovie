@@ -2,7 +2,7 @@
 
 import { Button, Input } from '@jovie/ui';
 import { ArrowDown, ArrowUp, Plus, Settings2 } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { type FormEvent, useEffect, useRef } from 'react';
 import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
@@ -96,6 +96,13 @@ export function TaskWorkspaceHeaderBar({
   onSubviewChange,
 }: Readonly<TaskWorkspaceHeaderBarProps>) {
   const createFormId = 'task-workspace-create-form';
+  const draftInputRef = useRef<HTMLInputElement>(null);
+
+  // Entering create mode is the explicit user action (New Task), so focus
+  // moves to the draft field then, not on every mount.
+  useEffect(() => {
+    if (mode === 'create') draftInputRef.current?.focus();
+  }, [mode]);
 
   const toolbarStart =
     mode === 'create' ? (
@@ -105,11 +112,11 @@ export function TaskWorkspaceHeaderBar({
         className='flex min-w-0 flex-1 items-center gap-2'
       >
         <Input
+          ref={draftInputRef}
           value={draftTitle}
           onChange={event => onDraftTitleChange(event.target.value)}
           placeholder='Draft press release, update bio, pitch sync supervisor...'
           aria-label='New Task Name'
-          autoFocus
           className='h-8 max-w-lg min-w-0'
         />
       </form>

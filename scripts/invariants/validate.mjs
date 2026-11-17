@@ -78,6 +78,7 @@ function changedPathsFromBase() {
   try {
     const git = args =>
       execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: 10_000,
