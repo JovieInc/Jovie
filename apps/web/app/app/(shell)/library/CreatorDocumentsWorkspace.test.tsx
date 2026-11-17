@@ -106,6 +106,17 @@ describe('CreatorDocumentsWorkspace', () => {
     vi.unstubAllGlobals();
   });
 
+  it('opens the requested private document from the persisted list', () => {
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[document]}
+        initialDocumentId={document.id}
+      />
+    );
+    expect(vi.mocked(useRegisterRightPanel).mock.lastCall?.[0]).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('captures an idea privately with an idempotency key', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ documentId: document.id }), { status: 201 })
