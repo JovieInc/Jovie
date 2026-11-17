@@ -90,15 +90,20 @@ async function queryOwnedReleases(
   return ordered.limit(1);
 }
 
-/**
- * Read a live, profile-owned release beyond the prompt slice, with identifiers
- * and bounded provider evidence. Prefer case-insensitive literal titles over
- * escaped substrings; known dates then ID break ties. DB failures propagate.
- */
+/** Read owned live releases with bounded evidence; exact titles precede substrings. */
 export async function findOwnedReleaseForChat(
   profileId: string,
   input: { releaseId?: string; releaseTitle?: string }
 ): Promise<ChatReleaseLookup | null> {
+  return (
+    (await findOwnedReleaseMatchForChat(profileId, input))?.release ?? null
+  );
+}
+
+async function findOwnedReleaseMatchForChat(
+  profileId: string,
+  input: Parameters<typeof findOwnedReleaseForChat>[1]
+): Promise<{ release: ChatReleaseLookup; exactTitle: boolean } | null> {
   const releaseId = input.releaseId?.trim();
   const releaseTitle = input.releaseTitle?.trim();
   if (!releaseId && !releaseTitle) return null;
@@ -109,6 +114,7 @@ export async function findOwnedReleaseForChat(
   );
 
   let row: ReleaseRow | undefined;
+  let exactTitle = false;
 
   if (releaseId) {
     // Guard the uuid column: a malformed id would throw at the DB boundary
@@ -129,6 +135,7 @@ export async function findOwnedReleaseForChat(
         true
       )
     )[0];
+    exactTitle = Boolean(row);
     if (!row) {
       const escaped = releaseTitle.replaceAll(/[\\%_]/g, match => `\\${match}`);
       row = (
@@ -163,7 +170,7 @@ export async function findOwnedReleaseForChat(
     .orderBy(desc(providerLinks.isPrimary), asc(providers.displayName))
     .limit(PROVIDER_LINK_LIMIT);
 
-  return {
+  const release: ChatReleaseLookup = {
     ...row,
     releaseDate: toISOStringOrNull(row.releaseDate),
     canvasStatus: getCanvasStatusFromMetadata(row.metadata),
@@ -173,6 +180,7 @@ export async function findOwnedReleaseForChat(
       isPrimary: link.isPrimary,
     })),
   };
+  return { release, exactTitle };
 }
 
 function matchesExact(release: ReleaseContext, title: string): boolean {
@@ -213,33 +221,24 @@ export async function resolveChatRelease(
   if (localExact) return localExact;
 
   if (profileId) {
-    const ownedExact = await findOwnedReleaseForChat(profileId, {
+    const owned = await findOwnedReleaseMatchForChat(profileId, {
       releaseTitle,
     });
-    // findOwnedReleaseForChat itself tries exact before partial; only an
-    // exact result counts in the exact tier.
-    if (
-      ownedExact &&
-      ownedExact.title.toLowerCase() === releaseTitle.toLowerCase()
-    ) {
-      return ownedExact;
-    }
+    // Preserve SQL's exact tier across differing Unicode case-fold semantics.
+    if (owned?.exactTitle) return owned.release;
     if (input.match === 'exact') return null;
 
     const localPartial =
       releases.find(item => matchesPartial(item, releaseTitle)) ?? null;
     if (localPartial) return localPartial;
-    return ownedExact; // owned partial match, or null when nothing matched
+    return owned?.release ?? null;
   }
 
   if (input.match === 'exact') return null;
   return releases.find(item => matchesPartial(item, releaseTitle)) ?? null;
 }
 
-/**
- * Hydrate bounded, deduplicated owned token IDs beyond the loaded slice.
- * Ignore token labels; catalog counts and prompt limits never change.
- */
+/** Hydrate bounded unique owned IDs, ignoring labels and preserving catalog limits. */
 export async function resolveOwnedReleaseTokensForHydration(
   releases: readonly ReleaseContext[],
   userTexts: readonly string[],

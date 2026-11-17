@@ -44,8 +44,9 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   feedback: 'Feedback',
   'visibility-audit': 'Visibility Audit',
 
-  // Root routes
-  app: 'Home',
+  // Root routes. `/app` is the Inbox: the header bell is its only shell
+  // entry and is named Inbox, so header, tab title and bell agree.
+  app: 'Inbox',
 } as const;
 
 /**
