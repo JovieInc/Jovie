@@ -31,4 +31,11 @@ describe('MenuView', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Release credits' }));
     expect(onOpenReleaseCredits).toHaveBeenCalledTimes(1);
   });
+
+  it('renders every entry as a non-submitting button', () => {
+    render(<MenuView {...baseProps} onOpenReleaseCredits={vi.fn()} />);
+    for (const item of screen.getAllByRole('menuitem')) {
+      expect(item).toHaveAttribute('type', 'button');
+    }
+  });
 });

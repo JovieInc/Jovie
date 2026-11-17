@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionGlobalConfig } from 'motion/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
-import { ToastProvider } from '../components/providers/ToastProvider';
+// Direct module, not the feedback barrel: every story renders through this
+// decorator, so the barrel would bind every receipt to all of @jovie/ui.
+import { FeedbackProvider as ToastProvider } from '../components/feedback/FeedbackProvider';
 import { STORYBOOK_A11Y_PARAMETERS } from '../lib/a11y-gates/wcag-22-aa.ts';
 import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';

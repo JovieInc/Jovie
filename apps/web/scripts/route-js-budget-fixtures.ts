@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   evaluateBudgets,
   grownBudgetNumbers,
@@ -80,59 +80,6 @@ export function growth(next: object, previous: object) {
   return grownBudgetNumbers(next, previous, NOW).join('\n');
 }
 
-/**
- * The budget CLI always reads `origin/main` from the process git dir. Pin that
- * ref to `budgets` inside `workDir` so a later shrink of the real ratchet is
- * not growth against this fixture.
- */
-export function isolateBudgetAncestor(
-  workDir: string,
-  budgets: object
-): NodeJS.ProcessEnv {
-  const budgetDir = join(workDir, 'apps/web/scripts');
-  mkdirSync(budgetDir, { recursive: true });
-  writeFileSync(
-    join(budgetDir, 'route-js-budgets.json'),
-    JSON.stringify(budgets)
-  );
-  const env: NodeJS.ProcessEnv = { ...process.env };
-  for (const key of Object.keys(env)) {
-    if (key.startsWith('GIT_')) delete env[key];
-  }
-  const emptyConfig = join(workDir, 'empty.gitconfig');
-  writeFileSync(emptyConfig, '');
-  Object.assign(env, {
-    GIT_CONFIG_GLOBAL: emptyConfig,
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'Budget fixture',
-    GIT_COMMITTER_NAME: 'Budget fixture',
-    GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
-    GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
-  });
-  const git = (args: string[]) => {
-    const result = spawnSync('git', args, {
-      cwd: workDir,
-      env,
-      encoding: 'utf8',
-      timeout: 10000,
-    });
-    if (result.status !== 0) {
-      throw new Error(
-        `git ${args.join(' ')} failed: ${result.stderr || result.stdout}`
-      );
-    }
-  };
-  git(['init', '--initial-branch=main']);
-  git(['add', 'apps/web/scripts/route-js-budgets.json']);
-  git(['commit', '-m', 'Fixture ancestor budgets']);
-  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
-  return {
-    ...env,
-    GIT_DIR: join(workDir, '.git'),
-    GIT_WORK_TREE: workDir,
-  };
-}
-
 export function buildFirstLoadFixture() {
   const nextDir = mkdtempSync(join(tmpdir(), 'first-load-js-'));
   fixtureRoots.push(nextDir);
@@ -157,4 +104,58 @@ export function buildFirstLoadFixture() {
     })
   );
   return nextDir;
+}
+
+/**
+ * The CLI proves budgets only shrink by diffing the budgets file against
+ * origin/main through git, so a hermetic CLI test needs a fixture repo —
+ * never the real repository's ancestor. Writes `files` (fixture-relative
+ * paths), commits them as origin/main, and returns the env that redirects
+ * the CLI's git calls at the fixture repo.
+ */
+export function writeAncestorGitRepo(
+  nextDir: string,
+  files: Record<string, string>
+): NodeJS.ProcessEnv {
+  for (const [relativePath, content] of Object.entries(files)) {
+    const path = join(nextDir, relativePath);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+  }
+  const emptyConfig = join(nextDir, 'empty.gitconfig');
+  writeFileSync(emptyConfig, '');
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) delete env[key];
+  }
+  Object.assign(env, {
+    GIT_NO_LAZY_FETCH: '1',
+    GIT_CONFIG_GLOBAL: emptyConfig,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Budget fixture',
+    GIT_COMMITTER_NAME: 'Budget fixture',
+    GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+    GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+  });
+  const git = (args: string[]): void => {
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: nextDir,
+      env,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    if (result.status !== 0) {
+      throw new Error(`fixture git ${args.join(' ')} failed: ${result.stderr}`);
+    }
+  };
+  git(['init', '--initial-branch=main']);
+  git(['add', '.']);
+  git(['commit', '--no-gpg-sign', '-m', 'Fixture ancestor budgets']);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return {
+    ...env,
+    GIT_DIR: join(nextDir, '.git'),
+    GIT_WORK_TREE: nextDir,
+  };
 }

@@ -13,7 +13,18 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import { commandResult, stopActiveCommand } from './lib/typecheck-command.mjs';
+
+// Test seam (JOV-12511): the shared-deadline fixture injects a virtual clock
+// module via TYPECHECK_PERFORMANCE_CLOCK so the deadline arithmetic below is
+// deterministic under suite load instead of racing real runner overhead.
+// With the variable unset the script reads the real monotonic clock and
+// behaves exactly as before — budgets, timeouts and verdicts are unchanged.
+const clockModule = process.env.TYPECHECK_PERFORMANCE_CLOCK;
+const clockNow = clockModule
+  ? (await import(pathToFileURL(clockModule).href)).now
+  : () => performance.now();
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CONFIG_PATH = resolve(
@@ -159,11 +170,7 @@ function turboSummary(previous) {
 
 async function runCommand(command, env, deadline = Infinity) {
   const before = new Set(existsSync(TURBO_RUNS) ? readdirSync(TURBO_RUNS) : []);
-  const result = await commandResult(
-    command,
-    env,
-    deadline - performance.now()
-  );
+  const result = await commandResult(command, env, deadline - clockNow());
   const turbo = result.exitCode === 0 ? turboSummary(before) : null;
   return {
     durationMs: result.durationMs,
@@ -334,7 +341,7 @@ async function main() {
       '--max-duration-ms must be a positive integer when enforcing'
     );
   const deadline = options.maxDurationMs
-    ? performance.now() + options.maxDurationMs
+    ? clockNow() + options.maxDurationMs
     : Infinity;
   const names = options.scenarios.includes('all')
     ? Object.keys(SCENARIOS)
@@ -372,7 +379,7 @@ async function main() {
       let round = 1;
       pending.length > 0 &&
       round <= options.confirmRetries &&
-      performance.now() < deadline;
+      clockNow() < deadline;
       round += 1
     ) {
       const stillFailing = [];

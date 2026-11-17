@@ -75,6 +75,7 @@ function main() {
     .map(entry => `apps/${entry.name}`)
     .filter(dir =>
       execFileSync('git', ['ls-files', '--', dir], {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         encoding: 'utf8',
       }).trim()

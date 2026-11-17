@@ -21,6 +21,46 @@ import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
+test('package source changes select sparse checkout closure in CI and local scope', () => {
+  const closure =
+    'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
+  const options = { root: ROOT, node: [], vitest: [closure] };
+  for (const path of [
+    'packages/api-client/client.ts',
+    'packages/api-client/types.ts',
+    'packages/another-client/removed.ts',
+  ]) {
+    for (const derivedOnly of [false, true]) {
+      assert.deepEqual(
+        selectScriptContracts([path], { ...options, derivedOnly }),
+        {
+          full: false,
+          node: [],
+          vitest: [closure],
+        }
+      );
+    }
+  }
+  assert.deepEqual(
+    selectScriptContracts(['apps/ios/Jovie/App.swift'], options).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts(['packages/api-client/types.ts'], {
+      ...options,
+      vitest: [],
+    }).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts([closure, 'packages/api-client/types.ts'], {
+      ...options,
+      derivedOnly: true,
+    }).vitest,
+    [closure]
+  );
+});
+
 test('a non-JS scripts path does not force the full contract lists', () => {
   const root = mkdtempSync(join(tmpdir(), 'script-contract-affected-'));
   const write = (path, body) => {

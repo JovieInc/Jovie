@@ -19,7 +19,11 @@ test('preflight repairs committed, staged and untracked formatting without touch
   const cwd = mkdtempSync(path.join(tmpdir(), 'preflight-format-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const git = (...args) => {
-    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      encoding: 'utf8',
+    });
     assert.equal(result.status, 0, result.stderr);
   };
   const bad = 'export const values=[1,2,3];\n';

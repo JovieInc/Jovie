@@ -127,6 +127,28 @@ export function companionChecklist(files, read) {
   const push = (trigger, item, done, hint) =>
     items.push({ trigger, item, done: Boolean(done), hint });
 
+  // Metadata assertions often live beside a route rather than its visible UI.
+  // Catch a missed companion before another source-CI round; this is diagnostic,
+  // and executing the test remains the proof that its expectations are current.
+  for (const { filename, status } of files) {
+    if (
+      status === 'removed' ||
+      !/^apps\/web\/app\/(?:.*\/)?(?:layout|page)\.tsx?$/.test(filename) ||
+      !/export\s+(?:const\s+metadata\b|(?:async\s+)?function\s+generateMetadata\b)/.test(
+        read(filename)
+      )
+    )
+      continue;
+    const companion = filename.replace(/\.(tsx?)$/, '.test.$1');
+    if (!read(companion)) continue;
+    push(
+      filename,
+      'route metadata test reviewed with its source',
+      has(companion),
+      `review ${companion} against the intended metadata and run \`pnpm --filter @jovie/web exec vitest run ${companion.replace('apps/web/', '')}\``
+    );
+  }
+
   // Mirror the pinned company size ratchet for changed working-tree files,
   // including untracked additions. CI remains the policy authority.
   let sizeBaseline;

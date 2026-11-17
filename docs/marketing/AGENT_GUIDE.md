@@ -40,28 +40,63 @@ it stays off public pages until offer truth carries it.
 
 The homepage renders the published `marketing-page/home` content record
 (`apps/web/lib/content-records/marketing-page.ts`): an ordered list of
-registered DS sections, each with its variant and copy slots. A copy or
-section-order change is a publish, not a PR. Locked lines (the headline),
-prices, plan facts and components have no slot and stay in code.
+registered DS sections, each with its variant and copy slots. Authorized copy
+and section-order changes within that schema use the publication path. Locked
+lines (the headline), prices, plan facts and components have no slot and stay
+in code.
 
-```bash
-API=https://jov.ie/api/content-records/marketing-page/home
-AUTH=(-H "authorization: Bearer $CONTENT_PUBLISH_SECRET" -H "x-content-actor: summer")
-curl "${AUTH[@]}" -X POST $API -d '{"action":"validate","data":SPEC}'   # dry run
-curl "${AUTH[@]}" -X POST $API -d '{"action":"draft","data":SPEC,"note":"why"}'  # → previewUrl
-curl "${AUTH[@]}" -X POST $API -d '{"action":"publish","versionId":"…","reason":"why"}'
-curl "${AUTH[@]}" -X POST $API -d '{"action":"rollback","reason":"why"}'  # previous version
-curl "${AUTH[@]}" $API                                                    # versions + audit log
-```
+Use the existing `/api/content-records/marketing-page/home` endpoint. History,
+validation and drafting accept a fresh admin session or the existing
+`CONTENT_PUBLISH_SECRET` bearer with `x-content-actor` naming the actual agent.
+Keep credentials out of URLs, content payloads and receipts. POST bodies are
+JSON objects; the protocol below names their fields rather than supplying
+placeholder copy.
+
+**Current commissioning blocker:** editable publication remains closed until
+[JOV-9741](https://linear.app/jovie/issue/JOV-9741) supplies real same-version
+renderer evidence. No editable kind registers `renderSmoke` today. Structural
+`smoke` checks, a valid draft and a preview do not satisfy that gate. Preserve
+the retained marketing owner; do not remove the check to publish.
+
+| Step | Request and required evidence |
+|---|---|
+| Read history | GET returns the live pointer, newest 50 versions and audit events. Retain the current live version and intended rollback target. |
+| Validate | POST `action: validate` and `data` containing the prepared spec object. Require HTTP 200 with `ok: true`; HTTP 422 contains validation failures. |
+| Draft | POST `action: draft`, the same `data`, and optional `note`. HTTP 201 returns immutable `version`, `review` and `previewUrl`. Save the response before continuing. An interrupted draft has no operation-id contract; reconcile history before creating another version. |
+| Preview | Open the returned signed `previewUrl` unchanged. Match its rendered `jovie-content-review` meta value to `review.reviewDigest`. The identity binds version, payload digest, schema, renderer commit/build, expected live pointer and arm. A missing identity/link or changed renderer prevents review. Only `marketing-page/home` currently receives a signed preview URL. |
+| Approve | From the configured founder's fresh, same-origin admin browser session, POST `action: approve`, `versionId`, a stable UUID `decisionId`, `reviewDigest` and `expectedLiveVersionId` from that exact review. No bearer or impersonation is accepted. Require HTTP 201 and retain its returned `id` as `approvalId`. |
+| Publish | POST `action: publish`, the reviewed `versionId`, `expectedLiveVersionId` (UUID or JSON null), a stable UUID `operationId`, the exact `approvalId`, and optional `reason`. The server rechecks approval, schema, renderer evidence and the live pointer before the atomic pointer/audit write. |
+| Verify delivery | Inspect the publication result, then fetch the intended public route and verify the approved content is actually served. Retain the version/build, response time and independent served-result evidence. An API response alone is not delivery proof. |
+| Roll back | Review and approve the intended prior version against the now-current live pointer and renderer. POST `action: rollback`, explicit `toVersionId`, that current `expectedLiveVersionId`, a new stable UUID `operationId`, the new `approvalId`, and optional `reason`. Verify the restored public result too. |
+
+Keep each approval/publication request's exact payload and actor for recovery.
+Reuse its original ID and unchanged payload after a timeout or ambiguous result;
+a changed request needs a new operation. HTTP 409 means conflict or stale proof:
+read current state and obtain a new exact review instead of changing the old
+request. Rollback cannot reuse a pre-publication approval whose live binding has
+changed. If no existing path supplies a fresh review for the target, record the
+JOV-9741 blocker rather than fabricating a digest or signature.
+
+Publication HTTP 200 means cache invalidation completed and server readback
+matched the target live version. HTTP 202 means that readback or invalidation
+has not been established. HTTP 503 with `state: uncertain` retains the
+`operationId` for reconciliation; it does not establish whether the write
+committed. Even HTTP 200 returns `delivery: unverified`. Retry the same
+publication request to reconcile its audit event/cache readback, and require
+public served-result verification before calling the change complete.
 
 Validation runs at draft and again at publish: section ids and variants must
 be in `MARKETING_SECTIONS` and have a renderer; hero first, cta last; no
 prices (offer truth only); `@jovie/copy` blocking rules; no audience language
-on general pages (MKT-D16). `experiment` adds variants (full section lists),
-integer weights, and one `artist_signup` funnel step as the metric. Preview
-any arm with `&arm=<id>` on the preview URL. Run the copy steps below before
-drafting; a valid spec is not approved copy. Publish goes live on the next
-request (cache tag expired) with no code deploy.
+on general pages (MKT-D16). Run the copy steps below before drafting. The schema
+can describe weighted experiment arms, but publication rejects experiments
+until a complete-arm approval receipt exists; appending `&arm=` changes the
+review identity and cannot reuse the base preview signature.
+
+Eligible content uses this versioned data path independently of a code PR.
+Renderer, component, schema, build-affecting content and locked-fact changes
+still use code qualification; sensitive content retains its permissions and
+approvals. A mixed change does not inherit data-only eligibility.
 
 ### Site header and footer (`site-chrome/main`)
 
@@ -88,14 +123,17 @@ bare glyphs), no visible step numbering, a single-field form is a title plus
 one microcopy line, no stat or filler cards, sentence case, two static matte
 backgrounds only, one primary action per section, no prices. Publish gates:
 schema, `@jovie/copy` lint, and a render smoke test (the visual critic stays
-warn-only for now). **Code is only for a new section type; content, order and
-section choice are data.** A migrated route is added to
+warn-only for now). **Content, order and certified section choice are data.**
+New section types, renderer/schema changes and build inputs use code
+qualification. A migrated route is added to
 `data/marketing/pageSpecMigrated.ts`, and
 `tests/unit/marketing/page-spec-copy-guard.test.ts` then fails if its
 components reintroduce hardcoded copy (mark exceptions `copy-allow: <reason>`).
-Edit-to-live for data changes is the `marketing-change` stage entity
-(`lib/content-records/stage-events.ts`, `docs/metrics/stage-manifest.json`),
-compared against the shipping entity's pr-open to verified for code changes.
+The existing `marketing-change` stage feed
+(`lib/content-records/stage-events.ts`, `docs/metrics/stage-manifest.json`)
+currently times draft to pointer movement. JOV-9741 owns first-served-response
+measurement; report that separately from pointer, check execution and hosted
+wait, and compare verified delivery with the code shipping entity.
 
 ## The 4-step procedure
 

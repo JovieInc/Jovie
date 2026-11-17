@@ -107,6 +107,67 @@ describe('useSidebarPreferencePersist', () => {
     expect(persist).not.toHaveBeenCalled();
   });
 
+  it('saves the final value after an opposite save already started', async () => {
+    const pending = Promise.withResolvers<void>();
+    const persist = vi
+      .fn<(collapsed: boolean) => Promise<void>>()
+      .mockResolvedValueOnce(undefined)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(undefined);
+    const { result } = renderHook(() => useSidebarPreferencePersist(persist));
+
+    act(() => result.current?.(false));
+    await settle();
+    act(() => result.current?.(true));
+    await settle();
+    act(() => result.current?.(false));
+    await settle();
+
+    await act(async () => pending.resolve());
+    expect(persist.mock.calls.map(([collapsed]) => collapsed)).toEqual([
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('coalesces toggles while a save is pending without concurrent writes', async () => {
+    const pending = Promise.withResolvers<void>();
+    const persist = vi
+      .fn<(collapsed: boolean) => Promise<void>>()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(undefined);
+    const { result } = renderHook(() => useSidebarPreferencePersist(persist));
+
+    act(() => result.current?.(false));
+    await settle();
+    act(() => result.current?.(true));
+    await settle();
+    expect(persist).toHaveBeenCalledTimes(1);
+
+    act(() => result.current?.(false));
+    await settle();
+    await act(async () => pending.resolve());
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops follow-on work when navigation unmounts an in-flight shell', async () => {
+    const pending = Promise.withResolvers<void>();
+    const persist = vi.fn(() => pending.promise);
+    const { result, unmount } = renderHook(() =>
+      useSidebarPreferencePersist(persist)
+    );
+
+    act(() => result.current?.(false));
+    await settle();
+    act(() => result.current?.(true));
+    await settle();
+    unmount();
+    await act(async () => pending.resolve());
+
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps one handler identity across renders', () => {
     const persist = vi.fn(async () => {});
     const { result, rerender } = renderHook(() =>

@@ -86,6 +86,7 @@ function approvalLine(row: OutboundRow): string {
         ? OUTBOUND_REJECT_REASON_LABELS[row.approval.rejectReason]
         : 'no reason'
     }`;
+  if (row.relationshipHold) return row.relationshipHold;
   if (row.approval.target === 'held') return 'Held';
   if (row.approval.target === 'stale')
     return 'Person changed since approval. Approve again.';
@@ -147,11 +148,12 @@ function MessageSection({
           className='px-1 pb-2 text-xs text-secondary-token'
           data-testid='outbound-message-empty'
         >
-          {row.view === 'needs_judge'
-            ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
-            : row.channel
-              ? 'No claim link yet. Build the profile to draft a message.'
-              : 'No reachable channel: no email address or Instagram handle on file.'}
+          {row.relationshipHold ??
+            (row.view === 'needs_judge'
+              ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
+              : row.channel
+                ? 'No claim link yet. Build the profile to draft a message.'
+                : 'No reachable channel: no email address or Instagram handle on file.')}
         </p>
       </DrawerSection>
     );
@@ -370,12 +372,25 @@ export function OutboundRail({
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
-          {row.entityNote || row.missingEvidence.length ? (
+          {row.entityNote ||
+          row.relationshipHold ||
+          row.relationshipNotes.length ||
+          row.missingEvidence.length ? (
             <DrawerSection title='Eligibility' collapsible={false}>
               <ul
                 className='space-y-1 px-1 pb-2 text-xs text-secondary-token'
                 data-testid='outbound-eligibility'
               >
+                {row.relationshipHold ? (
+                  <li data-testid='outbound-relationship-hold'>
+                    {row.relationshipHold}
+                  </li>
+                ) : null}
+                {row.relationshipNotes.map(note => (
+                  <li key={note} data-testid='outbound-relationship-note'>
+                    {note}
+                  </li>
+                ))}
                 {row.entityNote ? (
                   <li>
                     {OUTBOUND_FLAG_LABELS.possible_non_artist}: {row.entityNote}

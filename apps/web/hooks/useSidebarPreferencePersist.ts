@@ -31,45 +31,59 @@ export function useSidebarPreferencePersist(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCollapsedRef = useRef<boolean | null>(null);
   const storedCollapsedRef = useRef<boolean | null>(null);
+  const savingRef = useRef(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     persistRef.current = persist;
   }, [persist]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       // The cookie already holds the final state; a write that has not
       // started yet is dropped with the shell instead of racing a sign-out.
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = null;
-    },
-    []
-  );
+      pendingCollapsedRef.current = null;
+    };
+  }, []);
 
   const flush = useCallback(() => {
     timerRef.current = null;
-    const collapsed = pendingCollapsedRef.current;
-    pendingCollapsedRef.current = null;
-    const run = persistRef.current;
-    if (collapsed === null || !run) return;
-    if (storedCollapsedRef.current === collapsed) return;
+    // Keep the latest requested state until the current write finishes. A
+    // completed older value cannot tell us what an in-flight write will save.
+    if (savingRef.current || !mountedRef.current) return;
+    if (pendingCollapsedRef.current === null) return;
 
+    savingRef.current = true;
     startTransition(() => {
       // Fire-and-forget: an offline or failed save must not disturb the shell.
-      let saved: Promise<void>;
-      try {
-        saved = Promise.resolve(run(collapsed));
-      } catch {
-        storedCollapsedRef.current = null;
-        return;
-      }
-      saved
-        .then(() => {
-          storedCollapsedRef.current = collapsed;
-        })
-        .catch(() => {
-          storedCollapsedRef.current = null;
-        });
+      void (async () => {
+        try {
+          // A pending debounce keeps its full wait. If it already expired,
+          // drain only the latest value after the preceding write completes.
+          while (
+            mountedRef.current &&
+            timerRef.current === null &&
+            pendingCollapsedRef.current !== null
+          ) {
+            const collapsed = pendingCollapsedRef.current;
+            pendingCollapsedRef.current = null;
+            const run = persistRef.current;
+            if (!run || storedCollapsedRef.current === collapsed) continue;
+            try {
+              await run(collapsed);
+              storedCollapsedRef.current = collapsed;
+            } catch {
+              storedCollapsedRef.current = null;
+            }
+          }
+        } finally {
+          savingRef.current = false;
+        }
+      })();
     });
   }, [startTransition]);
 

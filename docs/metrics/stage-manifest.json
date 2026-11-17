@@ -12,6 +12,28 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "merch-concept": {
+      "entityId": "merch generation batch UUID",
+      "description": "Pre-art review receipts persist in private batch artistBrief JSON. Aggregate export is not wired; no live timings are claimed.",
+      "stages": [
+        {
+          "id": "pre-art-review",
+          "meaning": "exact concept plan admission before any image, upload or mockup call",
+          "producer": "apps/web/lib/merch/design-generation.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        },
+        {
+          "id": "reviewed",
+          "meaning": "terminal concept-admission decision, never artwork or product certification",
+          "producer": "apps/web/lib/merch/generation-concepts.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        }
+      ]
+    },
     "pen-review": {
       "entityId": "frame id:attempt start[:round]; one observation per timed round or frame",
       "description": "Opt-in Pen review timings; local state ledger and stage-timings-latest.json, not live Mac certification.",
@@ -36,6 +58,23 @@
           "producer": "scripts/pen-review/metrics.mjs",
           "status": "pushed",
           "source": "pen-review-ledger"
+        }
+      ]
+    },
+    "native-typecheck-qualification": {
+      "entityId": "source SHA:run id:attempt (local output directory digest)",
+      "stages": [
+        {
+          "id": "qualification",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        },
+        {
+          "id": "finished",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
         }
       ]
     },
@@ -815,13 +854,46 @@
           "owner": "lanes worker"
         }
       ]
+    },
+    "desktop-startup": {
+      "entityId": "source SHA:receipt start:launch index",
+      "description": "Synthetic Ubuntu local HTTP stub; not installed-native first-paint or a speedup measurement.",
+      "stages": [
+        {
+          "id": "launch",
+          "meaning": "bounded launch, sampling and cleanup duration",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "measurement ended with captured or unavailable evidence",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        }
+      ],
+      "endToEnd": [["launch", "finished"]]
     }
   },
   "sources": {
+    "merch-concept-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-4739; private merchGenerationBatches.artistBrief.conceptReview.stageEvent; aggregation handoff remains open"
+    },
     "pen-review-ledger": {
       "kind": "events",
       "url": null,
       "owner": "design-system; ~/.local/state/jovie-pen-review/ledger.jsonl and local stage-timings-latest.json"
+    },
+    "native-typecheck-qualification-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "native-typecheck-qualification/results/stage-events.ndjson",
+      "workflow": "typecheck-native-qualification.yml",
+      "owner": "JOV-8258"
     },
     "preflight-stages.jsonl": {
       "kind": "events",
@@ -906,6 +978,13 @@
       "kind": "events",
       "url": null,
       "owner": "scripts/design/design-loop-ledger.mjs (docs/metrics/design-loop-ledger.ndjson)"
+    },
+    "desktop-startup-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "desktop-startup-receipts/stage-events.ndjson",
+      "workflow": "ci.yml",
+      "owner": "desktop startup (JOV-12388)"
     }
   },
   "producers": {
@@ -928,6 +1007,10 @@
         "shipping:deployed"
       ],
       "canary-health-gate.yml": ["release:canary"],
+      "typecheck-native-qualification.yml": [
+        "native-typecheck-qualification:qualification",
+        "native-typecheck-qualification:finished"
+      ],
       "shipping-slo.yml": ["metrics:stage-timings"]
     },
     "exempt": {

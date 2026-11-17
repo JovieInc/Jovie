@@ -497,7 +497,7 @@ function ConnectionRail({
                 <PresenceIdentityPhoto
                   subject={row}
                   artistName={data.artist.name}
-                  size='xl'
+                  size='lg'
                   showSource
                 />
               )
@@ -514,6 +514,7 @@ function ConnectionRail({
                     : row.url
                 }
                 density='rail'
+                className='w-full min-w-0'
                 testId='profiles-rail-shareable-link'
               />
             }
@@ -522,7 +523,7 @@ function ConnectionRail({
             subtitleLineClamp={1}
             reserveSubtitleSlot
             reserveMetaSlot
-            metaOverflow='scroll'
+            metaOverflow='wrap'
             actions={
               <DrawerHeaderActions
                 primaryActions={[]}
@@ -545,25 +546,25 @@ function ConnectionRail({
           {inspector.sections.map(section => {
             switch (section.key) {
               case 'observation_summary':
+                // Status already leads the Signals section and the table, so
+                // the card only earns its place with a measured rank; a
+                // "Limit Reached / — / No change yet" tile said nothing.
+                if (
+                  row.rowType !== 'surface' ||
+                  row.monitoringState === 'locked' ||
+                  row.rank === null
+                ) {
+                  return null;
+                }
                 return (
                   <DrawerAnalyticsSummaryCard
                     key={section.key}
                     state='ready'
                     metrics={[
                       {
-                        id: 'status',
-                        label: 'Status',
-                        value: status?.label ?? '—',
-                        hint: MONITORING_LABELS[row.monitoringState],
-                      },
-                      {
                         id: 'rank',
                         label: 'Search Rank',
-                        value:
-                          row.rowType === 'surface' &&
-                          row.monitoringState !== 'locked'
-                            ? String(row.rank ?? '—')
-                            : '—',
+                        value: String(row.rank),
                         hint: rankChange === '—' ? 'No change yet' : rankChange,
                       },
                     ]}
@@ -1513,6 +1514,19 @@ function ProfilesWorkspaceContent({
     },
     [data, router, setSelected, founderChatMode, requestRemoval]
   );
+  // A column whose every cell is a dash is noise; show it once any row
+  // has something to say.
+  const hasRank = rows.some(
+    row =>
+      row.rowType !== 'connector' &&
+      row.monitoringState !== 'locked' &&
+      row.rank !== null
+  );
+  const hasRankChange = rows.some(
+    row =>
+      row.rowType !== 'connector' &&
+      formatProfileRankChange(row.rank, row.previousRank) !== '—'
+  );
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
@@ -1587,14 +1601,26 @@ function ProfilesWorkspaceContent({
         id: 'rank',
         header: 'Search Rank',
         size: 72,
-        meta: { className: cn('max-lg:hidden', styles.identityDetailColumn) },
+        meta: {
+          className: cn(
+            'max-lg:hidden',
+            styles.identityDetailColumn,
+            !hasRank && 'hidden'
+          ),
+        },
         cell: context => <RankCell row={context.row.original} />,
       }),
       columnHelper.display({
         id: 'change',
         header: 'Change',
         size: 78,
-        meta: { className: cn('max-xl:hidden', styles.identityDetailColumn) },
+        meta: {
+          className: cn(
+            'max-xl:hidden',
+            styles.identityDetailColumn,
+            !hasRankChange && 'hidden'
+          ),
+        },
         cell: context => {
           const row = context.row.original;
           if (row.rowType === 'connector') {
@@ -1686,6 +1712,8 @@ function ProfilesWorkspaceContent({
       data?.artist.name,
       data?.providerAvailable,
       getContextMenuItems,
+      hasRank,
+      hasRankChange,
       router,
       selected?.id,
       registerRemovalTrigger,
