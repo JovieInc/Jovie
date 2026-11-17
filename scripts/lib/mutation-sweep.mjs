@@ -22,6 +22,7 @@ export function emptyState() {
  * @property {string} blob git blob hash of the source when last scored
  * @property {string | null} sha commit the run tested
  * @property {string} at ISO timestamp of the run
+ * @property {string} [rearmedAt] ISO timestamp of a pending model-change re-arm
  * @property {string} status scored | error | untested
  * @property {number | null} score
  * @property {number} valid
@@ -457,9 +458,8 @@ export function shardOf(file, count) {
 }
 
 /**
- * Merges sweep states module by module, keeping each module's most recent
- * entry (a model-change re-arm counts from its rearmedAt). Other top-level fields
- * (the model fingerprint) come from the first state that has them: pass the state of record first.
+ * Keeps each module's latest score or re-arm. Top-level fields (the model
+ * fingerprint) come from the first state that has them: pass the state of record first.
  * @param {...unknown} states
  */
 export function mergeStates(...states) {

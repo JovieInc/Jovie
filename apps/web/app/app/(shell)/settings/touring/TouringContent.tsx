@@ -11,9 +11,6 @@ import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsT
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 
-const TOURING_DESCRIPTION =
-  'Connect Bandsintown to display tour dates on your profile.';
-
 export function TouringContent() {
   const { artist } = useSettingsContext();
 
@@ -24,11 +21,7 @@ export function TouringContent() {
   }
 
   return (
-    <SettingsSection
-      id='touring'
-      title='Touring'
-      description={TOURING_DESCRIPTION}
-    >
+    <SettingsSection id='touring' title='Touring'>
       <SettingsTouringSection profileId={artist.id} />
       <CalendarSubscribeRow
         username={artist.handle}

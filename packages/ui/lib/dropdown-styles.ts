@@ -404,10 +404,15 @@ export const MENU_ICON_TRIGGER_BASE =
  * narrows into it instead of overflowing the screen edge.
  */
 export function submenuViewportFitStyle(
-  menu: 'dropdown-menu' | 'context-menu'
+  menu: 'dropdown-menu' | 'context-menu',
+  preferredMinWidth?: number | string
 ): { maxWidth: string; minWidth: string } {
   const available = `var(--radix-${menu}-content-available-width)`;
-  return { maxWidth: available, minWidth: `min(12rem, ${available})` };
+  const preferred =
+    typeof preferredMinWidth === 'number'
+      ? `${preferredMinWidth}px`
+      : (preferredMinWidth ?? '12rem');
+  return { maxWidth: available, minWidth: `min(${preferred}, ${available})` };
 }
 
 export const subMenuContentClasses = [

@@ -368,13 +368,35 @@ describe('baseline shards', () => {
       at: new Date(0).toISOString(),
       rearmedAt: '2026-11-05T00:00:00Z',
     };
-    const fold = baselineAt =>
-      mergeStates(
-        { ...emptyState(), modules: { 'lib/a.ts': rearmed } },
-        { ...emptyState(), modules: { 'lib/a.ts': scored(baselineAt) } }
-      ).modules['lib/a.ts'];
-    expect(fold('2026-11-03T00:00:00Z')).toBe(rearmed);
-    expect(fold('2026-11-06T00:00:00Z').at).toBe('2026-11-06T00:00:00Z');
+    const stateOf = entry => ({
+      ...emptyState(),
+      modules: { 'lib/a.ts': entry },
+    });
+    const old = stateOf(scored('2026-11-03T00:00:00Z'));
+    const current = stateOf(rearmed);
+    const newer = stateOf(scored('2026-11-06T00:00:00Z'));
+    for (const states of [
+      [current, old, old],
+      [old, current, old],
+      [old, old, current],
+    ]) {
+      const merged = mergeStates(...states);
+      expect(merged.modules['lib/a.ts']).toBe(rearmed);
+      expect(mergeStates(merged, old).modules['lib/a.ts']).toBe(rearmed);
+      for (const observations of [
+        [merged, newer],
+        [newer, merged],
+      ]) {
+        expect(mergeStates(...observations).modules['lib/a.ts']).toBe(
+          newer.modules['lib/a.ts']
+        );
+      }
+    }
+    const tiedScore = stateOf(scored(rearmed.rearmedAt));
+    expect(mergeStates(current, tiedScore).modules['lib/a.ts']).toBe(rearmed);
+    expect(mergeStates(tiedScore, current).modules['lib/a.ts']).toBe(
+      tiedScore.modules['lib/a.ts']
+    );
   });
 
   it('keeps top-level fields from the first state that has them', () => {

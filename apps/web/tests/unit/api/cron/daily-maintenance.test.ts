@@ -16,6 +16,7 @@ const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
+const mockAutostartDesignPartnerAutopilot = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
 const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
@@ -61,13 +62,6 @@ vi.mock('@/lib/analytics/data-retention', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
 }));
 
 vi.mock('@/app/api/cron/billing-reconciliation/route', () => ({
@@ -120,6 +114,10 @@ vi.mock('@/lib/profile-search/runner', () => ({
 
 vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
   syncAiCrawlerAnalyticsCron: mockSyncAiCrawlerAnalyticsCron,
+}));
+
+vi.mock('@/lib/release-to-revenue/autostart', () => ({
+  autostartDesignPartnerAutopilot: mockAutostartDesignPartnerAutopilot,
 }));
 
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
@@ -321,6 +319,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       },
     });
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
+    expect(mockAutostartDesignPartnerAutopilot).toHaveBeenCalledTimes(1);
     expect(data.results.founderReviewUploadLeases.success).toBe(true);
     expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
     expect(data.results.aiGatewaySpend).toEqual({

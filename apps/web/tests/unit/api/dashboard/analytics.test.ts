@@ -2,15 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
   cacheQueryMock: vi.fn(),
   invalidateCacheMock: vi.fn(),
-  getUserDashboardAnalyticsMock: vi.fn(),
+  getDashboardAnalyticsForProfileMock: vi.fn(),
   getCurrentUserEntitlementsMock: vi.fn(),
   captureExceptionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
   requireAuth: hoisted.requireAuthMock,
+  getSessionContext: hoisted.getSessionContextMock,
 }));
 
 vi.mock('@/lib/db/cache', () => ({
@@ -19,7 +21,7 @@ vi.mock('@/lib/db/cache', () => ({
 }));
 
 vi.mock('@/lib/db/queries/analytics', () => ({
-  getUserDashboardAnalytics: hoisted.getUserDashboardAnalyticsMock,
+  getDashboardAnalyticsForProfile: hoisted.getDashboardAnalyticsForProfileMock,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -37,6 +39,10 @@ vi.mock('@/lib/utils/logger', () => ({
 describe('GET /api/dashboard/analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
+      profile: { id: 'profile-123', userId: 'user_123' },
+    });
     // cacheQuery should execute the callback by default
     hoisted.cacheQueryMock.mockImplementation(
       async (_key: string, fn: () => Promise<unknown>) => fn()
@@ -66,7 +72,9 @@ describe('GET /api/dashboard/analytics', () => {
       top_referrers: [],
       top_links: [],
     };
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue(mockAnalytics);
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue(
+      mockAnalytics
+    );
 
     const { GET } = await import('@/app/api/dashboard/analytics/route');
     const request = new Request(
@@ -86,7 +94,7 @@ describe('GET /api/dashboard/analytics', () => {
       analyticsRetentionDays: 30,
     });
     // Profile-not-found error comes from the analytics data layer, not auth
-    hoisted.getUserDashboardAnalyticsMock.mockRejectedValue(
+    hoisted.getDashboardAnalyticsForProfileMock.mockRejectedValue(
       new Error('Creator profile not found for user')
     );
 
@@ -105,7 +113,7 @@ describe('GET /api/dashboard/analytics', () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       analyticsRetentionDays: 7,
     });
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue({
       profile_views: 0,
       unique_users: 0,
     });
@@ -129,7 +137,7 @@ describe('GET /api/dashboard/analytics', () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       analyticsRetentionDays: 90,
     });
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue({
       profile_views: 0,
       unique_users: 0,
     });
