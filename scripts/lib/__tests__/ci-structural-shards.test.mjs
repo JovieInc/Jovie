@@ -124,7 +124,7 @@ describe('lanes coverage matrix legs', () => {
         `--include="${include}" --fail-under=${floor}`
       );
     }
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(27);
   });
 
   it('runs no leg command and reports a clean skip on a web-only head', async () => {
