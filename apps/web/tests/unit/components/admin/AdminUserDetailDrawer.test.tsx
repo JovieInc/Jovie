@@ -80,6 +80,18 @@ const user: AdminUserRow = {
 };
 
 describe('AdminUserDetailDrawer', () => {
+  it('reserves the header action band with the grid layout', () => {
+    // layout='grid' gives the floating action cluster a real grid cell, so a
+    // long email parked at the identity column's edge can never sit under it
+    // (the Storybook a11y build lacks the admin tree's pr-* utilities —
+    // globals.css excludes components/features/admin from its Tailwind scan).
+    render(<AdminUserDetailDrawer user={user} onClose={() => {}} />);
+    expect(screen.getByTestId('admin-user-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
+    );
+  });
+
   it.each([true, false])(
     'keeps header copy focus and targets the current user, including clipboard failure (%s)',
     async succeeds => {
@@ -136,15 +148,9 @@ describe('AdminUserDetailDrawer', () => {
       'data-surface-variant',
       'flat'
     );
-    expect(screen.getByTestId('admin-user-entity-header')).toHaveClass(
-      'relative',
-      'flex',
-      'items-start',
-      'gap-3'
-    );
     expect(screen.getByTestId('admin-user-entity-header')).toHaveAttribute(
       'data-layout',
-      'inline'
+      'grid'
     );
     expect(
       screen.getByTestId('drawer-analytics-metric-value-profile-completeness')

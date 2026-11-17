@@ -1,7 +1,12 @@
 'use client';
 
 import { Fragment, useMemo } from 'react';
-import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
+import { stripMachineContext } from '@/lib/chat/machine-context';
+import {
+  type ChatToken,
+  type EntityKind,
+  parseTokens,
+} from '@/lib/chat/tokens';
 import { skillById } from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
 import { EntityChip, type EntityChipTone } from './EntityChip';
@@ -45,7 +50,11 @@ export function TokenizedText({
   className,
   tone = 'onDark',
 }: TokenizedTextProps) {
-  const tokens = useMemo(() => parseTokens(content), [content]);
+  // Invariant: machine context (ids, JSON envelopes) never renders as text.
+  const tokens = useMemo(
+    () => parseTokens(stripMachineContext(content)),
+    [content]
+  );
 
   if (tokens.length === 0) return null;
 
@@ -115,7 +124,7 @@ function TranscriptSkillChip({ id, tone }: TranscriptSkillChipProps) {
 }
 
 interface TranscriptEntityChipProps {
-  readonly kind: 'release' | 'artist' | 'track' | 'event';
+  readonly kind: EntityKind;
   readonly id: string;
   readonly label: string;
   readonly tone: EntityChipTone;

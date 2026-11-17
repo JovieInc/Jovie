@@ -42,7 +42,9 @@ describe('pitch target helpers', () => {
 
     expect(prompt).toContain('/skill:generateReleasePitch');
     expect(prompt).toContain('@release:release-1[Tidal Drift]');
-    expect(prompt).toContain('"taskTitle":"Pitch to Sirius XM"');
+    expect(prompt).toContain('my task "Pitch to Sirius XM" (radio).');
+    expect(prompt).not.toContain('{');
+    expect(prompt).not.toContain('release-1"');
   });
 
   it('builds a release action prompt that asks for destination first', () => {

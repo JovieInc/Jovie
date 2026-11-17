@@ -167,6 +167,22 @@ The four wide public-profile baselines are the flag-on
 entry for that surface. No unreferenced file remained. Resulting tree: 112
 files (~8.2 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget).
 
+Approved raise (measured 2026-11-15, visual-baseline auto-refresh PR #25751):
+`maxSnapshotFiles` 121 → 133 (+10%, the per-raise cap). Exact `origin/main`
+measured 119 canonical baselines — 98.3% of the prior budget — leaving 2
+slots. `storybook-chat-history-switcher.spec.ts` requests 14 new pngs (closed,
+open, searching, no-matches, empty, unread, and after-close, each in light and
+dark), so this refresh cannot land inside 121. Counts on `origin/main`: 100
+files on 2026-08-17, 106 on 2026-10-16, 119 on 2026-11-15 (8,524,351 bytes of
+the unchanged 12 MiB byte budget). 29 commits and 2 contributors touched that
+tree in those 90 days. A consumer audit against `ADMIN_RENDER_SURFACES` and
+`ADMIN_MOBILE_SNAPSHOT_SURFACES` found five unreferenced admin pngs
+(`admin-needs-you-desktop`, `admin-needs-you-mobile`, `admin-growth-mobile`,
+`admin-ops-mobile`, `admin-product-mobile`); no spec requests those names, so
+they are pruned here. Every remaining file, including the 14 new switcher
+baselines, is named by a live `toHaveScreenshot`. Resulting tree: 128 files.
+The publisher refuses a refresh whose canonical directory would exceed this cap.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive
@@ -237,3 +253,5 @@ Budget: **60 runs per merged PR** across all workflows. The registry ceiling sta
 2026-10-29 hygiene pass (ratchet): main was 197.49 MiB of 198 MiB. Pruned drizzle snapshots 0141-0149 (9 files, 10.29 MiB) and kept only the newest (`0151`), per the JOV-6671 rule; retention cap lowered 8 -> 3 (`MAX_RETAINED_DRIZZLE_SNAPSHOTS`). Tracked bytes 197.49 -> 187.20 MiB (about 10.8 MiB headroom); the budget stays 198 MiB and the `maxTrackedBytes` comment marks it as a ratchet. The clean line of `repo-hygiene-guard` now prints the budget and remaining headroom. New guard: tracked `*.gen.json` files over 1 MiB fail unless listed in `GEN_JSON_SIZE_ALLOWLIST`; none exist today (largest generated JSON is 216 KiB). Not touched: docs/screenshots evidence (moving off-repo in #23631), the investor-deck PDF and demo video (served at runtime), the vendored actions, and the registry-driven screenshot catalog.
 
 2026-11-08 hygiene pass (ratchet): main was 207,612,930 of 207,618,048 bytes (about 5 KB headroom) and the drizzle cap test failing (8 snapshots, cap 3). Pruned drizzle snapshots 0151, 0160-0164 and 0177 (7 files) and kept only the newest (`0178`), per the JOV-6671 rule; every reader (`drizzle-kit generate`, the library migration tests, `scripts/lanes/migration_renumber.py`) reads the newest snapshot on the tip or older ones from git history. Budget unchanged.
+
+2026-11-15 hygiene pass (ratchet): main was 207,147,754 of 207,618,048 bytes (about 470 KB headroom) with 4 drizzle snapshots (cap 3), and merge groups of queued PRs crossed the combined-tree budget, so the queue ejected members (#25591). Pruned drizzle snapshots 0178-0180 (3 files, about 3.69 MB) and kept only the newest (`0181`), per the JOV-6671 rule. Budget unchanged.

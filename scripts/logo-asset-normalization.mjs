@@ -20,6 +20,7 @@ const DIRECT_LOGO_TAG =
 
 export function verifyNormalizedLogoConsumers() {
   const files = execFileSync('git', ['ls-files', 'apps/web/**/*.tsx'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
   })

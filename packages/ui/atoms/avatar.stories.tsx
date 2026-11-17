@@ -16,6 +16,10 @@ const meta: Meta<typeof Avatar> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Valid data URL, deliberately undecodable image bytes: native onError without
+// an unrelated network/TLS failure or a missing-resource console error.
+const FAILED_PORTRAIT_SRC = 'data:image/png;base64,bm90LWFuLWltYWdl';
+
 export const Default: Story = {
   render: () => (
     <Avatar size='lg'>
@@ -27,10 +31,7 @@ export const Default: Story = {
 export const WithImage: Story = {
   render: () => (
     <Avatar size='lg' ring>
-      <AvatarImage
-        src='https://cdn.jov.ie/static/placeholder-avatar.png'
-        alt='Artist'
-      />
+      <AvatarImage src='/images/avatars/tim-white.jpg' alt='Tim White' />
       <AvatarStatusDot status='online' size='lg' />
     </Avatar>
   ),
@@ -42,7 +43,7 @@ export const ArtworkComposition: Story = {
       <div className='grid justify-items-center gap-2'>
         <Avatar size='2xl' shape='artwork'>
           <AvatarImage
-            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            src='/images/mock-profile/tim-white-dont-look-down-card.jpg'
             alt='Full release artwork using inherited props'
           />
         </Avatar>
@@ -51,7 +52,7 @@ export const ArtworkComposition: Story = {
       <div className='grid justify-items-center gap-2'>
         <Avatar size='2xl' shape='artwork'>
           <AvatarImage
-            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            src='/images/mock-profile/tim-white-dont-look-down-card.jpg'
             alt='Full release artwork using explicit props'
             size='2xl'
             shape='artwork'
@@ -80,7 +81,7 @@ export const ImageFailure: Story = {
   render: ({ size, ring }) => (
     <UserAvatar
       name='Tim White'
-      src='/avatar-audit-portrait.png'
+      src={FAILED_PORTRAIT_SRC}
       size={size}
       ring={ring}
       status='away'
@@ -135,18 +136,13 @@ export const Empty: Story = {
 
 export const ErrorState: Story = {
   render: () => (
-    <UserAvatar
-      name='Alex Chen'
-      src='https://cdn.jov.ie/static/missing-portrait.png'
-      size='lg'
-      ring
-    />
+    <UserAvatar name='Alex Chen' src={FAILED_PORTRAIT_SRC} size='lg' ring />
   ),
   parameters: {
     docs: {
       description: {
         story:
-          'A broken image URL falls back to the named initials in the same circular frame.',
+          'Undecodable portrait data triggers the image error handler and falls back to the named initials in the same circular frame.',
       },
     },
   },

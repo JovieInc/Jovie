@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ListMusic } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
 import { PROFILE_VIEW_REGISTRY, type ProfileViewKey } from './registry';
@@ -71,7 +72,7 @@ export function MenuView({
       {visibleEntries.map(entry => {
         const Icon = entry.icon;
         return (
-          <button
+          <PlainButton
             key={entry.key}
             type='button'
             role='menuitem'
@@ -80,11 +81,11 @@ export function MenuView({
           >
             <Icon className={ICON_CLASS} />
             {entry.title}
-          </button>
+          </PlainButton>
         );
       })}
       {onOpenReleaseCredits ? (
-        <button
+        <PlainButton
           type='button'
           role='menuitem'
           className={PROFILE_DRAWER_MENU_ITEM_CLASS}
@@ -92,7 +93,7 @@ export function MenuView({
         >
           <ListMusic className={ICON_CLASS} />
           Release credits
-        </button>
+        </PlainButton>
       ) : null}
     </div>
   );

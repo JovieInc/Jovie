@@ -252,6 +252,16 @@ class OutboxTest(Base):
         self.assertEqual(row["result"], "readback")
         self.assertEqual([query for query, _ in linear.calls], [ls.COMMENTS_QUERY])
 
+    def test_failed_flush_is_partial_even_after_its_final_entry_is_dead_lettered(self):
+        with mock.patch.object(ls.time, "time", return_value=1_800_000_000), \
+                mock.patch.object(ls.time, "monotonic", return_value=0):
+            ls.enqueue(self.state, "rank", "id-1", target="1")
+            for _ in range(ls.DEAD_AFTER):
+                report = ls.flush(self.state, FakeLinear([RuntimeError("transport unavailable")]), lambda n: True)
+                self.assertEqual((report["outcome"], report["delivered"]), ("partial", []))
+            view = ls.status(self.state)["outbox"]
+            self.assertEqual((view["depth"], view["dead"]), (0, 1))
+
     def test_tick_isolates_faults_per_team(self):
         linear = FakeLinear([RuntimeError("x"), page([])])
         report = ls.tick(self.state, linear, lambda n: True, (Limited,), teams=("JOV", "LYB"))

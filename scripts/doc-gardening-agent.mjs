@@ -19,6 +19,7 @@ function parseArgs(argv) {
 
 function runGit(args, options = {}) {
   return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: REPO_ROOT,
     encoding: 'utf8',
     stdio: options.stdio ?? 'pipe',

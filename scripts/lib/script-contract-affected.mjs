@@ -12,7 +12,9 @@
  * contract's inputs or toolchain, so it runs both full lists. That is the
  * 2026-10-12 rule (37 merge-group failures after a green PR). Python, data,
  * and other non-JS paths under scripts/ cannot change those inputs, so they
- * use the derived selector (testsAffectedBy), same as any other diff. The
+ * use the derived selector (testsAffectedBy), same as any other diff. Package
+ * changes also run sparse-checkout closure: its recursive reads cannot be
+ * inferred from literal imports, including newly added declaration files. The
  * node and vitest lists run concurrently.
  *
  * Usage: node scripts/lib/script-contract-affected.mjs [--list] [changed paths...]
@@ -48,6 +50,8 @@ const FULL_RUN_INPUT =
 // source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
 // FULL_RUN_INPUT), selects the inventory contract without the full lists.
 export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
+const SPARSE_CLOSURE_TEST =
+  'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
 
 /** @param {string} file */
 export function copyInventoryScanPath(file) {
@@ -68,18 +72,15 @@ export function copyInventoryScanPath(file) {
 /**
  * @param {readonly string[]} catalog
  * @param {readonly string[]} selected
- * @param {readonly string[]} changed
+ * @param {string} contract
+ * @param {boolean} affected
  * @returns {string[]}
  */
-function unionCopyInventory(catalog, selected, changed) {
-  if (
-    !catalog.includes(COPY_INVENTORY_TEST) ||
-    selected.includes(COPY_INVENTORY_TEST) ||
-    !changed.some(copyInventoryScanPath)
-  ) {
+function unionAffectedContract(catalog, selected, contract, affected) {
+  if (!affected || !catalog.includes(contract) || selected.includes(contract)) {
     return [...selected];
   }
-  return [...selected, COPY_INVENTORY_TEST];
+  return [...selected, contract];
 }
 
 /**
@@ -98,16 +99,18 @@ export function testsNearChange(tests, changed, root) {
       return new Set();
     }
   };
-  return tests.filter(test => {
-    if (changes.has(test)) return true;
-    for (const dep of near(test)) {
-      if (changes.has(dep)) return true;
-      if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
-        for (const upstream of near(dep))
-          if (changes.has(upstream)) return true;
-    }
-    return false;
-  });
+  return tests.filter(test =>
+    test.split(' ').some(part => {
+      if (changes.has(part)) return true;
+      for (const dep of near(part)) {
+        if (changes.has(dep)) return true;
+        if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
+          for (const upstream of near(dep))
+            if (changes.has(upstream)) return true;
+      }
+      return false;
+    })
+  );
 }
 
 /**
@@ -127,7 +130,7 @@ export function selectScriptContracts(changed, options = {}) {
   ) {
     // Partial checkouts (fixtures, sparse archives) run what they contain.
     const present = (/** @type {string} */ test) =>
-      existsSync(join(root, test));
+      test.split(' ').every(part => existsSync(join(root, part)));
     return {
       full: true,
       node: node.filter(present),
@@ -138,12 +141,18 @@ export function selectScriptContracts(changed, options = {}) {
   const changedFiles = changed ?? [];
   return {
     full: false,
-    node: unionCopyInventory(
+    node: unionAffectedContract(
       node,
       select(node, changedFiles, root),
-      changedFiles
+      COPY_INVENTORY_TEST,
+      changedFiles.some(copyInventoryScanPath)
     ),
-    vitest: select(vitest, changedFiles, root),
+    vitest: unionAffectedContract(
+      vitest,
+      select(vitest, changedFiles, root),
+      SPARSE_CLOSURE_TEST,
+      changedFiles.some(file => file.startsWith('packages/'))
+    ),
   };
 }
 
@@ -184,7 +193,9 @@ async function main(args) {
         '--config',
         'vitest.config.mts',
         'run',
-        ...vitest.map(test => test.replace(/^scripts\//u, '')),
+        ...vitest.flatMap(test =>
+          test.split(' ').map(part => part.replace(/^scripts\//u, ''))
+        ),
       ])
     );
   const codes = await Promise.all(runs);

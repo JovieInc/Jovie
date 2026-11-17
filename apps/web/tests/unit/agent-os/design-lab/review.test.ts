@@ -63,7 +63,7 @@ describe('reviewDesignProposal', () => {
     });
   });
 
-  it('approves with yes, dispatches D5, and completes Linear issue', async () => {
+  it('records approval and the dispatch request without completing Linear work', async () => {
     const { reviewDesignProposal } = await import(
       '@/lib/agent-os/design-lab/review'
     );
@@ -87,10 +87,7 @@ describe('reviewDesignProposal', () => {
         reviewer: 'tim@jovie.com',
       })
     );
-    expect(updateDesignLabLinearIssueStatus).toHaveBeenCalledWith(
-      'JOV-1951',
-      'completed'
-    );
+    expect(updateDesignLabLinearIssueStatus).not.toHaveBeenCalled();
     expect(saveDesignProposal).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'approved',
@@ -99,6 +96,7 @@ describe('reviewDesignProposal', () => {
       })
     );
     expect(result.dispatchTriggered).toBe(true);
+    expect(result.linearUpdated).toBe(false);
   });
 
   it('rejects with no, skips dispatch, and cancels Linear issue', async () => {
@@ -140,7 +138,7 @@ describe('reviewDesignProposal', () => {
       '@/lib/agent-os/design-lab/review'
     );
 
-    await reviewDesignProposal({
+    const result = await reviewDesignProposal({
       dayBucket: '2026-06-08',
       proposalId: baseProposal.id,
       decision: 'yes-with-notes',
@@ -160,7 +158,47 @@ describe('reviewDesignProposal', () => {
         reviewNotes: 'Keep the underline but reduce accent saturation.',
       })
     );
+    expect(updateDesignLabLinearIssueStatus).not.toHaveBeenCalled();
+    expect(result.linearUpdated).toBe(false);
   });
+
+  it.each(['yes', 'yes-with-notes'] as const)(
+    'preserves %s approval and attempt evidence when dispatch is unconfirmed',
+    async decision => {
+      triggerDesignLabDispatch.mockResolvedValue({
+        triggered: false,
+        dispatchId: 'design-lab-unconfirmed',
+      });
+      const { reviewDesignProposal } = await import(
+        '@/lib/agent-os/design-lab/review'
+      );
+
+      const result = await reviewDesignProposal({
+        dayBucket: '2026-06-08',
+        proposalId: baseProposal.id,
+        decision,
+        notes: decision === 'yes-with-notes' ? 'Keep it quiet.' : null,
+        reviewer: 'test',
+      });
+
+      expect(result).toMatchObject({
+        dispatchTriggered: false,
+        dispatchId: 'design-lab-unconfirmed',
+        linearUpdated: false,
+        tasteMemoryWritten: true,
+        proposal: {
+          status: 'approved',
+          reviewDecision: decision,
+          dispatchId: 'design-lab-unconfirmed',
+        },
+      });
+      expect(saveDesignProposal).toHaveBeenCalledWith(result.proposal);
+      expect(appendDesignTasteMemoryEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ decision: 'accepted' })
+      );
+      expect(updateDesignLabLinearIssueStatus).not.toHaveBeenCalled();
+    }
+  );
 
   it('throws when proposal was already reviewed', async () => {
     getDesignProposal.mockResolvedValue({

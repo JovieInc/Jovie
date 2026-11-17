@@ -117,6 +117,7 @@ describe('shrink-only baseline semantic', () => {
 describe('two green branches stay green on the combined tree', () => {
   const git = (cwd, ...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
       env: {

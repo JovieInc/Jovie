@@ -2,17 +2,18 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { TeleprompterNotchVisual } from './TeleprompterNotchVisual';
 
 const meta = {
-  title: 'Jovie/TeleprompterNotchVisual',
+  title: 'Jovie/Components/TeleprompterNotchVisual',
   component: TeleprompterNotchVisual,
   parameters: {
     layout: 'centered',
   },
   args: {
-    script: 'Hey, it is Tim. New single out Friday. Pre-save it now.',
+    script:
+      'Hold the camera at eye level, press record, and walk through the release.',
   },
   decorators: [
     Story => (
-      <div className='w-55'>
+      <div className='w-64 bg-base p-6'>
         <Story />
       </div>
     ),
@@ -24,27 +25,28 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+// No script yet: the phone and the reading marker stand alone.
 export const EmptyScript: Story = {
   args: {
     script: '',
   },
 };
 
-export const LongContentScript: Story = {
+// A script past 120 characters is cut to a preview with an ellipsis.
+export const LongContent: Story = {
   args: {
     script:
-      'Hey, it is Tim. I have been in the studio for six months on this one and I cannot wait for you to hear it. The new single is out Friday everywhere you listen.',
+      'Hold the camera at eye level, press record, and walk through the release. Say where you wrote it, who played on it, what the cover means, when the vinyl ships and where fans can pre-save tonight.',
   },
 };
 
-export const RtlOverflowScript: Story = {
+export const Rtl: Story = {
   args: {
-    script:
-      'مرحبا، أغنيتي الجديدة تصدر يوم الجمعة على جميع المنصات. احفظها مسبقا الآن حتى لا تفوتك.',
+    script: 'أمسك الكاميرا على مستوى العين، اضغط تسجيل، ثم تحدّث عن الإصدار.',
   },
   decorators: [
     Story => (
-      <div dir='rtl' className='w-55'>
+      <div dir='rtl' lang='ar'>
         <Story />
       </div>
     ),

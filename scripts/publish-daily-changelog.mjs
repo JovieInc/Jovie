@@ -28,7 +28,10 @@ const output = resolve(
 mkdirSync(output, { recursive: true });
 const git = async (args, options = {}) => {
   try {
-    const result = execFileSync('git', args, { encoding: 'utf8' });
+    const result = execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      encoding: 'utf8',
+    });
     return options.status ? 0 : result;
   } catch (error) {
     if (options.status) return error.status;

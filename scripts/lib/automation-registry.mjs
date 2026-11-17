@@ -459,7 +459,7 @@ export function evaluateEntry(entry, observation, nowMs) {
   if (!observation || observation.ok !== true) {
     return {
       ...base,
-      status: 'unknown',
+      status: observation?.deferred ? 'deferred' : 'unknown',
       reason: observation?.reason ?? 'receipt-unreadable',
     };
   }
@@ -492,7 +492,7 @@ export function evaluateLiveness(registry, observations, nowMs) {
     if (!HOSTED_RECEIPT_KINDS.includes(entry.receipt?.kind)) continue;
     results.push(evaluateEntry(entry, observations.get(entry.id), nowMs));
   }
-  const red = results.filter(row => row.status !== 'fresh');
+  const red = results.filter(r => !['fresh', 'deferred'].includes(r.status));
   return {
     schema: LIVENESS_SCHEMA,
     observedAt: new Date(nowMs).toISOString(),
@@ -534,8 +534,8 @@ export function livenessDecisions(report, previous = {}) {
   for (const row of report.results) {
     if (!row.critical) continue;
     const fingerprint = livenessFingerprint(row.id);
-    if (row.status === 'fresh') {
-      if (previous[fingerprint] === 'red')
+    if (row.status === 'fresh' || row.status === 'deferred') {
+      if (row.status === 'fresh' && previous[fingerprint] === 'red')
         decisions.push({ action: 'green', fingerprint, id: row.id });
       continue;
     }

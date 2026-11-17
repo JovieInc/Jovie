@@ -82,7 +82,7 @@ vi.mock('@/lib/db/schema/tour', () => ({
 
 vi.mock('next/cache', () => ({
   unstable_noStore: vi.fn(),
-  unstable_cache: vi.fn((fn: () => unknown) => fn),
+  // No unstable_cache: the list is read uncached, so using it must fail here.
   revalidatePath: mockRevalidatePath,
   revalidateTag: mockRevalidateTag,
 }));
@@ -167,6 +167,10 @@ function setupAuthenticatedUser(
     needsOnboarding: false,
     selectedProfile: { ...DEFAULT_PROFILE, ...overrides },
   });
+}
+
+function expectPublicProfileExpired() {
+  expect(mockRevalidateTag).toHaveBeenCalledWith('profile:testartist', 'max');
 }
 
 /** A sample TourDate row as it would come from the database */
@@ -507,6 +511,7 @@ describe('tour-dates/actions.ts', () => {
       expect(result.tourDates).toHaveLength(1);
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
+      expectPublicProfileExpired();
       expect(mockVerifyBandsintownArtist).toHaveBeenCalledWith(
         'My Artist',
         null
@@ -833,6 +838,7 @@ describe('tour-dates/actions.ts', () => {
       expect(mockDbDelete).toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
+      expectPublicProfileExpired();
     });
 
     it('returns failure and captures error on database failure', async () => {
@@ -909,7 +915,7 @@ describe('tour-dates/actions.ts', () => {
   // ========================================================================
 
   describe('cache invalidation on mutations', () => {
-    it('revalidates tag and path after createTourDate', async () => {
+    it('expires the public profile tag after createTourDate (path skipped)', async () => {
       setupAuthenticatedUser();
       mockDbInsert.mockReturnValue(chainMock([makeTourDateRow()]));
 
@@ -923,16 +929,13 @@ describe('tour-dates/actions.ts', () => {
         country: 'US',
       });
 
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        'tour-dates:user_123:prof_123',
-        'max'
-      );
+      expectPublicProfileExpired();
       // revalidatePath is intentionally skipped to avoid resetting client-side
       // state (closing the sidebar). TanStack Query handles cache updates.
       expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
-    it('revalidates tag after deleteTourDate (path skipped to preserve sidebar)', async () => {
+    it('expires the public profile tag after deleteTourDate (path skipped to preserve sidebar)', async () => {
       setupAuthenticatedUser();
       mockDbDelete.mockReturnValue(chainMock({ rowCount: 1 }));
 
@@ -941,10 +944,7 @@ describe('tour-dates/actions.ts', () => {
       );
       await deleteTourDate('td_1');
 
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        'tour-dates:user_123:prof_123',
-        'max'
-      );
+      expectPublicProfileExpired();
       expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
   });

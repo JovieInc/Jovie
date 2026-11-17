@@ -178,7 +178,7 @@ function DesktopGuidanceFixture({
         above={
           centered ? undefined : (
             <div className='space-y-4'>
-              <ChatEmptyStateGreeting firstName='Tim' insight={null} />
+              <ChatEmptyStateGreeting firstName='Tim' />
               <ChatEmptyStateOpportunityCards
                 cards={[
                   {

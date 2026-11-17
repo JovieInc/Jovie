@@ -12,7 +12,10 @@ import type {
 } from './types';
 
 export const DEFAULT_DESIGN_PARTNER_CONFIG: DesignPartnerConfigTemplate = {
-  creatorUsername: TIM_WHITE_PROFILE.handle,
+  // Profiles are keyed by their public handle (jov.ie/tim). The person-level
+  // `handle` ('timwhite') matches no creator_profiles row, so looking it up
+  // left autopilot unconfigured and built smartlinks under /timwhite.
+  creatorUsername: TIM_WHITE_PROFILE.publicProfileHandle,
   store: {
     provider: 'printful',
     scope: 'default',

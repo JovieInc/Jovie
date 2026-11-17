@@ -43,6 +43,46 @@ export type VersionType =
 /** A numeric disambiguation suffix such as `-2` or `-12`. Never generated. */
 export const NUMERIC_SUFFIX = /-\d{1,3}$/;
 
+/**
+ * Track slugs that collide with static segments under a release
+ * (`/[username]/[slug]/sounds`, `/download`). Next.js resolves the static
+ * segment first, so a track with one of these slugs would be unreachable.
+ */
+export const RESERVED_TRACK_SLUGS: ReadonlySet<string> = new Set([
+  'sounds',
+  'download',
+]);
+
+/**
+ * Generate a URL-safe slug from a title.
+ * No longer appends Spotify ID suffix - uses collision numbering instead.
+ */
+export function generateBaseSlug(
+  title: string,
+  maxLength: number = 50
+): string {
+  // Guard against undefined to prevent runtime errors
+  if (!title) return '';
+
+  return (
+    title
+      .toLowerCase()
+      // Normalize unicode characters (é → e, ñ → n, etc.)
+      .normalize('NFD')
+      .replaceAll(/[\u0300-\u036f]/g, '')
+      // Remove special characters except spaces and hyphens
+      .replaceAll(/[^a-z0-9\s-]/g, '')
+      // Replace spaces with hyphens
+      .replaceAll(/\s+/g, '-')
+      // Collapse multiple hyphens
+      .replaceAll(/-+/g, '-')
+      // Remove leading/trailing hyphens
+      .replaceAll(/(^-)|(-$)/g, '')
+      // Truncate to max length
+      .slice(0, maxLength)
+  );
+}
+
 export function slugify(value: string, maxLength = 50): string {
   return value
     .toLowerCase()

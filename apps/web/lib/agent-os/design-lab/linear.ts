@@ -229,9 +229,9 @@ function buildDispatchLinkCommentBody(
   const proposalEllipsis = params.proposalText.trim().length > 500 ? '…' : '';
 
   return [
-    '## Design HTML builder dispatched',
+    '## Design HTML dispatch attempt recorded',
     '',
-    'Approved Design Lab proposal routed to `/design-html`.',
+    'Approved Design Lab proposal saved for a `/design-html` dispatch attempt. Request acceptance and worker execution are unconfirmed.',
     '',
     `- Surface: **${params.surfaceName}** (\`${params.surfaceId}\`)`,
     `- Proposal: \`${params.proposalId}\``,
@@ -244,7 +244,7 @@ function buildDispatchLinkCommentBody(
     '',
     proposalPreview + proposalEllipsis,
     '',
-    'The HTML artifact will be written under the artifact directory. When complete, attach the resulting HTML file path back to this issue.',
+    'The artifact directory is reserved for this attempt. If a worker produces an HTML artifact, attach the resulting file path back to this issue. This record does not establish execution or completion.',
   ]
     .filter((part): part is string => part !== null)
     .join('\n')

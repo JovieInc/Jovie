@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-09",
+  "updated_at": "2026-11-14",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
   "routing_policy": {
@@ -656,55 +656,6 @@
         "paid-gateway",
         "requires-hyperagent-cli",
         "most-expensive-hyperagent"
-      ]
-    },
-    {
-      "id": "gateway-deepseek-v4-flash",
-      "provider": "vercel-ai-gateway",
-      "model": "deepseek/deepseek-v4-flash",
-      "family": "deepseek",
-      "channel": "api",
-      "pool": "vercel-gateway",
-      "quality": 65,
-      "list_price_in": 0.06,
-      "list_price_out": 0.18,
-      "capabilities": ["review", "review-verify"],
-      "cost_tier": "gateway-budgeted-paid",
-      "strengths": ["cheapest-capable-api", "post-included-fallback"],
-      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"],
-      "quality_by_capability": {
-        "review": 54.4,
-        "review-verify": 54.4
-      },
-      "sources": [
-        "https://vercel.com/ai-gateway/models/deepseek-v4-flash",
-        "https://regolo.ai/deepseek-v4-1-flash-vs-v4-flash-which-open-weight-model-should-your-company-run/"
-      ],
-      "notes": "Disabled PR review ranking only; this does not restore a retired agent route."
-    },
-    {
-      "id": "gateway-deepseek-v4.1-flash",
-      "provider": "vercel-ai-gateway",
-      "model": "deepseek/deepseek-v4.1-flash",
-      "family": "deepseek",
-      "channel": "api",
-      "pool": "vercel-gateway",
-      "quality": 65,
-      "list_price_in": 0.075,
-      "list_price_out": 0.3,
-      "capabilities": ["review", "review-verify"],
-      "cost_tier": "gateway-budgeted-paid",
-      "strengths": ["per-call-review-route"],
-      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
-      "notes": "Retired PR review kernel catalog entry; not an active agent route. Peak list price; quality provisional until replay outcomes exist.",
-      "quality_by_capability": {
-        "review": 74.2,
-        "review-verify": 74.2
-      },
-      "sources": [
-        "https://vercel.com/ai-gateway/models/deepseek-v4.1-flash",
-        "https://www.digitalapplied.com/blog/deepseek-v4-1-flash-pro-routing-prices-early-tests",
-        "https://flowtivity.ai/blog/deepseek-v4-1-flash-benchmarks/"
       ]
     },
     {
