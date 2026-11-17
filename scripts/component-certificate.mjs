@@ -3,7 +3,8 @@
  * Component certificate CLI.
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
  *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
- *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json)
+ *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json
+ *     or a shard in component-certification.d/)
  *   node scripts/component-certificate.mjs --sort   (sort gates, waivers and screen debt by component path)
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
@@ -13,8 +14,10 @@ import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   COVERAGE_ROOTS,
+  coverageRootForPath,
   listComponentsInRoot,
   REPO_ROOT,
+  shouldWalkRootRecursively,
 } from './component-ship-policy.mjs';
 import { applyBenchmarkReview } from './lib/component-benchmark-review.mjs';
 import {
@@ -29,7 +32,11 @@ import {
   mutationStateKey,
   mutationTestsFor,
 } from './lib/component-certificate-mutation.mjs';
-import { acceptStoryReceipts } from './lib/component-evidence.mjs';
+import {
+  readCertificationRegistry,
+  sortCertificationRegistry,
+} from './lib/component-certification-registry.mjs';
+import { loadStoryReceipts } from './lib/component-story-receipts.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -111,16 +118,13 @@ const readWithCompanions = (rel, suffix) => {
 // PR appends.
 if (values.sort) {
   const { sortByPath } = await import('./lib/component-cert-screens.mjs');
-  /** @type {{rel: string, keys: string[]}[]} */
-  const files = [
-    { rel: values.registry, keys: ['gates', 'waivers'] },
-    { rel: values.screens, keys: ['debt'] },
-  ];
-  for (const { rel, keys } of files) {
-    const abs = rel.startsWith('/') ? rel : join(root, rel);
-    if (!existsSync(abs)) continue;
+  sortCertificationRegistry(root, values.registry);
+  const abs = values.screens.startsWith('/')
+    ? values.screens
+    : join(root, values.screens);
+  if (existsSync(abs)) {
     const doc = JSON.parse(readFileSync(abs, 'utf8'));
-    for (const key of keys) if (doc[key]) doc[key] = sortByPath(doc[key]);
+    if (doc.debt) doc.debt = sortByPath(doc.debt);
     writeFileSync(abs, `${JSON.stringify(doc, null, 2)}\n`);
   }
   process.exit(0);
@@ -134,24 +138,18 @@ if (values.guards) {
   process.exit(s.errors.length ? 1 : 0);
 }
 
-const registry = readJson(values.registry, { policy: {}, waivers: {} });
+const { registry, errors: registryErrors } = readCertificationRegistry(
+  root,
+  values.registry,
+  { policy: {}, waivers: {} }
+);
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-// Story-capture receipts count only when every story was captured in light
-// and dark; partial passes are dropped (and listed) rather than trusted.
-const receipts = kind => {
-  const { components, rejected } = acceptStoryReceipts(
-    readJson(values[kind], { components: {} }).components
-  );
-  for (const r of rejected)
-    console.error(
-      `[component-certificate] ignored ${kind} receipt for ${r.path}: ${r.problem}`
-    );
-  return components;
-};
-const a11y = receipts('a11y');
-const visual = receipts('visual');
+const { a11y, visual, renderInputs, renderInputsFor } = loadStoryReceipts(
+  root,
+  values
+);
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -166,13 +164,29 @@ const mutationInventory = Object.keys(mutation).length
 
 /** @type {any[]} */
 let list = [];
-if (values.all || values.gate)
-  for (const r of [...new Set(COVERAGE_ROOTS)])
-    list.push(...listComponentsInRoot(r, root));
-const seen = new Set();
-list = list.filter(c =>
-  seen.has(c.sourceRel) ? false : seen.add(c.sourceRel)
-);
+if (values.all || values.gate) {
+  const roots = [...new Set(COVERAGE_ROOTS)];
+  // Discover a recursive parent once, retaining the canonical per-root order.
+  // packages/ui is non-recursive, so its separate atoms root still runs.
+  const discoveryRoots = roots.filter(
+    rootRel =>
+      !roots.some(
+        parent =>
+          parent !== rootRel &&
+          shouldWalkRootRecursively(parent) &&
+          rootRel.startsWith(`${parent}/`)
+      )
+  );
+  const rootOrder = new Map(roots.map((rootRel, index) => [rootRel, index]));
+  list = discoveryRoots.flatMap(rootRel => listComponentsInRoot(rootRel, root));
+  list.sort(
+    (a, b) =>
+      rootOrder.get(coverageRootForPath(a.sourceRel)) -
+        rootOrder.get(coverageRootForPath(b.sourceRel)) ||
+      a.sourceRel.localeCompare(b.sourceRel)
+  );
+}
+const seen = new Set(list.map(c => c.sourceRel));
 // A gate key naming one .tsx file outside the coverage roots (an app-route
 // component such as app/[username]/_components/X.tsx) is certified as if
 // passed with --component; a missing file still fails "matches no component".
@@ -203,13 +217,28 @@ const prefixGateScope = new Set([
   ...(values.component ?? []),
   ...gatedFiles,
 ]);
-for (const rel of [...(values.component ?? []), ...gatedFiles, ...screenFiles])
-  if (!seen.has(rel) && seen.add(rel))
-    list.push({
+const scopedDirectories = new Map();
+for (const rel of [
+  ...(values.component ?? []),
+  ...gatedFiles,
+  ...screenFiles,
+]) {
+  if (seen.has(rel)) continue;
+  seen.add(rel);
+  const dir = dirname(rel);
+  if (!scopedDirectories.has(dir))
+    scopedDirectories.set(
+      dir,
+      new Map(listComponentsInRoot(dir, root, false).map(c => [c.sourceRel, c]))
+    );
+  list.push(
+    scopedDirectories.get(dir).get(rel) ?? {
       sourceRel: rel,
       testRel: rel.replace(/\.tsx$/, '.test.tsx'),
       storyRel: rel.replace(/\.tsx$/, '.stories.tsx'),
-    });
+    }
+  );
+}
 if (!values.all && values.component)
   list = list.filter(c => values.component.includes(c.sourceRel));
 
@@ -243,6 +272,8 @@ const certificates = list.map(c => {
     policy,
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
+      renderInputs,
+      componentRenderInputs: renderInputsFor(c.sourceRel),
       mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],
@@ -269,12 +300,7 @@ if (values.gate) {
     },
     registry.gates ?? {}
   );
-  const { unsortedPathErrors } = await import(
-    './lib/component-cert-screens.mjs'
-  );
-  const orderErrors = ['gates', 'waivers'].flatMap(key =>
-    unsortedPathErrors(`${values.registry}: ${key}`, registry[key])
-  );
+  const orderErrors = registryErrors;
   if (orderErrors.length) {
     result.errors.push(...orderErrors);
     result.ok = false;

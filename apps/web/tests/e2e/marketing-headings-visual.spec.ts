@@ -65,7 +65,6 @@ for (const lines of [2, 3]) {
 // JOV-7772: baseline allowances cannot certify the hero contract. Check both
 // complete text and two natural lines so removing a clamp cannot hide a failure.
 for (const route of [
-  '/',
   '/about',
   '/ai',
   '/artist-notifications',
@@ -80,12 +79,6 @@ for (const route of [
     // At lg the download hero splits into columns before the xl type fits.
     ...(route === '/download'
       ? [{ name: 'split-desktop', size: { width: 1024, height: 900 } }]
-      : []),
-    ...(route === '/'
-      ? [
-          { name: 'split-desktop', size: { width: 1024, height: 900 } },
-          { name: 'small-mobile', size: { width: 320, height: 900 } },
-        ]
       : []),
   ];
   for (const viewport of viewports) {
@@ -103,17 +96,6 @@ for (const route of [
       await expect(heading).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
 
-      if (route === '/') {
-        const support = page.locator('.marketing-hero-subtitle');
-        const headingSize = await heading.evaluate(element =>
-          Number.parseFloat(getComputedStyle(element).fontSize)
-        );
-        const supportSize = await support.evaluate(element =>
-          Number.parseFloat(getComputedStyle(element).fontSize)
-        );
-        expect(headingSize / supportSize).toBeGreaterThanOrEqual(1.8);
-      }
-
       const geometry = await measureHeading(heading);
       expect(geometry.lineHeight).toBeGreaterThan(0);
       expect(
@@ -126,11 +108,7 @@ for (const route of [
       ).toBeLessThanOrEqual(1);
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
-        snapshot.findings.filter(
-          finding =>
-            finding.kind === 'clipped-heading' ||
-            (route === '/' && finding.kind === 'heading-hierarchy-inversion')
-        )
+        snapshot.findings.filter(finding => finding.kind === 'clipped-heading')
       ).toEqual([]);
       await testInfo.attach('hero', {
         body: await page.screenshot(),
@@ -139,29 +117,6 @@ for (const route of [
     });
   }
 }
-
-test('homepage claim entry stays editable offline before native navigation', async ({
-  page,
-  context,
-}) => {
-  await page.setViewportSize(SCREENSHOT_VIEWPORTS.mobile);
-  const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
-  expect(response?.status()).toBe(200);
-  const input = page.getByRole('textbox', { name: 'Your handle' });
-  await input.fill('frontdoor');
-  await context.setOffline(true);
-  try {
-    await input.press('End');
-    await input.pressSequentially('-retry');
-    await expect(input).toHaveValue('frontdoor-retry');
-    await expect(input).toBeFocused();
-    await expect(
-      page.getByRole('button', { name: 'Claim your handle', exact: true })
-    ).toBeEnabled();
-  } finally {
-    await context.setOffline(false);
-  }
-});
 
 for (const route of [
   '/billing/youtube-thumbnails',

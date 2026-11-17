@@ -163,8 +163,8 @@ export interface MarketingRecipe {
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
   // ── homepage (proven — reference: /) ─────────────────────────────────────
-  // Tim 2026-11-03: "Music line wins" for `/` only; Tim 2026-11-09: the
-  // story ends in the claim entry, and every door routes into /start.
+  // Tim 2026-11-03: "Jovie helps you move your music forward." (`/` only).
+  // Invite-only: the story ends in the role waitlist form, never signup.
   {
     id: 'homepage',
     label: 'Homepage',
@@ -172,7 +172,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
     // Hero, the jov.ie/you profile, the releases workspace, then the
-    // claim entry. No prices on the page.
+    // invitation form. No prices on the page.
     sectionOrder: ['hero', 'feature-split', 'product-gallery', 'cta'],
     arc: [
       { beat: 'promise', feeling: HOME.hero.headline, section: 'hero' },
@@ -199,7 +199,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // headline + the claim action + the live-profile link
+        desktop: ['hero'], // headline + the invite action + the live-profile link
         mobile: ['hero'],
       },
     },
@@ -874,7 +874,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
         feeling: 'what early access makes possible',
         section: 'feature-split',
       },
-      { beat: 'capture', feeling: 'reserve your spot', section: 'capture' },
+      { beat: 'capture', feeling: 'join the waitlist', section: 'capture' },
       { beat: 'objection', feeling: 'my questions', section: 'faq' },
       { beat: 'action', feeling: 'request access', section: 'cta' },
     ],
@@ -900,7 +900,8 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     },
     minContent: ['hero.headline', 'capture.inputSlot'],
     maxContent: { maxSections: 5 },
-    chooseWhen: 'conversion=request-access AND WAITLIST_ENABLED=true',
+    chooseWhen:
+      'conversion=request-access AND brandConstraints.waitlistEnabled=true',
     neverUse: [
       'With multiple competing CTAs (capture is the conversion — one input, one submit)',
       'Without interaction states on capture (Design F2: submitting/success/error/already-subscribed)',

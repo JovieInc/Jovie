@@ -158,9 +158,7 @@ describe('correction pyramid guards', () => {
 
   it('locks the homepage H1 to the homepage copy module', () => {
     expect(HOMEPAGE_EDITORIAL_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe(
-      'The page people find when they look you up.'
-    );
+    expect(LOCKED_HOMEPAGE_H1).toBe('Move your music forward.');
     expect(HOMEPAGE_EDITORIAL_COPY.seo.title).toBe(
       'Jovie | Move your music forward'
     );

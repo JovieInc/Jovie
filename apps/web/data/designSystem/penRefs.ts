@@ -7,6 +7,7 @@ import {
   normalizeButtonVariantContract,
   resolveButtonPenMaster,
 } from '@jovie/ui';
+import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import type { DesignSystemComponentId } from './componentRegistry';
 
 export type PenOverrideProperty = 'content' | 'icon';
@@ -140,8 +141,8 @@ export const BUTTON_PEN_PROPAGATION_FIXTURES = [
   {
     route: '/artist-profiles',
     source: 'apps/web/components/site/MarketingTerminalCta.tsx',
-    labelSource: 'apps/web/components/site/MarketingFinalCTA.tsx',
-    label: 'Claim your handle',
+    labelSource: 'apps/web/data/homepageFrontDoorCta.ts',
+    label: HOMEPAGE_FRONT_DOOR_CTA.primary.label,
     variant: 'primary',
     size: 'lg',
   },

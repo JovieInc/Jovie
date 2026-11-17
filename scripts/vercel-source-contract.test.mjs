@@ -55,7 +55,7 @@ function ignoredFiles(paths) {
   const output = execFileSync(
     'git',
     ['ls-files', '-ci', '--exclude-from=.vercelignore', '--', ...paths],
-    { encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
   );
   return output.split('\n').filter(Boolean);
 }
@@ -72,7 +72,7 @@ describe('Vercel source contract', () => {
         'apps/docs/next.config.mjs',
         'apps/docs/app/page.mdx',
       ],
-      { encoding: 'utf8' }
+      { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
     );
 
     assert.equal(ignored.trim(), '');

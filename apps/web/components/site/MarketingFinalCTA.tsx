@@ -1,14 +1,15 @@
 // @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingTerminalCta } from './MarketingTerminalCta';
 
 export interface MarketingFinalCTAProps {
-  /** Override headline copy. Defaults to the standard private launch request line. */
+  /** Override headline copy. Defaults to the approved homepage claim headline. */
   readonly title?: string;
   /** Optional supporting paragraph below the headline. */
   readonly body?: string;
-  /** Primary CTA label. Defaults to "Claim your handle". */
+  /** Primary CTA label. Defaults to the shared front-door label. */
   readonly ctaLabel?: string;
   /** Primary CTA destination. Defaults to the signup route. */
   readonly ctaHref?: string;
@@ -19,8 +20,8 @@ export interface MarketingFinalCTAProps {
   readonly testId?: string;
 }
 
-const DEFAULT_TITLE = 'Request private launch access.';
-const DEFAULT_CTA_LABEL = 'Claim your handle';
+const DEFAULT_TITLE = HOMEPAGE_EDITORIAL_COPY.claim.headline;
+const DEFAULT_CTA_LABEL = HOMEPAGE_FRONT_DOOR_CTA.primary.label;
 const DEFAULT_CTA_HREF = HOMEPAGE_FRONT_DOOR_CTA.primary.href;
 
 export function MarketingFinalCTA({

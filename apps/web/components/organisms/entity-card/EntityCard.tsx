@@ -121,7 +121,7 @@ function EntityCtaControl({
   }
 
   const className = cn(
-    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-2xs font-semibold leading-none text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
     // Landscape profile actions keep the native 44px touch-target floor.
     // Portrait unified cards retain their compact 36px action row.
     unified
@@ -445,7 +445,7 @@ export function EntityCard({
 
           <h3
             className={cn(
-              'min-w-0 font-[590] leading-tight tracking-tighter text-primary-token',
+              'min-w-0 font-semibold leading-tight tracking-tighter text-primary-token',
               isUnified || (shape && treatment !== 'big')
                 ? 'line-clamp-1'
                 : 'line-clamp-2',
@@ -538,7 +538,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-3 text-2xs font-semibold leading-none text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
                     isProfileLandscape ? 'h-11 w-fit' : 'h-9 w-full'
                   )}
                 >
@@ -550,7 +550,7 @@ export function EntityCard({
             <>
               {model.price ? (
                 <div className='min-w-0'>
-                  <span className='text-sm font-[680] text-primary-token'>
+                  <span className='text-sm font-bold text-primary-token'>
                     {model.price.original ? (
                       <>
                         {model.price.display}

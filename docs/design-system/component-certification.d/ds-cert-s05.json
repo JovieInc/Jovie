@@ -1,0 +1,108 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/account-settings/EmailManagementCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-activity-feed/DashboardActivityFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceAlertsCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/MismatchCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/grouped-links/GroupedLinksManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/profile-form/ProfileForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceAlertsCell.tsx": {
+      "permission-denied": "Detector false positive: the only match is the ARIA attribute role='img' on the channel chip; the cell has no permission or plan gate."
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar.tsx": {
+      "error": "Unreachable as a rendered state: a failed confirm or reject leaves the panel unchanged, and a failed removal surfaces only as the transient toast.error('Failed to remove ...') from onError.",
+      "offline": "Unreachable as a rendered state: an offline request fails into the same silent mutation error or onError toast; the panel reads no network status and renders no offline UI.",
+      "permission-denied": "Detector false positive: the only match is the ARIA attribute role='img' on the missing-image badge; the sidebar has no permission or plan gate."
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSummary.tsx": {
+      "error": "Unreachable as a rendered state: a failed discovery request surfaces only as the transient toast from onError (toast.error('Failed to trigger discovery')); the toolbar itself renders no error UI.",
+      "offline": "Unreachable as a rendered state: an offline discovery request fails into the same onError toast; the toolbar renders no offline UI and reads no network status."
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/MismatchCard.tsx": {
+      "empty": "Detector false positive: the card renders one mismatch and owns no collection; the matches are the class names list-none and items-center. The empty list belongs to CatalogHealthSection.",
+      "permission-denied": "Detector false positive: the only matches are the ARIA attributes role='status' and role='alert'; the card has no permission or plan gate."
+    },
+    "apps/web/components/features/dashboard/organisms/grouped-links/GroupedLinksManager.tsx": {
+      "loading": "The only loading UI is the next/dynamic fallback (loading: () => <div className='mb-4 h-12 rounded-lg skeleton' />) shown while the InlineChatArea code chunk downloads; it is a code-split fallback, not a state the manager's props or data can hold.",
+      "error": "Unreachable: the detector matched the word submit in handleChatSubmit, which only forwards a message to the inline chat or router.push; the manager renders no error UI (the link input and suggestion children own theirs).",
+      "offline": "Unreachable: the manager itself makes no request; handleChatSubmit only forwards a message or navigates, so there is no offline UI here (children own their network states)."
+    }
+  }
+}

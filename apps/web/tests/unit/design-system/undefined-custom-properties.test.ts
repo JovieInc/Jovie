@@ -64,7 +64,6 @@ const KNOWN_UNRESOLVED: ReadonlySet<string> = new Set([
   '--font-caption',
   '--grayN',
   '--line-height-normal',
-  '--line-height-relaxed',
   '--line-height-tight',
   '--outcome-accent',
   '--profile-drawer-header',

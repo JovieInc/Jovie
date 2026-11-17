@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { HomepageNameSearch } from './HomepageNameSearch';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -34,7 +35,7 @@ describe('homepage read-only name discovery', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toHaveAttribute('href', '/start');
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
@@ -56,7 +57,7 @@ describe('homepage read-only name discovery', () => {
       await screen.findByText(/No matching public profile yet/)
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toBeVisible();
   });
 
@@ -75,7 +76,7 @@ describe('homepage read-only name discovery', () => {
     ).toBeVisible();
     expect(screen.queryByText(/No matching public profile/)).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toBeVisible();
   });
 
@@ -93,7 +94,7 @@ describe('homepage read-only name discovery', () => {
       );
       expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
       expect(
-        screen.getByRole('link', { name: 'Claim your handle' })
+        screen.getByRole('link', { name: getClaimProfileIntent().label })
       ).toBeVisible();
     }
   );
@@ -159,7 +160,7 @@ describe('homepage read-only name discovery', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeVisible());
     // The recovery door is the claim entry at /start, never signup.
     expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
+      screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toHaveAttribute('href', '/start');
   });
 });

@@ -46,7 +46,7 @@ describe('HomepageEditorial chapters', () => {
     ).toHaveAttribute('id', 'home-hero-heading');
     expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
       'href',
-      '/start'
+      getClaimProfileIntent().href
     );
     expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
       'href',
@@ -122,18 +122,71 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('closes on the claim form and the three numbered steps', async () => {
+  it('closes on the claim action and the three numbered steps', async () => {
     const { container } = render(<HomepageInviteClose />);
 
     const section = screen.getByTestId('marketing-section-cta');
     expect(section).toHaveAttribute('id', HOMEPAGE_INVITE_ANCHOR);
+    const claim = getClaimProfileIntent();
     expect(
-      screen.getAllByRole('button', { name: COPY.invite.action }).length
-    ).toBeGreaterThan(0);
+      within(section).getByRole('button', { name: claim.label })
+    ).toHaveAttribute('type', 'submit');
+    expect(
+      within(section).getByRole('textbox', { name: 'Your handle' })
+    ).toHaveAttribute('name', 'handle');
+    expect(within(section).getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      claim.href
+    );
+    expect(
+      within(section).queryByTestId('waitlist-role-form')
+    ).not.toBeInTheDocument();
     const steps = within(section).getAllByRole('listitem');
-    expect(steps).toHaveLength(COPY.invite.steps.length);
-    expect(steps[0]).toHaveTextContent(`01${COPY.invite.steps[0].title}`);
+    expect(steps).toHaveLength(COPY.claim.steps.length);
+    expect(steps[0]).toHaveTextContent(`01${COPY.claim.steps[0].title}`);
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps typed handle and keyboard focus through rerender and offline editing', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<HomepageInviteClose />);
+    const handle = screen.getByRole('textbox', {
+      name: COPY.claim.handleLabel,
+    });
+    await user.click(handle);
+    await user.type(handle, 'myhandle');
+    rerender(<HomepageInviteClose />);
+    expect(handle).toHaveValue('myhandle');
+    expect(handle).toHaveFocus();
+    await user.keyboard('{Escape}');
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      await user.type(handle, '-offline');
+    } finally {
+      offline.mockRestore();
+    }
+    expect(handle).toHaveValue('myhandle-offline');
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: getClaimProfileIntent().label })
+    ).toHaveFocus();
+  });
+
+  it('closes on the invite form only while public signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    try {
+      const { container } = render(<HomepageInviteClose />);
+      const section = screen.getByTestId('marketing-section-cta');
+      expect(
+        screen.getAllByRole('button', { name: COPY.invite.action }).length
+      ).toBeGreaterThan(0);
+      const steps = within(section).getAllByRole('listitem');
+      expect(steps).toHaveLength(COPY.invite.steps.length);
+      expect(steps[0]).toHaveTextContent(`01${COPY.invite.steps[0].title}`);
+      await expectNoA11yViolations(container);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('wraps long caller copy without dropping any of it', async () => {
@@ -178,58 +231,32 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps the claim action and free-start note in both legacy flag modes', async () => {
-    const off = render(<HomepageStoryHero />);
-    const invite = screen.getByTestId('homepage-primary-cta');
-    expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
-    expect(invite).toHaveTextContent(COPY.hero.primaryAction);
-    expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
-    off.unmount();
+  it('enters /start by default and keeps the invitation action only while public signup is closed', async () => {
+    const claim = getClaimProfileIntent();
+    const open = render(<HomepageStoryHero />);
+    const start = screen.getByTestId('homepage-primary-cta');
+    expect(start).toHaveAttribute('href', '/start');
+    expect(start).toHaveAttribute('href', claim.href);
+    expect(start).toHaveAttribute('data-primary-action', 'true');
+    expect(start).toHaveTextContent(claim.label);
+    // The note describes the invitation form, so it leaves with that action.
+    expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
+      'href',
+      COPY.hero.secondaryHref
+    );
+    await expectNoA11yViolations(open.container);
+    open.unmount();
 
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     try {
-      const claim = getClaimProfileIntent();
-      const { container } = render(<HomepageStoryHero />);
-      const start = screen.getByTestId('homepage-primary-cta');
-      expect(start).toHaveAttribute('href', '/start');
-      expect(start).toHaveAttribute('href', claim.href);
-      expect(start).toHaveAttribute('data-primary-action', 'true');
-      expect(start).toHaveTextContent(COPY.hero.primaryAction);
+      render(<HomepageStoryHero />);
+      const invite = screen.getByTestId('homepage-primary-cta');
+      expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
+      expect(invite).toHaveTextContent(COPY.hero.primaryAction);
       expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
-      expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
-        'href',
-        COPY.hero.secondaryHref
-      );
-      await expectNoA11yViolations(container);
     } finally {
       vi.unstubAllEnvs();
     }
   });
-});
-
-it('keeps the handle and focus through a parent update, Escape, and blur', async () => {
-  const user = userEvent.setup();
-  const { container, rerender } = render(<HomepageInviteClose />);
-  const input = screen.getByRole('textbox', { name: 'Your handle' });
-  await user.type(input, 'myhandle');
-  rerender(
-    <HomepageInviteClose
-      copy={{ headline: 'Claim your handle.', subhead: 'Your page is ready.' }}
-    />
-  );
-  expect(input).toHaveValue('myhandle');
-  expect(input).toHaveFocus();
-  await user.keyboard('{Escape}');
-  expect(input).toHaveValue('myhandle');
-  expect(input).toHaveFocus();
-  await user.tab();
-  expect(input).toHaveValue('myhandle');
-  expect(
-    screen.getByRole('button', { name: 'Claim your handle' })
-  ).toHaveFocus();
-  const form = container.querySelector('form');
-  expect(form).toHaveAttribute('action', '/start');
-  expect(form).toHaveAttribute('method', 'get');
-  expect(new FormData(form ?? undefined).get('handle')).toBe('myhandle');
-  await expectNoA11yViolations(container);
 });

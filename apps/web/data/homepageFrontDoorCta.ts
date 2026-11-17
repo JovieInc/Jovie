@@ -5,12 +5,12 @@ export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
 /**
- * Canonical public acquisition destination for marketing CTAs. Every door
- * routes into `/start` (the chat onboarding), which admits or reserves
- * server-side; nothing lands on `/signup` or `/waitlist` from marketing
- * surfaces. Durable waitlist receipts stay on `APP_ROUTES.WAITLIST`.
+ * Same-origin sign-up entry (working AuthShell) used by flows that must not
+ * land on `/waitlist`, which 404s for several authenticated and
+ * half-provisioned states (JOV-6436). Durable waitlist receipts stay on
+ * `APP_ROUTES.WAITLIST`.
  */
-export const PUBLIC_WAITLIST_URL = APP_ROUTES.START;
+export const PUBLIC_WAITLIST_URL = APP_ROUTES.SIGNUP;
 
 /** Stable variant identity for the splash-B waitlist-first handoff. */
 export const WAITLIST_FRONT_DOOR_VARIANT_ID =
@@ -45,22 +45,20 @@ export interface HomepageFrontDoorCtaContract {
   readonly fallbackSupport: string;
 }
 
-export function getHomepageFrontDoorCtaContract(
-  waitlistEnabled: boolean
-): HomepageFrontDoorCtaContract {
-  // One front door (Tim, 2026-11-09): both modes resolve the same claim
-  // CTA into /start; the server-side gate decides admit vs reserve. The
-  // secondary stays the quiet live-profile proof path in both modes.
-  void waitlistEnabled;
+/**
+ * The one public front-door CTA. Signup is open and there is one flow: every
+ * claim enters the /start chat, which owns post-auth routing.
+ */
+export function getHomepageFrontDoorCtaContract(): HomepageFrontDoorCtaContract {
   return {
     primary: {
-      label: 'Claim your handle',
+      label: 'Claim your free profile',
       href: buildHomepageStartHref(),
     },
     secondary: {
       label: 'See a live profile',
       href: TIM_WHITE_PROFILE.publicProfilePath,
     },
-    fallbackSupport: 'Free to start. Reserve your name now.',
+    fallbackSupport: 'Free forever. No credit card.',
   };
 }

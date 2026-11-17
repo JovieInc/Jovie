@@ -6,20 +6,6 @@ import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: new Proxy(actual.FEATURE_FLAGS, {
-      get: (target, key) =>
-        key === 'WAITLIST_ENABLED'
-          ? gate.WAITLIST_ENABLED
-          : target[key as keyof typeof target],
-    }),
-  };
-});
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(
@@ -93,10 +79,10 @@ describe('homepage frames', { timeout: 60_000 }, () => {
     );
     // US spelling throughout.
     expect(container.textContent).not.toMatch(/recognis/i);
-    // 04: the claim row spans the panel width; the scrolled nav is opaque.
+    // 04: the email field spans the role chips; the scrolled nav is opaque.
     const form = strip('components/homepage/v3/form.css');
     expect(form).toMatch(
-      /\.hv3-form \.hv3-claim\s*\{\s*display: flex;\s*align-items: center;\s*gap: 0\.5rem;\s*width: min\(28\.75rem, calc\(100vw - 4rem\)\);\s*margin: 0 auto;/
+      /@media \(min-width: 48rem\)\s*\{\s*\.hv3-form > div\s*\{\s*width: fit-content;\s*max-width: 100%;\s*\}\s*\.hv3-form \[data-slot="inline-subscribe"\]\s*\{\s*width: 100%;/
     );
     expect(form).toMatch(
       /\.home-viewport \.header-nav--docked\s*\{\s*--marketing-dock-glass: var\(--noir-ion-shell\);/

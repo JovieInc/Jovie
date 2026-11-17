@@ -1,21 +1,20 @@
-import { APP_ROUTES } from '@/constants/routes';
 import {
   featuredArtistPossessive,
   featuredArtistPossessiveTitle,
   HOMEPAGE_FEATURED_ARTIST,
 } from '@/data/demoArtists';
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
-import { claim } from '@/lib/billing/offer/claims';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
  * Homepage copy for `/` (Tim, 2026-11-03: "Music line wins" for the root
  * route only; gbrain decisions/homepage-music-line-scope-2026-11-03-0420).
  *
- * One front door (Tim, 2026-11-09): the page is an editorial story that ends
- * in the claim entry, and every door routes into `/start` (the chat
- * onboarding). There is no invitation wording on the page; claiming a handle
- * is open to anyone.
+ * Open signup (2026-11-09; Tim, 2026-11-12 23:46Z: "Switch it"): the page is
+ * an editorial story whose actions all enter `/start` with the shared
+ * claim-profile intent, ending in the `claim` close. While the
+ * `PUBLIC_SIGNUP_CLOSED` kill switch is on, the hero action scrolls to the
+ * on-page role waitlist form instead and the close is `invite`.
  *
  * These are the code defaults. The published `marketing-page/home` content
  * record fills the open slots (`lib/content-records/marketing-page.ts`); the
@@ -37,18 +36,18 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     title: 'Jovie | Move your music forward',
   },
   hero: {
-    headline: 'The page people find when they look you up.',
+    headline: 'Move your music forward.',
     subhead:
-      'Jovie is your profile at jov.ie/yourname, showing who you are and everything you make. Tell it what changed and it’s done, and visitors become people you can reach again.',
-    primaryAction: 'Claim your handle',
-    primaryHref: APP_ROUTES.START,
+      'Your profile, every release, and a link to each place the music is streaming.',
+    primaryAction: 'Request an invite',
+    primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: claim('profile.free_start_note') ?? '',
+    note: 'two fields · we email when your spot opens',
     windowLabel: `Jovie for Mac: ${featuredArtistPossessive(HOMEPAGE_FEATURED_ARTIST)} Releases list, beside the ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page listeners open`,
   },
   /** Chapter index (mono, lowercase, as approved). */
-  chapters: ['profile', 'releases', 'specs', 'claim'],
+  chapters: ['profile', 'releases', 'specs', 'invitation'],
   chaptersLabel: 'On this page',
   profile: {
     headline: 'One name. Found everywhere.',
@@ -89,25 +88,53 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       },
     },
   },
-  invite: {
-    headline: 'Claim your handle.',
+  /**
+   * 04 claim: the close while public signup is open (Tim, 2026-11-12 23:46Z:
+   * "Switch it"). Code-owned: the `cta` record slots were written for the
+   * invitation form, so they apply only to `invite` below. The action label
+   * and destination come from the shared claim-profile CTA intent.
+   */
+  claim: {
+    chapter: 'claim',
+    handleLabel: 'Your handle',
+    handlePlaceholder: 'yourname',
+    headline: 'Claim your name on Jovie.',
     subhead:
-      'Your page at jov.ie/yourname is free to claim. Tell Jovie who you are and it sets the page up with you.',
-    action: 'Claim your handle',
-    claimLabel: 'Your handle',
-    claimPlaceholder: 'yourname',
+      'Find yourself on Spotify and your catalog comes in once. Your profile and a page for every release are ready when you finish.',
     steps: [
       {
-        title: 'Tell Jovie who you are',
-        body: 'A few questions, about a minute.',
+        title: 'Find yourself',
+        body: 'Your artist name or a Spotify link.',
       },
       {
         title: 'Claim your name',
-        body: 'Your page goes up at jov.ie/yourname.',
+        body: 'The handle people type to find you.',
       },
       {
-        title: 'Bring your catalog',
-        body: 'Releases import once, and every page matches.',
+        title: 'Go live',
+        body: 'Your profile and release pages, built from your catalog.',
+      },
+    ],
+  },
+  /** 04 invitation: the close only while `PUBLIC_SIGNUP_CLOSED` is on. */
+  invite: {
+    headline: 'Jovie opens by invitation.',
+    subhead:
+      'Tell us your role and where to reach you. We’ll email you when your spot opens.',
+    roleLabel: 'I’m a',
+    action: 'Request an invite',
+    steps: [
+      {
+        title: 'Tell us who you are',
+        body: 'Under a minute.',
+      },
+      {
+        title: 'We review each request',
+        body: 'Jovie opens to a small group at a time.',
+      },
+      {
+        title: 'Your invite arrives',
+        body: 'A link to claim your name and bring in your catalog.',
       },
     ],
   },
@@ -116,10 +143,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
 export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
   Record<string, readonly string[]>
 > = {
-  [HOMEPAGE_EDITORIAL_COPY.hero.headline]: [
-    'The page people find',
-    'when they look you up.',
-  ],
+  [HOMEPAGE_EDITORIAL_COPY.hero.headline]: ['Move your', 'music forward.'],
   [HOMEPAGE_EDITORIAL_COPY.profile.headline]: [
     'One name.',
     'Found everywhere.',
@@ -128,4 +152,6 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
     'Every release,',
     'ready on day one.',
   ],
+  [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
+  [HOMEPAGE_EDITORIAL_COPY.claim.headline]: ['Claim your name', 'on Jovie.'],
 };

@@ -2,6 +2,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY as COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -56,16 +57,16 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
-// Editorial homepage (Tim, 2026-11-03; Tim, 2026-11-09 one front door): the
-// locked hero, the profile and releases chapters, then the claim entry that
-// routes into /start. No prices.
+// Editorial homepage (Tim, 2026-11-03): the music-line hero, the profile and
+// releases chapters, then the claim-your-profile close into /start (Tim,
+// 2026-11-12: "Switch it"). No prices.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the locked headline with the claim action and a live-profile link', async ({
+  test('renders the locked headline with one claim action and a live-profile link', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -74,9 +75,10 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
 
+    const claim = getClaimProfileIntent();
     const cta = page.getByTestId('homepage-primary-cta');
-    await expect(cta).toHaveText(COPY.hero.primaryAction);
-    await expect(cta).toHaveAttribute('href', '/start');
+    await expect(cta).toHaveText(claim.label);
+    await expect(cta).toHaveAttribute('href', claim.href);
     const live = page.getByTestId('homepage-hero-live-profile');
     await expect(live).toHaveText(COPY.hero.secondaryAction);
     await expect(live).toHaveAttribute(
@@ -86,22 +88,35 @@ test.describe('Homepage', () => {
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
   });
 
-  test('offers no signup path and no prices', async ({ page }) => {
-    await expect(page.locator('main a:visible[href*="/signup"]')).toHaveCount(
-      0
-    );
+  test('sends every claim action to /start and shows no prices', async ({
+    page,
+  }) => {
+    await expect(
+      page.locator(
+        'main a:visible[href*="/signup"], main a:visible[href*="/claim"]'
+      )
+    ).toHaveCount(0);
+    const startLinks = page.locator('main a:visible[href^="/start"]');
+    expect(await startLinks.count()).toBeGreaterThan(0);
+    for (const href of await startLinks.evaluateAll(links =>
+      links.map(link => link.getAttribute('href'))
+    )) {
+      expect(href).toBe('/start');
+    }
+    await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
     await expect(page.locator('main')).not.toContainText(/\$\d/);
   });
 
-  test('closes on the claim entry that routes into /start', async ({
-    page,
-  }) => {
+  test('closes on the claim action into /start', async ({ page }) => {
     const close = page.locator(`#${HOMEPAGE_INVITE_ANCHOR}`);
-    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
-      'action',
-      '/start'
-    );
-    await expect(close.locator('input[name="handle"]')).toBeVisible();
+    await close.scrollIntoViewIfNeeded();
+    await expect(
+      close.getByRole('heading', { name: COPY.claim.headline })
+    ).toBeVisible();
+    await expect(close.getByTestId('waitlist-role-form')).toHaveCount(0);
+    const cta = close.getByTestId('homepage-close-cta');
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute('href', getClaimProfileIntent().href);
   });
 
   test('mounts hero, profile, releases, and the claim close in order', async ({
@@ -114,7 +129,7 @@ test.describe('Homepage', () => {
       COPY.hero.headline,
       COPY.profile.headline,
       COPY.releases.headline,
-      COPY.invite.headline,
+      COPY.claim.headline,
     ]);
     await expect(
       page.getByRole('img', { name: COPY.profile.alt })
@@ -143,10 +158,10 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    // One front door: the header action routes into /start.
+    // The header action enters /start with the shared claim intent.
     await expect(
-      header.getByRole('link', { name: 'Claim your handle' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: getClaimProfileIntent().label })
+    ).toHaveAttribute('href', getClaimProfileIntent().href);
     await expect(
       header.getByRole('link', { name: 'Request access' })
     ).toHaveCount(0);
@@ -424,9 +439,9 @@ test.describe('Homepage', () => {
   });
 });
 
-// The anchor must work from the server-rendered HTML alone.
+// The claim actions must work from the server-rendered HTML alone.
 test.describe('Homepage without JavaScript', () => {
-  test('keeps the hero action and the invitation form reachable', async ({
+  test('keeps the hero action and the claim close reachable', async ({
     browser,
     baseURL,
   }) => {
@@ -443,13 +458,13 @@ test.describe('Homepage without JavaScript', () => {
       });
       await expect(page.getByTestId('homepage-primary-cta')).toHaveAttribute(
         'href',
-        '/start'
+        getClaimProfileIntent().href
       );
       await expect(
         page
           .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-          .getByTestId('homepage-claim-entry')
-      ).toBeAttached();
+          .getByTestId('homepage-close-cta')
+      ).toHaveAttribute('href', getClaimProfileIntent().href);
     } finally {
       await context.close();
     }

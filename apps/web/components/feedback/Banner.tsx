@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button } from '@jovie/ui/atoms/button';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';

@@ -11,32 +11,26 @@ import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
-  it('keeps both front-door modes on the one claim CTA routed into /start', () => {
-    for (const waitlistEnabled of [true, false]) {
-      const contract = getHomepageFrontDoorCtaContract(waitlistEnabled);
+  it('keeps the one front-door CTA in open-signup mode, off /signup and /waitlist', () => {
+    const contract = getHomepageFrontDoorCtaContract();
 
-      // One front door (Tim, 2026-11-09): every mode resolves the same
-      // claim CTA into /start; the server gate decides admit vs reserve.
-      expect(contract.primary).toEqual({
-        label: 'Claim your handle',
-        href: APP_ROUTES.START,
-      });
-      expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.START);
-      expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
-      expect(contract.secondary).toEqual({
-        label: 'See a live profile',
-        href: TIM_WHITE_PROFILE.publicProfilePath,
-      });
-      expect(contract.fallbackSupport).toBe(
-        'Free to start. Reserve your name now.'
-      );
-      // Retired with the self-serve offer (EVENT: Tim, 2026-10-20).
-      expect(contract.primary.label).not.toMatch(/request access/i);
-      expect(contract.fallbackSupport).not.toMatch(/limited/i);
-    }
+    expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
+    expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
+    expect(contract.primary.label).not.toMatch(/request access/i);
+    expect(contract.fallbackSupport).not.toMatch(/limited|reserve/i);
+
+    expect(contract.primary).toEqual({
+      label: 'Claim your free profile',
+      href: APP_ROUTES.START,
+    });
+    expect(contract.secondary).toEqual({
+      label: 'See a live profile',
+      href: TIM_WHITE_PROFILE.publicProfilePath,
+    });
+    expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
 
-  it('keeps free acquisition off the marketing doors, claims on the qualify chat, and Pro on the self-serve claim checkout', () => {
+  it('keeps the front door and claims on the qualify chat, free plans on signup, and Pro on the self-serve claim checkout', () => {
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.START);
     // Claims enter the /start qualify chat (Tim 2026-09-28, JOV-3379).
     expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.START);

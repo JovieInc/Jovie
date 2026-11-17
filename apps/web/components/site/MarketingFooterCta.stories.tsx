@@ -35,12 +35,13 @@ export const BinaryDownload: Story = {
   },
 };
 
-// The changelog terminal CTA routes into /start (Tim, 2026-11-09: one front
-// door). Keep this story in lockstep with the changelog page's footer CTA.
+// The changelog terminal CTA anchors into the homepage invitation form
+// (signup is invite-only). Keep this story in lockstep with that id: the
+// homepage contract guard fails if any /#fragment anchor stops resolving on '/'.
 export const ChangelogClaimAnchor: Story = {
   args: {
-    ctaLabel: 'Claim your handle',
-    ctaHref: '/start',
+    ctaLabel: 'Request an Invite',
+    ctaHref: '/#request-invite',
   },
 };
 

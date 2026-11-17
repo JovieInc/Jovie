@@ -103,6 +103,27 @@ describe('library entity actions', () => {
     resetCacheIsolationForTests();
   });
 
+  it('hands chat the clicked release as an entity chip, never JSON', () => {
+    applyCacheScope({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      profileId: 'profile-1',
+      ready: true,
+    });
+    const router = { push: vi.fn() };
+    const asset = buildAsset({ id: 'release-9', title: 'Wheels Up' });
+    const actions = buildActions(asset, {
+      onAskJovie: draft => {
+        openChatWithDraft(draft, router);
+      },
+    });
+    actions.find(action => action.id === 'ask-jovie')?.onExecute?.();
+    expect(consumePendingChatDraft('profile-1')).toBe(
+      '@release:release-9[Wheels Up]'
+    );
+    resetCacheIsolationForTests();
+  });
+
   it('does not invoke Ask without a selected profile even if called programmatically', () => {
     const onAskJovie = vi.fn();
     const action = buildActions(buildAsset(), {

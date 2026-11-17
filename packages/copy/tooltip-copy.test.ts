@@ -93,6 +93,94 @@ describe('tooltip copy scanner', () => {
     expect(rules("<Tooltip label={label ?? 'Open user menu'} />")).toEqual([]);
   });
 
+  it('reads the right-hand copy of && on every tooltip surface', () => {
+    for (const source of [
+      `<Tooltip label={on && 'Zero requests'} />`,
+      `<SimpleTooltip content={on && <span>Zero requests</span>} />`,
+      `<TooltipContent>{on && 'Zero requests'}</TooltipContent>`,
+      `<IconButton tooltip={on && 'Zero requests'} />`,
+      `const badge = { tooltip: on && 'Zero requests' };`,
+    ]) {
+      expect(rules(source), source).toEqual(['explainer-tell']);
+    }
+    expect(rules(`<Tooltip label={'Zero requests' && 'Open'} />`)).toEqual([]);
+  });
+
+  it('checks both JSX ternary branches separately with surrounding copy', () => {
+    for (const branches of [
+      `on ? 'Open' : 'Zero requests'`,
+      `on ? 'Zero requests' : 'Open'`,
+    ]) {
+      expect(
+        scanTooltipCopy(
+          TSX,
+          `<TooltipContent>Action: {${branches}}</TooltipContent>`
+        )
+      ).toEqual([
+        {
+          path: TSX,
+          rule: 'explainer-tell',
+          value: 'Action: Zero requests',
+          line: 1,
+        },
+      ]);
+    }
+    expect(
+      rules(
+        `<TooltipContent>{on ? 'Open. View the release.' : 'Close. Hide the release.'}</TooltipContent>`
+      )
+    ).toEqual([]);
+  });
+
+  it('checks every nested ternary branch through JSX and fragments', () => {
+    expect(
+      scanTooltipCopy(
+        TSX,
+        `<SimpleTooltip content={<>{a ? <span>{b ? 'Open' : 'Zero requests'}</span> : <>{c ? 'We promise' : 'No longer calls'}</>}</>} />`
+      ).map(({ rule, value }) => ({ rule, value }))
+    ).toEqual([
+      { rule: 'explainer-tell', value: 'Zero requests' },
+      { rule: 'explainer-tell', value: 'We promise' },
+      { rule: 'explainer-tell', value: 'No longer calls' },
+    ]);
+    expect(
+      rules(
+        `<TooltipContent>{on && (other ? 'Open' : 'Zero requests')}</TooltipContent>`
+      )
+    ).toEqual(['explainer-tell']);
+  });
+
+  it('combines sibling alternatives with the rest of each rendering', () => {
+    expect(
+      rules(
+        `<TooltipContent>{a ? 'Open' : 'One two three four five six'} {b ? 'menu' : 'seven'}: Details.</TooltipContent>`
+      )
+    ).toEqual(['title-too-long', 'title-too-long']);
+    expect(
+      rules(
+        `<TooltipContent>{label} {/* no copy */} {on ? 'Open' : 'Close'}</TooltipContent>`
+      )
+    ).toEqual([]);
+  });
+
+  it('preserves interactive and list rules in later rich branches', () => {
+    expect(
+      rules(
+        `<TooltipContent>{on ? <span>Open</span> : <button>Open</button>}</TooltipContent>`
+      )
+    ).toEqual(['rich-interactive']);
+    expect(
+      rules(
+        `<TooltipContent><ul><li>A</li>{on ? <li>B</li> : <><li>B</li><li>C</li><li>D</li></>}</ul></TooltipContent>`
+      )
+    ).toEqual(['rich-list-too-long']);
+    expect(
+      rules(
+        `<TooltipContent>{on ? <ul><li>A</li><li>B</li></ul> : <ul><li>C</li><li>D</li></ul>}</TooltipContent>`
+      )
+    ).toEqual([]);
+  });
+
   it('allows kbd and a short list, blocks interactive and long rich content', () => {
     expect(
       rules(

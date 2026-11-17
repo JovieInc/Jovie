@@ -6,9 +6,17 @@ import {
   storyReceiptProblem,
 } from '../component-evidence.mjs';
 
+import { RENDER_INPUT_SCHEMA } from '../component-render-inputs.mjs';
+
 const hash = 'a'.repeat(64);
+const renderInputs = {
+  schema: RENDER_INPUT_SCHEMA,
+  digest: hash,
+  mode: 'storybook-full',
+};
 const receipt = (stories, extra = {}) => ({
   schema: STORY_EVIDENCE_SCHEMA,
+  renderInputs,
   sourceHash: hash,
   status: 'pass',
   captured: stories.length,

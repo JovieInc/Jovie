@@ -1167,11 +1167,11 @@ def _native_runtime(reads, row, prs, binding, observed_at):
     providers, policy = lane.load_providers(), lane.read_json(lane.ROUTING_POLICY)
     if not providers or not policy:
         raise Unavailable("native-routing-policy-unreadable")
-    choices = []
+    choices, capacity = [], lane.pr_wip.capacity_snapshot(state_dir=state, now=observed_at)
+    capacity.pop("observedAt", None)  # Sampling time is not part of the stable capacity predicate.
     account_reads = reads if any((spec.get("quota") or {}).get("source") == "codex-accounts" for spec in providers.values()) else None
     with _observed_slots(lane, account_reads, observed_at) as (locked, codex):
-        # No caller owns a seat: an empty self-name makes the maintained router
-        # inspect health/cooling/free seats for every prospective provider.
+        # An empty self-name routes prospectively through maintained health/cooling/free seats.
         route = lane.issue_router(host, "", providers, policy)
         for provider, spec in providers.items():
             if not isinstance(spec, dict):
@@ -1189,7 +1189,7 @@ def _native_runtime(reads, row, prs, binding, observed_at):
                 free_slots = min(free_slots, sum(r["freeSlots"] for r in status.get("accounts", {}).values() if r.get("available")))
             choices.append({"provider": provider, "rejection": rejection, "quota": quota,
                             "intakeSlots": host.intake_slots(provider, spec.get("slots", 1)), "freeSlots": free_slots,
-                            "budget": lane.new_issue_budget(provider, slots, prs)})
+                            "budget": lane.new_issue_budget(provider, slots, prs, capacity=capacity)})
     # Preserve installed route selection. Only a native accepted route can win.
     selected = next((c for c in choices if c["rejection"] is None and c["quota"].get("ok") and c["intakeSlots"] > 0 and c["freeSlots"] > 0),
                     next((c for c in choices if c["rejection"] is None), choices[0] if choices else None))

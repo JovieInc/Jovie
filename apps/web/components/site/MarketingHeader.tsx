@@ -28,7 +28,6 @@ import {
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { track } from '@/lib/analytics';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export interface MarketingHeaderChromeNav {
   readonly primary: readonly MarketingNavLink[];
@@ -58,7 +57,7 @@ const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[]
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
-  getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary;
+  getHomepageFrontDoorCtaContract().primary;
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
@@ -72,19 +71,15 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
 
 /**
  * Resolve the header's primary CTA for a route. Every marketing-header route
- * shares the single waitlist-mode front-door CTA (JOV-6860); the locked
- * homepage override in MARKETING_HEADER_CTA_BY_PATH is the only divergence.
+ * shares the single front-door CTA (JOV-6860); the locked homepage override
+ * in MARKETING_HEADER_CTA_BY_PATH is the only divergence.
  */
 export function resolveMarketingHeaderPrimaryCta(
-  pathname: string | null,
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
+  pathname: string | null
 ): MarketingHeaderCta {
   const override =
     pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname];
-  if (override) return override;
-  return waitlistEnabled === FEATURE_FLAGS.WAITLIST_ENABLED
-    ? DEFAULT_MARKETING_CTA
-    : getHomepageFrontDoorCtaContract(waitlistEnabled).primary;
+  return override ?? DEFAULT_MARKETING_CTA;
 }
 
 export interface MarketingHeaderProps
@@ -228,8 +223,7 @@ export function MarketingHeader({
   }, [presentation]);
 
   const centerNavEnabled =
-    FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
-    (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
+    !usesHomepageChrome || (isHomepage && showHomepageCenterNav);
   const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;
   const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
