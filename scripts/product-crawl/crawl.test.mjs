@@ -239,7 +239,10 @@ test('a rejected continuation preserves the original stranger-only receipt asser
 
 test('receipt files do not hide a signal-terminated crawl', async t => {
   await assert.rejects(crawl(t, 'signal-exit'), error => {
+    assert.ok(error instanceof assert.AssertionError);
     assert.equal(error.code, 'ERR_ASSERTION');
+    assert.ok(error.actual instanceof Error);
+    assert.ok('code' in error.actual && 'signal' in error.actual);
     assert.equal(error.actual?.code, null);
     assert.equal(error.actual?.signal, 'SIGTERM');
     return true;
