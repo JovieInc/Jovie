@@ -171,19 +171,3 @@ export function resolveLockedPrice(input: {
     locked: false,
   };
 }
-export function formatLockedPrice(
-  price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
-): string {
-  const dollars = price.amountCents / 100;
-  const formatted = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: price.currency.toUpperCase(),
-    maximumFractionDigits: dollars % 1 === 0 ? 0 : 2,
-  }).format(dollars);
-  return `${formatted}/${price.interval === 'month' ? 'mo' : 'yr'}`;
-}
-export function priceLockDisclosure(
-  price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
-): string {
-  return `Your price is locked at ${formatLockedPrice(price)}. It stays the same if the list price changes.`;
-}

@@ -1,15 +1,14 @@
 import { lintCopy } from '@jovie/copy';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+import { formatLockedPrice, priceLockDisclosure } from './price-lock-view';
 import {
   assertPriceVersionsValid,
   buildPriceLockFromSubscriptionPrice,
   buildPriceLockSnapshot,
   CURRENT_PRICE_VERSION_ID,
-  formatLockedPrice,
   PRICE_VERSIONS,
   type PriceVersion,
-  priceLockDisclosure,
   resolveLockedPrice,
 } from './price-versions';
 
