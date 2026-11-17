@@ -27,7 +27,7 @@ describe('Copyright', () => {
   it('applies dark variant classes by default', () => {
     render(<Copyright />);
     const el = screen.getByText('© 2026');
-    expect(el).toHaveClass('text-white/50');
+    expect(el).toHaveClass('text-on-media/50');
   });
 
   it('applies light variant classes', () => {

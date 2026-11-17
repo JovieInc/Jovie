@@ -42,9 +42,11 @@ vi.mock(
     ArtistNotificationsCTA: ({
       source,
       triggerClassName,
+      triggerLabel,
     }: {
       source?: string;
       triggerClassName?: string;
+      triggerLabel?: string;
       forceExpanded?: boolean;
       hideListenFallback?: boolean;
       artist: Artist;
@@ -55,7 +57,7 @@ vi.mock(
         data-testid='mock-notifications-cta'
         data-source={source}
       >
-        Subscribe CTA
+        {triggerLabel ?? 'Subscribe CTA'}
       </button>
     ),
   })
@@ -156,6 +158,12 @@ describe('TourModePanel', () => {
       'events_empty_state'
     );
     const notificationsCta = screen.getByTestId('mock-notifications-cta');
+    // Walk 2026-11-09: same flat glass pill and sentence case as Get updates.
+    expect(notificationsCta).toHaveClass(
+      'profile-glass-pill',
+      'profile-glass-pill--flat'
+    );
+    expect(notificationsCta).toHaveTextContent('Turn on event alerts');
     expect(notificationsCta).toHaveClass('h-auto', 'min-h-7');
     expect(notificationsCta).toHaveClass(
       'before:h-full',
@@ -173,7 +181,7 @@ describe('TourModePanel', () => {
     );
 
     const previewCta = screen.getByRole('button', {
-      name: 'Turn On Event Alerts',
+      name: 'Turn on event alerts',
     });
     expect(previewCta).toHaveClass('h-auto', 'min-h-7');
     expect(previewCta).toHaveClass(

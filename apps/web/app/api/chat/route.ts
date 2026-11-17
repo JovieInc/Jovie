@@ -82,7 +82,6 @@ import {
 } from '@/lib/chat/message-text';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
-import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -99,6 +98,10 @@ import {
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
+import {
+  createRequestCapabilityTool,
+  createUseSkillTool,
+} from '@/lib/chat/skills/tools';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
@@ -801,91 +804,6 @@ function createCheckCanvasStatusTool(
   });
 }
 
-/**
- * Creates the suggestRelatedArtists tool.
- * Uses the creator's profile data to suggest related subjects for pitching,
- * outreach, and ad targeting. The framing is source-aware (JOV-7635): music
- * similarity language only applies when the creator's work is music;
- * everything else stays "related creators".
- */
-function createSuggestRelatedArtistsTool(context: ArtistContext) {
-  const framing = buildRelatedSuggestionsFraming(context);
-
-  return tool({
-    description: framing.description,
-    inputSchema: chatToolSchema({
-      purpose: z
-        .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
-        .describe(`What the ${framing.subjectTerm} will be used for`),
-      count: z
-        .number()
-        .int()
-        .min(3)
-        .max(15)
-        .optional()
-        .describe('Number of suggestions to return (default 5)'),
-    }),
-    execute: async ({ purpose, count: suggestionCount }) => {
-      // Provide the AI with structured context to generate recommendations
-      return {
-        success: true,
-        summary: framing.summary,
-        subjectKind: framing.isMusicSource ? 'artist' : 'creator',
-        creatorContext: {
-          name: context.displayName,
-          genres: context.genres,
-          spotifyFollowers: context.spotifyFollowers,
-          spotifyPopularity: context.spotifyPopularity,
-          purpose,
-          requestedCount: suggestionCount ?? 5,
-        },
-        instructions: framing.instructions,
-      };
-    },
-  });
-}
-
-/**
- * Creates the generateCanvasPlan tool.
- * Helps the artist plan a canvas video generation from their album artwork.
- */
-function createGenerateCanvasPlanTool(
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .describe('The title of the release to generate canvas for'),
-      motionPreference: z
-        .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
-        .optional()
-        .describe(
-          'Preferred animation style. Default: ambient (subtle motion with color shifts)'
-        ),
-    }),
-    execute: async ({ releaseTitle, motionPreference }) => {
-      if (!profileId) {
-        return { success: false, error: 'Profile ID required' };
-      }
-
-      const release = findReleaseByTitle(releases, releaseTitle);
-
-      if (!release) {
-        return {
-          success: false,
-          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-        };
-      }
-
-      return buildCanvasPlan(release, motionPreference);
-    },
-  });
-}
-
 function createGenerateAlbumArtTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
@@ -1246,132 +1164,6 @@ function createMerchPayoutsTool(profileId: string | null) {
         readyToPay: formatMerchMoney(summary.readyCents),
         paidManually: formatMerchMoney(summary.paidCents),
         payoutMode: 'manual ledger, no automatic Stripe Connect payout in MVP',
-      };
-    },
-  });
-}
-
-function buildCanvasPlan(
-  release: ReleaseContext,
-  motionPreference = 'ambient'
-) {
-  const motion = motionPreference;
-  const hasArtwork = Boolean(release.artworkUrl);
-
-  return {
-    success: true,
-    plan: {
-      release: {
-        title: release.title,
-        type: release.releaseType,
-        hasArtwork,
-        artworkUrl: release.artworkUrl,
-        currentCanvasStatus: release.canvasStatus,
-      },
-      steps: [
-        {
-          step: 1,
-          action: 'Process Artwork',
-          description: hasArtwork
-            ? 'AI removes text/logos from album art and upscales to 1080x1920 (9:16 portrait)'
-            : 'No artwork available — upload album art first, then we can generate a canvas',
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 2,
-          action: 'Generate Video',
-          description: `Create a ${motion} animation loop (3-8 seconds) from the processed artwork`,
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 3,
-          action: 'Encode & Download',
-          description:
-            'Encode to H.264 MP4 at 30fps, ready for upload to Spotify for Artists',
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 4,
-          action: 'Upload to Spotify',
-          description:
-            'Download the video and upload it via Spotify for Artists → Music → Select track → Canvas',
-          status: 'manual',
-        },
-      ],
-      motionStyle: motion,
-      specs: {
-        resolution: '1080x1920',
-        aspectRatio: '9:16',
-        duration: '3-8 seconds (loops)',
-        format: 'MP4 (H.264)',
-        fps: 30,
-      },
-    },
-  };
-}
-
-/**
- * Creates the createPromoStrategy tool.
- * Generates a promotional strategy including social ads, TikTok, and canvas.
- */
-function createPromoStrategyTool(
-  context: ArtistContext,
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .optional()
-        .describe(
-          'Specific release to promote. If not provided, uses the latest release.'
-        ),
-      budget: z
-        .enum(['free', 'low', 'medium', 'high'])
-        .optional()
-        .describe(
-          'Budget level: free (organic only), low ($50-200), medium ($200-1000), high ($1000+)'
-        ),
-      platforms: z
-        .array(
-          z.enum(['tiktok', 'instagram', 'youtube', 'spotify', 'hulu', 'meta'])
-        )
-        .optional()
-        .describe('Target platforms for the promotion'),
-    }),
-    execute: async ({ releaseTitle, budget, platforms }) => {
-      const targetRelease = profileId
-        ? releaseTitle
-          ? findReleaseByTitle(releases, releaseTitle)
-          : (releases[0] ?? null)
-        : null;
-
-      return {
-        success: true,
-        context: {
-          artist: {
-            name: context.displayName,
-            genres: context.genres,
-            followers: context.spotifyFollowers,
-            popularity: context.spotifyPopularity,
-          },
-          release: targetRelease
-            ? {
-                title: targetRelease.title,
-                type: targetRelease.releaseType,
-                hasArtwork: Boolean(targetRelease.artworkUrl),
-                canvasStatus: targetRelease.canvasStatus,
-                popularity: targetRelease.spotifyPopularity,
-              }
-            : null,
-          budget: budget ?? 'low',
-          platforms: platforms ?? ['tiktok', 'instagram', 'spotify'],
-        },
-        instructions:
-          'Create a specific, actionable promo strategy. Include: (1) Spotify Canvas plan if not set, (2) Social video ad concepts using album art + 30s song clip + promo text + QR code to Jovie, (3) TikTok sound strategy with best clip selection advice, (4) Related artist targeting for ads, (5) Timeline with specific daily/weekly actions. Be concrete — no vague advice.',
       };
     },
   });
@@ -1782,7 +1574,8 @@ function createGenerateReleasePitchTool(
 function buildFreeChatTools(
   resolvedProfileId: string | null,
   clerkUserId: string,
-  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>
+  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>,
+  conversationId: string | null = null
 ) {
   return {
     ...createAccountChatTools(accountContext),
@@ -1790,6 +1583,14 @@ function buildFreeChatTools(
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
     submitFeedback: createSubmitFeedbackTool(clerkUserId),
+    useSkill: createUseSkillTool({
+      paidPlan: canUsePaidChatTools(accountContext),
+    }),
+    requestCapability: createRequestCapabilityTool({
+      clerkUserId,
+      founder: authorizeFounderSummerUser(clerkUserId) === 'authorized',
+      conversationId,
+    }),
   };
 }
 
@@ -1835,13 +1636,8 @@ function buildChatTools(
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
-    suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
-      resolvedProfileId,
-      releases
-    ),
-    generateCanvasPlan: createGenerateCanvasPlanTool(
       resolvedProfileId,
       releases
     ),
@@ -1867,11 +1663,6 @@ function buildChatTools(
           }),
         }
       : {}),
-    createPromoStrategy: createPromoStrategyTool(
-      artistContext,
-      resolvedProfileId,
-      releases
-    ),
     // gh-9808 HOT ZONE: voice promo audio generation from cloned voice (premium, 11Labs)
     // "clone my voice" / "voice promo" / "radio drop" intent loads via system prompt
     voicePromo: createVoicePromoTool({
@@ -2807,7 +2598,8 @@ export async function POST(req: Request) {
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
       userId,
-      accountContext
+      accountContext,
+      dispatchConversationId
     );
     // Advanced tools gated behind paid plans
     const paidTools = canUsePaidChatTools(accountContext)

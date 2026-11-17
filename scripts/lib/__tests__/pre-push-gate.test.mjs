@@ -290,6 +290,7 @@ describe('publication range failures', () => {
       'scripts/ci-branching-guard.mjs',
       'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
+      'scripts/lib/projected-tree-budget.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
       'scripts/preflight-changed.mjs',
       'scripts/hooks/prepush-preflight.mjs',

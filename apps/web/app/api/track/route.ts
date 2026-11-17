@@ -14,7 +14,9 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
+  hasServerMarketingConsent,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { db, doesTableExist } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -72,7 +74,6 @@ function anonymizeIp(ip: string): string {
   return '0.0.0.0';
 }
 
-// API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
@@ -375,7 +376,6 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     const botDetection = detectBot(request, '/api/track');
-    // ipAddress already extracted above for rate limiting
     // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
     // is the current page URL, not the external traffic source.
     const httpReferer = request.headers.get('referer') ?? undefined;
@@ -393,18 +393,19 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
-    // Determine marketing consent from jv_cc cookie.
-    // Non-regulated jurisdictions remain default-allow when no banner was
-    // required, but consent-required visitors need a valid marketing opt-in.
+    // Determine marketing consent from jv_cc cookie, region and Sec-GPC.
     const requiresCookieConsent =
       request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
       isCookieBannerRequired(geoCountry ?? null, geoRegion ?? null);
-    const consent = parseConsentCookieValue(
-      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
-    );
-    const hasMarketingConsent =
-      consent?.marketing === true ||
-      (consent === null && !requiresCookieConsent);
+    const hasMarketingConsent = hasServerMarketingConsent({
+      consent: parseConsentCookieValue(
+        request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+      ),
+      requiresCookieConsent,
+      secGpc: request.headers.get('sec-gpc'),
+      trackingConsent: request.cookies?.get(TRACKING_CONSENT_COOKIE_NAME)
+        ?.value,
+    });
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).
@@ -415,7 +416,6 @@ export async function POST(request: NextRequest) {
       ? createFingerprint(ipAddress, userAgent)
       : 'anonymous';
 
-    // Find the creator profile
     const [profile] = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)

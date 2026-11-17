@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { Mark, PALETTE, Wordmark } from '@/lib/brand';
 import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
@@ -580,7 +580,7 @@ function FinalCta() {
           into the next step up.
         </p>
         <Link
-          href={APP_ROUTES.SIGNUP}
+          href={PUBLIC_ENTRY_HREF}
           className='system-b-brand-secondary-link system-b-brand-final-link'
         >
           Start Free Trial

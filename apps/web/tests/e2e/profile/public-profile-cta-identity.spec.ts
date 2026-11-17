@@ -257,7 +257,7 @@ test.describe('Public profile CTA and identity evidence', () => {
           events.getByRole('button', { name: 'View Events' })
         ).toHaveCount(0);
         await expect(
-          events.getByRole('button', { name: 'Turn On Event Alerts' })
+          events.getByRole('button', { name: 'Turn on event alerts' })
         ).toHaveCount(0);
         await capture(`${viewport.id}-events.png`);
         return;
@@ -276,7 +276,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         emptyEvents.getByRole('heading', { name: 'No upcoming events' })
       ).toBeVisible();
       const canonicalCta = emptyEvents.getByRole('button', {
-        name: 'Turn On Event Alerts',
+        name: 'Turn on event alerts',
       });
       await expect(canonicalCta).toBeVisible();
       await expect(canonicalCta).toBeEnabled();

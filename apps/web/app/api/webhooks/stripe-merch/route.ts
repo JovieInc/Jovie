@@ -10,6 +10,7 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   handleMerchChargeRefunded,
   handleMerchCheckoutCompleted,
+  handleMerchCheckoutPaymentFailed,
 } from '@/lib/merch/orders';
 import { stripe } from '@/lib/stripe/client';
 import {
@@ -161,7 +162,13 @@ export async function POST(request: NextRequest) {
     try {
       switch (event.type) {
         case 'checkout.session.completed':
+        case 'checkout.session.async_payment_succeeded':
           await handleMerchCheckoutCompleted(
+            event.data.object as Stripe.Checkout.Session
+          );
+          break;
+        case 'checkout.session.async_payment_failed':
+          await handleMerchCheckoutPaymentFailed(
             event.data.object as Stripe.Checkout.Session
           );
           break;

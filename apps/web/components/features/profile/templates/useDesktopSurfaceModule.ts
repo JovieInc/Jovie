@@ -62,6 +62,7 @@ function desktopSurfacePaint(props: ProfileDesktopSurfaceProps) {
         ? createElement('img', {
             alt: '',
             className: 'h-40 w-40 rounded-full object-contain',
+            loading: 'lazy',
             src: heroUrl,
           })
         : null,
@@ -122,6 +123,10 @@ export function useDesktopSurfaceModule(enabled: boolean): {
     void import('@/features/profile/templates/ProfileDesktopSurface').then(
       mod => {
         if (!cancelled) setSurface(() => mod.ProfileDesktopSurface);
+      },
+      () => {
+        // Keep the server-painted navigation usable if this optional chunk
+        // fails. Re-entering the desktop viewport can retry the import.
       }
     );
     return () => {

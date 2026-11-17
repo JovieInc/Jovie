@@ -264,12 +264,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
           className={cn(
             calm ? 'sr-only' : 'h-1.5 w-1.5 rounded-full',
             thread.status === 'running'
-              ? 'bg-cyan-300/85 anim-calm-breath'
+              ? 'bg-accent/85 anim-calm-breath'
               : thread.status === 'errored'
-                ? 'bg-rose-400/85'
+                ? 'bg-error/85'
                 : unread
-                  ? 'bg-cyan-300/85'
-                  : 'bg-white/25'
+                  ? 'bg-accent/85'
+                  : 'bg-primary-token/25'
           )}
         />
       </span>
@@ -385,10 +385,10 @@ export function formatSidebarThreadTime(
 }
 
 // Status dot tones:
-//   running → cyan, anim-calm-breath
-//   errored → rose
-//   unread  → cyan static
-//   read    → dim white
+//   running → accent, anim-calm-breath
+//   errored → error
+//   unread  → accent static
+//   read    → dim primary
 export function SidebarThreadsSection({
   calm = false,
   threads,

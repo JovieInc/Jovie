@@ -112,7 +112,7 @@ export const SidebarBottomNowPlaying = React.memo(
               />
             ) : null}
           </ArtworkFrame>
-          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100'>
+          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100 [@media(hover:none)]:opacity-100'>
             <Button
               type='button'
               variant='ghost'
@@ -120,7 +120,7 @@ export const SidebarBottomNowPlaying = React.memo(
               onClick={onPlay}
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
-              <span className='pointer-events-none absolute inset-0 rounded-full bg-black/55' />
+              <span className='pointer-events-none absolute inset-0 rounded-full bg-ink-on-media/55' />
               {isPlaying ? (
                 <Pause
                   aria-hidden='true'
@@ -145,7 +145,7 @@ export const SidebarBottomNowPlaying = React.memo(
             variant='ghost'
             size='sm'
             onClick={onExpand}
-            aria-label='Show Player'
+            data-audio-expand-player='true'
             className='min-w-0 flex-1 justify-start'
           >
             <div className='min-w-0 flex-1'>
@@ -159,6 +159,10 @@ export const SidebarBottomNowPlaying = React.memo(
                 {artistName}
               </div>
             </div>
+            {/* An aria-label would shadow the visible title/artist and trip axe
+                label-content-name-mismatch; append the purpose instead so the
+                accessible name contains the visible text. */}
+            <span className='sr-only'>Show Player</span>
           </Button>
         ) : (
           <div className='min-w-0 flex-1'>

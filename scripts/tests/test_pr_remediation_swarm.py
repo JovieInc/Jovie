@@ -17,7 +17,7 @@ class SwarmPolicyTest(unittest.TestCase):
         for path in ("apps/web/components/Button.tsx", "docs/README.md", "scripts/ci-fast-lanes.mjs"):
             self.assertFalse(swarm.SENSITIVE.search(path), path)
 
-    def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None):
+    def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None, mergeable="blocked"):
         import types, tempfile
         calls = {"claim": 0, "rerun": 0}
         saved = {k: getattr(swarm, k) for k in ("latest_failures", "job_log_tail", "receipts_for", "take_claim", "finish_plan", "rerun_failed")}
@@ -31,7 +31,7 @@ class SwarmPolicyTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 a = types.SimpleNamespace(agent=agent, log=str(Path(d) / "l.log"))
                 plan = {"pr": 9, "sha": "abc", "sensitive": sensitive}
-                swarm.prepare_red(a, plan, {"mergeable_state": "blocked"})
+                swarm.prepare_red(a, plan, {"mergeable_state": mergeable})
                 return plan, calls
         finally:
             for k, v in saved.items():
@@ -58,6 +58,18 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertEqual((plan["fix"], c["claim"], c["rerun"]), ("rerun-failed-jobs", 1, 1))
         plan, c = self._gate(red, False, "generated workflow DAG is stale; run pnpm ci:topology:write\n::error::x")
         self.assertEqual((plan["action"], plan["regen"], c["claim"]), ("regen", "pnpm ci:topology:write", 1))
+
+    def test_alias_review_owner_handoff_never_claims_or_reruns(self):
+        error = ('Error: public-profile alias graduation review was due 2026-11-07T06:00:00Z '
+                 '(JOV-8737) and its 72h grace ended 2026-11-10T06:00:00.000Z; re-review and refresh it.')
+        red = [{"name": "structural", "conclusion": "failure", "id": 1}]
+        for agent in ("true", "false"):
+            plan, calls = self._gate(red, False, error, agent=agent)
+            self.assertEqual((plan.get("outcome"), plan["action"], plan.get("reason")),
+                             ("skipped", "none", "shared-evidence:alias-graduation:JOV-8737"))
+            self.assertEqual(calls, {"claim": 0, "rerun": 0})
+        plan, calls = self._gate(red, False, error, mergeable="dirty")
+        self.assertEqual((plan["action"], calls["claim"]), ("sync-main", 1))
 
     def test_launch_shepherd_prs_are_excluded(self):
         self.assertTrue({23495, 23519} <= swarm.EXCLUDED)

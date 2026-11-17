@@ -7,9 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
-import { APP_ROUTES } from '@/constants/routes';
 import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
 import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
 
@@ -38,7 +36,7 @@ vi.mock('@/lib/hooks/useVersionMonitor', () => ({
 function Surface({ inbox = true }: { inbox?: boolean }) {
   return (
     <RuntimeUpdateProvider>
-      {inbox ? <InboxRuntimeNotification /> : null}
+      <main data-testid='page-content'>{inbox ? 'Inbox' : 'Chat'}</main>
     </RuntimeUpdateProvider>
   );
 }
@@ -60,7 +58,7 @@ function DesktopUpdateProbe() {
   );
 }
 
-describe('updates in the central Inbox', () => {
+describe('runtime updates in the shell corner pill', () => {
   it('exposes the desktop update context to descendants (unsupported on web)', () => {
     render(
       <RuntimeUpdateProvider>
@@ -73,24 +71,34 @@ describe('updates in the central Inbox', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows runtime attention on the canonical shell Inbox bell', () => {
+  it('announces an update in the shell corner pill beside the navigation', () => {
     state.available = true;
     state.downloaded = true;
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: ui =>
         render(<RuntimeUpdateProvider>{ui}</RuntimeUpdateProvider>),
       overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
     });
     expect(
-      getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+      screen.getByRole('button', { name: 'Restart Jovie to update' })
+    ).toBeEnabled();
+    expect(screen.getByTestId('runtime-update-pill')).toBeInTheDocument();
   });
 
   it('does not show a notification without a real update', () => {
     render(<Surface />);
-    expect(
-      screen.queryByTestId('inbox-runtime-notification')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('runtime-update-pill')).not.toBeInTheDocument();
+  });
+  it('renders update status outside the page content area', () => {
+    state.available = true;
+    state.downloaded = true;
+    render(<Surface />);
+    const pill = screen.getByTestId('runtime-update-pill');
+    expect(pill).toHaveClass('fixed');
+    expect(screen.getByTestId('page-content')).not.toContainElement(pill);
+    expect(screen.getByTestId('page-content')).not.toHaveTextContent(
+      /Jovie to update|Updating Jovie/
+    );
   });
   it('keeps a downloaded update pending across route views and installs only on explicit action', () => {
     state.available = true;
@@ -165,15 +173,14 @@ describe('updates in the central Inbox', () => {
     ).toBeDisabled();
     expect(state.install).not.toHaveBeenCalled();
   });
-  it('renders the notification through the imported renderer when mounted directly', () => {
+  it('renders the pill through the imported renderer when mounted directly', () => {
     // Rendered with the imported testing-library render (not the Surface
-    // helper) so the runtime component evidence for the notification stays
-    // executable: the update flow keeps its own dedicated notification test.
+    // helper) so the provider's own pill stays executable without children.
     state.available = true;
     state.downloaded = true;
     renderRTL(
       <RuntimeUpdateProvider>
-        <InboxRuntimeNotification />
+        <div />
       </RuntimeUpdateProvider>
     );
     expect(

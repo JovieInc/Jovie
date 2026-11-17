@@ -193,6 +193,63 @@ describe('setTestAuthBypassSession', () => {
       setTestAuthBypassSession(page, null, 'unknown-real-user')
     ).rejects.toMatchObject({ code: 'CLERK_SETUP_FAILED' });
   });
+
+  // JOV-12753: a transient keep-alive reset against the standalone server
+  // must retry instead of writing a Playwright error-context artifact whose
+  // call log embeds the live session cookie (the artifact guard then blocks
+  // it as credential-text and fails the lane).
+  it('retries a transient connection reset and succeeds on a later attempt', async () => {
+    const connectionReset = Object.assign(
+      new Error('apiRequestContext.post: read ECONNRESET'),
+      { code: 'ECONNRESET' }
+    );
+    const post = vi
+      .fn()
+      .mockRejectedValueOnce(connectionReset)
+      .mockResolvedValueOnce({
+        ok: () => true,
+        status: () => 200,
+        json: () =>
+          Promise.resolve({ success: true, userId: 'ba_dev_creator-ready' }),
+      });
+    const page = { request: { post } } as unknown as Page;
+
+    await setTestAuthBypassSession(page, 'creator-ready');
+
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  it('still fails closed after exhausting the connection-error retries', async () => {
+    const connectionReset = Object.assign(
+      new Error('apiRequestContext.post: read ECONNRESET'),
+      { code: 'ECONNRESET' }
+    );
+    const post = vi.fn().mockRejectedValue(connectionReset);
+    const page = { request: { post } } as unknown as Page;
+
+    await expect(
+      setTestAuthBypassSession(page, 'creator-ready')
+    ).rejects.toThrow('ECONNRESET');
+    expect(post).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry an HTTP error status — the first response fails closed', async () => {
+    const post = vi.fn().mockResolvedValue({
+      ok: () => false,
+      status: () => 404,
+      json: () =>
+        Promise.resolve({
+          success: false,
+          error: 'Unknown Better Auth test user',
+        }),
+    });
+    const page = { request: { post } } as unknown as Page;
+
+    await expect(
+      setTestAuthBypassSession(page, null, 'unknown-real-user')
+    ).rejects.toMatchObject({ code: 'CLERK_SETUP_FAILED' });
+    expect(post).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('waitForAuthenticatedHealth', () => {

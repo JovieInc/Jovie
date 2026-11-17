@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
 import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
@@ -76,6 +77,14 @@ describe('ProfileMobileNotificationsFlow', () => {
       ).toHaveAttribute('aria-modal', 'true');
     }
   );
+
+  it('opens on a sentence-case Get updates sheet', () => {
+    renderFlow({ step: 'email', onDismissCapture: vi.fn() });
+
+    expect(screen.getByText('Get updates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to SMS' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
+  });
 
   it('keeps the inline flow outside modal dialog semantics', () => {
     renderFlow({ presentation: 'inline', step: 'email' });
@@ -168,5 +177,60 @@ describe('contrast floor (WCAG 1.4.3)', () => {
     // color-contrast); 60% white is the floor for label/body text here.
     expect(source).not.toMatch(/text-white\/(?:[0-4]\d|5[0-9])\b/);
     expect(source).toMatch(/text-white\/60/);
+  });
+
+  describe('inline loading footprint', () => {
+    it('paints the inline email step on its first render instead of an empty frame', () => {
+      const markup = renderToStaticMarkup(
+        <ProfileMobileNotificationsFlow
+          open
+          presentation='inline'
+          artistName='Tim White'
+          channel='email'
+          country={COUNTRY_OPTIONS[0]}
+          step='email'
+          emailInput=''
+          phoneInput=''
+          otpCode=''
+          nameInput=''
+          birthdayInput=''
+          error={null}
+          isSubmitting={false}
+          isNameSaving={false}
+          isBirthdaySaving={false}
+          isPreferencesSaving={false}
+          birthdayHintShown={false}
+          resendCooldownEnd={0}
+          isResending={false}
+          isCountryOpen={false}
+          contentPrefs={{
+            newMusic: true,
+            tourDates: true,
+            merch: true,
+            general: true,
+          }}
+          onClose={vi.fn()}
+          onBack={vi.fn()}
+          onChannelChange={vi.fn()}
+          onCountryOpenChange={vi.fn()}
+          onCountrySelect={vi.fn()}
+          onEmailChange={vi.fn()}
+          onPhoneChange={vi.fn()}
+          onEmailSubmit={vi.fn()}
+          onOtpChange={vi.fn()}
+          onOtpComplete={vi.fn()}
+          onOtpSubmit={vi.fn()}
+          onResendOtp={vi.fn()}
+          onNameChange={vi.fn()}
+          onNameSubmit={vi.fn()}
+          onBirthdayChange={vi.fn()}
+          onBirthdaySubmit={vi.fn()}
+          onTogglePref={vi.fn()}
+          onPreferencesSubmit={vi.fn()}
+        />
+      );
+
+      expect(markup).toContain('data-testid="mobile-email-input"');
+    });
   });
 });

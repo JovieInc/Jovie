@@ -332,10 +332,10 @@ describe('SidebarThreadsSection', () => {
         collapsed={false}
       />
     );
-
     const threadButton = screen.getByRole('button', { name: 'Draft thread' });
 
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
+    expect(threadButton.innerHTML).toContain('bg-accent/85');
     expect(threadButton).toHaveClass(
       'h-(--app-shell-sidebar-row-height)',
       'bg-sidebar-accent-active'

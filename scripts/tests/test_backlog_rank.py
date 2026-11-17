@@ -144,11 +144,49 @@ class RefillGuardTests(unittest.TestCase):
 class RankWriteTests(unittest.TestCase):
     def test_plan_puts_ranked_rows_above_everything_and_settles(self):
         ranked = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
-        plan = br.plan_sort_orders(ranked, {"a": -5.0, "b": -9.0, "c": -1.0}, others_min=-4.0)
-        self.assertEqual(plan, {"a": -7.0, "b": -6.0, "c": -5.0})
-        self.assertLess(max(plan.values()), -4.0)
-        self.assertEqual(br.plan_sort_orders(ranked, plan, -4.0), {})  # settled: no writes, no drift
+        current = {"a": -5.0, "b": -9.0, "c": -1.0}
+        plan = br.plan_sort_orders(ranked, current, others_min=-4.0)
+        self.assertEqual(plan, {"b": -4.666667, "c": -4.333333})  # a is already in place and is not rewritten
+        after = {**current, **plan}
+        self.assertEqual(sorted(after, key=after.get), ["a", "b", "c"])
+        self.assertLess(max(after.values()), -4.0)
+        self.assertEqual(br.plan_sort_orders(ranked, after, -4.0), {})  # settled: no writes, no drift
         self.assertEqual(br.plan_sort_orders(ranked, {"a": 1.0}, 0.0), {})  # unknown order: never guess
+
+    def test_plan_writes_only_rows_out_of_order(self):  # JOV-12550
+        ranked = [{"id": f"r{n}"} for n in range(40)]
+        settled = {f"r{n}": -100.0 + n for n in range(40)}
+        self.assertEqual(br.plan_sort_orders(ranked, settled, -50.0), {})
+        swapped = {**settled, "r10": settled["r11"], "r11": settled["r10"]}
+        plan = br.plan_sort_orders(ranked, swapped, -50.0)
+        self.assertLessEqual(len(plan), 2)
+        after = {**swapped, **plan}
+        self.assertEqual(sorted(after, key=after.get), [row["id"] for row in ranked])
+
+    def test_kept_rows_with_linear_precision_are_not_rewritten(self):  # JOV-12550
+        ranked = [{"id": f"r{n}"} for n in range(5)]
+        current = {f"r{n}": -100.123456789 + n + n * 1e-9 for n in range(5)}
+        current["r2"], current["r3"] = current["r3"], current["r2"]
+        plan = br.plan_sort_orders(ranked, current, -50.0)
+        self.assertLessEqual(len(plan), 1)
+        after = {**current, **plan}
+        self.assertEqual(sorted(after, key=after.get), [row["id"] for row in ranked])
+        self.assertEqual(br.plan_sort_orders(ranked, after, -50.0), {})
+
+    def test_row_leaving_the_list_does_not_rewrite_the_rest(self):  # JOV-12550
+        ranked = [{"id": f"r{n}"} for n in range(40)]
+        current = {f"r{n}": -100.0 + n for n in range(41)}  # r40 dropped to 41st: it is now an "other"
+        others = {"r40": current["r40"], "x": 5.0}
+        self.assertEqual(br.plan_sort_orders(ranked, current, min(others.values()), others=others), {})
+
+    def test_newcomer_listed_first_moves_below_instead_of_rewriting_the_list(self):  # JOV-12550
+        ranked = [{"id": f"r{n}"} for n in range(40)]
+        current = {f"r{n}": -100.0 + n for n in range(40)}
+        others = {"new": -200.0, "old": 10.0}  # Linear lists a new issue above everything
+        plan = br.plan_sort_orders(ranked, {**current, **others}, min(others.values()), others=others)
+        self.assertEqual(plan, {"new": -60.0})
+        after = {**current, **others, **plan}
+        self.assertTrue(all(after[f"r{n}"] < after["new"] for n in range(40)))
 
     def test_rank_pass_reads_once_writes_through_outbox_in_batches(self):
         tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
@@ -167,14 +205,18 @@ class RankWriteTests(unittest.TestCase):
         host = SimpleNamespace(state=state)
         binding = SimpleNamespace(key="JOV", excluded=())
         first = refill.rank_pass(lane, host, binding, Client(), now=NOW + 1)
-        self.assertEqual((first["written"], len(first["pending"])), (10, 5))
+        planned = first["written"] + len(first["pending"])
+        self.assertEqual(first["written"], 10)
+        self.assertGreater(planned, 10)
+        self.assertLess(planned, 15)  # rows already in order keep their value (JOV-12550)
         self.assertEqual(len(calls), 1)
         second = refill.rank_pass(lane, host, binding, Client(), now=NOW + 2)  # drains the rest, no second read
-        self.assertEqual((second["written"], len(second["pending"])), (5, 0))
+        self.assertEqual((second["written"], len(second["pending"])), (planned - 10, 0))
         self.assertEqual(len(calls), 1)
         entries = [e for e in json.loads((state / "linear" / "outbox.json").read_text())["entries"] if e["op"] == "rank"]
-        self.assertEqual(len(entries), 15)
-        values = {e["issueId"]: e["value"] for e in entries}
+        self.assertEqual(len(entries), planned)
+        values = {r["id"]: -float(i) for i, r in enumerate(rows)}
+        values.update({e["issueId"]: e["value"] for e in entries})
         best = br.order(rows, NOW + 1)
         self.assertEqual(sorted(values, key=values.get), [r["id"] for r in best])
         throttled = refill.rank_pass(lane, host, binding, Client(), now=NOW + 3)

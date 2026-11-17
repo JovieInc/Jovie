@@ -127,6 +127,9 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/components/jovie/hooks', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/components/jovie/hooks')>();
+  const { idleChatFileAttachments } = await import(
+    './idle-chat-file-attachments'
+  );
   return {
     ...actual,
     useSuggestedProfiles: () => ({
@@ -171,31 +174,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
         serialized: '',
       },
     }),
-    useChatFileAttachments: () => ({
-      pendingFiles: [],
-      isDragOver: false,
-      isUploading: false,
-      hasReadyFiles: false,
-      addFiles: vi.fn(),
-      removeFile: vi.fn(),
-      clearFiles: vi.fn(),
-      toFileUIParts: () => [],
-      dropZoneRef: { current: null },
-      accept: 'image/*,audio/*,video/*',
-      aggregate: {
-        total: 0,
-        done: 0,
-        uploading: 0,
-        queued: 0,
-        errors: 0,
-        duplicates: 0,
-        totalBytes: 0,
-        uploadedBytes: 0,
-        overallPct: 0,
-        speed: '—',
-        eta: '—',
-      },
-    }),
+    useChatFileAttachments: idleChatFileAttachments,
   };
 });
 
@@ -653,6 +632,22 @@ describe('JovieChat styling regressions', () => {
     expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
   });
 
+  it('offers next moves under the first reply of a profile-chip chat', () => {
+    Object.assign(mockChatState, { isLoading: false, status: 'ready' });
+    mockChatState.messages = ['@profile:profile-1[Tim White]', 'Hi'].map(
+      (text, i) => ({
+        id: `m${i}`,
+        role: i ? 'assistant' : 'user',
+        parts: [{ type: 'text', text }],
+      })
+    );
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    const chips = '[data-testid="chat-follow-ups"] button';
+    expect(container.querySelectorAll(chips)).toHaveLength(4);
+  });
+
   it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
@@ -698,21 +693,15 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="chat-empty-state-insight"]')
     ).toBeNull();
-    // Allow the enabled query to settle before committing the fallback.
-    expect(container.textContent).toContain('Finding your next step');
+    // Nothing finished yet: greeting only. No chore, no loading line.
+    expect(container.textContent).not.toContain('Finding your next step');
     expect(container.textContent).not.toContain('Draft This With Jovie');
     expect(container.textContent).not.toContain('Review Your Profile');
-
-    const nextStep = container.querySelector(
-      '[data-testid="chat-empty-state-next-step"]'
-    );
-    expect(nextStep?.className).toContain('min-h-24');
-    act(() => vi.advanceTimersByTime(10_000));
-    expect(container.textContent).not.toContain('Finding your next step');
-    expect(container.textContent).toContain('Review Your Profile');
     expect(
-      container.querySelector('[data-testid="chat-empty-state-next-step"]')
-    ).toBe(nextStep);
+      container.querySelector('[data-testid="chat-empty-state-result"]')
+    ).toBeNull();
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(container.textContent).not.toContain('Review Your Profile');
     expect(
       container.querySelector(
         '[data-testid="chat-empty-state-greeting-region"]'
@@ -720,7 +709,7 @@ describe('JovieChat styling regressions', () => {
     ).toBe(region);
   });
 
-  it('preserves the welcome and offers one action without promoting Insight prose to a win (JOV-7150)', () => {
+  it('never turns an AI insight into a chore suggestion (Nov 14)', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -729,14 +718,14 @@ describe('JovieChat styling regressions', () => {
     mockInsightsSummary.data = {
       insights: [
         {
-          id: 'release-insight',
+          id: 'tip-insight',
           status: 'active',
-          title: 'Streams are up 12% this week',
-          insightType: 'release_momentum',
-          category: 'content',
+          title: '27 tip link clicks, zero tips completed',
+          insightType: 'tip_hotspot',
+          category: 'revenue',
           priority: 'high',
           description: '',
-          actionSuggestion: 'Streams are up 320% today.',
+          actionSuggestion: 'Review your tip flow.',
           confidence: '0.90',
           createdAt: new Date().toISOString(),
           periodStart: new Date().toISOString(),
@@ -750,22 +739,15 @@ describe('JovieChat styling regressions', () => {
       <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    const insight = container.querySelector(
-      '[data-testid="chat-empty-state-greeting-text"]'
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-greeting-text"]')
+        ?.textContent
+    ).toMatch(/^Good (morning|afternoon|evening), Tim\.$/);
+    expect(container.textContent).not.toMatch(
+      /tip flow|Draft This With Jovie/i
     );
-    expect(insight?.textContent).toMatch(
-      /^Good (morning|afternoon|evening), Tim\.$/
-    );
-    expect(container.textContent).toContain('Draft a release update');
-    expect(container.textContent).not.toMatch(/12%|320%/);
     expect(
-      container.querySelectorAll('[data-testid="chat-empty-state-next-step"]')
-    ).toHaveLength(1);
-    expect(
-      container.querySelector('[data-insight-id="release-insight"]')
-    ).toBeTruthy();
-    expect(
-      container.querySelector('[data-testid="chat-empty-state-insight"]')
+      container.querySelector('[data-testid="chat-empty-state-result"]')
     ).toBeNull();
   });
 

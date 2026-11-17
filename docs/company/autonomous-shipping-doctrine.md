@@ -12,6 +12,14 @@
 > `blocksUnattendedAutoMerge` for any surface — high-risk surfaces get
 > **stricter CI** (smoke + preview evidence), not a human queue.
 
+> **2026-11-12 amendment:** Routine GitHub and Linear writes never wait on Tim:
+> PR titles, descriptions and comments (CI and validation detail included),
+> labels, status, retargeting, closing, auto-merge, and Linear issues, status
+> and comments. Secrets and personal data are stripped automatically
+> ([routine writes](../../canon/FLEET.md#routine-writes)). Tim's yes is only for
+> outbound outside the company, secrets, production data and deletes, money,
+> and taste.
+
 ## Principle
 
 Jovie is a **100% autonomous shipping** company during development.

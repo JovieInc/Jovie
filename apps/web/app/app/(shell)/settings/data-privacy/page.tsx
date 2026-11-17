@@ -7,11 +7,7 @@ import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsCo
 export default function SettingsDataPrivacyPage() {
   const { artist, setArtist } = useSettingsContext();
   return (
-    <SettingsSection
-      id='data-privacy'
-      title='Data & Privacy'
-      description='Profile discovery, data export, and account deletion.'
-    >
+    <SettingsSection id='data-privacy' title='Data & privacy'>
       <DataPrivacySection artist={artist} onArtistUpdate={setArtist} />
     </SettingsSection>
   );

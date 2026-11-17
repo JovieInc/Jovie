@@ -43,3 +43,12 @@ export const Catalog: Story = {
     </div>
   ),
 };
+
+/** Right-to-left: the Releases window inside an RTL document. */
+export const RtlReleases: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <AppWindow />
+    </div>
+  ),
+};

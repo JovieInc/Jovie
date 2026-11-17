@@ -406,14 +406,14 @@ export function DesignProposalReviewPanel() {
         if (decision === 'yes' || decision === 'yes-with-notes') {
           toast.success(
             payload.result?.dispatchTriggered
-              ? 'Taste proposal approved and D5 dispatch triggered.'
-              : 'Taste proposal approved.'
+              ? 'Taste proposal approved. Dispatch request accepted; execution is unconfirmed.'
+              : 'Taste proposal approved. Dispatch could not be confirmed.'
           );
         } else {
           toast.success('Taste proposal rejected and taste memory updated.');
         }
 
-        if (payload.result?.linearUpdated === false) {
+        if (decision === 'no' && payload.result?.linearUpdated === false) {
           toast.error('Linear issue status could not be updated.');
         }
       } catch (error) {
@@ -445,8 +445,8 @@ export function DesignProposalReviewPanel() {
               Taste Inbox
             </p>
             <p className='text-xs text-secondary-token'>
-              Review agent-generated taste proposals before Summer ships or
-              discards them.
+              Review agent-generated taste proposals. Approval records your
+              decision and attempts a dispatch request.
             </p>
           </div>
           <span className='text-2xs tabular-nums text-tertiary-token'>

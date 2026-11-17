@@ -1,9 +1,13 @@
 'use server';
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidateTag,
+  updateTag,
+} from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TAGS } from '@/lib/cache/tags';
+import { CACHE_TAGS, createProfileTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -19,10 +23,11 @@ import { getDashboardDataEssential } from '../actions';
  * zero rows updated and a `not_found` result — no profile-existence side
  * channel.
  *
- * Cache invalidation: each action `revalidateTag`s the per-creator
- * tour-dates cache so the next server fetch is fresh. The TanStack Query
- * client on the calendar page invalidates its own `events.list(profileId)`
- * key in the mutation hook.
+ * Cache invalidation: each action `updateTag`s the dashboard data (the inbox
+ * badge counts pending tour dates, and the creator must see their own review)
+ * and expires the public profile page, which lists confirmed dates. The tour
+ * date list itself is read uncached. The TanStack Query client on the calendar
+ * page invalidates its own `events.list(profileId)` key in the mutation hook.
  */
 
 export type EventActionResult =
@@ -36,6 +41,7 @@ export type BulkEventActionResult =
 interface AuthedProfile {
   userId: string;
   profileId: string;
+  handle: string | null;
 }
 
 type ModerationStatus = 'confirmed' | 'pending' | 'rejected';
@@ -55,12 +61,23 @@ async function requireAuthedProfile(): Promise<AuthedProfile | null> {
   if (!data.selectedProfile) {
     return null;
   }
-  return { userId, profileId: data.selectedProfile.id };
+  return {
+    userId,
+    profileId: data.selectedProfile.id,
+    handle:
+      data.selectedProfile.usernameNormalized ??
+      data.selectedProfile.username ??
+      null,
+  };
 }
 
 function invalidateEventsCache(authed: AuthedProfile): void {
-  revalidateTag(`tour-dates:${authed.userId}:${authed.profileId}`, 'max');
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  updateTag(CACHE_TAGS.DASHBOARD_DATA);
+  // Confirmed dates are listed on the public profile page. Tag-only (no
+  // revalidatePath) so the review action stays a single re-render.
+  if (authed.handle) {
+    revalidateTag(createProfileTag(authed.handle.toLowerCase()), 'max');
+  }
 }
 
 function isValidEventId(id: string): boolean {

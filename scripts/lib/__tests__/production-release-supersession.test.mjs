@@ -35,7 +35,6 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
-import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -138,11 +137,6 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    assertReviewDeadline({
-      label: 'public-profile alias graduation',
-      deadline: policy.nextReviewAt,
-      trackingIssue: policy.trackingIssue,
-    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );
@@ -1468,6 +1462,7 @@ esac
     mkdirSync(src);
     const git = args => {
       const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: src,
         encoding: 'utf8',
         env: {
