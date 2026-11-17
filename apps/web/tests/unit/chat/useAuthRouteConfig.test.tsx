@@ -32,7 +32,7 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.isChatRoute).toBe(true);
   });
 
-  it('uses Inbox as the single shell title for the root opportunity surface', () => {
+  it('titles the root opportunity surface Inbox, matching the header bell', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
 
     const { result } = renderHook(() => useAuthRouteConfig());

@@ -35,6 +35,24 @@ def red(*names):
 
 
 class DesignSourceCliTest(unittest.TestCase):
+    def test_zero_new_identity_excerpt_syncs_main_before_fixture_infrastructure(self):
+        # Bounded Source Validation excerpts can omit both the Vitest title and
+        # typed identities. Zero new baseline identities still proves the CLI
+        # failed its trusted-base comparison, which needs the one-sync route.
+        diagnostic = ('AssertionError: [design-system-source-ratchet] FAIL — '
+                      '1888 identities (0 new / baseline 1907)\n')
+        prefix = 'Source Validation\tUNKNOWN STEP\t2026-11-17T04:51:20.9436841Z '
+        for excerpt in (diagnostic, prefix + diagnostic,
+                        diagnostic.replace('FAIL', '\x1b[31mFAIL\x1b[39m')):
+            with self.subTest(excerpt=excerpt):
+                pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+                logs = {'Source Validation': 'passing fixture: API rate limit exceeded\n' + excerpt}
+                route = classes.classify(pr, logs)
+                self.assertEqual((route['cls'], route['action']), ('design-source-cli', 'sync-main'))
+                with patch.object(lane, 'failed_logs', return_value=logs):
+                    self.assertIsNone(lane.infra_only_red(None, pr))
+                    self.assertEqual(lane.route_fix_red(None, pr)['action'], 'sync-main')
+
     def test_infrastructure_shortcut_preserves_design_failure_routes(self):
         summary = (' FAIL workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs'
                    ' > design-system source identity ratchet > exits zero from the CLI on the live tree\n')
@@ -60,12 +78,13 @@ class DesignSourceCliTest(unittest.TestCase):
         identity = ('new design identity: apps/web/components/shell/StatusBadge.tsx'
                     '\traw-palette-class\tbg-amber-300\n')
         noise = 'passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n'
-        for log in (header + identity, noise + header + identity):
+        for log in (header, header + identity, noise + header + identity):
             got = classes.classify(red('Source Validation'), {'Source Validation': log})
             self.assertEqual((got['cls'], got['action']), ('design-source-cli', 'sync-main'))
             self.assertEqual(got['actions'], ['sync-main'])
-        for log in (header, identity, header.replace('FAIL', 'PASS') + identity,
-                    header + identity.replace('raw-palette-class', 'unknown-rule')):
+        for log in (header.replace('0 new', '1 new'), identity,
+                    header.replace('FAIL', 'PASS') + identity,
+                    header.replace('0 new', '1 new') + identity.replace('raw-palette-class', 'unknown-rule')):
             got = classes.classify(red('Source Validation'), {'Source Validation': noise + log})
             self.assertEqual((got['cls'], got['action']), ('quota-deferred', 'rerun'))
 

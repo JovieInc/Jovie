@@ -19,6 +19,7 @@ const BRAND_LOGO_PRODUCTION_SOURCES = [
   'components/atoms/Logo.tsx',
   'components/atoms/LogoIcon.tsx',
   'components/atoms/LogoLoader.tsx',
+  'components/ask-jovie/AskJovie.tsx',
   'components/features/auth/AuthUnavailableCard.tsx',
   'components/features/onboarding/OnboardingChatEmptyIntro.tsx',
   'components/organisms/UnifiedSidebar.tsx',
@@ -102,6 +103,33 @@ describe('brand mark size ladder', () => {
     }
 
     expect(offenders).toEqual([]);
+  });
+
+  it('keeps the sidebar brand-row mark on the nav icon scale', () => {
+    // The brand row is `mark · wordmark · bell · search` on one optical line
+    // (shell-ia.md). Bell and search render at --app-shell-sidebar-icon-size
+    // (1rem); both brand-row BrandLogo call sites must sit on the matching
+    // 'compact' rung so the row never grows a second, larger mark again
+    // (founder note 2026-11-09: a 20/24px mark read as a different line).
+    // Only the ROW is pinned — the WorkspaceSelector dropdown menu items
+    // keep their own 'chrome' rung in the larger menu-row context.
+    for (const relativePath of [
+      'components/ask-jovie/AskJovie.tsx',
+      'components/molecules/WorkspaceSelector.tsx',
+    ]) {
+      const source = readWebSource(relativePath);
+      // The trigger's mark is what sits on the brand row; stop at any
+      // dropdown body (WorkspaceSelector menu items keep the 'chrome' rung
+      // in their larger menu-row context).
+      const dropdownIndex = source.indexOf('<DropdownMenuContent');
+      const rowSource =
+        dropdownIndex === -1 ? source : source.slice(0, dropdownIndex);
+      // A raw pixel size (the old size={24}) is off-ladder on the brand row.
+      const pxSizes = [...rowSource.matchAll(RAW_SIZE_RE)].map(m => m[1]);
+      expect(pxSizes).toEqual([]);
+      const tokens = [...rowSource.matchAll(TOKEN_SIZE_RE)].map(m => m[1]);
+      expect(tokens).toEqual(['compact']);
+    }
   });
 
   it('keeps asserted source receipts for BrandLogo call sites without colocated tests', () => {

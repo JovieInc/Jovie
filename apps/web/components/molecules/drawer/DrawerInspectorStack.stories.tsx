@@ -32,7 +32,12 @@ export const Default: Story = {
     await expect(canvas.getByTestId('inspector-stack')).toHaveTextContent(
       'Draft'
     );
-    await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: 'Copy Release: Summer EP' })
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Copy Status: Draft' })
+    ).toBeVisible();
   },
 };
 

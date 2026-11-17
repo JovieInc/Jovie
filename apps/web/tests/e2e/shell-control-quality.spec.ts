@@ -356,9 +356,9 @@ test('route navigation keeps the shell attached and inspects rendered materials 
       theme
     );
     // [sidebar entry, page heading, pathname]. The Identity destination is
-    // titled `Profiles` since #20953. `/app` has no rail row any more: the
-    // header bell (named Inbox) is its entry, and header + tab title say
-    // Inbox to match (Tim 2026-11-14).
+    // titled `Profiles` since #20953. `/app` has no rail row: the header
+    // bell (named Inbox) is its entry, and the header, breadcrumb, and tab
+    // title say Inbox so the destination has one name.
     for (const [entry, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
@@ -463,7 +463,7 @@ test('resizing through narrow drawers clears stale locks and preserves the deskt
   await expect(
     page.getByRole('button', { name: 'More options', exact: true })
   ).toBeVisible();
-  await page.getByRole('heading', { name: 'Home', exact: true }).click();
+  await page.getByRole('heading', { name: 'Inbox', exact: true }).click();
   await page.keyboard.press('[');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });

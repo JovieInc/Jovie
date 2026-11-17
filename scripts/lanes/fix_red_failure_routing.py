@@ -8,13 +8,24 @@ import subprocess
 
 # Inherited design identities removed on main need the existing one-sync-per-head
 # route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
-DESIGN_SOURCE_CLI = re.compile(
+# failure plus a typed identity, or a zero-new-identity failure excerpt. The
+# latter fails only the trusted-base comparison; sync once before source repair.
+_DESIGN_SOURCE_CLI = re.compile(
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
     r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
     r"(?:apps/web|packages/ui)/[^\t\n]+\t"
-    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+")
+    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+|"
+    r"\[design-system-source-ratchet\] FAIL[^\n]* — \d+ identities "
+    r"\(0 new / baseline \d+\)")
+
+
+class DesignSourceCliFailure:
+    def search(self, text):
+        return _DESIGN_SOURCE_CLI.search(_ANSI.sub('', str(text or '')))
+
+
+DESIGN_SOURCE_CLI = DesignSourceCliFailure()
 
 # A local TS2307 can mean a prerequisite has landed on main while the PR is
 # BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
@@ -84,6 +95,64 @@ class RouteBudgetGrowth:
 
 
 ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
+
+
+# `routes.X grew A -> B` is a stale ceiling and syncs main. This annotation is
+# the route-js ratchet: the head shipped more gzip than the baseline. Raising
+# the baseline is gate-weakening. Shrink the shared client module instead.
+_ROUTE_JS_SHIP = re.compile(
+    r'(?:##\[error\]|::error::)\s*(?P<route>/\S+) ships (?P<measured>\d+) KB gzip initial JS; '
+    r'its baseline is (?P<baseline>\d+) KB \(\+(?P<delta>\d+) KB\)')
+_PLAIN_BUTTON_SCOPE = re.compile(
+    r'Use Button from @jovie/ui\. PlainButton is only for the approved files')
+
+
+class RouteJsInitialGrowth:
+    """Shared-route gzip growth is a source shrink. Never raise the baseline."""
+
+    def search(self, text):
+        match = _ROUTE_JS_SHIP.search(_ANSI.sub('', str(text or '')))
+        if match is None or int(match['measured']) <= int(match['baseline']):
+            return None
+        return match
+
+
+class PlainButtonScopeFailure:
+    """An unapproved PlainButton is replaced in place. Never grow the allowlist."""
+
+    def search(self, text):
+        return _PLAIN_BUTTON_SCOPE.search(_ANSI.sub('', str(text or '')))
+
+
+ROUTE_JS_INITIAL = RouteJsInitialGrowth()
+PLAIN_BUTTON_SCOPE = PlainButtonScopeFailure()
+
+
+def route_js_shrink_decision(text):
+    """Repair record for a ships-N-KB annotation. None when it is not that failure."""
+    match = ROUTE_JS_INITIAL.search(text)
+    if match is None:
+        return None
+    return {
+        'route': match['route'],
+        'measuredKb': int(match['measured']),
+        'baselineKb': int(match['baseline']),
+        'deltaKb': int(match['delta']),
+        'repair': 'shrink-client-js',
+        'forbid': 'raise-baseline',
+    }
+
+
+def plain_button_decision(text):
+    """Repair record for the PlainButton scope guard. None when it did not fail.
+
+    plain-button-scope.json is already at maxFiles. A raw button fails the
+    component certificate, and Button rejects restyle classes. Use @jovie/ui
+    Button with layout-only classes.
+    """
+    if PLAIN_BUTTON_SCOPE.search(text) is None:
+        return None
+    return {'repair': 'replace-with-ui-button', 'forbid': 'grow-allowlist'}
 
 
 # Exact-head Coverage compares apps/web/scripts/route-render-modes.json with

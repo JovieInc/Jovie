@@ -3,6 +3,8 @@
 // must too: components list `router` in effect deps, and a fresh object per
 // render re-ran those effects forever (Maximum update depth in the
 // Storybook a11y lane, which then hung or lost the browser).
+import { usePathname as storybookUsePathname } from '@storybook/nextjs-vite/navigation.mock';
+
 const router = {
   push: () => Promise.resolve(true),
   replace: () => Promise.resolve(true),
@@ -29,7 +31,9 @@ const searchParams = new URLSearchParams();
 const params = {};
 
 export const useRouter = () => router;
-export const usePathname = () => '/test';
+// Let the installed framework's router context own per-story pathnames.
+// A fixed /test path suppresses app feedback even in app-shell error stories.
+export const usePathname = storybookUsePathname;
 export const useSearchParams = () => searchParams;
 export const useParams = () => params;
 export function redirect() {}

@@ -41,4 +41,58 @@ for (const story of ['dashboard', 'admin-dashboard', 'composed-history']) {
     for (const icon of column.icons) expect(icon).toBe(12);
     expect(column.brand).toBe(12);
   });
+
+  // Vertical optical line: the brand mark, the bell and the search icons
+  // must share one center at one size — a size or offset drift on any of
+  // them reads as the header sitting on two lines (founder note 2026-11-09:
+  // the x-only column guard let a 20px mark ship on a 16px icon row).
+  test(`${story} keeps the brand row on one vertical optical center`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `/iframe.html?id=organisms-unifiedsidebar--${story}&viewMode=story`,
+      { waitUntil: 'domcontentloaded' }
+    );
+    const row = page.locator('[data-sidebar-brand-row]');
+    await expect(row).toBeVisible({ timeout: 60_000 });
+    const geometry = await row.evaluate((rowEl: Element) => {
+      const center = (el: Element | null | undefined) => {
+        if (!el) return Number.NaN;
+        const box = el.getBoundingClientRect();
+        return box.y + box.height / 2;
+      };
+      const brandMark = rowEl.querySelector('svg');
+      const bellIcon = rowEl.querySelector('a svg');
+      const searchIcon = rowEl.querySelector('[data-app-search-trigger] svg');
+      const rowBox = rowEl.getBoundingClientRect();
+      return {
+        row: rowBox.y + rowBox.height / 2,
+        brandMark: center(brandMark),
+        bell: center(bellIcon),
+        search: center(searchIcon),
+        markSize: brandMark
+          ? Math.round(brandMark.getBoundingClientRect().width)
+          : Number.NaN,
+        navIconSize: document.querySelector(
+          'nav[aria-label="Dashboard Navigation"] a[data-navigation-item-id] svg'
+        )
+          ? Math.round(
+              document
+                .querySelector(
+                  'nav[aria-label="Dashboard Navigation"] a[data-navigation-item-id] svg'
+                )
+                .getBoundingClientRect().width
+            )
+          : Number.NaN,
+      };
+    });
+    const line = geometry.row;
+    expect(line).not.toBeNaN();
+    for (const center of [geometry.brandMark, geometry.bell, geometry.search]) {
+      expect(Math.abs(center - line)).toBeLessThanOrEqual(1);
+    }
+    // One scale, not just one center: the brand mark must match the nav
+    // icon size exactly (the 16px rail scale).
+    expect(geometry.markSize).toBe(geometry.navIconSize);
+  });
 }

@@ -152,12 +152,9 @@ describe('EntityHoverLink', () => {
 
 describe('EntityPopover source contract', () => {
   it('keeps floating surface chrome on the shared token', () => {
-    // Robust path: resolve relative to this test file (same dir as the source).
-    // Prevents cwd-dependent breakage (package vs repo root invocation contexts).
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
+    // Cwd-independent: package vs repo root invocation contexts.
     const source = readFileSync(
-      resolve(__dirname, 'EntityPopover.tsx'),
+      resolve(dirname(fileURLToPath(import.meta.url)), 'EntityPopover.tsx'),
       'utf8'
     );
 
@@ -165,6 +162,8 @@ describe('EntityPopover source contract', () => {
       "import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';"
     );
     expect(source).toContain('LINEAR_SURFACE.popover');
+    // The anchor widened to nullable (the close path clears it first).
+    expect(source).toContain('readonly anchor: HTMLElement | null');
     expect(source).toContain('system-b-brand-spotify-glyph');
     expect(source).not.toContain('#1DB954');
     expect(source).not.toContain("'rounded-lg border border-default'");

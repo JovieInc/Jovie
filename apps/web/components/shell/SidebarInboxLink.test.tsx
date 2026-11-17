@@ -65,11 +65,7 @@ describe('central Inbox bell', () => {
     expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
     expect(link).toHaveAttribute('data-prefetch', 'false');
-    expect(link.querySelector('span')).toHaveClass(
-      'absolute',
-      'bottom-1',
-      'right-1'
-    );
+    expect(link.querySelector('span')).toHaveClass('app-shell-count-badge');
     expect(link.querySelector('span')).not.toHaveClass('top-1');
     await userEvent.tab();
     expect(link).toHaveFocus();
@@ -91,7 +87,7 @@ describe('central Inbox bell', () => {
     }
   });
 
-  it('keeps one unread dot for pending work, bottom right of the glyph', () => {
+  it('earns one count badge from real pending work', () => {
     render(
       <SidebarInboxLink
         availability={{ state: 'available', pendingCount: 3 }}
@@ -100,12 +96,10 @@ describe('central Inbox bell', () => {
     const link = screen.getByRole('link', {
       name: 'Inbox — 3 Items Need Attention',
     });
-    expect(link.querySelectorAll('[data-inbox-unread]')).toHaveLength(1);
-    expect(link.querySelector('[data-inbox-unread]')).toHaveClass(
-      'absolute',
-      'bottom-1',
-      'right-1',
-      'bg-accent'
+    expect(link.querySelectorAll('[data-inbox-count]')).toHaveLength(1);
+    expect(link.querySelector('[data-inbox-count]')).toHaveTextContent('3');
+    expect(link.querySelector('[data-inbox-count]')).toHaveClass(
+      'app-shell-count-badge'
     );
   });
 
@@ -132,8 +126,30 @@ describe('central Inbox bell', () => {
       name: 'Inbox — 12840 Items Need Attention',
     });
     expect(link).toHaveClass('size-7');
+    expect(link.querySelector('[data-inbox-count]')).toHaveTextContent('99');
     expect(link.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps a zero or unavailable count quiet', () => {
+    const { rerender } = render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: 0 }}
+      />
+    );
+    expect(document.querySelector('[data-inbox-count]')).toBeNull();
+    rerender(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: null }}
+      />
+    );
+    expect(document.querySelector('[data-inbox-count]')).toBeNull();
+    rerender(
+      <SidebarInboxLink
+        availability={{ state: 'unknown', pendingCount: null }}
+      />
+    );
+    expect(document.querySelector('[data-inbox-count]')).toBeNull();
   });
 
   it('keeps the pending dot and name in a right-to-left sidebar', async () => {

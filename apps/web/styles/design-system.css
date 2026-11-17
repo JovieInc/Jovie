@@ -4613,3 +4613,23 @@ html:not(.dark) .smart-link-powered-by {
     border-radius: var(--profile-drawer-radius-desktop);
   }
 }
+
+/* Header inbox count. One class so the shared shell chunk does not ship the
+   long utility string on every /app route. Geometry matches the rail badge. */
+.app-shell-count-badge {
+  position: absolute;
+  top: -0.125rem;
+  right: -0.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-size: var(--app-shell-sidebar-badge-font-size);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}

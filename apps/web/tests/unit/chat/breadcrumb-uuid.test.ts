@@ -17,7 +17,7 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('library')).toBe('Work');
   });
 
-  it('returns "Inbox" for the app root segment', () => {
+  it('returns "Inbox" for the app root so the breadcrumb matches the header bell', () => {
     expect(getBreadcrumbLabel('app')).toBe('Inbox');
   });
 

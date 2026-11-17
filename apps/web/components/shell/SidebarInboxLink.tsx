@@ -24,7 +24,9 @@ export function SidebarInboxLink({
 }) {
   const pendingCount = availability?.pendingCount;
   const pending =
-    availability?.state === 'available' && typeof pendingCount === 'number';
+    availability?.state === 'available' &&
+    typeof pendingCount === 'number' &&
+    pendingCount > 0;
   const label = pending
     ? `Inbox — ${formatInboxPendingWorkLabel(pendingCount)}`
     : availability?.state === 'empty'
@@ -48,10 +50,12 @@ export function SidebarInboxLink({
         <Bell className={SIDEBAR_HEADER_ICON_CLASS} aria-hidden='true' />
         {pending ? (
           <span
-            data-inbox-unread='true'
+            data-inbox-count='true'
             aria-hidden='true'
-            className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
-          />
+            className='app-shell-count-badge'
+          >
+            {Math.min(pendingCount, 99)}
+          </span>
         ) : null}
       </Link>
     </Tooltip>
