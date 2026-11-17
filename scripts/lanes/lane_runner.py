@@ -67,7 +67,7 @@ import migration_renumber  # noqa: E402  (no-model fix for migration number coll
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
-import fix_red_compose  # noqa: E402
+import fix_red_compose, fix_red_mixed_repairs  # noqa: E401,E402
 import fix_red_size_split  # noqa: E402
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
@@ -177,7 +177,8 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
-                  "scripts/tests/test_size_500_stale.py",
+                  # Installed self-tests retain immutable Design evidence and stale-size routing fixtures.
+                  "scripts/tests/design_gate_git_evidence.py", "scripts/tests/test_size_500_stale.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_publication_cases.py",
@@ -7172,27 +7173,28 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
     return fix_red_failure_routing.classify_repair(host, pr, failed_logs, fix_red_classes.classify, gh_call, REPO_SLUG)
 
 
+def _publish_pr_body(host: Host, pr: dict, name: str, text: str) -> bool:
+    return fix_red_mixed_repairs.publish_pr_body(THIS, host, pr, name, text)
+
+
 def stamp_changelog_decision(host: Host, pr: dict) -> bool:
-    """Write the internal customer-changelog note onto the PR body. False when the body cannot
-    take one or GitHub rejects the edit (the model then gets the head)."""
-    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
-    if stamped is None:
-        return False
-    runs = host.state / "runs"
-    runs.mkdir(parents=True, exist_ok=True)
-    path = runs / f"changelog-{int(pr['number'])}.md"
-    atomic_write_text(path, stamped)
-    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
-                     priority="repair")
-    return edited.returncode == 0
+    return fix_red_mixed_repairs.stamp_changelog_decision(THIS, host, pr)
+
+
+def stamp_fleet_body(host: Host, pr: dict) -> str | None:
+    return fix_red_mixed_repairs.stamp_fleet_body(THIS, host, pr)
 
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
     if reason := fix_red_classes.first_route_reason(host, pr, route, claim_route):
         return reason
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
+    if not route or route["action"] not in {
+            fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG,
+            fix_red_classes.STAMP_REPAIR}:
         return None
+    if route["action"] == fix_red_classes.STAMP_REPAIR:
+        return stamp_fleet_body(host, pr)
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
         # No body, or a note already present: do not spend the once-per-head claim. An invalid
         # note is a different defect and still belongs to the model.
