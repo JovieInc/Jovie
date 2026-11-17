@@ -95,6 +95,51 @@ class RouteBudgetGrowth:
 ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
 
 
+# Exact-head Coverage compares apps/web/scripts/route-render-modes.json with
+# origin/main. A stale head keeps HTML bytes or a mode main already tightened
+# (#25599). Sync once; a loss that remains is a real regression, and claim_route
+# will not sync that head again. Never loosen the snapshot or add an override.
+_RENDER_SNAPSHOT_LINE = re.compile(
+    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:##\[error\]|::error::)\s?'
+    r'/\S+ baseline weakened: '
+    r'(?:html (?P<prev>\d+) -> (?P<next>\d+) bytes'
+    r'|render mode \S+ -> \S+'
+    r'|revalidate window \d+ s -> \d+ s)\b')
+
+
+def _snapshot_log_rejects(line):
+    """Another marked failure in the same log is a repair, not a stale snapshot."""
+    if '##[error]' in line and 'Process completed with exit code 1.' not in line:
+        return True
+    if '::error::' in line:
+        return True
+    if 'prerendered HTML grew' in line or 'lost cacheability' in line:
+        return True
+    return _OTHER_FAILURE.search(line) is not None
+
+
+class RenderModeSnapshotDrift:
+    """Sync main when the only coverage errors are inherited snapshot loosenings."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        matches = []
+        for raw in clean.splitlines():
+            line = _LOG_FAILED_PREFIX.sub('', raw, count=1)
+            match = _RENDER_SNAPSHOT_LINE.match(line)
+            if match:
+                nxt = match.group('next')
+                if nxt is not None and int(nxt) <= int(match.group('prev')):
+                    return None
+                matches.append(match)
+            elif _snapshot_log_rejects(line):
+                return None
+        return matches[0] if matches else None
+
+
+RENDER_MODE_SNAPSHOT = RenderModeSnapshotDrift()
+
+
 # PR Size Guard counts the PR head for repository hygiene and the merged tree
 # for the combined-tree budget. A head that has not yet merged a main prune
 # (drizzle snapshots, #25664) fails both while the live base tip is already

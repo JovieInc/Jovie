@@ -55,6 +55,16 @@ Native Debug/Release tests exercise local editing contracts. Physical input
 methods, VoiceOver and installed-Mac performance remain separate acceptance;
 source or app-hosted tests do not establish live native chat parity.
 
+## Hosted recovery lifetime (JOV-12806)
+
+`apps/desktop/src/renderer-recovery-unlatch.ts` owns one hosted recovery attempt.
+Restart, stop, hosted navigation, renderer boot and window disposal invalidate
+the old generation, cancel its timer and abort its reachability request. Late
+results cannot navigate or schedule another retry, even if a probe ignores
+cancellation. The existing `renderer-recovery.ts` policy and retry cadence remain
+the authority. Deferred-probe regressions in `renderer-recovery-unlatch.test.ts` exercise
+the consumed controller; source tests do not establish installed-app behavior.
+
 ## Transition plan
 
 **Swift-native, phased.** Ship the targeted Electron fixes first, extract shared

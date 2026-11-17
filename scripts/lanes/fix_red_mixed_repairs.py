@@ -8,16 +8,17 @@ from __future__ import annotations
 
 
 def promote_body_and_sync(cls, action, per_check):
-    """A red-before-green body beside only sync-main classes is not a model job.
+    """Repair body evidence beside only sync-main classes without a model.
 
     Body repair stays on the mixed path. The sync is the route, including when
     the branch is already BEHIND (that override would otherwise drop the body repair).
     """
     import fix_red_classes as classes
 
-    if "pr-body" not in {item_cls for item_cls, _ in per_check}:
+    body_classes = {"pr-body", "measured-win"}
+    if not body_classes.intersection(item_cls for item_cls, _ in per_check):
         return cls, action
-    rest = [item_action for item_cls, item_action in per_check if item_cls != "pr-body"]
+    rest = [item_action for item_cls, item_action in per_check if item_cls not in body_classes]
     if not rest or any(item_action != classes.SYNC_MAIN for item_action in rest):
         return cls, action
     return "mixed", classes.SYNC_MAIN

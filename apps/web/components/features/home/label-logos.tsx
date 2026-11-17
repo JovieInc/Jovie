@@ -158,7 +158,7 @@ export function DiscoWaxLogo({
       role='img'
       aria-label='disco:wax' // ui-casing-allow: brand lockup
       className={cn(
-        'inline-flex items-center justify-center select-none text-white/92',
+        'inline-flex items-center justify-center select-none text-on-media/92',
         className
       )}
     >
@@ -179,7 +179,7 @@ export function BlancoYNegroLogo({
       role='img'
       aria-label='Blanco y Negro' // ui-casing-allow: brand lockup
       className={cn(
-        'inline-flex items-center justify-center select-none text-white/92',
+        'inline-flex items-center justify-center select-none text-on-media/92',
         className
       )}
     >
@@ -200,7 +200,7 @@ export function RecPlayLogo({
       role='img'
       aria-label='rec play' // ui-casing-allow: brand lockup
       className={cn(
-        'inline-flex items-center justify-center select-none text-white/92',
+        'inline-flex items-center justify-center select-none text-on-media/92',
         className
       )}
     >

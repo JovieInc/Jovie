@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRecordShippedFixDeploys = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock('@/lib/recovery/probes.server', () => ({
+  recordShippedFixDeploys: mockRecordShippedFixDeploys,
+}));
+
 vi.mock('@/lib/env', () => ({
   env: new Proxy(
     {},
@@ -28,6 +36,19 @@ describe('@critical GET /api/health/build-info', () => {
     cwdSpy?.mockRestore();
     cwdSpy = undefined;
     vi.unstubAllEnvs();
+  });
+
+  it('never touches the recovery/DB hooks on the request path (JOV-12766)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+
+    // The public identity receipt is read by monitors on every probe; its
+    // request path must not kick off database work (the recovery deploy-time
+    // stamp runs from the instrumentation boot hook instead).
+    expect(mockRecordShippedFixDeploys).not.toHaveBeenCalled();
   });
 
   it('logs warning and returns fallback when build info read fails in production', async () => {

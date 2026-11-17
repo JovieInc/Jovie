@@ -153,7 +153,7 @@ describe('Mutation Diff sweep job runs packages/ui on a bounded slice', () => {
   );
   const sweep = workflow.slice(workflow.indexOf('\n  sweep:'));
   const step = sweep.slice(sweep.indexOf('- name: Score the next modules'));
-  const uiAt = step.indexOf('mutation-sweep.mjs --include packages/ui/');
+  const uiAt = step.indexOf('mutation-sweep.mjs --include "$UI_INCLUDE"');
   const webAt = step.indexOf('--touch-file');
 
   it('scores packages/ui before apps/web, in the same state file', () => {
@@ -161,7 +161,7 @@ describe('Mutation Diff sweep job runs packages/ui on a bounded slice', () => {
     expect(webAt).toBeGreaterThan(uiAt);
     const ui = step.slice(uiAt, step.indexOf('|| ui_status=$?'));
     expect(ui).toContain('--state "$state_dir/sweep-state.json"');
-    // Only the apps/web sweep drives chaining and baseline proposals.
+    // The rolling UI slice leaves chaining to apps/web; UI-only proposals are optional args.
     expect(ui).not.toContain('--github-output');
     expect(ui).not.toContain('--propose-baseline');
     expect(step.slice(uiAt, webAt)).toContain(
