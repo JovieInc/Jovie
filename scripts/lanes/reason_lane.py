@@ -795,7 +795,7 @@ def run_research(spec: dict, prompt: str, run=lifecycle.run) -> dict:
 
 # ---------------------------------------------------------------- linear + drain
 
-def queued_jobs(linear, label: str) -> list[dict]:
+def queued_jobs(linear, label: str, refresh=False) -> list[dict]:
     import lane_runner as lane
 
     def fetch():
@@ -803,7 +803,7 @@ def queued_jobs(linear, label: str) -> list[dict]:
                           'labels:{name:{eq:$l}}}){nodes{id identifier title description createdAt}}}', {"l": label})
         return sorted(data["issues"]["nodes"], key=lambda node: node["createdAt"])
 
-    jobs = lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
+    jobs = lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", 0 if refresh else lane.CLAIM_SCAN_TTL_S, fetch) or []
     return [job for job in jobs if has_job_block(job.get("description") or "")]
 
 
@@ -927,6 +927,7 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
         return result("linear-rate-limited", resetAt=error.reset_at)
     finally:
         lock.release()
+        _reason_dispatch.wake_pending(host, lane)
 
 
 def _ownership():
@@ -938,12 +939,12 @@ def schedule_tick(host, lane, spawn=None) -> dict:
     return _reason_dispatch.schedule_tick(host, lane, spawn=spawn)
 
 
-def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen) -> dict:
-    return _reason_dispatch.tick(host, lane, linear_factory, config or load_config(), queued_jobs=queued_jobs, spawn=spawn)
+def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen, refresh=False) -> dict:
+    return _reason_dispatch.tick(host, lane, linear_factory, config or load_config(), queued_jobs=queued_jobs, spawn=spawn, queue_refresh=refresh)
 
 
-def checked_tick(host, lane, linear_factory) -> dict:
-    return _reason_dispatch.checked_tick(host, lane, linear_factory, check=tick, now_iso=now_iso)
+def checked_tick(host, lane, linear_factory, event_file=None) -> dict:
+    return _reason_dispatch.checked_tick(host, lane, linear_factory, check=tick, now_iso=_reason_dispatch.now_iso, event_file=event_file)
 
 
 def guarded_main(argv: list[str] | None = None) -> int:
@@ -953,13 +954,14 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("drain")
-    sub.add_parser("tick")
+    tick_parser = sub.add_parser("tick")
+    tick_parser.add_argument("--event-file")
     one = sub.add_parser("run")
     one.add_argument("identifier")
     args = parser.parse_args(argv)
     host = lane.Host()
     if args.command == "tick":
-        receipt = checked_tick(host, lane, lambda: lane.Linear(host.linear_env))
+        receipt = checked_tick(host, lane, lambda: lane.Linear(host.linear_env), event_file=args.event_file)
         print(json.dumps(receipt))
         return 1 if receipt["status"] == "blocked" else 0
     if args.command == "drain":

@@ -1,5 +1,6 @@
 'use client';
 
+import { OtpDigitInput } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 interface SegmentedDigitBoxProps {
@@ -67,11 +68,8 @@ export function SegmentedDigitBox({
         'active:bg-(--profile-pearl-bg-hover)'
       )}
     >
-      <input
+      <OtpDigitInput
         ref={inputRef}
-        type='text'
-        inputMode='numeric'
-        pattern='[0-9]*'
         value={digit}
         onChange={e => onInputChange(index, e.target.value)}
         onKeyDown={e => onKeyDown(index, e)}
@@ -84,13 +82,7 @@ export function SegmentedDigitBox({
         aria-invalid={ariaInvalid}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
-        className={cn(
-          'absolute inset-0 h-full w-full bg-transparent text-center font-sans',
-          textSizeClassName,
-          'outline-none border-none',
-          'touch-manipulation [-webkit-tap-highlight-color:transparent]',
-          disabled && 'cursor-not-allowed'
-        )}
+        className={textSizeClassName}
       />
 
       {isCursor && (
