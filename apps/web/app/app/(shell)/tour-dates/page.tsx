@@ -16,7 +16,9 @@ import { TourDatesPageClient } from './TourDatesPageClient';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Tour Dates | Jovie',
+  // Title carries the route name only; the root layout template (`%s | Jovie`)
+  // supplies the single brand suffix.
+  title: 'Tour Dates',
   description: 'Manage tour dates and events',
 };
 

@@ -59,6 +59,7 @@ def deterministic_fixer(lane, action: str):
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
     import fix_red_size_500
     table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
+    table[fix_red_size_500.ACTION_EXTRACT] = fix_red_size_500.bind_self_growth(lane.sh, lane.failed_logs)
     import fix_red_biome
     table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
     return table.get(action)
@@ -125,6 +126,10 @@ def repair_files(cls, action, names, logs, per_check):
         import fix_red_size_500
         files = sorted(set(files) | set(fix_red_size_500.paths(
             "\n".join(logs.get(name) or "" for name in names))))
+    if cls == "size-500-self-growth":
+        from fix_red_source_edits import size_500_grew
+        grew = size_500_grew("\n".join(logs.get(name) or "" for name in names)) or []
+        files = sorted(set(files) | {path for path, _baseline in grew})
     if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
         from fix_red_biome import cited_paths
         files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))
