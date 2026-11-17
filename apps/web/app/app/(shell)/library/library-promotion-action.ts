@@ -13,7 +13,8 @@ export function buildPrivatePromotionAction(
     (asset.itemKind ?? 'release') !== 'release' ||
     asset.status === 'draft' ||
     asset.lifecycleStatus === 'archived'
-  ) return null;
+  )
+    return null;
   return {
     id: 'draft-promotion',
     label: 'Draft Private Promotion',

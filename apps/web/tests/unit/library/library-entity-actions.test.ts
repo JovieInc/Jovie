@@ -135,6 +135,21 @@ describe('library entity actions', () => {
     expect(onAskJovie).not.toHaveBeenCalled();
   });
 
+  it('opens only an eligible selected catalog work for private promotion', () => {
+    const openUrl = vi.fn();
+    const eligible = buildActions(buildAsset(), { openUrl });
+    eligible.find(action => action.id === 'draft-promotion')?.onExecute?.();
+    expect(openUrl).toHaveBeenCalledWith('/app/library?promotion=release-1');
+    for (const asset of [
+      buildAsset({ status: 'draft' }),
+      buildAsset({ lifecycleStatus: 'archived' }),
+    ]) {
+      expect(
+        buildActions(asset).some(action => action.id === 'draft-promotion')
+      ).toBe(false);
+    }
+  });
+
   it('builds release actions in one canonical order', () => {
     const actions = buildActions(buildAsset());
 
