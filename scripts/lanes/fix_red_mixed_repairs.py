@@ -6,6 +6,39 @@ is spent before the edit; a failed edit returns None so the model still runs thi
 """
 from __future__ import annotations
 
+from atomic_state import atomic_write_text
+
+
+def publish_pr_body(lane, host, pr: dict, name: str, text: str) -> bool:
+    """Write a prepared body through the owning runner's existing repair client."""
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"{name}-{int(pr['number'])}.md"
+    atomic_write_text(path, text)
+    edited = lane.gh_call(["pr", "edit", str(int(pr["number"])), "--repo", lane.REPO_SLUG,
+                           "--body-file", str(path)], priority="repair")
+    return edited.returncode == 0
+
+
+def stamp_changelog_decision(lane, host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = lane.fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    return lane._publish_pr_body(host, pr, "changelog", stamped)
+
+
+def stamp_fleet_body(lane, host, pr: dict) -> str | None:
+    """Stamp missing repair evidence once per head; a measured win stays with the model."""
+    body = pr.get("body")
+    if not isinstance(body, str) or lane.pr_events.red_section_complete(body):
+        return None
+    updated = lane.pr_events.repair_evidence_body(pr, body, "")
+    if updated == body or not lane.claim_route(host, pr, lane.fix_red_classes.STAMP_REPAIR):
+        return None
+    return "stamped-fleet-body" if lane._publish_pr_body(host, pr, "fleet-body", updated) else None
+
 
 def promote_body_and_sync(cls, action, per_check):
     """Repair body evidence beside only sync-main classes without a model.

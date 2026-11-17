@@ -1,10 +1,17 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildSingleRouteConfig,
   collectProductionRoutes,
+  createPnpmRouteAttemptExecutor,
   loadProductionCollectPlan,
 } from '../../lighthouse-production-collect.mjs';
 
@@ -302,5 +309,114 @@ describe('production Lighthouse per-route collect', () => {
     expect(result.code).toBe(1);
     expect(result.failureClass).toBe('unknown');
     expect(result.output).toContain('1/3 required reports');
+  });
+
+  it('discovers LHCI 0.16 report names (lhr-<timestamp>-<nanos>.json) through the real pnpm executor', async () => {
+    const root = makeTempDir();
+    const webRoot = join(root, 'web');
+    const reportsDir = join(webRoot, '.lighthouseci');
+    const executeRouteAttempt = createPnpmRouteAttemptExecutor({
+      webRoot,
+      repoRoot: root,
+      runAttempt: async () => {
+        mkdirSync(reportsDir, { recursive: true });
+        // Exact shape written by @lhci/utils 0.16 saveLHR.
+        for (const name of [
+          'lhr-1794892330451-539214.json',
+          'lhr-1794892346479-112358.json',
+          'lhr-1794892362001-424242.json',
+        ]) {
+          writeFileSync(join(reportsDir, name), '{}');
+        }
+        return { code: 0, output: 'Done running Lighthouse!' };
+      },
+    });
+
+    const result = await executeRouteAttempt({
+      url: 'https://jovie-abc-jovie.vercel.app/',
+      numberOfRuns: 3,
+      rawConfig: baseConfig(['https://jovie-abc-jovie.vercel.app/']),
+      timeoutMs: undefined,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.reportFiles).toHaveLength(3);
+    expect(result.reportDiscovery).toBeUndefined();
+  });
+
+  it('still discovers legacy LHCI 0.15 report names (lhr-<timestamp>.json)', async () => {
+    const root = makeTempDir();
+    const webRoot = join(root, 'web');
+    const reportsDir = join(webRoot, '.lighthouseci');
+    const executeRouteAttempt = createPnpmRouteAttemptExecutor({
+      webRoot,
+      repoRoot: root,
+      runAttempt: async () => {
+        mkdirSync(reportsDir, { recursive: true });
+        for (const name of [
+          'lhr-1794892330451.json',
+          'lhr-1794892346479.json',
+          'lhr-1794892362001.json',
+        ]) {
+          writeFileSync(join(reportsDir, name), '{}');
+        }
+        return { code: 0, output: 'Done running Lighthouse!' };
+      },
+    });
+
+    const result = await executeRouteAttempt({
+      url: 'https://jovie-abc-jovie.vercel.app/',
+      numberOfRuns: 3,
+      rawConfig: baseConfig(['https://jovie-abc-jovie.vercel.app/']),
+      timeoutMs: undefined,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.reportFiles).toHaveLength(3);
+  });
+
+  it('carries the reports-directory listing when a successful collect writes zero reports', async () => {
+    const root = makeTempDir();
+    const webRoot = join(root, 'web');
+    const reportsDir = join(webRoot, '.lighthouseci');
+    const configPath = join(root, 'config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify(baseConfig(['https://jovie-abc-jovie.vercel.app/']))
+    );
+    const executeRouteAttempt = createPnpmRouteAttemptExecutor({
+      webRoot,
+      repoRoot: root,
+      runAttempt: async () => {
+        mkdirSync(reportsDir, { recursive: true });
+        // lhci 0.16 that wrote nothing recognizable: only a non-report file.
+        writeFileSync(join(reportsDir, 'links.json'), '{}');
+        return { code: 0, output: 'Done running Lighthouse!' };
+      },
+    });
+    const report = vi.fn();
+
+    const result = await collectProductionRoutes({
+      configPath,
+      reportsDir: join(root, 'final'),
+      executeRouteAttempt,
+      estimatedRunMs: 1_000,
+      overheadMs: 0,
+      report,
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.failureClass).toBe('unknown');
+    expect(result.output).toContain('produced 0/3 required reports');
+    expect(result.output).toContain(
+      'Lighthouse report discovery found 0/3 lhr-*.json reports'
+    );
+    expect(result.output).toContain(join(webRoot, '.lighthouseci'));
+    expect(result.output).toContain('links.json');
+    expect(
+      report.mock.calls.some(call =>
+        String(call[0]).includes('Lighthouse report discovery found 0/3')
+      )
+    ).toBe(true);
   });
 });

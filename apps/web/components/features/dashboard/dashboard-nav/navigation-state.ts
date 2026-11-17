@@ -78,3 +78,33 @@ export function isNavigationItemActive(
 
   return true;
 }
+
+/** The rail's Inbox row; the header bell replaces it when it owns `/app`. */
+const INBOX_ROW_ID = 'home';
+
+/**
+ * Rail destinations for the current chrome. When the header bell owns the
+ * Inbox, the rail drops its Inbox row: the bell (with the unread dot) and
+ * New Chat already reach `/app` (Tim 2026-11-14).
+ */
+export function getRailNavigation<Item extends Pick<NavItem, 'id'>>(
+  items: readonly Item[],
+  headerOwnsInbox: boolean
+): readonly Item[] {
+  return headerOwnsInbox
+    ? items.filter(item => item.id !== INBOX_ROW_ID)
+    : items;
+}
+
+/**
+ * One selected row at a time. While a destination resolves it takes the
+ * selected paint and the still-current page yields it, so `/app` never shows
+ * Inbox and Audience highlighted together. `aria-current` stays on the page.
+ */
+export function isNavigationItemHighlighted(
+  itemId: string,
+  isActive: boolean,
+  pendingItemId: string | undefined
+): boolean {
+  return pendingItemId === undefined ? isActive : pendingItemId === itemId;
+}

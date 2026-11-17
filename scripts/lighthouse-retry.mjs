@@ -262,7 +262,7 @@ function formatDeadlineReceipt({
 
 /**
  * @param {object} options
- * @param {(attempt: number, meta: LighthouseAttemptMeta) => Promise<{ code: number; output?: string; timedOut?: boolean; reportFiles?: string[] }>} options.executeAttempt
+ * @param {(attempt: number, meta: LighthouseAttemptMeta) => Promise<{ code: number; output?: string; timedOut?: boolean; reportFiles?: string[]; reportDiscovery?: string }>} options.executeAttempt
  * @param {number} [options.maxAttempts]
  * @param {number} [options.cooldownMs]
  * @param {number | null} [options.deadlineMs]

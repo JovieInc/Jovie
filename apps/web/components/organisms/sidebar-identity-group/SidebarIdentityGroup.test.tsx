@@ -126,6 +126,19 @@ function getTabbableActions(group: HTMLElement) {
 }
 
 describe('SidebarIdentityGroup', () => {
+  it('preserves public profile access when Settings owns logout instead of the account menu', () => {
+    render(
+      <SidebarIdentityGroup
+        showAccountMenu={false}
+        profileHref={PROFILE_HREF}
+      />
+    );
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: PROFILE_LINK_NAME })
+    ).toHaveAttribute('href', PROFILE_HREF);
+    expect(screen.getByTestId(SIDEBAR_USER_PANEL_TEST_ID)).toBeInTheDocument();
+  });
   beforeEach(() => {
     pathnameMock.mockReturnValue('/app');
   });

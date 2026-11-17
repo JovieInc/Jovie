@@ -6,14 +6,17 @@ const { checkout } = vi.hoisted(() => ({ checkout: vi.fn() }));
 vi.mock('@/lib/queries', () => ({
   useCheckoutMutation: () => ({
     mutate: checkout,
+    reset: vi.fn(),
     isPending: false,
     error: null,
   }),
   usePricingOptionsQuery: () => ({
     data: {
+      priceLock: null,
       options: [
         {
           priceId: 'price_presence',
+          plan: 'pro',
           amount: 1200,
           currency: 'usd',
           interval: 'month',

@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   utimesSync,
   writeFileSync,
@@ -15,6 +16,12 @@ import {
   formatRecoveryLogLine,
   normalizePid,
 } from '../typecheck-singleflight-lock.mjs';
+import {
+  initReuseRepo,
+  isolatedGitEnv,
+  maxConcurrentOwners,
+  ownerScript,
+} from './fixtures/typecheck-singleflight-process.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..');
 const wrapper = resolve(repoRoot, 'scripts/typecheck-singleflight.mjs');
@@ -49,25 +56,6 @@ function wrapperEnv(stateDir, overrides = {}) {
   };
 }
 
-function ownerScript(durationMs) {
-  // Track concurrent live owners so we can prove singleflight serialization
-  // independently of completed-result reuse (commands/fingerprints differ by
-  // argv paths across helper variants).
-  return (
-    "const fs=require('node:fs');" +
-    'const marker=process.argv[1];' +
-    'const active=process.argv[2];' +
-    "const n=Number(fs.readFileSync(active,'utf8')||'0')+1;" +
-    'fs.writeFileSync(active,String(n));' +
-    "fs.appendFileSync(marker,'owner concurrent='+n+'\\n');" +
-    `setTimeout(()=>{` +
-    "const m=Number(fs.readFileSync(active,'utf8'))-1;" +
-    'fs.writeFileSync(active,String(m));' +
-    'process.exit(0);' +
-    `},${durationMs});`
-  );
-}
-
 function runWrapper(stateDir, marker, options = {}) {
   const durationMs = options.durationMs ?? 700;
   const active = resolve(stateDir, 'active.txt');
@@ -87,8 +75,8 @@ function runWrapper(stateDir, marker, options = {}) {
         active,
       ],
       {
-        cwd: repoRoot,
-        env: wrapperEnv(stateDir, options.env),
+        cwd: options.cwd ?? repoRoot,
+        env: isolatedGitEnv(wrapperEnv(stateDir, options.env)),
         stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
       }
     );
@@ -108,17 +96,6 @@ function runWrapper(stateDir, marker, options = {}) {
       resolveRun({ code, stdout, stderr, pid: child.pid })
     );
   });
-}
-
-function maxConcurrentOwners(markerPath) {
-  const lines = readFileSync(markerPath, 'utf8')
-    .trim()
-    .split('\n')
-    .filter(Boolean);
-  return lines.reduce((max, line) => {
-    const match = /concurrent=(\d+)/.exec(line);
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
 }
 
 function writeLock(stateDir, lock) {
@@ -519,24 +496,40 @@ describe('typecheck singleflight process integration', () => {
     // the suite's 5s window on a loaded runner, and an expired result is
     // rightly re-run (merge group 38354601053). This test proves reuse inside
     // the window, so make the window outlast any boot.
-    const env = { TYPECHECK_SINGLEFLIGHT_REUSE_WINDOW_MS: '600000' };
-    const first = await runWrapper(stateDir, marker, {
+    // Parallel contracts may change the real checkout's fingerprint.
+    const fixtureRoot = realpathSync(makeStateDir());
+    initReuseRepo(fixtureRoot);
+    const options = {
       durationMs: 50,
       capture: true,
-      env,
-    });
+      cwd: fixtureRoot,
+      env: {
+        TYPECHECK_SINGLEFLIGHT_REUSE_WINDOW_MS: '600000',
+        GIT_DIR: resolve(stateDir, 'foreign-git-dir'),
+      },
+    };
+    const first = await runWrapper(stateDir, marker, options);
     expect(first.code).toBe(0);
+    const firstReceipt = JSON.parse(
+      readFileSync(resolve(stateDir, 'result.json'), 'utf8')
+    );
+    expect(firstReceipt.repoRoot).toBe(fixtureRoot);
 
-    const second = await runWrapper(stateDir, marker, {
-      durationMs: 50,
-      capture: true,
-      env,
-    });
+    const second = await runWrapper(stateDir, marker, options);
     expect(second.code).toBe(0);
     expect(second.stderr).toContain('reused completed');
     expect(second.stderr).toContain('phase=reuse');
     // Reuse must not re-execute the owner command.
     expect(readFileSync(marker, 'utf8').trim().split('\n')).toEqual([
+      'owner concurrent=1',
+    ]);
+
+    writeFileSync(resolve(fixtureRoot, 'input.txt'), 'changed input\n');
+    const changed = await runWrapper(stateDir, marker, options);
+    expect(changed.code).toBe(0);
+    expect(changed.stderr).not.toContain('reused completed');
+    expect(readFileSync(marker, 'utf8').trim().split('\n')).toEqual([
+      'owner concurrent=1',
       'owner concurrent=1',
     ]);
   });
