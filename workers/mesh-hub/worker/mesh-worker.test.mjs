@@ -44,11 +44,12 @@ const message = id => ({
   correlationId: id,
 });
 test('SSH retains actual executor and shell-quotes trusted config without credential transfer', () => {
+  const output = join(state, 'output');
   const command = worker.executorCommand(
     '/actual/codex',
-    ['exec', '-o', '/tmp/output'],
+    ['exec', '-o', output],
     "/path/with quote's",
-    '/tmp/output',
+    output,
     'timwhite@100.106.27.46'
   );
   assert.equal(command.binary, '/usr/bin/ssh');
