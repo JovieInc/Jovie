@@ -29,7 +29,7 @@ it('saves edited copy for the exact selected work and reopens the returned priva
   fireEvent.change(screen.getByRole('textbox'), {
     target: { value: 'The creator’s own detail' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare caption' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
   const copy = screen.getByRole('textbox');
   expect((copy as HTMLTextAreaElement).value).toContain(
     'https://example.test/selected'
