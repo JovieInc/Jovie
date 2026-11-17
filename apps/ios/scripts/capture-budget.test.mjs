@@ -87,9 +87,12 @@ test('withDeadline passes the underlying result and rejection through', async ()
   );
 });
 
-test('withDeadline rejects with a named error when the work outlives the deadline', async () => {
+test('withDeadline rejects with a named error when the work outlives the deadline', async t => {
+  // Real 250ms waits fail test-hygiene (real-sleep). The test clock fires the
+  // 50ms deadline and leaves the later completion pending.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const startedAt = Date.now();
-  await assert.rejects(
+  const pending = assert.rejects(
     withDeadline(
       new Promise(done => setTimeout(() => done('late'), 250)),
       50,
@@ -100,6 +103,8 @@ test('withDeadline rejects with a named error when the work outlives the deadlin
       return true;
     }
   );
+  t.mock.timers.tick(50);
+  await pending;
   assert.ok(Date.now() - startedAt < 200);
 });
 
