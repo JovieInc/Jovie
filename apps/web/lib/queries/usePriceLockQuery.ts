@@ -5,6 +5,8 @@
 import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { FetchError, fetchWithTimeout } from './fetch';
 
+export { applyPriceLockToOptions } from '@/lib/billing/price-lock-view';
+
 /** Null when there is no lock to apply; any outage fails the query. */
 export async function fetchPriceLock({
   signal,

@@ -5,7 +5,7 @@ import { pricingOptionsQueryOptions } from '@/lib/queries/usePricingOptionsQuery
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.doUnmock('@/lib/queries/price-lock-pricing');
+  vi.doUnmock('@/lib/queries/usePriceLockQuery');
   vi.resetModules();
 });
 
@@ -82,7 +82,7 @@ describe('pricingOptionsQueryOptions', () => {
 
   it('starts the raw read while lock tooling is still loading', async () => {
     const gate = Promise.withResolvers<void>();
-    vi.doMock('@/lib/queries/price-lock-pricing', async importOriginal => {
+    vi.doMock('@/lib/queries/usePriceLockQuery', async importOriginal => {
       await gate.promise;
       return importOriginal();
     });
@@ -96,7 +96,7 @@ describe('pricingOptionsQueryOptions', () => {
   });
 
   it('rejects a module-load failure without returning list pricing', async () => {
-    vi.doMock('@/lib/queries/price-lock-pricing', () => {
+    vi.doMock('@/lib/queries/usePriceLockQuery', () => {
       throw new Error('lock tooling unavailable');
     });
     respond();
@@ -132,7 +132,7 @@ describe('pricingOptionsQueryOptions', () => {
 
   it('fails closed when canceled before the lock module loads', async () => {
     const gate = Promise.withResolvers<void>();
-    vi.doMock('@/lib/queries/price-lock-pricing', async importOriginal => {
+    vi.doMock('@/lib/queries/usePriceLockQuery', async importOriginal => {
       await gate.promise;
       return importOriginal();
     });

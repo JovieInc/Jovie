@@ -55,7 +55,7 @@ async function fetchPricingOptions({
   signal?: AbortSignal;
 }): Promise<PricingOptionsResponse> {
   // Apply the lock here; a lock read failure fails the query, never a list price.
-  const lockTools = import('./price-lock-pricing');
+  const lockTools = import('./usePriceLockQuery');
   const [raw, priceLock, tools] = await Promise.all([
     fetchPricingOptionsRaw({ signal }),
     lockTools.then(module => module.fetchPriceLock({ signal })),
