@@ -373,3 +373,91 @@ def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
         kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
         return [f"agent-declined:{kind}:{declined[:160]}"]
     return ["no-change:agent-ended-without-push"]
+
+
+# A sync-main claim is written before update-branch returns. A crash after the
+# claim and before synced.json leaves the head with the model, so the no-model
+# route never runs. One absent receipt may retry. A recorded failure, including
+# a conflict, stays claimed. An unreadable ledger never releases a held claim.
+SYNC_UNRECORDED = "sync-main-unrecorded"
+SYNC_UNRECORDED_CAP = 1
+
+
+def _unrecorded_retries(row: dict) -> int:
+    retries = row.get(SYNC_UNRECORDED)
+    if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
+        return 0
+    return retries
+
+
+def sync_claim_decision(row, receipt_state: str, head: str):
+    """Return ('run'|'skip', next_row) for one class-routes.json PR entry.
+
+    'run' calls update-branch. 'skip' leaves the head with the model: the
+    receipt already names this head, the ledger is unreadable while a claim
+    is held, or an absent receipt was already retried once.
+    """
+    current = dict(row) if isinstance(row, dict) else {}
+    if (not isinstance(head, str) or not head
+            or receipt_state not in {"recorded", "absent", "unreadable"}):
+        return "skip", current
+    held = current.get("sync-main") == head
+    retries = _unrecorded_retries(current) if held else 0
+    if receipt_state == "recorded" or (receipt_state == "unreadable" and held):
+        current["sync-main"] = head
+        if not held:
+            current.pop(SYNC_UNRECORDED, None)
+        return "skip", current
+    if held and retries >= SYNC_UNRECORDED_CAP:
+        current["sync-main"] = head
+        current[SYNC_UNRECORDED] = retries
+        return "skip", current
+    current["sync-main"] = head
+    if held:
+        current[SYNC_UNRECORDED] = retries + 1
+    else:
+        current.pop(SYNC_UNRECORDED, None)
+    return "run", current
+
+
+def _sync_receipt_state(host, key: str, head) -> str:
+    path = host.state / "synced.json"
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        return "absent"
+    except OSError:
+        return "unreadable"
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return "unreadable"
+    if not isinstance(data, dict):
+        return "unreadable"
+    receipt = data.get(key)
+    if isinstance(receipt, dict) and receipt.get("from") == head:
+        return "recorded"
+    return "absent"
+
+
+def take_sync_main(host, pr, cls, update_json, sync_main, runner, now: float):
+    """Claim sync-main. Retry once when that claim never wrote a receipt."""
+    head = pr.get("headRefOid")
+    if not isinstance(head, str) or not head:
+        return None
+    decision = "skip"
+
+    def change(data: dict) -> None:
+        nonlocal decision
+        key = str(pr["number"])
+        decision, data[key] = sync_claim_decision(
+            data.get(key), _sync_receipt_state(host, key, head), head)
+
+    try:
+        update_json(host.state / "class-routes.json", change)
+    except (OSError, ValueError):
+        return None
+    if decision != "run":
+        return None
+    verdict = sync_main(host, runner, pr, now, terminal_ok=True)
+    return f"infra-rerun:{cls}" if verdict == "synced" else None

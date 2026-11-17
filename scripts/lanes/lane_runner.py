@@ -7207,12 +7207,12 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
         import quota_rerun
         return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
-    # One rerun per head, shared with the platform-red gate above; one sync per head.
-    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
+    # One rerun per head. An unrecorded sync claim is retried once, then the model.
+    if route["action"] == fix_red_classes.SYNC_MAIN:
+        return fix_red_failure_routing.take_sync_main(host, pr, route["cls"], update_json, pr_events.sync_main, THIS, time.time())
+    if not claim_infra_rerun(host, pr):
         return None
-    if route["action"] == fix_red_classes.RERUN:
-        return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
-    return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
+    return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
 
 # Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
 # runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
