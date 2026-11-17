@@ -48,7 +48,8 @@ export function shouldShowInboxNavigation(
 
 /** Count-aware pending-work label — a lone item stays singular. */
 export function formatInboxPendingWorkLabel(pendingCount: number): string {
-  return pendingCount === 1
-    ? '1 Item Needs Attention'
-    : `${pendingCount} Items Need Attention`;
+  const phrase =
+    pendingCount === 1 ? 'Item Needs Attention' : 'Items Need Attention';
+
+  return `${pendingCount} ${phrase}`;
 }

@@ -176,6 +176,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
 
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
@@ -185,9 +187,23 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Validate current-week invariant stewardship state
-        # Pure node + checked-in evidence. No external API calls, database,
-        # queue, credentials, or package install.
-        run: node scripts/invariant-stewardship/audit.mjs | tee invariant-stewardship-audit.json
+        shell: bash
+        # Git source facts only; temporary evidence never advances policy/history.
+        run: |
+          : "${GITHUB_REPOSITORY:?source repository missing}"
+          if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo '::error::Stewardship source revision does not match checked-out HEAD' >&2
+            exit 1
+          fi
+          if ! git diff --quiet "$GITHUB_SHA" -- canon/invariants.jsonl; then
+            echo '::error::Canonical source differs from checked-out revision' >&2
+            exit 1
+          fi
+          node scripts/invariant-stewardship/audit.mjs --regenerate \
+            --event-kind source-change \
+            --event-id "git:$GITHUB_REPOSITORY:$GITHUB_SHA" \
+            --event-revision "$GITHUB_SHA" > invariant-stewardship.source-bound.json
+          node scripts/invariant-stewardship/audit.mjs --input invariant-stewardship.source-bound.json | tee invariant-stewardship-audit.json
 
       - name: Project and audit performance invariants
         # JOV-INV-026. Receipt only; do not steal the Kimi remediator.
@@ -198,6 +214,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: invariant-stewardship-${{ github.run_id }}
-          path: invariant-stewardship-audit.json
+          path: |
+            invariant-stewardship-audit.json
+            invariant-stewardship.source-bound.json
           retention-days: 30
           if-no-files-found: error
