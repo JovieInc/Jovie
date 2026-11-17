@@ -32,6 +32,7 @@ ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 def test_staging_controller_is_independent_and_exact_sha() -> None:
     staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
     production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
+    identity_reader = (REPO_ROOT / ".github/scripts/staging-identity-read.sh").read_text()
     assert "workflows: [CI]" in staging
     assert "group: staging-mutation" in staging
     assert "outcome=not_applicable" in staging
@@ -40,7 +41,11 @@ def test_staging_controller_is_independent_and_exact_sha() -> None:
     assert "fleet-promotion" not in staging
     assert "release_mode: production" in production
     assert 'staging_receipt_sha="$web_evidence_sha"' in production
-    assert "https://staging.jov.ie/api/health/build-info" in production
+    assert production.count("bash .github/scripts/staging-identity-read.sh") == 3
+    assert (
+        'url="${STAGING_IDENTITY_URL:-https://staging.jov.ie/api/health/build-info}"'
+        in identity_reader
+    )
 
 
 def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
