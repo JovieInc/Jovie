@@ -49,3 +49,11 @@ earns the mark — that may be a local Codex CLI lane.
 
 UI. The Ovie shipping screen and any Jovie presentation render `TrackingTask`
 rows; their design lives elsewhere (Pen, per the shipping-display IA).
+
+## Workspace directory
+
+This package is checked out at `apps/web/packages/shipping-state-contracts`.
+Source Validation classifies the diff with the product-lane classifier on
+`origin/main`, which maps `apps/web/**` and does not map a new
+`packages/<name>/` tree. A move to `packages/shipping-state-contracts` waits
+until that classifier rule is on main.
