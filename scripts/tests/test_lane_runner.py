@@ -8412,6 +8412,7 @@ class FixRedTest(unittest.TestCase):
         self.assertIn("conflicts with main", prompt)
         self.assertIn("renumber yours", prompt)
         self.assertIn("merge_additive_identifier_list", prompt)
+        self.assertIn("resolve_complementary_destructure_text", prompt)
 
     def test_a_pushed_fix_records_pending_intent_without_publishing_unverified_head(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt

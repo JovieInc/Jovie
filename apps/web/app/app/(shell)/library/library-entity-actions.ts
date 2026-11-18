@@ -1,4 +1,6 @@
+import { defaultCopyText, defaultOpenUrl } from './library-browser-actions';
 import { buildLibraryAskJovieDraft } from './library-chat-context';
+import { buildPrivatePromotionAction } from './library-promotion-action';
 
 export { buildLibraryAskJovieDraft } from './library-chat-context';
 
@@ -45,6 +47,7 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-primary',
   'copy',
   'ask-jovie',
+  'draft-promotion',
   'archive',
   'restore',
 ] as const;
@@ -182,14 +185,6 @@ function buildProfileVisibilityAction({
       } satisfies LibraryEntityAction;
     }),
   };
-}
-
-function defaultOpenUrl(url: string): void {
-  globalThis.open(url, '_blank', 'noopener,noreferrer');
-}
-
-function defaultCopyText(value: string): void {
-  void globalThis.navigator?.clipboard?.writeText(value);
 }
 
 function buildApprovalActions({
@@ -449,6 +444,13 @@ export function buildLibraryEntityActions({
     },
   });
 
+  const promotionAction = buildPrivatePromotionAction(
+    asset,
+    profileId,
+    openUrl
+  );
+  if (promotionAction) actions.push(promotionAction);
+
   const lifecycleAction = buildLifecycleAction({
     asset,
     profileId,
@@ -486,9 +488,7 @@ function toContextMenuItem(action: LibraryEntityAction): ContextMenuItemType {
     disabled: action.disabled,
     subText: action.disabledReason,
     destructive: action.destructive,
-    onClick: () => {
-      void action.onExecute?.();
-    },
+    onClick: () => void action.onExecute?.(),
   };
 }
 
