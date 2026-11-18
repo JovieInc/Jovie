@@ -5,11 +5,15 @@ import { isDeepStrictEqual } from 'node:util';
 import { isChatMerchGenerationResult } from '@/components/jovie/components/ChatMerchCard';
 import { isChatMerchDesignCarouselResult } from '@/components/jovie/components/ChatMerchDesignCarousel';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
-import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
+import {
+  isMerchSourceSelectionOutput,
+  mobileMerchEventFromResult,
+} from '@/lib/mobile/chat/merch-tool-events';
 
 export const MOBILE_MERCH_ARTIFACT_TOOL_NAMES = new Set([
   'createMerch',
   'previewMerchOptions',
+  'findMerchSources',
 ]);
 
 export function isMobileMerchArtifactOutput(
@@ -17,7 +21,8 @@ export function isMobileMerchArtifactOutput(
 ): output is Record<string, unknown> {
   return (
     isChatMerchGenerationResult(output) ||
-    isChatMerchDesignCarouselResult(output)
+    isChatMerchDesignCarouselResult(output) ||
+    isMerchSourceSelectionOutput(output)
   );
 }
 
@@ -95,24 +100,11 @@ export function mobileMerchToolEventsFromResults(
   }>
 ): PersistedToolEvent[] {
   return toolResults
-    .filter(result => MOBILE_MERCH_ARTIFACT_TOOL_NAMES.has(result.toolName))
-    .map(result => {
-      const config = getToolUiConfig(result.toolName);
-      const output =
-        result.output &&
-        typeof result.output === 'object' &&
-        !Array.isArray(result.output)
-          ? (result.output as Record<string, unknown>)
-          : undefined;
-
-      return {
-        schemaVersion: 2 as const,
-        toolCallId: result.toolCallId,
-        toolName: result.toolName,
-        state: 'succeeded' as const,
-        output,
-        retryable: false,
-        uiHint: config.uiHint,
-      };
-    });
+    .map(result => ({
+      toolName: result.toolName,
+      toolCallId: result.toolCallId,
+      output: result.output,
+    }))
+    .map(mobileMerchEventFromResult)
+    .filter((event): event is PersistedToolEvent => event !== null);
 }

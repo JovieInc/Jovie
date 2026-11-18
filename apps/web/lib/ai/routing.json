@@ -103,11 +103,10 @@
       "id": "ci.golden-path-review",
       "label": "Golden path recorded visual review (CI vision screening)",
       "repo": "JovieInc/Jovie",
-      "route": "workers-first",
-      "fallback": "gateway",
-      "models": ["zai/glm-5.3-flash"],
-      "gatewayKey": "jovie-golden-path-review",
-      "gatewayUsdPerDayMax": 0.1
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": null
     },
     {
       "id": "dev.evals",

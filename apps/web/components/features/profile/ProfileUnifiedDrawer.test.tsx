@@ -267,4 +267,22 @@ describe('ProfileUnifiedDrawer', () => {
     expect(section).toHaveAttribute('data-credit-segments', '');
     expect(section).toHaveAttribute('data-contacts', '');
   });
+
+  it('keeps the unsubscribe control a non-submitting button that calls back', () => {
+    const onUnsubscribe = vi.fn();
+    render(
+      <ProfileUnifiedDrawer
+        {...baseProps}
+        view='notifications'
+        onUnsubscribe={onUnsubscribe}
+      />
+    );
+
+    const unsubscribe = screen.getByRole('button', {
+      name: /turn off notifications/i,
+    });
+    expect(unsubscribe).toHaveAttribute('type', 'button');
+    unsubscribe.click();
+    expect(onUnsubscribe).toHaveBeenCalledTimes(1);
+  });
 });

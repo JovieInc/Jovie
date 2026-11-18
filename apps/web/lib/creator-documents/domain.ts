@@ -12,6 +12,9 @@ export const saveIdeaInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   body: z.string().trim().min(1).max(100_000),
   idempotencyKey: z.string().trim().min(8).max(200),
+  catalogSelection: z
+    .object({ profileId: z.string().uuid(), releaseId: z.string().uuid() })
+    .optional(),
 });
 
 export const saveRevisionInputSchema = z.object({

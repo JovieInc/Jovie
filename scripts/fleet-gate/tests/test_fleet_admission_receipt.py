@@ -823,22 +823,22 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
 
     def test_absent_main_gate_uses_recent_ci_for_production_admission(self):
         """JOV-8148: reach deployment projection during gate materialization."""
-        def github_response(_repo, endpoint):
-            if endpoint == "branches/main":
-                return {"commit": {"sha": SHA}}
-            if endpoint == f"commits/{SHA}/status":
-                return {"state": "pending"}
-            if endpoint.startswith(f"commits/{SHA}/check-runs?"):
-                return {"check_runs": []}
-            if endpoint.startswith("actions/artifacts?"):
-                return {"artifacts": []}
-            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+        responses = {
+            "branches/main": {"commit": {"sha": SHA}},
+            f"commits/{SHA}/status": {"state": "pending"},
+            f"commits/{SHA}/check-runs?": {"check_runs": []},
+            "actions/artifacts?": {"artifacts": []},
+        }
 
-        for conclusion, integrity, allowed in (
-            ("success", "clear", True),
-            ("failure", "clear", False),
-            (None, "clear", False),
-            ("success", "active", False),
+        def github_response(_repo, endpoint):
+            path, query, _ = endpoint.partition("?")
+            return responses[path + query]
+
+        for conclusion, integrity, blockers in (
+            ("success", "clear", set()),
+            ("failure", "clear", {"main"}),
+            (None, "clear", {"main"}),
+            ("success", "active", {"global-integrity"}),
         ):
             with self.subTest(conclusion=conclusion, integrity=integrity):
                 fallback = {
@@ -846,27 +846,27 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                     "conclusion": conclusion, "completedAt": now_iso(),
                     "source": "ancestor-ci-workflow-job", "ancestorSha": "b" * 40,
                 } if conclusion else None
+                waits = [mock.call(5)] * 12 if fallback is None else []
                 with (
+                    mock.patch.dict(os.environ, {"FLEET_GATE_RELEASE_READY_POLL_SECONDS": ""}),
+                    mock.patch.object(GATE_MODULE, "time") as clock,
                     mock.patch.object(GATE_MODULE, "gh_json", side_effect=github_response),
                     mock.patch.object(GATE_MODULE, "observe_main_release_ready_jobs", return_value=[]),
-                    mock.patch.object(GATE_MODULE, "observe_recent_real_release_ready", return_value=fallback),
+                    mock.patch.object(GATE_MODULE, "observe_recent_real_release_ready", return_value=fallback) as recent,
                 ):
+                    clock.sleep.side_effect = [None] * len(waits)
+                    clock.monotonic.side_effect = lambda: sum(call.args[0] for call in clock.sleep.call_args_list)
                     main = GATE_MODULE.observe_main("JovieInc/Jovie")
+                self.assertEqual(clock.sleep.call_args_list, waits)
+                self.assertEqual(recent.call_count, len(waits) + 1)
                 receipt = evaluate_receipt(
-                    main=main, production=production_health("green"),
-                    integrity={"status": integrity},
+                    main=main, production=production_health("green"), integrity={"status": integrity}
                 )
-                projected = PROJECT.project_fleet_admission_receipt(
-                    receipt, scoped_request(risk_lane="high")
-                )
-                admission = projected["scopedAdmission"]
-                self.assertEqual(admission["allowed"], allowed)
+                projection = PROJECT.project_fleet_admission_receipt(receipt, scoped_request(risk_lane="high"))
+                admission = projection["scopedAdmission"]
+                self.assertEqual(admission["allowed"], not blockers)
                 self.assertEqual(admission["revision"], SHA)
-                if not allowed:
-                    self.assertEqual(
-                        {row["signal"] for row in admission["relevantBlockers"]},
-                        {"global-integrity"} if integrity == "active" else {"main"},
-                    )
+                self.assertEqual({row["signal"] for row in admission["relevantBlockers"]}, blockers)
 
     def test_pending_screenshot_check_never_blocks_promotion(self):
         """The incident shape: optional pending lane stays observable only."""

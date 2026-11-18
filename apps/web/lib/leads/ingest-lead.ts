@@ -37,6 +37,45 @@ export interface LeadIngestionResult {
   reason?: PagelessLeadSkipReason;
 }
 
+export type EvidenceQueueOutcome =
+  | { status: 'accepted'; jobId: string }
+  | { status: 'no_source' | 'not_accepted' | 'failed'; jobId: null };
+
+export interface LeadEvidenceRefreshResult {
+  status: 'accepted' | 'partial' | 'failed' | 'no_source';
+  /** Compatibility fields: true only with an acknowledged queue job ID. */
+  musicFetch: boolean;
+  dspDiscovery: boolean;
+  jobs: {
+    musicFetch: EvidenceQueueOutcome;
+    dspDiscovery: EvidenceQueueOutcome;
+  };
+  surfaces:
+    | { status: 'reconciled'; surfaces: number; sources: number }
+    | { status: 'failed' };
+}
+
+async function collectQueueReceipt(
+  enqueue: (() => Promise<string | null>) | null,
+  message: string,
+  leadId: string
+): Promise<EvidenceQueueOutcome> {
+  if (!enqueue) return { status: 'no_source', jobId: null };
+  try {
+    const jobId = await enqueue();
+    if (jobId) return { status: 'accepted', jobId };
+    // Null does not prove a deduplicated job exists. The queue returns an ID
+    // for a known existing job; do not manufacture acceptance without one.
+    await captureError(message, new Error('Queue returned no job receipt'), {
+      leadId,
+    });
+    return { status: 'not_accepted', jobId: null };
+  } catch (error) {
+    await captureError(message, error, { leadId });
+    return { status: 'failed', jobId: null };
+  }
+}
+
 /**
  * Collect the evidence certification reads for a lead-built profile:
  * project its links into profile surfaces and start DSP enrichment.
@@ -46,7 +85,7 @@ export interface LeadIngestionResult {
 export async function refreshLeadProfileEvidence(
   profileId: string,
   lead: Pick<Lead, 'id' | 'spotifyUrl'>
-): Promise<{ musicFetch: boolean; dspDiscovery: boolean }> {
+): Promise<LeadEvidenceRefreshResult> {
   const [createdProfile] = await db
     .select({
       spotifyUrl: creatorProfiles.spotifyUrl,
@@ -56,43 +95,78 @@ export async function refreshLeadProfileEvidence(
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
+  if (!createdProfile) throw new Error('Lead profile not found');
+
   const leadArtistId = lead.spotifyUrl
     ? extractSpotifyArtistId(lead.spotifyUrl)
     : null;
   const spotifyUrl =
-    createdProfile?.spotifyUrl ?? (leadArtistId ? lead.spotifyUrl : null);
-  const spotifyId = createdProfile?.spotifyId ?? leadArtistId;
+    createdProfile.spotifyUrl ?? (leadArtistId ? lead.spotifyUrl : null);
+  const spotifyId = createdProfile.spotifyId ?? leadArtistId;
 
+  let surfaces: LeadEvidenceRefreshResult['surfaces'];
   try {
-    await reconcileProfileSurfaces(profileId);
+    surfaces = {
+      status: 'reconciled',
+      ...(await reconcileProfileSurfaces(profileId)),
+    };
   } catch (err) {
+    surfaces = { status: 'failed' };
     await captureError('Lead profile surface reconcile failed', err, {
       leadId: lead.id,
     });
   }
 
-  if (spotifyUrl) {
-    void enqueueMusicFetchEnrichmentJob({
-      creatorProfileId: profileId,
-      spotifyUrl,
-    }).catch(err =>
-      captureError('MusicFetch enrichment enqueue failed for lead', err, {
-        leadId: lead.id,
-      })
+  // Await durable acceptance, not provider execution. These are independent;
+  // one rejection must not discard the other job's receipt.
+  const [musicFetch, dspDiscovery] = await Promise.all([
+    collectQueueReceipt(
+      spotifyUrl
+        ? () =>
+            enqueueMusicFetchEnrichmentJob({
+              creatorProfileId: profileId,
+              spotifyUrl,
+            })
+        : null,
+      'MusicFetch enrichment enqueue failed for lead',
+      lead.id
+    ),
+    collectQueueReceipt(
+      spotifyId
+        ? () =>
+            enqueueDspArtistDiscoveryJob({
+              creatorProfileId: profileId,
+              spotifyArtistId: spotifyId,
+              targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+            })
+        : null,
+      'DSP discovery enqueue failed for lead',
+      lead.id
+    ),
+  ]);
+  const jobs = { musicFetch, dspDiscovery };
+  const hasAcceptedJob = Object.values(jobs).some(
+    job => job.status === 'accepted'
+  );
+  const hasFailure =
+    surfaces.status === 'failed' ||
+    Object.values(jobs).some(
+      job => job.status === 'failed' || job.status === 'not_accepted'
     );
+  let status: LeadEvidenceRefreshResult['status'];
+  if (hasFailure) {
+    status =
+      hasAcceptedJob || surfaces.status === 'reconciled' ? 'partial' : 'failed';
+  } else {
+    status = hasAcceptedJob ? 'accepted' : 'no_source';
   }
-  if (spotifyId) {
-    void enqueueDspArtistDiscoveryJob({
-      creatorProfileId: profileId,
-      spotifyArtistId: spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-    }).catch(err =>
-      captureError('DSP discovery enqueue failed for lead', err, {
-        leadId: lead.id,
-      })
-    );
-  }
-  return { musicFetch: Boolean(spotifyUrl), dspDiscovery: Boolean(spotifyId) };
+  return {
+    status,
+    musicFetch: musicFetch.status === 'accepted',
+    dspDiscovery: dspDiscovery.status === 'accepted',
+    jobs,
+    surfaces,
+  };
 }
 
 /**

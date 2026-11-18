@@ -8,6 +8,7 @@ import {
   EmptyState,
   type EmptyStateProps,
 } from '@/components/molecules/EmptyState';
+import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
@@ -15,6 +16,7 @@ import {
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import {
   getInsightsEmptyCopy,
   type InsightsEmptyCopy,
@@ -301,7 +303,14 @@ export function InsightsPanelView({
 
   const toolbar = (
     <PageToolbar
-      start={null}
+      start={
+        <RouteSegmentControl
+          value='insights'
+          aria-label='Audience Workspace'
+          className='max-w-72'
+          options={getAudienceWorkspaceNavigation()}
+        />
+      }
       end={
         <PageToolbarActionButton
           ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}

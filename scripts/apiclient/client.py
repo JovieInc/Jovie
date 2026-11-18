@@ -12,6 +12,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Callable, Optional
 from urllib.parse import urlsplit
 
@@ -102,6 +103,18 @@ def _log_stderr(event: dict) -> None:
     sys.stderr.write(json.dumps(event) + "\n")
 
 
+def _model_pool_gate(provider: str, url: str, text_body: Optional[str]) -> None:
+    """Anthropic models never leave through a metered pool (scripts/lanes/model-pools.json). Every model
+    request made through this client is checked before any budget is reserved or byte sent."""
+    if text_body is None or '"model"' not in text_body:
+        return
+    lanes = str(Path(__file__).resolve().parents[1] / "lanes")
+    if lanes not in sys.path:
+        sys.path.insert(0, lanes)
+    import model_pool_calls  # noqa: PLC0415
+    model_pool_calls.assert_request(url, text_body, site=f"apiclient:{provider}")
+
+
 class ApiClient:
     def __init__(self, provider: str, credential: str, authorize: Optional[Callable[[dict], None]] = None,
                  store=None, cache=None, transport=None, now: Callable[[], int] = now_ms,
@@ -144,6 +157,7 @@ class ApiClient:
                 price_usd: Optional[float] = None) -> ApiResponse:
         method = method.upper()
         text_body = body if body is None or isinstance(body, str) else json.dumps(body)
+        _model_pool_gate(self.provider, url, text_body)
         is_graphql = urlsplit(url).path.endswith("/graphql")
         read = method in ("GET", "HEAD") or (is_graphql and not _MUTATION.search(_graphql_query(text_body)))
         write = (not read) if write is None else write

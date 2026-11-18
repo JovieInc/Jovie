@@ -79,7 +79,6 @@ import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { FALLBACK_VERIFIED_PRICE_LABEL } from '@/lib/billing/verified-upgrade';
 import {
   useBillingStatusQuery,
   useChatUsageQuery,
@@ -111,7 +110,17 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
-const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
+// No list-price fallback: no price until the person's own price loads.
+const UPGRADE_CTA = 'Get Verified';
+
+/** Billing resolved for an account on the free plan. */
+function mockFreeBilling(): void {
+  mockUseBillingStatusQuery.mockReturnValue({
+    data: { isPro: false, plan: null, hasStripeCustomer: false },
+    isLoading: false,
+    error: null,
+  } as any);
+}
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
@@ -321,11 +330,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('keeps the calm workspace identity and account menu together', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     render(<UserButton calm showUserInfo profileHref='/adele' />);
     // Founder lock 2026-09-25: single compact 32px row, name only — the
     // workspace subtitle line is hidden.
@@ -353,11 +358,7 @@ describe('UserButton billing actions', () => {
   it('shows web build diagnostics in the account menu', async () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
@@ -366,7 +367,7 @@ describe('UserButton billing actions', () => {
     const diagnostics = await screen.findByTestId('app-build-diagnostics');
     expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
     expect(diagnostics).toHaveClass(
-      'min-h-8',
+      'h-8',
       'text-2xs',
       'text-tertiary-token',
       'select-none'
@@ -380,11 +381,7 @@ describe('UserButton billing actions', () => {
 
   it('shows desktop release identity in account-menu diagnostics', async () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
@@ -408,11 +405,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('renders the compact trigger avatar on the canonical app frame size', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     render(<UserButton />);
 
@@ -432,11 +425,7 @@ describe('UserButton billing actions', () => {
   it('offers a direct upgrade checkout when the user is not on Pro', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/test';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     // Pricing options are fetched via usePricingOptionsQuery (already mocked in beforeEach)
     // Only checkout goes through fetch
@@ -480,11 +469,7 @@ describe('UserButton billing actions', () => {
   it('uses a monthly interval alias when starting checkout', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/monthly';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
@@ -528,11 +513,7 @@ describe('UserButton billing actions', () => {
   it('falls back to the first available pricing option when monthly is unavailable', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/fallback';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
@@ -593,7 +574,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown to render
-    const manageBillingButton = await screen.findByText('Manage billing');
+    const manageBillingButton = await screen.findByText('Manage Billing');
     await user.click(manageBillingButton);
 
     await flushMicrotasks();
@@ -819,11 +800,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('renders a custom trigger while user data is still loading', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUseUserSafe.mockReturnValue({
       isLoaded: false,
@@ -867,11 +844,7 @@ describe('UserButton billing actions', () => {
 
   it('only offers manual workspace lock inside Ovie', async () => {
     const user = userEvent.setup();
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     mockUsePathname.mockReturnValue('/app');
     const jovie = render(<UserButton showUserInfo />);
     await user.click(screen.getByText('Adele Adkins'));
@@ -881,39 +854,27 @@ describe('UserButton billing actions', () => {
     jovie.unmount();
 
     mockUsePathname.mockReturnValue('/app/ov/ops');
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     render(<UserButton showUserInfo />);
     await user.click(screen.getByText('Adele Adkins'));
     expect(screen.getByTestId('ovie-privacy-control')).toBeInTheDocument();
   });
 
   it('shows an inline usage remaining row in the user menu', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
 
-    expect(screen.getByText('Usage remaining')).toBeInTheDocument();
+    expect(screen.getByText('Usage Remaining')).toBeInTheDocument();
     expect(screen.getByText('73%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
   it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const openModal = vi.fn();
     mockUseDesktopUpdateContext.mockReturnValue({
       state: { state: 'idle' },
@@ -1005,31 +966,17 @@ describe('UserButton billing actions', () => {
 
     await user.click(screen.getByText(longDisplayName));
 
-    const identityRow = document.querySelector<HTMLElement>(
-      '[data-menu-action-row="profile-help"]'
-    );
-    expect(identityRow).not.toBeNull();
-    expect(screen.getByRole('menu')).toHaveClass(
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveClass(
       'w-(--radix-dropdown-menu-trigger-width)',
       'min-w-60',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(screen.getByRole('menu')).not.toHaveClass('w-80');
-    expect(identityRow).toHaveClass(
-      'grid',
-      'grid-cols-[minmax(0,1fr)_auto]',
-      'min-h-12',
-      'w-full'
-    );
-    expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
-    expect(identityRow?.querySelector('button, a')).toBeNull();
-
-    const profileItem = within(identityRow as HTMLElement).getByRole(
-      'menuitem',
-      {
-        name: `Open profile for ${longDisplayName}`,
-      }
-    );
+    expect(menu).not.toHaveClass('w-80');
+    const profileItem = within(menu).getByRole('menuitem', {
+      name: `Open profile for ${longDisplayName}`,
+    });
+    expect(profileItem.querySelector('button, a')).toBeNull();
     expect(profileItem).toHaveClass('min-w-0');
     expect(within(profileItem).getByText(longDisplayName)).toHaveClass(
       'truncate'
@@ -1045,17 +992,13 @@ describe('UserButton billing actions', () => {
     // Keep the viewport bound when matching the expanded sidebar trigger.
     expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
 
-    const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
-      name: 'Help',
-    });
-    expect(helpItem).toHaveClass('min-h-8', 'shrink-0');
+    const helpItem = within(menu).getByRole('menuitem', { name: 'Help' });
+    expect(profileItem).not.toContainElement(helpItem);
     await user.keyboard('{ArrowDown}');
     expect(profileItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('menuitem', { name: /Settings/u })).toHaveFocus();
-    await user.keyboard('{ArrowUp}');
+    await user.keyboard('Help');
     expect(helpItem).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(openMock).toHaveBeenCalledWith(
@@ -1066,7 +1009,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('uses spacing instead of visible rules to group account actions', async () => {
+  it('groups account actions with three restrained hairlines', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,
@@ -1078,26 +1021,37 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
 
     const separators = screen.getAllByRole('separator');
-    expect(separators).toHaveLength(5);
+    expect(separators).toHaveLength(3);
     for (const separator of separators) {
-      expect(separator).toHaveClass('h-2', 'border-0');
+      expect(separator).toHaveClass(
+        'border-0',
+        'h-px',
+        'mx-(--space-2-5)',
+        'bg-subtle'
+      );
+      expect(separator).not.toHaveClass('h-2');
     }
+    const signOut = screen.getByRole('menuitem', { name: /Sign Out/ });
+    const diagnostics = screen.getByTestId('app-build-diagnostics');
+    expect(
+      signOut.compareDocumentPosition(diagnostics) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
 
     for (const menuItem of screen.getAllByRole('menuitem')) {
       if (menuItem.getAttribute('aria-label')?.startsWith('Open profile for')) {
-        expect(menuItem).toHaveClass('min-h-12');
+        // The header hugs its content (name + handle or email); it never
+        // reserves a fixed height for a line that may be absent.
+        expect(menuItem).toHaveClass('h-auto', 'min-h-8');
+        expect(menuItem).not.toHaveClass('min-h-12');
       } else {
-        expect(menuItem).toHaveClass('min-h-8');
+        expect(menuItem).toHaveClass('min-h-8', 'h-8');
       }
     }
   });
 
   it('preserves trigger keyboard and escape-to-close menu semantics', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
 
@@ -1112,11 +1066,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('collapses the sidebar identity trigger to a centered avatar-only control', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     render(<UserButton showUserInfo />);
 
@@ -1143,11 +1093,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('anchors the sidebar identity menu to the start edge', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
 
     render(<UserButton showUserInfo />);
@@ -1160,11 +1106,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('uses distinct semantic icons for the Learn More menu items', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
 
     render(<UserButton showUserInfo />);

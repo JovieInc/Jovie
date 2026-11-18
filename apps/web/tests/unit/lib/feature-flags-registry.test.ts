@@ -111,6 +111,8 @@ describe('feature flag registry integrity', () => {
             'CREATOR_FINANCE',
             'RELEASE_PLAN_DEMO',
             'VISIBILITY_AUDIT_OFFER',
+            'OUTBOUND_DOGFOOD_GATE',
+            'OUTBOUND_COLD_DRAFTS',
           ].includes(name)
       )
       .map(([, value]) => value);
@@ -123,6 +125,8 @@ describe('feature flag registry integrity', () => {
     expect(APP_FLAG_DEFAULTS.CREATOR_FINANCE).toBe(false);
     expect(APP_FLAG_DEFAULTS.RELEASE_PLAN_DEMO).toBe(false);
     expect(APP_FLAG_DEFAULTS.VISIBILITY_AUDIT_OFFER).toBe(false);
+    expect(APP_FLAG_DEFAULTS.OUTBOUND_DOGFOOD_GATE).toBe(false);
+    expect(APP_FLAG_DEFAULTS.OUTBOUND_COLD_DRAFTS).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {

@@ -80,3 +80,67 @@ export const SparseHonesty: StoryObj<typeof meta> = {
     content: { ...content, facts: [], faqs: [] },
   },
 };
+
+/** A new profile with no facts, links, bio or FAQs: heading and share only. */
+export const EmptyNewProfile: StoryObj<typeof meta> = {
+  args: {
+    content: {
+      ...content,
+      facts: [],
+      listenLinks: [],
+      followLinks: [],
+      description: [],
+      descriptionBlocks: [],
+      descriptionSegments: [],
+      faqs: [],
+    },
+  },
+};
+
+const longName = 'Tim White and the Los Angeles After Hours Orchestra';
+const longBio =
+  'Tim White is a producer, songwriter, DJ and after-hours romantic whose records score late-night drives, sunrise sets and the long walk home from the club.';
+const longTour =
+  'The project tours clubs and festivals across North America and Europe, releasing on independent labels between residencies in Los Angeles.';
+
+/** A long name, truncated fact values, a two-paragraph bio and the claim card. */
+export const LongContentFullProfile: StoryObj<typeof meta> = {
+  args: {
+    claimHref: '/start',
+    content: {
+      ...content,
+      artistName: longName,
+      facts: [
+        ...content.facts,
+        { label: 'Labels', value: 'Armada, Anjunadeep, Spinnin Records' },
+      ],
+      description: [longBio, longTour],
+      descriptionBlocks: [
+        { kind: 'bio', text: longBio },
+        { kind: 'bio', text: longTour },
+      ],
+      descriptionSegments: [
+        [{ type: 'text', text: longBio }],
+        [{ type: 'text', text: longTour }],
+      ],
+      faqs: [
+        {
+          question: `What kind of music does ${longName} make?`,
+          answer: longBio,
+          source: { label: 'Jovie profile', href: '/timwhite' },
+        },
+      ],
+    },
+  },
+};
+
+/** The About section inside a right-to-left page. */
+export const Rtl: StoryObj<typeof meta> = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

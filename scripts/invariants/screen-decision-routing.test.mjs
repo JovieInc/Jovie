@@ -51,6 +51,20 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
       ...overrides,
     });
 
+  it('registers the tip return through the shared registry without claiming runtime certification', () => {
+    const result = gate(undefined, {
+      changedFiles: ['apps/web/app/[username]/tip/thank-you/page.tsx'],
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.receipt.certified, false);
+    const owner = SCREEN_REGISTRY.find(s => s.id === 'web.tip-checkout-return');
+    assert.deepEqual(owner?.sources, [
+      'apps/web/app/[username]/tip/thank-you/page.tsx',
+    ]);
+    assert.deepEqual(owner?.viewports, ['desktop', 'mobile']);
+    assert.ok(!owner.excluded);
+  });
+
   it('projects an EVENT candidate in the real gate without inventing delivery or approval', () => {
     const result = gate(declaration());
     assert.equal(result.ok, true);

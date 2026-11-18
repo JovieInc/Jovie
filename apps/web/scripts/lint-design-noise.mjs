@@ -17,12 +17,21 @@
  * Rendered counterparts (text-layer budget, icon tiles, step labels) live in
  * tests/e2e/marketing-noise-budget.spec.ts.
  *
- *   node scripts/lint-design-noise.mjs [--list] [--update]
+ *   node scripts/lint-design-noise.mjs [--list] [--tighten] [--update]
+ *
+ * --tighten only lowers or removes baseline entries (safe to run any time).
+ * --update rewrites the baseline to the current counts, growth included, so
+ * it is a floor raise that needs review.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  announceShrink,
+  compareToBaseline as compareCounts,
+  tightenBaseline,
+} from '../../../scripts/lib/shrink-only-baseline.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..');
@@ -153,29 +162,16 @@ export function collect() {
   return result;
 }
 
+/**
+ * Growth only. A count below its baseline is stale headroom, not a failure:
+ * the PR that removes debt must not have to rewrite this shared file, or two
+ * green PRs go red together in a merge group (scripts/lib/shrink-only-baseline.mjs).
+ */
 export function compareToBaseline(current, baseline) {
-  const problems = [];
-  const keys = new Set([...Object.keys(current), ...Object.keys(baseline)]);
-  for (const file of keys) {
-    const rules = new Set([
-      ...Object.keys(current[file] ?? {}),
-      ...Object.keys(baseline[file] ?? {}),
-    ]);
-    for (const rule of rules) {
-      const now = current[file]?.[rule] ?? 0;
-      const was = baseline[file]?.[rule] ?? 0;
-      if (now > was) {
-        problems.push(
-          `${file}: ${rule} x${now} (baseline ${was}). ${HINTS[rule]}`
-        );
-      } else if (now < was) {
-        problems.push(
-          `${file}: ${rule} debt shrank (${now} < ${was}); run node scripts/lint-design-noise.mjs --update.`
-        );
-      }
-    }
-  }
-  return problems;
+  return compareCounts(current, baseline).growth.map(
+    ({ path: [file, rule], count, baseline: was }) =>
+      `${file}: ${rule} x${count} (baseline ${was}). ${HINTS[rule]}`
+  );
 }
 
 const HINTS = {
@@ -189,29 +185,52 @@ const HINTS = {
   'filler-bio': 'Show the real bio or nothing; never a filler line.',
 };
 
-function main() {
-  const args = new Set(process.argv.slice(2));
-  const current = collect();
-  if (args.has('--list')) console.log(JSON.stringify(current, null, 2));
+/** Returns the exit code. `--tighten` lowers the baseline and still fails growth. */
+export function main(
+  argv = process.argv.slice(2),
+  {
+    baselinePath = BASELINE_PATH,
+    current = collect(),
+    log = console.log,
+    error = console.error,
+  } = {}
+) {
+  const args = new Set(argv);
+  if (args.has('--list')) log(JSON.stringify(current, null, 2));
   if (args.has('--update')) {
     writeFileSync(
-      BASELINE_PATH,
+      baselinePath,
       `${JSON.stringify({ files: current }, null, 2)}\n`
     );
-    console.log(
-      `design-noise baseline updated (${Object.keys(current).length} files)`
-    );
-    return;
+    log(`design-noise baseline updated (${Object.keys(current).length} files)`);
+    return 0;
   }
-  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
+  let baseline = JSON.parse(readFileSync(baselinePath, 'utf8')).files;
+  if (args.has('--tighten')) {
+    const next = tightenBaseline(current, baseline);
+    if (next.tightened.length > 0) {
+      writeFileSync(
+        baselinePath,
+        `${JSON.stringify({ files: next.baseline }, null, 2)}\n`
+      );
+    }
+    log(`design-noise: tightened ${next.tightened.length} entries`);
+    baseline = next.baseline;
+  }
   const problems = compareToBaseline(current, baseline);
   if (problems.length) {
-    console.error(problems.join('\n'));
-    process.exit(1);
+    error(problems.join('\n'));
+    return 1;
   }
-  console.log(
+  announceShrink('design-noise', compareCounts(current, baseline).shrink, {
+    log,
+  });
+  log(
     `design-noise guard ok (${Object.keys(baseline).length} baselined files)`
   );
+  return 0;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exitCode = main();
+}

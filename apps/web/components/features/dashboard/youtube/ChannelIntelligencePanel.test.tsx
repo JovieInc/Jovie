@@ -52,4 +52,25 @@ describe('ChannelIntelligencePanel', () => {
 
     expect(screen.getByText('Connect YouTube Analytics')).toBeInTheDocument();
   });
+
+  it('reserves the thumbnail box with width and height so rows do not shift', () => {
+    const { container } = render(
+      <ChannelIntelligencePanel
+        report={{
+          ...REPORT,
+          bestVideos: [
+            {
+              ...REPORT.bestVideos[0],
+              thumbnailUrl: 'https://i.ytimg.com/vi/video_1/mqdefault.jpg',
+            },
+          ],
+        }}
+        isConnected
+      />
+    );
+
+    const thumbnail = container.querySelector('img');
+    expect(thumbnail).toHaveAttribute('width', '80');
+    expect(thumbnail).toHaveAttribute('height', '48');
+  });
 });

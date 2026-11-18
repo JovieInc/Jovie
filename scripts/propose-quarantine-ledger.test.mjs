@@ -42,6 +42,7 @@ function fixture() {
   roots.push(root);
   const git = args =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

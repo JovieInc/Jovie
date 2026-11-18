@@ -37,7 +37,11 @@ vi.mock('@/lib/notifications/sender-policy', () => ({
 vi.mock('@/lib/notifications/suppression', () => ({
   isEmailSuppressed: hoisted.suppressed,
 }));
-vi.mock('@/lib/outbound/cold-claim-invites', () => ({
+vi.mock('@/lib/outbound/cold-claim-invites', async importOriginal => ({
+  // Keep the real existing-relationship hold; only the open switch is faked.
+  ...(await importOriginal<
+    typeof import('@/lib/outbound/cold-claim-invites')
+  >()),
   COLD_CLAIM_INVITE_CLOSED_MESSAGE: 'closed',
   isColdClaimInviteSendOpen: () => true,
 }));
@@ -118,5 +122,22 @@ describe('claim invite token rotation', () => {
     ).rejects.toThrow('stop after rotation');
 
     expect(hoisted.sets.some(values => 'claimToken' in values)).toBe(true);
+  });
+
+  it('never sends a queued invite to an artist Tim already works with', async () => {
+    hoisted.suppressed.mockResolvedValue({ suppressed: false });
+    const profile = hoisted.selects[1]?.[0] as Record<string, unknown>;
+    profile.username = 'djdannic';
+    profile.displayName = 'Dannic';
+
+    const result = await processSendClaimInviteJob(makeTx() as never, IDS);
+
+    expect(result).toMatchObject({
+      status: 'skipped',
+      detail: 'Existing relationship: flag to Tim, no cold outreach',
+    });
+    // No token rotation, no status write, no suppression lookup: nothing sent.
+    expect(hoisted.sets).toEqual([]);
+    expect(hoisted.suppressed).not.toHaveBeenCalled();
   });
 });

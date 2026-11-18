@@ -24,3 +24,45 @@ export const Compact: Story = {
     compact: true,
   },
 };
+
+/** The release time has passed: the countdown renders nothing and refreshes. */
+export const EmptyAfterRelease: Story = {
+  args: {
+    releaseDate: new Date(Date.now() - 60_000),
+  },
+};
+
+/** Under a day left: the days column drops out. */
+export const PartialUnderADay: Story = {
+  args: {
+    releaseDate: new Date(Date.now() + 3 * 60 * 60 * 1000 + 5 * 60 * 1000),
+  },
+};
+
+/** A long custom label wraps above the digits. */
+export const LongContentLabel: Story = {
+  args: {
+    label: 'Premieres worldwide on every streaming service in',
+  },
+  decorators: [
+    Story => (
+      <div className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** The countdown inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    label: 'يصدر خلال',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -61,6 +61,23 @@
       "liveAuthority": "Stripe prices"
     },
     {
+      "id": "person-price-lock",
+      "title": "A person's price (price lock)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/billing/price-versions.ts",
+        "note": "Price versions name each list price; the price_locks table holds the snapshot each person signed up at. A person's price is resolveLockedPrice(lock), never the list price."
+      },
+      "derived": [
+        "apps/web/lib/billing/price-lock-checkout.ts",
+        "apps/web/lib/billing/price-lock-view.ts",
+        "apps/web/lib/billing/price-lock.server.ts",
+        "apps/web/app/api/billing/price-lock/route.ts",
+        "apps/web/lib/queries/usePricingOptionsQuery.ts"
+      ],
+      "liveAuthority": "Stripe subscriptions (daily price lock reconcile)"
+    },
+    {
       "id": "entitlements-limits",
       "title": "Entitlements and plan limits",
       "owner": {

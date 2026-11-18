@@ -52,4 +52,27 @@ describe('WaitlistRankedQueuePanel', () => {
     rerender(<WaitlistRankedQueuePanel queue={null} />);
     expect(screen.getByText('The queue could not be read.')).toBeTruthy();
   });
+  it('names the support-load pause in plain words', () => {
+    render(
+      <WaitlistRankedQueuePanel
+        queue={{
+          capacity,
+          rows: [
+            {
+              entryId: 'b',
+              artistName: 'Paused Artist',
+              status: 'waitlisted',
+              waitlistedAt: null,
+              score: 40,
+              components: { identity: 30, audience: 10, catalog: 0, intent: 0 },
+              unmeasured: [],
+              followers: 900,
+              holdReason: 'hold_support_load',
+            },
+          ],
+        }}
+      />
+    );
+    expect(screen.getByText(/Paused for open bug reports/)).toBeTruthy();
+  });
 });

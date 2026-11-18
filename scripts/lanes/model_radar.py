@@ -354,7 +354,7 @@ def channel_policy(task: dict, model: dict, allowlist: set[str]) -> str | None:
 
 def screen(registry: dict, catalog: dict, allowlist: set[str]) -> list[dict]:
     rows = []
-    for task in registry["tasks"]:
+    for task in (t for t in registry["tasks"] if t.get("status", "active") != "inactive"):
         candidates = []
         compatible = CHANNEL_SOURCES.get(task["channel"])
         if "same-family-successor" in task["screens"]:

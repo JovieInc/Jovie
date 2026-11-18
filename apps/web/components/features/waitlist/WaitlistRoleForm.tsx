@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
 import { InlineSubscribe } from '@jovie/ui/atoms/inline-subscribe';
 import { Input } from '@jovie/ui/atoms/input';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
@@ -23,7 +24,7 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import {
   GENERAL_WAITLIST_ROLES,
-  WAITLIST_ROLES,
+  WAITLIST_ROLE_CHOICES,
   type WaitlistRole,
 } from '@/lib/waitlist/roles';
 import { WaitlistJoinedConfirmation } from './WaitlistJoinedConfirmation';
@@ -60,22 +61,18 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
 
 export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
 
-/**
- * Chip presentation (homepage v1): the design names Producer and Songwriter
- * separately; the stored role is still the one `producer_songwriter` value.
- */
-const ROLE_CHIPS: ReadonlyArray<{
+type RoleChoice = {
   readonly key: string;
   readonly label: string;
   readonly role: WaitlistRole;
-}> = [
-  { key: 'artist', label: 'Artist', role: 'artist' },
-  { key: 'manager', label: 'Manager', role: 'manager' },
-  { key: 'label', label: 'Label', role: 'label' },
-  { key: 'producer', label: 'Producer', role: 'producer_songwriter' },
-  { key: 'songwriter', label: 'Songwriter', role: 'producer_songwriter' },
-  { key: 'other', label: 'Other', role: 'other' },
-];
+};
+
+const GENERAL_ROLE_CHOICES: ReadonlyArray<RoleChoice> =
+  GENERAL_WAITLIST_ROLES.map(entry => ({
+    key: entry.value,
+    label: entry.label,
+    role: entry.value,
+  }));
 
 /**
  * Closed-signup waitlist form (canon/PRODUCT.md, 2026-11-02): role and email,
@@ -85,7 +82,7 @@ const ROLE_CHIPS: ReadonlyArray<{
 export function WaitlistRoleForm({
   variant = 'artist',
   headingLevel = 1,
-  title = 'Request access',
+  title = 'Reserve your spot',
   description,
   headingClassName,
   align = 'center',
@@ -121,7 +118,10 @@ export function WaitlistRoleForm({
     align === 'start' ? 'items-start text-left' : 'items-center text-center';
   const formId = useId();
   const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
-  const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
+  // Artist forms show the same six choices as the homepage chips; the
+  // general form keeps its own context list. A choice key maps to a role.
+  const roleChoices: ReadonlyArray<RoleChoice> =
+    variant === 'general' ? GENERAL_ROLE_CHOICES : WAITLIST_ROLE_CHOICES;
   const [name, setName] = useState('');
   const confirmationRef = useRef<HTMLDivElement>(null);
   const joinedRef = useRef(false);
@@ -393,7 +393,7 @@ export function WaitlistRoleForm({
                   aria-labelledby={`${formId}-role-label`}
                   className='waitlist-chips__row'
                 >
-                  {ROLE_CHIPS.map((chip, index) => (
+                  {WAITLIST_ROLE_CHOICES.map((chip, index) => (
                     <Fragment key={chip.key}>
                       {index === 3 ? (
                         <span aria-hidden className='waitlist-chips__break' />
@@ -404,12 +404,12 @@ export function WaitlistRoleForm({
                           chipKey === chip.key ? 'true' : undefined
                         }
                       >
-                        <input
+                        <HostDrawnInput
+                          visuallyHidden
                           type='radio'
                           name={`${formId}-role`}
                           value={chip.key}
                           checked={chipKey === chip.key}
-                          className='sr-only'
                           onChange={() => {
                             setChipKey(chip.key);
                             setRole(chip.role);
@@ -425,21 +425,27 @@ export function WaitlistRoleForm({
             ) : (
               <RadioGroup
                 aria-label='Role'
-                value={role}
-                onValueChange={value => {
-                  setRole(value as WaitlistRole);
+                // Full width so the choices start on the email field's edge.
+                className='w-full'
+                data-testid='waitlist-role-radios'
+                value={chipKey}
+                onValueChange={key => {
+                  const choice = roleChoices.find(entry => entry.key === key);
+                  if (!choice) return;
+                  setChipKey(choice.key);
+                  setRole(choice.role);
                   clearError();
                 }}
               >
-                {roles.map(option => (
+                {roleChoices.map(option => (
                   <label
-                    key={option.value}
-                    htmlFor={`${formId}-${option.value}`}
-                    className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+                    key={option.key}
+                    htmlFor={`${formId}-${option.key}`}
+                    className='flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm text-primary-token'
                   >
                     <RadioGroupItem
-                      id={`${formId}-${option.value}`}
-                      value={option.value}
+                      id={`${formId}-${option.key}`}
+                      value={option.key}
                     />
                     {option.label}
                   </label>

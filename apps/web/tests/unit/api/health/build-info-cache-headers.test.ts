@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * JOV-1958: public production build-info must never inherit the general
- * `/api/*` s-maxage=300 rule. Health identity routes are declared after the
- * general API header block so no-store wins when sources merge.
+ * JOV-1958: public production build-info must never be shared-cached. The
+ * general `/api/*` rule is now no-store too; health identity routes stay
+ * declared after it so their CDN-level no-store headers always apply.
  */
 describe('build-info cache headers (JOV-1958)', () => {
   const nextConfigSource = readFileSync(

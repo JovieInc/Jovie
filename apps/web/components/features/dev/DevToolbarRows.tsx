@@ -88,10 +88,10 @@ export function OrphanOverrides({
 }: Readonly<{ keys: string[]; onPurge: () => void }>) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className='mb-2 mt-1 border-l-2 border-yellow-500/50 pl-3'>
+    <div className='mb-2 mt-1 border-l-2 border-warning/50 pl-3'>
       <div className='flex items-center justify-between mb-1'>
         <span
-          className='text-3xs font-semibold uppercase tracking-wide text-yellow-400'
+          className='text-3xs font-semibold tracking-wide text-warning'
           title='Override keys in localStorage that no longer match any flag in APP_FLAG_OVERRIDE_KEYS. Likely from renamed or removed flags.'
         >
           Orphans ({keys.length})
@@ -109,7 +109,7 @@ export function OrphanOverrides({
             type='button'
             variant='link'
             onClick={onPurge}
-            className='h-auto text-3xs text-yellow-400 hover:text-yellow-300 underline transition-colors'
+            className='h-auto text-3xs text-warning hover:text-warning/80 underline transition-colors'
           >
             Purge
           </Button>

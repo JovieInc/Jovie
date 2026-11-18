@@ -28,6 +28,10 @@ export interface ToolFailurePayload {
   readonly errorCode: ToolErrorCode;
   readonly retryable: boolean;
   readonly hint?: string;
+  /** Generation batch id preserved from a merch failure output, if present. */
+  readonly generationId?: string;
+  /** Sanitized failure summary preserved from a merch failure output. */
+  readonly failureSummary?: Record<string, unknown>;
 }
 
 export interface ToolFailurePresentation {
@@ -306,13 +310,25 @@ export function normalizeToolFailureOutput(
       ? output.retryable
       : errorCode !== TOOL_ERROR_CODES.PLAN_UNAVAILABLE;
 
-  return buildToolFailure({
+  // Preserve sanitized merch outcome fields (generationId / failureSummary)
+  // so a normalized failure payload stays attributable to its batch instead
+  // of collapsing to bare user copy.
+  const failure = buildToolFailure({
     toolName,
     errorCode,
     error: rawError,
     retryable,
     hint: typeof output.hint === 'string' ? output.hint : undefined,
   });
+  return {
+    ...failure,
+    ...(typeof output.generationId === 'string' && output.generationId
+      ? { generationId: output.generationId }
+      : {}),
+    ...(isRecord(output.failureSummary)
+      ? { failureSummary: output.failureSummary }
+      : {}),
+  };
 }
 
 export function resolveToolFailurePresentation(input: {

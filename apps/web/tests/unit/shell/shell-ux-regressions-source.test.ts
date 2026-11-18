@@ -261,8 +261,23 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
 
     // The collapse toggle stays reachable in the 52px icon rail: it is
     // ordered first while the brand cluster and header actions stage out.
-    expect(unified).toContain('group-data-[collapsible=icon]:order-first');
-    expect(unified).toContain("data-sidebar-header-actions='true'");
+    // The brand row's trailing controls live in SidebarHeaderActions; the
+    // collapsed-rail order comes from the shared rail-motion contract.
+    const headerActions = readFileSync(
+      path.join(webRoot, 'components/shell/SidebarHeaderActions.tsx'),
+      'utf8'
+    );
+    expect(unified).toContain('<SidebarHeaderActions');
+    expect(headerActions).toContain('SHELL_RAIL_TOGGLE_LEAD');
+    expect(
+      readFileSync(
+        path.join(webRoot, 'components/shell/rail-motion.ts'),
+        'utf8'
+      )
+    ).toMatch(
+      /SHELL_RAIL_TOGGLE_LEAD =\s*'group-data-\[collapsible=icon\]:order-first/
+    );
+    expect(headerActions).toContain("data-sidebar-header-actions='true'");
 
     // Long labels stage out (max-width + opacity + travel) instead of
     // popping to display:none at frame one.

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +19,7 @@ export function FilterChip({
   ...rest
 }: FilterChipProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onClick}
       {...rest}
@@ -32,6 +33,6 @@ export function FilterChip({
       )}
     >
       {children || 'Filter'}
-    </button>
+    </PlainButton>
   );
 }

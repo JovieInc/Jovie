@@ -1,0 +1,335 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/SettingsAudienceSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsContactsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsNotificationsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsPaymentsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsSearchabilitySection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/account-settings/ConnectedAccountsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/account-settings/SessionManagementCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberActivityFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberDetails.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/contacts-table/ContactDetailSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/contacts-table/ContactsTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceFilterDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceHeaderBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableSubheader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceActionCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceEngagementBars.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceFanCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceLastCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceStateCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-theme-toggle/ThemeIcons.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": {
+      "offline": "The section has no distinct offline UI: a failed billing fetch renders the same Billing unavailable panel shown in the ErrorUnavailable story.",
+      "permission-denied": "Billing has no permission gate; every signed-in owner sees their own billing. The detector matched the words plan and upgrade, and a free account sees Compare plans in the base stories."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsContactsSection.tsx": {
+      "offline": "A failed contacts load while offline renders the same retry panel shown in the ErrorLoadFailed story; there is no separate offline UI."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsNotificationsSection.tsx": {
+      "offline": "A save that fails offline goes through the same failure path as the ErrorSaveFailed story; the section has no separate offline UI.",
+      "long-content": "The section title, descriptions and toggle labels are fixed copy in the component; no caller text reaches it, so it cannot grow long."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx": {
+      "offline": "A failed pay summary fetch while offline renders the same panel as the ErrorSummaryFailed story; there is no separate offline UI."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsSearchabilitySection.tsx": {
+      "offline": "A save that fails offline goes through the same failure path as the ErrorSaveFailed story; the section has no separate offline UI.",
+      "long-content": "The title, description and toggle label are fixed copy in the component; no caller text reaches it, so it cannot grow long."
+    },
+    "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx": {
+      "offline": "The section makes no network call of its own; an unreachable session reads as signed out, which the base SignedOut story covers."
+    },
+    "apps/web/components/features/dashboard/organisms/contacts-table/ContactDetailSidebar.tsx": {
+      "offline": "The sidebar makes no network call; it hands edits to onSave, and an offline save failure reaches it only as contact.error, which the ErrorSaveFailed story covers.",
+      "permission-denied": "The sidebar has no permission gate. The detector matched role, which here is the contact type select (ContactRole), not an access role."
+    },
+    "apps/web/components/features/dashboard/organisms/contacts-table/ContactsTable.tsx": {
+      "offline": "The table is fed by props and makes no network call; isLoading comes from the parent, and offline save errors belong to useContactsManager, not this table.",
+      "permission-denied": "The table has no permission gate. The detector matched role, which here is the contact role column (ContactRole), not an access role."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceFilterDropdown.tsx": {
+      "long-content": "Every label comes from the fixed SEGMENT_OPTIONS list in the component; no caller text reaches the menu, so it cannot grow long."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceEngagementBars.tsx": {
+      "long-content": "The meter draws five fixed-height bars and the fixed label 'Engagement N of 5' from a 0-100 score; there is no caller text to lengthen. The detector matched aria-label.",
+      "permission-denied": "The meter has no permission input or gated action; the detector matched role='img' on the bar group."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceLastCell.tsx": {
+      "long-content": "AudienceLastCell renders only a compact relative time (now, 5m, 3h, 12d) or an em dash computed from lastSeenAt; there is no caller text to lengthen. The detector matched the text-2xs class."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceStateCell.tsx": {
+      "long-content": "The badge text is one of the four fixed AUDIENCE_STATE_LABELS (High, Rising, Dormant, Subscriber); no caller text reaches it, so it cannot grow long."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext.tsx": {
+      "empty": "NowMsContext is a timestamp provider with no UI of its own; it renders its children unchanged and owns no collection that could be empty.",
+      "long-content": "NowMsContext renders no text; it only supplies a number to consumers through context, so there is nothing to lengthen.",
+      "rtl-overflow": "NowMsContext renders no markup beyond its children, so document direction cannot change its output. The detector matched the children prop."
+    },
+    "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
+      "offline": "The feed has no offline UI of its own: react-query pauses the fetch while offline and keeps the last loaded list, and a fetch that fails lands on the ErrorLoadFailed story. A distinct offline treatment would be a design call."
+    }
+  }
+}
