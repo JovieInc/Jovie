@@ -194,6 +194,7 @@ export async function buildExtensionSummary(params: {
       .where(
         and(
           eq(tourDates.profileId, profile.id),
+          eq(tourDates.eventType, 'tour'),
           gte(tourDates.startDate, new Date())
         )
       )

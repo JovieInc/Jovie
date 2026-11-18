@@ -1,24 +1,39 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
 
+const where = vi.hoisted(() =>
+  vi.fn((_condition: Parameters<PgDialect['sqlToQuery']>[0]) => ({
+    orderBy: async () => [],
+  }))
+);
 vi.mock('@/lib/db', () => ({
-  db: {},
+  db: { select: () => ({ from: () => ({ where }) }) },
 }));
 
-vi.mock('@/lib/db/schema/tour', () => ({
-  tourDates: {},
-}));
+import {
+  getConfirmedTourEventsForProfile,
+  getUpcomingTourDatesForProfile,
+  isMissingTourDatesConfirmationStatusError,
+} from '@/lib/tour-dates/queries';
 
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn((_col, val) => ({ eq: val })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  gte: vi.fn((_col, val) => ({ gte: val })),
-}));
-
-vi.mock('@/lib/tour-dates/view-model', () => ({
-  mapTourDateToViewModel: vi.fn((row: unknown) => row),
-}));
-
-import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
+describe('public tour feeds', () => {
+  it.each([getUpcomingTourDatesForProfile, getConfirmedTourEventsForProfile])(
+    '%s excludes even confirmed non-tour events',
+    async load => {
+      where.mockClear();
+      await load('profile-1');
+      // Check the predicate actually handed to Drizzle for both profile and ICS.
+      const condition = where.mock.lastCall?.[0];
+      if (!condition) throw new Error('Expected a tour visibility filter');
+      const query = new PgDialect().sqlToQuery(condition);
+      expect(query.sql).toContain('"tour_dates"."event_type" =');
+      expect(query.sql).toContain('"tour_dates"."confirmation_status" =');
+      expect(query.params).toEqual(
+        expect.arrayContaining(['profile-1', 'tour', 'confirmed'])
+      );
+    }
+  );
+});
 
 /**
  * Mirrors the prod migration-drift failure (JOV-4857): Drizzle wraps the PG

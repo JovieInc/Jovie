@@ -131,7 +131,16 @@ function Harness({ showManager = true }: { readonly showManager?: boolean }) {
         {showManager ? (
           <TourDatesManager
             profileId='profile-1'
-            initialTourDates={[tourDate]}
+            initialTourDates={[
+              tourDate,
+              {
+                ...tourDate,
+                id: 'signing-1',
+                eventType: 'signing',
+                title: 'Book launch signing',
+                venueName: 'City Books',
+              },
+            ]}
             connectionStatus={{
               connected: true,
               hasApiKey: true,
@@ -147,6 +156,15 @@ function Harness({ showManager = true }: { readonly showManager?: boolean }) {
 }
 
 describe('TourDatesManager shell rail', () => {
+  it('keeps private signings out of the tour manager', () => {
+    render(<Harness />);
+    const manager = within(screen.getByTestId('tour-dates-manager'));
+    expect(
+      manager.getByRole('button', { name: 'Brooklyn Bowl' })
+    ).toBeVisible();
+    expect(manager.queryByRole('button', { name: 'City Books' })).toBeNull();
+  });
+
   it('opens the typed tour-date detail in the global rail from click or Enter', async () => {
     const user = userEvent.setup();
     render(<Harness />);

@@ -27,13 +27,18 @@ interface TourDatesManagerProps {
   readonly connectionStatus: BandsintownConnectionStatus;
 }
 
+function onlyTourDates(events: TourDateViewModel[]): TourDateViewModel[] {
+  return events.filter(event => event.eventType === 'tour');
+}
+
 export function TourDatesManager({
   profileId,
   initialTourDates,
   connectionStatus,
 }: Readonly<TourDatesManagerProps>) {
-  const [tourDates, setTourDates] =
-    useState<TourDateViewModel[]>(initialTourDates);
+  const [tourDates, setTourDates] = useState(() =>
+    onlyTourDates(initialTourDates)
+  );
   const [isConnected, setIsConnected] = useState(connectionStatus.connected);
   const [hasApiKey, setHasApiKey] = useState(connectionStatus.hasApiKey);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
@@ -75,7 +80,7 @@ export function TourDatesManager({
       if (result.success) {
         // Refresh local state with updated tour dates
         const refreshed = await loadTourDates();
-        setTourDates(refreshed);
+        setTourDates(onlyTourDates(refreshed));
         toast.success(result.message);
       } else {
         toast.error(result.message);
@@ -141,7 +146,7 @@ export function TourDatesManager({
   ]);
 
   const handleConnected = useCallback((newTourDates: TourDateViewModel[]) => {
-    setTourDates(newTourDates);
+    setTourDates(onlyTourDates(newTourDates));
     setIsConnected(true);
   }, []);
 

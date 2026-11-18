@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarPageClient } from '@/app/app/(shell)/calendar/CalendarPageClient';
 import { CalendarRouteSkeleton } from '@/app/app/(shell)/calendar/CalendarRouteSkeleton';
@@ -16,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   rejectEvents: vi.fn(),
   undoRejectEvent: vi.fn(),
   navigationReady: vi.fn(),
+  getCachedAuth: vi.fn(),
+  getDashboardDataEssential: vi.fn(),
+  insertValues: vi.fn(),
 }));
 
 vi.mock('@/components/features/dashboard/NavigationDestinationReady', () => ({
@@ -23,6 +32,18 @@ vi.mock('@/components/features/dashboard/NavigationDestinationReady', () => ({
     mocks.navigationReady(props);
     return null;
   },
+}));
+
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mocks.getCachedAuth,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
+  getDashboardDataEssential: mocks.getDashboardDataEssential,
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: { insert: () => ({ values: mocks.insertValues }) },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -107,11 +128,11 @@ const rejectedEvent: EventRecord = {
   provider: 'Songkick',
 };
 
-function renderCalendar() {
-  const client = new QueryClient({
+function renderCalendar(
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
-
+  })
+) {
   return render(
     <QueryClientProvider client={client}>
       <CalendarPageClient />
@@ -139,6 +160,91 @@ describe('CalendarPageClient', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('opens the manual signing form from the calendar toolbar', () => {
+    renderCalendar();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Event' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add Event' });
+    expect(within(dialog).getByLabelText('Event Type')).toBeRequired();
+    expect(within(dialog).getByLabelText('Venue Timezone')).toBeRequired();
+    expect(
+      within(dialog).getByLabelText('Ticket Link (Optional)')
+    ).not.toBeRequired();
+  });
+
+  it('persists a private signing from the form and refreshes the owning profile caches', async () => {
+    vi.useRealTimers();
+    mocks.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
+    mocks.getDashboardDataEssential.mockResolvedValue({
+      selectedProfile: { id: 'profile-1' },
+    });
+    mocks.insertValues.mockReturnValue({
+      returning: async () => [{ id: 'signing-1' }],
+    });
+    const client = new QueryClient();
+    const cacheKeys = [
+      ['events', 'list', 'profile-1'],
+      ['tour-dates', 'list', 'profile-1'],
+      ['events', 'list', 'profile-2'],
+      ['tour-dates', 'list', 'profile-2'],
+    ];
+    for (const key of cacheKeys) client.setQueryData(key, []);
+    renderCalendar(client);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Event' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Add Event' }));
+    const fields = [
+      ['Event Type', 'signing'],
+      ['Event Name', 'Book launch signing'],
+      ['Venue Date And Time', '2026-11-20T20:00'],
+      ['Venue Timezone', 'Pacific/Fiction'],
+      ['Venue Name', 'City Books'],
+      ['City', 'Los Angeles'],
+      ['Country', 'US'],
+    ];
+    for (const [label, value] of fields) {
+      fireEvent.change(dialog.getByLabelText(label), { target: { value } });
+    }
+    fireEvent.click(dialog.getByRole('button', { name: 'Save Event' }));
+    expect(
+      await dialog.findByText(/enter a valid venue timezone/i)
+    ).toBeVisible();
+    expect(dialog.getByLabelText('Event Name')).toHaveValue(
+      'Book launch signing'
+    );
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+
+    const retry = await dialog.findByRole('button', { name: 'Save Event' });
+    fireEvent.change(dialog.getByLabelText('Venue Timezone'), {
+      target: { value: 'America/Los_Angeles' },
+    });
+    fireEvent.click(retry);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Add Event' })).toBeNull();
+    });
+    expect(mocks.insertValues).toHaveBeenCalledExactlyOnceWith({
+      profileId: 'profile-1',
+      provider: 'manual',
+      eventType: 'signing',
+      confirmationStatus: 'confirmed',
+      reviewedAt: expect.any(Date),
+      title: 'Book launch signing',
+      startDate: new Date('2026-11-21T04:00:00.000Z'),
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'City Books',
+      city: 'Los Angeles',
+      region: null,
+      country: 'US',
+      ticketUrl: null,
+    });
+    expect(
+      cacheKeys.map(key => client.getQueryState(key)?.isInvalidated)
+    ).toEqual([true, true, false, false]);
   });
 
   it('reads calendar releases from the canonical release matrix query', () => {
@@ -284,6 +390,7 @@ describe('CalendarPageClient', () => {
 
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('');
     expect(mocks.useEventsQuery).toHaveBeenCalledWith('');
+    expect(screen.queryByRole('button', { name: 'Add Event' })).toBeNull();
   });
 
   it('does not mark the destination ready when a calendar query fails', () => {

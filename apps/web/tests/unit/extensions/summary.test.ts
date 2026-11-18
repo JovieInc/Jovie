@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getExtensionFlags,
@@ -49,6 +50,7 @@ vi.mock('@/lib/db/schema/tour', () => ({
     country: 'country',
     ticketUrl: 'ticketUrl',
     profileId: 'profileId',
+    eventType: 'event_type',
   },
 }));
 vi.mock('drizzle-orm', () => ({
@@ -175,6 +177,15 @@ describe('extension summary', () => {
         kind: 'copy',
       },
     });
+  });
+
+  it('keeps private non-tour events out of extension tour suggestions', async () => {
+    await buildExtensionSummary({
+      pageUrl: 'https://distrokid.com/new',
+      pageTitle: 'Upload Music',
+    });
+
+    expect(eq).toHaveBeenCalledWith('event_type', 'tour');
   });
 
   it('returns release context for an AWAL page', async () => {
