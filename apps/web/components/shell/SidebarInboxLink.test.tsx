@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
-const { runtimeUpdate } = vi.hoisted(() => ({
+const { pathname, runtimeUpdate } = vi.hoisted(() => ({
+  pathname: { current: '/app/chat' },
   runtimeUpdate: { available: false },
 }));
 // Expose the Next Link contract without starting a router in jsdom.
@@ -19,6 +21,10 @@ vi.mock('next/link', () => ({
 
 vi.mock('./RuntimeUpdateProvider', () => ({
   useRuntimeUpdate: () => runtimeUpdate,
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => pathname.current,
 }));
 
 import { SidebarInboxLink } from './SidebarInboxLink';
@@ -177,6 +183,43 @@ describe('central Inbox bell', () => {
     } finally {
       runtimeUpdate.available = false;
     }
+  });
+
+  it('acknowledges the header bell as the home warm-navigation trigger', () => {
+    pathname.current = APP_ROUTES.CHAT;
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    expect(link).toHaveAttribute('data-navigation-item-id', 'home');
+    expect(link).not.toHaveAttribute('data-navigation-pending');
+    fireEvent.pointerDown(link, { button: 0 });
+    expect(link).toHaveAttribute('data-navigation-pending', 'true');
+    expect(link).toHaveAttribute('aria-busy', 'true');
+    expect(link).toHaveClass('size-7');
+  });
+
+  it('does not acknowledge Inbox when the dashboard is already current', () => {
+    pathname.current = APP_ROUTES.DASHBOARD;
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    fireEvent.pointerDown(link, { button: 0 });
+    expect(link).not.toHaveAttribute('data-navigation-pending');
+    expect(link).not.toHaveAttribute('aria-busy');
+  });
+
+  it('drops the home acknowledgment when the click opens another tab', () => {
+    pathname.current = APP_ROUTES.CHAT;
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    fireEvent.pointerDown(link, { button: 0 });
+    expect(link).toHaveAttribute('data-navigation-pending', 'true');
+    fireEvent.click(link, { button: 0, metaKey: true });
+    expect(link).not.toHaveAttribute('data-navigation-pending');
   });
 
   it('uses the shared sidebar header icon-button box and 16px glyph', () => {
