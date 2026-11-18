@@ -6505,19 +6505,7 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         for path in conflicted:
             target = worktree / path
             try:
-                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text())
-                list_path = "scripts/lib/ci-structural-shards.mjs"
-                if text is None and path == "scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs" and list_path in conflicted:
-                    from fix_red_conflict_resolvers import resolve_pytest_count_conflict
-                    stage_lists = []
-                    for stage in (2, 3):
-                        source = sh(["git", "show", f":{stage}:{list_path}"], cwd=worktree)
-                        lines = re.findall(r"(?m)^[ \t]*'scripts/tests/test_[^\n]+\.split\(\n", source.stdout or "")
-                        if source.returncode or len(lines) != 1:
-                            break
-                        stage_lists.append(lines[0])
-                    if len(stage_lists) == 2:
-                        text = resolve_pytest_count_conflict(target.read_text(), *stage_lists)
+                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text()) or fix_red_source_edits.resolve_pytest_count_file(worktree, path, conflicted, sh)
             except (OSError, UnicodeError):
                 text = None
             if text is None:

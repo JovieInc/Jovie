@@ -55,7 +55,7 @@ class CoverageIncludeMergeTest(unittest.TestCase):
 
 class PytestCountConflictTest(unittest.TestCase):
     def test_counts_union_and_keeps_assertions_but_rejects_unrelated_edits(self):
-        from fix_red_conflict_resolvers import resolve_pytest_count_conflict
+        from fix_red_pytest_count import resolve_pytest_count_conflict
         head = "  'scripts/tests/test_a.py scripts/tests/test_head.py'.split(\n"
         main = "  'scripts/tests/test_a.py scripts/tests/test_main.py'.split(\n"
         hunk = ("<<<<<<< HEAD\n    expect(LANES_PYTEST_FILES).toHaveLength(2);\n"
