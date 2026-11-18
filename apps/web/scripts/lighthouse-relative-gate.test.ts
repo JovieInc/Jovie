@@ -1,5 +1,5 @@
 import {
-  chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -342,58 +342,101 @@ describe('relative Lighthouse gate flow', () => {
 });
 
 describe('collect-only report hand-off', () => {
-  const { collectOnly } = createRequire(import.meta.url)(
-    './lighthouse-dashboard-auth.cjs'
-  ) as {
-    collectOnly: (options: {
-      collectDir: string;
-      config: string;
-      chromePath: string;
-      collectUrls: string[];
-      env: NodeJS.ProcessEnv;
-      lhciDir: string;
-    }) => number;
-  };
-
   it("hands over only the reports this collection wrote, never an earlier side's", () => {
     const dir = mkdtempSync(join(tmpdir(), 'lighthouse-collect-'));
     try {
       const lhciDir = join(dir, '.lighthouseci');
-      const bin = join(dir, 'bin');
       mkdirSync(lhciDir);
-      mkdirSync(bin);
-      // A collector that, unlike lhci today, does not clear old reports.
-      writeFileSync(
-        join(bin, 'pnpm'),
-        '#!/usr/bin/env bash\necho \'{"side":"head"}\' > "$STUB_LHCI_DIR/lhr-2.json"\n'
+      // Give the real module a local CLI package with a declared bin. No
+      // executable lookup or downloads are needed in this fixture.
+      const fixtureWeb = join(dir, 'apps/web');
+      const fixtureScripts = join(fixtureWeb, 'scripts');
+      const fixturePackage = join(fixtureWeb, 'node_modules/@lhci/cli');
+      mkdirSync(fixtureScripts, { recursive: true });
+      mkdirSync(fixturePackage, { recursive: true });
+      const modulePath = join(fixtureScripts, 'lighthouse-dashboard-auth.cjs');
+      copyFileSync(
+        join(webRoot, 'scripts/lighthouse-dashboard-auth.cjs'),
+        modulePath
       );
-      chmodSync(join(bin, 'pnpm'), 0o755);
+      writeFileSync(
+        join(fixturePackage, 'package.json'),
+        JSON.stringify({ bin: { lhci: './fixture.cjs' } })
+      );
+      writeFileSync(
+        join(fixturePackage, 'fixture.cjs'),
+        `
+        const { appendFileSync, writeFileSync } = require('node:fs');
+        const { join } = require('node:path');
+        appendFileSync(process.env.LHCI_FIXTURE_TRACE, JSON.stringify(process.argv.slice(2)) + '\\n');
+        if (process.argv[2] === 'collect') writeFileSync(join(process.env.LHCI_FIXTURE_REPORTS, 'lhr-2.json'), '{"side":"head"}');
+        if (process.argv[2] === process.env.LHCI_FIXTURE_FAIL) process.exitCode = 23;
+      `
+      );
+      const { collectOnly } = createRequire(import.meta.url)(modulePath);
       // Left behind by the base collection that ran just before.
       writeFileSync(join(lhciDir, 'lhr-1.json'), '{"side":"base"}');
       writeFileSync(join(lhciDir, 'keep.txt'), 'not a report');
 
       const collectDir = join(dir, 'head');
-      const status = collectOnly({
+      const trace = join(dir, 'calls.jsonl');
+      const config = '.lighthouserc.dashboard.pr.json';
+      const url = 'http://localhost:3000/app';
+      const env = {
+        ...process.env,
+        LHCI_FIXTURE_REPORTS: lhciDir,
+        LHCI_FIXTURE_TRACE: trace,
+      };
+      const options = {
         collectDir,
-        config: '.lighthouserc.dashboard.pr.json',
+        config,
         chromePath: '/bin/true',
-        collectUrls: ['http://localhost:3000/app'],
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          STUB_LHCI_DIR: lhciDir,
-          LIGHTHOUSE_COLLECT_UPLOAD: '',
-        },
+        collectUrls: [url],
+        env,
         lhciDir,
-      });
-
-      expect(status).toBe(0);
+      };
+      vi.stubEnv('LIGHTHOUSE_COLLECT_RUNS', '3');
+      vi.stubEnv('LIGHTHOUSE_COLLECT_UPLOAD', '1');
+      expect(collectOnly(options)).toBe(0);
+      const commands = () =>
+        readFileSync(trace, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => JSON.parse(line));
+      expect(commands()).toEqual([
+        [
+          'collect',
+          `--config=${config}`,
+          '--chromePath=/bin/true',
+          '--numberOfRuns=3',
+          `--url=${url}`,
+        ],
+        ['upload', `--config=${config}`],
+      ]);
       expect(readdirSync(collectDir)).toEqual(['lhr-2.json']);
       expect(readFileSync(join(collectDir, 'lhr-2.json'), 'utf8')).toContain(
         'head'
       );
       expect(readdirSync(lhciDir).sort()).toEqual(['keep.txt', 'lhr-2.json']);
+      expect(
+        collectOnly({
+          ...options,
+          env: { ...env, LHCI_FIXTURE_FAIL: 'collect' },
+        })
+      ).toBe(23);
+      expect(commands().length).toBe(3);
+      expect(
+        collectOnly({
+          ...options,
+          env: { ...env, LHCI_FIXTURE_FAIL: 'upload' },
+        })
+      ).toBe(23);
+      expect(commands().length).toBe(5);
+      vi.stubEnv('LIGHTHOUSE_COLLECT_UPLOAD', '');
+      expect(collectOnly(options)).toBe(0);
+      expect(commands().length).toBe(6);
     } finally {
+      vi.unstubAllEnvs();
       rmSync(dir, { recursive: true, force: true });
     }
   });
