@@ -8,8 +8,9 @@ name: Pen draft pictures to Linear
 # After a Pen draft run on main (JOV-12577): render each drafted frame alone
 # from its <frame>.pen (the draft's own png is the whole canvas, too small to
 # read), and put that picture inline on the Linear issue `Pen draft for approval: <frame>`, labelled
-# `pen-draft:needs-tim`, a label with no default on silence. One issue
-# per frame: a new draft updates it. It never moves an issue, edits the
+# `tim-action-required`, so it appears in the Ovie inbox. One issue
+# per frame: a new draft updates it. Backlog issues move to Triage so the inbox
+# can show them; decisions are never moved. It never edits the
 # canonical Pen file or approves anything in pen-bindings.json.
 # A failed draft run still publishes the frames that drew a picture.
 
