@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -73,11 +79,15 @@ function traced<T>(cwd: string, action: () => T) {
     cwd: process.cwd(),
     trace: process.env.GIT_TRACE2_EVENT,
     temporary: process.env.TMPDIR,
+    temporaryWindows: process.env.TEMP,
+    temporaryFallback: process.env.TMP,
   };
   try {
     process.chdir(cwd);
     // Nest fixtures in the ambient clone to catch parent-repository discovery.
     process.env.TMPDIR = cwd;
+    process.env.TEMP = cwd;
+    process.env.TMP = cwd;
     process.env.GIT_TRACE2_EVENT = trace;
     const result = action();
     const events: GitTraceEvent[] = readFileSync(trace, 'utf8')
@@ -91,6 +101,8 @@ function traced<T>(cwd: string, action: () => T) {
     for (const [key, value] of [
       ['GIT_TRACE2_EVENT', previous.trace],
       ['TMPDIR', previous.temporary],
+      ['TEMP', previous.temporaryWindows],
+      ['TMP', previous.temporaryFallback],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -125,10 +137,15 @@ describe('synthetic certification fixtures stay local', () => {
         };
       });
       expect(result.certificate.status).toBe('GREEN');
-      expect(dirname(result.gitRoot ?? '')).toBe(ambient);
-      expect(events).toContainEqual(
-        expect.objectContaining({ event: 'def_repo', worktree: result.gitRoot })
-      );
+      const fixtureRoot = realpathSync(result.gitRoot ?? '');
+      expect(dirname(fixtureRoot)).toBe(realpathSync(ambient));
+      expect(
+        events.flatMap(event =>
+          event.event === 'def_repo' && event.worktree
+            ? [realpathSync(event.worktree)]
+            : []
+        )
+      ).toContain(fixtureRoot);
       expect(transportCommands(events)).toEqual([]);
     }
   );
