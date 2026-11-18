@@ -372,6 +372,7 @@ function OutboundRailContent({
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
+          {/* Link row, not shell navigation (JOV-INV-047). */}
           <div
             data-testid='outbound-profile-source'
             className='flex flex-wrap items-center gap-2 px-1 pb-2 text-xs'
