@@ -5952,6 +5952,13 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/calendar/create-manual-event.ts",
+      "kind": "action",
+      "export": "createManualEvent",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/calendar/page.tsx",
       "kind": "page",
       "route": "/app/calendar",
