@@ -53,5 +53,24 @@ class CoverageIncludeMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_additive_identifier_list_text(conflict.replace(".split(", ".join(", 1)))
 
 
+class PytestCountConflictTest(unittest.TestCase):
+    def test_counts_union_and_keeps_assertions_but_rejects_unrelated_edits(self):
+        from fix_red_pytest_count import resolve_pytest_count_conflict
+        head = "  'scripts/tests/test_a.py scripts/tests/test_head.py'.split(\n"
+        main = "  'scripts/tests/test_a.py scripts/tests/test_main.py'.split(\n"
+        hunk = ("<<<<<<< HEAD\n    expect(LANES_PYTEST_FILES).toHaveLength(2);\n"
+                "    expect(whole).toContain('scripts/tests/test_head.py');\n=======\n"
+                "    expect(LANES_PYTEST_FILES).toHaveLength(2);\n"
+                "    expect(whole).toContain('scripts/tests/test_main.py');\n>>>>>>> origin/main\n")
+        expected = ("    expect(LANES_PYTEST_FILES).toHaveLength(3);\n"
+                    "    expect(whole).toContain('scripts/tests/test_main.py');\n"
+                    "    expect(whole).toContain('scripts/tests/test_head.py');\n")
+        self.assertEqual(resolve_pytest_count_conflict(hunk, head, main), expected)
+        self.assertIsNone(resolve_pytest_count_conflict(hunk.replace('Length(2)', 'Length(9)', 1), head, main))
+        self.assertIsNone(resolve_pytest_count_conflict(hunk.replace('test_head.py', 'test_other.py'), head, main))
+        self.assertIsNone(resolve_pytest_count_conflict(hunk + hunk, head, main))
+        self.assertIsNone(resolve_pytest_count_conflict(hunk.replace('=======', '    dangerous();\n======='), head, main))
+
+
 if __name__ == "__main__":
     unittest.main()

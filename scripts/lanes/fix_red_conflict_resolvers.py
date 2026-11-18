@@ -184,6 +184,7 @@ def merge_pytest_file_list(ours: str, theirs: str) -> str | None:
     ordered = left and right and left[0] == right[0] and [t for t in left[1] if t in right[1]] == [t for t in right[1] if t in left[1]]
     return f"{right[0]}'{' '.join(dict.fromkeys([*right[1], *left[1]]))}'.split(\n" if ordered else None
 
+
 def resolve_additive_node_tests_text(text: str) -> str | None:
     """Union complete top-level node:test additions against an empty diff3 base.
 

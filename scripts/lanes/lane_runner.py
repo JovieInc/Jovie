@@ -168,7 +168,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py", "scripts/tests/test_pool_feed.py", "scripts/tests/test_release_fixtures.py",
               "scripts/tests/test_epics.py",
@@ -6505,7 +6505,7 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         for path in conflicted:
             target = worktree / path
             try:
-                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text())
+                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text()) or fix_red_source_edits.resolve_pytest_count_file(worktree, path, conflicted, sh)
             except (OSError, UnicodeError):
                 text = None
             if text is None:
