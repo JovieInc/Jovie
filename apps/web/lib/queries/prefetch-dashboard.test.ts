@@ -17,10 +17,6 @@ vi.mock('./fetch', () => ({
   createQueryFn: vi.fn(() => vi.fn()),
   fetchWithTimeout: vi.fn().mockResolvedValue([{ id: 'contact-1' }]),
 }));
-// Avoid the heavy @/lib/queries barrel that useEventsQuery pulls in.
-vi.mock('./useEventsQuery', () => ({
-  tourDateToEventRecord: (td: unknown) => td,
-}));
 
 import { queryKeys } from './keys';
 import { prefetchChatEntityPanelData } from './prefetch-dashboard';
