@@ -61,6 +61,7 @@ export {
 } from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -1364,7 +1365,8 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
+/** @typedef {{ catalogId: string | null, rows: object[], wallMs?: number, state?: string }} StructuralCommandReceipt */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number, structuralCommands?: StructuralCommandReceipt }} LaneResult */
 
 const LANES = [
   {
@@ -3001,6 +3003,32 @@ export async function runStructural(opts = {}) {
   const timings = results.flatMap((result, index) =>
     result ? [{ index, command: parts[index], ...result }] : []
   );
+  // Keep every selected index, including holes left by fail-fast or stop. Only
+  // digests cross into the artifact; command arguments and output stay in logs.
+  const catalog = parts.map((command, index) => ({
+    index,
+    id: createHash('sha256').update(command).digest('hex'),
+  }));
+  const commandReceipt = {
+    catalogId: createHash('sha256')
+      .update(JSON.stringify(catalog))
+      .digest('hex'),
+    wallMs,
+    rows: catalog.map(({ index, id }) => {
+      const result = results[index];
+      return {
+        index,
+        recipe: id,
+        ...(result
+          ? {
+              status: 'completed',
+              durationMs: result.durationMs,
+              exit: result.code,
+            }
+          : { status: 'unstarted' }),
+      };
+    }),
+  };
   // First failure in list order, not completion order.
   const failedIndex = results.findIndex(result => result && result.code !== 0);
   if (failedIndex !== -1) {
@@ -3016,6 +3044,7 @@ export async function runStructural(opts = {}) {
       ),
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // findIndex, not some(): unstarted commands are holes in the results array.
@@ -3027,11 +3056,12 @@ export async function runStructural(opts = {}) {
       skipped: true,
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // Deterministic list order regardless of completion order.
   const combined = results.map(result => result.output).join('');
-  return { code: 0, output: combined, timings, wallMs };
+  return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -3100,6 +3130,13 @@ function writeLaneResults(results, laneGroup, setupError) {
         schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
+        execution: {
+          runId: process.env.GITHUB_RUN_ID || null,
+          runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+          sha: process.env.GITHUB_SHA || null,
+          eventName: process.env.GITHUB_EVENT_NAME || null,
+          jobId: process.env.GITHUB_JOB || null,
+        },
         lanes: results,
         setupError: setupError || null,
         generatedAt: new Date().toISOString(),
@@ -3164,6 +3201,15 @@ async function main() {
           status: 'skipped',
           logExcerpt,
           durationMs,
+          ...(lane.id === 'structural'
+            ? {
+                structuralCommands: {
+                  state: 'not-run',
+                  catalogId: null,
+                  rows: [],
+                },
+              }
+            : {}),
         });
         continue;
       }
@@ -3221,6 +3267,15 @@ async function main() {
         status,
         logExcerpt,
         durationMs,
+        ...(lane.id === 'structural'
+          ? {
+              structuralCommands: outcome.commandReceipt ?? {
+                state: skipped ? 'not-run' : 'missing',
+                catalogId: null,
+                rows: [],
+              },
+            }
+          : {}),
       });
     }
   } catch (error) {

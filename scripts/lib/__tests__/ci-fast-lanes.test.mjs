@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseCLI } from 'vitest/node';
+import './fixtures/structural-command-receipts.mjs';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
