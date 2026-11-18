@@ -9,6 +9,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { CreatorDocumentsWorkspace as CreatorDocumentsWorkspaceComponent } from './CreatorDocumentsWorkspace';
+import { document } from './creator-document-test-fixture';
 
 function CreatorDocumentsWorkspace({
   creatorProfileId = '22222222-2222-4222-8222-222222222222',
@@ -84,17 +85,6 @@ vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
   ),
 }));
 
-const document = {
-  id: '11111111-1111-4111-8111-111111111111',
-  title: 'A durable idea',
-  kind: 'idea' as const,
-  stage: 'private_draft' as const,
-  currentRevision: 1,
-  content: { type: 'doc' as const, content: [] },
-  plainText: 'Body',
-  updatedAt: '2026-08-16T00:00:00.000Z',
-};
-
 describe('CreatorDocumentsWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,6 +94,17 @@ describe('CreatorDocumentsWorkspace', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('opens the requested private document from the persisted list', () => {
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[document]}
+        initialDocumentId={document.id}
+      />
+    );
+    expect(vi.mocked(useRegisterRightPanel).mock.lastCall?.[0]).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('captures an idea privately with an idempotency key', async () => {
@@ -216,12 +217,10 @@ describe('CreatorDocumentsWorkspace', () => {
     render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
     fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
 
-    const registeredPanel = vi
-      .mocked(useRegisterRightPanel)
-      .mock.calls.at(-1)?.[0];
-    expect(registeredPanel).toBeTruthy();
-    if (!registeredPanel) throw new Error('Expected a document panel');
-    render(registeredPanel);
+    const panel = vi.mocked(useRegisterRightPanel).mock.lastCall?.[0];
+    expect(panel).toBeTruthy();
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
     expect(screen.getByLabelText('Document Title')).toBeInTheDocument();
   });
 
