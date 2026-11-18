@@ -604,6 +604,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
   },
+  OUTBOUND_COLD_DRAFTS: {
+    nonMarketing:
+      'internal certified email draft composition; default off; no send authority (JOV-12382)',
+  },
   OUTBOUND_DOGFOOD_GATE: {
     nonMarketing:
       'internal outbound draft visibility; default off outside tests; no send authority (JOV-12380)',

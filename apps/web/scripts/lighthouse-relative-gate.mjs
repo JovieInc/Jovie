@@ -15,6 +15,7 @@
 //                                fails (default 3, 0 turns the recheck off)
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -88,18 +89,37 @@ export async function decide({
   withServer,
   evaluate,
   log = console.log,
+  now = () => performance.now(),
 }) {
+  const collections = [];
+  async function measure(side, suite, runs) {
+    const started = now();
+    let completed = false;
+    try {
+      completed = await collect(side, suite, runs);
+      return completed;
+    } finally {
+      collections.push({
+        suite: suite.name,
+        side,
+        phase: runs === null ? 'initial' : 'recheck',
+        elapsedMs: Math.round(now() - started),
+        completed,
+      });
+    }
+  }
+
   let headCollected = true;
   await withServer('head', async () => {
     for (const suite of suites) {
-      if (!(await collect('head', suite, null))) headCollected = false;
+      if (!(await measure('head', suite, null))) headCollected = false;
     }
   });
   if (!headCollected) {
     log(
       '::error::Lighthouse could not measure this change; see the lhci output above.'
     );
-    return { passed: false, evaluations: [], baseline: new Set() };
+    return { passed: false, evaluations: [], baseline: new Set(), collections };
   }
 
   const baseline = new Set();
@@ -108,7 +128,7 @@ export async function decide({
     try {
       await withServer('base', async () => {
         for (const suite of wanted) {
-          if (await collect('base', suite, null)) baseline.add(suite.name);
+          if (await measure('base', suite, null)) baseline.add(suite.name);
         }
       });
     } catch (error) {
@@ -155,7 +175,7 @@ export async function decide({
       try {
         await withServer(side, async () => {
           for (const suite of recheck) {
-            if (!(await collect(side, suite, extraRuns))) rechecked = false;
+            if (!(await measure(side, suite, extraRuns))) rechecked = false;
           }
         });
       } catch (error) {
@@ -182,6 +202,7 @@ export async function decide({
     passed: evaluations.every(({ evaluation }) => evaluation.passed),
     evaluations,
     baseline,
+    collections,
   };
 }
 
@@ -298,6 +319,27 @@ async function stopServer({ child, hasExited }, baseUrl) {
   throw new Error(`${baseUrl} still serves after the server was stopped.`);
 }
 
+export function appendCollectionSummary(summaryPath, collections) {
+  if (!summaryPath) return;
+  const lines = [
+    '### Signed-in Lighthouse collection times',
+    '',
+    '| Suite | Build | Phase | Elapsed | Collection |',
+    '| --- | --- | --- | ---: | --- |',
+    ...collections.map(
+      ({ suite, side, phase, elapsedMs, completed }) =>
+        `| ${suite} | ${side} | ${phase} | ${(elapsedMs / 1000).toFixed(1)}s | ${completed ? 'Complete' : 'Failed'} |`
+    ),
+  ];
+  try {
+    appendFileSync(summaryPath, lines.join('\n') + '\n');
+  } catch {
+    console.warn(
+      'Lighthouse collection times remain available in verdict.json.'
+    );
+  }
+}
+
 async function main() {
   const baseUrl = (process.env.BASE_URL || 'http://localhost:3000').replace(
     /\/$/,
@@ -338,7 +380,7 @@ async function main() {
   const reportDir = (suite, side) => path.join(reportRoot, suite.name, side);
   const uploaded = new Set();
 
-  const { passed, evaluations, baseline } = await decide({
+  const { passed, evaluations, baseline, collections } = await decide({
     suites,
     hasBaseline,
     extraRuns,
@@ -405,6 +447,7 @@ async function main() {
     `${JSON.stringify(
       {
         passed,
+        collections,
         baselineSha: process.env.LIGHTHOUSE_BASELINE_SHA || null,
         suites: evaluations.map(({ suite, evaluation }) => ({
           name: suite.name,
@@ -416,6 +459,7 @@ async function main() {
       2
     )}\n`
   );
+  appendCollectionSummary(process.env.GITHUB_STEP_SUMMARY, collections);
   console.log(
     passed
       ? 'Lighthouse budgets passed.'

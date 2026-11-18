@@ -1,0 +1,49 @@
+{
+  "gates": {
+    "apps/web/components/organisms/release-sidebar/ReleaseTrackList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/sidebar/controls.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/sidebar/layout.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/atoms/AudienceMobileCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/organisms/sidebar/controls.tsx": {
+      "partial": "The controls do not render partial data; the detector counted optional 'children?' and 'className?' props."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceMobileCard.tsx": {
+      "empty": "The card renders one required member, not a collection; the detector matched 'items-center' in its layout classes.",
+      "permission-denied": "The card has no permission gate; 'role=\\'button\\'' appears in its explanatory comment. Contact availability is shown in the anonymous state."
+    }
+  }
+}

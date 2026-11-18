@@ -3,6 +3,7 @@
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createGitHubClient } from '../packages/api-client/github.ts';
+import { QUOTA_DEFERRED_MARKER } from './lib/github-rate-limit.mjs';
 
 export const MAX_SILENCE_MINUTES = 420; // Six-hour interval + one-hour grace.
 export const RUN_GRACE_MINUTES = 60; // Includes runner queue time; job timeout is 20m.
@@ -10,6 +11,29 @@ const CANARY = 'Production Synthetic Tests';
 const DAILY = 'Web AI Health (Daily)';
 export const DAILY_TITLE = 'Production Synthetic Monitoring (47 7 * * *)';
 const CANARY_TITLE = 'Production Synthetic Monitoring (17 */6 * * *)';
+const INFRASTRUCTURE_READ_KINDS = new Set([
+  'shed',
+  'budget',
+  'exhausted',
+  'budget_exhausted',
+]);
+
+/**
+ * The shared client throws ApiError (exit 75) when a poll read is shed, over
+ * budget, or out of retries. That is infrastructure, not a canary verdict.
+ * A returned HTTP status is a different failure and stays fail-closed.
+ * @param {unknown} error
+ */
+function isInfrastructureReadFailure(error) {
+  if (!error || typeof error !== 'object') return false;
+  const exitCode = /** @type {{ exitCode?: unknown }} */ (error).exitCode;
+  const kind = /** @type {{ kind?: unknown }} */ (error).kind;
+  return (
+    exitCode === 75 &&
+    typeof kind === 'string' &&
+    INFRASTRUCTURE_READ_KINDS.has(kind)
+  );
+}
 
 /**
  * @typedef {{rest: (method: string, path: string, body?: unknown, options?: object) =>
@@ -34,6 +58,12 @@ async function read(github, path) {
 
 /** @param {{github: WorkflowReader, repo: string, now?: number}} options */
 export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
+  /**
+   * @param {boolean} ok
+   * @param {string} reason
+   * @param {{ id?: number } | undefined} [run]
+   * @param {{ missedSlot?: boolean, deferred?: boolean }} [extra]
+   */
   const result = (ok, reason, run, extra = {}) => ({
     ok,
     reason,
@@ -151,8 +181,15 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
         missedSlot: !pending,
       }
     );
-  } catch {
+  } catch (error) {
     // Do not publish raw API errors (which may contain credential material).
+    // A thrown exit-75 read is retried by the next 20-minute bucket. It must
+    // not reopen JOV-6813. Returned non-200 and every other throw stay red.
+    if (isInfrastructureReadFailure(error)) {
+      return result(false, 'Synthetic canary evidence deferred', undefined, {
+        deferred: true,
+      });
+    }
     return result(false, 'Synthetic canary evidence unavailable');
   }
 }
@@ -205,7 +242,11 @@ export async function main({
       missedSlotDispatched = false;
     }
   }
-  const status = checked.ok ? 'passed' : 'failed';
+  const status = checked.deferred
+    ? 'deferred'
+    : checked.ok
+      ? 'passed'
+      : 'failed';
   if (env.GITHUB_OUTPUT) {
     appendFileSync(
       env.GITHUB_OUTPUT,
@@ -230,6 +271,11 @@ export async function main({
       );
     }
   }
+  if (checked.deferred) {
+    console.warn(
+      `::warning title=Synthetic canary evidence deferred::${QUOTA_DEFERRED_MARKER}: the next check retries. Not a canary failure.`
+    );
+  }
   console.log(
     JSON.stringify({
       checkedAt: new Date(now).toISOString(),
@@ -237,7 +283,7 @@ export async function main({
       ...checked,
     })
   );
-  return checked.ok ? 0 : 1;
+  return checked.deferred || checked.ok ? 0 : 1;
 }
 
 if (

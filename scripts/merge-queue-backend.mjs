@@ -1807,11 +1807,8 @@ export async function reconcileDraftQueueEntry({
 
 /**
  * @param {{
- *   backend?: string,
- *   repository?: string,
- *   number?: string | number,
- *   expectedHeadOid?: string,
- *   requireDraft?: boolean,
+ *   backend?: string, repository?: string, number?: string | number,
+ *   expectedHeadOid?: string, requireDraft?: boolean,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1857,15 +1854,6 @@ export async function dequeuePullRequest({
       state: before,
     };
   }
-  if (dequeuePostcondition(before)) {
-    return {
-      backend: resolvedBackend,
-      changed: false,
-      mutationActor,
-      state: before,
-    };
-  }
-
   const noLongerDraft = state =>
     requireDraft && (state.state !== 'OPEN' || state.isDraft !== true);
   if (noLongerDraft(before)) {
@@ -1878,7 +1866,14 @@ export async function dequeuePullRequest({
       state: before,
     };
   }
-
+  if (dequeuePostcondition(before)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      mutationActor,
+      state: before,
+    };
+  }
   let mutationBefore = before;
   let guardedQueueEntry = null;
   if (expectedHead !== null) {
@@ -1938,7 +1933,6 @@ export async function dequeuePullRequest({
       };
     }
   }
-
   const mutationErrors = [];
   if (
     mutationBefore.isInMergeQueue ||
@@ -1988,7 +1982,6 @@ export async function dequeuePullRequest({
     }
     current = await readPullRequestQueueState(stateOptions);
   }
-
   if (
     expectedHead !== null &&
     String(current.headRefOid ?? '').toLowerCase() !== expectedHead
@@ -2000,6 +1993,13 @@ export async function dequeuePullRequest({
     );
   }
 
+  if (noLongerDraft(current)) {
+    throw backendError(
+      'dequeue_draft_raced',
+      'Draft cleanup cannot prove an open draft after native dequeue',
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
   if (dequeuePostcondition(current)) {
     return {
       backend: resolvedBackend,

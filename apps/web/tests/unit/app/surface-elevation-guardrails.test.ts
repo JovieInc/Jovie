@@ -463,6 +463,9 @@ describe('surface elevation guardrails', () => {
     // The in-flow desktop drawer owns the raised inspector tier. Its children
     // must stay flat so entity surfaces do not reintroduce same-level nesting.
     expect(rightDrawer).toContain('shadow-(--app-shell-drawer-shadow)');
+    expect(rightDrawer).toMatch(
+      /rounded-\(--app-shell-radius\)[^\n]*border-\(--app-shell-frame-seam\)[^\n]*shadow-\(--app-shell-shadow\)/
+    );
     expect(rightDrawer).toContain('rounded-(--app-shell-radius)');
     expect(rightDrawer).toContain('border-(--app-shell-frame-seam)');
     expect(rightDrawer).toContain('bg-surface-1');

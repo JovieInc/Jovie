@@ -163,6 +163,12 @@ class RevertPlanTest(unittest.TestCase):
         self.assertTrue(plan["dependencyBump"])
         self.assertIn("Dependency bumps are always reverted", plan["body"])
 
+    def test_invalid_win_evidence_cannot_leave_the_generator(self):
+        attribution = rf.name_culprit(RED_AFTER_GREEN, [commit()])
+        attribution["run"] = "\n## Unexpected section\n"
+        with self.assertRaisesRegex(ValueError, "only Win evidence"):
+            rf.revert_plan(attribution, named_at=NAMED_AT)
+
     def test_titles_stay_conventional_and_within_100_characters(self):
         plan = self.plan(commit(subject=f"feat(web): {'x' * 200} (#24100)"))
         self.assertLessEqual(len(plan["title"]), 100)

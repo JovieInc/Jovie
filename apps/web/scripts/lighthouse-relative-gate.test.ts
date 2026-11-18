@@ -10,8 +10,9 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  appendCollectionSummary,
   decide,
   readBuildId,
   resolveSuites,
@@ -106,6 +107,101 @@ describe('relative Lighthouse gate flow', () => {
       'chat:strict',
       'onboarding:relative',
     ]);
+  });
+
+  it('accounts separately for initial collections and paired rechecks, including unsuccessful attempts', async () => {
+    const { options } = harness({
+      verdicts: { onboarding: [{ passed: false, retryable: true }] },
+      failCollect: (side, _suite, runs) => side === 'base' && runs === 2,
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => elapsed,
+      collect: (
+        side: string,
+        suite: { name: string },
+        count: number | null
+      ) => {
+        elapsed += count === null ? 100 : 200;
+        return options.collect(side, suite, count);
+      },
+      hasBaseline: true,
+      extraRuns: 2,
+    });
+    expect(result.passed).toBe(false);
+    const initial = result.collections.filter(row => row.phase === 'initial');
+    expect(initial.map(row => [row.side, row.suite])).toEqual([
+      ['head', 'dashboard'],
+      ['head', 'chat'],
+      ['head', 'onboarding'],
+      ['base', 'dashboard'],
+      ['base', 'onboarding'],
+    ]);
+    expect(initial.every(row => row.elapsedMs === 100 && row.completed)).toBe(
+      true
+    );
+    expect(result.collections.filter(row => row.phase === 'recheck')).toEqual([
+      {
+        suite: 'onboarding',
+        side: 'head',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: true,
+      },
+      {
+        suite: 'onboarding',
+        side: 'base',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: false,
+      },
+    ]);
+  });
+
+  it('appends readable timings without replacing earlier job notes or hiding a failed collection', async () => {
+    const { options } = harness({
+      verdicts: {},
+      failCollect: (_side, suite) => suite === 'chat',
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => (elapsed += 1250),
+      hasBaseline: false,
+      extraRuns: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const summary = join(dir, 'job.md');
+    try {
+      writeFileSync(summary, 'Previous step\n');
+      appendCollectionSummary(summary, result.collections);
+      const markdown = readFileSync(summary, 'utf8');
+      expect(markdown).toMatch(/^Previous step\n### Signed-in Lighthouse/);
+      expect(markdown).toContain(
+        '| dashboard | head | initial | 1.3s | Complete |'
+      );
+      expect(markdown).toContain('| chat | head | initial | 1.3s | Failed |');
+      expect(result.passed).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing or unwritable job summary as optional reporting', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      appendCollectionSummary(undefined, []);
+      expect(warn).not.toHaveBeenCalled();
+      appendCollectionSummary(dir, []);
+      expect(warn).toHaveBeenCalledWith(
+        'Lighthouse collection times remain available in verdict.json.'
+      );
+    } finally {
+      warn.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('without a baseline enforces the configured budgets and never rechecks', async () => {
