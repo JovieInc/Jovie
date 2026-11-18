@@ -3,6 +3,7 @@
  * Creates checkout sessions for subscription purchases
  */
 
+import { createHash } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
@@ -13,6 +14,8 @@ import {
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { normalizeUpgradeReturnTo } from '@/lib/billing/artist-presence-upgrade';
+import { resolveCheckoutPriceForUser } from '@/lib/billing/price-lock.server';
 import {
   CLAIM_FLOW_COOKIE,
   claimStateHref,
@@ -233,7 +236,9 @@ export async function POST(request: NextRequest) {
       throw error;
     }
     const checkoutSource =
-      rawSource === 'onboarding' || rawSource === 'youtube_thumbnails'
+      rawSource === 'onboarding' ||
+      rawSource === 'youtube_thumbnails' ||
+      rawSource === 'in_app'
         ? rawSource
         : undefined;
 
@@ -242,23 +247,47 @@ export async function POST(request: NextRequest) {
     }
 
     const referralCode = normalizeReferralCode(rawReferralCode);
-    const onboardingReturnTo = normalizeOnboardingReturnTo(rawReturnTo);
+    const onboardingReturnTo = normalizeOnboardingReturnTo(
+      checkoutSource === 'onboarding' ? rawReturnTo : undefined
+    );
 
-    const priceError = await validatePriceId(priceId, userId);
-    if (priceError) return priceError;
+    // Price lock: the person is charged the price they signed up at, not the
+    // list price the browser sent. A lock that cannot be read or created
+    // fails closed (500) rather than charging an unlocked price.
+    const { decision: priceDecision, lock: priceLock } =
+      await resolveCheckoutPriceForUser(userId, priceId);
+    const chargedPriceId = priceDecision.priceId;
+    const lockedExpectation =
+      priceDecision.kind === 'locked' ? priceDecision.expectation : undefined;
+    if (priceDecision.kind === 'locked' && priceDecision.substituted) {
+      logger.info('Checkout price replaced by price lock', {
+        userId,
+        requestedPriceId: priceId,
+        chargedPriceId,
+        priceVersionId: priceLock.priceVersionId,
+      });
+    }
 
-    if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
+    if (priceDecision.kind === 'list') {
+      const priceError = await validatePriceId(chargedPriceId, userId);
+      if (priceError) return priceError;
+    }
+
+    if (!isMaxPlanEnabled() && isMaxPriceId(chargedPriceId)) {
       return jsonError('Max plan is not currently available', 403);
     }
 
-    const priceDetails = getPriceMappingDetails(priceId);
-    if (envelope?.agentIntent && priceDetails?.plan !== 'pro') {
+    const priceDetails = getPriceMappingDetails(chargedPriceId);
+    const resolvedPlan =
+      priceDetails?.plan ??
+      (priceDecision.kind === 'locked' ? priceDecision.plan : undefined);
+    if (envelope?.agentIntent && resolvedPlan !== 'pro') {
       return jsonError('Invalid price for the selected offer', 400);
     }
     logger.info('Creating checkout session for:', {
       userId,
-      priceId,
-      plan: priceDetails?.plan,
+      priceId: chargedPriceId,
+      plan: resolvedPlan,
       description: priceDetails?.description,
     });
 
@@ -273,7 +302,7 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const selectedPlan = priceDetails?.plan;
+    const selectedPlan = resolvedPlan;
     if (selectedPlan) {
       const subscriptionCheck = await withStripeRetry(
         'checkExistingPlanSubscription',
@@ -302,11 +331,21 @@ export async function POST(request: NextRequest) {
       checkoutSource === 'onboarding' &&
       request.cookies.get(CLAIM_FLOW_COOKIE)?.value === '1';
 
-    const sourceKey = isClaimFlow ? 'claim' : (checkoutSource ?? 'default');
+    const upgradeReturnTo = normalizeUpgradeReturnTo(rawReturnTo);
+    const returnKey = createHash('sha256')
+      .update(upgradeReturnTo)
+      .digest('hex')
+      .slice(0, 16);
+    const sourceKey =
+      checkoutSource === 'in_app'
+        ? `in_app:${returnKey}`
+        : isClaimFlow
+          ? 'claim'
+          : (checkoutSource ?? 'default');
     const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
     const idempotencyKey = correlationPart
-      ? `checkout:${userId}:${priceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
-      : `checkout:${userId}:${priceId}:${sourceKey}:${idempotencyBucket}`;
+      ? `checkout:${userId}:${chargedPriceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
+      : `checkout:${userId}:${chargedPriceId}:${sourceKey}:${idempotencyBucket}`;
 
     const planIdSuffix = selectedPlan
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
@@ -320,6 +359,11 @@ export async function POST(request: NextRequest) {
     } else if (checkoutSource === 'onboarding') {
       successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
+    } else if (checkoutSource === 'in_app') {
+      // Navigation is not payment proof: the destination's existing entitlement
+      // checks remain authoritative, including while a webhook is pending.
+      successUrl = `${baseUrl}${upgradeReturnTo}`;
+      cancelUrl = `${baseUrl}${upgradeReturnTo}`;
     } else if (checkoutSource === 'youtube_thumbnails') {
       successUrl = `${baseUrl}/billing/youtube-thumbnails/success?session_id={CHECKOUT_SESSION_ID}`;
       cancelUrl = `${baseUrl}/billing/youtube-thumbnails?checkout=cancel`;
@@ -331,8 +375,9 @@ export async function POST(request: NextRequest) {
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({
         customerId,
-        priceId,
+        priceId: chargedPriceId,
         plan: selectedPlan,
+        ...(lockedExpectation ? { lockedPrice: lockedExpectation } : {}),
         userId,
         successUrl,
         cancelUrl,
@@ -345,7 +390,7 @@ export async function POST(request: NextRequest) {
     logger.info('Checkout session created:', {
       sessionId: session.id,
       userId,
-      priceId,
+      priceId: chargedPriceId,
       customerId,
       url: session.url,
     });

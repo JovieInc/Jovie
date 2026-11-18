@@ -129,4 +129,12 @@ describe('DrawerEditableTextField', () => {
     expect(screen.queryByLabelText('Copy Spotify URL')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Open Spotify URL')).not.toBeInTheDocument();
   });
+
+  it('renders the edit trigger through the design-system plain button', () => {
+    render(<DrawerEditableTextField label='Title' value='Nova' editable />);
+    expect(screen.getByRole('button', { name: /Nova/ })).toHaveAttribute(
+      'data-slot',
+      'plain-button'
+    );
+  });
 });

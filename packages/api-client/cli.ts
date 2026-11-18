@@ -2,7 +2,7 @@
 /**
  * node packages/api-client/cli.ts status [--json]
  *   Per-provider budgets, breakers and last-hour usage for lanes-status/doctor.
- * node packages/api-client/cli.ts gh [--priority P] [--credential ID] -- <gh args>
+ * node packages/api-client/cli.ts gh [--priority P] [--credential ID] [--once] -- <gh args>
  *   Run gh through the shared ledger; exit 75 when the call is deferred.
  */
 import { realpathSync } from 'node:fs';
@@ -141,6 +141,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = await runGh(rest.slice(split + 1), {
       priority,
       credential: flag('--credential'),
+      ...(flags.includes('--once') ? { maxAttempts: 1, maxWaitMs: 0 } : {}),
     });
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);

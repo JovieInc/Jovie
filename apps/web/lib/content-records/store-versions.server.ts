@@ -37,11 +37,22 @@ interface StoredLive {
   readonly schemaVersion: number;
 }
 
+/** The table probe could not confirm the live table (already logged). */
+class ContentStoreUnavailableError extends Error {}
+
+/**
+ * Reads the live pointer or throws. The table probe returns false on
+ * connection failures too, so it must throw rather than return null:
+ * `unstable_cache` stores every returned value with no expiry, and a cached
+ * null would pin the repo default until the record is published again.
+ */
 async function readStoredLive(
   kind: string,
   key: string
 ): Promise<StoredLive | null> {
-  if (!(await doesTableExist(TABLE))) return null;
+  if (!(await doesTableExist(TABLE))) {
+    throw new ContentStoreUnavailableError(`${TABLE} table unavailable`);
+  }
   const [row] = await db
     .select({
       versionId: contentRecordLive.versionId,
@@ -101,16 +112,44 @@ export async function getLiveContent<T>(
       { tags: [contentRecordCacheTag(definition.kind, key)] }
     )();
   } catch (error) {
-    await captureWarning('Content record read failed', error, {
-      kind: definition.kind,
-      key,
-    });
+    if (!(error instanceof ContentStoreUnavailableError)) {
+      await captureWarning('Content record read failed', error, {
+        kind: definition.kind,
+        key,
+      });
+    }
     return defaultContent(definition, key, 'unavailable');
   }
   if (!stored) return defaultContent(definition, key);
 
   const validated = validateContentRecord(definition, key, stored.data);
   if (!validated.ok || stored.schemaVersion !== definition.schemaVersion) {
+    // Retired shapes shared this revision. A hook must never authorize an
+    // unsupported stored/renderer revision merely because its output validates.
+    try {
+      const migrated =
+        stored.schemaVersion === definition.schemaVersion
+          ? definition.migrate?.(stored.data, definition.defaultRecord(key))
+          : null;
+      if (migrated !== null && migrated !== undefined) {
+        const migratedValidated = validateContentRecord(
+          definition,
+          key,
+          migrated
+        );
+        if (migratedValidated.ok) {
+          return {
+            data: migratedValidated.data,
+            source: 'live',
+            versionId: stored.versionId,
+            version: stored.version,
+            publishedAt: stored.publishedAt,
+          };
+        }
+      }
+    } catch {
+      // Failed compatibility is still an incompatible read, never a write.
+    }
     await captureWarning(
       'Live content record no longer validates',
       new Error(

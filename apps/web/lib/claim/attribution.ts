@@ -28,5 +28,6 @@ export function claimHrefWithAttribution(
   const [pathname, query = ''] = path.split('?');
   const params = new URLSearchParams(query);
   appendClaimAttribution(params, source);
-  return `${pathname}${params.size ? `?${params.toString()}` : ''}`;
+  const search = params.toString();
+  return `${pathname}${search ? `?${search}` : ''}`;
 }

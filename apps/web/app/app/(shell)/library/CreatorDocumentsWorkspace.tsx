@@ -13,6 +13,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { richTextDocumentSchema } from '@/lib/rich-text/document';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import type { CreatorDocumentsWorkspaceProps } from './creator-documents-workspace-props';
 
 const DOCUMENT_DRAFT_KEY_PREFIX = 'jovie:creator-document-draft:v1:';
 const IDEA_DRAFT_KEY_PREFIX = 'jovie:creator-idea-draft:v1:';
@@ -428,7 +429,7 @@ function DocumentEditor({
             setIsDirty(true);
             setStatus('idle');
           }}
-          className='w-full bg-transparent text-lg font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
+          className='w-full bg-transparent text-base font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
         />
         <label className='flex items-center justify-between gap-3 text-xs text-secondary-token'>
           <span>Document Type</span>
@@ -611,24 +612,20 @@ function DocumentEditor({
 export function CreatorDocumentsWorkspace({
   creatorProfileId,
   initialDocuments,
+  initialDocumentId = null,
   initialNextCursor = null,
   initialLoadFailed = false,
   onUnsavedDraftChange,
   onDiscardDraftsReady,
-}: Readonly<{
-  creatorProfileId: string;
-  initialDocuments: readonly CreatorDocumentListItem[];
-  initialNextCursor?: string | null;
-  initialLoadFailed?: boolean;
-  onUnsavedDraftChange?: (hasDraft: boolean) => void;
-  onDiscardDraftsReady?: (discard: (() => void) | null) => void;
-}>) {
+}: CreatorDocumentsWorkspaceProps) {
   const [documents, setDocuments] = useState([...initialDocuments]);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [listStatus, setListStatus] = useState<'idle' | 'loading' | 'error'>(
     initialLoadFailed ? 'error' : 'idle'
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialDocumentId
+  );
   const [showCapture, setShowCapture] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');

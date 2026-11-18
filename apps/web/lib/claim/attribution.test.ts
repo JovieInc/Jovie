@@ -2,6 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { claimHrefWithAttribution } from './attribution';
 
 describe('claim attribution allowlist', () => {
+  it('preserves trusted route and campaign parameters without URLSearchParams.size', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      URLSearchParams.prototype,
+      'size'
+    );
+    Reflect.deleteProperty(URLSearchParams.prototype, 'size');
+    try {
+      expect(
+        claimHrefWithAttribution(
+          '/artist/claim?next=auth',
+          new URLSearchParams('utm_source=claim_link&email=private@example.com')
+        )
+      ).toBe('/artist/claim?next=auth&utm_source=claim_link');
+      expect(
+        claimHrefWithAttribution('/artist/claim', new URLSearchParams())
+      ).toBe('/artist/claim');
+    } finally {
+      if (descriptor)
+        Object.defineProperty(URLSearchParams.prototype, 'size', descriptor);
+    }
+  });
   it('keeps the trusted destination and route parameters, carrying only safe UTM labels', () => {
     const href = claimHrefWithAttribution(
       '/artist/claim?next=auth',

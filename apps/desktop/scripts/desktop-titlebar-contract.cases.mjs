@@ -76,7 +76,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /grid-template-columns: var\(--electron-sidebar-width\)/
   );
   // The overlay reserves a fixed control-row width for native window controls.
-  assert.match(globalsCss, /--electron-controls-width: 200px;/);
+  assert.match(globalsCss, /--electron-controls-width: 176px;/);
   assert.doesNotMatch(
     globalsCss,
     /grid-template-columns: var\(--linear-app-sidebar-width\)/
@@ -159,6 +159,32 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   assert.ok(
     toggleStart >= lightsEnd + toggleGap,
     `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${toggleGap}px`
+  );
+  // The page title must sit right after the controls, not float away from
+  // them (Tim, Nov 14: title 44px past the arrows read as broken). Controls:
+  // toggle 28 + toggle gap + back 24 + 2 + forward 24. The reserve may add at
+  // most 12px of drag strip before the header's own padding.
+  const controlsEnd = toggleStart + 28 + toggleGap + 24 + 2 + 24;
+  const controlsWidth = Number(
+    globalsCss.match(/--electron-controls-width: (\d+)px;/)?.[1]
+  );
+  const deadSpan = controlsWidth - controlsEnd;
+  assert.ok(
+    deadSpan >= 0 && deadSpan <= 12,
+    `title must start within 12px of the titlebar controls (dead span ${deadSpan}px)`
+  );
+  const fullScreenControlsWidth = Number(
+    globalsCss.match(
+      /data-electron-fullscreen="true"\][^{]*\{[^}]*--electron-controls-width: (\d+)px;/s
+    )?.[1]
+  );
+  // Full screen drops the light reserve: toggle starts at shellGap + gap.
+  const fullScreenDeadSpan =
+    fullScreenControlsWidth -
+    (shellGap + toggleGap + 28 + toggleGap + 24 + 2 + 24);
+  assert.ok(
+    fullScreenDeadSpan >= 0 && fullScreenDeadSpan <= 12,
+    `full-screen title must start within 12px of the controls (dead span ${fullScreenDeadSpan}px)`
   );
   assert.ok(
     titlebarHeight >= y + controlDiameter,

@@ -2,68 +2,40 @@ import { MarketingContainer } from '@/components/marketing';
 import './changelog-editorial.css';
 
 /**
- * Skeleton mirrors the release-journal hero + O64tu entry-row geometry of
- * ./page.tsx so the loading state lands on the final layout without shift.
+ * Skeleton mirrors the header and day-row geometry of ./page.tsx so the
+ * loading state lands on the final layout without shift.
  */
 export default function ChangelogLoading() {
   return (
     <div aria-hidden='true' className='min-h-screen bg-page text-primary-token'>
-      {/* Hero skeleton: kicker, display title, support line, version timeline */}
-      <section className='changelog-hero'>
-        <MarketingContainer width='page' className='changelog-hero__inner'>
-          <div className='changelog-hero__masthead'>
-            <div className='h-3 w-24 skeleton rounded' />
-            <div className='h-20 w-2/3 max-w-xl skeleton rounded-lg' />
-            <div className='h-6 w-80 max-w-full skeleton rounded' />
+      <MarketingContainer width='page'>
+        <div className='changelog-header'>
+          <div className='changelog-header__copy'>
+            <div className='h-14 w-64 max-w-full skeleton rounded-lg' />
+            <div className='h-6 w-96 max-w-full skeleton rounded' />
           </div>
-          <div className='changelog-hero__timeline'>
-            <div className='changelog-hero__timeline-entries'>
-              {[0, 1, 2].map(index => (
-                <div
-                  key={`cl-hero-skeleton-${index}`}
-                  className='changelog-hero__timeline-link'
-                >
-                  <div className='h-1.5 w-1.5 skeleton rounded-full' />
-                  <div className='h-3 w-20 skeleton rounded' />
-                  <div className='h-3 w-40 skeleton rounded' />
-                </div>
-              ))}
-            </div>
+          <div className='changelog-subscribe'>
+            <div className='h-28 w-full skeleton rounded-2xl' />
           </div>
-        </MarketingContainer>
-      </section>
-
-      {/* Archive content skeleton: copy, sticky subscribe, and outcomes */}
-      <MarketingContainer width='page' className='changelog-content'>
-        <div className='changelog-content__grid'>
-          <div className='changelog-lead__copy'>
-            <div className='h-5 w-full max-w-lg skeleton rounded' />
-          </div>
-          <aside className='changelog-subscribe-rail'>
-            <div className='h-48 w-full skeleton rounded-2xl' />
-          </aside>
-          <div className='changelog-entries'>
-            {[0, 1].map(index => (
-              <div
-                key={`cl-entry-skeleton-${index}`}
-                className='changelog-entry'
-              >
-                <div className='changelog-entry__date'>
-                  <div className='h-4 w-28 skeleton rounded' />
-                </div>
-                <div className='changelog-entry__main'>
-                  <div className='changelog-entry__content'>
-                    <div className='h-3 w-16 skeleton rounded' />
-                    <div className='h-8 w-2/3 skeleton rounded' />
-                    <div className='space-y-2'>
-                      <div className='h-4 w-full skeleton rounded' />
-                      <div className='h-4 w-5/6 skeleton rounded' />
-                    </div>
+        </div>
+        <div className='changelog-feed'>
+          {[0, 1].map(index => (
+            <div key={`cl-day-skeleton-${index}`} className='changelog-day'>
+              <div className='changelog-day__rail'>
+                <div className='h-4 w-28 skeleton rounded' />
+              </div>
+              <div className='changelog-day__body'>
+                <div className='changelog-post'>
+                  <div className='h-5 w-16 skeleton rounded-full' />
+                  <div className='h-9 w-2/3 skeleton rounded' />
+                  <div className='space-y-2'>
+                    <div className='h-4 w-full skeleton rounded' />
+                    <div className='h-4 w-5/6 skeleton rounded' />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </MarketingContainer>
     </div>

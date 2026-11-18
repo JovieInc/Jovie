@@ -44,6 +44,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
+import { expectDesktop32Control } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -251,25 +252,21 @@ function clickGridView() {
   fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
 }
 
-function expectDesktop32Control(
-  control: HTMLElement,
-  { square = false }: { readonly square?: boolean } = {}
-) {
-  expect(control).toHaveClass(
-    'h-8',
-    'min-h-8',
-    'lg:before:h-8',
-    'lg:before:min-w-0'
-  );
-  expect(control).not.toHaveClass('h-7');
-  expect(control).not.toHaveClass('h-7.5');
-  if (square) {
-    expect(control).toHaveClass('w-8', 'min-w-8');
-    expect(control).not.toHaveClass('w-7');
-  }
-}
-
 describe('LibrarySurface', () => {
+  it.each([
+    [1, '1 of 1 Item'],
+    [2, '2 of 2 Items'],
+  ])('agrees the status bar noun with %i total assets', (count, label) => {
+    renderLibrary(
+      Array.from({ length: Number(count) }, (_, index) =>
+        buildAsset({ id: `asset-${index}`, title: `Asset ${index}` })
+      )
+    );
+    expect(
+      screen.getByText(String(label), { exact: true })
+    ).toBeInTheDocument();
+  });
+
   it('renders stored child assets under a visible album with dependency guides and working selection', async () => {
     window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
     const album = buildAsset({
@@ -1164,9 +1161,7 @@ describe('LibrarySurface', () => {
           'Chat is unavailable. Reopen this item and try again.'
         );
       } else {
-        expect(draft).toContain('"kind":"release"');
-        expect(draft).toContain('"id":"release-1"');
-        expect(draft).toContain('"profileId":"profile-1"');
+        expect(draft).toBe('@release:release-1[Take Me Over]');
       }
       resetCacheIsolationForTests();
     }

@@ -37,7 +37,7 @@ describe('ConnectedComponentsGallery', () => {
   it('renders one real capture per moment, in release order', () => {
     render(<ConnectedComponentsGallery />);
     const gallery = screen.getByTestId('connected-components-gallery');
-    expect(gallery).toHaveAttribute('data-count', '3');
+    expect(gallery.closest('[data-count]')).toHaveAttribute('data-count', '3');
     expect(
       screen.getByRole('heading', { name: CONNECTED_COMPONENTS_COPY.headline })
     ).toBeInTheDocument();

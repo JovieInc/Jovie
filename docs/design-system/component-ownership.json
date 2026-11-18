@@ -143,13 +143,15 @@
         "Field",
         "Textarea",
         "HostDrawnInput",
-        "HostDrawnSelect"
+        "HostDrawnSelect",
+        "OtpDigitInput"
       ],
       "ownerFiles": [
         "packages/ui/atoms/index.ts",
         "packages/ui/atoms/button.tsx",
         "packages/ui/atoms/icon-button.tsx",
-        "packages/ui/atoms/host-drawn-field.tsx"
+        "packages/ui/atoms/host-drawn-field.tsx",
+        "packages/ui/atoms/otp-digit-input.tsx"
       ]
     },
     "dialogs-and-drawers": {

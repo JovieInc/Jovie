@@ -22,8 +22,34 @@ vi.mock('./RuntimeUpdateProvider', () => ({
 }));
 
 import { SidebarInboxLink } from './SidebarInboxLink';
+import { SIDEBAR_HEADER_ICON_BUTTON_CLASS } from './sidebar-header-icon-button';
 
 describe('central Inbox bell', () => {
+  it('keeps the destination visible without inventing an unavailable count', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: null }}
+      />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox' });
+    expect(link).toBeVisible();
+    expect(link).toHaveAttribute('data-inbox-attention', 'unknown');
+    expect(link.querySelector('span')).toBeNull();
+  });
+
+  it.each([
+    [1, 'Inbox — 1 Item Needs Attention'],
+    [2, 'Inbox — 2 Items Need Attention'],
+  ])(
+    'agrees the attention label with %i pending items',
+    (pendingCount, name) => {
+      render(
+        <SidebarInboxLink availability={{ state: 'available', pendingCount }} />
+      );
+      expect(screen.getByRole('link', { name })).toBeVisible();
+    }
+  );
+
   it('keeps pending work on view and keyboard navigation', async () => {
     const { container } = render(
       <SidebarInboxLink
@@ -31,7 +57,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
@@ -50,46 +76,37 @@ describe('central Inbox bell', () => {
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
     await expectNoA11yViolations(container);
   });
-  it('keeps available runtime updates visible even when server work is empty', () => {
+  it('never marks the bell for an app update: the shell update pill owns it', () => {
     runtimeUpdate.available = true;
     try {
       render(
         <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
       );
-      const link = screen.getByRole('link', {
-        name: 'Inbox — all caught up; app update available',
-      });
-      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
-        'absolute',
-        'bottom-1',
-        'right-1'
-      );
-      expect(link.querySelector('[data-runtime-update]')).not.toHaveClass(
-        'top-1'
-      );
+      const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+      expect(link).toHaveAttribute('data-inbox-attention', 'empty');
+      expect(link.querySelector('[data-runtime-update]')).toBeNull();
+      expect(link.querySelector('[data-inbox-unread]')).toBeNull();
     } finally {
       runtimeUpdate.available = false;
     }
   });
 
-  it('consolidates pending work and runtime updates into one attention indicator', () => {
-    runtimeUpdate.available = true;
-    try {
-      render(
-        <SidebarInboxLink
-          availability={{ state: 'available', pendingCount: 3 }}
-        />
-      );
-      const link = screen.getByRole('link', {
-        name: 'Inbox — 3 items need attention; app update available',
-      });
-      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
-      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
-        'bottom-1'
-      );
-    } finally {
-      runtimeUpdate.available = false;
-    }
+  it('keeps one unread dot for pending work, bottom right of the glyph', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: 3 }}
+      />
+    );
+    const link = screen.getByRole('link', {
+      name: 'Inbox — 3 Items Need Attention',
+    });
+    expect(link.querySelectorAll('[data-inbox-unread]')).toHaveLength(1);
+    expect(link.querySelector('[data-inbox-unread]')).toHaveClass(
+      'absolute',
+      'bottom-1',
+      'right-1',
+      'bg-accent'
+    );
   });
 
   it.each([
@@ -112,7 +129,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 12840 items need attention',
+      name: 'Inbox — 12840 Items Need Attention',
     });
     expect(link).toHaveClass('size-7');
     expect(link.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
@@ -128,9 +145,50 @@ describe('central Inbox bell', () => {
       </div>
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps a lone pending item singular (JOV-9018 class)', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: 1 }}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Inbox — 1 Item Needs Attention' })
+    ).toBeInTheDocument();
+  });
+
+  it('names pending work without an update suffix even while an update is ready', () => {
+    runtimeUpdate.available = true;
+    try {
+      render(
+        <SidebarInboxLink
+          availability={{ state: 'available', pendingCount: 1 }}
+        />
+      );
+      const link = screen.getByRole('link', {
+        name: 'Inbox — 1 Item Needs Attention',
+      });
+      expect(link.getAttribute('aria-label')).not.toMatch(/update/i);
+    } finally {
+      runtimeUpdate.available = false;
+    }
+  });
+
+  it('uses the shared sidebar header icon-button box and 16px glyph', () => {
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    for (const token of SIDEBAR_HEADER_ICON_BUTTON_CLASS.split(' ')) {
+      expect(link).toHaveClass(token);
+    }
+    expect(link.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
   });
 });

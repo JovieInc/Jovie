@@ -39,6 +39,25 @@ class CollectorUnit(unittest.TestCase):
         self.assertIsNone(f.access_signature("HTTP 401', () => thing"))
         self.assertIsNone(f.access_signature("HTTP 401"))
 
+    def test_access_signature_drops_parameterized_test_titles(self):
+        # JOV-12818: the certificate-delivery suite's it.each 401 fixture title ran in a gem lane
+        # session and the transcript line was counted as a real 401 denial five times. A vitest
+        # fixture title is test output, not a denial; the sig it produced (key 0eaaad1acdc3) opened
+        # the phantom credential-rotation incident. A genuinely failed delivery still counts.
+        self.assertIsNone(f.access_signature("HTTP 401, requested=true, secret=true, report=true"))
+        for status in (401, 403):
+            self.assertIsNone(f.access_signature(
+                f"HTTP {status}, requested=false, secret=false, report=false (3ms)"))
+        self.assertIsNotNone(
+            f.access_signature("Ovie delivery: failed (http-or-transport-error; HTTP 401). Ingestion unverified."))
+
+    def test_access_signature_keeps_real_denials_with_requested_fields(self):
+        for line in ("HTTP 401 Unauthorized, requested=profile",
+                     "HTTP 403 Forbidden, requested=true, secret=true",
+                     "HTTP 401 Unauthorized, requested=true, secret=true, report=true"):
+            with self.subTest(line=line):
+                self.assertIsNotNone(f.access_signature(line))
+
 class ResendCollector(unittest.TestCase):
     """Only authoritative account usage is a quota reading; unknown evidence stays GAP."""
 

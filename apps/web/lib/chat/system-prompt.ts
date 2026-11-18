@@ -3,14 +3,25 @@ import {
   buildArtistRulesPromptSection,
   type EnforcedArtistRule,
 } from '@/lib/artist-rules/gate';
+import {
+  buildDiscographySection,
+  discographyTotalLine,
+  formatPromptDate,
+} from '@/lib/chat/discography-prompt';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { buildSkillsPromptSection } from '@/lib/chat/skills/registry';
 import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
+import type { ReleaseCatalogMeta } from '@/lib/chat/types';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
+
+export {
+  describeReleaseTiming,
+  formatPromptDate,
+} from '@/lib/chat/discography-prompt';
 
 interface ArtistContext {
   readonly displayName: string;
@@ -70,68 +81,6 @@ interface AccountPromptContext {
   };
 }
 
-const DAY_MS = 86_400_000;
-
-function utcDay(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
-function weekday(date: Date): string {
-  return date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-}
-
-/** "2026-10-30 (Friday)" */
-export function formatPromptDate(date: Date): string {
-  return `${date.toISOString().slice(0, 10)} (${weekday(date)})`;
-}
-
-/**
- * Upcoming vs released, relative to today. Without this the model treats a
- * single due Friday as already out (helpfulness eval, 2026-10-28).
- */
-export function describeReleaseTiming(
-  releaseDate: string | null,
-  now: Date
-): string {
-  if (!releaseDate) return 'date not set';
-  const date = new Date(releaseDate);
-  if (Number.isNaN(date.getTime())) return 'date not set';
-  const days = Math.round((utcDay(date) - utcDay(now)) / DAY_MS);
-  if (days > 0) {
-    return `UPCOMING, out ${weekday(date)} ${releaseDate.slice(0, 10)}, in ${days} day${days === 1 ? '' : 's'}`;
-  }
-  if (days === 0) return `OUT TODAY, ${releaseDate.slice(0, 10)}`;
-  const ago = -days;
-  return `released ${releaseDate.slice(0, 10)}, ${ago} day${ago === 1 ? '' : 's'} ago`;
-}
-
-function formatReleaseLine(release: ReleasePromptContext, now: Date): string {
-  const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
-  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`;
-}
-
-function buildDiscographySection(
-  releases: ReleasePromptContext[],
-  now: Date
-): string {
-  if (releases.length === 0) {
-    return '- No releases found in the connected discography yet.';
-  }
-
-  const releaseLines = releases
-    .slice(0, 25)
-    .map(release => formatReleaseLine(release, now))
-    .join('\n');
-  const overflowCount = releases.length - 25;
-  const releasePlural = overflowCount === 1 ? '' : 's';
-  const overflowLine =
-    overflowCount > 0
-      ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
-      : '';
-
-  return `${releaseLines}${overflowLine}`;
-}
-
 /**
  * `stable` is identical across turns for the same artist, plan and tool set;
  * `dynamic` changes turn to turn. Send `stable` first as its own cacheable
@@ -180,6 +129,13 @@ export function buildSystemPromptParts(
      * releases and music links already in this context.
      */
     segment?: ResolvedSegment;
+    /** Catalog read health + total; omitted = loaded slice is the whole catalog. */
+    releaseCatalog?: ReleaseCatalogMeta;
+    /**
+     * Releases the artist named this turn that are outside the shown rows.
+     * Rendered inside Discography Context; omitted when the catalog is unread.
+     */
+    namedReleases?: readonly ReleasePromptContext[];
     /** Clock for release timing. Defaults to now; tests and evals pin it. */
     now?: Date;
   }
@@ -214,8 +170,8 @@ Everything you say about this artist's own accounts, connections, releases, song
 - **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes (the public profile shows streaming links)' : 'No'}
 
 ## Discography Context
-- **Total Releases:** ${releases.length}
-${buildDiscographySection(releases, now)}
+- **Total Releases:** ${discographyTotalLine(releases, options?.releaseCatalog)}
+${buildDiscographySection(releases, now, options?.releaseCatalog, options?.namedReleases)}
 
 ${buildSegmentPromptSection(segment)}
 
@@ -228,7 +184,7 @@ ${buildSegmentPromptSection(segment)}
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
 - \`@release:<id>[<title>]\`: reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
-- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks.
+- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks. \`@profile:<id>[<name>]\` is the user's own Jovie profile, attached when they start a chat from it; treat it as a request for help with that profile.
 - \`/skill:<toolId>\`: the user picked this skill explicitly. Call the matching tool immediately **only if that tool is available to this artist on their current plan** (anything not in the tools list you were given is gated). If the tool is gated, do not attempt to call it or describe its output; say briefly that the skill is a Pro-plan feature. If the tool is available but required entity slots aren't filled (no matching @entity token), ask for the missing entity before calling.
 Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
 

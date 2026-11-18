@@ -37,6 +37,7 @@ import {
   OUTBOUND_RAIL_COMMAND_EVENT,
   type OutboundRailCommand,
 } from './outbound-keys';
+import { outboundMessageEmptyReason } from './outbound-message-state';
 
 function useRailCommand(
   command: OutboundRailCommand,
@@ -83,6 +84,7 @@ function approvalLine(row: OutboundRow): string {
         ? OUTBOUND_REJECT_REASON_LABELS[row.approval.rejectReason]
         : 'no reason'
     }`;
+  if (row.relationshipHold) return row.relationshipHold;
   if (row.approval.target === 'held') return 'Held';
   if (row.approval.target === 'stale')
     return 'Person changed since approval. Approve again.';
@@ -143,13 +145,7 @@ function MessageSection({
         className='px-1 pb-2 text-xs text-secondary-token'
         data-testid='outbound-message-empty'
       >
-        {row.view === 'needs_judge'
-          ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
-          : row.flags.includes('cold_draft_unavailable')
-            ? 'Draft hidden until certified page facts and email compliance checks are available.'
-            : row.channel
-              ? 'No draft is available for this profile yet.'
-              : 'No reachable channel: no email address or Instagram handle on file.'}
+        {outboundMessageEmptyReason(row)}
       </p>
     );
   }

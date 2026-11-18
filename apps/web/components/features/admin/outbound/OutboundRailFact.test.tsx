@@ -104,7 +104,6 @@ describe('OutboundRailFact', () => {
       expect(onDecision).toHaveBeenCalledWith(item, label.toLowerCase());
     }
   );
-
   it('requires explicit correction entry and save, retaining provenance and revision', () => {
     const onDecision = vi.fn();
     renderFact({ onDecision });
@@ -128,7 +127,6 @@ describe('OutboundRailFact', () => {
     fireEvent.click(save);
     expect(onDecision).toHaveBeenCalledWith(item, 'no', 'Ada Artist');
   });
-
   it('keeps unknown confidence and stale evidence explicit, and disables pending review', () => {
     const { rerender } = render(
       <OutboundRailFact

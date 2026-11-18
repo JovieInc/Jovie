@@ -148,9 +148,9 @@ describe('gating tests carry no new wall-clock assertions (JOV-10086)', () => {
       );
     expect(
       added,
-      'New wall-clock assertion in a gating test. Use an injected clock or ' +
-        'assert order/state; put a real perf budget in a *.perf.test.* file; ' +
-        'or add `// wall-clock-ok: <reason>` for a false positive.'
+      `New wall-clock assertion in a gating test: ${added.join('; ') || 'none'}. ` +
+        'Use an injected clock or assert order/state; put a real perf budget in a ' +
+        '*.perf.test.* file; or add `// wall-clock-ok: <reason>` for a false positive.'
     ).toEqual([]);
   });
 

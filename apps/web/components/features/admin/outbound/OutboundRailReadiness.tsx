@@ -51,6 +51,7 @@ export function OutboundRailReadiness({
   }[row.view as 'sent' | 'replied' | 'claimed' | 'paid'];
   const blockers = [
     error,
+    ...row.relationshipNotes,
     lifecycle,
     row.approval.target === 'rejected' || row.view === 'rejected'
       ? `Rejected: ${row.approval.rejectReason ? OUTBOUND_REJECT_REASON_LABELS[row.approval.rejectReason] : 'reason not recorded'}.`
@@ -141,6 +142,11 @@ export function OutboundRailReadiness({
           className='space-y-1 text-xs text-secondary-token'
           data-testid='outbound-eligibility'
         >
+          {row.relationshipHold ? (
+            <li data-testid='outbound-relationship-hold'>
+              {row.relationshipHold}
+            </li>
+          ) : null}
           {blockers.length ? (
             blockers.map(blocker => (
               <li

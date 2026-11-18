@@ -69,6 +69,9 @@ describe('OutboundRail', () => {
       screen.queryByText('Message', { exact: true })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Source' })).toBeVisible();
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'No draft is available for this profile yet.'
+    );
     expect(screen.getByTestId('outbound-readiness')).toHaveTextContent(
       'Current certification is unknown.'
     );
@@ -281,6 +284,15 @@ describe('OutboundRail', () => {
     );
   });
 
+  it('explains a missing claim link when a recipient is reachable', () => {
+    renderRail({
+      row: outboundFixtureRow({ message: null, profilePath: null }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'No claim link yet. Build the profile to draft a message.'
+    );
+  });
+
   it('lists missing evidence and the non-artist flag', () => {
     renderRail({
       row: outboundFixtureRow({
@@ -293,6 +305,37 @@ describe('OutboundRail', () => {
     const box = screen.getByTestId('outbound-eligibility');
     expect(box).toHaveTextContent('Looks like a label or distributor');
     expect(box).toHaveTextContent('Needs evidence: dsp, search.');
+  });
+
+  it('prioritizes the existing-relationship hold over unavailable cold draft inputs', () => {
+    const hold = 'Existing relationship: flag to Tim, no cold outreach';
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'held',
+        flags: ['existing_relationship', 'cold_draft_unavailable'],
+        relationshipHold: hold,
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      hold
+    );
+    expect(screen.getByTestId('outbound-relationship-hold')).toHaveTextContent(
+      hold
+    );
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('shows a relationship tag beside a draft that stays approvable', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        relationshipNotes: ["Relationship: Armada Music, Tim's vocalist deals"],
+      }),
+    });
+    expect(screen.getByTestId('outbound-eligibility')).toHaveTextContent(
+      "Relationship: Armada Music, Tim's vocalist deals"
+    );
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
   });
 
   it('blocks approval until the current facts are certified', () => {

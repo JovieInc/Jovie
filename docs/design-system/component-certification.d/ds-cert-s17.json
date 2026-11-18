@@ -1,0 +1,79 @@
+{
+  "gates": {
+    "apps/web/components/shell/ShellMetadataChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/SidebarNavItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/SidebarNowPlaying.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/SidebarThreadsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/StatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/TaskStatusIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/shell/ShellMetadataChip.tsx": {
+      "empty": "The chip renders one caller-supplied label and owns no collection that could be empty. The detector matched the items-center class in 'inline-flex h-5 shrink-0 items-center gap-1.5 ...' and the word rows in its doc comment."
+    },
+    "apps/web/components/shell/SidebarNavItem.tsx": {
+      "empty": "The row renders one nav item and owns no collection that could be empty. The detector matched the items-center class in 'relative grid items-center rounded-full ...' and the word rows in the comment 'These rows never render a trailing action'."
+    },
+    "apps/web/components/shell/SidebarThreadsSection.tsx": {
+      "offline": "The section fetches nothing: it renders threads and a caller-owned state of idle, loading or error, so there is no offline branch. The detector matched the loading value in \"export type SidebarThreadListState = 'idle' | 'loading' | 'error';\"."
+    },
+    "apps/web/components/shell/StatusBadge.tsx": {
+      "partial": "status is the only data prop and every status renders its full dot, label and tooltip from STATUS_CHIP, so no field can be missing; className is styling only.",
+      "long-content": "Labels come from the fixed STATUS_CHIP map (longest is 'Announced') and no prop carries caller text, so a long label cannot be rendered."
+    },
+    "apps/web/components/shell/TaskStatusIcon.tsx": {
+      "empty": "The glyph renders one status and owns no collection. The detector matched the word list in the doc comment 'Linear-style task list states' and the items-center class.",
+      "partial": "status is the only data prop and every status renders a complete glyph; agentRunning only adds a pulse and className is styling, so no field can be missing.",
+      "long-content": "The glyph renders no caller text; its accessible names are fixed strings such as aria-label='Backlog', which is what the detector matched as label.",
+      "permission-denied": "The glyph has no permission concept. The detector matched role='img' on the in-progress and done glyphs."
+    }
+  }
+}

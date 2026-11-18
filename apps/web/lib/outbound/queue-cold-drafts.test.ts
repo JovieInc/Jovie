@@ -123,6 +123,30 @@ function coldRow(
 }
 
 describe('cold composition selection', () => {
+  it.each([true, false])(
+    'preserves an existing-relationship hold with cold drafts enabled and judge passed=%s',
+    passed => {
+      const lead = facts({
+        linktreeHandle: 'djdannic',
+        displayName: 'Dannic',
+        certified: true,
+      });
+      expect(
+        coldRow({
+          facts: lead,
+          target: target(lead),
+          dogfoodGate: { passed, blocks: passed ? [] : ['artifact_failed'] },
+        })
+      ).toMatchObject({
+        view: 'held',
+        nextAction: 'none',
+        message: null,
+        relationshipHold:
+          'Existing relationship: flag to Tim, no cold outreach',
+      });
+    }
+  );
+
   it('uses certified catalog facts and the composer first touch, never a scraped first name', () => {
     const step = composeColdSequence(coldContext().artifact, NOW).steps[0];
     expect(coldRow().message).toEqual({
@@ -244,6 +268,57 @@ describe('cold composition selection', () => {
       revision: null,
     });
   });
+  it.each([false, true])(
+    'preserves DM copy with the dogfood gate disabled and cold drafting %s',
+    coldDraftEnabled => {
+      const lead = facts({
+        certified: true,
+        contactEmail: null,
+        instagramHandle: 'artist',
+        outreachRoute: 'dm',
+        dmCopy: 'A saved DM for this artist',
+      });
+      expect(
+        coldRow({
+          facts: lead,
+          target: target(lead),
+          dogfoodGate: null,
+          coldDraftEnabled,
+          coldDraftContext: null,
+        })
+      ).toMatchObject({
+        view: 'certified',
+        channel: 'dm',
+        message: { channel: 'dm', body: lead.dmCopy },
+      });
+      expect(
+        coldRow({
+          facts: lead,
+          target: target(lead),
+          dogfoodGate: { passed: false, blocks: ['artifact_failed'] },
+          coldDraftEnabled,
+        })
+      ).toMatchObject({ view: 'needs_judge', message: null });
+      const heldLead = {
+        ...lead,
+        linktreeHandle: 'djdannic',
+        displayName: 'Dannic',
+      };
+      expect(
+        coldRow({
+          facts: heldLead,
+          target: target(heldLead),
+          dogfoodGate: null,
+          coldDraftEnabled,
+        })
+      ).toMatchObject({
+        view: 'held',
+        nextAction: 'none',
+        message: null,
+        approval: { target: 'held' },
+      });
+    }
+  );
   it('retains the old rollout behavior when composition is off', () => {
     expect(
       coldRow({

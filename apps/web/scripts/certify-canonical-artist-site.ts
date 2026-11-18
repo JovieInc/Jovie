@@ -7,6 +7,17 @@ import {
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
 } from '@/lib/acquisition/canonical-artist-site-certification';
+import {
+  canonicalJourneyChecks,
+  type M2Receipt,
+  readJson,
+  reportCanonicalCertificate,
+  stepPassed,
+} from './certify-canonical-artist-site-evidence';
+import {
+  classifyDeployedRevisionFromGit,
+  resolveGitRoot,
+} from './certify-canonical-artist-site-lineage';
 
 export interface CanonicalArtistSiteCliOptions {
   readonly candidateId: string;
@@ -25,6 +36,11 @@ export interface CanonicalArtistSiteCliOptions {
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
   readonly sourceHistory?: readonly string[];
   /**
+   * Checkout root for the git-path lineage binding. Defaults to the repo that
+   * contains the process working directory; only used when git can answer.
+   */
+  readonly gitRoot?: string;
+  /**
    * True when `--source-history` was passed and its file parsed to zero
    * entries. The Golden Path shell pre-creates the history file and clears it
    * only when a history page failed (e.g. a GitHub installation-quota 403),
@@ -32,15 +48,12 @@ export interface CanonicalArtistSiteCliOptions {
    * deployed revision is unrelated to the certified one.
    */
   readonly lineageFileEmpty?: boolean;
-}
-
-interface M2Receipt {
-  readonly steps?: readonly {
-    readonly name?: string;
-    readonly ok?: boolean;
-    readonly detail?: string;
-    readonly evidence?: readonly string[];
-  }[];
+  /**
+   * Playwright JSON report of the golden-path run. When present, the revenue
+   * checks read the spec that proves them instead of the whole step outcome,
+   * so an unrelated spec (e.g. /start layout) cannot flip them.
+   */
+  readonly journeyReportPath?: string;
 }
 
 interface ProfileResult {
@@ -131,12 +144,13 @@ function loadSourceHistory(path: string | undefined): {
  * drift. The Golden Path shell always creates the file, so empty content
  * means every history page failed.
  */
+export const LINEAGE_DEFERRAL_DETAIL =
+  'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty and git could not answer (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.';
+
 export class LineageEvidenceUnavailableError extends Error {
   readonly deployedRevision: string | null;
   constructor(deployedRevision: string | null) {
-    super(
-      'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.'
-    );
+    super(LINEAGE_DEFERRAL_DETAIL);
     this.name = 'LineageEvidenceUnavailableError';
     this.deployedRevision = deployedRevision;
   }
@@ -161,19 +175,9 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     outputPath: required(argv, '--output'),
     sourceHistory: history.entries,
     lineageFileEmpty: historyFlag !== undefined && history.entries.length === 0,
+    gitRoot: optional(argv, '--git-root'),
+    journeyReportPath: optional(argv, '--journey-report'),
   };
-}
-
-function readJson<T>(path: string): T | null {
-  try {
-    return JSON.parse(readFileSync(resolve(path), 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-function stepPassed(receipt: M2Receipt | null, name: string): boolean {
-  return receipt?.steps?.some(step => step.name === name && step.ok) ?? false;
 }
 
 export function certifyCanonicalArtistSite(
@@ -187,32 +191,56 @@ export function certifyCanonicalArtistSite(
     : null;
 
   const goldenPassed = options.goldenPathStatus === 'success';
+  const journeyReportRequested = options.journeyReportPath !== undefined;
+  const { billingJourneyOk, freeStateOk } = canonicalJourneyChecks(
+    options.journeyReportPath,
+    goldenPassed
+  );
   const claimContractPassed = options.claimContractStatus === 'success';
   const deployedRevision = profileReport?.snapshot?.releaseSha ?? null;
   const profileHealthy =
     options.profileStatus === 'success' && profile?.failed === false;
-  const revisionRelation = classifyDeployedRevision(
-    options.sourceRevision,
-    deployedRevision,
-    options.sourceHistory ?? []
-  );
+  // Bind from the local checkout first (JOV-12646: the commits-API lineage
+  // read loses whole pushes to GitHub installation-quota deferrals). Git is
+  // only skipped when it cannot answer; the lineage file then decides as
+  // before. A git `unrelated` verdict is real evidence — both revisions are
+  // present locally — and must stay RED even when the lineage file is empty.
+  const gitRoot = options.gitRoot ?? resolveGitRoot(process.cwd());
+  const gitLineage = gitRoot
+    ? classifyDeployedRevisionFromGit(
+        gitRoot,
+        options.sourceRevision,
+        deployedRevision
+      )
+    : 'unanswered';
+  const revisionRelation =
+    gitLineage === 'unanswered'
+      ? classifyDeployedRevision(
+          options.sourceRevision,
+          deployedRevision,
+          options.sourceHistory ?? []
+        )
+      : gitLineage;
   const revisionBound =
     revisionRelation === 'same' || revisionRelation === 'ancestor';
   // A history file the workflow pre-created but left empty means every
-  // commits-history page failed (GitHub installation-quota 403 or transport):
-  // the deployed revision cannot be bound, which is missing evidence, not
-  // drift. Fail honestly as quota-deferred instead of issuing a false RED
-  // product verdict; the journey results themselves still stand and a re-run
-  // after the quota reset re-reads the history. Real failures keep their RED:
-  // an unhealthy profile or a history that shows a genuinely unrelated
-  // revision never reaches this branch.
-  if (
+  // commits-history page failed (GitHub installation-quota 403 or transport)
+  // and git could not answer either: the deployed revision cannot be bound,
+  // which is missing evidence, not drift. Report a visible deferral instead
+  // of issuing a false GREEN or turning Golden Path (manual) red (JOV-12646):
+  // the certificate stays RED with the deferral detail, the CLI announces the
+  // quota-deferral and exits 0, and a re-run after the quota reset re-reads
+  // the lineage. Real failures keep their hard RED: an unhealthy profile or
+  // genuine drift (git-answered or history-answered unrelated) never reaches
+  // this branch.
+  const revisionDeferral =
     options.lineageFileEmpty === true &&
+    gitLineage === 'unanswered' &&
     revisionRelation === 'unrelated' &&
-    profileHealthy
-  ) {
-    throw new LineageEvidenceUnavailableError(deployedRevision);
-  }
+    profileHealthy;
+  const revisionSummary = revisionDeferral
+    ? new LineageEvidenceUnavailableError(deployedRevision).message
+    : `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
   const profilePassed = profileHealthy && revisionBound;
   const exposedDeferred = profile?.exposedDeferredSurfaces;
   const boundDefect = (passesIgnoringRevision: boolean) =>
@@ -243,7 +271,7 @@ export function certifyCanonicalArtistSite(
   const journeyDetail = goldenPassed
     ? 'Production build passed the prebuilt claim, real-auth golden path, start-entry continuity, and Stripe journey.'
     : 'Production-faithful Golden Path did not pass.';
-  const revisionDetail = `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
+  const revisionDetail = revisionSummary;
   const profileDetail = profilePassed
     ? revisionRelation === 'ancestor'
       ? `Live Tim White profile passed. Deployed revision ${deployedRevision ?? 'unknown'} is an ancestor of source revision ${options.sourceRevision}.`
@@ -268,7 +296,12 @@ export function certifyCanonicalArtistSite(
     deferredHidden = true;
     deferredDetail =
       'Scanned markers were absent: pay-trigger, profile-mode-drawer-pay, profile-pay-recipient, tip-button, tip-drawer, ask-jovie launcher, operator-banner, and operator-lists-nav. Deep audience intelligence has no public marker.';
-  } else if (profileHealthy && !revisionBound) {
+  } else if (
+    profileHealthy &&
+    !revisionBound &&
+    Array.isArray(exposedDeferred) &&
+    exposedDeferred.length === 0
+  ) {
     deferredDetail = revisionDetail;
     deferredDefect = 'canonical-artist-site-source-revision';
   }
@@ -314,7 +347,9 @@ export function certifyCanonicalArtistSite(
   ];
   const navigationDetail = navigationOk
     ? 'Live mobile and desktop Events → Home → 15-second wait → reload and Back/Forward passed on the observed profile revision.'
-    : 'Live mobile/desktop profile navigation failed, was skipped, or lacks bound profile evidence.';
+    : revisionDeferral && navigationPassed
+      ? revisionDetail
+      : 'Live mobile/desktop profile navigation failed, was skipped, or lacks bound profile evidence.';
   const identityOk = profilePassed && claimOk;
   const hierarchyOk = profilePassed && goldenPassed;
   const releaseOk = referenceReleasePassed && goldenPassed;
@@ -324,14 +359,20 @@ export function certifyCanonicalArtistSite(
       identityOk,
       identityOk
         ? profileDetail
-        : `${profileDetail} ${journeyDetail} ${claimDetail}`,
+        : claimOk
+          ? `${profileDetail} ${journeyDetail} ${claimDetail}`
+          : `${journeyDetail} ${claimDetail} ${profileDetail}`,
       [...profileEvidence, ...claimAndJourney],
       boundDefect(profileHealthy && claimOk)
     ),
     row(
       'profile_hierarchy',
       hierarchyOk,
-      hierarchyOk ? profileDetail : `${profileDetail} ${journeyDetail}`,
+      hierarchyOk
+        ? profileDetail
+        : goldenPassed
+          ? `${profileDetail} ${journeyDetail}`
+          : `${journeyDetail} ${profileDetail}`,
       profileAndJourney,
       boundDefect(profileHealthy && goldenPassed)
     ),
@@ -347,7 +388,10 @@ export function certifyCanonicalArtistSite(
       releaseOk,
       releaseOk
         ? 'The live Never Say a Word release and artist loop are reachable.'
-        : profileHealthy && !revisionBound && referenceReleaseReachable
+        : profileHealthy &&
+            !revisionBound &&
+            referenceReleaseReachable &&
+            goldenPassed
           ? revisionDetail
           : 'The live Never Say a Word reference release loop did not pass.',
       profileAndJourney,
@@ -374,12 +418,33 @@ export function certifyCanonicalArtistSite(
     row(
       'refresh_back_retry',
       claimOk && navigationOk,
-      `${claimText} ${navigationDetail}`,
+      revisionDeferral && claimOk && navigationPassed
+        ? revisionDetail
+        : `${claimText} ${navigationDetail}`,
       [...claimAndJourney, ...navigationEvidence],
       'canonical-artist-site-refresh-back-retry'
     ),
-    ...(['free_state_value', 'payment_entitlement'] as const).map(checkId =>
-      row(checkId, goldenPassed, journeyDetail, goldenEvidence)
+    row(
+      'free_state_value',
+      freeStateOk,
+      freeStateOk
+        ? journeyReportRequested
+          ? 'Prebuilt claim, home-welcome, and golden-path specs passed.'
+          : journeyDetail
+        : 'Free-state specs (claim-prebuilt, home-welcome, golden-path) did not all pass.',
+      goldenEvidence
+    ),
+    row(
+      'payment_entitlement',
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true),
+      billingJourneyOk &&
+        (journeyReportRequested ? proPassed && activationPassed : true)
+        ? journeyReportRequested
+          ? 'Golden-path billing spec and revenue-path Pro checkout and activation passed.'
+          : journeyDetail
+        : 'Checkout, entitlement or activation proof failed (golden-path billing spec or revenue-path steps).',
+      [...goldenEvidence, ...m2Evidence]
     ),
     row(
       'pro_handoff_199',
@@ -392,12 +457,12 @@ export function certifyCanonicalArtistSite(
     ),
     row(
       'immediate_value',
-      goldenPassed && activationPassed,
-      goldenPassed && activationPassed
+      freeStateOk && activationPassed,
+      freeStateOk && activationPassed
         ? 'Claim first value and the live post-checkout activation state passed.'
         : 'Claim first value or the live post-checkout activation state failed.',
       [...goldenEvidence, ...m2Evidence],
-      goldenPassed ? 'JOV-6439' : 'JOV-7192'
+      freeStateOk ? 'JOV-6439' : 'JOV-7192'
     ),
   ];
 
@@ -422,24 +487,12 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     const certificate = certifyCanonicalArtistSite(
       parseOptions(process.argv.slice(2))
     );
-    console.log(certificate.statusLine);
-    for (const failure of certificate.failingChecks) {
-      console.error(`${failure.id}: ${failure.detail}`);
-    }
-    for (const failure of certificate.evidenceIntegrityFailures) {
-      console.error(`evidence: ${failure}`);
-    }
-    if (!certificate.safeToSend) process.exitCode = 1;
+    process.exitCode = reportCanonicalCertificate(
+      certificate,
+      LINEAGE_DEFERRAL_DETAIL
+    );
   } catch (error) {
-    if (error instanceof LineageEvidenceUnavailableError) {
-      // The repository's quota-deferral convention (runWithGitHubRetry): exit
-      // 75 with a github-quota-deferred warning is a transport state, never a
-      // verdict on the change. Re-running after the reset re-reads history.
-      console.error(`::warning title=github-quota-deferred::${error.message}`);
-      process.exitCode = 75;
-    } else {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
-    }
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
   }
 }

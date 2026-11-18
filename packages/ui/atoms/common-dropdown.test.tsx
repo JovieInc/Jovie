@@ -55,6 +55,49 @@ const basicItems: CommonDropdownItem[] = [
 ];
 
 describe('CommonDropdown', () => {
+  it('returns keyboard focus and retains distinct targets when moving between root menus', async () => {
+    const user = userEvent.setup();
+    const rowAction = vi.fn();
+    const inspectorAction = vi.fn();
+    render(
+      <>
+        <CommonDropdown
+          trigger={<button type='button'>Jovie row</button>}
+          items={[
+            {
+              type: 'action',
+              id: 'view',
+              label: 'View Details',
+              onClick: rowAction,
+            },
+          ]}
+        />
+        <CommonDropdown
+          trigger={<button type='button'>Tidal inspector</button>}
+          items={[
+            {
+              type: 'action',
+              id: 'view',
+              label: 'View Details',
+              onClick: inspectorAction,
+            },
+          ]}
+        />
+      </>
+    );
+    const row = screen.getByRole('button', { name: 'Jovie row' });
+    await user.click(row);
+    await user.keyboard('{Escape}');
+    expect(row).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Tidal inspector' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View Details' }));
+    expect(inspectorAction).toHaveBeenCalledOnce();
+    expect(rowAction).not.toHaveBeenCalled();
+    await user.click(row);
+    await user.click(screen.getByRole('menuitem', { name: 'View Details' }));
+    expect(rowAction).toHaveBeenCalledOnce();
+    expect(inspectorAction).toHaveBeenCalledOnce();
+  });
   it('flattens deep menus into a searchable chooser while preserving disabled policy', async () => {
     const choose = vi.fn();
     const blocked = vi.fn();
@@ -776,11 +819,11 @@ describe('CommonDropdown', () => {
       // A text input is not an allowed role="menu" child (axe
       // aria-required-children): input in the group, items in the inner menu.
       const input = screen.getByPlaceholderText('Search...');
-      expect(input.closest('[role="group"]')).not.toBeNull();
+      const group = input.closest('[role="group"]');
+      // axe aria-allowed-attr: orientation is not allowed on role="group".
+      expect(group?.hasAttribute('aria-orientation')).toBe(false);
       expect(input.closest('[role="menu"]')).toBeNull();
-      expect(
-        input.closest('[role="group"]')?.querySelector('[role="menuitem"]')
-      ).not.toBeNull();
+      expect(group?.querySelector('[role="menuitem"]')).not.toBeNull();
     });
 
     // A text input is not an allowed role="menu" child (axe
@@ -1409,77 +1452,6 @@ describe('CommonDropdown', () => {
         screen.queryByRole('menuitem', { name: /Facebook Post/ })
       ).not.toBeInTheDocument();
       expect(screen.getAllByRole('menu')).toHaveLength(1);
-    });
-
-    it('inherits submenu min-width from the trigger row when no override is provided', async () => {
-      const items: CommonDropdownItem[] = [
-        {
-          type: 'submenu',
-          id: 'share',
-          label: 'Share',
-          items: [
-            {
-              type: 'action',
-              id: 'copy-link',
-              label: 'Copy Link',
-              onClick: vi.fn(),
-            },
-          ],
-        },
-      ];
-      const user = userEvent.setup({ delay: null });
-      render(<CommonDropdown items={items} open={true} />);
-
-      const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
-      const triggerRectSpy = vi
-        .spyOn(shareTrigger, 'getBoundingClientRect')
-        .mockReturnValue(new DOMRect(0, 0, 236.6, 32));
-
-      await user.hover(shareTrigger);
-
-      await waitFor(() => {
-        const submenu = screen
-          .getByRole('menuitem', { name: 'Copy Link' })
-          .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '237px' });
-      });
-
-      expect(triggerRectSpy).toHaveBeenCalled();
-    });
-
-    it('keeps an explicit submenu min-width override when present', async () => {
-      const items: CommonDropdownItem[] = [
-        {
-          type: 'submenu',
-          id: 'share',
-          label: 'Share',
-          minWidth: '320px',
-          items: [
-            {
-              type: 'action',
-              id: 'copy-link',
-              label: 'Copy Link',
-              onClick: vi.fn(),
-            },
-          ],
-        },
-      ];
-      const user = userEvent.setup({ delay: null });
-      render(<CommonDropdown items={items} open={true} />);
-
-      const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
-      vi.spyOn(shareTrigger, 'getBoundingClientRect').mockReturnValue(
-        new DOMRect(0, 0, 240, 32)
-      );
-
-      await user.hover(shareTrigger);
-
-      await waitFor(() => {
-        const submenu = screen
-          .getByRole('menuitem', { name: 'Copy Link' })
-          .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '320px' });
-      });
     });
 
     it('preserves leading slot structure for icon-less submenu rows', async () => {

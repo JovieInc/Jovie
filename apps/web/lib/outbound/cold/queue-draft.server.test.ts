@@ -33,9 +33,6 @@ vi.mock('@/lib/services/profile/queries', () => ({
   getProfileByUsername: mocks.profile,
   getProfileSocialLinks: mocks.links,
 }));
-vi.mock('@/lib/notifications/suppression', () => ({
-  hashEmail: (email: string) => `synthetic-hash:${email}`,
-}));
 vi.mock('@/lib/email/unsubscribe-token', () => ({
   buildClaimInviteUnsubscribeUrl: mocks.unsubscribe,
 }));

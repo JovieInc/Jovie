@@ -91,12 +91,12 @@ export function ArtistProfileAnnotatedTruth({
             ))}
           </div>
 
-          <ol className='ap-annotated-truth__callouts border-t border-subtle'>
+          <ol className='ap-annotated-truth__callouts divide-y divide-subtle border-y border-subtle'>
             {callouts.map((callout, index) => (
               <li
                 key={callout.id}
                 data-testid='artist-profile-truth-tile'
-                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-subtle py-5'
+                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 py-5'
               >
                 <span className='font-mono text-3xs text-tertiary-token'>
                   {String(index + 1).padStart(2, '0')}

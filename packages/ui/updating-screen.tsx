@@ -74,7 +74,7 @@ export function UpdatingScreen({
           className='w-full space-y-2'
         >
           {typeof title === 'string' ? (
-            <h1 className='text-lg font-semibold tracking-tight text-balance'>
+            <h1 className='text-base font-semibold tracking-tight text-balance'>
               {title}
             </h1>
           ) : (

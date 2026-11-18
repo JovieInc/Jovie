@@ -1,10 +1,15 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  createLinearClient,
-  LINEAR_API_URL,
-} from '../../packages/api-client/linear.ts';
+import { collectLinearIssues } from './stage-collect-linear.mjs';
+
+export {
+  canonicalLinearIdentifier,
+  collectLinearIssues,
+  linearAdmit,
+  sliceLinearIdentifiers,
+} from './stage-collect-linear.mjs';
+
 import { parseStageEventFeed } from './stage-events.mjs';
 
 const DAY_MS = 86_400_000;
@@ -266,53 +271,7 @@ async function fetchText(fetchImpl, url, headers = {}) {
   if (text.length > FEED_MAX_BYTES) throw new Error('feed exceeds size cap');
   return text;
 }
-const LINEAR_ISSUES = `query($numbers:[Float!]){issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}}){nodes{identifier createdAt startedAt history(first:30){nodes{createdAt fromState{type} toState{type}}}}}}`;
-export async function collectLinearIssues({ fetchImpl, apiKey, identifiers }) {
-  const out = {};
-  const linear = createLinearClient({
-    identity: apiKey,
-    authorization: () => apiKey,
-    fetch: fetchImpl,
-  });
-  const numbers = [
-    ...new Set(identifiers.map(id => Number(id.split('-')[1]))),
-  ].filter(Number.isFinite);
-  for (let i = 0; i < numbers.length; i += 50) {
-    const response = await linear.client.request({
-      url: LINEAR_API_URL,
-      method: 'POST',
-      body: {
-        query: LINEAR_ISSUES,
-        variables: { numbers: numbers.slice(i, i + 50) },
-      },
-      priority: 'report',
-      timeoutMs: 20_000,
-    });
-    if (response.status < 200 || response.status >= 300)
-      throw new Error(`Linear HTTP ${response.status}`);
-    const body = JSON.parse(response.text);
-    if (body.errors?.length)
-      throw new Error(body.errors.map(e => e.message).join('; '));
-    for (const node of body.data?.issues?.nodes ?? []) {
-      const history = (node.history?.nodes ?? []).map(h => ({
-        at: h.createdAt,
-        fromType: h.fromState?.type ?? null,
-        toType: h.toState?.type ?? null,
-      }));
-      const firstMove = history
-        .filter(h => h.fromType)
-        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
-      out[node.identifier] = {
-        identifier: node.identifier,
-        createdAt: node.createdAt,
-        startedAt: node.startedAt,
-        initialType: firstMove?.fromType ?? 'unstarted',
-        history,
-      };
-    }
-  }
-  return out;
-}
+
 function parseTimingsBody(text) {
   try {
     const body = JSON.parse(text);
@@ -545,20 +504,38 @@ export async function collectStageRaw({
       return match ? `JOV-${match[1]}` : null;
     })
     .filter(Boolean);
-  const linearIssues = env.LINEAR_API_KEY
-    ? ((await settle(sources, 'linear-history', () =>
-        collectLinearIssues({
-          fetchImpl,
-          apiKey: env.LINEAR_API_KEY,
-          identifiers,
-        })
-      )) ?? {})
-    : ((sources['linear-history'] = {
-        ok: false,
-        n: 0,
-        error: 'LINEAR_API_KEY not set',
-      }),
-      {});
+  let linearIssues = {};
+  if (env.LINEAR_API_KEY) {
+    // Not routed through settle(): a partial collection must not be flipped
+    // to {}/n:0 — successful batches are kept and the counts travel with the
+    // source record so the report can show the gap.
+    const linear = await collectLinearIssues({
+      fetchImpl,
+      apiKey: env.LINEAR_API_KEY,
+      identifiers,
+    });
+    linearIssues = linear.issues;
+    const { counts } = linear;
+    const incomplete =
+      Boolean(linear.error) ||
+      counts.failed > 0 ||
+      counts.missing > 0 ||
+      counts.capped > 0 ||
+      counts.historyTruncated > 0;
+    sources['linear-history'] = {
+      ok: linear.error ? Object.keys(linear.issues).length > 0 : true,
+      n: counts.fetched,
+      counts,
+      ...(incomplete ? { partial: true } : {}),
+      ...(linear.error ? { error: linear.error } : {}),
+    };
+  } else {
+    sources['linear-history'] = {
+      ok: false,
+      n: 0,
+      error: 'LINEAR_API_KEY not set',
+    };
+  }
   const feeds = {};
   const external = {};
   for (const [id, source] of Object.entries(manifest.sources ?? {})) {

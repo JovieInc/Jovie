@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { PanelRight } from 'lucide-react';
 
 export interface MobileProfileDrawerProps {
@@ -14,13 +15,13 @@ export interface MobileProfileDrawerProps {
  */
 export function MobileProfileDrawer({ onOpen }: MobileProfileDrawerProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       aria-label='Open Profile Panel'
       onClick={onOpen}
-      className='flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-(--app-shell-content-surface) lg:hidden'
+      className='relative flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-(--app-shell-content-surface) before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 lg:hidden'
     >
       <PanelRight className='size-4 text-secondary-token' />
-    </button>
+    </PlainButton>
   );
 }

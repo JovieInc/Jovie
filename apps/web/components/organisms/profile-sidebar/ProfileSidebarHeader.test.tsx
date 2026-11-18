@@ -31,17 +31,20 @@ function Header({
   displayName = 'Tim White',
   profilePath = '/tim',
   onClose,
+  onQrDownloadError,
 }: {
   readonly username?: string;
   readonly displayName?: string;
   readonly profilePath?: string;
   readonly onClose?: () => void;
+  readonly onQrDownloadError?: (message: string) => void;
 }) {
   const { title, actions } = useProfileHeaderParts({
     username,
     displayName,
     profilePath,
     onClose,
+    onQrDownloadError,
   });
   return (
     <div>
@@ -122,6 +125,28 @@ describe('useProfileHeaderParts', () => {
     );
     expect(downloadBlobMock).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
+  });
+
+  it('routes the QR failure report through the owner callback when provided', async () => {
+    globalThis.fetch = vi.fn(
+      async () => new Response(null, { status: 500 })
+    ) as typeof fetch;
+    const onQrDownloadError = vi.fn();
+    const user = userEvent.setup();
+    render(<Header onQrDownloadError={onQrDownloadError} />);
+
+    await openMenu(user);
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Download QR Code' })
+    );
+
+    await waitFor(() =>
+      expect(onQrDownloadError).toHaveBeenCalledWith(
+        'Unable to download QR code'
+      )
+    );
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(downloadBlobMock).not.toHaveBeenCalled();
   });
 
   it('downloads the QR code image when the service answers', async () => {
