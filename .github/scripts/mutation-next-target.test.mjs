@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { finalizeEvidenceEntry } from '../../scripts/lib/mutation-evidence.mjs';
+import { MIN_RATCHET_VALID } from '../../scripts/lib/mutation-sweep.mjs';
 import {
   claim,
   clone,
@@ -26,6 +28,32 @@ import {
   selectRequest,
   verifyPublication,
 } from './mutation-next-target.mjs';
+
+function smallSample(value = claim(), valid = 9) {
+  const measured = measurement(value);
+  const module = measured.state.modules[FILE];
+  const provenance = module.evidence;
+  Object.assign(module, {
+    valid,
+    killed: valid,
+    survived: 0,
+    score: 100,
+    counts: { Killed: valid },
+  });
+  const { verdict } = finalizeEvidenceEntry({
+    file: FILE,
+    entry: module,
+    baseline: { files: {} },
+    configDigest: provenance.configDigest,
+    runId: provenance.runId,
+  });
+  Object.assign(module.evidence, provenance, {
+    verdict: verdict.status,
+    reason: verdict.reason,
+  });
+  Object.assign(measured.history[0], { valid, ratchet: verdict.status });
+  return measured;
+}
 
 describe('reviewed request identity and scope', () => {
   it('binds payload independent of object ordering, including predecessor attempt', () => {
@@ -161,6 +189,40 @@ describe('predecessor publication fence', () => {
 });
 
 describe('durable request replay', () => {
+  it('closes a small-sample request only with the same authenticated publication', () => {
+    const evidence = completedEvidence();
+    const value = evidence.claims.entries[0].claim;
+    const measured = smallSample(value);
+    const finished = finishMeasurement(value, measured);
+    assert.equal(finished.status, 'measured', finished.reason);
+    const row = evidence.results.entries[0];
+    row.result = finished.result;
+    row.publication.stateText = JSON.stringify(measured.state);
+    row.publication.historyText = measured.history
+      .map(row => JSON.stringify(row))
+      .join('\n');
+    row.publication.receipt.stateSha256 = hash(row.publication.stateText);
+    row.publication.receipt.attemptsSha256 = hash(row.publication.historyText);
+    const selected = selectRequest([request()], evidence);
+    assert.equal(selected.status, 'complete');
+    assert.equal(selected.result.verdict, 'unknown');
+    assert.equal(selected.result.valid, 9);
+    for (const [path, bad] of [
+      ['result.verdict', 'pass'],
+      ['publication.receipt.runAttempt', '2'],
+      ['publication.stateText', `${row.publication.stateText} `],
+      ['publication.artifact.workflow_run.id', 501],
+    ]) {
+      const altered = clone(evidence);
+      set(altered.results.entries[0], path, bad);
+      assert.equal(selectRequest([request()], altered).status, 'hold', path);
+    }
+    evidence.results.entries = [];
+    assert.equal(
+      selectRequest([request()], evidence).status,
+      'attempted-unknown'
+    );
+  });
   it('authenticates durable historical completion after its live cache is evicted', () => {
     const evidence = completedEvidence();
     delete evidence.results.entries[0].publication.cache;
@@ -257,6 +319,55 @@ describe('durable request replay', () => {
 });
 
 describe('actual bound measurement', () => {
+  it('retains complete scored small samples without establishing a ratchet anchor', () => {
+    assert.equal(MIN_RATCHET_VALID, 30);
+    for (const valid of [1, 9, MIN_RATCHET_VALID - 1]) {
+      const value = claim();
+      const evidence = smallSample(value, valid);
+      const module = evidence.state.modules[FILE];
+      assert.equal(module.evidence.verdict, 'unknown');
+      assert.equal(module.evidence.reason, 'insufficient mutation sample');
+      const finished = finishMeasurement(value, evidence);
+      assert.equal(finished.status, 'measured', finished.reason);
+      assert.equal(finished.result.valid, valid);
+      assert.equal(finished.result.verdict, 'unknown');
+      assert.equal(module.highWater, undefined);
+    }
+  });
+  it('holds an insufficient-sample claim at the ratchet minimum', () => {
+    const value = claim();
+    const evidence = smallSample(value, MIN_RATCHET_VALID);
+    Object.assign(evidence.state.modules[FILE].evidence, {
+      verdict: 'unknown',
+      reason: 'insufficient mutation sample',
+    });
+    evidence.history[0].ratchet = 'unknown';
+    assert.equal(finishMeasurement(value, evidence).status, 'hold');
+  });
+  for (const [path, bad] of [
+    ['evidence.reason', undefined],
+    [
+      'evidence.reason',
+      'configuration changed; reviewed control evidence required',
+    ],
+    ['sha', SHA],
+    ['complete', false],
+    ['score', null],
+    ['evidence.unresolvedInputs', ['dynamic import']],
+    ['evidence.inputDigest', undefined],
+  ])
+    it(`holds a small sample with invalid ${path}=${bad}`, () => {
+      const value = claim();
+      const evidence = smallSample(value);
+      set(evidence.state.modules[FILE], path, bad);
+      assert.equal(finishMeasurement(value, evidence).status, 'hold');
+    });
+  it('holds small samples without matching current-run history', () => {
+    const value = claim();
+    const evidence = smallSample(value);
+    evidence.history[0].ratchet = 'pass';
+    assert.equal(finishMeasurement(value, evidence).status, 'hold');
+  });
   it('rejects additional current-run module history outside the one-file bound', () => {
     const value = claim();
     const evidence = measurement(value);
