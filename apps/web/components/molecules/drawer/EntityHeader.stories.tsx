@@ -52,6 +52,22 @@ export const Person: Story = {
   },
 };
 
+export const GridPerson: Story = {
+  args: {
+    ...Person.args,
+    layout: 'grid',
+    actions: (
+      <IconButton aria-label='More actions' variant='ghost' size='sm'>
+        <MoreHorizontal />
+      </IconButton>
+    ),
+  },
+};
+
+export const GridPersonTitleOnly: Story = {
+  args: { ...GridPerson.args, subtitle: undefined },
+};
+
 export const LongStableIdentity: Story = {
   args: {
     ...Person.args,

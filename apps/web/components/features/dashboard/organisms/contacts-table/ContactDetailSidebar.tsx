@@ -294,7 +294,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             actions={contactFieldActions(field, value)}
             displayClassName='truncate text-app text-primary-token'
             emptyClassName='text-tertiary-token italic'
-            inputClassName='h-8 text-app'
           />
         }
         labelWidth={96}
@@ -349,7 +348,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               ) : undefined
             }
             actions={headerActions}
-            className='px-2 py-2'
+            className='px-3 pt-3'
             titleClassName='text-base leading-5 tracking-tighter'
             data-testid='contact-detail-entity-header'
           />
