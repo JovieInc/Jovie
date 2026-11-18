@@ -690,6 +690,8 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
   'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+  'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
 ]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(

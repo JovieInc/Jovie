@@ -15,61 +15,20 @@ import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import {
+  type ActionStep,
+  actionStep,
+  actionSteps,
+  coldHosted,
+  evaluateCondition,
+  setupAction,
+  stepIndex,
+} from './runner-setup-fixture';
+import { registerPreparedWorkspaceTests } from './runner-setup-prepared-workspace';
+
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 
-// JOV-7707: the setup action is checked from its parsed YAML. Step `if:`
-// expressions are evaluated for each event, and the prune shell runs against
-// a fixture .pnpm tree.
-type ActionStep = {
-  id?: string;
-  name?: string;
-  if?: string;
-  uses?: string;
-  run?: string;
-  env?: Record<string, string>;
-  with?: Record<string, unknown>;
-};
-const setupAction = parseYaml(
-  readFileSync(
-    resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
-    'utf8'
-  )
-) as {
-  inputs: Record<string, { default?: string }>;
-  runs: { steps: ActionStep[] };
-};
-const actionSteps = setupAction.runs.steps;
-const actionStep = (name: string) => {
-  const found = actionSteps.find(step => step.name === name);
-  expect(found, name).toBeDefined();
-  return found as ActionStep;
-};
-const stepIndex = (name: string) =>
-  actionSteps.findIndex(step => step.name === name);
-
-// Minimal GitHub Actions expression evaluator: literals, context paths,
-// ==, !=, !, &&, || and parentheses (all the setup action uses).
-function evaluateCondition(
-  expression: string | undefined,
-  context: Record<string, string>
-): boolean {
-  if (!expression) return true;
-  const tokens =
-    expression
-      .replace(/^\$\{\{|\}\}$/g, '')
-      .match(/'[^']*'|==|!=|&&|\|\||!|\(|\)|[A-Za-z_][\w.-]*/g) ?? [];
-  const source = tokens
-    .map(token => {
-      if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1));
-      if (token === '==') return '===';
-      if (token === '!=') return '!==';
-      if (['&&', '||', '!', '(', ')'].includes(token)) return token;
-      if (token === 'true' || token === 'false') return `'${token}'`;
-      return `(ctx[${JSON.stringify(token)}] ?? '')`;
-    })
-    .join(' ');
-  return Boolean(new Function('ctx', `return (${source});`)(context));
-}
+registerPreparedWorkspaceTests();
 
 describe('self-hosted runner setup action', () => {
   const pruneRoots: string[] = [];
@@ -77,20 +36,6 @@ describe('self-hosted runner setup action', () => {
     for (const root of pruneRoots.splice(0))
       rmSync(root, { recursive: true, force: true });
   });
-  const coldHosted = {
-    'steps.runner-prereqs.outputs.dependencies_warm': 'false',
-    'runner.environment': 'github-hosted',
-    'runner.os': 'Linux',
-    'inputs.package_cache': 'true',
-    'inputs.reuse_merge_group_workspace': 'false',
-    'inputs.save_merge_group_workspace': 'false',
-    'steps.node-modules-cache.outcome': 'success',
-    'steps.node-modules-cache.outputs.cache-hit': 'false',
-    'steps.node-modules-cache.outputs.cache-matched-key': '',
-    'github.event_name': 'push',
-    'github.repository': 'JovieInc/Jovie',
-    'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
-  };
 
   it('uses the warning-free pinned installer without saving pnpm stores', () => {
     expect(
@@ -349,141 +294,6 @@ describe('self-hosted runner setup action', () => {
       ['@rollup+rollup-linux-x64-gnu@4.0.0', 'rollup.node'],
     ] as const)
       expect(kept(dir, file), dir).toBe(true);
-  });
-
-  it('only prefers the prepared workspace on an opted-in hosted merge-group exact hit', () => {
-    const eligible = {
-      ...coldHosted,
-      'github.event_name': 'merge_group',
-      'inputs.prefer_prepared_workspace': 'true',
-      'steps.node-modules-cache.outputs.cache-hit': 'true',
-    };
-    const expression = actionStep('Install dependencies').env
-      ?.USE_PREPARED_WORKSPACE;
-    expect(setupAction.inputs.prefer_prepared_workspace?.default).toBe('false');
-    expect(expression).toBeDefined();
-    expect(evaluateCondition(expression, eligible)).toBe(true);
-    for (const [key, value] of [
-      ['github.event_name', 'workflow_dispatch'],
-      ['github.event_name', 'pull_request'],
-      ['runner.environment', 'self-hosted'],
-      ['inputs.prefer_prepared_workspace', 'false'],
-      ['steps.node-modules-cache.outputs.cache-hit', 'false'],
-      ['steps.node-modules-cache.outputs.cache-hit', ''],
-    ] as const) {
-      expect(evaluateCondition(expression, { ...eligible, [key]: value })).toBe(
-        false
-      );
-    }
-  });
-
-  it('validates the prepared workspace and retains frozen install and patch repair on fallback', () => {
-    const stamp = actionStep('Stamp installed workspace receipt');
-    expect(actionStep('Install dependencies').id).toBe('install-dependencies');
-    const install = 'pnpm install --frozen-lockfile';
-    const validate = 'node scripts/lib/ci-dependency-workspace.mjs validate';
-    const verify = 'node scripts/lib/verify-patched-dependencies.mjs';
-    const native = 'load Next native compiler';
-    const healthy = {
-      eligible: true,
-      receipt: 0,
-      broken: false,
-      tool: 'ready',
-      installExit: 0,
-    };
-    const scenarios = [
-      { ...healthy, calls: [validate, native, verify] },
-      { ...healthy, tool: 'missing', calls: [validate, install, verify] },
-      {
-        ...healthy,
-        tool: 'native-fails',
-        calls: [validate, native, install, verify],
-      },
-      { ...healthy, eligible: false, calls: [install, verify] },
-      { ...healthy, receipt: 1, calls: [validate, install, verify] },
-      {
-        ...healthy,
-        broken: true,
-        calls: [validate, native, verify, install, verify, install, verify],
-      },
-      { ...healthy, receipt: 1, installExit: 17, calls: [validate, install] },
-    ];
-    const script = String(actionStep('Install dependencies').run)
-      .replaceAll(
-        '${{ steps.runner-prereqs.outputs.dependencies_warm }}',
-        'false'
-      )
-      .replaceAll(
-        /\$\{\{ steps\.runner-prereqs\.outputs\.installed_tree_archive_(path|sha256) \}\}/g,
-        'unused'
-      );
-    for (const scenario of scenarios) {
-      const root = mkdtempSync(resolve(tmpdir(), 'jovie-dashboard-install-'));
-      pruneRoots.push(root);
-      const cache = resolve(root, 'node_modules');
-      mkdirSync(cache);
-      if (scenario.broken) writeFileSync(resolve(cache, 'stale'), '');
-      const webBin = resolve(root, 'apps/web/node_modules/.bin');
-      mkdirSync(webBin, { recursive: true });
-      for (const name of [
-        'next',
-        'next-sitemap',
-        'tsx',
-        'vitest',
-        'playwright',
-        'lhci',
-      ]) {
-        writeFileSync(resolve(webBin, name), '', {
-          mode: name === 'lhci' && scenario.tool === 'missing' ? 0o644 : 0o755,
-        });
-      }
-      const tools = {
-        node: `if [ "$1" = "-e" ]; then
-  echo "load Next native compiler" >> "$CALLS"
-  exit "$NATIVE_EXIT"
-fi
-echo "node $*" >> "$CALLS"
-if [ "$2" = validate ]; then exit "$RECEIPT"; fi
-[ ! -f node_modules/stale ]`,
-        pnpm: 'echo "pnpm $*" >> "$CALLS"\nexit "$INSTALL_EXIT"',
-      };
-      for (const [tool, body] of Object.entries(tools)) {
-        writeFileSync(resolve(root, tool), `#!/bin/sh\n${body}\n`, {
-          mode: 0o755,
-        });
-      }
-      const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          PATH: `${root}${delimiter}${process.env.PATH ?? ''}`,
-          CALLS: resolve(root, 'calls'),
-          GITHUB_OUTPUT: resolve(root, 'output'),
-          NATIVE_EXIT: scenario.tool === 'native-fails' ? '1' : '0',
-          USE_PREPARED_WORKSPACE: String(scenario.eligible),
-          RECEIPT: String(scenario.receipt),
-          INSTALL_EXIT: String(scenario.installExit),
-        },
-      });
-      expect(result.status, result.stderr).toBe(scenario.installExit);
-      const output = resolve(root, 'output');
-      const reused =
-        existsSync(output) &&
-        readFileSync(output, 'utf8').trim() ===
-          'prepared-workspace-reused=true';
-      expect(reused).toBe(!scenario.calls.includes(install));
-      expect(
-        evaluateCondition(stamp.if, {
-          ...coldHosted,
-          'github.event_name': 'merge_group',
-          'steps.install-dependencies.outputs.prepared-workspace-reused':
-            String(reused),
-        })
-      ).toBe(!reused);
-      expect(
-        readFileSync(resolve(root, 'calls'), 'utf8').trim().split('\n')
-      ).toEqual(scenario.calls);
-    }
   });
 
   it('reinstalls an evicted merge-group workspace over any restored tree', () => {

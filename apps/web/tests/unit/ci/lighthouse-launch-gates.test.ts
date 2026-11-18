@@ -13,35 +13,14 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
-
-interface LighthouseStep {
-  with?: Record<string, string>;
-  id?: string;
-  uses?: string;
-  name?: string;
-  if?: string;
-  run: string;
-  env: Record<string, string>;
-  'continue-on-error'?: unknown;
-}
-interface LighthouseJob {
-  needs?: string[];
-  steps: LighthouseStep[];
-  'continue-on-error'?: unknown;
-}
-interface SelectOptions {
-  download?: string;
-  ephemeral?: boolean;
-  relevant?: boolean;
-  failed?: boolean;
-  branch?: string;
-  baseline?: boolean;
-  started?: string;
-}
+import {
+  type LighthouseJob,
+  type LighthouseStep,
+  selected,
+} from './lighthouse-launch-fixture';
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
 
@@ -55,46 +34,6 @@ describe('Lighthouse identity admission', () => {
   const workflow = load(
     readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
   ) as { jobs: Record<string, LighthouseJob> };
-  const selected = (
-    step: LighthouseStep | undefined,
-    available: string,
-    {
-      download = 'failure',
-      ephemeral = false,
-      relevant = true,
-      failed = false,
-      branch = 'fixture-branch',
-      baseline = false,
-      started = 'true',
-    }: SelectOptions = {}
-  ): boolean => {
-    const expression = (step?.if ?? 'success()')
-      .replace(/\$\{\{|\}\}/g, '')
-      .replace(
-        /\.(lighthouse-identity|lighthouse-baseline|background-build-start|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
-        "['$1']"
-      );
-    // Actions implicitly applies success() unless the expression explicitly
-    // selects a status, such as the always() on evidence and cleanup steps.
-    if (failed && !/\b(?:always|success|failure|cancelled)\(/.test(expression))
-      return false;
-    return runInNewContext(expression, {
-      success: () => !failed,
-      always: () => true,
-      steps: {
-        'lighthouse-identity': { outputs: { available } },
-        'lighthouse-baseline': { outputs: { built: String(baseline) } },
-        'background-build-start': { outputs: { started } },
-        check_changes: { outputs: { run_full_ci: String(relevant) } },
-        'download-build': { outcome: download },
-        'neon-branch': { outputs: { branch_id: branch } },
-      },
-      needs: {
-        'ci-path-changes': { outputs: { run_neon: String(ephemeral) } },
-        'neon-db': { result: ephemeral ? 'success' : 'skipped' },
-      },
-    });
-  };
 
   const PROBE_NAMES = {
     dashboard: 'Run signed-in shell navigation',

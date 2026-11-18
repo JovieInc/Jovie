@@ -2033,6 +2033,43 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
   });
 
+  it('selects the runtime lane for changes confined to either runner setup support file', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'runner-setup-selection-'));
+    const git = (...args) => execFileSync('git', args, { cwd: directory });
+    try {
+      git('init', '--quiet');
+      git('config', 'user.name', 'CI test');
+      git('config', 'user.email', 'ci-test@example.invalid');
+      git('commit', '--quiet', '--allow-empty', '-m', 'base');
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      vi.stubEnv('TURBO_SCM_BASE', 'HEAD^1');
+      for (const path of [
+        'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+        'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
+      ]) {
+        const filename = join(directory, path);
+        mkdirSync(dirname(filename), { recursive: true });
+        writeFileSync(filename, 'export {};\n');
+        git('add', '--', path);
+        git('commit', '--quiet', '-m', 'change one support file');
+        const runtimeFiles = changedFiles(
+          NODE_RUNTIME_CONTRACT_PATHS,
+          directory
+        );
+        expect(runtimeFiles).toEqual([path]);
+        expect(
+          selectNodeRuntimeContractCommands({
+            event: 'pull_request',
+            runtimeFiles,
+          })
+        ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('uses the maintained Node-only config for the complete runtime contract lane', () => {
     expect(NODE_RUNTIME_CONTRACT_COMMAND).toBe(
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts'
