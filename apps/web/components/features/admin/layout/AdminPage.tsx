@@ -7,7 +7,6 @@ import {
 } from '@/components/organisms/WorkspaceTabsSurface';
 import type { AdminViewGroupId } from '@/constants/admin-navigation';
 import { cn } from '@/lib/utils';
-import { AdminQueryTabsSelect } from './AdminQueryTabsSelect';
 import { AdminRouteViews } from './AdminRouteViews';
 
 export interface AdminPageTabsConfig<
@@ -44,14 +43,13 @@ export interface AdminPageProps<
   readonly hero?: ReactNode;
   /**
    * Query-param views inside this one destination (filters of the same
-   * data). Separate routes use `views` instead. A page has one tab row:
-   * when `views` is also set, these tabs render as a toolbar select.
+   * data). Separate routes use `views` instead.
    */
   readonly tabs?: AdminPageTabsConfig<TPrimary, TSecondary>;
   /**
    * Route views behind this page's sidebar destination (Shipping: Pipeline,
-   * Product, Timeline). Rendered as the only tab row in the page toolbar.
-   * Pages never render sub-navigation markup themselves.
+   * Product, Timeline). Rendered in the page toolbar with the canonical
+   * RouteSegmentControl. Pages never render sub-navigation markup themselves.
    */
   readonly views?: AdminViewGroupId;
   readonly actions?: ReactNode;
@@ -69,10 +67,9 @@ export interface AdminPageProps<
  *   live in the page toolbar. Descriptions remain metadata unless a page has
  *   a specific disclosure need.
  * - Optional `hero` slot for primary metrics.
- * - Optional `tabs` slot. Alone, it delegates to `WorkspaceTabsSurface`
- *   (headerless, because the shell breadcrumb owns the title). With `views`,
- *   the same tabs render as a `PageToolbarSelect` at the end of the toolbar
- *   so the page keeps one tab row.
+ * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. The parent
+ *   owns the route title in the shell breadcrumb, so the tabs surface renders
+ *   headerless to avoid duplicate page titles.
  * - Explicit viewport workspace or scrolling document composition.
  */
 export function AdminPage<
@@ -100,15 +97,6 @@ export function AdminPage<
       {children}
     </div>
   );
-  const queryTabsSelect =
-    views && tabs ? (
-      <AdminQueryTabsSelect
-        param={tabs.param}
-        value={tabs.value}
-        options={tabs.options}
-        clearOnChange={tabs.clearOnPrimaryChange}
-      />
-    ) : null;
 
   return (
     <AppShellContentPanel frame='none' contentPadding='none'>
@@ -124,14 +112,7 @@ export function AdminPage<
         {actions || views ? (
           <PageToolbar
             start={views ? <AdminRouteViews group={views} /> : null}
-            end={
-              queryTabsSelect || actions ? (
-                <>
-                  {queryTabsSelect}
-                  {actions}
-                </>
-              ) : undefined
-            }
+            end={actions}
             data-testid='admin-page-toolbar'
           />
         ) : null}
@@ -142,7 +123,7 @@ export function AdminPage<
           </div>
         ) : null}
 
-        {tabs && !views ? (
+        {tabs ? (
           <WorkspaceTabsSurface
             title={title}
             description={description ?? ''}

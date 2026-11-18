@@ -11,9 +11,8 @@ import type { AdminViewGroupId } from '@/constants/admin-navigation';
 /**
  * - `route-views`: the page is one of several routes behind one sidebar
  *   destination; `AdminPage views=` renders the canonical RouteSegmentControl.
- * - `query-tabs`: views of the same data inside one destination.
- *   `AdminPage tabs=` alone renders WorkspaceTabsSurface. When the page
- *   also has `views=`, those tabs render as a PageToolbarSelect.
+ * - `query-tabs`: views of the same data inside one destination;
+ *   `AdminPage tabs=` renders WorkspaceTabsSurface.
  * - `none`: one destination, one view. The sidebar row is the navigation.
  */
 export type OvieSubnav = 'route-views' | 'query-tabs' | 'none';
@@ -22,7 +21,7 @@ export interface OviePageSpec {
   readonly subnav: OvieSubnav;
   /** Required for `route-views`: which view group the page belongs to. */
   readonly views?: AdminViewGroupId;
-  /** A route-views page may also filter its own data. AdminPage renders those tabs as a toolbar select, never as a second tab row. */
+  /** A `route-views` page may also filter its own data with query tabs. */
   readonly tabs?: boolean;
 }
 

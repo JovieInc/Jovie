@@ -16,11 +16,8 @@ the screen inventory it covers is `APP_SCREEN_SOURCES` in the same folder.
      the canonical `RouteSegmentControl` in the page toolbar, the same control
      Jovie's Audience uses. The view label equals the page title.
    - `tabs=` for views of the same data inside one destination (People,
-     Platform Connections, Playlists). When the page has only `tabs=`,
-     AdminPage renders `WorkspaceTabsSurface`.
-   - One tab row per page. When a page has both `views=` and `tabs=`, the
-     tabs render as a `PageToolbarSelect` at the end of the toolbar. A
-     choice that narrows the page's data is a filter, not a tab.
+     Platform Connections, Playlists, Agents). It renders
+     `WorkspaceTabsSurface`.
    - Nothing else. A destination with its own sidebar row needs no
      sub-navigation; a view group with one view is deleted, not rendered.
 3. **Sections.** `ContentSurfaceCard` + `ContentSectionHeader`
@@ -44,7 +41,6 @@ the screen inventory it covers is `APP_SCREEN_SOURCES` in the same folder.
 | Page frame and toolbar | `components/features/admin/layout/AdminPage.tsx` |
 | Route views | `components/molecules/RouteSegmentControl.tsx` via `AdminRouteViews` |
 | Query tabs | `components/organisms/WorkspaceTabsSurface.tsx` |
-| Single-choice toolbar filter | `components/organisms/table/molecules/PageToolbarSelect.tsx` |
 | Section header | `components/molecules/ContentSectionHeader.tsx` |
 | Metric row / stat / card | `ContentMetricRow`, `ContentMetricStat`, `ContentMetricCard` |
 | Unknown or stale value | `components/molecules/MeasuredValue.tsx` |
