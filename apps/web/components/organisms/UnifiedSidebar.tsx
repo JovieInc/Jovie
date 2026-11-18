@@ -7,11 +7,9 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
@@ -20,35 +18,23 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarMenu,
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
-import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
-import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
+import { SidebarHeaderActions } from '@/components/shell/SidebarHeaderActions';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
-import {
-  artistSettingsNavigation,
-  paymentsNavItem,
-  userSettingsNavigation,
-} from '@/features/dashboard/dashboard-nav/config';
-import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
-import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
 import {
@@ -63,11 +49,18 @@ import {
   type OperatorNavSection,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
+import { SettingsNavGroup } from './SettingsNavGroup';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 // Founder-only (OV) block: split out so creator routes never ship it.
 const OperatorListsNav = dynamic(() =>
   import('./OperatorListsNav').then(module => module.OperatorListsNav)
+);
+
+// Settings-only search/profile/auth code is not initial operator route JS.
+// Keep default SSR so direct Settings entries retain their navigation content.
+const SettingsNavigation = dynamic(() =>
+  import('./SettingsSidebarNav').then(module => module.SettingsNavigation)
 );
 
 export interface UnifiedSidebarProps {
@@ -76,38 +69,6 @@ export interface UnifiedSidebarProps {
   readonly variant?: BrandVariant;
   /** Only transfer the collapsed browser action when a header is present. */
   readonly headerOwnsCollapsedToggle?: boolean;
-}
-
-/** Render a group of nav items */
-function SettingsNavGroup({
-  items,
-  pathname,
-  isItemActive,
-  onPrefetch,
-}: Readonly<{
-  items: readonly NavItem[];
-  pathname: string;
-  isItemActive?: (item: NavItem) => boolean;
-  onPrefetch?: (item: NavItem) => void;
-}>) {
-  return (
-    <SidebarMenu>
-      {items.map(item => {
-        const isActive =
-          isItemActive?.(item) ??
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
-        return (
-          <NavMenuItem
-            key={item.id}
-            item={item}
-            isActive={isActive}
-            calm
-            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
-          />
-        );
-      })}
-    </SidebarMenu>
-  );
 }
 
 /**
@@ -208,88 +169,6 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   );
 }
 
-/** Navigation list for settings section — grouped with labels like Linear */
-function SettingsNavigation({
-  pathname,
-  section,
-}: {
-  pathname: string;
-  section: string;
-}) {
-  const { selectedProfile } = useDashboardData();
-  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
-  // Prefer the TanStack Query cache (updated by profile mutations) over
-  // the server-rendered context so the sidebar reflects name edits immediately.
-  const { data: cachedProfileData } = useDashboardProfileQuery();
-  // Cache may hold either the unwrapped DashboardProfile (from optimistic updates)
-  // or the { profile: DashboardProfile } envelope (from server refetch).
-  const cachedDisplayName =
-    cachedProfileData?.displayName ??
-    (
-      cachedProfileData as unknown as {
-        profile?: { displayName?: string | null };
-      }
-    )?.profile?.displayName;
-  // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
-  // If cachedDisplayName is empty string, the user intentionally cleared it.
-  const artistName =
-    cachedDisplayName == null
-      ? selectedProfile?.displayName?.trim() || undefined
-      : cachedDisplayName.trim() || undefined;
-
-  // Build user settings items with conditional Payments
-  const userItems = useMemo(() => {
-    if (!isStripeConnectEnabled) return userSettingsNavigation;
-    // Insert Payments after Billing & Subscription
-    const billingIndex = userSettingsNavigation.findIndex(
-      i => i.id === 'billing'
-    );
-    const items = [...userSettingsNavigation];
-    items.splice(billingIndex + 1, 0, paymentsNavItem);
-    return items;
-  }, [isStripeConnectEnabled]);
-
-  // Replace "Profile" label with the artist's display name when available
-  const artistItems = useMemo(() => {
-    if (!artistName) return artistSettingsNavigation;
-    return artistSettingsNavigation.map(item =>
-      item.id === 'artist-profile' ? { ...item, name: artistName } : item
-    );
-  }, [artistName]);
-
-  return (
-    <nav
-      aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-    >
-      <div>
-        <span
-          className={cn(
-            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
-            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
-            SHELL_RAIL_LABEL
-          )}
-        >
-          Account
-        </span>
-        <SettingsNavGroup items={userItems} pathname={pathname} />
-      </div>
-      <div>
-        <span
-          className={cn(
-            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
-            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
-            SHELL_RAIL_LABEL
-          )}
-        >
-          Artist
-        </span>
-        <SettingsNavGroup items={artistItems} pathname={pathname} />
-      </div>
-    </nav>
-  );
-}
-
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   headerOwnsCollapsedToggle,
@@ -312,9 +191,6 @@ function SidebarHeaderNav({
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
-  const isDesktop = useIsElectronRuntime();
-  const { state, isMobile, isPreview, open: pinned } = useSidebar();
-  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
@@ -412,28 +288,11 @@ function SidebarHeaderNav({
           );
         })()}
       </div>
-      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <RailStagedContent
-          hidden={chromeHidden}
-          className='flex items-center'
-          data-sidebar-header-actions='true'
-        >
-          <SidebarInboxLink availability={inboxNavigation} />
-          <HeaderSearchSurfaceFromContext compact />
-        </RailStagedContent>
-      ) : null}
-
-      {!isDesktop ? (
-        <RailStagedContent
-          hidden={
-            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
-          }
-          stage={headerOwnsCollapsedToggle}
-          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
-        >
-          <SidebarCollapseButton />
-        </RailStagedContent>
-      ) : null}
+      <SidebarHeaderActions
+        showActions={!isRouteSidebar && !isOperatorSection && !isDemoRoute}
+        headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
+        inboxNavigation={inboxNavigation}
+      />
     </div>
   );
 }
@@ -493,11 +352,14 @@ export function UnifiedSidebar({
     >
       <SidebarHeader
         data-electron-drag-region='true'
+        // Same height as the content header, so the logo row and the page
+        // title share one center line (Tim, Nov 14: the 64px header sat the
+        // brand row 12px below "Home").
+        // Every sidebar (customer, route and operator) uses the one unified
+        // header-height token (founder lock 2026-09-25).
         className={cn(
           'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-          isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pt-5 pb-4'
+          'h-(--app-shell-header-height) py-0.5'
         )}
       >
         <SidebarHeaderNav
@@ -519,7 +381,9 @@ export function UnifiedSidebar({
             {section === 'ov' ? (
               <OperatorNavigation pathname={pathname} />
             ) : isInSettings ? (
-              <SettingsNavigation pathname={pathname} section={section} />
+              <div className='flex flex-1 flex-col overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+                <SettingsNavigation pathname={pathname} section={section} />
+              </div>
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
@@ -545,7 +409,7 @@ export function UnifiedSidebar({
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
+      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         <SidebarDockBridge
           userId={user?.id ?? ''}
           userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
@@ -555,6 +419,7 @@ export function UnifiedSidebar({
             <SidebarIdentityGroup
               calm={!isRouteSidebar}
               profileHref={section === 'ov' ? undefined : profileHref}
+              showAccountMenu={!isInSettings}
               dockStatus={dockStatus}
               label={section === 'ov' ? 'Account' : undefined}
             />

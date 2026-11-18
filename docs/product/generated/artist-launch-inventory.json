@@ -1977,6 +1977,14 @@
       "classification": "A"
     },
     {
+      "source": "apps/web/app/api/billing/price-lock/route.ts",
+      "kind": "handler",
+      "route": "/api/billing/price-lock",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/billing/status/route.ts",
       "kind": "handler",
       "route": "/api/billing/status",
@@ -3404,6 +3412,14 @@
       "source": "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/dogfood-judge-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/fix-deploy-stamp/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/fix-deploy-stamp",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"

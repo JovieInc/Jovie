@@ -164,6 +164,7 @@ describe('Billing Components', () => {
             options: [
               {
                 priceId: 'price_presence',
+                plan: 'pro',
                 amount: toCents(offer.monthlyUsd),
                 currency: offer.currency,
                 interval: offer.interval,
@@ -172,6 +173,7 @@ describe('Billing Components', () => {
             ],
           })
         )
+        .mockResolvedValueOnce(Response.json({ priceLock: null }))
         .mockResolvedValueOnce(Response.json({ url }));
       renderWithQueryClient(<UpgradeButton />);
       const button = await screen.findByRole('button', {

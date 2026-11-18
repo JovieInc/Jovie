@@ -99,19 +99,10 @@
 
   .marketing-phone-gallery__list {
     display: grid;
-    grid-template-columns: repeat(
-        var(--marketing-phone-gallery-columns, 3),
-        minmax(0, 1fr)
-      );
+    /* One equal column per state without inline styles or per-count vars. */
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: var(--space-8);
-  }
-
-  .marketing-phone-gallery[data-count="2"] {
-    --marketing-phone-gallery-columns: 2;
-  }
-
-  .marketing-phone-gallery[data-count="4"] {
-    --marketing-phone-gallery-columns: 4;
   }
 }
 

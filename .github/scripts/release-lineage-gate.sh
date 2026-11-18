@@ -440,5 +440,12 @@ emit unshipped_commits "$unshipped_commits"
 emit unshipped_age_seconds "$unshipped_age_seconds"
 emit gate_decision "$decision"
 emit gate_reason "$reason"
+if [ "$decision" = yield ]; then
+  # Machine-readable lease handoff. An authorization yield is a forward-only
+  # lease transfer to a queued successor, not a failed authorization; the
+  # Production Verified step reads this output to conclude as a notice naming
+  # the successor instead of a false red (run 43880144248, 2026-11-16).
+  emit yielded_to "$current"
+fi
 echo "::notice::Release lineage gate $boundary: decision=$decision lineage=$lineage successor_pending=$successor_pending starving=$starving unshipped=$unshipped_commits age=${unshipped_age_seconds}s reason=\"$reason\"" >&2
 printf 'decision=%s\n' "$decision"

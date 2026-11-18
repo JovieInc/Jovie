@@ -9,6 +9,7 @@
  * flagged off — this is the email capture MVP.
  */
 
+import { PlainButton } from '@jovie/ui';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
@@ -105,7 +106,7 @@ export function ScheduledReleasePage({
 
         {/* Countdown */}
         <div
-          className='mt-5 flex w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl empty:hidden'
+          className='mt-5 flex w-full items-center justify-center rounded-xl border border-on-media/8 bg-on-media/5 px-4 py-3 backdrop-blur-2xl empty:hidden'
           data-testid='release-countdown'
         >
           <ReleaseCountdown releaseDate={releaseDate} compact />
@@ -123,12 +124,12 @@ export function ScheduledReleasePage({
             title='Share'
             align='center'
             trigger={
-              <button
+              <PlainButton
                 type='button'
                 className='text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs transition-colors'
               >
                 Share
-              </button>
+              </PlainButton>
             }
           />
         </div>

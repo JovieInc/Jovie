@@ -7,16 +7,10 @@ import { describe, it } from 'node:test';
 
 import * as linear from '../linear-client.mjs';
 import { reconcileIssues } from '../reconcile.mjs';
-
-const jsonResponse = (
-  body,
-  { status = 200, contentType = 'application/json', headers = {} } = {}
-) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  headers: new Headers({ 'content-type': contentType, ...headers }),
-  text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
-});
+import {
+  concurrentRateLimitedFetches,
+  jsonResponse,
+} from './fixtures/linear-transport.mjs';
 
 let clock = Date.now();
 /** @param {string} query @param {any} variables @param {any} options */
@@ -769,6 +763,7 @@ describe('durable credential budget', () => {
   it('composes simultaneous cooldown writers by the latest reset without shortening it', async () => {
     await withKey('concurrent-secret', async () => {
       const now = clock;
+      const { requests, fetchFor } = concurrentRateLimitedFetches(2);
       await Promise.all(
         [120, 30].map(seconds =>
           assert.rejects(
@@ -777,16 +772,17 @@ describe('durable credential budget', () => {
               {},
               {
                 rateLimitMaxAttempts: 1,
-                fetchImpl: async () =>
-                  jsonResponse(
-                    {},
-                    { status: 429, headers: { 'retry-after': String(seconds) } }
-                  ),
+                fetchImpl: fetchFor(seconds),
               }
             ),
-            isLimited
+            (/** @type {any} */ error) =>
+              isLimited(error) && error.attempts === 1
           )
         )
+      );
+      assert.deepEqual(
+        requests.sort((a, b) => a - b),
+        [30, 120]
       );
       clock = now + 60_000;
       await assert.rejects(
@@ -800,7 +796,9 @@ describe('durable credential budget', () => {
           }
         ),
         (/** @type {any} */ error) =>
-          isLimited(error) && error.metadata.resetAt === now + 120_000
+          isLimited(error) &&
+          error.attempts === 0 &&
+          error.metadata.resetAt === now + 120_000
       );
     });
   });

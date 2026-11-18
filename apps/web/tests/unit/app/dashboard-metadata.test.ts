@@ -95,11 +95,12 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses the static dashboard title for the app root', async () => {
+  it('titles the app root Inbox, matching the header bell and breadcrumb', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home');
+    // Rendered tab title is "Inbox | Jovie" via the root title template.
+    expect(metadata.title).toBe('Inbox');
   });
 
   it('uses the visible New Chat title for the chat home route', async () => {
@@ -159,5 +160,36 @@ describe('dashboard metadata generation', () => {
     expect(children.some(child => child.type === OpportunityInboxRoute)).toBe(
       true
     );
+  });
+});
+
+// The root app layout owns `title: { template: '%s | Jovie' }`. Shell pages
+// must export the bare route name so the template supplies exactly one brand
+// suffix; a child title that already carries `| Jovie` renders it twice
+// ('Links | Jovie | Jovie'), and a page without metadata falls back to the
+// bare default and never names the route.
+describe('shell leaf-route document titles', () => {
+  it('names the links route and lets the layout template brand it', async () => {
+    const { metadata } = await import('@/app/app/(shell)/links/page');
+
+    expect(metadata?.title).toBe('Links');
+  });
+
+  it('names the tour dates route and lets the layout template brand it', async () => {
+    const { metadata } = await import('@/app/app/(shell)/tour-dates/page');
+
+    expect(metadata?.title).toBe('Tour Dates');
+  });
+
+  it('gives the chats route its own document title', async () => {
+    const { metadata } = await import('@/app/app/(shell)/chats/page');
+
+    expect(metadata?.title).toBe('Chats');
+  });
+
+  it('gives the insights route its own document title', async () => {
+    const { metadata } = await import('@/app/app/(shell)/insights/page');
+
+    expect(metadata?.title).toBe('Insights');
   });
 });

@@ -8,8 +8,9 @@ import subprocess
 
 # Inherited design identities removed on main need the existing one-sync-per-head
 # route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
+# failure plus a typed identity or an error with zero baseline growth.
 DESIGN_SOURCE_CLI = re.compile(
+    r"(?:AssertionError: |##\[error\])\[design-system-source-ratchet\] FAIL — \d+ identities \(0 new / baseline \d+\)|"
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
     r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
@@ -86,11 +87,57 @@ class RouteBudgetGrowth:
 ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
 
 
+# Exact-head Coverage compares apps/web/scripts/route-render-modes.json with
+# origin/main. A stale head keeps HTML bytes or a mode main already tightened
+# (#25599). Sync once; a loss that remains is a real regression, and claim_route
+# will not sync that head again. Never loosen the snapshot or add an override.
+_RENDER_SNAPSHOT_LINE = re.compile(
+    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:##\[error\]|::error::)\s?'
+    r'/\S+ baseline weakened: '
+    r'(?:html (?P<prev>\d+) -> (?P<next>\d+) bytes'
+    r'|render mode \S+ -> \S+'
+    r'|revalidate window \d+ s -> \d+ s)\b')
+
+
+def _snapshot_log_rejects(line):
+    """Another marked failure in the same log is a repair, not a stale snapshot."""
+    if '##[error]' in line and 'Process completed with exit code 1.' not in line:
+        return True
+    if '::error::' in line:
+        return True
+    if 'prerendered HTML grew' in line or 'lost cacheability' in line:
+        return True
+    return _OTHER_FAILURE.search(line) is not None
+
+
+class RenderModeSnapshotDrift:
+    """Sync main when the only coverage errors are inherited snapshot loosenings."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        matches = []
+        for raw in clean.splitlines():
+            line = _LOG_FAILED_PREFIX.sub('', raw, count=1)
+            match = _RENDER_SNAPSHOT_LINE.match(line)
+            if match:
+                nxt = match.group('next')
+                if nxt is not None and int(nxt) <= int(match.group('prev')):
+                    return None
+                matches.append(match)
+            elif _snapshot_log_rejects(line):
+                return None
+        return matches[0] if matches else None
+
+
+RENDER_MODE_SNAPSHOT = RenderModeSnapshotDrift()
+
+
 # PR Size Guard counts the PR head for repository hygiene and the merged tree
 # for the combined-tree budget. A head that has not yet merged a main prune
-# (drizzle snapshots, #25664) fails both while the live base tip is already
-# under budget. Sync main once; a head that is still over after that sync is
-# a real shrink, and claim_route will not sync it again.
+# (drizzle snapshots, #25664) fails while the live base tip is already under
+# budget. sync_claim allows one sync per head against that tip. The same tip
+# does not sync again. A later tip, after an up-to-date sync burned the old
+# key, gets its own claim. A head still over after that sync is a real shrink.
 _TREE_BYTE_LINE = re.compile(
     r'(?:##\[error\]|::error::)\s*\d+ bytes of tracked regular files '
     r'\(merged tree; base \d+ [+-]\d+\) exceeds the \d+-byte combined-tree budget')
@@ -126,6 +173,35 @@ class TreeByteBudget:
 
 
 TREE_BYTE_BUDGET = TreeByteBudget()
+
+
+def base_tip(pr) -> str:
+    """Current base branch tip, or "" when the pull request does not name one."""
+    if not isinstance(pr, dict):
+        return ""
+    ref = pr.get("baseRef")
+    oid = None
+    if isinstance(ref, dict):
+        target = ref.get("target")
+        if isinstance(target, dict):
+            oid = target.get("oid")
+    if not isinstance(oid, str):
+        oid = pr.get("baseRefOid")
+    return oid if isinstance(oid, str) and _SHA.fullmatch(oid) else ""
+
+
+def sync_claim(pr, action: str) -> str:
+    """Route claim key. sync-main is once per head and base tip.
+
+    A no-op sync records the unqualified key `sync-main` on that head. Main
+    can then land a prune without changing the head. The qualified key
+    `sync-main:<tip>` is free, so the lane merges the new tip instead of
+    dispatching a model. Other actions stay once per head.
+    """
+    if action != "sync-main":
+        return action
+    tip = base_tip(pr)
+    return f"sync-main:{tip}" if tip else action
 
 
 class SoleAliasReviewFailure:

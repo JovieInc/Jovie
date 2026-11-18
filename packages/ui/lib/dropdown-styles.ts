@@ -35,6 +35,10 @@ export const DROPDOWN_TRANSITIONS =
   'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
   'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none';
 
+/** Default root action menus leave the paint tree as soon as Radix closes.
+ * Apply only at CommonDropdown roots; nested and explicit motion keep theirs. */
+export const CLOSED_MENU_ROOT_CLASS = 'data-[state=closed]:hidden';
+
 /**
  * @deprecated Positional slide/zoom motion is intentionally disabled.
  */
@@ -404,10 +408,15 @@ export const MENU_ICON_TRIGGER_BASE =
  * narrows into it instead of overflowing the screen edge.
  */
 export function submenuViewportFitStyle(
-  menu: 'dropdown-menu' | 'context-menu'
+  menu: 'dropdown-menu' | 'context-menu',
+  preferredMinWidth?: number | string
 ): { maxWidth: string; minWidth: string } {
   const available = `var(--radix-${menu}-content-available-width)`;
-  return { maxWidth: available, minWidth: `min(12rem, ${available})` };
+  const preferred =
+    typeof preferredMinWidth === 'number'
+      ? `${preferredMinWidth}px`
+      : (preferredMinWidth ?? '12rem');
+  return { maxWidth: available, minWidth: `min(${preferred}, ${available})` };
 }
 
 export const subMenuContentClasses = [

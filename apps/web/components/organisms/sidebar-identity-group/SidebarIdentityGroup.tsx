@@ -16,6 +16,7 @@ export const SIDEBAR_IDENTITY_GROUP_TEST_ID = 'sidebar-identity-group';
 export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 
 export interface SidebarIdentityGroupProps {
+  readonly showAccountMenu?: boolean;
   readonly calm?: boolean;
   readonly dockStatus?: SidebarDockStatus;
   readonly profileHref: string | undefined;
@@ -47,6 +48,7 @@ export function publicProfileAccessibleName(
  * two top-level rows.
  */
 export function SidebarIdentityGroup({
+  showAccountMenu = true,
   calm = false,
   dockStatus,
   profileHref,
@@ -90,13 +92,15 @@ export function SidebarIdentityGroup({
           '[&_[data-slot=common-dropdown-trigger]]:focus-visible:ring-0'
         )}
       >
-        <UserButton
-          calm={calm}
-          dockStatus={dockStatus}
-          profileHref={profileHref}
-          settingsHref={APP_ROUTES.SETTINGS}
-          showUserInfo
-        />
+        {showAccountMenu ? (
+          <UserButton
+            calm={calm}
+            dockStatus={dockStatus}
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            showUserInfo
+          />
+        ) : null}
         {!calm && profileHref && profileDisplayHref ? (
           <Tooltip label={profileDisplayHref} side='right'>
             <Link

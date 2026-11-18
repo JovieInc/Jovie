@@ -16,6 +16,18 @@ import { pathToFileURL } from 'node:url';
 const API_BASE = 'https://api.vercel.com';
 const DAY_MS = 86_400_000;
 const BUILD_SERVICES = new Set(['Build CPU Minutes', 'Build Minutes']);
+const validUsd = value =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+function assertCurrentPeriod(period, now) {
+  if (
+    !Number.isFinite(now) ||
+    !Number.isFinite(period?.start) ||
+    !Number.isFinite(period?.end) ||
+    !(period.start > 0 && period.start <= now && now < period.end)
+  )
+    throw new Error('billing period is unavailable or not current');
+}
 
 export function loadPolicy(
   path = new URL('../vercel-on-demand-policy.json', import.meta.url)
@@ -23,6 +35,7 @@ export function loadPolicy(
   const policy = JSON.parse(readFileSync(path, 'utf8'));
   if (
     policy.schema !== 'jovie-vercel-on-demand-policy/v1' ||
+    ![policy.hardCapUsd, policy.cutoffUsd, policy.alertUsd].every(validUsd) ||
     !(policy.cutoffUsd < policy.hardCapUsd) ||
     !(policy.alertUsd < policy.cutoffUsd) ||
     policy.buildMachineType !== 'standard' ||
@@ -57,7 +70,12 @@ export function computeLedger({
   period,
   now = Date.now(),
 }) {
+  assertCurrentPeriod(period, now);
+  if (!Array.isArray(deployments) || !Array.isArray(charges))
+    throw new Error('build usage collections are unavailable');
   const since = Math.max(period.start, Date.parse(policy.enabledAt));
+  if (!Number.isFinite(since) || since > now)
+    throw new Error('on-demand enablement time is invalid');
   const counted = deployments.filter(
     d =>
       d?.projectId === policy.projectId &&
@@ -75,7 +93,17 @@ export function computeLedger({
         row?.Tags?.ProjectId === policy.projectId &&
         Date.parse(row?.ChargePeriodEnd) > since
     )
-    .reduce((sum, row) => sum + (Number(row.BilledCost) || 0), 0);
+    .reduce((sum, row) => {
+      const value = row.BilledCost;
+      const cost = Number(value);
+      if (
+        !['number', 'string'].includes(typeof value) ||
+        (typeof value === 'string' && !value.trim()) ||
+        !validUsd(cost)
+      )
+        throw new Error('billed build cost is invalid');
+      return sum + cost;
+    }, 0);
   const actualUsd = Math.max(estimatedUsd, billedUsd);
   const windowStart = Math.max(
     since,
@@ -100,8 +128,9 @@ export function computeLedger({
 /** Desired on-demand state. Cutoff on actual OR projected spend. */
 export function decide({ ledger, policy, project }) {
   const rc = project?.resourceConfig ?? {};
+  const known = validUsd(ledger?.actualUsd) && validUsd(ledger?.projectedUsd);
   const alert =
-    ledger !== null &&
+    known &&
     (ledger.actualUsd >= policy.alertUsd ||
       ledger.projectedUsd >= policy.alertUsd);
   const off = reason => ({ enabled: false, reason, alert });
@@ -112,7 +141,7 @@ export function decide({ ledger, policy, project }) {
   ) {
     return off('build-machine-not-pinned-standard');
   }
-  if (ledger === null) return off('spend-unknown');
+  if (!known) return off('spend-unknown');
   if (ledger.actualUsd >= policy.cutoffUsd) return off('cutoff-actual');
   if (ledger.projectedUsd >= policy.cutoffUsd) return off('cutoff-projected');
   return { enabled: true, reason: 'within-cap', alert };
@@ -136,15 +165,32 @@ async function vercel(path, { token, teamId, fetchImpl, method, body, text }) {
 
 async function listProjectDeployments(ctx, projectId, since) {
   const rows = [];
+  const cursors = new Set();
   let until = '';
   for (let page = 0; page < 20; page++) {
     const result = await vercel(
       `/v6/deployments?projectId=${projectId}&since=${since}&limit=100${until ? `&until=${until}` : ''}`,
       ctx
     );
-    rows.push(...(result.deployments ?? []));
+    if (!Array.isArray(result?.deployments))
+      throw new Error('deployment listing is malformed');
+    if (
+      result.deployments.some(
+        row => !row || typeof row !== 'object' || row.projectId !== projectId
+      )
+    )
+      throw new Error('deployment identity is unavailable or mismatched');
+    rows.push(...result.deployments);
     const next = result.pagination?.next;
-    if (!next || (result.deployments ?? []).length === 0) return rows;
+    if (next === null || next === undefined) return rows;
+    if (
+      !Number.isSafeInteger(Number(next)) ||
+      Number(next) <= 0 ||
+      result.deployments.length === 0 ||
+      cursors.has(String(next))
+    )
+      throw new Error('deployment pagination is incomplete');
+    cursors.add(String(next));
     until = next;
   }
   throw new Error('deployment listing exceeded 20 pages');
@@ -165,9 +211,7 @@ export async function runLedger({
   try {
     const team = await vercel(`/v2/teams/${teamId}`, ctx);
     const period = team?.billing?.period;
-    if (!(period?.start > 0 && period?.end > period.start)) {
-      throw new Error('billing period unavailable');
-    }
+    assertCurrentPeriod(period, now);
     const since = Math.max(period.start, Date.parse(policy.enabledAt));
     const deployments = await listProjectDeployments(
       ctx,
@@ -250,7 +294,11 @@ export function renderLedger(result, policy) {
   return `${lines.join('\n')}\n`;
 }
 
-export async function runCli({ env = process.env, fetchImpl = fetch } = {}) {
+export async function runCli({
+  env = process.env,
+  fetchImpl = fetch,
+  now = Date.now(),
+} = {}) {
   let policy;
   try {
     policy = loadPolicy();
@@ -262,6 +310,7 @@ export async function runCli({ env = process.env, fetchImpl = fetch } = {}) {
       teamId: env.VERCEL_ORG_ID,
       policy,
       fetchImpl,
+      now,
     });
     const report = renderLedger(result, policy);
     console.log(report);
