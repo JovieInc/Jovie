@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, within } from 'storybook/test';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -85,7 +86,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Connected: Story = {};
+export const Connected: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText('The Echo')).toBeVisible();
+    await expect(canvas.getByText('The Fillmore')).toBeVisible();
+    await expect(canvas.getByText('Los Angeles, CA, US')).toBeVisible();
+    await expect(canvas.getByText('Sold Out')).toBeVisible();
+  },
+};
 
 export const ConnectedNoUpcomingDates: Story = {
   args: { initialTourDates: [] },
