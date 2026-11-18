@@ -179,7 +179,7 @@ jobs:
             if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
               for persona in creator creator-ready; do
                 ready=0
-                for attempt in 1 2 3; do
+                for ((attempt = 1; attempt <= 3; attempt++)); do
                   if curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session -H 'content-type: application/json' --data "{\"persona\":\"$persona\"}" >/dev/null; then
                     ready=1
                     break
