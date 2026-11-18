@@ -7220,8 +7220,10 @@ jobs:
     # Push leaves neon-db skipped; this job opens its own ephemeral branch.
     # A red push run does not fail CI. The gate still blocks when the range
     # requires a green journey.
-    needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    # The journey builds its own real-auth artifact; the public build uses mock
+    # auth and must not prevent this lane from running if its prerequisites fail.
+    needs: [ci-path-changes, neon-db]
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
