@@ -319,6 +319,27 @@ async function stopServer({ child, hasExited }, baseUrl) {
   throw new Error(`${baseUrl} still serves after the server was stopped.`);
 }
 
+export function appendCollectionSummary(summaryPath, collections) {
+  if (!summaryPath) return;
+  const lines = [
+    '### Signed-in Lighthouse collection times',
+    '',
+    '| Suite | Build | Phase | Elapsed | Collection |',
+    '| --- | --- | --- | ---: | --- |',
+    ...collections.map(
+      ({ suite, side, phase, elapsedMs, completed }) =>
+        `| ${suite} | ${side} | ${phase} | ${(elapsedMs / 1000).toFixed(1)}s | ${completed ? 'Complete' : 'Failed'} |`
+    ),
+  ];
+  try {
+    appendFileSync(summaryPath, lines.join('\n') + '\n');
+  } catch {
+    console.warn(
+      'Lighthouse collection times remain available in verdict.json.'
+    );
+  }
+}
+
 async function main() {
   const baseUrl = (process.env.BASE_URL || 'http://localhost:3000').replace(
     /\/$/,
@@ -438,25 +459,7 @@ async function main() {
       2
     )}\n`
   );
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    const lines = [
-      '### Signed-in Lighthouse collection times',
-      '',
-      '| Suite | Build | Pass | Elapsed | Collection |',
-      '| --- | --- | --- | ---: | --- |',
-      ...collections.map(
-        ({ suite, side, phase, elapsedMs, completed }) =>
-          `| ${suite} | ${side} | ${phase} | ${(elapsedMs / 1000).toFixed(1)}s | ${completed ? 'Complete' : 'Failed'} |`
-      ),
-    ];
-    try {
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
-    } catch {
-      console.warn(
-        'Lighthouse collection times remain available in verdict.json.'
-      );
-    }
-  }
+  appendCollectionSummary(process.env.GITHUB_STEP_SUMMARY, collections);
   console.log(
     passed
       ? 'Lighthouse budgets passed.'

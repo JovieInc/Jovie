@@ -10,8 +10,9 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  appendCollectionSummary,
   decide,
   readBuildId,
   resolveSuites,
@@ -156,6 +157,51 @@ describe('relative Lighthouse gate flow', () => {
         completed: false,
       },
     ]);
+  });
+
+  it('appends readable timings without replacing earlier job notes or hiding a failed collection', async () => {
+    const { options } = harness({
+      verdicts: {},
+      failCollect: (_side, suite) => suite === 'chat',
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => (elapsed += 1250),
+      hasBaseline: false,
+      extraRuns: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const summary = join(dir, 'job.md');
+    try {
+      writeFileSync(summary, 'Previous step\n');
+      appendCollectionSummary(summary, result.collections);
+      const markdown = readFileSync(summary, 'utf8');
+      expect(markdown).toMatch(/^Previous step\n### Signed-in Lighthouse/);
+      expect(markdown).toContain(
+        '| dashboard | head | initial | 1.3s | Complete |'
+      );
+      expect(markdown).toContain('| chat | head | initial | 1.3s | Failed |');
+      expect(result.passed).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing or unwritable job summary as optional reporting', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      appendCollectionSummary(undefined, []);
+      expect(warn).not.toHaveBeenCalled();
+      appendCollectionSummary(dir, []);
+      expect(warn).toHaveBeenCalledWith(
+        'Lighthouse collection times remain available in verdict.json.'
+      );
+    } finally {
+      warn.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('without a baseline enforces the configured budgets and never rechecks', async () => {
