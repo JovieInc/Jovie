@@ -48,6 +48,9 @@ describe('watchdog wiring', () => {
     expect(alarm.if).toContain(
       "steps.synthetic-heartbeat.outcome != 'success'"
     );
+    expect(alarm.if).toContain(
+      "steps.synthetic-heartbeat.outputs.test_status != 'deferred'"
+    );
     expect(alarm.with.custom_payload).toContain(
       'heartbeat check did not complete'
     );
@@ -86,6 +89,13 @@ describe('watchdog wiring', () => {
       step => step.name === 'Preserve synthetic dead-man failure'
     );
     expect(preserve.run).toContain('exit 1');
+    expect(preserve.if).toBe(
+      steps.find(step => step.name === 'Send Slack Alert on Synthetic Silence')
+        .if
+    );
+    expect(preserve.if).toContain(
+      "steps.synthetic-heartbeat.outputs.test_status != 'deferred'"
+    );
     expect(steps.indexOf(preserve)).toBeGreaterThan(
       steps.findIndex(
         step => step.name === 'Send Slack Alert on Synthetic Silence'
@@ -103,6 +113,7 @@ describe('watchdog wiring', () => {
       '.github/workflows/automation-liveness.yml',
       '.github/workflows/synthetic-monitoring.yml',
       'scripts/synthetic-canary-liveness.mjs',
+      'scripts/lib/__tests__/synthetic-canary-liveness.cases.mjs',
       'scripts/lib/__tests__/synthetic-canary-liveness.test.mjs',
     ]) {
       expect(guard.inputs.test(file)).toBe(true);
