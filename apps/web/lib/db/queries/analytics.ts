@@ -12,6 +12,11 @@ import {
 } from 'drizzle-orm';
 import { externalAccountSql } from '@/lib/accounts/internal-account';
 import {
+  type AuthorizedAnalyticsProfile,
+  assertAuthorizedAnalyticsProfile,
+  resolveAuthorizedAnalyticsProfile,
+} from '@/lib/analytics/authorized-profile';
+import {
   buildEvidenceReceiptSet,
   buildMetricReceipt,
   certifiedRateOrUnavailable,
@@ -30,7 +35,7 @@ import {
   resolveRangeStart,
   resolveRangeStartOrEpoch,
 } from '@/lib/analytics/time-range';
-import { getSessionContext, setupDbSession } from '@/lib/auth/session';
+import { setupDbSession } from '@/lib/auth/session';
 import {
   type DbOrTransaction,
   db,
@@ -54,40 +59,33 @@ import type {
   DashboardAnalyticsView,
   TourDateAnalyticsData,
 } from '@/types/analytics';
+import { type JsonArray, parseJsonArray } from './analytics-row-mapping';
 
-type JsonArray<T> = T[] | string | null;
 type AggregateValue = string | number | null;
-
-const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
-  if (!value) return [];
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value) as T[];
-    } catch {
-      return [];
-    }
-  }
-
-  return value;
-};
 
 export async function getUserDashboardAnalytics(
   clerkUserId: string,
   range: AnalyticsRange,
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
-  const { profile } = await getSessionContext({
-    clerkUserId,
-    requireUser: true,
-    requireProfile: true,
-  });
+  const scope = await resolveAuthorizedAnalyticsProfile(clerkUserId);
+  return getDashboardAnalyticsForProfile(scope, range, view);
+}
+
+/** Load exactly the profile authorized before the outer cache lookup. */
+export async function getDashboardAnalyticsForProfile(
+  scope: AuthorizedAnalyticsProfile,
+  range: AnalyticsRange,
+  view: DashboardAnalyticsView
+): Promise<DashboardAnalyticsResponse> {
+  assertAuthorizedAnalyticsProfile(scope);
 
   // Defense-in-depth: set RLS session variable on the db connection
   // so the analytics CTE can query RLS-protected tables
   // (audience_members, notification_subscriptions) correctly.
-  await setupDbSession(clerkUserId);
+  await setupDbSession(scope.userId);
 
-  const creatorProfile = { id: profile!.id };
+  const creatorProfile = { id: scope.profileId };
 
   {
     // Canonical window semantics: rolling N × 24h windows ending at query

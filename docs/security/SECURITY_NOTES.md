@@ -86,8 +86,9 @@ _Last reviewed: 2026-04-01_
       - `X-Content-Type-Options: nosniff`
       - `Referrer-Policy: origin-when-cross-origin`
     - Caching strategy:
-      - Other `/api/*`: `Cache-Control: public, max-age=300, s-maxage=300`.
-      - All other routes (except `.well-known/vercel/flags`): `Cache-Control: public, max-age=0, must-revalidate`.
+      - `/api/*` default: `Cache-Control: private, no-cache, no-store, must-revalidate` (fail-closed; a public endpoint sets its own header in the handler).
+      - `/app/*` and the account, billing, onboarding, sign-in and link-redirect sections: the same no-store value.
+      - All other routes: `Cache-Control: public, max-age=0, must-revalidate`. This catch-all is declared first because the last matching rule wins.
     - `next/image` is configured with a very strict per-image CSP (`default-src 'self'; script-src 'none'; sandbox;`) via `images.contentSecurityPolicy`. This applies only to the image optimizer, not as a global app CSP.
 - `proxy.ts`:
   - Bot detection for sensitive link APIs, including a 204 anti-cloaking response for `/api/link/*` when appropriate.

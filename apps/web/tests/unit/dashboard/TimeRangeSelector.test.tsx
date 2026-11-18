@@ -1,7 +1,106 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
+
+type SegmentRange = '1d' | '7d' | '30d' | '90d';
+
+function ControlledSegmentRange({
+  onValueChange,
+}: {
+  readonly onValueChange: (range: SegmentRange) => void;
+}) {
+  const [value, setValue] = useState<SegmentRange>('1d');
+  return (
+    <TimeRangeSelector
+      value={value}
+      onValueChange={range => {
+        setValue(range);
+        onValueChange(range);
+      }}
+      ranges={['1d', '7d', '30d', '90d']}
+      lockedRanges={['7d']}
+      maxRetentionDays={30}
+    />
+  );
+}
+
+describe('TimeRangeSelector (segment variant)', () => {
+  it('exposes a named single choice without empty tab panels', () => {
+    render(
+      <TimeRangeSelector
+        value='7d'
+        onValueChange={vi.fn()}
+        ranges={['1d', '7d', '30d']}
+      />
+    );
+
+    expect(
+      screen.getByRole('radiogroup', { name: 'Analytics Time Range' })
+    ).toBeVisible();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getByRole('radio', { name: '7D' })).toBeChecked();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tabpanel', { hidden: true })
+    ).not.toBeInTheDocument();
+  });
+
+  it('selects an enabled range once and keeps locked ranges unavailable', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<ControlledSegmentRange onValueChange={onValueChange} />);
+
+    const chosen = screen.getByRole('radio', { name: '30D' });
+    await user.click(chosen);
+    expect(chosen).toBeChecked();
+    expect(chosen).toHaveFocus();
+    expect(screen.getByRole('radio', { name: '1D' })).not.toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenLastCalledWith('30d');
+
+    for (const name of ['7D', '90D']) {
+      const locked = screen.getByRole('radio', { name });
+      expect(locked).toBeDisabled();
+      await user.click(locked);
+    }
+    expect(chosen).toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips disabled ranges and supports keyboard focus and selection', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<ControlledSegmentRange onValueChange={onValueChange} />);
+    const first = screen.getByRole('radio', { name: '1D' });
+    const last = screen.getByRole('radio', { name: '30D' });
+
+    await user.tab();
+    expect(first).toHaveFocus();
+    // Radix checks arrow-focused items while the arrow key is held.
+    await user.keyboard('{ArrowRight>}');
+    await waitFor(() => expect(last).toHaveFocus());
+    await user.keyboard('{/ArrowRight}');
+    expect(last).toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenLastCalledWith('30d');
+
+    await user.keyboard('{Home}');
+    await waitFor(() => expect(first).toHaveFocus());
+    await user.keyboard(' ');
+    expect(first).toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(2);
+    expect(onValueChange).toHaveBeenLastCalledWith('1d');
+
+    await user.keyboard('{End}');
+    await waitFor(() => expect(last).toHaveFocus());
+    await user.keyboard(' ');
+    expect(last).toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(3);
+    expect(onValueChange).toHaveBeenLastCalledWith('30d');
+  });
+});
 
 describe('TimeRangeSelector (tabs variant)', () => {
   it('renders pill-shaped shell and active tab styling', () => {
@@ -54,15 +153,29 @@ describe('TimeRangeSelector (tabs variant)', () => {
 
   it('wires the external analytics panel to package-owned tabs', () => {
     render(
-      <TimeRangeSelector
-        variant='tabs'
-        value='7d'
-        onValueChange={vi.fn()}
-        ranges={['1d', '7d', '30d']}
-        tabsBaseId='analytics'
-        panelId='analytics-panel'
-      />
+      <>
+        <TimeRangeSelector
+          variant='tabs'
+          value='7d'
+          onValueChange={vi.fn()}
+          ranges={['1d', '7d', '30d']}
+          tabsBaseId='analytics'
+          panelId='analytics-panel'
+        />
+        <div
+          id='analytics-panel'
+          role='tabpanel'
+          aria-labelledby='analytics-tab-7d'
+        >
+          Current analytics results
+        </div>
+      </>
     );
+    expect(screen.getByRole('tabpanel', { name: '7D' })).toHaveAttribute(
+      'id',
+      'analytics-panel'
+    );
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
 
     const activeTab = screen.getByRole('tab', { name: '7D' });
     const inactiveTab = screen.getByRole('tab', { name: '30D' });

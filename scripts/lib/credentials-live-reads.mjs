@@ -17,6 +17,44 @@ export const CODEX_ACCOUNTS_PATH = join(
   '.local/state/jovie-lanes/codex-accounts.json'
 );
 const TIMEOUT_MS = 15_000;
+export const LANES_LINEAR_APP_ID = 'lanes-linear-app-oauth';
+
+/** Redacted host snapshot only. This reader never opens a credential/cache file. */
+export function readLanesLinearStatus(raw, nowMs) {
+  let status;
+  try {
+    status = JSON.parse(raw);
+  } catch {
+    return { ok: false, reason: 'metadata-unparsed' };
+  }
+  if (status?.schema !== 'jovie.linear-app-status/v1')
+    return { ok: false, reason: 'metadata-unavailable' };
+  const observed = Date.parse(status.observedAt);
+  if (
+    !Number.isFinite(observed) ||
+    observed > nowMs ||
+    nowMs - observed > 300_000
+  )
+    return { ok: false, reason: 'metadata-stale' };
+  if (status.mintFailed === true) return { ok: false, reason: 'mint-failed' };
+  if (status.mintFailed !== false)
+    return { ok: false, reason: 'metadata-unavailable' };
+  if (status.available !== true)
+    return { ok: false, reason: 'app-unavailable' };
+  if (status.scopeMatches !== true)
+    return { ok: false, reason: 'scope-mismatch' };
+  const expiresAt = new Date(observed + status.expiresInS * 1000);
+  if (
+    typeof status.expiresInS !== 'number' ||
+    !Number.isFinite(status.expiresInS) ||
+    !Number.isFinite(expiresAt.getTime())
+  )
+    return { ok: false, reason: 'expiry-unparsed' };
+  return {
+    ok: true,
+    value: { id: LANES_LINEAR_APP_ID, expiresAt: expiresAt.toISOString() },
+  };
+}
 
 /** AI Gateway credit balance. Accepts a Gateway API key or a Vercel OIDC token. */
 export async function readGatewayCredits({ token, fetchImpl = fetch, now }) {

@@ -1,4 +1,6 @@
+import { defaultCopyText, defaultOpenUrl } from './library-browser-actions';
 import { buildLibraryAskJovieDraft } from './library-chat-context';
+import { buildPrivatePromotionAction } from './library-promotion-action';
 
 export { buildLibraryAskJovieDraft } from './library-chat-context';
 
@@ -34,6 +36,7 @@ import {
   getUTMShareActionMenuItems,
 } from '@/lib/utm/share-menu-items';
 import type { LibraryReleaseAsset } from './library-data';
+import { isLibraryTakeAsset } from './library-take-assets';
 
 export const LIBRARY_ENTITY_ACTION_ORDER = [
   'approval-status',
@@ -44,6 +47,7 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-primary',
   'copy',
   'ask-jovie',
+  'draft-promotion',
   'archive',
   'restore',
 ] as const;
@@ -181,14 +185,6 @@ function buildProfileVisibilityAction({
       } satisfies LibraryEntityAction;
     }),
   };
-}
-
-function defaultOpenUrl(url: string): void {
-  globalThis.open(url, '_blank', 'noopener,noreferrer');
-}
-
-function defaultCopyText(value: string): void {
-  void globalThis.navigator?.clipboard?.writeText(value);
 }
 
 function buildApprovalActions({
@@ -360,6 +356,19 @@ export function buildLibraryEntityActions({
   copyText = defaultCopyText,
 }: BuildLibraryEntityActionsOptions): LibraryEntityAction[] {
   const primaryHref = asset.primaryActionHref ?? asset.smartLinkPath;
+  const openPrimary: LibraryEntityAction = {
+    id: 'open-primary',
+    label: asset.primaryActionLabel ?? 'Open Smart Link',
+    icon: ExternalLink,
+    authority: 'none',
+    disabled: false,
+    destructive: false,
+    onExecute: () => openUrl(primaryHref),
+  };
+  // A private take has no approval, profile or archive state to change.
+  if (isLibraryTakeAsset(asset)) {
+    return [openPrimary, buildCopyAction({ asset, copyText })];
+  }
   const actions: LibraryEntityAction[] = [
     buildApprovalActions({
       asset,
@@ -415,18 +424,7 @@ export function buildLibraryEntityActions({
     });
   }
 
-  actions.push(
-    {
-      id: 'open-primary',
-      label: asset.primaryActionLabel ?? 'Open Smart Link',
-      icon: ExternalLink,
-      authority: 'none',
-      disabled: false,
-      destructive: false,
-      onExecute: () => openUrl(primaryHref),
-    },
-    buildCopyAction({ asset, copyText })
-  );
+  actions.push(openPrimary, buildCopyAction({ asset, copyText }));
 
   actions.push({
     id: 'ask-jovie',
@@ -445,6 +443,13 @@ export function buildLibraryEntityActions({
       onAskJovie(buildLibraryAskJovieDraft(asset, profileId), profileId);
     },
   });
+
+  const promotionAction = buildPrivatePromotionAction(
+    asset,
+    profileId,
+    openUrl
+  );
+  if (promotionAction) actions.push(promotionAction);
 
   const lifecycleAction = buildLifecycleAction({
     asset,
@@ -483,9 +488,7 @@ function toContextMenuItem(action: LibraryEntityAction): ContextMenuItemType {
     disabled: action.disabled,
     subText: action.disabledReason,
     destructive: action.destructive,
-    onClick: () => {
-      void action.onExecute?.();
-    },
+    onClick: () => void action.onExecute?.(),
   };
 }
 

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
-import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { loadLibraryDocuments } from '@/lib/db/creator-documents/library-page';
 import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -28,12 +30,18 @@ import {
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
 import {
+  type TeleprompterTakeSummary,
+  toTeleprompterTakeSummary,
+} from '@/lib/teleprompter/takes/contract';
+import { listTeleprompterTakes } from '@/lib/teleprompter/takes/server';
+import {
   hasConnectedYouTubeAccount,
   listVideosForLibraryProjection,
   type PublicVideoListItem,
 } from '@/lib/youtube-library';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
+import { CatalogPromotionComposer } from './promotion/[releaseId]/CatalogPromotionComposer';
 
 export const runtime = 'nodejs';
 
@@ -60,11 +68,18 @@ export default async function LibraryPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{
+    readonly promotion?: string;
     readonly section?: string | string[] | undefined;
     readonly view?: string | string[] | undefined;
+    readonly document?: string | string[];
   }>;
 }) {
-  const { view } = await searchParams;
+  const { view, promotion } = await searchParams;
+  const requestedDocument = (await searchParams).document;
+  const requestedId =
+    typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
+      ? requestedDocument.toLowerCase()
+      : null;
   const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
@@ -76,7 +91,18 @@ export default async function LibraryPage({
     return routeContext.error;
   }
 
+  if (typeof promotion === 'string')
+    return <CatalogPromotionComposer releaseId={promotion} />;
   const selectedProfile = routeContext.dashboardData.selectedProfile;
+  // Studio takes are private to the signed-in creator, not the profile.
+  const takesPromise = listTeleprompterTakes(routeContext.userId)
+    .then(records => records.map(toTeleprompterTakeSummary))
+    .catch((error): TeleprompterTakeSummary[] => {
+      void captureError('Studio takes load failed on library page', error, {
+        route: APP_ROUTES.LIBRARY,
+      });
+      return [];
+    });
   const profileId = selectedProfile?.id ?? null;
   let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
     [];
@@ -106,7 +132,10 @@ export default async function LibraryPage({
           userId: routeContext.userId,
           profileId,
         });
-        const privateDocuments = await listCreatorDocuments(profileId);
+        const privateDocuments = await loadLibraryDocuments(
+          profileId,
+          requestedId
+        );
         return {
           documents: [...privateDocuments.documents],
           nextCursor: privateDocuments.nextCursor,
@@ -241,6 +270,14 @@ export default async function LibraryPage({
     creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
+  if (
+    requestedId &&
+    !creatorDocumentsLoadFailed &&
+    !creatorDocuments.some(item => item.id === requestedId)
+  )
+    notFound();
+  const teleprompterTakes = await takesPromise;
+
   return (
     <HydrateClient state={getDehydratedState()}>
       <LibraryPageClient
@@ -256,6 +293,7 @@ export default async function LibraryPage({
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         youtubeVideos={youtubeVideos}
         youtubeConnected={youtubeConnected}
+        teleprompterTakes={teleprompterTakes}
         relationships={relationships}
         postReleaseBundle={postReleaseBundle}
       />

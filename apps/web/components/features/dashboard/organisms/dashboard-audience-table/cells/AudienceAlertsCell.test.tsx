@@ -17,6 +17,7 @@ describe('AudienceAlertsCell', () => {
 
     for (const chip of screen.getAllByRole('img')) {
       expect(chip.className).not.toMatch(/emerald|amber|orange|cyan/);
+      expect(chip).not.toHaveClass('uppercase');
     }
     expect(screen.getByText('S')).toBeInTheDocument();
     expect(screen.getByText('E')).toBeInTheDocument();

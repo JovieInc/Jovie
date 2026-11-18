@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react';
+import { OpportunityInboxRouteSkeleton } from '@/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
 import ChatLoading from './chat/ChatLoadingState';
-import { ReleaseTableSkeleton } from './dashboard/releases/loading';
-import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { LinksRouteSkeleton } from './links/LinksRouteSkeleton';
-import { ProfilesRouteSkeleton } from './profiles/ProfilesRouteSkeleton';
 import { SettingsRouteSkeleton } from './settings/SettingsRouteSkeleton';
 import {
   isCalendarShellRoute,
   isChatShellRoute,
   isEarningsShellRoute,
+  isInboxShellRoute,
   isLibraryShellRoute,
   isLinksShellRoute,
   isLyricsShellRoute,
@@ -21,6 +20,11 @@ import {
   isTasksShellRoute,
   isTouringShellRoute,
 } from './shell-route-matches';
+import {
+  LibraryLoadingStateLazy,
+  ProfilesRouteSkeletonLazy,
+  ReleaseTableSkeletonLazy,
+} from './shell-route-table-skeletons';
 import { TourDatesRouteSkeleton } from './tour-dates/TourDatesRouteSkeleton';
 
 /**
@@ -36,16 +40,19 @@ import { TourDatesRouteSkeleton } from './tour-dates/TourDatesRouteSkeleton';
 export function resolveShellRouteSkeleton(
   pathname: string | null
 ): ReactNode | undefined {
+  // Home (`/app`) renders the Opportunity Inbox, not chat: checked first so it
+  // boots into the inbox frame instead of flashing a composer.
+  if (isInboxShellRoute(pathname)) return <OpportunityInboxRouteSkeleton />;
   if (isChatShellRoute(pathname)) return <ChatLoading />;
   if (isReleasesShellRoute(pathname)) {
-    return <ReleaseTableSkeleton showHeader={false} />;
+    return <ReleaseTableSkeletonLazy showHeader={false} />;
   }
-  if (isLibraryShellRoute(pathname)) return <LibraryLoadingState />;
+  if (isLibraryShellRoute(pathname)) return <LibraryLoadingStateLazy />;
   if (isLyricsShellRoute(pathname)) return <LyricsRouteSkeleton />;
   if (isTasksShellRoute(pathname)) return <TasksRouteSkeleton />;
   if (isCalendarShellRoute(pathname)) return <CalendarRouteSkeleton />;
   if (isLinksShellRoute(pathname)) return <LinksRouteSkeleton />;
-  if (isPresenceShellRoute(pathname)) return <ProfilesRouteSkeleton />;
+  if (isPresenceShellRoute(pathname)) return <ProfilesRouteSkeletonLazy />;
   if (isTouringShellRoute(pathname)) return <TourDatesRouteSkeleton />;
   if (isSettingsShellRoute(pathname) || isEarningsShellRoute(pathname)) {
     return <SettingsRouteSkeleton />;

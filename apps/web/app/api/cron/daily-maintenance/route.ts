@@ -32,7 +32,9 @@ import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { runLegacyClaimVerificationSweep } from '@/lib/claim/legacy-verification.server';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { sweepAppleMusicCatalogCompletenessForCron } from '@/lib/discography/apple-music-import';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
+import { sweepLegacySlugsForCron } from '@/lib/discography/slug-migration';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
@@ -44,6 +46,7 @@ import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
+import { runDesignPartnerAutopilotSubJob } from '@/lib/release-to-revenue/autostart';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -171,6 +174,13 @@ export async function GET(request: Request) {
     sweepUnderEnrichedProfilesForCron
   );
 
+  // 7b. Apple Music catalog completeness — add releases that exist only on
+  //     Apple Music, weekly per profile, bounded batch (JOV-7140)
+  results.appleMusicCatalogImport = await runSubJob(
+    'appleMusicCatalogImport',
+    sweepAppleMusicCatalogCompletenessForCron
+  );
+
   // 8. Onboarding script self-improvement — recompute conversion counters,
   //    mine lint-clean LLM candidates, promote/retire variants (JOV-3806)
   results.onboardingScriptAggregation = await runSubJob(
@@ -196,6 +206,13 @@ export async function GET(request: Request) {
       }
       return summary;
     }
+  );
+
+  // 10b. Design-partner autopilot — start a drafts-only release cycle when
+  //      none ran in the last window (JOV-7140 dogfood proof).
+  results.designPartnerAutopilot = await runSubJob(
+    'designPartnerAutopilot',
+    () => runDesignPartnerAutopilotSubJob()
   );
 
   // 11. Expired founder-review audio uploads that never bound to a receipt.
@@ -252,6 +269,13 @@ export async function GET(request: Request) {
         families: summary.families,
       };
     }
+  );
+
+  // 12a. Legacy `-2`/`-3` release and track URLs -> plain-language slugs,
+  //      old URLs 308ing (slug policy follow-up to #23143), bounded batch.
+  results.legacySlugMigration = await runSubJob(
+    'legacySlugMigration',
+    sweepLegacySlugsForCron
   );
 
   // 12b. Expired agent connector drafts (privacy policy retention, #23772).

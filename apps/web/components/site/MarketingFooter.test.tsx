@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 // These cases cover the theme-switching policy itself; production ships with
 // theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
@@ -30,25 +31,24 @@ vi.mock('next-themes', () => ({
   useTheme: () => themeState,
 }));
 
-// Product default: SHOW_MARKETING_FULL_FOOTER is false (clean homepage baseline).
-// Enable it here so footer content assertions exercise expanded chrome in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_FULL_FOOTER: true,
-    },
-  };
-});
-
 function footerColumnTitle(name: string) {
   return screen.getByText(name, { selector: 'p.mf-eyebrow' });
 }
 
 describe('MarketingFooter', () => {
+  it('keeps privacy choices available even with published legal links', () => {
+    render(
+      <MarketingFooter
+        legalLinks={[{ href: '/legal/privacy', label: 'Privacy' }]}
+      />
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Do Not Sell or Share My Personal Information',
+      })
+    ).toHaveAttribute('href', '/legal/privacy#privacy-choices');
+  });
+
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
     themeState.theme = 'dark';
@@ -289,7 +289,7 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('honors the expanded footer variant when the full-footer flag is enabled', () => {
+  it('renders the expanded footer when a route asks for it', () => {
     mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter variant='expanded' />);
 
@@ -319,6 +319,37 @@ describe('MarketingFooter', () => {
     rerender(<MarketingFooter variant='minimal' />);
 
     expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
+  });
+
+  it.each([
+    ['expanded', {}],
+    ['minimal', { variant: 'minimal' as const }],
+    ['empty columns', { variant: 'expanded' as const, columns: [] }],
+  ])('has no axe violations in the %s footer', async (_label, props) => {
+    const { container } = render(<MarketingFooter {...props} />);
+    expect(screen.getByTestId('marketing-footer')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('labels each right-to-left column by its own heading', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <MarketingFooter
+          variant='expanded'
+          showCta={false}
+          columns={[
+            {
+              title: 'المنتج',
+              links: [{ href: '/pricing', label: 'الأسعار' }],
+            },
+            { title: 'الشركة', links: [{ href: '/about', label: 'من نحن' }] },
+          ]}
+        />
+      </div>
+    );
+    expect(screen.getByRole('region', { name: 'المنتج' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'الشركة' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('keeps the legal entity line in code, with the current year', () => {

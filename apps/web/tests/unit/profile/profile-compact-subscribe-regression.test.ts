@@ -18,6 +18,15 @@ const PROFILE_MOBILE_NOTIFICATIONS_FLOW = join(
   'artist-notifications-cta',
   'ProfileMobileNotificationsFlow.tsx'
 );
+// The flow's inline root class lives here, shared with its loading skeleton.
+const INLINE_FLOW_LAYOUT = join(
+  process.cwd(),
+  'components',
+  'features',
+  'profile',
+  'artist-notifications-cta',
+  'inline-flow-layout.ts'
+);
 
 describe('ProfileCompactSurface subscribe composition', () => {
   it('renders one notification flow when the subscribe tab is active', () => {
@@ -33,8 +42,10 @@ describe('ProfileCompactSurface subscribe composition', () => {
 
   it('sizes the inline flow from the available panel height', () => {
     const contents = readFileSync(PROFILE_MOBILE_NOTIFICATIONS_FLOW, 'utf8');
+    const layout = readFileSync(INLINE_FLOW_LAYOUT, 'utf8');
 
-    expect(contents).toMatch(/relative flex h-full min-h-full flex-1 flex-col/);
+    expect(contents).toMatch(/className=\{INLINE_FLOW\.root\}/);
+    expect(layout).toMatch(/relative flex h-full min-h-full flex-1 flex-col/);
     expect(contents).not.toMatch(/relative min-h-150/);
     expect(contents).not.toMatch(/touch-action:pan-y/);
   });

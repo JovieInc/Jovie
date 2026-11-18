@@ -579,9 +579,7 @@ test('verdict script maps exit codes to the job result and never turns a deferra
         out: done.stdout + done.stderr,
       };
     };
-    // The job result is the verdict. No commit status is posted: it was
-    // informational and its github.token POST turned a verdict read on the CI
-    // App budget into a quota deferral (run 40164178818).
+    // No commit status is posted; the job result is the verdict.
     const noStatusPost = result =>
       assert.doesNotMatch(result.posts, /statuses|-X POST/);
     const green = run(0, '');
@@ -1154,6 +1152,7 @@ test('PR Ready executes the exact-head evidence gate and denies missing, failed,
       head_repository: { id: 1 },
       created_at: '2026-10-29T01:00:00Z',
       id: 42,
+      head_sha: 'a'.repeat(40),
       status: 'completed',
       conclusion: 'success',
       html_url: 'https://github.com/o/r/actions/runs/42',
@@ -1197,6 +1196,7 @@ test('PR Ready executes the exact-head evidence gate and denies missing, failed,
         env: {
           ...process.env,
           HEAD_SHA: 'a'.repeat(40),
+          BASE_SHA: 'b'.repeat(40),
           PR_NUMBER: '42',
           HEAD_REF: row.head_branch,
           HEAD_REPO_ID: '1',

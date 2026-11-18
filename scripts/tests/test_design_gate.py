@@ -16,9 +16,11 @@ from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import design_gate  # noqa: E402
 import design_gate_check  # noqa: E402
+from scripts.tests.design_gate_git_evidence import GitEvidenceTest, complete_brief  # noqa: E402
 
 
 NOW = 1_791_000_000.0
@@ -33,46 +35,6 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z",
     )
 
 
-def complete_brief(capability="smart-links", imagery="photo", component="PublicProfileHero",
-                   pen="node Ab12Cd", sections=("hero", "cta")):
-    section_lines = "\n".join(f"- {section_id}" for section_id in sections)
-    copy_lines = "\n".join(
-        f"- {section_id}: Publish the certified page without inventing a claim."
-        for section_id in sections)
-    imagery_lines = "\n".join(f"- {section_id}: {imagery}" for section_id in sections)
-    return f"""## 1. IA / message
-Message: Artists see one public page that explains what Jovie publishes for them.
-
-## 2. Certified capabilities
-Capability ids:
-- {capability}
-
-## 3. Outcome
-Outcome: A founder can publish a certified artist page without inventing claims.
-
-## 4. Problem → solution
-Problem: Landing pages ship claims the product cannot prove yet.
-Solution: The page sells only the certified public-profile outcome.
-
-## 5. Layout
-Sections:
-{section_lines}
-
-## 6. Copy
-Copy:
-{copy_lines}
-
-## 7. Imagery
-Imagery:
-{imagery_lines}
-
-## 8. Art direction
-Component: {component}
-
-## 9. Creative exploration
-Pen: {pen}
-ImageGen:
-"""
 
 
 def load_lane():
@@ -590,8 +552,8 @@ class CiCheckTest(unittest.TestCase):
         for prefix in design_gate.GATED_PATH_PREFIXES:
             self.assertIn(prefix, text)
         self.assertIn("DESIGN_GATE_ENFORCE", text)
-        self.assertIn("fetch-depth: 2", text)
-        self.assertIn("git diff --name-only HEAD^1 HEAD", text)
+        self.assertIn("fetch-depth: 0", text)
+        self.assertIn("--git-diff", text)
         self.assertNotIn("gh api", text)
         self.assertNotIn("gh pr", text)
         self.assertNotIn("controller-hop-exception", text)

@@ -76,7 +76,7 @@ jobs:
           persist-credentials: false
       - name: Setup pnpm
         if: steps.guard.outputs.eligible == 'true'
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 9.15.9
       - name: Setup Node.js 24
@@ -153,6 +153,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: write
+          permission-pull-requests: read
       - name: Commit the synced files at the exact head
         id: commit
         env:
@@ -165,9 +166,12 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --head "$HEAD_SHA" \
             --root "$RUNNER_TEMP/pin-sync" --files "$FILES"
 
+      # The shared Actions token's REST bucket failed the unretried repos
+      # GET after this App token had already committed (run 43845895181).
+      # contents:write does not grant the pull read resolve_origin_head needs.
       - name: Emit origin for the published pin-sync head
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
         run: |

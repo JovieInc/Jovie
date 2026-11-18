@@ -14,6 +14,21 @@ completions, introduced holdouts, regressions and an evidence-based ETA.
 Add `--rows` for each surface's URL, source identity and inherited family metadata.
 An optional positional base ref replaces `origin/main` for the ratchet comparison.
 
+For retained historical pricing records, run
+`node scripts/design-surface-census.mjs --retained pricing` in a full-history
+checkout containing the recorded archive revision. This reads the existing
+census's immutable revision/path/blob records from local Git, verifies byte
+counts and SHA-256, and checks original capture-manifest image digests when
+present. Missing objects fail explicitly without fetching. The report contains
+metadata only; it grants no permission to publish screenshots.
+
+Retained records are `historical-source-local`, with `currentQualification: false`.
+Recorded capture source hashes are preserved, not requalified. Older README-only
+bundles remain legacy records without equivalent capture bindings. The historical
+reader works independently of current-file certification; ordinary census and
+authority checks still require current source hashes and unchanged transition
+history.
+
 The unit is a route entrypoint, including dynamic patterns, compatibility routes
 and intercepted auth presentations. It is not a visitor count: a redirect needs
 destination verification, and a dynamic pattern represents its state family.
@@ -51,8 +66,14 @@ path. Against the base, existing non-holdouts cannot become holdouts, canonical
 surfaces cannot regress, and existing surfaces cannot disappear into exclusions.
 Deleted route files may retire. Baseline work weights and the observation start
 remain fixed; transition history is append-only. Gate read/Git failures fail closed.
-Canonical source digests invalidate stale certification when a page or declared
-owner changes. Renew the actual render evidence before updating the digest.
+Canonical rows are certified per file: `surfaceCensus.evidence/<group>/` holds
+one entry (`file`, `sha256`, `at`, `ref`) for the page and each declared owner.
+Changing a certified file makes only its entry stale. The PR that changes it
+checks the rendered surface, then runs
+`node scripts/surface-recertify.mjs renew --ref "<what changed, how verified>"`,
+which rewrites only the entries of the files that PR changed. Two PRs that
+change different certified files touch different entries, so they stay green
+when a merge group combines them.
 
 For every status change, append `{source, from, to, at, evidence}` with an observed
 UTC timestamp and reviewable evidence. A genuinely new surface starts with
@@ -92,14 +113,14 @@ separate receipts. The census never claims this branch has deployed.
 
 ## Automatic recertification and main health
 
-A canonical census row fingerprints the bytes of its page and owners (`sourceDigest`). A push to main that
-changes those bytes without renewing the row fails `design-surface-census.test.mjs` for every later PR.
+A canonical census row fingerprints the bytes of its page and each owner in a per-file evidence entry. A push to
+main that changes those bytes without renewing the entry fails `design-surface-census.test.mjs` for every later PR.
 
 - `Surface Recertify` (`.github/workflows/surface-recertify.yml`) runs on pushes to main that touch certified
   source. `node scripts/surface-recertify.mjs list` finds stale rows; `capture` renders each route in Chromium at
   1440 and 390; `apply` validates the evidence (HTTP 200, no horizontal overflow, no page errors) and writes the new
-  `sourceDigest` with the census module itself. One `compounding` bot PR carries the renewal. Screenshots live in the
-  run artifact (90 days); the repo keeps their sha256 digests and the run URL in `evidence.ref`. No object-store
+  evidence entries with the census module itself. One `compounding` bot PR carries the renewal. Screenshots live in the
+  run artifact (90 days); the repo keeps their sha256 digests and the run URL in each entry's `ref`. No object-store
   credential is needed, so this works while PR #23631 (off-repo evidence ledger) waits on its R2 secret; when that
   lands, only the evidence location changes. Rows that cannot be captured (dynamic route, several sources, failed
   render) stay red by design.

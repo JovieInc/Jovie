@@ -70,7 +70,7 @@ describe('GET /claim/start', () => {
     });
   });
 
-  it('records claim-start for the consented journey and sends a new artist to signup with Pro intent', async () => {
+  it('records claim-start for the consented journey and sends a new artist to /start with Pro intent', async () => {
     const response = await GET(
       request(
         `spotify=${SPOTIFY_ID}`,
@@ -83,9 +83,11 @@ describe('GET /claim/start', () => {
       'claim-start'
     );
     const target = new URL(location(response), 'https://jov.ie');
-    expect(target.pathname).toBe('/signup');
-    expect(target.searchParams.get('plan')).toBe('pro');
+    expect(target.pathname).toBe('/start');
     expect(target.searchParams.get('artist_name')).toBe('Indie Artist');
+    expect(target.searchParams.get('starter_prompt')).toBe(
+      'I want to claim my profile.'
+    );
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const cookies = response.headers.getSetCookie().join('\n');
     expect(cookies).toContain('jovie_plan_intent=pro');
@@ -116,8 +118,7 @@ describe('GET /claim/start', () => {
     });
     const response = await GET(request(`spotify=${SPOTIFY_ID}`));
     const url = new URL(location(response) ?? '', 'http://localhost');
-    expect(url.pathname).toBe('/signup');
-    expect(url.searchParams.get('plan')).toBe('pro');
+    expect(url.pathname).toBe('/start');
   });
 
   it('never routes an unclaimed high-reach Jovie profile to the takeover route', async () => {
@@ -134,7 +135,7 @@ describe('GET /claim/start', () => {
     const response = await GET(request(`spotify=${SPOTIFY_ID}`));
     expect(location(response)).not.toContain('/famous/claim');
     expect(new URL(location(response) ?? '', 'http://localhost').pathname).toBe(
-      '/signup'
+      '/start'
     );
   });
 
@@ -178,7 +179,11 @@ describe('GET /claim/start', () => {
     );
 
     const anonymous = await GET(request('new=1'));
-    expect(location(anonymous)).toBe('/signup?plan=pro&interval=month');
+    expect(
+      new URL(location(anonymous), 'https://jov.ie').searchParams.get(
+        'starter_prompt'
+      )
+    ).toBe('I want to claim my profile.');
     expect(anonymous.headers.get('Cache-Control')).toBe('no-store');
   });
 

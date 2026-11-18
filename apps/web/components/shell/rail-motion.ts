@@ -60,6 +60,16 @@ export const SHELL_RAIL_STAGE =
   'min-w-0 max-w-full overflow-hidden transition-[max-width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
 
 /**
+ * Staged exit for rail content that holds focusable controls. Same motion as
+ * {@link SHELL_RAIL_STAGE}, but the clip box only applies while the rail is
+ * collapsed: an always-on `overflow-hidden` cut the 2px ring + 2px offset of
+ * `focus-ring-themed` off the first and last control (sidebar header bell,
+ * Tim 2026-11-14). Collapsed content is inert, so nothing there can focus.
+ */
+export const SHELL_RAIL_STAGE_CONTROLS =
+  'min-w-0 max-w-full overflow-visible transition-[max-width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:overflow-hidden group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+
+/**
  * Staged exit for single-line labels inside flex rows: max-width collapse
  * keeps the label mounted while it fades and slides, so long labels remain
  * present during the exit instead of popping to display:none at frame one.
@@ -82,3 +92,18 @@ export const SHELL_RAIL_LABEL_OVERLAY =
  */
 export const SHELL_RAIL_BLOCK_LABEL =
   'max-h-8 overflow-hidden transition-[max-height,margin,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:max-h-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+
+/**
+ * Collapsed-rail icon box for the account row. When the sidebar collapses to
+ * icons, the row centres itself in a 28px square with no padding or gap, so
+ * the account button and its loading placeholder share one footprint.
+ */
+export const SHELL_RAIL_ICON_BOX =
+  'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0';
+
+/**
+ * Collapsed-rail placement for the header's rail toggle: once the sidebar
+ * collapses to icons, the toggle leads the brand row and centres on the rail.
+ */
+export const SHELL_RAIL_TOGGLE_LEAD =
+  'group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto';

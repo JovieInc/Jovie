@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { ChatAlbumArtCandidate } from '../types';
 import {
   ALBUM_ART_SWIPE_PREFERENCE_KEY,
@@ -173,5 +174,112 @@ describe('ChatAlbumArtSwipeReview', () => {
       screen.getByRole('button', { name: 'Switch To Grid View' })
     );
     expect(props.onExitSwipeMode).toHaveBeenCalled();
+  });
+});
+
+describe('ChatAlbumArtSwipeReview certificate states', () => {
+  const LONG_CANDIDATES = CANDIDATES.map((candidate, index) => ({
+    ...candidate,
+    id: `long-${candidate.id}`,
+    styleLabel:
+      index === 0
+        ? 'Hand-Painted Watercolor Collage With Film Grain'
+        : 'Retro Futurist Chrome Typography On Dusk Gradient',
+  }));
+
+  function renderState(
+    overrides: Partial<Parameters<typeof ChatAlbumArtSwipeReview>[0]> = {},
+    dir?: 'rtl'
+  ) {
+    const ui = (
+      <ChatAlbumArtSwipeReview
+        releaseTitle='Skyline Dreams'
+        candidates={CANDIDATES}
+        appliedCandidateId={null}
+        isActionPending={false}
+        onAccept={vi.fn()}
+        onRequestMore={vi.fn()}
+        onExitSwipeMode={vi.fn()}
+        {...overrides}
+      />
+    );
+    return render(
+      dir ? (
+        <div dir={dir} lang='ar'>
+          {ui}
+        </div>
+      ) : (
+        ui
+      )
+    );
+  }
+
+  it.each([
+    ['review deck', {}],
+    ['apply pending', { isActionPending: true }],
+    ['candidate applied', { appliedCandidateId: 'candidate-1' }],
+    ['empty candidate set', { candidates: [] }],
+    [
+      'long release and style names',
+      {
+        releaseTitle:
+          'The Extended Midnight Drive Sessions (Deluxe Anniversary Edition)',
+        candidates: LONG_CANDIDATES,
+      },
+    ],
+  ] as const)('has no axe violations: %s', async (_state, overrides) => {
+    const { container } = renderState(overrides);
+    await expectNoA11yViolations(container);
+  });
+
+  it('opens an empty set on the request-more panel without review controls', () => {
+    const props = { onRequestMore: vi.fn() };
+    renderState({ candidates: [], ...props });
+    expect(screen.getByTestId('album-art-swipe-exhausted')).toBeInTheDocument();
+    expect(screen.getByTestId('album-art-swipe-status')).toHaveTextContent(
+      'No more candidates in this set.'
+    );
+    expect(screen.queryByRole('button', { name: /^Accept / })).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Request Another Set' })
+    );
+    expect(props.onRequestMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('names long styles in full on the controls and the live status', () => {
+    renderState({ candidates: LONG_CANDIDATES });
+    expect(
+      screen.getByRole('button', {
+        name: 'Accept Hand-Painted Watercolor Collage With Film Grain artwork',
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('album-art-swipe-status')).toHaveTextContent(
+      'Candidate 1 of 2: Hand-Painted Watercolor Collage With Film Grain'
+    );
+  });
+
+  it('keeps arrow-key meaning in a right-to-left layout and stays axe-clean', async () => {
+    const onAccept = vi.fn();
+    const { container } = renderState(
+      {
+        releaseTitle: 'ليلة في القاهرة',
+        candidates: CANDIDATES.map(candidate => ({
+          ...candidate,
+          styleLabel: 'بوب حالم',
+        })),
+        onAccept,
+      },
+      'rtl'
+    );
+    await expectNoA11yViolations(container);
+    const region = screen.getByTestId('album-art-swipe-region');
+    fireEvent.keyDown(region, { key: 'ArrowRight' });
+    expect(onAccept).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'candidate-1' })
+    );
+    fireEvent.keyDown(region, { key: 'ArrowLeft' });
+    expect(screen.getByTestId('album-art-swipe-status')).toHaveTextContent(
+      'Candidate 2 of 2'
+    );
   });
 });

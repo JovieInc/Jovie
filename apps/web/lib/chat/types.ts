@@ -49,6 +49,45 @@ export interface ReleaseContext {
   readonly metadata: Record<string, unknown> | null;
 }
 
+/** Catalog read health for one chat turn. */
+export type ReleaseCatalogStatus = 'ok' | 'unavailable';
+
+/**
+ * Catalog counts for one chat turn. `total` is the number of live releases in
+ * the artist's catalog (not just the loaded slice); null when the count is
+ * unknown because the catalog could not be read.
+ */
+export interface ReleaseCatalogMeta {
+  readonly status: ReleaseCatalogStatus;
+  readonly total: number | null;
+}
+
+/**
+ * Per-turn release catalog snapshot: the loaded prompt/tool slice plus the
+ * whole-catalog count and read health. `status: 'unavailable'` means the read
+ * failed; the artist may still have releases, so callers must never render it
+ * as "no releases exist".
+ */
+export interface ReleaseCatalogSnapshot extends ReleaseCatalogMeta {
+  readonly releases: ReleaseContext[];
+}
+
+/**
+ * An owned release resolved from the full catalog (beyond the per-turn
+ * slice), with the evidence a chat tool needs to ground a statement about it:
+ * date/type/identity plus catalog identifiers and provider links.
+ */
+export interface ChatReleaseLookup extends ReleaseContext {
+  readonly upc: string | null;
+  readonly label: string | null;
+  readonly distributor: string | null;
+  readonly providerLinks: readonly {
+    readonly provider: string;
+    readonly url: string;
+    readonly isPrimary: boolean;
+  }[];
+}
+
 /**
  * Telemetry hooks for the chat turn pipeline.
  *
