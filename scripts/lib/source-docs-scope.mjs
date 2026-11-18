@@ -35,7 +35,8 @@ const result = (paths, reasons) => ({
 });
 
 /**
- * Applicability only: the caller owns exact trusted-base/head provenance and
+ * Path applicability only: entrypoints must also verify exact HEAD blob modes
+ * and bytes with assertInertSourceProse. The caller owns base/head provenance and
  * supplies every changed path, including deleted paths and rename originals.
  * This never certifies an installed dependency graph or authorizes promotion.
  */

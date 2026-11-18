@@ -14,11 +14,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { runInNewContext } from 'node:vm';
 import {
   evaluateSourceAdmission,
   runSourceAdmission,
 } from '../source-admission-policy.mjs';
+import { assertSourceProofReuseContract } from './fixtures/source-proof-reuse-contract.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
@@ -1328,163 +1328,7 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 });
 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
-  const workflow = sourceValidationWorkflow();
-  const gate = "steps.reuse.outputs.reuse != 'true'";
-  const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
-  assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
-  assert.equal(client.with['persist-credentials'], false);
-  assert.match(client.with['sparse-checkout'], /packages\/api-client/);
-  assert.equal(
-    runtime.with['node-version-file'],
-    '.source-validation-client/.nvmrc'
-  );
-  // The quota-client runtime is primed from nodejs.org so a metadata edit does
-  // not spend a GITHUB_TOKEN manifest call in each of the jobs (2026-10-25).
-  assert.match(prime.run, /prime-node-toolcache\/prime\.sh/);
-  assert.equal(prime.env.NODE_VERSION_FILE, '.source-validation-client/.nvmrc');
-  assert.match(
-    client.with['sparse-checkout'],
-    /prime-node-toolcache\/prime\.sh/
-  );
-  assert.equal(client.if, reuseStep.if);
-  assert.match(prime.if, /github\.event\.action == 'edited'/);
-  assert.equal(runtime.if, reuseStep.if);
-  assert.equal(reuseStep.id, 'reuse');
-  // Base retargets change the compared tree, so they never reuse a proof.
-  // Label changes leave the tree untouched, so they reuse it too (#23748).
-  assert.equal(
-    reuseStep.if,
-    "${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}"
-  );
-  for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [jobClient, jobPrime, jobRuntime, first, ...rest] =
-      workflow.jobs[job].steps;
-    assert.deepEqual(jobClient, client, job);
-    assert.deepEqual(jobPrime, prime, job);
-    assert.deepEqual(jobRuntime, runtime, job);
-    assert.equal(first.id, 'reuse', job);
-    assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
-    // Coverage/unit lanes and the trusted Dependabot handoff narrow further;
-    // none may run on a reused metadata-only edit. Check every handoff case
-    // rather than accepting an arbitrary condition after the reuse predicate.
-    for (const step of rest) {
-      if (job === 'unit') {
-        const guardStart = rest.findIndex(
-          item => item.id === 'source_guard_merge'
-        );
-        if (rest.indexOf(step) >= guardStart) {
-          assert.match(step.if, /matrix\.shard == '4\/4'/, step.name);
-          continue; // Executable matrix/cleanup coverage lives in the generation suite.
-        }
-        if (
-          [
-            'Checkout exact source head for unit and merged guard proofs',
-            'Fetch head and base history only',
-          ].includes(step.name)
-        ) {
-          assert.equal(step.if, `${gate} || matrix.shard == '4/4'`);
-          continue;
-        }
-        if (
-          ['Setup Node.js and pnpm', 'Setup Playwright warm path'].includes(
-            step.name
-          )
-        ) {
-          assert.match(
-            step.if,
-            /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && /
-          );
-          continue; // Full truth table covers reused/no-diff cases.
-        }
-      }
-      if (
-        job === 'security' &&
-        [
-          'Mint dependency review read token',
-          'Review added and upgraded dependencies',
-        ].includes(step.name)
-      ) {
-        assert.equal(
-          step.if,
-          `${gate} && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')`
-        );
-        for (const reuse of ['true', 'false'])
-          for (const login of ['dependabot[bot]', 'human'])
-            for (const ref of ['main', 'integration/test']) {
-              const actual = runInNewContext(step.if, {
-                steps: { reuse: { outputs: { reuse } } },
-                github: {
-                  event: { pull_request: { user: { login }, base: { ref } } },
-                },
-              });
-              const expected =
-                reuse !== 'true' &&
-                !(login === 'dependabot[bot]' && ref === 'main');
-              assert.equal(
-                actual,
-                expected,
-                `${step.name}: reuse=${reuse}, author=${login}, base=${ref}`
-              );
-            }
-        continue;
-      }
-      assert.ok(
-        step.if === gate ||
-          (job === 'coverage' &&
-            step.if === `${gate} && steps.scope.outputs.build == 'true'`) ||
-          (job === 'unit' && step.if?.startsWith(`${gate} && `)),
-        `${job}: ${step.name ?? step.uses}`
-      );
-    }
-  }
-  const always = [
-    // The disk-read guards run on every edit and can launch Chromium, so
-    // their browser setup must run whenever they do (#21956, 2026-10-20).
-    'Setup Playwright (Chromium)',
-    'Validate customer changelog decision from trusted base',
-    'Measure actual installed source dependency graph',
-    'Preserve exact source dependency evidence',
-  ];
-  // Fleet evidence is a status read in `ready`, produced by the base-branch
-  // Fleet Rules Evidence workflow; it never depends on proof reuse.
-  assert.ok(
-    workflow.jobs.ready.steps.some(
-      step => step.name === 'Require fleet-rule evidence'
-    )
-  );
-  const deterministic = workflow.jobs.deterministic.steps;
-  for (const name of always) {
-    const step = deterministic.find(candidate => candidate.name === name);
-    assert.ok(step, name);
-    assert.equal(
-      step.if,
-      undefined,
-      `${name} must run on a metadata-only edit`
-    );
-  }
-  assert.equal(
-    deterministic.find(
-      step => step.name === 'Run deterministic source contract'
-    ).if,
-    gate
-  );
-  // Every step that can launch Chromium runs after the browser setup and is
-  // never broader than it.
-  const names = deterministic.map(step => step.name);
-  const setup = names.indexOf('Setup Playwright (Chromium)');
-  for (const name of ['Run deterministic source contract']) {
-    assert.ok(setup >= 0 && names.indexOf(name) > setup, name);
-    const step = deterministic[names.indexOf(name)];
-    assert.ok(
-      deterministic[setup].if === undefined ||
-        step.if === deterministic[setup].if,
-      `${name} can run without Playwright`
-    );
-  }
-  assert.equal(
-    workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success,success,success\''
-  );
+  assertSourceProofReuseContract(sourceValidationWorkflow());
 });
 
 test('route budgets build only when the diff can change build output', () => {

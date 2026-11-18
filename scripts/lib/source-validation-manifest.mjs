@@ -195,6 +195,11 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
  * each with the reason. `match` is a substring of the normalised command.
  */
 export const NOT_LOCAL = Object.freeze([
+  {
+    match: 'SOURCE_DOCS_HELPER_ROOT/scripts/source-docs-check.mjs',
+    reason:
+      'Exact-base CI applicability receipt; native regressions run through the dependency-parity contract.',
+  },
   { match: 'prime-node-toolcache', reason: 'CI runner toolcache' },
   {
     match: 'dependency-parity-evidence',

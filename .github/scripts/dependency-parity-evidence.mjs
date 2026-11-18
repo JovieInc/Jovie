@@ -15,6 +15,21 @@ import {
   resolveMergeGroupMembers,
   validateMergeGroupEvent,
 } from '../../scripts/lib/merge-group-member-policy.mjs';
+import { readSourceProseEntries } from '../../scripts/lib/source-prose.mjs';
+import {
+  readServerSourceProseEntries,
+  validateSourceDocsScope,
+  validateSourceDocsScopeIdentity,
+  verifySourceDocsComparison,
+  verifySourceDocsMainAncestry,
+  writeSourceDocsScope,
+} from './source-docs-evidence.mjs';
+
+export {
+  validateSourceDocsScope,
+  writeSourceDocsScope,
+} from './source-docs-evidence.mjs';
+
 import { collectPaged } from './collect-quarantine-evidence.mjs';
 import parity from './dep-parity.js';
 
@@ -22,6 +37,7 @@ const REPO = 'JovieInc/Jovie';
 const SHA = /^[a-f0-9]{40}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const positive = n => Number.isSafeInteger(n) && n > 0;
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 function receiptPath(name, environment = process.env) {
   const directory = resolve(environment.DEPENDENCY_PARITY_RECEIPT_DIR || '.');
   mkdirSync(directory, { recursive: true });
@@ -120,7 +136,11 @@ export function writeDependencyDigest(
   );
   return digest;
 }
-export function compareDependencyDigests(group, sources) {
+export function compareDependencyDigests(
+  group,
+  sources,
+  { root = repoRoot, readProseEntries = readSourceProseEntries } = {}
+) {
   validateDependencyDigest(group);
   fact(
     group.event === 'merge_group' &&
@@ -132,6 +152,28 @@ export function compareDependencyDigests(group, sources) {
   const comparisons = [],
     mismatches = [];
   for (const source of sources) {
+    fact(
+      Boolean(source.digest) !== Boolean(source.scope),
+      'Dependency source evidence missing or ambiguous'
+    );
+    if (source.scope) {
+      const scope = validateSourceDocsScope(source.scope, {
+        root,
+        readProseEntries,
+      });
+      fact(
+        positive(source.prNumber) && scope.prNumber === source.prNumber,
+        'Dependency source docs member mismatch'
+      );
+      comparisons.push({
+        prNumber: source.prNumber,
+        sourceHeadSha: scope.headSha,
+        comparable: false,
+        applicability: 'not-applicable',
+        reason: 'source-docs-only-no-installed-graph',
+      });
+      continue;
+    }
     validateDependencyDigest(source.digest);
     fact(
       positive(source.prNumber) && source.digest.event === 'pull_request',
@@ -191,6 +233,9 @@ export function readDigestArtifact(artifact, execute = execFileSync) {
         { timeout: 60000, maxBuffer: 4 * 1024 * 1024 }
       )
     );
+    const member = artifact.name?.startsWith('source-docs-scope-')
+      ? 'source-docs-scope.json'
+      : 'dep-digest.json';
     const names = execFileSync('unzip', ['-Z1', zip], {
       encoding: 'utf8',
       timeout: 10000,
@@ -199,11 +244,11 @@ export function readDigestArtifact(artifact, execute = execFileSync) {
       .trim()
       .split('\n');
     fact(
-      names.length === 1 && names[0] === 'dep-digest.json',
+      names.length === 1 && names[0] === member,
       'Unexpected dependency archive contents'
     );
     return JSON.parse(
-      execFileSync('unzip', ['-p', zip, 'dep-digest.json'], {
+      execFileSync('unzip', ['-p', zip, member], {
         encoding: 'utf8',
         timeout: 10000,
         maxBuffer: 4 * 1024 * 1024,
@@ -213,18 +258,62 @@ export function readDigestArtifact(artifact, execute = execFileSync) {
     rmSync(root, { recursive: true, force: true });
   }
 }
+/** @param {any} run @param {number} runId @param {string} sourceHead @param {number} [runAttempt] */
+function assertSourceRun(run, runId, sourceHead, runAttempt) {
+  fact(
+    run?.id === runId &&
+      positive(run.run_attempt) &&
+      (runAttempt === undefined || run.run_attempt === runAttempt) &&
+      run.event === 'pull_request' &&
+      run.head_sha === sourceHead &&
+      run.repository?.full_name === REPO &&
+      run.head_repository?.full_name === REPO &&
+      run.path === '.github/workflows/source-validation.yml' &&
+      run.status === 'completed' &&
+      run.conclusion === 'success',
+    'Unbound dependency source run or changed attempt'
+  );
+}
 /** @param {object} input
  * @param {any} input.event
  * @param {any} input.group
  * @param {(path:string)=>any} input.api
  * @param {(artifact:any)=>any} [input.download]
+ * @param {string} [input.root]
  */
 export function collectDependencyParity({
   event,
   group,
   api,
   download = readDigestArtifact,
+  root = repoRoot,
 }) {
+  const comparisons = new Map();
+  const sourceComparison = scope => {
+    const key = `${scope.baseSha}...${scope.headSha}`;
+    if (!comparisons.has(key))
+      comparisons.set(key, api(`repos/${REPO}/compare/${key}`));
+    return comparisons.get(key);
+  };
+  // Immutable object reads are shared only within this collection invocation.
+  const prose = new Map();
+  const readProseEntries = source => {
+    const key = `${source.headSha}:${JSON.stringify(source.paths)}`;
+    if (!prose.has(key)) {
+      let entries;
+      try {
+        entries = readSourceProseEntries({ ...source, root });
+      } catch {
+        entries = readServerSourceProseEntries({
+          ...source,
+          comparison: sourceComparison(source),
+          api,
+        });
+      }
+      prose.set(key, entries);
+    }
+    return prose.get(key);
+  };
   const identity = validateMergeGroupEvent(event);
   fact(
     identity.repository === REPO && group.headSha === identity.headSha,
@@ -242,6 +331,7 @@ export function collectDependencyParity({
       'Foreign dependency source'
     );
     const sourceHead = pr.head.sha;
+    const baseSnapshot = pr.base?.sha;
     const candidates = collectPaged(
       `repos/${REPO}/actions/runs?event=pull_request&head_sha=${sourceHead}`,
       'workflow_runs',
@@ -259,24 +349,15 @@ export function collectDependencyParity({
       `No successful dependency source run for #${pr.number}`
     );
     const run = api(`repos/${REPO}/actions/runs/${candidates[0].id}`);
-    fact(
-      run.id === candidates[0].id &&
-        positive(run.run_attempt) &&
-        run.event === 'pull_request' &&
-        run.head_sha === sourceHead &&
-        run.repository?.full_name === REPO &&
-        run.head_repository?.full_name === REPO &&
-        run.path === '.github/workflows/source-validation.yml' &&
-        run.status === 'completed' &&
-        run.conclusion === 'success',
-      'Unbound dependency source run'
-    );
+    assertSourceRun(run, candidates[0].id, sourceHead);
+    const runAttempt = run.run_attempt;
     const name = `dependency-digest-${run.id}-${run.run_attempt}-${sourceHead}`;
+    const scopeName = `source-docs-scope-${run.id}-${run.run_attempt}-${sourceHead}`;
     const artifacts = collectPaged(
       `repos/${REPO}/actions/runs/${run.id}/artifacts`,
       'artifacts',
       api
-    ).filter(artifact => artifact.name === name);
+    ).filter(artifact => artifact.name === name || artifact.name === scopeName);
     fact(
       artifacts.length === 1,
       'Dependency source artifact missing or ambiguous'
@@ -289,24 +370,67 @@ export function collectDependencyParity({
         artifact.workflow_run?.head_sha === sourceHead,
       'Unbound dependency source artifact'
     );
-    const digest = validateDependencyDigest(download(artifact));
+    const isScope = artifact.name === scopeName;
+    const evidence = download(artifact);
     fact(
-      digest.headSha === sourceHead &&
-        digest.runId === run.id &&
-        digest.runAttempt === run.run_attempt,
+      evidence?.headSha === sourceHead &&
+        evidence.runId === run.id &&
+        evidence.runAttempt === runAttempt,
       'Unbound dependency source digest'
+    );
+    const value = isScope
+      ? validateSourceDocsScopeIdentity(evidence)
+      : validateDependencyDigest(evidence);
+    fact(
+      value.headSha === sourceHead &&
+        value.runId === run.id &&
+        value.runAttempt === runAttempt,
+      'Unbound dependency source digest'
+    );
+    if (isScope) {
+      verifySourceDocsMainAncestry(value, pr, baseSnapshot, api);
+      verifySourceDocsComparison(value, pr, sourceComparison(value), root);
+      if (Array.isArray(run.pull_requests) && run.pull_requests.length > 0) {
+        fact(
+          run.pull_requests.some(
+            pull =>
+              pull.number === member.number &&
+              pull.head?.sha === sourceHead &&
+              pull.base?.sha === value.baseSha
+          ),
+          'Unbound source docs run pull request'
+        );
+      }
+      validateSourceDocsScope(value, { root, readProseEntries });
+    }
+    assertSourceRun(
+      api(`repos/${REPO}/actions/runs/${run.id}`),
+      run.id,
+      sourceHead,
+      runAttempt
     );
     const latest = api(`repos/${REPO}/pulls/${member.number}`);
     fact(
-      latest.state === 'open' && latest.head?.sha === sourceHead,
+      latest.state === 'open' &&
+        latest.head?.sha === sourceHead &&
+        (!isScope ||
+          (latest.number === member.number &&
+            latest.base?.ref === 'main' &&
+            latest.base.sha === baseSnapshot &&
+            latest.base.repo?.full_name === REPO &&
+            latest.head.repo?.full_name === REPO &&
+            latest.head.repo.fork === false)),
       'Dependency member source changed'
     );
-    return { prNumber: member.number, digest };
+    return isScope
+      ? { prNumber: member.number, scope: value }
+      : { prNumber: member.number, digest: value };
   });
-  return compareDependencyDigests(group, sources);
+  return compareDependencyDigests(group, sources, { root, readProseEntries });
 }
 export function main() {
   if (process.argv[2] === 'write') return writeDependencyDigest();
+  if (process.argv[2] === 'write-scope') return writeSourceDocsScope();
   fact(
     process.argv[2] === 'compare' &&
       process.env.DEPENDENCY_PARITY_ENFORCED === 'true',

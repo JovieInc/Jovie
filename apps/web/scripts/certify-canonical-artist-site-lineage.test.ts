@@ -76,6 +76,7 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
       profileStatus: 'success',
       profileResultPath: join(directory, 'profile-result.json'),
       outputPath: join(directory, 'certificate.json'),
+      gitRoot: directory,
       ...overrides,
     };
   };
@@ -148,6 +149,7 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
       profileStatus: 'success',
       profileResultPath: join(directory, 'profile-result.json'),
       outputPath: join(directory, 'certificate.json'),
+      gitRoot: directory,
       lineageFileEmpty: true,
       sourceHistory: [],
     });
