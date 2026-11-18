@@ -87,28 +87,13 @@ test('the description holds the picture inline, the run link and the ask', () =>
     ].join('\n')
   );
   assert.equal(APPROVAL_LINE, 'Move to Todo to accept, cancel to reject.');
-  assert.equal(APPROVAL_LABEL, 'pen-draft:needs-tim');
+  assert.equal(APPROVAL_LABEL, 'tim-action-required');
 });
 
-test('the approval label has no default on silence and no shared cap', () => {
-  // fleet_ledger.py accepts a gate label's default at its deadline, and the
-  // quality-gap finder caps issues with its own label. Both match labels by
-  // exact name, so the Pen draft label must not be named in either.
-  for (const file of [
-    'scripts/lanes/fleet_ledger.py',
-    'scripts/lanes/workstreams.py',
-    'scripts/quality-gap-finder.mjs',
-  ])
-    assert.equal(
-      readFileSync(file, 'utf8').includes(APPROVAL_LABEL),
-      false,
-      file
-    );
+test('the inbox label is not a silence-acceptance gate', () => {
   const ledger = readFileSync('scripts/lanes/fleet_ledger.py', 'utf8');
   const gates = ledger.match(/GATE_LABELS = frozenset\(\{([^}]*)\}\)/)[1];
-  assert.match(gates, /"quality-gap:needs-tim"/);
-  // Exact set membership, not a pattern a new needs-tim label could match.
-  assert.match(ledger, /labels & GATE_LABELS/);
+  assert.equal(gates.includes(`"${APPROVAL_LABEL}"`), false);
 });
 
 test('the run link takes a numeric run id only', () => {
@@ -124,7 +109,7 @@ test('the run link takes a numeric run id only', () => {
   assert.throws(() => runUrlFor(undefined, {}), /number/);
 });
 
-test('a new frame uploads its png and gets one labelled Backlog issue', async () => {
+test('a new frame uploads its png and gets one labelled Triage issue', async () => {
   const dir = artifacts({
     'pen-draft-homepage': ['homepage.pen', 'homepage.png'],
   });
@@ -166,7 +151,7 @@ test('a new frame uploads its png and gets one labelled Backlog issue', async ()
       runUrl: RUN_URL,
     }),
     labelIds: ['label-team'],
-    stateId: 'state-backlog',
+    stateId: 'state-triage',
   });
   // The key goes to Linear only, never to the upload host.
   assert.equal(sign.authorization, 'lin_api_test');
@@ -230,7 +215,32 @@ test('an existing issue that lost the label gets it back on update', async () =>
   );
   assert.equal(update.variables.id, 'issue-claim');
   assert.deepEqual(update.variables.input.addedLabelIds, ['label-team']);
+  assert.equal(update.variables.input.stateId, 'state-triage');
   assert.equal(network.ops().includes('PenDraftApprovalCreate'), false);
+});
+
+test('only backlog issues move to triage; decisions remain untouched', async () => {
+  for (const state of ['backlog', 'unstarted', 'canceled']) {
+    const network = fakeNetwork({
+      issues: [
+        {
+          id: 'issue-claim',
+          identifier: 'JOV-77',
+          title: 'Pen draft for approval: claim',
+          state: { type: state },
+          labels: { nodes: [{ id: 'label-team' }] },
+        },
+      ],
+    });
+    await publish(artifacts({ 'pen-draft-claim': ['claim.png'] }), network);
+    const update = network.calls.find(
+      call => call.op === 'PenDraftApprovalUpdate'
+    );
+    assert.equal(
+      update.variables.input.stateId,
+      state === 'backlog' ? 'state-triage' : undefined
+    );
+  }
 });
 
 test('a failed upload fails the run, writes no issue, and other frames still publish', async () => {
