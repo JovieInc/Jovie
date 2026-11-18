@@ -151,18 +151,18 @@ describe('ci-fast bounded parallel workflow', () => {
           line.includes('pnpm turbo test:fast --affected --') &&
           /--passWithNoTests(?:\s|$)/u.test(line)
       );
-    const selectors = command?.match(
-      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
-    )?.[1];
-    expect(selectors, 'manual unit filename selectors').toBeTruthy();
-    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+    const tail = command?.split('unit_excludes }}')[1]?.trim();
+    expect(tail, 'manual unit filename selectors and report flag').toBeTruthy();
+    const reportFlag = '--outputFile=manual units.junit.xml';
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${tail}`], {
       encoding: 'utf8',
+      env: { ...process.env, OUTPUT_FLAG: reportFlag },
       timeout: 1000,
     });
     expect(parsed.status, parsed.stderr).toBe(0);
-    const [, ...runnerArgs] = buildWebVitestFastArgs(
-      parsed.stdout.split('\0').filter(Boolean)
-    );
+    const selectors = parsed.stdout.split('\0').filter(Boolean);
+    expect(selectors.pop()).toBe(reportFlag);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(selectors);
     const webRoot = resolve(REPO_ROOT, 'apps/web');
     const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
     try {
