@@ -5175,6 +5175,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        with:
+          prefer_prepared_workspace: ${{ github.event_name == 'merge_group' && needs.neon-db.result == 'success' }}
 
       # Relative budgets compile the merge-group base in this workspace, then
       # head. Restore the read-only Turbopack cache first so both compiles

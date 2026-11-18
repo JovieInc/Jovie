@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
 
 interface LighthouseStep {
+  with?: Record<string, string>;
   id?: string;
   uses?: string;
   name?: string;
@@ -28,6 +29,7 @@ interface LighthouseStep {
   'continue-on-error'?: unknown;
 }
 interface LighthouseJob {
+  needs?: string[];
   steps: LighthouseStep[];
   'continue-on-error'?: unknown;
 }
@@ -98,6 +100,28 @@ describe('Lighthouse identity admission', () => {
     dashboard: 'Run signed-in shell navigation',
     onboarding: 'Run authenticated onboarding Lighthouse',
   } as const;
+
+  it('dashboard: uses a prepared workspace only after merge-group DB certification', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    expect(job.needs).toEqual([
+      'ci-path-changes',
+      'neon-db',
+      'ci-build-public',
+    ]);
+    const setup = job.steps.find(
+      step => step.uses === './.github/actions/setup-node-pnpm'
+    );
+    expect(setup?.with?.prefer_prepared_workspace).toBe(
+      "${{ github.event_name == 'merge_group' && needs.neon-db.result == 'success' }}"
+    );
+    expect(
+      Object.values(workflow.jobs).filter(candidate =>
+        candidate.steps?.some(
+          step => step.with?.prefer_prepared_workspace !== undefined
+        )
+      )
+    ).toEqual([job]);
+  });
 
   it('dashboard: runs without an identity secret and blocks on the shell nav click-through', () => {
     const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
