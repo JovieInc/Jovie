@@ -30,6 +30,21 @@ describe('AudienceMobileCard', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('renders a selected member accessibly', async () => {
+    const { container } = render(
+      <AudienceMobileCard
+        member={member}
+        mode='members'
+        isSelected
+        onTap={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'View details for Jamie Rivera' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
   it('renders a long RTL name accessibly', async () => {
     const longName = 'موسيقي ذو اسم طويل يحتاج إلى مساحة كافية';
     const { container } = render(

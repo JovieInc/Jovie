@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { Download, ShieldBan } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +25,7 @@ export function AudienceQuickActionsCell({
       onClick={e => e.stopPropagation()}
       onKeyDown={e => e.stopPropagation()}
     >
-      <PlainButton
+      <button
         type='button'
         onClick={onExport}
         className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
@@ -34,8 +33,8 @@ export function AudienceQuickActionsCell({
         title='Export vCard'
       >
         <Download className='h-4 w-4' />
-      </PlainButton>
-      <PlainButton
+      </button>
+      <button
         type='button'
         onClick={onBlock}
         className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:bg-interactive-hover'
@@ -43,7 +42,7 @@ export function AudienceQuickActionsCell({
         title='Block'
       >
         <ShieldBan className='h-4 w-4' />
-      </PlainButton>
+      </button>
     </div>
   );
 }

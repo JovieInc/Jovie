@@ -9,13 +9,11 @@ const meta = {
     layout: 'centered',
   },
   decorators: [
-    function ActionFrame(Story) {
-      return (
-        <div className='group w-32 bg-surface-0 p-2'>
-          <Story />
-        </div>
-      );
-    },
+    Story => (
+      <div className='group w-32 bg-surface-0 p-2'>
+        <Story />
+      </div>
+    ),
   ],
   args: {
     onExport: fn(),

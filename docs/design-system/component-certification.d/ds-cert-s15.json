@@ -35,15 +35,6 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
-    ],
-    "apps/web/components/organisms/table/atoms/AudienceQuickActionsCell.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
     ]
   },
   "waivers": {
@@ -53,12 +44,6 @@
     "apps/web/components/organisms/table/atoms/AudienceMobileCard.tsx": {
       "empty": "The card renders one required member, not a collection; the detector matched 'items-center' in its layout classes.",
       "permission-denied": "The card has no permission gate; 'role=\\'button\\'' appears in its explanatory comment. Contact availability is shown in the anonymous state."
-    },
-    "apps/web/components/organisms/table/atoms/AudienceQuickActionsCell.tsx": {
-      "empty": "The two actions are fixed, not a collection; the detector matched 'items-center' in their layout classes.",
-      "error": "The cell does not perform requests or render an error; the detector matched 'hover:bg-error/10' in the block control's styling.",
-      "long-content": "Both icon controls use fixed labels ('Export Contact' and 'Block Member'); the cell accepts no variable text.",
-      "permission-denied": "The cell has no permission gate; the detector matched role='toolbar' on the action container."
     }
   }
 }

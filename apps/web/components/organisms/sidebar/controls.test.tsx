@@ -4,8 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const toggleSidebar = vi.hoisted(() => vi.fn());
+const sidebarState = vi.hoisted(() => ({ state: 'open' as 'open' | 'closed' }));
 vi.mock('./context', () => ({
-  useSidebar: () => ({ state: 'open', toggleSidebar }),
+  useSidebar: () => ({ state: sidebarState.state, toggleSidebar }),
 }));
 
 import { SidebarRail, SidebarShortcutHint, SidebarTrigger } from './controls';
@@ -33,6 +34,19 @@ describe('sidebar controls', () => {
     await user.keyboard('{Enter}');
     expect(toggleSidebar).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
+  });
+
+  it('exposes the closed rail state', async () => {
+    sidebarState.state = 'closed';
+    try {
+      const { container } = render(<SidebarRail />);
+      expect(
+        screen.getByRole('button', { name: 'Toggle Sidebar' })
+      ).toHaveAttribute('aria-expanded', 'false');
+      await expectNoA11yViolations(container);
+    } finally {
+      sidebarState.state = 'open';
+    }
   });
 
   it('keeps a long accessible label usable in RTL', async () => {
