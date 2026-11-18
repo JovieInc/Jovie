@@ -52,6 +52,20 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('explains unavailable cold draft facts or compliance without offering message actions', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'flagged',
+        flags: ['cold_draft_unavailable'],
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'certified page facts and email compliance'
+    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
   it('explains a judge-blocked draft without offering message actions', () => {
     const props = renderRail({
       row: outboundFixtureRow({
@@ -84,6 +98,13 @@ describe('OutboundRail', () => {
     );
   });
 
+  it('explains a missing claim link when a recipient is reachable', () => {
+    renderRail({ row: outboundFixtureRow({ message: null }) });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'No claim link yet. Build the profile to draft a message.'
+    );
+  });
+
   it('lists missing evidence and the non-artist flag', () => {
     renderRail({
       row: outboundFixtureRow({
@@ -98,12 +119,12 @@ describe('OutboundRail', () => {
     expect(box).toHaveTextContent('Needs evidence: dsp, search.');
   });
 
-  it('shows the existing-relationship hold with no draft to approve', () => {
+  it('prioritizes the existing-relationship hold over unavailable cold draft inputs', () => {
     const hold = 'Existing relationship: flag to Tim, no cold outreach';
     renderRail({
       row: outboundFixtureRow({
         view: 'held',
-        flags: ['existing_relationship'],
+        flags: ['existing_relationship', 'cold_draft_unavailable'],
         relationshipHold: hold,
         message: null,
       }),

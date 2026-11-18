@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileAeoContent } from './ProfileAeoContent';
@@ -28,6 +28,24 @@ const baseContent = {
 } satisfies ProfileAeoContentModel;
 
 describe('ProfileAeoContent', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'));
+  it('preserves campaign attribution on the AEO claim CTA', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/artist?utm_campaign=claim-link-outreach&utm_source=claim_link&utm_medium=dm&token=synthetic'
+    );
+    render(
+      <ProfileAeoContent
+        content={baseContent}
+        claimHref='/artist/claim?next=auth'
+      />
+    );
+    expect(screen.getByTestId('profile-aeo-claim-cta')).toHaveAttribute(
+      'href',
+      '/artist/claim?next=auth&utm_source=claim_link&utm_medium=dm&utm_campaign=claim-link-outreach'
+    );
+  });
   it('renders the FAQ section only when at least one sourced FAQ exists', () => {
     const { rerender } = render(<ProfileAeoContent content={baseContent} />);
 

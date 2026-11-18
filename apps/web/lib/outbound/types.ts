@@ -123,13 +123,15 @@ export type OutboundFlag =
   | 'existing_relationship'
   | 'possible_non_artist'
   | 'unscored'
-  | 'presence_only_fit';
+  | 'presence_only_fit'
+  | 'cold_draft_unavailable';
 
 export const OUTBOUND_FLAG_LABELS: Record<OutboundFlag, string> = {
   existing_relationship: 'Existing relationship',
   possible_non_artist: 'Possible non-artist',
   unscored: 'Unscored',
   presence_only_fit: 'Presence-only fit',
+  cold_draft_unavailable: 'Certified draft inputs unavailable',
 };
 
 /** What the fit score is based on, so a thin score is not read as a judgment. */

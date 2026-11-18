@@ -128,3 +128,16 @@ export const NeedsJudge: Story = {
     activeFactKey: null,
   },
 };
+
+export const ColdDraftUnavailable: Story = {
+  args: {
+    row: outboundFixtureRow({
+      view: 'flagged',
+      nextAction: 'review_facts',
+      flags: ['cold_draft_unavailable'],
+      message: null,
+    }),
+    certification: certification('certified_for_outreach'),
+    activeFactKey: null,
+  },
+};

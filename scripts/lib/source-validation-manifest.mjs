@@ -150,18 +150,18 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['pnpm ci:harness:check'],
   },
   {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate --screens-base origin/{base}',
+    when: /^(?:apps\/web\/(?:app|components|hooks|lib)\/|packages\/ui\/|docs\/design-system\/|scripts\/(?:component-|lib\/component-))/,
+    covers: ['pnpm component-certificate:gate'],
+  },
+  {
     id: 'screen-registration',
     name: 'screen registration gate',
     command: 'pnpm screen-registration-gate',
     when: /^(?:apps\/web\/(?:app|components)\/|scripts\/invariants\/screen-)/,
     covers: ['pnpm screen-registration-gate'],
-  },
-  {
-    id: 'component-certificate',
-    name: 'component and screen certificate gate',
-    command: 'pnpm component-certificate:gate',
-    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:(?:component-certification|cert-screens)\.json$|component-certification\.d\/)|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
-    covers: ['pnpm component-certificate:gate'],
   },
   {
     id: 'layout-guard-pen',
