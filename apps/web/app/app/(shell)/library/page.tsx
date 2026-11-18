@@ -41,6 +41,7 @@ import {
 } from '@/lib/youtube-library';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
+import { CatalogPromotionComposer } from './promotion/[releaseId]/CatalogPromotionComposer';
 
 export const runtime = 'nodejs';
 
@@ -67,12 +68,13 @@ export default async function LibraryPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{
+    readonly promotion?: string;
     readonly section?: string | string[] | undefined;
     readonly view?: string | string[] | undefined;
     readonly document?: string | string[];
   }>;
 }) {
-  const { view } = await searchParams;
+  const { view, promotion } = await searchParams;
   const requestedDocument = (await searchParams).document;
   const requestedId =
     typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
@@ -89,6 +91,8 @@ export default async function LibraryPage({
     return routeContext.error;
   }
 
+  if (typeof promotion === 'string')
+    return <CatalogPromotionComposer releaseId={promotion} />;
   const selectedProfile = routeContext.dashboardData.selectedProfile;
   // Studio takes are private to the signed-in creator, not the profile.
   const takesPromise = listTeleprompterTakes(routeContext.userId)

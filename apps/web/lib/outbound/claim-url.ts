@@ -1,3 +1,5 @@
+import { CLAIM_LINK_OUTREACH_LOOP, trackedLink } from '@/lib/growth/loop-links';
+
 /**
  * Canonical public origin for anything sent to a real person. Outbound copy is
  * read outside the app, so it never uses the request host or the deploy's
@@ -10,6 +12,10 @@ export const PRODUCTION_PUBLIC_ORIGIN = 'https://jov.ie';
  * old `getAppUrl('/claim/…')` built `/app/claim/…`, which sends a signed-out
  * artist to sign-in instead of their claim.
  */
-export function getOutboundClaimUrl(token: string): string {
-  return `${PRODUCTION_PUBLIC_ORIGIN}/claim/${encodeURIComponent(token)}`;
+export function getOutboundClaimUrl(
+  token: string,
+  options?: { readonly tracked?: boolean }
+): string {
+  const url = `${PRODUCTION_PUBLIC_ORIGIN}/claim/${encodeURIComponent(token)}`;
+  return options?.tracked ? trackedLink(CLAIM_LINK_OUTREACH_LOOP, url) : url;
 }

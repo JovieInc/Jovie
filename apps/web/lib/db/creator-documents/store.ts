@@ -15,6 +15,11 @@ import {
   creatorDocumentRevisions,
   creatorDocuments,
 } from '@/lib/db/schema/creator-documents';
+import {
+  CatalogSelectionUnavailable,
+  findCapturedPromotion,
+  promotionCaptureSql,
+} from './catalog-promotion';
 
 export class CreatorDocumentConflictError extends Error {
   constructor(
@@ -149,7 +154,19 @@ export async function captureCreatorIdea(input: {
   readonly title: string;
   readonly body: string;
   readonly idempotencyKey: string;
+  readonly catalogSelection?: {
+    readonly releaseId: string;
+    readonly profileId: string;
+  };
 }): Promise<{ readonly documentId: string; readonly deduplicated: boolean }> {
+  const selected = input.catalogSelection;
+  if (selected && selected.profileId !== input.creatorProfileId)
+    throw new CatalogSelectionUnavailable();
+  const source =
+    selected && promotionCaptureSql(input.creatorProfileId, selected.releaseId);
+  const key = selected
+    ? `promo:${selected.releaseId}:${input.idempotencyKey}`
+    : input.idempotencyKey;
   const content = ideaContent(input.body);
   const contentHash = hashRevision({
     title: input.title,
@@ -164,9 +181,8 @@ export async function captureCreatorIdea(input: {
       insert into ${creatorDocuments} (
         "creator_profile_id", "title", "kind", "capture_idempotency_key"
       )
-      values (
-        ${input.creatorProfileId}, ${input.title}, 'idea', ${input.idempotencyKey}
-      )
+      select ${input.creatorProfileId}, ${input.title}, 'idea', ${key}
+      where ${source?.eligible ?? drizzleSql`true`}
       on conflict ("creator_profile_id", "capture_idempotency_key")
         where "capture_idempotency_key" is not null
       do update set
@@ -186,7 +202,7 @@ export async function captureCreatorIdea(input: {
       from target_document
       on conflict ("document_id", "revision") do nothing
       returning "document_id"
-    )
+    ) ${source?.relationship ?? drizzleSql.empty()}
     select
       target_document."id" as "documentId",
       target_document.created
@@ -195,9 +211,18 @@ export async function captureCreatorIdea(input: {
       on inserted_revision."document_id" = target_document."id"
   `);
   const result = captured.rows[0];
-  if (!result?.documentId) {
-    throw new Error('Idea capture did not persist');
+  // A prior capture remains readable when the release has since been archived.
+  // A fresh snapshot also sees competing captures that committed during the upsert.
+  if (selected && !result?.created) {
+    const documentId = await findCapturedPromotion(
+      input.creatorProfileId,
+      key,
+      selected.releaseId
+    );
+    if (!documentId) throw new CatalogSelectionUnavailable();
+    return { documentId, deduplicated: true };
   }
+  if (!result?.documentId) throw new Error('Idea capture did not persist');
   return { documentId: result.documentId, deduplicated: !result.created };
 }
 
