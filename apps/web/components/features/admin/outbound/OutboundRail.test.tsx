@@ -68,7 +68,14 @@ describe('OutboundRail', () => {
     expect(
       screen.queryByText('Message', { exact: true })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Source' })).toBeVisible();
+    expect(
+      screen.queryByRole('navigation', { name: 'Profile And Source' })
+    ).not.toBeInTheDocument();
+    const profileSource = screen.getByTestId('outbound-profile-source');
+    expect(profileSource).toBeVisible();
+    expect(
+      within(profileSource).getByRole('link', { name: 'Source' })
+    ).toBeVisible();
     expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
       'No draft is available for this profile yet.'
     );

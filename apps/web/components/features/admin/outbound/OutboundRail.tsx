@@ -372,8 +372,8 @@ function OutboundRailContent({
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
-          <nav
-            aria-label='Profile And Source'
+          <div
+            data-testid='outbound-profile-source'
             className='flex flex-wrap items-center gap-2 px-1 pb-2 text-xs'
           >
             {row.profilePath ? (
@@ -402,7 +402,7 @@ function OutboundRailContent({
               Source
               <ExternalLink className='h-3 w-3' aria-hidden='true' />
             </a>
-          </nav>
+          </div>
           {certification ? (
             <DrawerSection title='Certification details' defaultOpen={false}>
               <div className='space-y-2 px-1 pb-2'>
