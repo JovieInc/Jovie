@@ -553,7 +553,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   test.beforeEach(async ({ context }, testInfo) => {
     if (!hasProdAuthCredentials()) {
       if (process.env.EXPECTED_VERCEL_ENVIRONMENT === 'production') {
-        throw new Error('Required production auth smoke credentials are missing.');
+        throw new Error(
+          'Required production auth smoke credentials are missing.'
+        );
       }
       test.skip(true, 'No production auth credentials configured');
       return;
