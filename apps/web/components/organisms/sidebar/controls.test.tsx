@@ -1,48 +1,58 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
+const toggleSidebar = vi.hoisted(() => vi.fn());
 vi.mock('./context', () => ({
-  useSidebar: () => ({
-    state: 'open',
-    open: true,
-    setOpen: vi.fn(),
-    openMobile: false,
-    setOpenMobile: vi.fn(),
-    isMobile: false,
-    toggleSidebar: vi.fn(),
-  }),
-}));
-
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    ...props
-  }: React.ComponentProps<'button'> & { variant?: string; size?: string }) => (
-    <button {...props}>{children}</button>
-  ),
-  Kbd: ({ children }: { readonly children: React.ReactNode }) => (
-    <kbd>{children}</kbd>
-  ),
+  useSidebar: () => ({ state: 'open', toggleSidebar }),
 }));
 
 import { SidebarRail, SidebarShortcutHint, SidebarTrigger } from './controls';
 
 describe('sidebar controls', () => {
-  it('renders SidebarTrigger with accessible label', () => {
-    render(<SidebarTrigger />);
-    expect(screen.getByText('Toggle Sidebar')).toBeTruthy();
+  it('toggles the sidebar and calls the trigger handler', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const { container } = render(<SidebarTrigger onClick={onClick} />);
+    await user.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(toggleSidebar).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
-  it('renders shortcut hint', () => {
-    render(<SidebarShortcutHint />);
-    expect(screen.getByText(/.+/)).toBeTruthy();
+  it('keeps the rail focusable and toggles the open sidebar', async () => {
+    toggleSidebar.mockClear();
+    const user = userEvent.setup();
+    const { container } = render(<SidebarRail />);
+    const rail = screen.getByRole('button', { name: 'Toggle Sidebar' });
+    expect(rail).toHaveAttribute('aria-expanded', 'true');
+    expect(rail).toHaveAttribute('data-slot', 'plain-button');
+    await user.tab();
+    expect(rail).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(toggleSidebar).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
-  it('renders SidebarRail toggle control', () => {
-    render(<SidebarRail />);
-    expect(screen.getByLabelText('Toggle Sidebar')).toHaveAttribute(
-      'aria-expanded',
-      'true'
+  it('keeps a long accessible label usable in RTL', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <div dir='rtl'>
+        <SidebarTrigger aria-label='Toggle the navigation sidebar and return to your workspace' />
+      </div>
     );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Toggle the navigation sidebar and return to your workspace',
+      })
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows the shortcut hint', async () => {
+    const { container } = render(<SidebarShortcutHint />);
+    expect(screen.getByText(/.+/)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
