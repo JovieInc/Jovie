@@ -16,6 +16,7 @@ export const SIDEBAR_IDENTITY_GROUP_TEST_ID = 'sidebar-identity-group';
 export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 
 export interface SidebarIdentityGroupProps {
+  readonly showAccountMenu?: boolean;
   readonly calm?: boolean;
   readonly dockStatus?: SidebarDockStatus;
   readonly profileHref: string | undefined;
@@ -47,6 +48,7 @@ export function publicProfileAccessibleName(
  * two top-level rows.
  */
 export function SidebarIdentityGroup({
+  showAccountMenu = true,
   calm = false,
   dockStatus,
   profileHref,
@@ -67,9 +69,9 @@ export function SidebarIdentityGroup({
       data-active={isPublicProfileActive ? 'true' : undefined}
       className={cn(
         'm-0 min-w-0 border-0',
-        calm
-          ? 'px-(--app-shell-sidebar-inset) py-0'
-          : 'px-(--app-shell-sidebar-inset) py-1.5'
+        // Calm row: the hover surface insets 4px and the row 8px, which
+        // lands the avatar column on the 12px nav icon column.
+        calm ? 'px-1 py-0' : 'px-(--app-shell-sidebar-inset) py-1.5'
       )}
     >
       <div
@@ -77,7 +79,7 @@ export function SidebarIdentityGroup({
         data-testid={SIDEBAR_IDENTITY_GROUP_TEST_ID}
         className={cn(
           'relative flex items-center rounded-lg px-0.5 py-0.5',
-          calm && 'p-0',
+          calm && 'px-2 py-0',
           'transition-colors duration-fast ease-interactive',
           'hover:bg-sidebar-accent',
           isPublicProfileActive && 'bg-sidebar-accent-active',
@@ -90,13 +92,15 @@ export function SidebarIdentityGroup({
           '[&_[data-slot=common-dropdown-trigger]]:focus-visible:ring-0'
         )}
       >
-        <UserButton
-          calm={calm}
-          dockStatus={dockStatus}
-          profileHref={profileHref}
-          settingsHref={APP_ROUTES.SETTINGS}
-          showUserInfo
-        />
+        {showAccountMenu ? (
+          <UserButton
+            calm={calm}
+            dockStatus={dockStatus}
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            showUserInfo
+          />
+        ) : null}
         {!calm && profileHref && profileDisplayHref ? (
           <Tooltip label={profileDisplayHref} side='right'>
             <Link

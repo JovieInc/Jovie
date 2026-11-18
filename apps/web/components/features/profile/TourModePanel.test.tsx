@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { track } from '@/lib/analytics';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 import { TourEventAlertsAction, TourModePanel } from './TourModePanel';
 
@@ -20,9 +22,13 @@ vi.mock('@/hooks/useUserLocation', () => ({
   }),
 }));
 
+const { ticketClick } = vi.hoisted(() => ({ ticketClick: vi.fn() }));
+
 vi.mock('@/hooks/useTourDateTicketClick', () => ({
-  useTourDateTicketClick: () => () => undefined,
+  useTourDateTicketClick: () => ticketClick,
 }));
+
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 
 vi.mock(
   '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
@@ -137,6 +143,103 @@ describe('TourModePanel', () => {
     expect(screen.queryByTestId('tour-drawer-list')).not.toBeInTheDocument();
     expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
     expect(screen.queryByText('Releases')).not.toBeInTheDocument();
+  });
+});
+
+describe('TourModePanel tickets and states', () => {
+  it('tracks a Tickets click and hands it to the ticket-click handler', () => {
+    render(
+      <TourModePanel
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[makeTourDate()]}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('link', {
+        name: 'Tickets for The Novo — Los Angeles, CA',
+      })
+    );
+
+    expect(track).toHaveBeenCalledWith(
+      'event_click',
+      expect.objectContaining({
+        event_id: 'tour-1',
+        venue_name: 'The Novo',
+        target_url: 'https://tickets.example.com/the-novo',
+        current_route_tab: 'events',
+      })
+    );
+    expect(ticketClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows sold-out, cancelled and unticketed dates as plain text, never a link', () => {
+    render(
+      <TourModePanel
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[
+          makeTourDate({ ticketUrl: null }),
+          makeTourDate({ id: 'tour-2', ticketStatus: 'sold_out' }),
+          makeTourDate({ id: 'tour-3', ticketStatus: 'cancelled' }),
+        ]}
+      />
+    );
+
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(screen.getAllByText('The Novo')).toHaveLength(3);
+
+    // The plain-text status labels hold the AA contrast floor on the media
+    // stage: on-media/52 (~5.6:1 on the dark stage), not the old /38 (~3.4:1).
+    for (const label of [
+      screen.getByText('Sold Out'),
+      ...screen.getAllByText('No Tickets'),
+    ]) {
+      expect(label).toHaveClass('text-on-media/52');
+    }
+
+    // A cancelled row mutes its date and venue with the same on-media/52
+    // token instead of a container opacity-50: halved alpha compounds with
+    // the muted tokens to ~2.2:1 and fails WCAG 2.2 AA (axe color-contrast).
+    const cancelledRow = screen
+      .getAllByText('No Tickets')
+      .at(-1)
+      ?.closest('div.grid');
+    expect(cancelledRow).toBeDefined();
+    expect(cancelledRow?.className).not.toContain('opacity-50');
+    const cancelledVenue = cancelledRow?.querySelector('p');
+    expect(cancelledVenue).toHaveClass('text-on-media/52');
+    const cancelledDay = cancelledRow?.querySelector('span.tabular-nums');
+    expect(cancelledDay).toHaveClass('text-on-media/52');
+  });
+
+  it('draws row text and dividers with on-media tokens, not raw white', () => {
+    render(
+      <TourModePanel
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[makeTourDate()]}
+      />
+    );
+
+    const list = screen.getByTestId('tour-drawer-list');
+    expect(list.innerHTML).toContain('border-on-media/[0.075]');
+    expect(list.innerHTML).toContain('text-on-media/52');
+    expect(list.innerHTML).not.toMatch(/\b(?:bg|text|border)-white\b/);
+  });
+
+  it('has no accessibility violations with dates and when empty', async () => {
+    const { container, rerender } = render(
+      <TourModePanel
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[
+          makeTourDate(),
+          makeTourDate({ id: 'tour-2', ticketStatus: 'sold_out' }),
+        ]}
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(<TourModePanel artist={PROFILE_STORY_ARTIST} tourDates={[]} />);
+    await expectNoA11yViolations(container);
   });
 });
 

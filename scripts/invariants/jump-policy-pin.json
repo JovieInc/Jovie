@@ -1,0 +1,7 @@
+{
+  "schema": "jovie-jump-policy-pin/v2",
+  "MARKETING_LABEL": "priority:marketing",
+  "jumpTrueSites": 0,
+  "priorityDequeueSites": 0,
+  "enqueueInputSha256": "10d144c417701d5b566b01543036f05ee014a0b8c2abd902c648cc08fd23249b"
+}

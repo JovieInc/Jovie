@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,9 +12,13 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   designedFrames,
+  EXPORT_KEY_FILE,
+  exportCacheKey,
+  exportGroups,
   exportScript,
   findExport,
   MANIFEST,
+  PEN_CLI_VERSION,
   runGoldenPathPen,
 } from './pen-golden-path.mjs';
 
@@ -169,4 +174,140 @@ test('a frame with its own penFile exports from that file in the archive', async
   );
   assert.match(opened[0][1], /Export\(\["oaz9c"\]/u);
   assert.match(opened[1][1], /Export\(\["hLRZB"\]/u);
+});
+
+// JOV-12639: the export is cached by what was downloaded, never by the URL.
+function exportingRun(out, calls) {
+  return (cmd, args, opts = {}) => {
+    calls.push([cmd, ...args]);
+    if (args.includes('interactive')) {
+      for (const id of ['oaz9c', 'hLRZB'])
+        writeFileSync(join(out, 'png', `${id}.png`), `png-${id}`);
+    }
+    return Buffer.from('');
+  };
+}
+const penEnv = url => ({ PEN_CLI_KEY: 'k', PEN_GOLDEN_PATH_FILE_URL: url });
+const penSource = body => async () => new Response(body);
+
+test('the export cache key follows content, exporter and selection, not the URL', async () => {
+  const groups = [{ penFile: 'a.pen', nodeIds: ['oaz9c'] }];
+  const sha = 'a'.repeat(64);
+  const key = exportCacheKey({ contentSha256: sha, groups });
+  assert.ok(key.includes(`cli${PEN_CLI_VERSION}`));
+  assert.ok(key.endsWith(`src${sha}`));
+  assert.equal(key, exportCacheKey({ contentSha256: sha, groups }));
+  assert.notEqual(
+    key,
+    exportCacheKey({ contentSha256: 'b'.repeat(64), groups })
+  );
+  assert.notEqual(
+    key,
+    exportCacheKey({
+      contentSha256: sha,
+      groups: [{ penFile: 'a.pen', nodeIds: ['hLRZB'] }],
+    })
+  );
+  assert.throws(() => exportCacheKey({ contentSha256: 'url', groups }));
+
+  const root = fixtureRoot();
+  const keys = [];
+  for (const [url, body] of [
+    ['https://blob.example/one', '{"v":1}'],
+    ['https://blob.example/two', '{"v":1}'],
+    ['https://blob.example/one', '{"v":2}'],
+  ]) {
+    const outputs = {};
+    await runGoldenPathPen({
+      out: join(root, `out-${keys.length}`),
+      root,
+      env: penEnv(url),
+      run: () => assert.fail('fetch-only runs no exporter'),
+      fetchImpl: penSource(body),
+      fetchOnly: true,
+      log: () => {},
+      report: (name, value) => {
+        outputs[name] = value;
+      },
+    });
+    keys.push(outputs.cache_key);
+  }
+  assert.equal(keys[0], keys[1], 'same bytes at another URL: same key');
+  assert.notEqual(keys[0], keys[2], 'new bytes at the same URL: new key');
+  const manifest = JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'));
+  assert.deepEqual(exportGroups(manifest, designedFrames(manifest)), [
+    { penFile: 'canonical.lib.pen', nodeIds: ['oaz9c', 'hLRZB'] },
+  ]);
+});
+
+test('a restored export for the same content skips the Pen CLI; new content exports again', async () => {
+  const root = fixtureRoot();
+  const out = join(root, 'out');
+  const env = penEnv('https://blob.example/x.pen');
+  const calls = [];
+  const outputs = {};
+  const options = body => ({
+    out,
+    root,
+    env,
+    run: exportingRun(out, calls),
+    fetchImpl: penSource(body),
+    log: () => {},
+    report: (name, value) => {
+      outputs[name] = value;
+    },
+  });
+  const first = await runGoldenPathPen(options('{"v":1}'));
+  assert.equal(first.exportSource, 'pen-cli');
+  assert.equal(outputs.export_cacheable, 'true');
+  assert.equal(
+    readFileSync(join(out, 'png', EXPORT_KEY_FILE), 'utf8').trim(),
+    first.cacheKey
+  );
+  // A new job: only the restored png/ survives.
+  rmSync(join(out, 'workspace'), { recursive: true });
+  calls.length = 0;
+  const second = await runGoldenPathPen(options('{"v":1}'));
+  assert.equal(second.exportSource, 'cache');
+  assert.equal(second.exported.length, 2);
+  assert.equal(outputs.export_cacheable, 'false');
+  assert.ok(!calls.some(c => c.includes('interactive')), 'Pen CLI not run');
+  assert.ok(
+    calls.some(c => c.includes('scripts/invariants/pen-still-diff.mjs'))
+  );
+  assert.equal(
+    JSON.parse(readFileSync(join(out, 'export.json'), 'utf8')).source,
+    'cache'
+  );
+
+  calls.length = 0;
+  const third = await runGoldenPathPen(options('{"v":2}'));
+  assert.equal(third.exportSource, 'pen-cli');
+  assert.ok(
+    calls.some(c => c.includes('interactive')),
+    'new content exports'
+  );
+});
+
+test('a partial export is never cached', async () => {
+  const root = fixtureRoot();
+  const out = join(root, 'out');
+  const outputs = {};
+  await runGoldenPathPen({
+    out,
+    root,
+    env: penEnv('https://blob.example/x.pen'),
+    run: (cmd, args) => {
+      if (args.includes('interactive'))
+        writeFileSync(join(out, 'png', 'oaz9c.png'), 'png');
+      return Buffer.from('');
+    },
+    fetchImpl: penSource('{"v":1}'),
+    log: () => {},
+    report: (name, value) => {
+      outputs[name] = value;
+    },
+  });
+  assert.equal(outputs.export_cacheable, 'false');
+  assert.ok(!existsSync(join(out, 'png', EXPORT_KEY_FILE)));
 });

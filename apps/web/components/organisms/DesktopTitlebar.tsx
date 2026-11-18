@@ -158,6 +158,8 @@ export function DesktopTitlebar() {
   // 44pt title row keeps its height. Outside Electron the flag stays off.
   useEffect(() => {
     const root = document.documentElement;
+    // New shells own this before hydration; retain the observer for older binaries.
+    if (root.dataset.electronFullscreenManaged === 'preload') return;
     if (!isDesktop) {
       delete root.dataset.electronFullscreen;
       return;
@@ -235,8 +237,8 @@ export function DesktopTitlebar() {
               className={cn(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                 'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'hover:bg-sidebar-accent hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
             >
@@ -251,8 +253,8 @@ export function DesktopTitlebar() {
               className={cn(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                 'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'hover:bg-sidebar-accent hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
             >

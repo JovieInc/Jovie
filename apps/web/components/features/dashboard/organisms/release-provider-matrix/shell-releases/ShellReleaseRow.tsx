@@ -425,7 +425,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               'inline-flex min-w-0 hover:no-underline'
             )}
           >
-            {release.title}
+            <span className='min-w-0 truncate'>{release.title}</span>
           </EntityHoverLink>
           <TypeBadge label={typeLabel} />
           {artistLabel ? (
@@ -439,7 +439,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               <span
                 className={cn(
                   shellReleaseRowTypography.subtitleClassName,
-                  'min-w-0'
+                  'min-w-0 shrink-9999'
                 )}
               >
                 {artistLabel}

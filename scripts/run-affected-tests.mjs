@@ -348,7 +348,6 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -1190,6 +1189,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'pr_events',
     'remediation',
     'reason_lane',
+    'reason_dispatch',
+    'reason_publication',
     'doctor',
     'hud',
     'disk_guard',
@@ -2780,10 +2781,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')

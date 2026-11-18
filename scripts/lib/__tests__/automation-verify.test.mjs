@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -32,6 +31,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { spawn, spawnSync } from '../child-process.mjs';
 import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
@@ -1697,7 +1697,6 @@ const PLAYWRIGHT_SENTRY_ISOLATION_DIFF = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',

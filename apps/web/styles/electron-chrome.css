@@ -6,7 +6,9 @@ html[data-desktop-runtime="electron"] {
   --chrome-traffic-lights-leading: 12px;
   --chrome-traffic-lights-reserve: 76px;
   --electron-titlebar-height: var(--chrome-title-row-height);
-  --electron-controls-width: 200px;
+  /* Controls end at x=168; +8 keeps the title 20px past the arrows
+     (8 + the 12px header padding) instead of a 44px dead span. */
+  --electron-controls-width: 176px;
   --electron-traffic-light-x: var(--chrome-traffic-lights-leading);
   /* JOV-8974: the titlebar band sits one shell gap below the window top, so
      the native lights ride down with it (15px in-band + the top gutter). */
@@ -37,5 +39,6 @@ html[data-desktop-runtime="electron"][data-electron-fullscreen="true"] {
     var(--chrome-traffic-lights-reserve) *
     0
   );
-  --electron-controls-width: 140px;
+  /* Full-screen controls end at x=110; same 20px rhythm. */
+  --electron-controls-width: 118px;
 }

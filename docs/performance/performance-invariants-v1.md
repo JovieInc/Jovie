@@ -13,45 +13,134 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
-| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/route-js-budget.mjs` | Per-route-group initialJS budgets (JOV-8561): each group's `initialJS_gzip_kb` is the target; the operative per-group ceiling is the downward-only `groups` ratchet in `apps/web/scripts/route-js-budgets.json`, enforced per route group in the build lanes. `compare-chunks.ts` owns the growth ratchet (JOV-8555) and telemetry budgets; its former max-across-routes budget check is removed | `route-js-budget.mjs` in `ci.yml` Build + Layout and `source-validation.yml` — any over-budget group fails the job. The `compare-chunks` growth-ratchet workflow wiring stays pending (JOV-8555) |
+| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/route-js-budgets.json`, `apps/web/scripts/route-js-budget.mjs` | Initial JS (gzip) per route and per route group. Every route has its own baseline in `route-js-budgets.json`, recorded at measured size plus 2%; each group's `initialJS_gzip_kb` in `route-budgets.json` is the target and `groups.<group>.baselineKb` its ceiling (JOV-8561). This is the growth ratchet (JOV-8555) | `route-js-budget.mjs` in `ci.yml` Build + Layout and `source-validation.yml` Exact-head Coverage. A route over its baseline, a route with no baseline, or a group over its ceiling fails the job |
+| 6 | `apps/web/scripts/route-render-modes.json`, `apps/web/scripts/route-render-modes.mjs` | Render mode per route (`static`, `isr:<seconds>`, `param-prerender`, `dynamic`) and prerendered HTML bytes per static or ISR page, read from the build's `prerender-manifest.json` | `route-render-modes.mjs` in the same two jobs, after the same build. A route that loses cacheability, HTML past its allowance, or a route with no entry fails the job |
 
-Rows 1–4 define certified surfaces; row 5's group initialJS budgets are enforced per
-route group by route-js-budget since JOV-8561; its remaining numbers (lcp/fcp/cls/tti)
+Rows 1–4 define certified surfaces. Rows 5 and 6 are build-output ratchets: they
+need no deployment and no secrets, so they block on the PR and again on the
+combined head. Row 5's remaining `route-budgets.json` numbers (lcp/fcp/cls/tti)
 are citable targets only. Where two live sources disagree, the stricter number
 governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
 
-`apps/web/scripts/route-js-budget.mjs` blocks finished builds on per-route gzip
-budgets, and since JOV-8561 also on per-route-group initialJS budgets. Marketing targets are tighter; unlisted routes use the default.
-Targets and measured baselines shrink; raises require an unexpired registry
-override for the exact key. Initial measurements (2026-10-23) allow at most 2%
-headroom. Lower baselines after reductions and delete them at the target.
-Profiles remain visible in server HTML before JavaScript. Since JOV-8561 every
-measured route is also attributed to a `route-budgets.json` group (admin:
-`/app/admin*`, dashboard: other `/app` routes, marketing: the firstLoad
-`marketingRoutes` patterns, public: every other first-load route) and checked
-against that group's own `groups.<group>.baselineKb` ceiling in
-`route-js-budgets.json` — never the max ceiling across groups — with the
-group's `initialJS_gzip_kb` as the target. Raising a group baseline or a
-group target needs the same unexpired override (owner, reason, Linear ID,
-expiry, evidence). The compare-chunks growth-ratchet wiring stays pending:
-no workflow invokes compare-chunks yet, and the in-script growth ratchet now
-fails closed on an unwired baseline (JOV-8555), so the first wired run fails
-loudly until the baseline is captured with `pnpm --filter @jovie/web
-compare-chunks:snapshot` after a clean build.
+## Initial JS ratchet (row 5)
 
-| Route | Measured KB | Baseline KB | Target KB |
-| --- | ---: | ---: | ---: |
-| `/demo/showcase/[surface]` | 1284 | 1309 | 800 |
-| `/start` | 1223 | 1247 | 800 |
-| `/demo/founder-video` | 1157 | 1180 | 800 |
-| `/exp/shell-v1` | 947 | 965 | 800 |
-| `/[username]` | 883 | 900 | 800 |
-| `/[username]/profile-mode-render/[profileMode]/[marker]` | 883 | 900 | 800 |
-| `/exp/page-builder` | 881 | 898 | 800 |
-| `/demo/audience` | 847 | 863 | 800 |
-| `/demo` | 815 | 831 | 800 |
-| `/` | 650 | 663 | 640 |
+`apps/web/scripts/route-js-budget.mjs` measures every route of a finished build
+(root files plus the route's client-reference chunks, gzip -9) and holds each
+route to its own baseline: `routes` for `/app` routes, `firstLoad.baselines` for
+every other route.
+
+- **A baseline is measured size plus 2%** (`BASELINE_HEADROOM_RATIO`), rounded
+  down. `/` measured 567 KB, so its baseline is 578.
+- **A route with no baseline fails closed.** There is no default to fall back
+  to. The error prints the line to add. `defaultMaxGzipKb` (900 for `/app`,
+  800 public, 640 marketing) is only the most a new route's first baseline
+  may be without an override.
+- **Baselines only move down by themselves.**
+  `node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next --write`
+  records new routes, lowers every baseline that has more than 2% slack, drops
+  routes that left the build, and lowers each group baseline to its worst
+  route. It never raises a number. A route that got lighter passes without a
+  budget edit (the job prints a notice), so two green PRs cannot conflict on
+  this file; run `--write` on main after a reduction lands to lock it in.
+- **A raise is a hand edit plus an override.** Raising any number against
+  `origin/main` fails unless `raises["<key>"]` (for example
+  `raises["routes./app/chat"]`) is a complete, unexpired
+  design-exception-registry entry: owner, reason, Linear issue, removal
+  condition, evidence, expiry.
+- **Intercepting routes are not initial JS.** `@auth/(.)signin` and
+  `@auth/(.)signup` render only on a client-side navigation. They used to be
+  unioned into `/`, which overstated the homepage by about 90 KB; they are
+  now excluded from every route's measurement and still scanned for forbidden
+  client code.
+- **Groups.** Every route is also attributed to a `route-budgets.json` group
+  (admin: `/app/admin*`, dashboard: other `/app` routes, marketing: the
+  firstLoad `marketingRoutes` patterns, public: every other route) and checked
+  against that group's own `groups.<group>.baselineKb`, never the max across
+  groups. Raising a group baseline or a group target needs the same override.
+
+Generate baselines only from the build CI measures: `pnpm turbo build
+--filter=@jovie/web` with the mock environment of `source-validation.yml`'s
+"Build exact PR head" step (`CI=true`, `NEXT_PUBLIC_APP_URL` and
+`NEXT_PUBLIC_BETTER_AUTH_URL` `http://localhost:3230`, `NEXT_PUBLIC_AUTH_MOCK=1`,
+`NEXT_PUBLIC_AUTH_PROXY_DISABLED=1`, `NEXT_PUBLIC_E2E_MODE=1`,
+`NEXT_IGNORE_ESLINT=1`, `NEXT_IGNORE_TYPECHECK=1`,
+`NEXT_PRIVATE_SKIP_SIZE_CHECK=true`). A production build with real auth
+measures different bundles.
+
+JOV-8555 is closed by this ratchet. `compare-chunks.ts` no longer carries a
+growth ratchet: it keyed a snapshot by chunk filename, and Turbopack's hashed
+filenames change with any content change, so it could never be wired. Its
+placeholder `docs/performance/bundle-baseline.json` and the
+`compare-chunks:snapshot` script are removed.
+
+Measured on main `0b82835e` (2026-11-12), before and after the ratchet:
+
+| Route | Measured KB | Ceiling before | Baseline now | Slack before | Slack now |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `/` | 567 (657 with the modals) | 663 | 578 | 6 | 11 |
+| `/[username]` | 846 | 900 | 862 | 54 | 16 |
+| `/start` | 789 | 1247 | 804 | 458 | 15 |
+| `/app` | 748 | 935 | 762 | 187 | 14 |
+| `/app/chat` | 806 | 1385 | 822 | 579 | 16 |
+| `/pricing` | 537 | 800 | 547 | 263 | 10 |
+
+Across all 259 routes the median slack under the old ceilings was 187 KB. Group
+baselines dropped to their worst route: public 1309 to 1207, marketing 663 to
+578, dashboard 1385 to 1199, admin 1345 to 1124.
+
+## Render-mode and HTML-weight ratchet (row 6)
+
+`apps/web/scripts/route-render-modes.mjs` classifies every page, and every
+prerendered route handler, from `.next/prerender-manifest.json` and
+`.next/app-path-routes-manifest.json`, and compares the result with
+`apps/web/scripts/route-render-modes.json`. It reads build output only, so it
+sees a dynamic API reached through an imported component, which the
+source-level `static-revalidate-policy` test cannot.
+
+| Mode | Meaning |
+| --- | --- |
+| `static` | Prerendered at build, never revalidated |
+| `isr:<seconds>` | Prerendered, revalidated on that window |
+| `param-prerender` | Parameterised route prerendered or cached on demand; `:<seconds>` when the build prerendered a path with a window |
+| `dynamic` | Rendered on every request |
+
+It fails when:
+
+- a route moves to a less cacheable mode (`static` to `isr` to `dynamic`, or
+  `param-prerender` to `dynamic`), or its revalidate window gets shorter;
+- a prerendered handler (`/robots.txt`, feeds, `/llms.txt`) starts running per
+  request;
+- a static or ISR page's HTML grows past its recorded bytes plus the larger of
+  5% and 4096 bytes, or its entry has lost its `html=` size;
+- a route has no entry (new routes fail closed), or an entry has no route;
+- a new page is `dynamic` outside `/app`, `/api`, `/billing`, `/auth`, `/hud`.
+
+The content indexes `/blog`, `/changelog` and `/engineering` gain an entry per
+post or release, so their mode is ratcheted but their bytes are not
+(`HTML_GROWS_BY_DESIGN` in `route-render-modes-policy.mjs`).
+
+A route that got cheaper passes and the job prints a notice.
+`node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next --write`
+records new routes, cheaper modes, longer windows and smaller HTML, and drops
+routes that left the build. It never records a loss: a route that regressed
+keeps its entry and the run still fails. An intended loss is a hand edit of
+the entry plus a complete, unexpired `overrides["<route>"]` entry (same fields
+as `raises` above), judged against `origin/main`. Use the same mock-env build
+as row 5. Build with `CI=true`, as the workflows do: the `/renders` fixture routes
+are admitted only then (they 404 as small static pages otherwise), so a
+snapshot written from a `CI=1` build records them wrong.
+
+The first snapshot (main `0b82835e`) records 94 static, 2 ISR, 19 parameterised-prerender and 168 dynamic routes (113 of the dynamic ones under `/app`). The dynamic public
+pages in it (`/start`, `/signin`, `/claim`, `/r/[slug]`, seven `/[username]/*`
+subpages and others) are recorded as they are; each is a candidate to make
+static later, and doing so tightens the snapshot.
+
+Limits: the build states no revalidate window for a parameterised route with
+no prerendered path, so a shorter window on `/[username]` (ISR 3600, no path
+prerendered in the mock-env build) is not seen here; the
+`static-revalidate-policy` test still covers its source. The proxy matcher is
+not snapshotted.
 
 ## Authenticated six-route graduation
 
@@ -148,13 +237,19 @@ decisions and update the existing workflow enforcement in the same change.
    the file's note; lowering is free. The route-group initialJS ratchet (JOV-8561) follows the
    same one-way rule: `route-js-budgets.json` group baselines and `route-budgets.json` group
    `initialJS_gzip_kb` targets raise only with a founder-approved unexpired `raises` override
-   carrying the Linear ID.
+   carrying the Linear ID. The per-route baselines (row 5) and the render-mode snapshot (row 6)
+   follow it too: `--write` only tightens, and a loss needs an unexpired `raises` or
+   `overrides` entry carrying the Linear ID.
 4. Weight budgets are transfer (compressed) bytes, per `performance-budgets-guard.ts`.
 5. INP is measured (`apps/web/lib/monitoring/web-vitals.ts`), not budgeted, until a repo
    file names an INP budget.
 
 ## Known holes (recorded 2026-09-03, JOV-5888 verification pass)
 
+- The telemetry-contribution budget (`docs/performance/telemetry-budgets.json`, JOV-6585) is
+  enforced by nothing. `compare-chunks.ts` classifies telemetry chunks by filename, and
+  Turbopack's hashed chunk names match none of its markers, so it reads 0 bytes. It is not
+  wired into CI for that reason: a gate that cannot fail is not a gate. Recorded 2026-11-12.
 - `apps/web/performance-budgets.config.js` is a stale, unreferenced legacy copy of the route
   manifest (e.g. `/app/chat` LCP 2500 vs manifest 3000). Never cite it for a budget.
 - Resolved (JOV-6002): the dashboard/onboarding Lighthouse jobs are now "Lighthouse

@@ -33,6 +33,14 @@ const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 /** @type {readonly Guard[]} */
 export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
+    id: 'web-eslint',
+    name: 'changed web ESLint (including hook dependencies)',
+    command:
+      'ESLINT_CHANGED_BASE="origin/{base}" pnpm --filter @jovie/web run lint:eslint:changed',
+    when: /^apps\/web\/.+\.tsx?$/,
+    covers: ['pnpm --filter @jovie/web run lint:eslint:changed'],
+  },
+  {
     id: 'wf:refs',
     name: 'workflow references',
     command: 'node scripts/verify-workflow-references.mjs',
@@ -101,8 +109,9 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
     id: 'duplicate-literals',
     name: 'no copied owner values (prices, names, retention, limits)',
-    command: 'node scripts/invariants/duplicate-literals.mjs',
-    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//,
+    command:
+      'node scripts/invariants/duplicate-literals.mjs && node scripts/invariants/offer-claims/check.mjs && node scripts/invariants/validate.mjs',
+    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\/|^scripts\/invariants\/offer-claims\//,
     covers: ['scripts/invariants/duplicate-literals.mjs'],
   },
   {
@@ -139,6 +148,13 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     command: 'pnpm ci:harness:check',
     when: /^(?:\.github\/|scripts\/(?:ci-harness|lib\/policy-gate)|docs\/ci-harness)/,
     covers: ['pnpm ci:harness:check'],
+  },
+  {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate --screens-base origin/{base}',
+    when: /^(?:apps\/web\/(?:app|components|hooks|lib)\/|packages\/ui\/|docs\/design-system\/|scripts\/(?:component-|lib\/component-))/,
+    covers: ['pnpm component-certificate:gate'],
   },
   {
     id: 'screen-registration',
@@ -226,10 +242,6 @@ export const NOT_LOCAL = Object.freeze([
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
   {
-    match: 'component-certificate:gate',
-    reason: 'pre-push runs it right after component-ship-gate',
-  },
-  {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',
   },
@@ -280,18 +292,41 @@ export const coveredBy = atom =>
   SOURCE_VALIDATION_GUARDS.some(g => g.covers.some(c => atom.includes(c))) ||
   NOT_LOCAL.some(n => atom.includes(n.match));
 
-/** Guards whose trigger matches the changed paths, `{base}` expanded. */
 /**
  * Guards for these changed paths: Source Validation's, then the pre-push-only
  * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ * `{base}` in a command expands to the base branch name.
+ *
+ * Local guards have no `covers` list. The return type keeps that field optional
+ * so a caller can read it on a Source Validation guard without a cast.
+ *
+ * @param {readonly string[]} paths
+ * @param {string} [base]
+ * @returns {Array<{
+ *   id: string,
+ *   name: string,
+ *   command: string,
+ *   when: RegExp | ((p: string) => boolean),
+ *   covers?: readonly string[],
+ *   heavy?: boolean,
+ *   workflow?: string,
+ *   phase?: number,
+ *   timeoutMs?: number,
+ * }>}
  */
 export function selectManifestGuards(paths, base = 'main') {
-  return [
-    ...SOURCE_VALIDATION_GUARDS.filter(g =>
-      paths.some(p => g.when.test(p))
-    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
-    ...selectLocalGuards(paths),
-  ];
+  // Supplemental local guards may refine a CI guard (for example, include
+  // uncommitted files in ESLint). Keep one command per ID in manifest order.
+  const guards = new Map(
+    [
+      ...SOURCE_VALIDATION_GUARDS.filter(g => paths.some(p => g.when.test(p))),
+      ...selectLocalGuards(paths),
+    ].map(g => [g.id, g])
+  );
+  return [...guards.values()].map(g => ({
+    ...g,
+    command: g.command.replaceAll('{base}', base),
+  }));
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

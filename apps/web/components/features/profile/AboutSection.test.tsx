@@ -104,7 +104,7 @@ describe('AboutSection', () => {
 });
 
 describe('AboutSection text contrast contract (JOV-8873)', () => {
-  it('raises muted copy to white/50', async () => {
+  it('raises muted copy to on-media/50 (white/50)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const webRoot = process.cwd().endsWith('/apps/web')
@@ -114,7 +114,8 @@ describe('AboutSection text contrast contract (JOV-8873)', () => {
       resolve(webRoot, 'components/features/profile/AboutSection.tsx'),
       'utf8'
     );
-    expect(source).toContain('text-sm font-book text-white/50');
+    expect(source).toContain('text-sm font-book text-on-media/50');
+    expect(source).not.toContain('text-on-media/40');
     expect(source).not.toContain('text-white/40');
   });
 

@@ -15,12 +15,22 @@
  *   - all of the thread's comments were read (no further page).
  * Human-started threads, and bot threads a human replied in, are never touched.
  *
- * api-budget: github-app-graphql 120/hr - one thread read per green PR Ready head (~60/hr at peak) plus one resolve per open bot thread
+ * Before resolving, a P0/P1 finding nobody replied to is upserted to Linear
+ * and the thread gets a reply naming the issue (bot-review-findings.mjs).
+ * Filing is best effort: a failure is logged and the thread still resolves.
+ *
+ * api-budget: github-app-graphql 120/hr - one thread read per green PR Ready head (~60/hr at peak) plus one resolve per open bot thread and one reply per unanswered P0/P1 thread
  *
  * CLI:
  *   node scripts/lib/bot-review-threads.mjs --repo OWNER/NAME --pr N --head SHA [--dry-run]
  */
 import { pathToFileURL } from 'node:url';
+import {
+  buildFindingIssue,
+  escalationSeverity,
+  fileFinding,
+  findingReply,
+} from './bot-review-findings.mjs';
 
 export const REVIEW_BOTS = Object.freeze([
   'sentry',
@@ -39,9 +49,13 @@ const SHA = /^[0-9a-f]{40}$/;
 export const THREADS_QUERY =
   'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){' +
   'pullRequest(number:$number){state headRefOid reviewThreads(first:100){nodes{id isResolved ' +
-  'comments(first:50){pageInfo{hasNextPage} nodes{body author{__typename login}}}}}}}}';
+  'path line originalLine comments(first:50){pageInfo{hasNextPage} ' +
+  'nodes{body url author{__typename login}}}}}}}}';
 export const RESOLVE_MUTATION =
   'mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}';
+export const REPLY_MUTATION =
+  'mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(' +
+  'input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}';
 
 const login = author =>
   String(author?.login ?? '')
@@ -91,8 +105,53 @@ async function defaultGh(args) {
 }
 
 /**
+ * File an unanswered P0/P1 thread to Linear and reply with the issue. Never
+ * throws and never stops the resolve that follows.
+ * @param {{ repo: string, pr: number, head: string, thread: any,
+ *   dryRun: boolean, gh: Gh, log: (line: string) => void,
+ *   intake: import('./bot-review-findings.mjs').FindingIntake }} options
+ */
+async function escalateThread({
+  repo,
+  pr,
+  head,
+  thread,
+  dryRun,
+  gh,
+  log,
+  intake,
+}) {
+  const severity = escalationSeverity(thread);
+  if (!severity) return null;
+  const issue = buildFindingIssue({ repo, pr, head, thread, severity });
+  const filed = await fileFinding(issue, {
+    ...intake,
+    ...(dryRun ? { enabled: false } : {}),
+    log,
+    pr,
+  });
+  if (!filed.ok) return filed;
+  const reply = await gh([
+    'api',
+    'graphql',
+    '-f',
+    `query=${REPLY_MUTATION}`,
+    '-f',
+    `id=${thread.id}`,
+    '-f',
+    `body=${findingReply(filed, severity)}`,
+  ]).catch(() => ({ code: -1 }));
+  if (reply.code !== 0)
+    log(
+      `bot-review-threads: #${pr} reply naming ${filed.identifier} failed on ${thread.id} (exit ${reply.code})`
+    );
+  return filed;
+}
+
+/**
  * @param {{ repo: string, pr: number, head: string, dryRun?: boolean,
- *   gh?: Gh, log?: (line: string) => void }} options
+ *   gh?: Gh, log?: (line: string) => void,
+ *   intake?: import('./bot-review-findings.mjs').FindingIntake }} options
  */
 export async function resolveBotThreads({
   repo,
@@ -101,6 +160,7 @@ export async function resolveBotThreads({
   dryRun = false,
   gh = defaultGh,
   log = console.log,
+  intake = {},
 }) {
   const [owner, name] = String(repo ?? '').split('/');
   if (!owner || !name || !Number.isInteger(pr) || pr < 1)
@@ -119,17 +179,32 @@ export async function resolveBotThreads({
   ]);
   if (read.code !== 0) {
     log(`bot-review-threads: #${pr} read failed (exit ${read.code})`);
-    return { resolved: [], failed: [], skip: 'read-failed' };
+    return { resolved: [], failed: [], filed: [], skip: 'read-failed' };
   }
   const live = JSON.parse(read.stdout)?.data?.repository?.pullRequest;
   const { skip, ids } = selectResolvableThreads(live, head);
   if (skip) {
     log(`bot-review-threads: #${pr} skipped (${skip})`);
-    return { resolved: [], failed: [], skip };
+    return { resolved: [], failed: [], filed: [], skip };
   }
   const resolved = [];
   const failed = [];
+  const filed = [];
+  const threads = new Map(
+    (live.reviewThreads?.nodes ?? []).map(t => [t.id, t])
+  );
   for (const id of ids) {
+    const escalated = await escalateThread({
+      repo,
+      pr,
+      head,
+      thread: threads.get(id),
+      dryRun,
+      gh,
+      log,
+      intake,
+    });
+    if (escalated?.ok) filed.push(escalated.identifier);
     if (dryRun) {
       log(`bot-review-threads: #${pr} would resolve ${id}`);
       resolved.push(id);
@@ -147,9 +222,10 @@ export async function resolveBotThreads({
   }
   log(
     `bot-review-threads: #${pr} resolved ${resolved.length} bot thread(s)` +
-      (failed.length ? `, ${failed.length} failed` : '')
+      (failed.length ? `, ${failed.length} failed` : '') +
+      (filed.length ? `, filed ${filed.join(', ')}` : '')
   );
-  return { resolved, failed, skip: null };
+  return { resolved, failed, filed, skip: null };
 }
 
 function parseArgs(argv) {

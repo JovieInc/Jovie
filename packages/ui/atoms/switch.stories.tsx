@@ -188,7 +188,7 @@ export const ErrorState: Story = {
         />
         <Label htmlFor='sw-error'>Accept the distribution terms</Label>
       </div>
-      <p id='sw-error-message' className='text-xs text-error' role='alert'>
+      <p id='sw-error-message' className='text-xs text-error-text' role='alert'>
         Turn this on to publish the release.
       </p>
     </div>

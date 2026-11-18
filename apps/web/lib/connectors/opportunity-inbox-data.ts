@@ -1,15 +1,24 @@
 import 'server-only';
 
-import { and, desc, eq, gte, inArray, type SQL } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gte,
+  inArray,
+  type SQL,
+} from 'drizzle-orm';
 import {
   isMissingConnectorSchemaError,
   isMissingSignalTypeColumnError,
 } from '@/lib/connectors/schema-errors';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { feedbackItems } from '@/lib/db/schema/feedback';
 import { tourDates } from '@/lib/db/schema/tour';
+import { PENDING_SUGGESTED_ACTION_STATUS } from '@/lib/inbox/navigation-availability';
 import { logger } from '@/lib/utils/logger';
 import { isCreatorInboxSourceKind } from './creator-inbox-source-policy';
 import { creatorInboxSourceCondition } from './creator-inbox-source-policy.server';
@@ -57,10 +66,39 @@ const BASE_SELECTION = {
 function pendingForUser(userId: string): SQL | undefined {
   return and(
     eq(suggestedActions.userId, userId),
-    eq(suggestedActions.status, 'pending'),
+    eq(suggestedActions.status, PENDING_SUGGESTED_ACTION_STATUS),
     // Workflow recordings belong to Ovie, including for founders using Jovie.
     creatorInboxSourceCondition(suggestedActions.kind)
   );
+}
+
+/**
+ * Pending-work count for the shell's Inbox badge: the uncapped
+ * source-eligible pending-row total, built on the exact eligibility
+ * condition the Inbox feed query uses (`pendingForUser`). An operator-only
+ * pending row (Ovie workflow captures, founder/ops/ovie sources) therefore
+ * never produces a creator-work badge.
+ *
+ * Total-versus-page contract: this count deliberately does NOT come from the
+ * feed's candidate page (SOCIAL_INBOX_CANDIDATE_LIMIT rows, of which at most
+ * 50 cards render). Deriving the badge from that capped page would silently
+ * drop valid pending work beyond the cap; the badge counts every
+ * source-eligible pending row instead, so it can exceed the number of cards
+ * the Inbox renders. Payload-level renderability is enforced at map time in
+ * `buildOpportunityInboxData` (malformed payloads never become cards) and is
+ * deliberately not replicated in this count — excluding malformed payloads
+ * from the count and recovering candidates starved behind the page cap
+ * remain outstanding follow-up work.
+ */
+export async function countPendingCreatorInboxActions(
+  userId: string,
+  dbOrTx: DbOrTransaction = db
+): Promise<number> {
+  const rows = await dbOrTx
+    .select({ count: drizzleSql<number>`count(*)` })
+    .from(suggestedActions)
+    .where(pendingForUser(userId));
+  return Number(rows[0]?.count ?? 0);
 }
 
 async function loadSocialInboxRankingPreferences(userId: string) {

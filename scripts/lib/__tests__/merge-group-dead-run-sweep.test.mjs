@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import {
+  coreQuotaDefersCancels,
   MAX_CANCELS,
+  MIN_CORE_REMAINING,
   main,
   parseLsRemote,
   planDeadRunCancels,
@@ -105,12 +107,17 @@ describe('main', () => {
     REPOSITORY: REPO,
   };
 
-  /** @param {{ runs?: any, refs?: string[] | null, commits?: any, cancelOk?: boolean }} [opts] */
+  const HEALTHY_QUOTA = {
+    resources: { core: { remaining: 5000, limit: 5000 } },
+  };
+
+  /** @param {{ runs?: any, refs?: string[] | null, commits?: any, cancelOk?: boolean, quota?: any }} [opts] */
   function fakeIo({
     runs = { workflow_runs: [run(1, DEAD), run(2, LIVE)] },
     refs = [ref(LIVE)],
     commits = [{ sha: sha('9') }],
     cancelOk = true,
+    quota = HEALTHY_QUOTA,
   } = {}) {
     const calls = [];
     return {
@@ -127,6 +134,10 @@ describe('main', () => {
         calls.push(`CANCEL ${id}`);
         return cancelOk;
       },
+      actionsCoreQuota() {
+        calls.push('quota-probe');
+        return quota;
+      },
     };
   }
   const quiet = () => {};
@@ -142,6 +153,7 @@ describe('main', () => {
       list('in_progress'),
       'ls-remote',
       `GET repos/${REPO}/commits?sha=main&per_page=100`,
+      'quota-probe',
       'CANCEL 1',
     ]);
   });
@@ -180,6 +192,64 @@ describe('main', () => {
   it('reports a failed cancel without counting it', () => {
     const io = fakeIo({ cancelOk: false });
     expect(main(env, io, quiet)).toEqual({ cancelled: [] });
+  });
+
+  it('defers the cancel loop when the core bucket cannot cover it plus the reserve', () => {
+    const io = fakeIo({
+      quota: { resources: { core: { remaining: 2, limit: 5000 } } },
+    });
+    const notices = [];
+    expect(main(env, io, (level, m) => notices.push(`${level}:${m}`))).toEqual({
+      cancelled: [],
+    });
+    expect(io.calls).toContain('quota-probe');
+    expect(io.calls.some(c => c.startsWith('CANCEL'))).toBe(false);
+    expect(notices.some(n => n.includes('github-quota-deferred'))).toBe(true);
+  });
+
+  it('cancels at the exact boundary and defers one call below it', () => {
+    // One dead run: remaining = 1 + MIN_CORE_REMAINING proceeds.
+    const enough = fakeIo({
+      quota: {
+        resources: { core: { remaining: 1 + MIN_CORE_REMAINING, limit: 5000 } },
+      },
+    });
+    expect(main(env, enough, quiet)).toEqual({ cancelled: [1] });
+    const short = fakeIo({
+      quota: {
+        resources: { core: { remaining: MIN_CORE_REMAINING, limit: 5000 } },
+      },
+    });
+    expect(main(env, short, quiet)).toEqual({ cancelled: [] });
+    expect(short.calls.some(c => c.startsWith('CANCEL'))).toBe(false);
+  });
+
+  it('cancels nothing when the quota probe itself fails', () => {
+    const io = fakeIo({ quota: null });
+    expect(main(env, io, quiet)).toEqual({ cancelled: [] });
+    expect(io.calls.some(c => c.startsWith('CANCEL'))).toBe(false);
+  });
+
+  it('never probes when nothing is dead', () => {
+    const io = fakeIo({
+      runs: { workflow_runs: [run(2, LIVE)] },
+    });
+    expect(main(env, io, quiet)).toEqual({ cancelled: [] });
+    expect(io.calls).not.toContain('quota-probe');
+  });
+});
+
+describe('coreQuotaDefersCancels', () => {
+  it('defers on an unreadable probe, at the floor, and not above it', () => {
+    expect(coreQuotaDefersCancels(null, 1)).toBe(true);
+    expect(coreQuotaDefersCancels({}, 1)).toBe(true);
+    const quota = remaining => ({ resources: { core: { remaining } } });
+    expect(coreQuotaDefersCancels(quota(MIN_CORE_REMAINING), 1)).toBe(true);
+    expect(coreQuotaDefersCancels(quota(1 + MIN_CORE_REMAINING), 1)).toBe(
+      false
+    );
+    expect(coreQuotaDefersCancels(quota(0), 100)).toBe(true);
+    expect(coreQuotaDefersCancels(quota(5000), 100)).toBe(false);
   });
 });
 

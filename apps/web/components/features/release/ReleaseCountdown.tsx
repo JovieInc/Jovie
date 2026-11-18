@@ -146,7 +146,7 @@ export function ReleaseCountdown({
             <span className='text-xl font-bold tracking-tight text-(--color-text-tooltip)'>
               {segment.value}
             </span>
-            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-widest text-secondary-token'>
+            <span className='ml-0.5 text-3xs font-semibold tracking-widest text-secondary-token'>
               {segment.label}
             </span>
           </span>
@@ -157,17 +157,15 @@ export function ReleaseCountdown({
 
   return (
     <div className='text-center'>
-      <p className='text-xs uppercase tracking-widest text-secondary-token'>
-        {label}
-      </p>
+      <p className='text-xs tracking-widest text-secondary-token'>{label}</p>
       <div className='mt-2 flex items-center justify-center gap-3'>
         {timeLeft.days > 0 && (
           <div className='flex flex-col items-center'>
             <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
               {timeLeft.days}
             </span>
-            <span className='text-3xs uppercase tracking-wider text-secondary-token'>
-              {timeLeft.days === 1 ? 'day' : 'days'}
+            <span className='text-3xs tracking-wider text-secondary-token'>
+              {timeLeft.days === 1 ? 'Day' : 'Days'}
             </span>
           </div>
         )}
@@ -175,16 +173,16 @@ export function ReleaseCountdown({
           <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
             {timeLeft.hours}
           </span>
-          <span className='text-3xs uppercase tracking-wider text-secondary-token'>
-            {timeLeft.hours === 1 ? 'hr' : 'hrs'}
+          <span className='text-3xs tracking-wider text-secondary-token'>
+            {timeLeft.hours === 1 ? 'Hr' : 'Hrs'}
           </span>
         </div>
         <div className='flex flex-col items-center'>
           <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
             {timeLeft.minutes}
           </span>
-          <span className='text-3xs uppercase tracking-wider text-secondary-token'>
-            min
+          <span className='text-3xs tracking-wider text-secondary-token'>
+            Min
           </span>
         </div>
       </div>

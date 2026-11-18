@@ -60,6 +60,27 @@ def is_epic(issue) -> bool:
     return EPIC_LABEL in {str(label).lower() for label in getattr(issue, "labels", ()) or ()}
 
 
+# Linear-bus agents that read their issue threads on their own schedule (canon/FLEET.md "Fleet bus").
+FLEET_LABEL = "fleet"
+FLEET_AGENT = re.compile(r"\((Lola|Chloe|Aeon)\b[^)]*\)\s*$|^\W*For (Lola|Chloe|Aeon)\b", re.IGNORECASE)
+
+
+def fleet_reserved(issue, now: float | None = None) -> str | None:
+    """The bus agent a `fleet` issue is addressed to ("... (Lola)" or "For Lola"), while it is theirs.
+
+    A lane that claims it duplicates that agent's writer (JOV-12439 looped 14 lane claims in a day while
+    Lola waited on the claim). The reservation lapses HOLD_EXPIRY_S after creation: no issue waits forever."""
+    if FLEET_LABEL not in {str(label).lower() for label in getattr(issue, "labels", ()) or ()}:
+        return None
+    match = FLEET_AGENT.search(str(getattr(issue, "title", "") or "")) or FLEET_AGENT.search(
+        str(getattr(issue, "description", "") or "")[:200])
+    created = _timestamp(getattr(issue, "created_at", None))
+    now = time.time() if now is None else now
+    if not match or (created is not None and now - created.timestamp() > HOLD_EXPIRY_S):
+        return None
+    return (match.group(1) or match.group(2)).capitalize()
+
+
 def children_status(children: list[dict], complete: bool = True) -> str:
     """open | done | empty. `done` needs every child terminal and at least one completed.
     All-canceled (or none) is `empty`: the epic still needs real children."""
