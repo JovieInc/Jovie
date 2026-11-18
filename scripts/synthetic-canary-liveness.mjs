@@ -58,6 +58,12 @@ async function read(github, path) {
 
 /** @param {{github: WorkflowReader, repo: string, now?: number}} options */
 export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
+  /**
+   * @param {boolean} ok
+   * @param {string} reason
+   * @param {{ id?: number } | undefined} [run]
+   * @param {{ missedSlot?: boolean, deferred?: boolean }} [extra]
+   */
   const result = (ok, reason, run, extra = {}) => ({
     ok,
     reason,
