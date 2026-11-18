@@ -229,7 +229,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs", "scripts/invariants/screen-proof-transport.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
-                  "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
+                  "scripts/lib/credentials-registry.mjs", "scripts/lib/credentials-registry-rules.mjs", "scripts/lib/linear-issue-intake.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
                   "ops/registry/spend.json", "ops/registry/capacity.json",
                   "scripts/backlog-orchestrator/config/model-registry.json",
@@ -1507,7 +1507,7 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
 # (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
 # (infrastructure red or a failure main already has), 17 found the head already green. A
 # specific reason lets the budget, the backoff and the ledger treat each differently.
-from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason  # noqa: E402
+from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason, sync_claim  # noqa: E402
 
 
 def parse_numstat(text: str) -> list[Change]:
@@ -6292,7 +6292,7 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "then head-only tokens. Unknown hunks stay unresolved.",
                    "When both sides import different modules of the same extracted helpers,",
                    "split_helper_import.resolve_split_helper_conflict keeps main's identical",
-                   "definitions and the head-only names. Unknown hunks stay unresolved.",
+                   "definitions and the head-only names. When both sides bind different names in `const { names } = await expr;`, fix_red_source_edits.resolve_complementary_destructure_text keeps main's names, then head-only names, and unions the trailing statements. Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -7207,8 +7207,8 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
         import quota_rerun
         return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
-    # One rerun per head, shared with the platform-red gate above; one sync per head.
-    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
+    # One rerun per head. Sync once per head against the current base tip.
+    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, sync_claim(pr, route["action"]))):
         return None
     if route["action"] == fix_red_classes.RERUN:
         return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
