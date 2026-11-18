@@ -25,6 +25,7 @@ const meta = {
     entityHeader: (
       <EntityHeader
         layout='grid'
+        className='px-3 pt-3'
         thumbnail={<DrawerEntityAvatar name='Visitor' />}
         title='Visitor'
         subtitle='Berlin · 18 visits'

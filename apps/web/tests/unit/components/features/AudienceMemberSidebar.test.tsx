@@ -127,7 +127,7 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByText('jordan@example.com')).toBeInTheDocument();
   });
 
-  it('reserves the header contact line when an audience member has no email or phone', () => {
+  it('uses location and visits when no contact detail is available', () => {
     render(
       <AudienceMemberSidebar
         member={{ ...member, email: null, phone: null }}
@@ -137,11 +137,14 @@ describe('AudienceMemberSidebar', () => {
     );
 
     expect(screen.getByText('Jordan Reyes')).toBeInTheDocument();
+    expect(screen.getByTestId('entity-header-details-row')).toHaveTextContent(
+      'Austin, TX · 3 visits'
+    );
     expect(
       screen
         .getByTestId('audience-member-header-card')
-        .querySelector('.invisible.min-h-4')
-    ).toBeInTheDocument();
+        .querySelector('.invisible')
+    ).toBeNull();
   });
 
   it('keeps the canonical entity-header geometry around the close action', () => {
@@ -151,7 +154,14 @@ describe('AudienceMemberSidebar', () => {
 
     expect(screen.getByTestId('audience-member-header-card')).toHaveClass(
       'grid',
-      'grid-cols-[auto_minmax(0,1fr)_auto]'
+      'grid-cols-[auto_minmax(0,1fr)_auto]',
+      'px-3',
+      'pt-3',
+      'items-center'
+    );
+    expect(screen.getByTestId('audience-member-header-card')).not.toHaveClass(
+      'px-2',
+      'py-2'
     );
     expect(screen.getByTestId('audience-member-header-card')).toHaveAttribute(
       'data-layout',
@@ -160,6 +170,11 @@ describe('AudienceMemberSidebar', () => {
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('button', { name: 'More actions' })
+        .closest('[data-entity-header-actions]')
+    ).not.toBeNull();
     const avatarFrame = screen.getByTestId('audience-entity-avatar-frame');
     expect(avatarFrame).toHaveClass('size-14', 'rounded-full');
     expect(avatarFrame.firstElementChild).toHaveClass(
@@ -194,13 +209,31 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByRole('menuitem', { name: 'Copy Email' })).toBeVisible();
   });
 
-  it('renders location and visit count in meta slot', () => {
+  it('uses email as the only header detail when present', () => {
     render(
       <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />
     );
+    expect(screen.getByTestId('entity-header-details-row')).toHaveTextContent(
+      'jordan@example.com'
+    );
+    expect(screen.queryByTestId('entity-header-meta-slot')).toBeNull();
+  });
 
-    expect(screen.getByText('Austin, TX')).toBeInTheDocument();
-    expect(screen.getByText('3 visits')).toBeInTheDocument();
+  it('omits the details line for a sparse member', () => {
+    render(
+      <AudienceMemberSidebar
+        member={{
+          ...member,
+          email: null,
+          phone: null,
+          locationLabel: '',
+          visits: 0,
+        }}
+        isOpen
+        onClose={() => undefined}
+      />
+    );
+    expect(screen.queryByTestId('entity-header-details-row')).toBeNull();
   });
 
   it('keeps each consumer state behind the shared tab contract', async () => {
