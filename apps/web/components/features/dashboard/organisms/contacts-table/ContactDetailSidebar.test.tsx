@@ -86,6 +86,14 @@ describe('ContactDetailSidebar', () => {
     expect(
       screen.getByTestId('contact-detail-entity-header')
     ).toHaveTextContent('Alex Rivera');
+    expect(screen.getByTestId('contact-detail-entity-header')).toHaveClass(
+      'px-3',
+      'pt-3'
+    );
+    expect(screen.getByTestId('contact-entity-avatar-frame')).toHaveClass(
+      'size-14',
+      'rounded-full'
+    );
     await expectNoA11yViolations(container);
 
     await user.click(screen.getByRole('tab', { name: 'Territories' }));
