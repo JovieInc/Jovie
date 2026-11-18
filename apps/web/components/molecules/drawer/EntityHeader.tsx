@@ -371,7 +371,7 @@ export function EntityHeader({
         {badge}
         {isGrid && actions ? (
           <div
-            className='-mr-2 flex h-0 shrink-0 items-center'
+            className='flex h-0 shrink-0 items-center'
             data-entity-header-actions
           >
             {actions}

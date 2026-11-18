@@ -158,7 +158,7 @@ describe('EntityHeader', () => {
       'row-start-2'
     );
     const actions = header.querySelector('[data-entity-header-actions]');
-    expect(actions).toHaveClass('-mr-2', 'h-0', 'items-center');
+    expect(actions).toHaveClass('h-0', 'items-center');
     expect(actions?.parentElement).toBe(
       screen.getByTestId('entity-header-title').parentElement
     );
