@@ -79,8 +79,11 @@ export function isNavigationItemActive(
   return true;
 }
 
-/** The rail's Inbox row; the header bell replaces it when it owns `/app`. */
-const INBOX_ROW_ID = 'home';
+/**
+ * Navigation identity for `/app`. The header bell carries it once the rail
+ * drops the Inbox row, and the warm probe measures that same id.
+ */
+export const INBOX_NAVIGATION_ITEM_ID = 'home';
 
 /**
  * Rail destinations for the current chrome. When the header bell owns the
@@ -92,7 +95,7 @@ export function getRailNavigation<Item extends Pick<NavItem, 'id'>>(
   headerOwnsInbox: boolean
 ): readonly Item[] {
   return headerOwnsInbox
-    ? items.filter(item => item.id !== INBOX_ROW_ID)
+    ? items.filter(item => item.id !== INBOX_NAVIGATION_ITEM_ID)
     : items;
 }
 
