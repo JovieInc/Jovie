@@ -200,10 +200,8 @@ function DashboardAudienceClientInner({
   const handleViewChange = React.useCallback(
     (nextView: AudienceView) => {
       setView(nextView);
-      setSegments([]);
-      setUrlParams({ sort: 'lastSeen', direction: 'desc' });
     },
-    [setView, setSegments, setUrlParams]
+    [setView]
   );
 
   const handleFiltersChange = React.useCallback(
