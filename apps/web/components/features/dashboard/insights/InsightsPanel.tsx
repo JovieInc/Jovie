@@ -2,21 +2,20 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import {
   EmptyState,
   type EmptyStateProps,
 } from '@/components/molecules/EmptyState';
-import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarActionButton,
+  PageToolbarSelect,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { AudienceWorkspaceSwitch } from '@/features/dashboard/molecules/AudienceWorkspaceSwitch';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import {
   getInsightsEmptyCopy,
   type InsightsEmptyCopy,
@@ -238,7 +237,7 @@ function InsightsPanelContent({
 }
 
 const CATEGORY_FILTERS: { label: string; value: InsightCategory | 'all' }[] = [
-  { label: 'All', value: 'all' },
+  { label: 'All Categories', value: 'all' },
   { label: 'Geographic', value: 'geographic' },
   { label: 'Growth', value: 'growth' },
   { label: 'Content', value: 'content' },
@@ -303,31 +302,36 @@ export function InsightsPanelView({
 
   const toolbar = (
     <PageToolbar
-      start={
-        <RouteSegmentControl
-          value='insights'
-          aria-label='Audience Workspace'
-          className='max-w-72'
-          options={getAudienceWorkspaceNavigation()}
-        />
-      }
+      start={<AudienceWorkspaceSwitch value='insights' />}
       end={
-        <PageToolbarActionButton
-          ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
-          disabled={isGenerating}
-          onClick={onGenerate}
-          icon={
-            <Icon
-              name={isGenerating ? 'Loader2' : 'Sparkles'}
-              className={isGenerating ? 'animate-spin' : undefined}
-            />
-          }
-          label={isGenerating ? 'Generating…' : 'Generate'}
-          iconOnly
-          tooltipLabel={
-            isGenerating ? 'Generating insights…' : 'Generate insights'
-          }
-        />
+        <>
+          <PageToolbarSelect
+            label='Category'
+            value={selectedCategory}
+            defaultValue='all'
+            onValueChange={onCategoryChange}
+            options={CATEGORY_FILTERS}
+            data-testid='insights-category-select'
+          />
+          <PageToolbarActionButton
+            ariaLabel={
+              isGenerating ? 'Generating insights' : 'Generate insights'
+            }
+            disabled={isGenerating}
+            onClick={onGenerate}
+            icon={
+              <Icon
+                name={isGenerating ? 'Loader2' : 'Sparkles'}
+                className={isGenerating ? 'animate-spin' : undefined}
+              />
+            }
+            label={isGenerating ? 'Generating…' : 'Generate'}
+            iconOnly
+            tooltipLabel={
+              isGenerating ? 'Generating insights…' : 'Generate insights'
+            }
+          />
+        </>
       }
     />
   );
@@ -336,16 +340,6 @@ export function InsightsPanelView({
     <PageShell toolbar={toolbar} data-testid={testId}>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex min-h-full flex-col gap-4'>
-          <AppSegmentControl
-            value={selectedCategory}
-            onValueChange={onCategoryChange}
-            options={CATEGORY_FILTERS}
-            aria-label='Filter Insights By Category'
-            surface='ghost'
-            layout='hug'
-            listClassName='flex-wrap'
-          />
-
           <InsightsPanelContent
             isLoading={isLoading}
             error={error}

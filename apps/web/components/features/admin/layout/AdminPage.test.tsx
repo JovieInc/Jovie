@@ -98,6 +98,7 @@ describe('AdminPage', () => {
       'Overview content'
     );
     expect(screen.queryByTestId('admin-page-toolbar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tabs')).toBeVisible();
   });
 
   it('places page actions in the one canonical toolbar', () => {
@@ -135,6 +136,34 @@ describe('AdminPage', () => {
         .map(tab => tab.textContent)
     ).toEqual(['Pipeline', 'Product', 'Timeline']);
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+
+  it('renders query tabs as a toolbar select beside route views', () => {
+    render(
+      <AdminPage
+        title='Agents'
+        testId='agents-page'
+        views='operations'
+        tabs={{
+          param: 'tab',
+          value: 'skills',
+          options: [
+            { value: 'skills', label: 'Skills' },
+            { value: 'memory', label: 'Memory' },
+          ],
+        }}
+      >
+        <p>Agent content</p>
+      </AdminPage>
+    );
+
+    const toolbar = screen.getByTestId('admin-page-toolbar');
+    expect(screen.getAllByRole('tablist')).toHaveLength(1);
+    expect(
+      within(toolbar).getByRole('button', { name: 'View: Skills' })
+    ).toBeVisible();
+    expect(screen.queryByTestId('drawer-tabs')).not.toBeInTheDocument();
+    expect(screen.getByText('Agent content')).toBeVisible();
   });
 });
 

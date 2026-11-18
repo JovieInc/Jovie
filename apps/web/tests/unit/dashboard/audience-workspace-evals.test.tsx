@@ -17,6 +17,9 @@ describe('Audience workspace evals on the Contacts page', () => {
 
     expect(screen.getByTestId('dashboard-audience-loading')).toBeVisible();
     expect(screen.getByLabelText('Loading Audience')).toBeVisible();
+    expect(
+      screen.getByRole('tablist', { name: 'Audience Workspace' })
+    ).toBeVisible();
     // Dense 32px rows with the people-row face skeleton (JOV-7798).
     expect(
       document.querySelector('table[data-table-row-mode="dense"]')
@@ -33,6 +36,10 @@ describe('Audience workspace evals on the Contacts page', () => {
     );
     expect(page).toContain('LazyDashboardAudienceClient');
     expect(page).toContain('AudienceTableLoadingShell');
-    expect(page).toContain("tab', 'audience'");
+    const navigation = readFileSync(
+      join(WEB_ROOT, 'lib/audience/workspace-navigation.ts'),
+      'utf8'
+    );
+    expect(navigation).toContain("tab', 'audience'");
   });
 });

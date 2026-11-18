@@ -3,7 +3,10 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceTabsSurface } from './WorkspaceTabsSurface';
+import {
+  PRIMARY_TAB_RESET_KEYS,
+  WorkspaceTabsSurface,
+} from './WorkspaceTabsSurface';
 
 let pathname = '/app/ov/people';
 let searchParams = new URLSearchParams();
@@ -186,6 +189,10 @@ describe('WorkspaceTabsSurface', () => {
     expect(source).not.toContain('location.assign');
     expect(source).not.toContain('event.preventDefault()');
     expect(source).toContain('<Link');
+  });
+
+  it('exports the primary tab reset keys the toolbar select reuses', () => {
+    expect(PRIMARY_TAB_RESET_KEYS).toEqual(['page', 'pageSize', 'q', 'sort']);
   });
 });
 
