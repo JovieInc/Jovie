@@ -159,8 +159,8 @@ test('inline profile and source links fit a long valid handle on narrow mobile',
     { waitUntil: 'domcontentloaded' }
   );
   await page.getByTestId('outbound-rail').waitFor({ timeout: 90_000 });
-  const nav = page.getByRole('navigation', { name: 'Profile And Source' });
-  for (const link of await nav.getByRole('link').all()) {
+  const profileSource = page.getByTestId('outbound-profile-source');
+  for (const link of await profileSource.getByRole('link').all()) {
     await expect(link).toBeVisible();
     const bounds = await link.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(0);
