@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,6 +6,17 @@ import type { CanonicalArtistSiteCliOptions } from './certify-canonical-artist-s
 
 export const sourceRevision = '8d2f49a8bdb2618db89368931d2313158b0a01bc';
 const temporaryDirectories: string[] = [];
+
+export function isolatedGitRoot(directory: string): string {
+  // An empty repository also isolates fixtures when TMPDIR is inside a checkout.
+  execFileSync('git', [
+    'init',
+    '--quiet',
+    '--initial-branch=fixture',
+    directory,
+  ]);
+  return directory;
+}
 
 export function fixture(): CanonicalArtistSiteCliOptions {
   const directory = mkdtempSync(join(tmpdir(), 'jovie-jov-6572-'));
@@ -46,6 +58,7 @@ export function fixture(): CanonicalArtistSiteCliOptions {
     })
   );
   return {
+    gitRoot: isolatedGitRoot(directory),
     candidateId: 'acquisition:premade-artist-profile:tim-white:run-42',
     runId: 'run-42',
     sourceRevision,

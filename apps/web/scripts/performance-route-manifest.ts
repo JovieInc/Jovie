@@ -1273,10 +1273,10 @@ const CREATOR_SHELL_ROUTES = [
       shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="opportunity-inbox-page"]'],
       loading: ['[data-testid="dashboard-segment-skeleton"]'],
-      // The rail destination and the header bell both point at /app. The
-      // bell is `data-navigation-item-id="inbox"` and is first in DOM order,
-      // so an href selector clicks the wrong control and the probe rejects
-      // the identity. Measure the rail item whose id is `home`.
+      // The customer rail drops its Inbox row when the header bell owns
+      // `/app`. That bell carries navigation id `home` and acknowledges
+      // pointerdown with `data-navigation-pending`, which is the trigger
+      // this warm probe measures.
       navTrigger: ['[data-navigation-item-id="home"]'],
     },
     timings: [

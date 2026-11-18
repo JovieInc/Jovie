@@ -9,6 +9,7 @@ import {
   buildFirstTouch,
   sealFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
+import * as errorTracking from '@/lib/error-tracking';
 import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
@@ -32,24 +33,18 @@ const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
-const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi
+  .spyOn(errorTracking, 'captureCriticalError')
+  .mockResolvedValue(undefined);
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
-vi.mock('@/lib/error-tracking', async () => {
-  // parseJsonBody uses captureError/captureWarning internally — we only want
-  // to spy on captureCriticalError (the fatal pager), so preserve the rest.
-  const actual = await vi.importActual<typeof import('@/lib/error-tracking')>(
-    '@/lib/error-tracking'
-  );
-  return {
-    ...actual,
-    captureCriticalError: mockCaptureCriticalError,
-  };
-});
-
+vi.mock(
+  '@/lib/billing/price-lock.server',
+  () => import('@/tests/fixtures/price-lock-list-mock')
+);
 vi.mock('@/lib/stripe/client', () => ({
   createCheckoutSession: mockCreateCheckoutSession,
   createBillingPortalSession: mockCreateBillingPortalSession,
@@ -695,9 +690,8 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('returns 400 (not 500) when the request body is not valid JSON', async () => {
-    // Regression: malformed JSON was being caught by the generic error handler
-    // and returned as a 500 with `captureCriticalError` (fatal severity).
-    // Malformed JSON is a client error, not a server error, and must not page.
+    // Regression: malformed JSON was a paging 500 (fatal captureCriticalError);
+    // it is a client error and must not page.
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
     const response = await POST(malformedJsonRequest('/api/stripe/checkout'));
@@ -707,9 +701,8 @@ describe('POST /api/stripe/checkout', () => {
     expect(data.error).toBe('Invalid JSON in request body');
     // Must not reach Stripe when the body is malformed.
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
-    // Regression target: a malformed body must NOT page Sentry as a fatal
-    // server error — parseJsonBody catches the parse failure and returns a
-    // 400 directly, so captureCriticalError is never invoked.
+    // Regression target: parseJsonBody returns a 400 directly, so a malformed
+    // body never pages Sentry via captureCriticalError.
     expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
 });
@@ -722,9 +715,8 @@ describe('JOV-8805: dogfood checkout error surfacing', () => {
   });
 
   it('names the real error in the 500 body under E2E_TEST_MODE=1', async () => {
-    // The claim-checkout dogfood server has no Sentry DSN and the production
-    // logger is compiled out, so the 500 body is the only channel the
-    // journey can read. Under the test-mode flag it must carry the cause.
+    // The claim-checkout dogfood server has no Sentry DSN or logger, so under
+    // the test-mode flag the 500 body is the journey's only view of the cause.
     vi.stubEnv('E2E_TEST_MODE', '1');
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockRejectedValue(

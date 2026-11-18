@@ -111,15 +111,35 @@ function routeLabelFromUrl(url) {
   }
 }
 
+// `lhci collect` names saved reports `lhr-<timestamp>.json`; @lhci/utils 0.16
+// widened the format to `lhr-<timestamp>-<hrtime>.json` (its own LHR_REGEX
+// gained the optional `-\d+` suffix). Accept both so a collect that succeeded
+// is never mistaken for a collect that wrote nothing.
 function listLhrFiles(directory) {
   if (!directory) return [];
   try {
     return readdirSync(directory)
-      .filter(name => /^lhr-\d+\.json$/.test(name))
+      .filter(name => /^lhr-\d+(?:-\d+)?\.json$/.test(name))
       .slice()
       .sort();
   } catch {
     return [];
+  }
+}
+
+const REPORT_DISCOVERY_LISTING_LIMIT = 20;
+
+/** Bounded directory listing so an unexplained report count names its cause. */
+function describeReportsDirectory(directory) {
+  try {
+    const entries = readdirSync(directory).sort();
+    if (entries.length === 0) return '(empty)';
+    const shown = entries.slice(0, REPORT_DISCOVERY_LISTING_LIMIT).join(', ');
+    return entries.length > REPORT_DISCOVERY_LISTING_LIMIT
+      ? `${shown}, … (${entries.length} entries)`
+      : shown;
+  } catch {
+    return '(unreadable or missing)';
   }
 }
 
@@ -133,6 +153,7 @@ function resetDirectory(directory) {
  * @property {number} code
  * @property {string} [output]
  * @property {string[]} [reportFiles]
+ * @property {string} [reportDiscovery]
  * @property {boolean} [abortedForDeadline]
  */
 
@@ -289,12 +310,16 @@ export async function collectProductionRoutes(options) {
         report(
           `LIGHTHOUSE_FAILURE_CLASS=unknown LIGHTHOUSE_ROUTE=${routeLabel}`
         );
+        const reportDiscovery =
+          result.reportDiscovery ??
+          'Lighthouse report discovery details were not reported by the collect attempt.';
+        report(reportDiscovery);
         return {
           code: 1,
           failureClass: 'unknown',
           completedRoutes: routeIndex,
           requiredRoutes: plan.urls.length,
-          output: `${message}\n`,
+          output: `${message}\n${reportDiscovery}\n`,
         };
       }
 
@@ -336,7 +361,12 @@ export function createPnpmRouteAttemptExecutor({
   runAttempt = runStreamingAttempt,
   pnpmCommand = 'pnpm',
 } = {}) {
-  return async function executeRouteAttempt({ url, rawConfig, timeoutMs }) {
+  return async function executeRouteAttempt({
+    url,
+    numberOfRuns,
+    rawConfig,
+    timeoutMs,
+  }) {
     const workRoot = mkdtempSync(join(tmpdir(), 'lhci-prod-route-'));
     const configPath = join(workRoot, 'lighthouserc.json');
     const reportsDir = join(webRoot, '.lighthouseci');
@@ -365,7 +395,11 @@ export function createPnpmRouteAttemptExecutor({
       const reportFiles = listLhrFiles(reportsDir).map(name =>
         join(reportsDir, name)
       );
-      return { ...result, reportFiles };
+      const reportDiscovery =
+        reportFiles.length === numberOfRuns
+          ? undefined
+          : `Lighthouse report discovery found ${reportFiles.length}/${numberOfRuns} lhr-*.json reports in ${reportsDir}; directory contains: ${describeReportsDirectory(reportsDir)}`;
+      return { ...result, reportFiles, reportDiscovery };
     } finally {
       rmSync(workRoot, { force: true, recursive: true });
     }

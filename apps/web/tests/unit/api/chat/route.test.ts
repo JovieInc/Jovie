@@ -261,7 +261,7 @@ vi.mock('@/lib/ai/tools/voice-promo', () => ({
 }));
 
 vi.mock('@/lib/chat/releases', () => ({
-  fetchReleasesForChat: vi.fn(),
+  fetchReleaseCatalogForChat: vi.fn().mockResolvedValue({ releases: [] }),
 }));
 
 vi.mock('@/lib/chat/release-writes', () => ({

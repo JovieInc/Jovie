@@ -38,7 +38,7 @@ describe('MysteryReleasePage', () => {
     );
 
     expect(screen.getByText('Reveals In')).toBeVisible();
-    expect(screen.getByText('days')).toBeVisible();
+    expect(screen.getByText('Days')).toBeVisible();
     expect(container.querySelector('svg.lucide-audio-lines')).toBeTruthy();
     expect(screen.queryByRole('img', { name: /artwork/ })).toBeNull();
     const artist = screen.getByRole('link', { name: 'Tim White' });

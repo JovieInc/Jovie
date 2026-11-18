@@ -1,3 +1,5 @@
+// Collected by this registered census suite, without another CI test entry.
+import './retained-surface-evidence.cases.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

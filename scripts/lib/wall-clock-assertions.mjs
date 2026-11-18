@@ -6,8 +6,43 @@
 // budget belongs in a `*.perf.test.*` file, which gating suites exclude and
 // the non-blocking perf lane runs.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import ts from 'typescript';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The parser is not a top-level import: source admission runs a copy of this
+// file from a temp archive, and Node resolves packages from that copy. An
+// installed checkout (cwd package.json) still supplies typescript. A
+// scripts-only archive has neither and the caller skips the elapsed scan.
+let ts;
+let comparisons;
+
+function resolveTypescript() {
+  const attempts = [fileURLToPath(import.meta.url)];
+  const pkg = join(process.cwd(), 'package.json');
+  if (existsSync(pkg)) attempts.push(pkg);
+  let last;
+  for (const from of attempts) {
+    try {
+      return createRequire(from)('typescript');
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw last;
+}
+
+function ensureParser() {
+  if (ts) return;
+  ts = resolveTypescript();
+  comparisons = new Set([
+    ts.SyntaxKind.LessThanToken,
+    ts.SyntaxKind.LessThanEqualsToken,
+    ts.SyntaxKind.GreaterThanToken,
+    ts.SyntaxKind.GreaterThanEqualsToken,
+  ]);
+}
 
 export const PERF_FILE = /\.perf\.test\.|(^|\/)test_[^/]*_perf\.py$/;
 export const TEST_FILE =
@@ -29,13 +64,6 @@ const MATCHERS = new Set([
   'toBeGreaterThan',
   'toBeGreaterThanOrEqual',
 ]);
-const COMPARISONS = new Set([
-  ts.SyntaxKind.LessThanToken,
-  ts.SyntaxKind.LessThanEqualsToken,
-  ts.SyntaxKind.GreaterThanToken,
-  ts.SyntaxKind.GreaterThanEqualsToken,
-]);
-
 function containsClock(node) {
   if (!node) return false;
   if (ts.isIdentifier(node) && DURATION_NAME.test(node.text)) return true;
@@ -54,7 +82,7 @@ function containsTimedComparison(node) {
   if (!node) return false;
   if (
     ts.isBinaryExpression(node) &&
-    COMPARISONS.has(node.operatorToken.kind) &&
+    comparisons.has(node.operatorToken.kind) &&
     (containsClock(node.left) || containsDuration(node.right))
   )
     return true;
@@ -112,6 +140,7 @@ export function findWallClockAssertions(source, file = 'x.test.mjs') {
   }
   // Parse executable calls, not quoted fixtures or comments. The parser also
   // owns statement boundaries, including wrapping and semicolon-free code.
+  ensureParser();
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false);
   const assertions = [];
   const directives = new Map();

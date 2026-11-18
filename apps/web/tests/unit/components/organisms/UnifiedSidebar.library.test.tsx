@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -29,6 +30,7 @@ import {
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
+import { dashboardData } from './unified-sidebar-dashboard-data';
 
 const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
@@ -115,46 +117,6 @@ vi.mock('@/components/organisms/SidebarDockBridge', () => ({
     );
   },
 }));
-
-const dashboardData: DashboardData = {
-  user: { id: 'user_123' },
-  creatorProfiles: [
-    {
-      id: 'profile_123',
-      avatarUrl: null,
-      displayName: 'Tim White',
-      username: 'timwhite',
-      usernameNormalized: 'timwhite',
-    } as DashboardData['creatorProfiles'][number],
-  ],
-  selectedProfile: {
-    id: 'profile_123',
-    avatarUrl: null,
-    displayName: 'Tim White',
-    username: 'timwhite',
-    usernameNormalized: 'timwhite',
-  } as DashboardData['selectedProfile'],
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: false,
-  tippingStats: {
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 6,
-    steps: [],
-    profileIsLive: false,
-  },
-};
 
 function LibrarySidebarOverride({
   children,
@@ -405,14 +367,22 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('keeps the unified user panel available on settings routes', () => {
+  it('removes only the duplicate Settings account menu while preserving dock and profile access', async () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.SETTINGS,
       section: 'settings',
     });
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
 
     const panel = screen.getByTestId('sidebar-user-panel');
-    expect(panel).toContainElement(screen.getByTestId('user-button'));
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-whats-new')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('sidebar-now-playing-bridge')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
@@ -578,6 +548,30 @@ describe('UnifiedSidebar library route', () => {
     expect(stagedCluster?.className).not.toContain(
       'group-data-[collapsible=icon]:hidden'
     );
+  });
+
+  it('renders bell and rail toggle from one header actions contract in the brand row', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+    const brandRow = toggle.closest('[data-sidebar-brand-row]');
+    const toggleSlot = toggle.closest('[data-sidebar-header-toggle-slot]');
+    expect(toggleSlot).not.toBeNull();
+    expect(brandRow?.contains(toggleSlot ?? null)).toBe(true);
+
+    const bell = screen.getByRole('link', { name: /^Inbox/ });
+    expect(bell.closest('[data-sidebar-header-actions]')?.contains(bell)).toBe(
+      true
+    );
+    // Bell and toggle share the same 28px box so the header reads as one row.
+    for (const control of [bell, toggle]) {
+      expect(control).toHaveClass('size-7', 'rounded-md', 'focus-ring-themed');
+    }
   });
 
   it.each([

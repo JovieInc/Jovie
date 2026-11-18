@@ -16,6 +16,7 @@ import {
   DOGFOOD_GATE_CLOSED,
   type DogfoodGateResult,
 } from './cold/dogfood-gate';
+import { type ColdQueueDraftContext, coldQueueDraft } from './cold/queue-draft';
 import type {
   OutboundBand,
   OutboundChannel,
@@ -231,6 +232,8 @@ export function buildOutboundRow(input: {
   readonly now: Date;
   /** Null explicitly disables the feature; missing evidence always closes it. */
   readonly dogfoodGate?: DogfoodGateResult | null;
+  readonly coldDraftEnabled?: boolean;
+  readonly coldDraftContext?: ColdQueueDraftContext | null;
 }): Omit<OutboundRow, 'rank'> {
   const { facts, target } = input;
   const approval = resolveOutboundApproval(target, input.ledger);
@@ -246,36 +249,62 @@ export function buildOutboundRow(input: {
   if (basis === 'unscored') flags.push('unscored');
   if (basis === 'presence_only') flags.push('presence_only_fit');
   const missing = missingEvidence(facts);
-  const gate =
-    input.dogfoodGate === null
-      ? null
-      : (input.dogfoodGate ?? DOGFOOD_GATE_CLOSED);
-  // A relationship hold shows as held, with its reason, whatever the judge says.
-  const view =
-    gate && !gate.passed && !approval.relationshipHold
-      ? 'needs_judge'
-      : classify(facts, approval, flags, missing);
   const saved = approval.latestCopy?.channel;
   // A saved draft keeps its channel only while its recipient is on file.
   const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
+  const gate =
+    input.dogfoodGate === null &&
+    !(input.coldDraftEnabled && channel === 'email')
+      ? null
+      : (input.dogfoodGate ?? DOGFOOD_GATE_CLOSED);
+  // A relationship hold shows as held, with its reason, whatever the judge says.
+  let view =
+    gate && !gate.passed && !approval.relationshipHold
+      ? 'needs_judge'
+      : classify(facts, approval, flags, missing);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
   // No cold draft exists for an artist Tim already works with.
   const message =
     approval.relationshipHold || (gate && !gate.passed)
       ? null
-      : approval.latestCopy
-        ? approval.latestCopy
-        : channel && target.claimUrl
-          ? {
-              ...draftOutboundCopy({
-                channel,
-                displayName: name,
-                claimUrl: target.claimUrl,
-                dmCopy: facts.dmCopy,
-              }),
-              revision: null,
-            }
-          : null;
+      : input.coldDraftEnabled && channel === 'email'
+        ? facts.certified
+          ? coldQueueDraft(
+              target,
+              input.coldDraftContext,
+              approval.latestCopy,
+              input.now
+            )
+          : null
+        : approval.latestCopy
+          ? approval.latestCopy.channel === channel
+            ? approval.latestCopy
+            : null
+          : channel && target.claimUrl
+            ? {
+                ...draftOutboundCopy({
+                  channel,
+                  displayName: name,
+                  claimUrl: target.claimUrl,
+                  dmCopy: facts.dmCopy,
+                }),
+                revision: null,
+              }
+            : null;
+  if (
+    input.coldDraftEnabled &&
+    channel === 'email' &&
+    !message &&
+    view !== 'needs_judge'
+  ) {
+    flags.push('cold_draft_unavailable');
+    if (
+      ['ready', 'certified', 'approved', 'flagged', 'needs_evidence'].includes(
+        view
+      )
+    )
+      view = 'flagged';
+  }
   return {
     leadId: facts.id,
     dedupeKey: input.dedupeKey,
