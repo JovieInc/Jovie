@@ -44,7 +44,7 @@ export function OutboundRailFact({
         {name ? 'Name on record' : item.label}
       </p>
       <p className='break-words text-xs text-secondary-token'>
-        {item.value || 'Not available'}
+        {item.value || 'No value recorded'}
       </p>
       {suggested && suggested !== item.value ? (
         <p className='break-words text-xs text-secondary-token'>

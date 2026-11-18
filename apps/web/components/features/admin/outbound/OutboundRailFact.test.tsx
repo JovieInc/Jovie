@@ -62,7 +62,7 @@ describe('OutboundRailFact', () => {
     value => {
       const onDecision = vi.fn();
       renderFact({ item: { ...item, value }, onDecision });
-      expect(screen.getByText(value || 'Not available')).toBeVisible();
+      expect(screen.getByText(value || 'No value recorded')).toBeVisible();
       if (!value)
         expect(
           screen.queryByText(/Suggested display:/)
