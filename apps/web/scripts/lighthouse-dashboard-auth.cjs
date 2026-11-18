@@ -294,11 +294,19 @@ function collectOnly({
       rmSync(path.join(lhciDir, name));
     }
   }
+  // Run the installed workspace CLI directly for each head/base collection.
+  let lhciBin;
+  try {
+    const manifest = require.resolve('@lhci/cli/package.json');
+    lhciBin = path.resolve(path.dirname(manifest), require(manifest).bin.lhci);
+  } catch {
+    console.error('Could not resolve the installed @lhci/cli executable.');
+    return 1;
+  }
   const collected = spawnSync(
-    'pnpm',
+    process.execPath,
     [
-      'exec',
-      'lhci',
+      lhciBin,
       'collect',
       `--config=${config}`,
       `--chromePath=${chromePath}`,
@@ -328,8 +336,8 @@ function collectOnly({
   // Same filesystem dump `lhci autorun` makes, for the report summary step
   // and the uploaded artifact.
   const uploaded = spawnSync(
-    'pnpm',
-    ['exec', 'lhci', 'upload', `--config=${config}`],
+    process.execPath,
+    [lhciBin, 'upload', `--config=${config}`],
     { cwd: webRoot, env, stdio: 'inherit' }
   );
   return uploaded.status ?? 1;

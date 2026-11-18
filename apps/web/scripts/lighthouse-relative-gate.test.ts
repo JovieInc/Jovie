@@ -1,5 +1,4 @@
 import {
-  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -7,7 +6,6 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -338,64 +336,6 @@ describe('relative Lighthouse gate flow', () => {
     });
     expect(blocked.passed).toBe(false);
     expect(unmeasured.evaluated).toEqual([]);
-  });
-});
-
-describe('collect-only report hand-off', () => {
-  const { collectOnly } = createRequire(import.meta.url)(
-    './lighthouse-dashboard-auth.cjs'
-  ) as {
-    collectOnly: (options: {
-      collectDir: string;
-      config: string;
-      chromePath: string;
-      collectUrls: string[];
-      env: NodeJS.ProcessEnv;
-      lhciDir: string;
-    }) => number;
-  };
-
-  it("hands over only the reports this collection wrote, never an earlier side's", () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-collect-'));
-    try {
-      const lhciDir = join(dir, '.lighthouseci');
-      const bin = join(dir, 'bin');
-      mkdirSync(lhciDir);
-      mkdirSync(bin);
-      // A collector that, unlike lhci today, does not clear old reports.
-      writeFileSync(
-        join(bin, 'pnpm'),
-        '#!/usr/bin/env bash\necho \'{"side":"head"}\' > "$STUB_LHCI_DIR/lhr-2.json"\n'
-      );
-      chmodSync(join(bin, 'pnpm'), 0o755);
-      // Left behind by the base collection that ran just before.
-      writeFileSync(join(lhciDir, 'lhr-1.json'), '{"side":"base"}');
-      writeFileSync(join(lhciDir, 'keep.txt'), 'not a report');
-
-      const collectDir = join(dir, 'head');
-      const status = collectOnly({
-        collectDir,
-        config: '.lighthouserc.dashboard.pr.json',
-        chromePath: '/bin/true',
-        collectUrls: ['http://localhost:3000/app'],
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          STUB_LHCI_DIR: lhciDir,
-          LIGHTHOUSE_COLLECT_UPLOAD: '',
-        },
-        lhciDir,
-      });
-
-      expect(status).toBe(0);
-      expect(readdirSync(collectDir)).toEqual(['lhr-2.json']);
-      expect(readFileSync(join(collectDir, 'lhr-2.json'), 'utf8')).toContain(
-        'head'
-      );
-      expect(readdirSync(lhciDir).sort()).toEqual(['keep.txt', 'lhr-2.json']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });
 

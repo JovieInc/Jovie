@@ -929,7 +929,7 @@ jobs:
           [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
           [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
-          node --input-type=module -e '
+          source_guard_program="$(cat <<'SOURCE_GUARDS'
             import { spawnSync } from "node:child_process";
             import { randomUUID } from "node:crypto";
             const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
@@ -951,7 +951,9 @@ jobs:
               if (code !== 0 && exitCode === 0) exitCode = code;
             }
             process.exitCode = exitCode;
-          '
+          SOURCE_GUARDS
+          )"
+          node --input-type=module -e "$source_guard_program"
       - name: Restore exact source head after merged guards
         if: matrix.shard == '4/4' && (always() && steps.source_guard_merge.outputs.restore_head == 'true')
         id: source_guard_restore
