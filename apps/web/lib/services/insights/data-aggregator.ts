@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import {
   computeCaptureRate,
   computeRatePercent,
@@ -13,10 +13,10 @@ import {
 } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { tourDates } from '@/lib/db/schema/tour';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import type { GeoCount, MetricSnapshot } from '@/types/insights';
 import { DEFAULT_PERIOD_DAYS } from './thresholds';
+import { aggregateTourData } from './tour-data';
 
 type AggregateValue = string | number | null;
 type JsonArray<T> = T[] | string | null;
@@ -120,7 +120,7 @@ export async function aggregateMetrics(
     aggregateAudience(creatorProfileId, period, comparisonPeriod),
     aggregateSubscribers(creatorProfileId, period, comparisonPeriod),
     aggregateRevenue(creatorProfileId, period, comparisonPeriod),
-    aggregateTourData(creatorProfileId, period),
+    aggregateTourData(creatorProfileId),
     fetchProfileContext(creatorProfileId),
     aggregateReleases(creatorProfileId, period),
     aggregateTemporalPatterns(creatorProfileId, period),
@@ -630,48 +630,6 @@ export async function aggregateRevenue(
       countCurrent > 0 ? Math.round(totalCurrent / countCurrent) : 0,
     averageTipPrevious:
       countPrevious > 0 ? Math.round(totalPrevious / countPrevious) : 0,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Tour data aggregation
-// ---------------------------------------------------------------------------
-
-interface TourAggregateResult {
-  upcomingShows: {
-    city: string;
-    country: string;
-    date: string;
-    venueName: string;
-  }[];
-}
-
-async function aggregateTourData(
-  profileId: string,
-  period: { start: Date; end: Date }
-): Promise<TourAggregateResult> {
-  const now = new Date();
-  const upcoming = await db
-    .select({
-      city: tourDates.city,
-      country: tourDates.country,
-      startDate: tourDates.startDate,
-      venueName: tourDates.venueName,
-    })
-    .from(tourDates)
-    .where(
-      and(eq(tourDates.profileId, profileId), gte(tourDates.startDate, now))
-    )
-    .orderBy(tourDates.startDate)
-    .limit(20);
-
-  return {
-    upcomingShows: upcoming.map(s => ({
-      city: s.city,
-      country: s.country,
-      date: s.startDate.toISOString(),
-      venueName: s.venueName,
-    })),
   };
 }
 

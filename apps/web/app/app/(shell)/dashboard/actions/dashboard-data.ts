@@ -499,6 +499,7 @@ async function loadInboxNavigationAvailability(
           .where(
             and(
               eq(tourDates.profileId, profileId),
+              eq(tourDates.eventType, 'tour'),
               eq(tourDates.confirmationStatus, 'pending')
             )
           ),

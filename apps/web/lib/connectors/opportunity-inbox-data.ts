@@ -167,6 +167,7 @@ export async function loadOpportunityInboxTourDateSections(
         .where(
           and(
             eq(tourDates.profileId, profileId),
+            eq(tourDates.eventType, 'tour'),
             eq(tourDates.confirmationStatus, 'pending')
           )
         )
@@ -178,6 +179,7 @@ export async function loadOpportunityInboxTourDateSections(
         .where(
           and(
             eq(tourDates.profileId, profileId),
+            eq(tourDates.eventType, 'tour'),
             eq(tourDates.confirmationStatus, 'confirmed'),
             gte(tourDates.startDate, now)
           )
@@ -190,6 +192,7 @@ export async function loadOpportunityInboxTourDateSections(
         .where(
           and(
             eq(tourDates.profileId, profileId),
+            eq(tourDates.eventType, 'tour'),
             eq(tourDates.confirmationStatus, 'rejected')
           )
         )

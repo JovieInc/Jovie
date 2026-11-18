@@ -201,6 +201,18 @@ describe('consumer opportunity storage boundary', () => {
     expect(result.pending.map(item => item.id)).toEqual(['date-1']);
     expect(result.confirmed).toEqual([]);
   });
+  it('keeps private non-tour events out of every tour-date section', async () => {
+    mocks.limit.mockResolvedValue([]);
+    await loadOpportunityInboxTourDateSections('profile-1');
+
+    expect(mocks.where).toHaveBeenCalledTimes(3);
+    for (const [condition] of mocks.where.mock.calls) {
+      const query = new PgDialect().sqlToQuery(condition);
+      expect(query.sql).toContain('"tour_dates"."event_type" =');
+      expect(query.params).toContain('tour');
+    }
+  });
+
   it('marks successfully checked empty date sections as available', async () => {
     mocks.limit.mockResolvedValue([]);
     expect(
