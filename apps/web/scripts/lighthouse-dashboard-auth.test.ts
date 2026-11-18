@@ -10,9 +10,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectOnly } from './lighthouse-dashboard-auth.cjs';
 
 const require = createRequire(import.meta.url);
+// Use the native loader in both dashboard suites so V8 tracks one CJS module.
+const { collectOnly } =
+  require('./lighthouse-dashboard-auth.cjs') as typeof import('./lighthouse-dashboard-auth.cjs');
 const manifestPath = require.resolve('@lhci/cli/package.json');
 const manifest = require(manifestPath) as { bin: { lhci?: string } };
 const config = '.lighthouserc.dashboard.pr.json';
