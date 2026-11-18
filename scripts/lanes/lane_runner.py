@@ -6293,6 +6293,10 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "When both sides import different modules of the same extracted helpers,",
                    "split_helper_import.resolve_split_helper_conflict keeps main's identical",
                    "definitions and the head-only names. Unknown hunks stay unresolved.",
+                   "When both sides bind different names in `const { names } = await expr;`,",
+                   "fix_red_source_edits.resolve_complementary_destructure_text keeps main's",
+                   "names, then head-only names, and unions the trailing statements.",
+                   "Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
