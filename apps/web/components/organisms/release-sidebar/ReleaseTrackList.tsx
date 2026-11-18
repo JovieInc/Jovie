@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight, Pause, Play } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
@@ -324,7 +325,7 @@ function TrackListRow({
       )}
       data-testid={`release-track-row-${track.id}`}
     >
-      <button
+      <PlainButton
         type='button'
         onClick={handleTogglePlayback}
         disabled={!playableUrl && !isActiveTrack}
@@ -341,10 +342,10 @@ function TrackListRow({
         data-testid={`release-track-control-${track.id}`}
       >
         {trackButtonContent}
-      </button>
+      </PlainButton>
 
       {onSelect ? (
-        <button
+        <PlainButton
           type='button'
           onClick={onSelect}
           className='group/track-open flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left transition-[color,background-color] duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
@@ -356,7 +357,7 @@ function TrackListRow({
             className='h-3.5 w-3.5 shrink-0 text-quaternary-token opacity-0 transition-opacity duration-subtle group-hover/track-open:opacity-100'
             aria-hidden='true'
           />
-        </button>
+        </PlainButton>
       ) : (
         <div className='min-w-0 flex-1'>{titleNode}</div>
       )}
