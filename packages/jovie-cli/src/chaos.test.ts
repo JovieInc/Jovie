@@ -33,8 +33,8 @@ import {
   timeoutFromEnv,
   unsupportedNodeMessage,
 } from './cli.js';
-import { closedPipeListener } from './closed-pipe.js';
 import type { FetchImplementation } from './client.js';
+import { closedPipeListener } from './closed-pipe.js';
 import { installSkill, resolveSkillsDir } from './init.js';
 import { SKILL_MD } from './skill.js';
 
