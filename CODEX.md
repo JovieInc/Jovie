@@ -6,6 +6,21 @@ delegates to `scripts/setup.sh`. The wrapper selects the source-pinned Node
 runtime from nvm when already installed, including in non-interactive desktop
 hook shells. Current pins are Node 24.22.3 and pnpm 9.15.9.
 
+## Initial clone
+
+The Codex Symphony `after_create` hook in `WORKFLOW.md` uses
+`git clone --filter=blob:none git@github.com:JovieInc/Jovie.git .`.
+It retains complete commit/tree ancestry, checks out the current tree, and
+fetches older blobs on demand. It does not use shallow history or sparse
+checkout, so the existing setup and offline-first frozen pnpm install still
+see the full working tree. Existing desktop worktrees share their source
+clone's objects; the setup hooks do not clone again.
+
+This coding checkout is not a substitute for a full-blob security scan store.
+Security Evidence retains its unfiltered head/base ancestry fetch and rejects
+promisor stores: TruffleHog's internal local clone needs readable ancestry
+beyond the diff's blobs. Its missing-object proof must pass before scanning.
+
 ## Desktop worktrees and hooks
 
 `.codex/config.toml` enables `features.hooks`. `.codex/hooks.json` runs setup
