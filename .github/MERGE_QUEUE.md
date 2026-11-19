@@ -69,9 +69,11 @@ an early `PR Ready` commit status, and no job in `ci.yml` holds `statuses: write
 JOV-13106 ports LogYourBody's event-driven cancellation: every required lane in
 `ci-merge-group-ready.needs` has a `merge-group-cancel-<lane>` companion that
 depends only on that lane and runs on `merge_group && failure()`. A reusable
-workflow has only `actions: write`, no checkout or head code, and one
-`gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"` step. It cancels this
-run, while `ci-merge-group-supersede` retains its separate older-run behavior.
+workflow has `actions: write` and `contents: read` only to check out the
+trusted default-branch cancel helper (`packages/api-client/cancel-github-run.mjs`),
+never the merge-group head, and then cancels `GITHUB_RUN_ID`. A raw `gh run
+cancel` call site would grow the shrink-only external API ratchet. It cancels
+this run, while `ci-merge-group-supersede` retains its separate older-run behavior.
 Green groups make no cancel calls. Concurrent failures can start multiple cancel
 requests; the first wins. The completed failing lane keeps its logs and
 annotations; in-progress lanes retain partial logs and a second failure's

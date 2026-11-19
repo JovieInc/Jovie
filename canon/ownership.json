@@ -73,6 +73,7 @@
     {"id": "workflow:marketing-certification-producer", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/marketing-certification-producer.yml"},
     {"id": "workflow:main-red-eject", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/main-red-eject.yml"},
     {"id": "workflow:merge-group-dead-run-sweep", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/merge-group-dead-run-sweep.yml"},
+    {"id": "workflow:merge-group-fail-fast", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/merge-group-fail-fast.yml", "note": "JOV-13106. Event-driven cancel of the same merge-group run after a required lane fails; owned with CI."},
     {"id": "workflow:merge-queue-green-enroll", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/merge-queue-green-enroll.yml"},
     {"id": "workflow:merge-queue-ruleset-verify", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/merge-queue-ruleset-verify.yml"},
     {"id": "workflow:mutation-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/mutation-diff.yml"},

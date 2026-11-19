@@ -189,14 +189,14 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
       ({ job }) => job === 'merge-group-fail-fast/cancel'
     );
     expect(cancel.step.run).toBe(
-      'gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"'
+      'node packages/api-client/cancel-github-run.mjs'
     );
     for (const [id, job] of Object.entries(CI.jobs)) {
       if (!id.startsWith('merge-group-cancel-')) continue;
       expect(job.if).toBe(
         "${{ github.event_name == 'merge_group' && failure() }}"
       );
-      expect(job.permissions).toEqual({ actions: 'write' });
+      expect(job.permissions).toEqual({ actions: 'write', contents: 'read' });
     }
   });
   it('classifies every token-bearing step except failure-only ejection', () => {

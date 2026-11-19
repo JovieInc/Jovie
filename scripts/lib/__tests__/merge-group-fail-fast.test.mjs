@@ -51,29 +51,55 @@ describe('merge-group required lanes cancel only their own run', () => {
         name: `Merge Group Fail Fast (${lane})`,
         needs: [lane],
         if: "${{ github.event_name == 'merge_group' && failure() }}",
-        permissions: { actions: 'write' },
+        permissions: { actions: 'write', contents: 'read' },
         uses: './.github/workflows/merge-group-fail-fast.yml',
       });
       expect(lanes).not.toContain(id);
     }
   });
 
-  it('uses a single five-minute cancel step with no checkout, inputs, or status credential', () => {
+  it('cancels only this run via a trusted default-branch helper, never the merge-group head', () => {
     expect(CANCEL.on).toEqual({ workflow_call: null });
-    expect(CANCEL.permissions).toEqual({ actions: 'write' });
+    expect(CANCEL.permissions).toEqual({
+      actions: 'write',
+      contents: 'read',
+    });
     expect(Object.keys(CANCEL.jobs)).toEqual(['cancel']);
     expect(CANCEL.jobs.cancel).toEqual({
       'runs-on': 'ubuntu-latest',
       'timeout-minutes': 5,
-      permissions: { actions: 'write' },
+      permissions: { actions: 'write', contents: 'read' },
       steps: [
+        {
+          name: 'Check out the trusted cancel helper',
+          uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+          with: {
+            ref: '${{ github.event.repository.default_branch }}',
+            'sparse-checkout': 'packages/api-client/cancel-github-run.mjs',
+            'persist-credentials': false,
+          },
+        },
         {
           name: 'Cancel the rest of this merge-group run',
           env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' },
-          run: 'gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"',
+          run: 'node packages/api-client/cancel-github-run.mjs',
         },
       ],
     });
+    const helper = readFileSync(
+      resolve(ROOT, 'packages/api-client/cancel-github-run.mjs'),
+      'utf8'
+    );
+    expect(helper).toContain('GITHUB_RUN_ID');
+    expect(helper).toContain('/actions/runs/${runId}/cancel');
+    expect(helper).not.toMatch(/process\.argv/);
+    expect(CI_TEXT).not.toMatch(/gh\s+run\s+cancel/);
+    expect(
+      readFileSync(
+        resolve(ROOT, '.github/workflows/merge-group-fail-fast.yml'),
+        'utf8'
+      )
+    ).not.toMatch(/gh\s+run\s+cancel/);
   });
 
   it('still fails PR Ready when the merge group is red', () => {

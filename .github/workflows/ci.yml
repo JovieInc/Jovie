@@ -8401,189 +8401,189 @@ jobs:
     name: Merge Group Fail Fast (ci-path-changes)
     needs: [ci-path-changes]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-merge-group-admission:
     name: Merge Group Fail Fast (ci-merge-group-admission)
     needs: [ci-merge-group-admission]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-risk-classifier:
     name: Merge Group Fail Fast (ci-risk-classifier)
     needs: [ci-risk-classifier]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-fast:
     name: Merge Group Fail Fast (ci-fast)
     needs: [ci-fast]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-blog-content:
     name: Merge Group Fail Fast (ci-blog-content)
     needs: [ci-blog-content]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-unit-tests:
     name: Merge Group Fail Fast (ci-unit-tests)
     needs: [ci-unit-tests]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-exact-head-coverage:
     name: Merge Group Fail Fast (ci-exact-head-coverage)
     needs: [ci-exact-head-coverage]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-build-layout:
     name: Merge Group Fail Fast (ci-build-layout)
     needs: [ci-build-layout]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-build-ovie:
     name: Merge Group Fail Fast (ci-build-ovie)
     needs: [ci-build-ovie]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-typecheck-ovie:
     name: Merge Group Fail Fast (ci-typecheck-ovie)
     needs: [ci-typecheck-ovie]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-storybook-surfaces:
     name: Merge Group Fail Fast (ci-storybook-surfaces)
     needs: [ci-storybook-surfaces]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-ios:
     name: Merge Group Fail Fast (ci-ios)
     needs: [ci-ios]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-macos:
     name: Merge Group Fail Fast (ci-macos)
     needs: [ci-macos]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-cross-product-integration:
     name: Merge Group Fail Fast (ci-cross-product-integration)
     needs: [ci-cross-product-integration]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-product-lane-receipt:
     name: Merge Group Fail Fast (ci-product-lane-receipt)
     needs: [ci-product-lane-receipt]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-promptfoo-evals:
     name: Merge Group Fail Fast (ci-promptfoo-evals)
     needs: [ci-promptfoo-evals]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-golden-eval-set:
     name: Merge Group Fail Fast (ci-golden-eval-set)
     needs: [ci-golden-eval-set]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-secret-scan:
     name: Merge Group Fail Fast (ci-secret-scan)
     needs: [ci-secret-scan]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-golden-path-lock:
     name: Merge Group Fail Fast (ci-golden-path-lock)
     needs: [ci-golden-path-lock]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-visual-snapshot-compare:
     name: Merge Group Fail Fast (ci-visual-snapshot-compare)
     needs: [ci-visual-snapshot-compare]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-visual-snapshot-homepage:
     name: Merge Group Fail Fast (ci-visual-snapshot-homepage)
     needs: [ci-visual-snapshot-homepage]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-visual-marketing-dom:
     name: Merge Group Fail Fast (ci-visual-marketing-dom)
     needs: [ci-visual-marketing-dom]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-visual-marketing-routes:
     name: Merge Group Fail Fast (ci-visual-marketing-routes)
     needs: [ci-visual-marketing-routes]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-drizzle-migration-guard:
     name: Merge Group Fail Fast (drizzle-migration-guard)
     needs: [drizzle-migration-guard]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-neon-db:
     name: Merge Group Fail Fast (neon-db)
     needs: [neon-db]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-lighthouse-dashboard-pr:
     name: Merge Group Fail Fast (ci-lighthouse-dashboard-pr)
     needs: [ci-lighthouse-dashboard-pr]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   merge-group-cancel-ci-lighthouse-onboarding-pr:
     name: Merge Group Fail Fast (ci-lighthouse-onboarding-pr)
     needs: [ci-lighthouse-onboarding-pr]
     if: ${{ github.event_name == 'merge_group' && failure() }}
-    permissions: { actions: write }
+    permissions: { actions: write, contents: read }
     uses: ./.github/workflows/merge-group-fail-fast.yml
 
   # Cancellation may conclude PR Ready as cancelled before it starts. That is
