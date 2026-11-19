@@ -159,7 +159,7 @@ describe('revoked session with a still-valid cookie', () => {
           limit: async () => [
             {
               id: AUDIT_EVENT_ID,
-              flagKey: 'SPOTIFY_OAUTH',
+              flagKey: 'MERCH_MVP',
               envTier: 'prod',
               previousValue: false,
             },
@@ -216,7 +216,7 @@ describe('revoked session with a still-valid cookie', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          flagKey: 'SPOTIFY_OAUTH',
+          flagKey: 'MERCH_MVP',
           envTier: 'prod',
           enabled: true,
           reason: 'revoked-cookie regression',

@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   admission: vi.fn(),
   handleAvailability: vi.fn(),
   catalogPreview: vi.fn(),
-  valueBeforePaywall: vi.fn(),
   profileByUsername: vi.fn(),
   creatorName: vi.fn(),
   dbUpdate: vi.fn(),
@@ -58,7 +57,6 @@ vi.mock('@/lib/onboarding/reserved-handle', () => ({
 }));
 vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
   fetchOnboardingCatalogPreview: mocks.catalogPreview,
-  isValueBeforePaywallEnabled: mocks.valueBeforePaywall,
 }));
 vi.mock('@/lib/services/profile/queries', () => ({
   getProfileByUsername: mocks.profileByUsername,
@@ -297,7 +295,6 @@ describe('get_qualification', () => {
 
 describe('build_profile', () => {
   it('attaches the value-before-paywall catalog preview for Spotify drafts', async () => {
-    mocks.valueBeforePaywall.mockReturnValue(true);
     mocks.catalogPreview.mockResolvedValue({
       total: 12,
       releases: [
@@ -321,12 +318,11 @@ describe('build_profile', () => {
     expect(result.next_action).toBe('get_qualification');
   });
 
-  it('stays identity-only when the preview is disabled or unreachable', async () => {
-    mocks.valueBeforePaywall.mockReturnValue(false);
+  it('stays identity-only when the preview is unreachable', async () => {
     mocks.catalogPreview.mockResolvedValue(null);
     const result: Record<string, unknown> = await buildProfile(REF);
     expect(result.catalog).toBeNull();
-    expect(result.value_enabled).toBe(false);
+    expect(result.value_enabled).toBe(true);
   });
 });
 

@@ -154,18 +154,6 @@ const GATED_SETTINGS_ROUTE_FILES = [
     expectedGate: 'routeContext.dashboardData.isAdmin',
     expectedDestination: 'APP_ROUTES.SETTINGS_PROFILE',
   },
-  {
-    route: 'settings payments',
-    filePath: findSourceFile(
-      resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
-      resolve(
-        process.cwd(),
-        'apps/web/app/app/(shell)/settings/payments/page.tsx'
-      )
-    ),
-    expectedGate: 'getAppFlagValue',
-    expectedDestination: 'APP_ROUTES.SETTINGS_BILLING',
-  },
 ] as const;
 
 describe('settings shell normalization', () => {

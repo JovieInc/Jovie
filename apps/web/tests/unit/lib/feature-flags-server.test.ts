@@ -175,20 +175,12 @@ describe('Statsig server initialization', () => {
     const { checkGateForUser } = await import('@/lib/flags/statsig');
 
     await expect(
-      checkGateForUser(
-        'user-1',
-        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
-        true
-      )
+      checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.MERCH_MVP, true)
     ).resolves.toBe(true);
     // A failed init is not retried on every request: wait out the cooldown.
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(
-      checkGateForUser(
-        'user-2',
-        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
-        true
-      )
+      checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.MERCH_MVP, true)
     ).resolves.toBe(true);
 
     expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
@@ -259,7 +251,7 @@ describe('Statsig server initialization', () => {
 
       const result = checkGateForUser(
         'user-1',
-        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
+        LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
         true
       );
 
@@ -301,11 +293,7 @@ describe('Statsig server initialization', () => {
       );
 
       await expect(
-        checkGateForUser(
-          'user-1',
-          LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
-          false
-        )
+        checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.MERCH_MVP, false)
       ).resolves.toBe(true);
 
       shutdownMock.mockReturnValueOnce(new Promise(() => {}));
@@ -321,11 +309,7 @@ describe('Statsig server initialization', () => {
       expect(shutdownMock).toHaveBeenCalledWith();
 
       await expect(
-        checkGateForUser(
-          'user-2',
-          LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
-          false
-        )
+        checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.MERCH_MVP, false)
       ).resolves.toBe(true);
       expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
     } finally {
@@ -340,7 +324,7 @@ describe('Statsig server initialization', () => {
       name === 'jovie_app_flag_overrides'
         ? {
             value: encodeURIComponent(
-              JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
+              JSON.stringify({ 'code:MERCH_MVP': true })
             ),
           }
         : undefined
@@ -353,7 +337,7 @@ describe('Statsig server initialization', () => {
     const run = vi.fn().mockResolvedValue(false);
     vi.doMock('@/lib/flags/registry', () => ({
       APP_FLAG_REGISTRY: {
-        SPOTIFY_OAUTH: { run },
+        MERCH_MVP: { run },
       },
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
@@ -364,7 +348,7 @@ describe('Statsig server initialization', () => {
     }));
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
-    await expect(getAppFlagValue('SPOTIFY_OAUTH')).resolves.toBe(false);
+    await expect(getAppFlagValue('MERCH_MVP')).resolves.toBe(false);
     expect(run).toHaveBeenCalledTimes(1);
   });
 
@@ -378,7 +362,7 @@ describe('Statsig server initialization', () => {
     const run = vi.fn().mockResolvedValue(false);
     vi.doMock('@/lib/flags/registry', () => ({
       APP_FLAG_REGISTRY: {
-        SPOTIFY_OAUTH: { run },
+        MERCH_MVP: { run },
       },
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
@@ -390,7 +374,7 @@ describe('Statsig server initialization', () => {
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(
-      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+      getAppFlagValue('MERCH_MVP', { userId: 'admin_123' })
     ).resolves.toBe(true);
     expect(mockIsAdmin).toHaveBeenCalledWith('admin_123');
     expect(run).not.toHaveBeenCalled();
@@ -565,7 +549,7 @@ describe('Statsig server initialization', () => {
       name === 'jovie_app_flag_overrides'
         ? {
             value: encodeURIComponent(
-              JSON.stringify({ 'code:SPOTIFY_OAUTH': false })
+              JSON.stringify({ 'code:MERCH_MVP': false })
             ),
           }
         : undefined
@@ -577,7 +561,7 @@ describe('Statsig server initialization', () => {
 
     const run = vi.fn().mockResolvedValue(true);
     vi.doMock('@/lib/flags/registry', () => ({
-      APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+      APP_FLAG_REGISTRY: { MERCH_MVP: { run } },
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
       },
@@ -589,7 +573,7 @@ describe('Statsig server initialization', () => {
     const { getAppFlagValue } = await import('@/lib/flags/server');
     // Personal override (false) wins even over admin-default-true.
     await expect(
-      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+      getAppFlagValue('MERCH_MVP', { userId: 'admin_123' })
     ).resolves.toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
@@ -607,23 +591,21 @@ describe('Statsig server initialization', () => {
         process.env.VERCEL_ENV = 'production';
       }
       mockIsAdmin.mockResolvedValue(admin);
-      mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: false });
+      mockGetFlagOverrideMap.mockResolvedValue({ MERCH_MVP: false });
       mockCookiesGet.mockReturnValue({
-        value: encodeURIComponent(
-          JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
-        ),
+        value: encodeURIComponent(JSON.stringify({ 'code:MERCH_MVP': true })),
       });
       vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
       const run = vi.fn().mockResolvedValue(true);
       vi.doMock('@/lib/flags/registry', () => ({
-        APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+        APP_FLAG_REGISTRY: { MERCH_MVP: { run } },
         SUBSCRIBE_CTA_VARIANT_FLAG: { run: vi.fn() },
         PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
       }));
 
       const { getAppFlagValue } = await import('@/lib/flags/server');
       await expect(
-        getAppFlagValue('SPOTIFY_OAUTH', {
+        getAppFlagValue('MERCH_MVP', {
           userId: admin ? 'admin_123' : 'user_123',
         })
       ).resolves.toBe(false);
@@ -638,16 +620,16 @@ describe('Statsig server initialization', () => {
     process.env.VERCEL_ENV = 'production';
     mockIsAdmin.mockResolvedValue(true);
     mockGetFlagOverrideMap
-      .mockResolvedValueOnce({ SPOTIFY_OAUTH: false })
-      .mockResolvedValueOnce({ SPOTIFY_OAUTH: true });
+      .mockResolvedValueOnce({ MERCH_MVP: false })
+      .mockResolvedValueOnce({ MERCH_MVP: true });
     vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(
-      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+      getAppFlagValue('MERCH_MVP', { userId: 'admin_123' })
     ).resolves.toBe(false);
     await expect(
-      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+      getAppFlagValue('MERCH_MVP', { userId: 'admin_123' })
     ).resolves.toBe(true);
     expect(mockGetFlagOverrideMap).toHaveBeenCalledTimes(2);
   });
@@ -656,17 +638,15 @@ describe('Statsig server initialization', () => {
     vi.stubEnv('NODE_ENV', 'production');
     process.env.VERCEL_ENV = 'production';
     mockIsAdmin.mockResolvedValue(true);
-    mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
+    mockGetFlagOverrideMap.mockResolvedValue({ MERCH_MVP: true });
     mockCookiesGet.mockReturnValue({
-      value: encodeURIComponent(
-        JSON.stringify({ 'code:SPOTIFY_OAUTH': false })
-      ),
+      value: encodeURIComponent(JSON.stringify({ 'code:MERCH_MVP': false })),
     });
     vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(
-      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+      getAppFlagValue('MERCH_MVP', { userId: 'admin_123' })
     ).resolves.toBe(false);
   });
 
@@ -676,7 +656,7 @@ describe('Statsig server initialization', () => {
       vi.stubEnv('NODE_ENV', 'production');
       process.env.VERCEL_ENV = 'production';
       if (store === 'enabled') {
-        mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
+        mockGetFlagOverrideMap.mockResolvedValue({ MERCH_MVP: true });
       } else {
         mockGetFlagOverrideMap.mockRejectedValue(
           new Error('store unavailable')
@@ -685,14 +665,14 @@ describe('Statsig server initialization', () => {
       vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
       const run = vi.fn().mockResolvedValue(false);
       vi.doMock('@/lib/flags/registry', () => ({
-        APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+        APP_FLAG_REGISTRY: { MERCH_MVP: { run } },
         SUBSCRIBE_CTA_VARIANT_FLAG: { run: vi.fn() },
         PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
       }));
 
       const { getAppFlagValue } = await import('@/lib/flags/server');
       await expect(
-        getAppFlagValue('SPOTIFY_OAUTH', { userId: 'user_123' })
+        getAppFlagValue('MERCH_MVP', { userId: 'user_123' })
       ).resolves.toBe(store === 'enabled');
       expect(run).toHaveBeenCalledTimes(store === 'enabled' ? 0 : 1);
     }

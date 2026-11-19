@@ -10,9 +10,6 @@ import { renderWithQueryClient } from '../utils/test-utils';
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
   useFeatureFlag: vi.fn(),
-  FEATURE_FLAGS: {
-    BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
-  },
 }));
 
 const { pushMock } = vi.hoisted(() => ({
@@ -139,19 +136,6 @@ describe('Billing Components', () => {
       mockUseFeatureFlag.mockReturnValue(false);
       renderWithQueryClient(<UpgradeButton>Custom Upgrade Text</UpgradeButton>);
       expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
-    });
-
-    it('redirects to pricing when direct checkout is disabled', async () => {
-      mockUseFeatureFlag.mockReturnValue(false);
-
-      renderWithQueryClient(<UpgradeButton />);
-      const button = screen.getByRole('button');
-
-      fireEvent.click(button);
-
-      await waitFor(() => {
-        expect(pushMock).toHaveBeenCalledWith('/pricing');
-      });
     });
 
     it('loads canonical pricing and checks out when the caller omits priceId', async () => {

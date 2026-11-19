@@ -9,7 +9,6 @@ import { UpgradeButton } from './UpgradeButton';
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   track: vi.fn(),
-  directUpgrade: { current: false },
   pricing: {
     current: {
       data: {
@@ -44,7 +43,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/analytics', () => ({
   track: mocks.track,
-  useFeatureFlag: () => mocks.directUpgrade.current,
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -55,7 +53,6 @@ vi.mock('@/lib/queries', () => ({
 describe('UpgradeButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.directUpgrade.current = false;
     mocks.pricing.current = {
       data: {
         options: [
@@ -97,22 +94,7 @@ describe('UpgradeButton', () => {
     ).toBeInTheDocument();
   });
 
-  it('sends the user to pricing when direct upgrade is off', () => {
-    render(<UpgradeButton priceId='price_123' />);
-
-    fireEvent.click(screen.getByRole('button'));
-
-    expect(mocks.push).toHaveBeenCalledWith('/pricing');
-    expect(mocks.mutation.current.mutate).not.toHaveBeenCalled();
-    expect(mocks.track).toHaveBeenCalledWith('upgrade_button_clicked', {
-      flow_type: 'pricing_page',
-      price_id: 'price_123',
-      feature_flag_enabled: false,
-    });
-  });
-
   it('resolves the canonical monthly price without making callers supply one', () => {
-    mocks.directUpgrade.current = true;
     render(<UpgradeButton />);
 
     fireEvent.click(screen.getByRole('button'));
@@ -127,7 +109,6 @@ describe('UpgradeButton', () => {
   it.each(['month', 'year'] as const)(
     'selects the %s lock without blocking an uncovered interval',
     interval => {
-      mocks.directUpgrade.current = true;
       const month = {
         amountCents: 900,
         currency: 'usd',
@@ -170,7 +151,6 @@ describe('UpgradeButton', () => {
   );
 
   it('starts direct checkout for the price when direct upgrade is on', () => {
-    mocks.directUpgrade.current = true;
     render(<UpgradeButton priceId='price_123' />);
 
     fireEvent.click(screen.getByRole('button'));
@@ -190,7 +170,6 @@ describe('UpgradeButton', () => {
   });
 
   it('tracks a failed direct checkout with the error message', () => {
-    mocks.directUpgrade.current = true;
     render(<UpgradeButton priceId='price_123' />);
     fireEvent.click(screen.getByRole('button'));
 
@@ -246,7 +225,6 @@ describe('UpgradeButton', () => {
     expect(screen.getByText('Failed to start checkout')).toBeInTheDocument();
   });
   it('waits for pricing and fails closed when the canonical price is unavailable', () => {
-    mocks.directUpgrade.current = true;
     mocks.pricing.current = {
       data: { options: [] },
       isPending: true,
@@ -270,7 +248,6 @@ describe('UpgradeButton', () => {
   });
 
   it('allows a retry after failure but never starts two concurrent checkouts', () => {
-    mocks.directUpgrade.current = true;
     render(<UpgradeButton />);
     fireEvent.click(screen.getByRole('button'));
     fireEvent.click(screen.getByRole('button'));
@@ -284,7 +261,6 @@ describe('UpgradeButton', () => {
     expect(mocks.mutation.current.mutate).toHaveBeenCalledTimes(2);
   });
   it('releases checkout ownership when the browser restores a page after leaving Stripe', () => {
-    mocks.directUpgrade.current = true;
     render(<UpgradeButton />);
     fireEvent.click(screen.getByRole('button'));
     const restored = new Event('pageshow');
@@ -295,7 +271,6 @@ describe('UpgradeButton', () => {
     expect(mocks.mutation.current.mutate).toHaveBeenCalledTimes(2);
   });
   it('composes a named button, preserves its click signal, and locks only during checkout', () => {
-    mocks.directUpgrade.current = true;
     const onClick = vi.fn();
     const control = (
       <UpgradeButton asChild>

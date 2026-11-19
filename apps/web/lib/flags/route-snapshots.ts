@@ -4,7 +4,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { AppFlagName } from './contracts';
 
 const SHELL_CHROME_FLAG_NAMES = [
-  'STRIPE_CONNECT_ENABLED',
   'YOUTUBE_WORKSPACE_NAV',
   'JOVIE_WORK_NAV',
 ] as const satisfies readonly AppFlagName[];
@@ -61,22 +60,6 @@ function isDashboardProfileRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.DASHBOARD_PROFILE);
 }
 
-function isProfileSettingsRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS_PROFILE);
-}
-
-function isDashboardSectionRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.LEGACY_DASHBOARD);
-}
-
-function needsAppleWalletProfilePassFlag(pathname: string | null): boolean {
-  return (
-    isChatShellRoute(pathname) ||
-    (isDashboardSectionRoute(pathname) && !isChatShellRoute(pathname)) ||
-    isProfileSettingsRoute(pathname)
-  );
-}
-
 function needsChatJankMonitorFlag(pathname: string | null): boolean {
   return isChatShellRoute(pathname) || isDashboardProfileRoute(pathname);
 }
@@ -101,10 +84,6 @@ export function resolveAppShellRouteFlagNames(
 
   if (isReleasePlanRoute(pathname)) {
     flagNames.add('RELEASE_PLAN_DEMO');
-  }
-
-  if (needsAppleWalletProfilePassFlag(pathname)) {
-    flagNames.add('APPLE_WALLET_PROFILE_PASS');
   }
 
   return [...flagNames];

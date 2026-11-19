@@ -79,9 +79,9 @@ conflation is the point of the canonical action.
 ### 1d. `POST /api/onboarding/welcome-chat` — post-signup welcome conversation
 
 - **Path:** `apps/web/app/api/onboarding/welcome-chat/route.ts:33`
-- **What:** Bootstraps the first authenticated conversation: reuses latest conversation, claims the anonymous onboarding conversation (by `sessionId`), or creates one with a generated welcome message; seeds presence-build queue behind flag.
+- **What:** Bootstraps the first authenticated conversation: reuses latest conversation, claims the anonymous onboarding conversation (by `sessionId`), or creates one with a generated welcome message; seeds the presence-build queue.
 - **Validation:** manual — `initialReply` ≤2000 chars.
-- **Entitlement/flags:** `getAppFlagValue('ONBOARDING_WOW_TASK_QUEUE')` only; no plan/quota check.
+- **Entitlement/flags:** none; no plan/quota check.
 - **Idempotency:** `SELECT ... FOR UPDATE` profile row lock inside `withDbSessionTx` + reuse/claim semantics; last-message equality check before appending `initialReply`. No idempotency key.
 - **Errors:** `{ success:boolean, error? }`; 400/404/500; 200 reused / 201 created.
 - **Adapter:** web route, called from `apps/web/app/app/(shell)/chat/ChatPageClient.tsx:694`.

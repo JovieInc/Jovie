@@ -28,21 +28,17 @@ describe('route flag snapshots', () => {
       APP_ROUTES.LEGACY_FEATURE_FLAGS,
     ]) {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
-        expect.arrayContaining([
-          'STRIPE_CONNECT_ENABLED',
-          'YOUTUBE_WORKSPACE_NAV',
-          'JOVIE_WORK_NAV',
-        ])
+        expect.arrayContaining(['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'])
       );
     }
   });
 
   it('adds route-specific flags only where client consumers need them', () => {
     expect(resolveAppShellRouteFlagNames(APP_ROUTES.DASHBOARD)).toEqual(
-      expect.arrayContaining(['CHAT_JANK_MONITOR', 'APPLE_WALLET_PROFILE_PASS'])
+      expect.arrayContaining(['CHAT_JANK_MONITOR'])
     );
     expect(resolveAppShellRouteFlagNames(APP_ROUTES.CHAT)).toEqual(
-      expect.arrayContaining(['CHAT_JANK_MONITOR', 'APPLE_WALLET_PROFILE_PASS'])
+      expect.arrayContaining(['CHAT_JANK_MONITOR'])
     );
     expect(resolveAppShellRouteFlagNames(APP_ROUTES.CHAT)).not.toContain(
       'ALBUM_ART_GENERATION'
@@ -61,10 +57,6 @@ describe('route flag snapshots', () => {
 
     expect(resolveAppShellRouteFlagNames(APP_ROUTES.DASHBOARD_PROFILE)).toEqual(
       expect.arrayContaining(['CHAT_JANK_MONITOR'])
-    );
-
-    expect(resolveAppShellRouteFlagNames(APP_ROUTES.SETTINGS_PROFILE)).toEqual(
-      expect.arrayContaining(['APPLE_WALLET_PROFILE_PASS'])
     );
   });
 

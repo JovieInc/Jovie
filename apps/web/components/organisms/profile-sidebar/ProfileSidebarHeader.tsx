@@ -8,7 +8,6 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { getQrCodeDataUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 import { getProfileModePath } from '@/features/profile/registry';
-import { useAppFlag } from '@/lib/flags/client';
 import { downloadBlob } from '@/lib/utils/download';
 import {
   isAppleWalletPassSupportedClient,
@@ -70,7 +69,6 @@ export function useProfileHeaderParts({
   showOpenAction = true,
   onQrDownloadError,
 }: Readonly<UseProfileHeaderPartsProps>): UseProfileHeaderResult {
-  const appleWalletEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
   const [supportsAppleWallet, setSupportsAppleWallet] = useState(false);
   const resolvedProfilePath =
     profilePath.trim().length > 0
@@ -142,7 +140,7 @@ export function useProfileHeaderParts({
     });
   }
 
-  if (appleWalletEnabled && supportsAppleWallet) {
+  if (supportsAppleWallet) {
     overflowActions.push({
       id: 'apple-wallet-profile-pass',
       label: 'Add To Apple Wallet',

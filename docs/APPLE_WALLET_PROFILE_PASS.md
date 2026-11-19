@@ -6,10 +6,7 @@ Jovie owns the first-party Apple Wallet profile pass stack: pass serials, signin
 
 The iOS/mobile pass API is available when the user is authenticated, the profile
 is complete, and Apple Wallet signing config is present. It is not gated by a
-Statsig rollout flag.
-
-The web dashboard may still use the `APPLE_WALLET_PROFILE_PASS` app flag to hide
-or show web-only Wallet affordances while those surfaces are iterated.
+Statsig rollout flag, and the web dashboard Wallet affordances are permanent.
 
 ## Environment
 

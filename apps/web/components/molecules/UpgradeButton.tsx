@@ -3,7 +3,6 @@
 import { Button, type ButtonProps } from '@jovie/ui';
 import { Slot } from '@radix-ui/react-slot';
 import { Rocket } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import {
   cloneElement,
   isValidElement,
@@ -12,8 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
-import { track, useFeatureFlag } from '@/lib/analytics';
+import { track } from '@/lib/analytics';
 import {
   getArtistPresenceMonthlyPrice,
   normalizeUpgradeReturnTo,
@@ -39,14 +37,10 @@ export function UpgradeButton({
   size = 'md',
   priceId,
 }: UpgradeButtonProps) {
-  const router = useRouter();
   const checkoutMutation = useCheckoutMutation();
 
-  // Check if direct upgrade is enabled
-  const directUpgradeEnabled = useFeatureFlag('BILLING_UPGRADE_DIRECT');
-
   const pricing = usePricingOptionsQuery({
-    enabled: directUpgradeEnabled && !priceId,
+    enabled: !priceId,
   });
   const resolvedPriceId =
     priceId ||
@@ -71,73 +65,62 @@ export function UpgradeButton({
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (checkoutStarted.current || checkoutMutation.isPending) return;
-    if (directUpgradeEnabled && !resolvedPriceId) return;
+    if (!resolvedPriceId) return;
     // Track upgrade button click
     track('upgrade_button_clicked', {
-      flow_type:
-        directUpgradeEnabled && resolvedPriceId
-          ? 'direct_checkout'
-          : 'pricing_page',
+      flow_type: 'direct_checkout',
       price_id: resolvedPriceId || null,
-      feature_flag_enabled: directUpgradeEnabled,
+      feature_flag_enabled: true,
     });
 
-    if (directUpgradeEnabled && resolvedPriceId) {
-      // Direct checkout flow - skip pricing page
-      track('checkout_initiated', {
-        flow_type: 'direct',
-        price_id: resolvedPriceId,
-      });
+    // Direct checkout flow - skip pricing page
+    track('checkout_initiated', {
+      flow_type: 'direct',
+      price_id: resolvedPriceId,
+    });
 
-      checkoutStarted.current = true;
-      setIsRedirecting(true);
-      checkoutMutation.mutate(
-        {
-          priceId: resolvedPriceId,
-          source: 'in_app',
-          returnTo: normalizeUpgradeReturnTo(
-            globalThis.location.pathname + globalThis.location.search
-          ),
+    checkoutStarted.current = true;
+    setIsRedirecting(true);
+    checkoutMutation.mutate(
+      {
+        priceId: resolvedPriceId,
+        source: 'in_app',
+        returnTo: normalizeUpgradeReturnTo(
+          globalThis.location.pathname + globalThis.location.search
+        ),
+      },
+      {
+        onSuccess: data => {
+          track('checkout_redirect', {
+            flow_type: 'direct',
+            price_id: resolvedPriceId,
+          });
+          // Redirect to Stripe checkout
+          globalThis.location.href = data.url;
         },
-        {
-          onSuccess: data => {
-            track('checkout_redirect', {
-              flow_type: 'direct',
-              price_id: resolvedPriceId,
-            });
-            // Redirect to Stripe checkout
-            globalThis.location.href = data.url;
-          },
-          onError: error => {
-            checkoutStarted.current = false;
-            setIsRedirecting(false);
-            const errorMessage =
-              error instanceof Error
-                ? error.message
-                : 'Failed to create checkout session';
-            track('checkout_failed', {
-              flow_type: 'direct',
-              price_id: resolvedPriceId,
-              error: errorMessage,
-            });
-          },
-        }
-      );
-    } else {
-      // Traditional flow - redirect to pricing
-      track('pricing_page_redirect', {
-        flow_type: 'traditional',
-      });
-      router.push(APP_ROUTES.PRICING);
-    }
+        onError: error => {
+          checkoutStarted.current = false;
+          setIsRedirecting(false);
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : 'Failed to create checkout session';
+          track('checkout_failed', {
+            flow_type: 'direct',
+            price_id: resolvedPriceId,
+            error: errorMessage,
+          });
+        },
+      }
+    );
   };
 
   const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : size;
   const isLoading =
     isRedirecting ||
     checkoutMutation.isPending ||
-    (directUpgradeEnabled && !priceId && pricing.isPending);
-  const unavailable = directUpgradeEnabled && !resolvedPriceId && !isLoading;
+    (!priceId && pricing.isPending);
+  const unavailable = !resolvedPriceId && !isLoading;
   const error = checkoutMutation.error;
   const statusId = useId();
   const unavailableMessage = 'Checkout is unavailable. Please try again later.';

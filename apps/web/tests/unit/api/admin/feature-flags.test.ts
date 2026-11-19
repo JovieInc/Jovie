@@ -39,7 +39,7 @@ describe('POST /api/admin/feature-flags', () => {
     );
 
     const res = await POST(
-      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'prod', enabled: true })
+      request({ flagKey: 'MERCH_MVP', envTier: 'prod', enabled: true })
     );
 
     expect(res.status).toBe(403);
@@ -67,7 +67,7 @@ describe('POST /api/admin/feature-flags', () => {
 
   it('rejects an invalid env tier', async () => {
     const res = await POST(
-      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'qa', enabled: true })
+      request({ flagKey: 'MERCH_MVP', envTier: 'qa', enabled: true })
     );
     expect(res.status).toBe(400);
     expect(mockWriteFlagOverride).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe('POST /api/admin/feature-flags', () => {
   it('rejects an over-long reason', async () => {
     const res = await POST(
       request({
-        flagKey: 'SPOTIFY_OAUTH',
+        flagKey: 'MERCH_MVP',
         envTier: 'prod',
         enabled: true,
         reason: 'x'.repeat(501),
@@ -89,7 +89,7 @@ describe('POST /api/admin/feature-flags', () => {
   it('writes the override with actor and reason on a valid write', async () => {
     const res = await POST(
       request({
-        flagKey: 'SPOTIFY_OAUTH',
+        flagKey: 'MERCH_MVP',
         envTier: 'prod',
         enabled: false,
         reason: 'Investigating elevated Spotify errors',
@@ -100,12 +100,12 @@ describe('POST /api/admin/feature-flags', () => {
     expect(res.status).toBe(200);
     expect(data).toMatchObject({
       ok: true,
-      flagKey: 'SPOTIFY_OAUTH',
+      flagKey: 'MERCH_MVP',
       envTier: 'prod',
       enabled: false,
     });
     expect(mockWriteFlagOverride).toHaveBeenCalledWith({
-      flagKey: 'SPOTIFY_OAUTH',
+      flagKey: 'MERCH_MVP',
       envTier: 'prod',
       enabled: false,
       actor: 'admin_123',
@@ -115,12 +115,12 @@ describe('POST /api/admin/feature-flags', () => {
 
   it('accepts null to clear a cell back to the code default', async () => {
     const res = await POST(
-      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'dev', enabled: null })
+      request({ flagKey: 'MERCH_MVP', envTier: 'dev', enabled: null })
     );
     expect(res.status).toBe(200);
     expect(mockWriteFlagOverride).toHaveBeenCalledWith(
       expect.objectContaining({
-        flagKey: 'SPOTIFY_OAUTH',
+        flagKey: 'MERCH_MVP',
         envTier: 'dev',
         enabled: null,
         reason: undefined,
@@ -131,7 +131,7 @@ describe('POST /api/admin/feature-flags', () => {
   it('returns 500 when the write fails so the UI can revert', async () => {
     mockWriteFlagOverride.mockRejectedValue(new Error('db down'));
     const res = await POST(
-      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'prod', enabled: true })
+      request({ flagKey: 'MERCH_MVP', envTier: 'prod', enabled: true })
     );
     expect(res.status).toBe(500);
   });

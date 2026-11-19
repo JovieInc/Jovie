@@ -7,7 +7,6 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   createRateLimitHeaders,
@@ -61,12 +60,8 @@ export async function GET(req: NextRequest) {
           : eq(creatorProfiles.username, parsed.data.handle.toLowerCase())
       )
       .limit(1);
-    const stripeConnectEnabled = await getAppFlagValue(
-      'STRIPE_CONNECT_ENABLED'
-    );
     const available = Boolean(
       profile?.isPublic &&
-        stripeConnectEnabled &&
         profile.stripeAccountId &&
         profile.stripePayoutsEnabled
     );
@@ -202,16 +197,8 @@ export async function POST(req: NextRequest) {
       cancel_url: `${baseUrl}/${handle}/tip`,
     };
 
-    const stripeConnectEnabled = await getAppFlagValue(
-      'STRIPE_CONNECT_ENABLED'
-    );
-
     // Fail closed so an unavailable creator account never routes fan money to Jovie.
-    if (
-      !stripeConnectEnabled ||
-      !profile.stripeAccountId ||
-      !profile.stripePayoutsEnabled
-    ) {
+    if (!profile.stripeAccountId || !profile.stripePayoutsEnabled) {
       return NextResponse.json(
         { error: 'This artist cannot accept card payments yet' },
         { status: 409, headers: NO_STORE_HEADERS }

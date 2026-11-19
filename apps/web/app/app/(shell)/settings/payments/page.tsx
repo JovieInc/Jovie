@@ -1,8 +1,6 @@
-import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { loadAppShellRouteContext } from '../../app-shell-route-context';
 
 export const runtime = 'nodejs';
@@ -17,14 +15,6 @@ export default async function SettingsPaymentsPage() {
   });
   if (!routeContext.ok) {
     return routeContext.error;
-  }
-
-  const isStripeConnectEnabled = await getAppFlagValue(
-    'STRIPE_CONNECT_ENABLED',
-    { userId: routeContext.userId }
-  );
-  if (!isStripeConnectEnabled) {
-    redirect(APP_ROUTES.SETTINGS_BILLING);
   }
 
   return (

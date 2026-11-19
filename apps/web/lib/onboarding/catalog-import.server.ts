@@ -11,7 +11,6 @@ import { captureError } from '@/lib/error-tracking';
 import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { scheduleAfter } from '@/lib/next/schedule-after';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { isValueBeforePaywallEnabled } from './catalog-preview.server';
 
 const DSP_DISCOVERY_PROVIDERS = [
   'apple_music',
@@ -111,12 +110,11 @@ export async function runOnboardingCatalogImport(
  * Schedule the import after the claim response (Vercel `after()`), so the
  * chat turn stays fast while the catalog lands in the background. The
  * preview already shows the live Spotify catalog in the meantime.
- * Never throws; disabled by the JOV-9758 kill switch.
+ * Never throws.
  */
 export function scheduleOnboardingCatalogImport(
   input: OnboardingCatalogImportInput
 ): boolean {
-  if (!isValueBeforePaywallEnabled()) return false;
   scheduleAfter(async () => {
     try {
       await runOnboardingCatalogImport(input);

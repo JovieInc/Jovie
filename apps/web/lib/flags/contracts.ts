@@ -1,21 +1,16 @@
 import { DISCOVERABILITY_FLAGS } from './discoverability-defaults';
 
 export const LEGACY_STATSIG_GATE_KEYS = {
-  BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
-  SMARTLINK_PRE_SAVE: 'smartlink_pre_save_campaigns',
   IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   PROFILE_ALERT_OPTIN_EXPERIMENT: 'profile_alert_optin_cta_variant',
   PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT: 'profile_pac_variant_slots',
-  SPOTIFY_OAUTH: 'feature_spotify_oauth',
-  STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   MERCH_MVP: 'merch_mvp',
   BULK_PRESS_PHOTO_IMPORT: 'bulk_press_photo_import',
-  APPLE_WALLET_PROFILE_PASS: 'apple_wallet_profile_pass',
   TELEPROMPTER_RECORDING: 'teleprompter_recording',
   TELEPROMPTER_SHOWCASE_EXPERIMENT: 'experiment_teleprompter_showcase',
 } as const;
@@ -32,11 +27,7 @@ export interface StatsigFeatureFlagsBootstrap {
 
 export const APP_FLAG_DEFAULTS = {
   ...DISCOVERABILITY_FLAGS,
-  BILLING_UPGRADE_DIRECT: true,
-  SMARTLINK_PRE_SAVE: true,
   IOS_APPLE_MUSIC_PRIORITY: true,
-  SPOTIFY_OAUTH: true,
-  STRIPE_CONNECT_ENABLED: true,
   PLAYLIST_ENGINE: true,
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: true,
@@ -50,15 +41,9 @@ export const APP_FLAG_DEFAULTS = {
   AI_CONNECTORS_BETA: true,
   MERCH_MVP: true,
   BULK_PRESS_PHOTO_IMPORT: true,
-  APPLE_WALLET_PROFILE_PASS: true,
   TELEPROMPTER_RECORDING: true,
   /** Provider-runner stop control; health, scheduling and spend budgets also apply. */
   PROFILE_SEARCH_MONITORING: false,
-  /**
-   * Post-signup wow-moment: seed real presence-build tasks into workflow_runs
-   * and stream tool artifacts in the welcome chat (JOV-3988). Kill-switchable.
-   */
-  ONBOARDING_WOW_TASK_QUEUE: true,
   /**
    * Paid-subscription fulfillment confirmation email (JOV-6445).
    * Default OFF. Approvals-policy-v1: Tim must publish this flag on
@@ -93,11 +78,7 @@ export type PartialAppFlagSnapshot = Partial<Record<AppFlagName, boolean>>;
 export const APP_FLAG_KEYS = {
   YOUTUBE_WORKSPACE_NAV: 'youtube_workspace_nav',
   JOVIE_WORK_NAV: 'jovie_work_nav',
-  BILLING_UPGRADE_DIRECT: LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT,
-  SMARTLINK_PRE_SAVE: LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-  SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
-  STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   PLAYLIST_ENGINE: 'playlist_engine',
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
@@ -106,10 +87,8 @@ export const APP_FLAG_KEYS = {
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
-  APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
   TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
-  ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
@@ -121,11 +100,7 @@ export const APP_FLAG_KEYS = {
 export const APP_FLAG_OVERRIDE_KEYS = {
   YOUTUBE_WORKSPACE_NAV: 'code:YOUTUBE_WORKSPACE_NAV',
   JOVIE_WORK_NAV: 'code:JOVIE_WORK_NAV',
-  BILLING_UPGRADE_DIRECT: 'code:BILLING_UPGRADE_DIRECT',
-  SMARTLINK_PRE_SAVE: 'code:SMARTLINK_PRE_SAVE',
   IOS_APPLE_MUSIC_PRIORITY: 'code:IOS_APPLE_MUSIC_PRIORITY',
-  SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
-  STRIPE_CONNECT_ENABLED: 'code:STRIPE_CONNECT_ENABLED',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
@@ -134,10 +109,8 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   AI_CONNECTORS_BETA: 'code:AI_CONNECTORS_BETA',
   MERCH_MVP: 'code:MERCH_MVP',
   BULK_PRESS_PHOTO_IMPORT: 'code:BULK_PRESS_PHOTO_IMPORT',
-  APPLE_WALLET_PROFILE_PASS: 'code:APPLE_WALLET_PROFILE_PASS',
   TELEPROMPTER_RECORDING: 'code:TELEPROMPTER_RECORDING',
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
-  ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
@@ -147,16 +120,11 @@ export const APP_FLAG_OVERRIDE_KEYS = {
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
-  BILLING_UPGRADE_DIRECT: LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT,
-  SMARTLINK_PRE_SAVE: LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-  SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
-  STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
   AI_CONNECTORS_BETA: LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA,
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
-  APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
   TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
@@ -165,11 +133,7 @@ export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
 export const APP_FLAG_DESCRIPTIONS = {
   YOUTUBE_WORKSPACE_NAV: 'Cmd-K discovery of the YouTube workspace',
   JOVIE_WORK_NAV: 'Cmd-K discovery of autonomous work on your profile',
-  BILLING_UPGRADE_DIRECT: 'Direct billing upgrade (skip pricing page)',
-  SMARTLINK_PRE_SAVE: 'Spotify pre-save campaigns',
   IOS_APPLE_MUSIC_PRIORITY: 'Prefer Apple Music on iOS',
-  SPOTIFY_OAUTH: 'Spotify OAuth login',
-  STRIPE_CONNECT_ENABLED: 'Stripe Connect payouts',
   PLAYLIST_ENGINE: 'Playlist engine surfaces',
   ALBUM_ART_GENERATION: 'AI-generated release artwork via chat',
   CHAT_JANK_MONITOR:
@@ -182,14 +146,10 @@ export const APP_FLAG_DESCRIPTIONS = {
   MERCH_MVP: 'Jovie-owned merch creation, checkout, and Printful fulfillment',
   BULK_PRESS_PHOTO_IMPORT:
     'DSP bulk press-photo import after platform activation evidence passes',
-  APPLE_WALLET_PROFILE_PASS:
-    'First-party Apple Wallet profile pass for in-person sharing',
   TELEPROMPTER_RECORDING:
     'In-app teleprompter recording proposals and showcase interstitial',
   PROFILE_SEARCH_MONITORING:
     'Operational enable/stop control for Google search monitoring provider work',
-  ONBOARDING_WOW_TASK_QUEUE:
-    'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
   PAID_WELCOME_EMAIL:
     'Send one idempotent paid-welcome email after verified subscription entitlement. Default off — Tim publishes prod override and approves the first live send (JOV-6445).',
   AGENT_PROFILE_CREATE:
@@ -213,16 +173,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Remove when the YouTube navigation door is approved or retired.',
   JOVIE_WORK_NAV:
     'Remove when the autonomous work navigation door is approved or retired.',
-  BILLING_UPGRADE_DIRECT:
-    'Remove after direct checkout is the only supported upgrade path.',
-  SMARTLINK_PRE_SAVE:
-    'Remove after the pre-save fallback has no supported callers.',
   IOS_APPLE_MUSIC_PRIORITY:
     'Remove after Apple Music priority is the permanent iOS behavior.',
-  SPOTIFY_OAUTH:
-    'Remove after Spotify sign-in is either permanently supported or retired.',
-  STRIPE_CONNECT_ENABLED:
-    'Remove after payout operations have an independent incident stop control.',
   PLAYLIST_ENGINE:
     'Remove after the playlist engine fallback has no supported callers.',
   ALBUM_ART_GENERATION:
@@ -238,14 +190,10 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Remove after merch is generally available with an independent incident stop control.',
   BULK_PRESS_PHOTO_IMPORT:
     'Remove after activation evidence is the sole ingestion gate.',
-  APPLE_WALLET_PROFILE_PASS:
-    'Remove after Wallet passes are permanent or retired.',
   TELEPROMPTER_RECORDING:
     'Remove after recording is permanent and its experiment is concluded.',
   PROFILE_SEARCH_MONITORING:
     'Retain as the provider-work stop control alongside scheduler, health and spend budgets.',
-  ONBOARDING_WOW_TASK_QUEUE:
-    'Retain until task seeding has an independent queue incident stop control.',
   PAID_WELCOME_EMAIL:
     'Retain while external-recipient delivery requires a founder-controlled stop.',
   AGENT_PROFILE_CREATE:
@@ -319,7 +267,6 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate
   'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
-  'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate

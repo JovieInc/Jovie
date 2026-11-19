@@ -4,7 +4,6 @@ import { CODE_FLAGS, type CodeFlagName, isCodeFlagEnabled } from './code-flags';
 
 describe('code flags', () => {
   afterEach(() => {
-    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
     delete process.env.FEATURE_MUSICFETCH_FALLBACK;
   });
 
@@ -20,25 +19,10 @@ describe('code flags', () => {
     }
   });
 
-  it('honors FEATURE_<FLAG_NAME> env overrides', () => {
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
-    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
-    process.env.FEATURE_MUSICFETCH_FALLBACK = 'true';
-    expect(isCodeFlagEnabled('MUSICFETCH_FALLBACK')).toBe(true);
-  });
-
   it('defaults the final MusicFetch fallback switch off with an env rollback', () => {
     expect(CODE_FLAGS.MUSICFETCH_FALLBACK).toBe(false);
     process.env.FEATURE_MUSICFETCH_FALLBACK = 'true';
     expect(isCodeFlagEnabled('MUSICFETCH_FALLBACK')).toBe(true);
-  });
-
-  it('ships generic creator marketing copy on with an env kill switch', () => {
-    expect(CODE_FLAGS.MARKETING_GENERIC_CREATOR_NAV).toBe(true);
-    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(true);
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
-    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
-    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
   });
 
   it('keeps social HTML on an isolated provider flag that defaults off', () => {
@@ -55,12 +39,5 @@ describe('code flags', () => {
     process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED = 'true';
     expect(isCodeFlagEnabled('STRIPE_TEST_PRICE_CONFIGURED')).toBe(true);
     delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
-  });
-
-  it('ships value before paywall on with an env kill switch (JOV-9758)', () => {
-    expect(CODE_FLAGS.ONBOARDING_VALUE_BEFORE_PAYWALL).toBe(true);
-    process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL = 'false';
-    expect(isCodeFlagEnabled('ONBOARDING_VALUE_BEFORE_PAYWALL')).toBe(false);
-    delete process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL;
   });
 });

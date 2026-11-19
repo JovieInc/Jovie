@@ -26,13 +26,13 @@ vi.mock('@/lib/flags/contracts', () => ({
     CLAIM_HANDLE: 'code:CLAIM_HANDLE',
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
-    SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
+    MERCH_MVP: 'code:MERCH_MVP',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
-    SPOTIFY_OAUTH: false,
+    MERCH_MVP: false,
   },
 }));
 
@@ -543,7 +543,7 @@ describe('DevToolbar', () => {
     it('shows correct override count for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:SPOTIFY_OAUTH': true,
+        'code:MERCH_MVP': true,
       });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
@@ -734,7 +734,7 @@ describe('DevToolbar', () => {
     it('uses plural for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:SPOTIFY_OAUTH': true,
+        'code:MERCH_MVP': true,
       });
       renderToolbar();
 

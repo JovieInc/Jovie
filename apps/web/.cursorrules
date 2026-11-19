@@ -85,11 +85,11 @@ Jovie is a Next.js 15 application with Better Auth and Neon PostgreSQL. The proj
 import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
-  const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const merchEnabled = useAppFlag('MERCH_MVP');
 
   return (
     <div>
-      {stripeConnectEnabled && <PayoutsComponent />}
+      {merchEnabled && <BetaComponent />}
     </div>
   );
 }
@@ -97,7 +97,7 @@ export function MyComponent() {
 // Server-side usage:
 import { getAppFlagValue } from '@/lib/flags/server';
 
-const isEnabled = await getAppFlagValue('STRIPE_CONNECT_ENABLED', { userId });
+const isEnabled = await getAppFlagValue('MERCH_MVP', { userId });
 ```
 
 **Available app flags:** see `apps/web/lib/flags/contracts.ts`.
@@ -254,11 +254,11 @@ When changing auth:
 import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
-  const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const merchEnabled = useAppFlag('MERCH_MVP');
 
   return (
     <div>
-      {stripeConnectEnabled && <PayoutsComponent />}
+      {merchEnabled && <BetaComponent />}
     </div>
   );
 }

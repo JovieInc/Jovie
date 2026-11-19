@@ -1,4 +1,4 @@
-/** JOV-3988 presence-build queue; kill-switch ONBOARDING_WOW_TASK_QUEUE. */
+/** JOV-3988 presence-build queue. */
 
 export const ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND =
   'onboarding_presence_build' as const;

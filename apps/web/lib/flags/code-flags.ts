@@ -31,13 +31,6 @@ export const CODE_FLAGS = {
   // cross-DSP ladder before MusicFetch. Retained as a rollback-compatible
   // umbrella override while the family-specific flags soak independently.
   IN_HOUSE_RESOLVER: false,
-  // JOV-7580 / JOV-7579: generic creator marketing labels and the
-  // /smart-links hero. On: audience wording, with a release as the worked
-  // example. FEATURE_MARKETING_GENERIC_CREATOR_NAV=false is the kill switch
-  // back to the Music footer and the music smart-link headline. Does not
-  // certify smart links beyond music. Static pages pick this up at build
-  // time.
-  MARKETING_GENERIC_CREATOR_NAV: true,
   // gh-9869: v0 studio-session memory loop (creator tag photo → person/context → studio-session → approval-gated opportunity).
   MEMORY_STUDIO_SESSION_V0: true,
   // Final JOV-7323 vendor switch. Vendor-off becomes effective only after
@@ -46,11 +39,6 @@ export const CODE_FLAGS = {
   MUSICFETCH_FALLBACK: false,
   MUSIC_RESOLVER_PROVIDER_LINKS: false,
   MUSIC_RESOLVER_RELEASE_FACTS: false,
-  // JOV-9758: value before paywall. On: the onboarding preview shows the
-  // matched artist's real Spotify catalog, the materialized profile imports
-  // that catalog, and the upgrade page leads with it before the price.
-  // FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL=false is the kill switch.
-  ONBOARDING_VALUE_BEFORE_PAYWALL: true,
   // Better Auth dynamic client registration. Default off: Better Auth
   // discovery omits registration_endpoint and /oauth2/register stays closed.
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated

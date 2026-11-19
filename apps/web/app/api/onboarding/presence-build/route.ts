@@ -1,6 +1,5 @@
 /**
  * POST /api/onboarding/presence-build — advance one presence-build step (JOV-3988).
- * Kill-switch: ONBOARDING_WOW_TASK_QUEUE. Soft-degrades so chat never hard-fails.
  */
 
 import { and, desc, eq } from 'drizzle-orm';
@@ -10,7 +9,6 @@ import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import {
   advanceOnboardingPresenceBuild,
   ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND,
@@ -31,13 +29,6 @@ export async function POST() {
     });
     if (!profile) {
       return ok({ error: 'Profile not found' }, 404);
-    }
-
-    const enabled = await getAppFlagValue('ONBOARDING_WOW_TASK_QUEUE', {
-      userId: user.clerkId ?? user.id,
-    });
-    if (!enabled) {
-      return ok({ ok: true, disabled: true, done: true, advanced: false });
     }
 
     const [run] = await db

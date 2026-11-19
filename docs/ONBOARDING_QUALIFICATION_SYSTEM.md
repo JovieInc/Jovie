@@ -105,7 +105,7 @@ them. Checkout is one tap from the end of onboarding.
 ### 6. Realtime UI
 
 While the walk builds their profile, the artist sees it being built: the
-presence-build task queue (`ONBOARDING_WOW_TASK_QUEUE`) streams each finished
+presence-build task queue streams each finished
 piece into the chat. Views the artist pins persist; views the system creates
 are proposals until pinned.
 

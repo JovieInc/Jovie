@@ -15,7 +15,6 @@ import {
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
-import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { SettingsNavGroup } from './SettingsNavGroup';
@@ -74,7 +73,6 @@ export function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
-  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   const artistName = useArtistDisplayName();
   const [query, setQuery] = useState('');
   const { signOut } = useAuthSafe();
@@ -83,11 +81,9 @@ export function SettingsNavigation({
 
   const groups = useMemo(() => {
     const personal = [...userSettingsNavigation];
-    if (isStripeConnectEnabled) {
-      // Payments sits after Billing & Subscription.
-      const billingIndex = personal.findIndex(i => i.id === 'billing');
-      personal.splice(billingIndex + 1, 0, paymentsNavItem);
-    }
+    // Payments sits after Billing & Subscription.
+    const billingIndex = personal.findIndex(i => i.id === 'billing');
+    personal.splice(billingIndex + 1, 0, paymentsNavItem);
     // The Profile item carries the artist's display name when available.
     const artist = artistName
       ? artistSettingsNavigation.map(item =>
@@ -101,7 +97,7 @@ export function SettingsNavigation({
       ...group,
       items: group.items.filter(item => matchesSettingsSearch(item, query)),
     }));
-  }, [artistName, isStripeConnectEnabled, query]);
+  }, [artistName, query]);
 
   const hasResults = groups.some(group => group.items.length > 0);
 
