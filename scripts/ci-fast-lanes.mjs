@@ -879,6 +879,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
+  'scripts/linear-team-drift.test.mjs', // JOV-13101 team drift guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -996,6 +997,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
   'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
@@ -2789,8 +2791,7 @@ export async function runStructural(opts = {}) {
     'node --test .github/scripts/collect-quarantine-evidence.test.mjs',
     'node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs',
     'node --test .github/scripts/marketing-dom-workflow.test.mjs',
-    'node --test .github/scripts/update-quarantine.test.js',
-    'node --test scripts/lib/__tests__/flake-ledger.test.mjs scripts/lib/__tests__/ci-retry-classifier.test.mjs scripts/lib/__tests__/guard-test-network-guard.test.mjs scripts/propose-flip-quarantine.test.mjs',
+    'node --test .github/scripts/update-quarantine.test.js scripts/linear-team-drift.test.mjs scripts/lib/__tests__/flake-ledger.test.mjs scripts/lib/__tests__/guard-test-network-guard.test.mjs scripts/propose-flip-quarantine.test.mjs',
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,
     SCRIPT_CONTRACT_VITEST_COMMAND,
