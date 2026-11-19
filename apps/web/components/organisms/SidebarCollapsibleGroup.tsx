@@ -21,6 +21,8 @@ export interface SidebarCollapsibleGroupProps {
   readonly className?: string;
   readonly icon?: LucideIcon;
   readonly storageKey?: string;
+  readonly dismissOnEscape?: boolean;
+  readonly unmountWhenClosed?: boolean;
 }
 
 const SIDEBAR_GROUP_STORAGE_PREFIX = 'jovie:sidebar-section';
@@ -56,9 +58,13 @@ export function SidebarCollapsibleGroup({
   className,
   icon: GroupIcon,
   storageKey,
+  dismissOnEscape = false,
+  unmountWhenClosed = false,
 }: SidebarCollapsibleGroupProps) {
   const [open, setOpen] = useState<boolean>(defaultOpen);
   const hasLoadedStoredStateRef = useRef(false);
+  const groupRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const tooltip = useMemo(() => label, [label]);
 
@@ -80,11 +86,30 @@ export function SidebarCollapsibleGroup({
     setStoredOpen(storageKey, open);
   }, [open, storageKey]);
 
+  useEffect(() => {
+    if (!dismissOnEscape || !open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        !groupRef.current?.contains(document.activeElement)
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    globalThis.addEventListener('keydown', onKeyDown, true);
+    return () => globalThis.removeEventListener('keydown', onKeyDown, true);
+  }, [dismissOnEscape, open]);
+
   return (
-    <SidebarGroup className={cn('space-y-0', className)}>
+    <SidebarGroup ref={groupRef} className={cn('space-y-0', className)}>
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
+            ref={triggerRef}
             type='button'
             isActive={false}
             onClick={() => setOpen(value => !value)}
@@ -126,7 +151,9 @@ export function SidebarCollapsibleGroup({
         )}
       >
         <div className='overflow-hidden'>
-          <SidebarGroupContent className='mt-0'>{children}</SidebarGroupContent>
+          <SidebarGroupContent className='mt-0'>
+            {open || !unmountWhenClosed ? children : null}
+          </SidebarGroupContent>
         </div>
       </div>
     </SidebarGroup>
