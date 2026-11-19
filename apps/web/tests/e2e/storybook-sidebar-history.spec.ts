@@ -17,7 +17,7 @@ async function openHistory(
 
 test('desktop history is hidden on cold open and restores keyboard focus', async ({
   page,
-}) => {
+}, testInfo) => {
   const title = page.getByRole('link', {
     name: /Plan the full European summer/,
   });
@@ -29,7 +29,7 @@ test('desktop history is hidden on cold open and restores keyboard focus', async
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(title).toBeVisible();
   await expect(page.getByRole('link', { name: 'All chats' })).toBeVisible();
-  await page.screenshot({ path: '/tmp/jov-12958-desktop.png' });
+  await page.screenshot({ path: testInfo.outputPath('desktop.png') });
   await title.focus();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
@@ -56,7 +56,7 @@ test.describe('mobile', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
   test('touch opens history and Escape returns focus without closing the drawer', async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto(story('long-content-thread-titles'));
     await page.keyboard.press('Control+b');
     const trigger = page.getByRole('button', { name: 'Chat History' });
@@ -67,7 +67,7 @@ test.describe('mobile', () => {
       name: /Plan the full European summer/,
     });
     await expect(title).toBeVisible();
-    await page.screenshot({ path: '/tmp/jov-12958-mobile.png' });
+    await page.screenshot({ path: testInfo.outputPath('mobile.png') });
     await title.focus();
     await page.keyboard.press('Escape');
     await expect(trigger).toBeVisible();
