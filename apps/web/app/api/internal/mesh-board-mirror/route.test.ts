@@ -5,7 +5,8 @@ const { boardMock } = vi.hoisted(() => ({ boardMock: vi.fn() }));
 
 vi.mock('@vercel/board', () => ({ board: boardMock }));
 
-import { mirrorEnabled, POST } from './route';
+import { mirrorEnabled } from './access';
+import { POST } from './route';
 
 const SECRET = 'pilot-hmac-secret-0123456789abcdef';
 

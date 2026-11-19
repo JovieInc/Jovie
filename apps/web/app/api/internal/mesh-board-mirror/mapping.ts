@@ -42,6 +42,41 @@ export type HubRow = {
   answers?: Array<{ from: string; at: number; text: string }>;
 };
 
+/** The hub POSTs at most 50 rows per batch; the receiver re-caps. */
+export const MAX_ROWS = 50;
+
+/**
+ * Parse + validate the raw POST body into stage-id-ordered rows. Null when
+ * the body is not one signed batch of well-formed rows.
+ */
+export function parseHubRows(
+  rawBody: string,
+  maxRows = MAX_ROWS
+): HubRow[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+  const rows = (parsed as { rows?: unknown })?.rows;
+  if (!Array.isArray(rows) || rows.length > maxRows) return null;
+  const clean: HubRow[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') return null;
+    const candidate = row as Record<string, unknown>;
+    if (
+      !Number.isFinite(Number(candidate.stageId)) ||
+      typeof candidate.taskId !== 'string' ||
+      typeof candidate.stage !== 'string'
+    )
+      return null;
+    clean.push(row as HubRow);
+  }
+  // Stage-id order, always: the receiver owns ordering regardless of the wire.
+  return clean.sort((a, b) => a.stageId - b.stageId);
+}
+
 type Labels = Record<string, string>;
 
 /** Every Board write carries these; `extra` is the stage-specific part. */
