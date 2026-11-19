@@ -35,6 +35,40 @@ class Abandoned(unittest.TestCase):
         self.assertTrue(I.may_close_abandon({"state": "verified"}, NOW))
 
 
+
+class ProgressAtUnknown(unittest.TestCase):
+    """JOV-13158: a missing/None/non-numeric progress_at is UNKNOWN, never epoch 0."""
+
+    def test_prless_in_progress_without_progress_at_stays_with_assignee(self):
+        self.assertIsNone(I.reconcile_linear({"id": "JOV-1", "state": "In Progress"}, None, NOW))
+        self.assertIsNone(I.reconcile_linear({"id": "JOV-1", "state": "In Progress",
+                                              "progress_at": None}, None, NOW))
+        self.assertIsNone(I.reconcile_linear({"id": "JOV-1", "state": "Merging"}, None, NOW))
+
+    def test_prless_validating_without_progress_at_is_not_rework(self):
+        self.assertIsNone(I.reconcile_linear({"id": "JOV-1", "state": "Validating"}, None, NOW))
+
+    def test_non_numeric_progress_at_never_raises(self):
+        self.assertIsNone(I.reconcile_linear({"id": "JOV-1", "state": "In Progress",
+                                              "progress_at": "n/a"}, None, NOW))
+
+    def test_started_at_is_the_fallback_timestamp(self):
+        recent = {"id": "JOV-1", "state": "In Progress", "startedAt": NOW - H}
+        self.assertIsNone(I.reconcile_linear(recent, None, NOW))  # not stale on the fallback
+        ancient = {"id": "JOV-8470", "state": "In Progress", "startedAt": NOW - 711 * H}
+        out = I.reconcile_linear(ancient, None, NOW)              # genuinely stale on the fallback
+        self.assertEqual(out["to"], "Todo")
+        self.assertTrue(out["clear_assignee"])
+
+    def test_explicit_progress_at_still_governs(self):
+        stale = {"id": "JOV-8470", "state": "In Progress", "progress_at": NOW - 711 * H,
+                 "startedAt": NOW - H}
+        self.assertEqual(I.reconcile_linear(stale, None, NOW)["to"], "Todo")
+        fresh = {"id": "JOV-1", "state": "In Progress", "progress_at": NOW - H,
+                 "startedAt": NOW - 711 * H}
+        self.assertIsNone(I.reconcile_linear(fresh, None, NOW))
+
+
 class LinearReconcile(unittest.TestCase):
     def test_merged_and_green_is_done_with_receipt(self):
         out = I.reconcile_linear({"id": "JOV-1", "state": "Validating", "progress_at": NOW - 900 * H},
