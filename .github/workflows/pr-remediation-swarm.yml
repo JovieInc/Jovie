@@ -65,7 +65,8 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-pull-requests: read
-          permission-issues: read
+          # write: the selector posts its spend reservation before any model slot opens (reserve-then-admit)
+          permission-issues: write
       - name: Smoke the log path (gh version, one real job log, fails loudly if empty)
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
