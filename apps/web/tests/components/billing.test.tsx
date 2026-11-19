@@ -123,19 +123,43 @@ describe('Billing Components', () => {
   describe('UpgradeButton Component', () => {
     const mockUseFeatureFlag = vi.mocked(useFeatureFlag);
 
-    it('renders with default props', () => {
-      mockUseFeatureFlag.mockReturnValue(false);
+    function mockPricingResolved() {
+      const offer = ARTIST_VISIBILITY_OFFER.pro;
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce(
+          Response.json({
+            options: [
+              {
+                priceId: 'price_presence',
+                plan: 'pro',
+                amount: toCents(offer.monthlyUsd),
+                currency: offer.currency,
+                interval: offer.interval,
+                description: offer.displayName,
+              },
+            ],
+          })
+        )
+        .mockResolvedValueOnce(Response.json({ priceLock: null }));
+    }
+
+    it('renders with default props', async () => {
+      mockPricingResolved();
       renderWithQueryClient(<UpgradeButton />);
       expect(
-        screen.getByText('Upgrade to Artist Presence')
+        await screen.findByRole('button', {
+          name: 'Upgrade to Artist Presence',
+        })
       ).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
-    it('renders with custom children', () => {
-      mockUseFeatureFlag.mockReturnValue(false);
+    it('renders with custom children', async () => {
+      mockPricingResolved();
       renderWithQueryClient(<UpgradeButton>Custom Upgrade Text</UpgradeButton>);
-      expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: 'Custom Upgrade Text' })
+      ).toBeInTheDocument();
     });
 
     it('loads canonical pricing and checks out when the caller omits priceId', async () => {
