@@ -140,7 +140,29 @@ const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
 export const SWEEP_CURSOR_SCHEMA = 1;
 export const SWEEP_BATCH_SIZE = 4;
+/**
+ * JOV-7887: a full sweep used to run until the job's runner timeout killed
+ * it, and the kill also skipped the cursor save, so every sweep restarted
+ * the same overrun and ~60% of sweep runs were cancelled. The workflow
+ * exports one shared wall-clock deadline for every evaluation invocation in
+ * the job; the sweep stops before starting another batch once too little of
+ * it remains and defers the remainder from the cursor instead.
+ */
+export const SWEEP_MIN_BATCH_WINDOW_MS = 90_000;
 const SWEEP_CURSOR_FILE = 'cursor.json';
+
+/**
+ * Remaining wall-clock budget before the job-exported deadline, or null when
+ * no deadline was exported (merge events, receipt wakes, tests, direct runs).
+ * @param {string | undefined} deadlineAt
+ * @param {number} [now]
+ * @returns {number | null}
+ */
+export function sweepBudgetRemainingMs(deadlineAt, now = Date.now()) {
+  if (!deadlineAt) return null;
+  const deadline = Date.parse(deadlineAt);
+  return Number.isFinite(deadline) ? deadline - now : null;
+}
 
 /** @type {(ms: number) => Promise<void>} */
 let sleepFn = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -1617,11 +1639,15 @@ async function runSync(options) {
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
   const cursorDir =
     sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
+  const fullSweep = sweep && !receiptIssue;
+  const deadlineAt = fullSweep ? String(env.LINEAR_SYNC_DEADLINE_AT ?? '') : '';
   const results = [];
   const failures = [];
   let deferredNote = '';
   let deferredDetail = '';
   let cursorSaved = false;
+  let budgetDeferred = false;
+  let budgetDeferredCount = 0;
   const deferAt = (lookupId, message) => {
     const source = message.startsWith('Linear')
       ? 'Linear'
@@ -1641,6 +1667,28 @@ async function runSync(options) {
     log(deferredNote);
   };
   for (let index = 0; index < lookups.length; ) {
+    const remainingMs = sweepBudgetRemainingMs(deadlineAt);
+    if (
+      fullSweep &&
+      remainingMs !== null &&
+      remainingMs < SWEEP_MIN_BATCH_WINDOW_MS
+    ) {
+      // JOV-7887: stop under the job's own deadline instead of running into
+      // the runner timeout, whose kill also discarded the cursor save. The
+      // cursor keeps the resume point; this is a pause, not a quota event,
+      // so the quota hold and its retry never run for it.
+      writeSweepCursor(cursorDir, lookups[index]);
+      cursorSaved = true;
+      budgetDeferred = true;
+      budgetDeferredCount = lookups.length - index;
+      log(
+        `Lifecycle evaluation paused before the job wall-clock budget at ${lookups[index]}`
+      );
+      log(
+        `${budgetDeferredCount} issue(s) deferred to the next sweep by the job wall-clock budget; resume at ${lookups[index]}`
+      );
+      break;
+    }
     const slice = lookups.slice(index, index + SWEEP_BATCH_SIZE);
     /** @type {Awaited<ReturnType<typeof fetchLifecycleRaws>> | undefined} */
     let raws;
@@ -1739,11 +1787,19 @@ async function runSync(options) {
   }
   const first = results[0];
   return {
-    action: deferredNote ? 'deferred' : (first?.action ?? 'skip'),
+    action: budgetDeferred
+      ? 'budget_deferred'
+      : deferredNote
+        ? 'deferred'
+        : (first?.action ?? 'skip'),
     comment: first?.comment ?? '',
     identifier: first?.identifier ?? ref.identifier,
     results,
-    deferred: deferredNote ? Number(deferredNote.split(' ')[0]) || 0 : 0,
+    deferred: budgetDeferred
+      ? budgetDeferredCount
+      : deferredNote
+        ? Number(deferredNote.split(' ')[0]) || 0
+        : 0,
     ...(deferredDetail.startsWith('Linear') ? { deferralKind: 'linear' } : {}),
   };
 }
@@ -1835,7 +1891,28 @@ export function reportQuotaDeferral(disposition, env = process.env) {
  * @param {NodeJS.ProcessEnv} [env]
  */
 export function reportSweepDeferral(result, env = process.env) {
-  if (!result || result.action !== 'deferred') return false;
+  if (!result) return false;
+  // A wall-clock pause is not a quota event (JOV-7887): no quota_deferred
+  // output, so the GitHub-quota hold and its retry never run for it. The
+  // summary keeps the pause visible; the cursor already holds the resume
+  // point.
+  if (result.action === 'budget_deferred') {
+    const paused =
+      result.deferred && result.deferred > 0
+        ? `${result.deferred} issue(s) left for the next sweep by the job wall-clock budget`
+        : 'the job wall-clock budget stopped the sweep before any lifecycle evaluation';
+    try {
+      if (env.GITHUB_STEP_SUMMARY)
+        appendFileSync(
+          env.GITHUB_STEP_SUMMARY,
+          `- Linear sync paused before the job wall-clock budget: ${paused}; the cursor resumes there.\n`
+        );
+    } catch {
+      // Visibility must never turn a deferral into a crash.
+    }
+    return true;
+  }
+  if (result.action !== 'deferred') return false;
   const detail =
     result.deferred && result.deferred > 0
       ? `${result.deferred} issue(s) deferred to the next sweep by the rate limit; the retry resumes from the cursor`
