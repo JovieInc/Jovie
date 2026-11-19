@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { getCreatorConversationDetail } from '@/lib/chat/conversation-queries';
@@ -18,6 +19,11 @@ const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
   Pragma: 'no-cache',
 } as const;
+
+/** Schema for the rename-conversation request body. */
+const renameConversationSchema = z.object({
+  title: z.string().optional(),
+});
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -135,7 +141,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       );
     }
 
-    let body: { title?: string };
+    let body: unknown;
     try {
       body = await req.json();
     } catch {
@@ -145,7 +151,15 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       );
     }
 
-    const { title } = body;
+    const parsed = renameConversationSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { title } = parsed.data;
     const sanitizedTitle = sanitizeConversationTitle(title);
 
     // Update the conversation, ensuring it belongs to the user's profile
