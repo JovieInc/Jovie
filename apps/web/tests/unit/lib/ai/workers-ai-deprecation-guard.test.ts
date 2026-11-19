@@ -18,6 +18,19 @@ import { WORKERS_AI_MODEL_MAP } from '@/lib/ai/workers-ai';
  * When Cloudflare announces the next retirement wave, append the new ids
  * here with their retirement dates — do not remove old rows (history keeps
  * the guard honest for anything resurrected from an old branch).
+ *
+ * Known-deprecated ids still referenced outside the guarded surfaces, with
+ * open successor decisions tracked in JOV-13150 (the changelog lists NO
+ * per-model successor for any retired LLM):
+ * - @cf/deepseek-ai/deepseek-v4-pro-0813 — the helpfulness eval's calibrated
+ *   strong judge (apps/web/tests/eval/helpfulness/workers-ai.ts); breaks at
+ *   the cutoff until a successor is picked and recalibrated (no v4.1 pro
+ *   exists in the catalog as of 2026-11-19).
+ * - @cf/zai-org/glm-5.2 — only ever referenced in routing.json's hermes note
+ *   (follow-up voided by the retirement); live Hermes is gateway-only
+ *   zai/glm-5.2, a different channel.
+ * - @cf/moonshotai/kimi-k2.6 — historical fixture row only
+ *   (runner.ci.test.ts gbrain metric-page test), no live usage.
  */
 const DEPRECATED_WORKERS_AI_MODELS: ReadonlyArray<{
   readonly id: string;
