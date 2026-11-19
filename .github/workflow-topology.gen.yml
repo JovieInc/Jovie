@@ -840,8 +840,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:warm
-    jobCount: 1
+    terminalReceipt: job:warm-ovie
+    jobCount: 2
   - name: Nightly Testing Agent
     path: .github/workflows/nightly-testing-agent.yml
     active: true
