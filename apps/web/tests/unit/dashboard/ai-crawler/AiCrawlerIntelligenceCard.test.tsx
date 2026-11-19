@@ -38,6 +38,29 @@ vi.mock('@/lib/queries/useAiCrawlerAnalyticsQuery', () => ({
   useAiCrawlerAnalyticsQuery: hoisted.useAiCrawlerAnalyticsQueryMock,
 }));
 
+// UpgradeButton resolves its canonical price from the pricing query (the
+// direct-checkout path is no longer flag-gated); resolve it so the upgrade
+// CTA renders its label instead of the pending state.
+vi.mock('@/lib/queries/usePricingOptionsQuery', () => ({
+  usePricingOptionsQuery: () => ({
+    data: {
+      options: [
+        {
+          priceId: 'price_presence',
+          plan: 'pro',
+          amount: 1200,
+          currency: 'usd',
+          interval: 'month',
+          description: 'Artist Presence',
+        },
+      ],
+      priceLock: null,
+    },
+    isPending: false,
+    error: null,
+  }),
+}));
+
 const proAnalytics: AiCrawlerAnalyticsResponse = {
   totalRequests: 420,
   weeklyRequests: 88,
