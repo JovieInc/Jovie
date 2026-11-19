@@ -88,6 +88,7 @@ test('bulk-ack parsing: dryRun defaults true, maxIds caps at 5000, junk is rejec
   const parsed = parseBulkAckBody({
     filter: {
       msgKinds: ['message', 'event'],
+      from: ['board'],
       excludeBodyContains: ['Red-team'],
       excludeRefsContains: ['JOV-1'],
       excludeFrom: ['claude'],
@@ -104,8 +105,14 @@ test('bulk-ack parsing: dryRun defaults true, maxIds caps at 5000, junk is rejec
   );
   assert.deepEqual(parsed.filter.msgKinds, ['message', 'event']);
   assert.deepEqual(parsed.filter.excludeBodyContains, ['Red-team']);
-  assert.equal(parseBulkAckBody({ dryRun: false }).dryRun, false);
-  assert.equal(parseBulkAckBody({ maxIds: 99_999 }).maxIds, 5000);
+  assert.equal(
+    parseBulkAckBody({ dryRun: false, filter: { msgKinds: ['event'] } }).dryRun,
+    false
+  );
+  assert.equal(
+    parseBulkAckBody({ maxIds: 99_999, filter: { from: ['board'] } }).maxIds,
+    5000
+  );
   assert.throws(() => parseBulkAckBody({ maxIds: 0 }), /invalid_filter/);
   assert.equal(
     parseBulkAckBody({ filter: { from: ['board'] } }).filter.from.length,
@@ -116,12 +123,31 @@ test('bulk-ack parsing: dryRun defaults true, maxIds caps at 5000, junk is rejec
     /invalid_filter/
   );
   assert.throws(
+    () => parseBulkAckBody({ filter: { msgKinds: ['message'] } }),
+    /message_kind_requires_sender/,
+    'kind=message without an explicit sender restriction is refused'
+  );
+  assert.throws(
+    () => parseBulkAckBody({}),
+    /message_kind_requires_sender/,
+    'an empty filter would match kind=message: refused'
+  );
+  assert.equal(
+    parseBulkAckBody({
+      filter: { msgKinds: ['event', 'undeliverable', 'probe'] },
+    }).filter.from.length,
+    0,
+    'machine envelope kinds need no sender restriction'
+  );
+  assert.throws(
     () => parseBulkAckBody({ filter: { from: ['BAD KIND'] } }),
     /invalid_filter/
   );
   assert.throws(
     () =>
-      parseBulkAckBody({ filter: { excludeBodyContains: ['x'.repeat(201)] } }),
+      parseBulkAckBody({
+        filter: { from: ['board'], excludeBodyContains: ['x'.repeat(201)] },
+      }),
     /invalid_filter/
   );
   assert.throws(() => parseBulkAckBody('nope'), /invalid_json/);
@@ -209,7 +235,9 @@ test('admin bulk-ack: dry-run acks nothing and audits nothing; a real run acks a
   const dry = await adminMailboxRoute(
     new Request(url, {
       method: 'POST',
-      body: JSON.stringify({ filter: { msgKinds: ['message'] } }),
+      body: JSON.stringify({
+        filter: { msgKinds: ['message'], from: ['board'] },
+      }),
     }),
     new URL(url),
     'claude',
@@ -226,7 +254,7 @@ test('admin bulk-ack: dry-run acks nothing and audits nothing; a real run acks a
       method: 'POST',
       body: JSON.stringify({
         dryRun: false,
-        filter: { excludeBodyContains: ['keep'] },
+        filter: { msgKinds: ['undeliverable'], excludeBodyContains: ['keep'] },
       }),
     }),
     new URL(url),

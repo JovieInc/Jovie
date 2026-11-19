@@ -426,3 +426,54 @@ test('reassign refuses non-poster non-orchestrators, claimed tasks and bad targe
     false
   );
 });
+
+test('stale unclaimed offers are re-offered once per dedupe window, bounded per task', () => {
+  const store = board();
+  const reopened = () =>
+    notices(store).filter(n => JSON.parse(n.body).event === 'task.reopened');
+  store.post(
+    'summer',
+    { id: 'st-1', title: 'Nobody claimed', caps: ['research'] },
+    ACTIVE,
+    0
+  );
+  store.post('summer', { id: 'st-q', type: 'question', title: 'q' }, ACTIVE, 0);
+  // Fresh tasks: nothing re-offered inside the window.
+  assert.deepEqual(store.sweep(ACTIVE, 1_000).reoffered, []);
+  // Past the window: one bounded re-offer to every capable agent, never the
+  // question (questions are answered, not claimed).
+  assert.deepEqual(store.sweep(ACTIVE, BOARD.noticeDedupeMs + 1).reoffered, [
+    'st-1',
+  ]);
+  assert.equal(reopened().length, 3);
+  assert.equal(
+    store.get('st-1').status,
+    'open',
+    'the task itself is untouched'
+  );
+  // A second re-offer inside the window is deduped.
+  assert.deepEqual(
+    store.sweep(ACTIVE, 2 * BOARD.noticeDedupeMs + 1).reoffered,
+    ['st-1']
+  );
+  // The re-offer count is bounded: after maxNoticesPerTask the task stops
+  // re-offering (it stays open and readable on the board).
+  assert.deepEqual(
+    store.sweep(ACTIVE, 3 * BOARD.noticeDedupeMs + 1).reoffered,
+    ['st-1']
+  );
+  assert.deepEqual(
+    store.sweep(ACTIVE, 4 * BOARD.noticeDedupeMs + 1).reoffered,
+    []
+  );
+  assert.equal(
+    reopened().length,
+    9,
+    'three re-offer rounds x three capable agents, then the cap stops renewal'
+  );
+  assert.equal(
+    notices(store).filter(n => n.correlationId.startsWith('t:st-1:')).length,
+    BOARD.maxNoticesPerTask,
+    'total notices for the task cap at maxNoticesPerTask'
+  );
+});

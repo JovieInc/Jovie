@@ -47,15 +47,25 @@ export const SYSTEM_KINDS = new Set(['mesh-hub', 'mesh-probe', 'board']);
 /** Marker that a message (or its quoted copy) came from or is bound for the founder. */
 export const TIM_RELAY = 'TIM-RELAY';
 
+/** The board fan-out events that are pure offers: the only board notices the
+ * TTL may expire. Questions, answers and results are never automated. */
+export const BOARD_OFFER_EVENTS = new Set([
+  'task.open',
+  'task.reopened',
+  'merge.open',
+]);
+
 export type EnvelopeClass = 'automated' | 'direct';
 
 /**
  * One classifier for every mailbox decision that must treat noise differently
- * from mail (TTL expiry, dead-lettering, DLQ). Automated = board fan-out
- * notices (kind 'message' from 'board') plus every event/probe/undeliverable
- * envelope. Direct = a real peer message (registered agent or the 'tim'
- * identity), and anything carrying the TIM-RELAY marker in body or refs, which
- * always keeps normal retention and dead-letter behavior.
+ * from mail (TTL expiry, dead-lettering, DLQ). Automated = board fan-out OFFER
+ * notices (kind 'message' from 'board' carrying an offer event) plus every
+ * event/probe/undeliverable envelope. Direct = a real peer message (registered
+ * agent or the 'tim' identity), board questions/answers/results and any other
+ * human-directed ask — never expired merely because the sender is the board —
+ * and anything carrying the TIM-RELAY marker in body or refs, which is
+ * hard-protected: normal retention and dead-letter behavior, always.
  */
 export function classifyEnvelope(
   envelope: Pick<Envelope, 'kind' | 'from' | 'body' | 'refs'>
@@ -65,8 +75,24 @@ export function classifyEnvelope(
     envelope.refs.some(ref => ref.includes(TIM_RELAY))
   )
     return 'direct';
-  if (envelope.kind === 'message')
-    return envelope.from === 'board' ? 'automated' : 'direct';
+  if (envelope.kind === 'message') {
+    if (envelope.from !== 'board') return 'direct';
+    // Only fan-out offers are automated; questions, answers, results and
+    // anything unparseable or unknown stay direct (ambiguous = protected).
+    try {
+      const parsed = JSON.parse(envelope.body) as {
+        schema?: string;
+        event?: string;
+      };
+      return parsed.schema === 'jovie.board/v1' &&
+        typeof parsed.event === 'string' &&
+        BOARD_OFFER_EVENTS.has(parsed.event)
+        ? 'automated'
+        : 'direct';
+    } catch {
+      return 'direct';
+    }
+  }
   return 'automated';
 }
 

@@ -441,20 +441,23 @@ test('clearDead un-flags a message so a failed dead-letter notification is retri
   );
 });
 
-/** A board fan-out notice: kind 'message' from 'board' (the noise amplifier). */
+/** A board notice: kind 'message' from 'board' (default: a fan-out offer). */
 async function boardEnvelope(over = {}) {
-  const body = over.body ?? '{"schema":"jovie.board/v1","event":"task.open"}';
+  const { event, ...rest } = over;
+  const body =
+    rest.body ??
+    JSON.stringify({ schema: 'jovie.board/v1', event: event ?? 'task.open' });
   return {
-    id: over.id ?? 'board:t:t-1:1',
+    id: rest.id ?? 'board:t:t-1:1',
     from: 'board',
     to: 'claude',
-    correlationId: over.correlationId ?? 't:t-1:1',
+    correlationId: rest.correlationId ?? 't:t-1:1',
     sha256: await sha256Hex(body),
     body,
-    refs: over.refs ?? [],
+    refs: rest.refs ?? [],
     inReplyTo: null,
     sentAt: null,
-    acceptedAt: over.acceptedAt ?? 1_000,
+    acceptedAt: rest.acceptedAt ?? 1_000,
     kind: 'message',
   };
 }
@@ -476,7 +479,71 @@ test('classifyEnvelope: board fan-outs and machine envelopes are automated; peer
   assert.equal(
     classifyEnvelope(await boardEnvelope()),
     'automated',
-    'board offers/re-offers/task notices are automated'
+    'board offer/re-offer fan-outs are automated'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-9:2',
+        correlationId: 't:t-9:2',
+        event: 'task.reopened',
+      })
+    ),
+    'automated'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-8:3',
+        correlationId: 't:t-8:3',
+        event: 'merge.open',
+      })
+    ),
+    'automated'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-7:4',
+        correlationId: 't:t-7:4',
+        event: 'question.open',
+      })
+    ),
+    'direct',
+    'board questions are never expired merely because the sender is the board'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-6:5',
+        correlationId: 't:t-6:5',
+        event: 'question.answered',
+      })
+    ),
+    'direct',
+    'board answers stay direct'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-5:6',
+        correlationId: 't:t-5:6',
+        event: 'task.done',
+      })
+    ),
+    'direct',
+    'board results stay direct'
+  );
+  assert.equal(
+    classifyEnvelope(
+      await boardEnvelope({
+        id: 'board:t:t-4:7',
+        correlationId: 't:t-4:7',
+        body: 'plain text, not board JSON',
+      })
+    ),
+    'direct',
+    'unparseable board bodies are ambiguous and stay direct'
   );
   assert.equal(classifyEnvelope(await envelope()), 'direct');
   assert.equal(
@@ -922,4 +989,30 @@ test('DLQ helpers: window rollover, due check and the full-fallback threshold', 
   assert.equal(dlqFallbackFull(8_999), false);
   assert.equal(dlqFallbackFull(9_000), true);
   assert.equal(dlqFallbackFull(LIMITS.unackedPerMailbox), true);
+});
+
+test('sweepExpired keeps board questions, answers and results; only offers expire', async () => {
+  const store = new MailboxStore(sqlite());
+  const offer = await boardEnvelope({
+    id: 'board:t:o:1',
+    correlationId: 't:o:1',
+    acceptedAt: 0,
+  });
+  const answer = await boardEnvelope({
+    id: 'board:t:q:2',
+    correlationId: 't:q:2',
+    event: 'question.answered',
+    acceptedAt: 0,
+  });
+  store.enqueue(offer);
+  store.enqueue(answer);
+  const expired = store.sweepExpired(
+    LIMITS.autoNoticeTtlMs + 1,
+    LIMITS.autoNoticeTtlMs
+  );
+  assert.deepEqual(
+    expired.map(m => m.id),
+    [offer.id]
+  );
+  assert.equal(store.unackedCount(), 1, 'the answer notice survives the TTL');
 });

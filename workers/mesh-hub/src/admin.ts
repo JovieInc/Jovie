@@ -167,14 +167,22 @@ export function parseBulkAckBody(body: unknown): BulkAckInput {
       : Number(raw.maxIds);
   if (!Number.isFinite(maxIds) || maxIds < 1)
     throw new HubError(422, 'invalid_filter');
+  const msgKinds = msgKindList(filter.msgKinds);
+  const from = kindList(filter.from);
+  // Fail-closed: 'message' envelopes are how humans and agents talk. A filter
+  // that could select them (explicitly, or via an empty kind list = all kinds)
+  // is only allowed with an explicit automated-sender restriction, so a broad
+  // sweep can never silently ack a direct ask.
+  if ((!msgKinds.length || msgKinds.includes('message')) && !from.length)
+    throw new HubError(422, 'message_kind_requires_sender');
   return {
     filter: {
       afterSeq: 0,
       limit: Math.min(Math.floor(maxIds), MAX_BULK_IDS),
       olderThanMs: optionalMs(filter.olderThanMs),
       newerThanMs: optionalMs(filter.newerThanMs),
-      msgKinds: msgKindList(filter.msgKinds),
-      from: kindList(filter.from),
+      msgKinds,
+      from,
       unackedOnly: true,
       excludeBodyContains: termList(filter.excludeBodyContains),
       excludeRefsContains: termList(filter.excludeRefsContains),

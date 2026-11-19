@@ -21,6 +21,11 @@ export const BOARD = {
    * re-offer is allowed once the previous notice has normally expired out of
    * the recipient's mailbox. */
   noticeDedupeMs: LIMITS.autoNoticeTtlMs,
+  /** Total notices (original offer + re-offers) a task may generate before it
+   * stops re-offering: bounded renewal, never an unbounded retry loop. At one
+   * re-offer per dedupe window that is ~2.75 days of visibility; the task
+   * stays open and readable on the board the whole time. */
+  maxNoticesPerTask: 12,
 } as const;
 
 export type TaskType = 'task' | 'question' | 'merge';
@@ -734,7 +739,10 @@ export class BoardStore {
     return { replay: false, task };
   }
 
-  /** Expired leases go back to the pool and capable agents hear about it again. */
+  /** Expired leases go back to the pool and capable agents hear about it again
+   * (deduped per task — see notify), and open tasks that no one ever claimed
+   * get one bounded re-offer per dedupe window so a lost/expired offer can
+   * never strand unfinished work. */
   sweep(active: readonly string[], now: number) {
     const expired = this.sql
       .exec(
@@ -765,7 +773,51 @@ export class BoardStore {
         { previousClaimant: previous }
       );
     }
-    return { expired: expired.map(task => task.id) };
+    const reoffered = this.reofferStale(active, now);
+    return { expired: expired.map(task => task.id), reoffered };
+  }
+
+  /** One bounded re-offer per dedupe window for unclaimed open tasks. */
+  private reofferStale(active: readonly string[], now: number): string[] {
+    const stale = this.sql
+      .exec(
+        "SELECT * FROM tasks WHERE status = 'open' AND type != 'question' AND updatedAt <= ? ORDER BY postedAt LIMIT 50",
+        now - BOARD.noticeDedupeMs
+      )
+      .toArray()
+      .map(row);
+    const reoffered: string[] = [];
+    for (const task of stale) {
+      const prior = this.sql
+        .exec(
+          'SELECT COUNT(*) AS n FROM notices WHERE correlationId GLOB ?',
+          `t:${task.id}:*`
+        )
+        .toArray()[0];
+      if (Number(prior?.n ?? 0) >= BOARD.maxNoticesPerTask) continue;
+      const recipients = this.route(task, active);
+      // Every recipient still holds a fresh notice: nothing to renew yet.
+      if (
+        recipients.length &&
+        recipients.every(recipient =>
+          this.recentlyNotified(task.id, recipient, now)
+        )
+      )
+        continue;
+      task.updatedAt = now;
+      this.save(task);
+      const stageId = this.stage(task.id, 'board', 'reoffered', now);
+      this.notify(
+        task,
+        this.route(task, active),
+        'task.reopened',
+        stageId,
+        now,
+        { previousClaimant: null }
+      );
+      reoffered.push(task.id);
+    }
+    return reoffered;
   }
 
   nextLeaseDue(): number | null {
