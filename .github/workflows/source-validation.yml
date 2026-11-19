@@ -807,25 +807,24 @@ jobs:
           # tests/unit/ci read workflow YAML and scripts from disk, outside
           # the module graph `--changed` follows: run that suite whole.
           if changed scripts .github; then ci=true; fi
-          # Canonical parity inputs also include root tsconfigs and TS graphs
-          # outside apps/web. Select hydration before the later parity steps.
-          parity_scope="$(node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$base_sha")"
-          if [[ "$parity_scope" == *'=true'* ]]; then web=true; fi
+          # Root tsconfig files are canonical typecheck inputs and sit outside
+          # the unit path list, so hydrate the web runner for those only.
+          # A TypeScript file under apps/ovie stays on the ovie shard (JOV-6834).
+          while IFS= read -r -d '' path; do
+            if [[ "$path" =~ ^tsconfig[^/]*\.json$ ]]; then web=true; fi
+          done < <(git diff --name-only -z "$base_sha" HEAD)
           printf 'web=%s\nui=%s\novie=%s\nci=%s\n' "$web" "$ui" "$ovie" "$ci" >> "$GITHUB_OUTPUT"
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
-      - name: Setup Node.js and pnpm
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true'))
-        uses: ./.github/actions/setup-node-pnpm
-      - name: Setup Playwright warm path
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
-        uses: ./.github/actions/setup-playwright
       # JOV-13071: reuse the four required source runners for affected MQ lanes.
       # No second unit matrix or pre-push hook; the combined-head jobs stay intact.
+      # Parity selection is independent of the unit web/ui/ovie flags so a
+      # non-web TypeScript graph still reaches its twin without stealing the
+      # web shard (JOV-6834).
       - name: Select MQ parity scope
         id: mq-parity
-        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        if: steps.reuse.outputs.reuse != 'true'
         env:
           BASE_SHA: ${{ steps.scope.outputs.base }}
         run: |
@@ -835,21 +834,27 @@ jobs:
           git diff --name-only "$BASE_SHA" HEAD > "$paths"
           node scripts/lib/product-lane-classifier.mjs --files-from "$paths" \
             --base-ref "$BASE_SHA" --head-ref HEAD --github-output "$GITHUB_OUTPUT"
+      - name: Setup Node.js and pnpm
+        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true' || steps.mq-parity.outputs.structural == 'true' || steps.mq-parity.outputs.storybook == 'true' || steps.mq-parity.outputs.evals == 'true'))
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright warm path
+        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.mq-parity.outputs.storybook == 'true'))
+        uses: ./.github/actions/setup-playwright
       - name: Set up Python for affected MQ parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: .github/requirements/pytest.txt
       - name: Install pytest for affected MQ parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
       - name: Validate Promptfoo config
-        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
         run: pnpm --filter @jovie/web run evals:validate
       - name: Run deterministic Promptfoo evals
-        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
         env:
           JOVIE_RUN_LIVE_EVALS: '0'
           JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -860,7 +865,7 @@ jobs:
           PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
         run: pnpm run evals
       - name: Run golden eval-set CI gate
-        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '2/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.evals == 'true' && matrix.shard == '2/4'
         env:
           JOVIE_RUN_LIVE_EVALS: '0'
           JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -868,14 +873,14 @@ jobs:
           JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
         run: pnpm run evals:golden
       - name: Run typecheck lane parity
-        if: steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
         env:
           CI_FAST_LANE_GROUP: typecheck
           CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
         run: node scripts/ci-fast-lanes.mjs
       - name: Run structural remaining parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '1/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard == '1/4'
         env:
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_STRUCTURAL_PYTEST: skip
@@ -884,7 +889,7 @@ jobs:
           CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
         run: node scripts/ci-fast-lanes.mjs
       - name: Run structural Python parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '2/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard == '2/4'
         env:
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_STRUCTURAL_PYTEST: only
@@ -892,21 +897,21 @@ jobs:
           CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
         run: node scripts/ci-fast-lanes.mjs
       - name: Run structural web parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '3/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard == '3/4'
         env:
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_STRUCTURAL_WEB: only
           CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
         run: node scripts/ci-fast-lanes.mjs
       - name: Run lanes coverage parity
-        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '4/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.structural == 'true' && matrix.shard == '4/4'
         env:
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_STRUCTURAL_LANES: only
           CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
         run: node scripts/ci-fast-lanes.mjs
       - name: Start Storybook dev server for affected parity
-        if: steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
         working-directory: apps/web
         env:
           CI: true
@@ -918,7 +923,7 @@ jobs:
           echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"
       - name: Run surface elevation matrix (Storybook)
         working-directory: ${{ steps.mq-parity-tools.outputs.root }}
-        if: steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
           STORYBOOK_SHARD: ${{ matrix.shard == '1/4' && '1' || matrix.shard == '2/4' && '2' || '3' }}
