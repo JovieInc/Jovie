@@ -499,9 +499,9 @@ describe('runStructural screenshot contract discovery', () => {
     async (event, lanes, changed, expected) => {
       // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
       // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
-      // PRs keep the derived selection; landing events run the FULL lists
-      // (JOV-13095: tree-scanning ratchets are never statically selectable).
-      process.env.GITHUB_EVENT_NAME = event;      process.env.CI_PRODUCT_LANES = lanes;
+      // PRs keep the derived selection; landing events run the FULL lists.
+      process.env.GITHUB_EVENT_NAME = event;
+      process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
       await runStructural({ execute, changedFileList: changed });
