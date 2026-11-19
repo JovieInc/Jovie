@@ -27,13 +27,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyProxyFromEnv,
   type CliOutput,
-  closedPipeListener,
   isEntrypoint,
   reportFatal,
   runCli,
   timeoutFromEnv,
   unsupportedNodeMessage,
 } from './cli.js';
+import { closedPipeListener } from './closed-pipe.js';
 import type { FetchImplementation } from './client.js';
 import { installSkill, resolveSkillsDir } from './init.js';
 import { SKILL_MD } from './skill.js';
