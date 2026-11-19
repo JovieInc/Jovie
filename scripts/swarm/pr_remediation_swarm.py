@@ -138,6 +138,12 @@ def cmd_select(a) -> int:
     matrix = plan_matrix(modes, limit=a.limit, by_quota=by_quota, spent_cents=spent,
                          daily_cap_usd=a.daily_cap_usd, attempt_cap_usd=a.attempt_cap_usd, credits_ok=credits_ok)
     agents = sum(1 for m in matrix if m["agent"])
+    if agents:
+        want = int(round(agents * a.attempt_cap_usd * 100))
+        if not reserve(a.ledger_issue, os.environ.get("GITHUB_RUN_ID", "0"), want, a.daily_cap_usd * 100):
+            matrix = [dict(m, agent=False) for m in matrix]  # lost the race or ledger unwritable: $0 run
+            print(f"reservation of {want} cents not admitted under the daily cap: model slots closed")
+            agents = 0
     print(f"red={len(modes)} take={len(matrix)} agent_slots={agents} quota={remaining}/{limit} "
           f"model_mode={'on' if model_mode_on() else 'OFF (model slots closed)'} "
           f"credits={'ok' if credits_ok else 'NONE (model slots closed)'} "
@@ -183,15 +189,13 @@ def behind_prs(limit: int) -> list[int]:
     return found[:limit]
 
 
-def day_spend_cents(issue: str) -> int | None:
-    """Today's swarm spend in cents: the sum of `swarm-ledger` comments on the ledger issue since UTC
-    midnight. (The Actions artifacts listing 5xx's on this repo, so it cannot be the ledger.) None when
-    the ledger issue is unset or unreadable in full: the caller must treat that as the cap reached
-    (a cap that fails open is not a cap)."""
+def ledger_rows(issue: str) -> list[tuple[int, str, int, bool]] | None:
+    """Today's ledger rows as (comment id, run, cents, is_reservation), oldest first; None when unset
+    or unreadable."""
     if not issue or not str(issue).isdigit():
         return None
     since = iso()[:10] + "T00:00:00Z"
-    total, seen = 0, set()
+    out = []
     try:
         for page in range(1, 11):
             rows = gh_json(["api", f"repos/{REPO}/issues/{issue}/comments?per_page=100&page={page}&since={since}"],
@@ -200,14 +204,55 @@ def day_spend_cents(issue: str) -> int | None:
                 if (row.get("user") or {}).get("login") != LEDGER_AUTHOR:
                     continue  # public repo: only the Jovie Bot app's own comments are spend
                 m = LEDGER_RE.match(row.get("body") or "")
-                if m and m.group(3)[:10] == since[:10] and m.group(1) not in seen:
-                    seen.add(m.group(1))
-                    total += int(m.group(2))
+                if m and m.group(3)[:10] == since[:10]:
+                    out.append((int(row.get("id") or 0), m.group(1), int(m.group(2)),
+                                (row.get("body") or "").rstrip().endswith("kind=reserve")))
             if len(rows) < 100:
-                return total
+                return sorted(out)
     except (RuntimeError, ValueError, TypeError, KeyError, AttributeError):
         return None
     return None
+
+
+def per_run_cents(rows: list[tuple[int, str, int, bool]]) -> dict[str, int]:
+    """A run's spend: its final row once written (actual cost, may be 0 for a run that lost admission),
+    else its reservation (in flight). Legacy rows without a reservation are final rows."""
+    final: dict[str, int] = {}
+    held: dict[str, int] = {}
+    for _id, run, cents, is_reserve in rows:
+        (held if is_reserve else final)[run] = max((held if is_reserve else final).get(run, 0), cents)
+    return {run: final.get(run, held.get(run, 0)) for run in {*final, *held}}
+
+
+def reserve(issue: str, run: str, cents: int, cap_cents: float) -> bool:
+    """Reserve-then-admit, so parallel runs cannot each read the same 'spent' and overshoot the cap.
+
+    Post the reservation, re-read, and admit only if every run whose first row is older than ours, plus
+    ours, fits under the cap. Every run sees the same comment-id order, so at most the cap is admitted.
+    Any write or read failure admits nothing (fail closed)."""
+    body = f"🤖 swarm-ledger run={run} cents={cents} at={iso()} kind=reserve"
+    if gh(["api", f"repos/{REPO}/issues/{issue}/comments", "-f", f"body={body}"], priority="repair").returncode != 0:
+        return False
+    rows = ledger_rows(issue)
+    if rows is None:
+        return False
+    first: dict[str, int] = {}
+    for cid, r, _c, _k in rows:
+        first.setdefault(r, cid)
+    if run not in first:
+        return False
+    spend = per_run_cents(rows)
+    ahead = sum(c for r, c in spend.items() if r != run and first[r] < first[run])
+    return ahead + cents <= cap_cents
+
+
+def day_spend_cents(issue: str) -> int | None:
+    """Today's swarm spend in cents: per run, the larger of its reservation and its final row, summed
+    since UTC midnight. (The Actions artifacts listing 5xx's on this repo, so it cannot be the ledger.)
+    None when the ledger issue is unset or unreadable in full: the caller must treat that as the cap
+    reached (a cap that fails open is not a cap)."""
+    rows = ledger_rows(issue)
+    return None if rows is None else sum(per_run_cents(rows).values())
 
 
 def cmd_ledger(a) -> int:
