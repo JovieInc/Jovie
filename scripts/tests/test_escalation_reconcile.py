@@ -81,7 +81,10 @@ class ReconcileTest(unittest.TestCase):
         receipt = er.reconcile(self.state, [pr(1), pr(2), pr(3), pr(4)], PROVIDERS, update_attempts=update,
                                remove_label=lambda n: removed.append(n) or True, now=NOW, slots=slots)
         self.assertEqual(removed, [1])
-        self.assertEqual((receipt["orphan"], receipt["stale"], receipt["live"], receipt["surfaced"]), ([1], [2], 1, 1))
+        # 2026-11-19 (JOV-13078): a fresh pendingEscalation is PROGRESS, so PR 3 is skipped by the
+        # progress gate before disposition() runs — untouched, exactly as "live" meant, never journaled.
+        self.assertEqual((receipt["orphan"], receipt["stale"], receipt["live"], receipt["surfaced"]), ([1], [2], 0, 1))
+        self.assertEqual(receipt["skipped"], [3])
         data = json.loads((self.state / "fix-attempts.json").read_text())
         self.assertNotIn("pendingEscalation", data["2"])
         self.assertEqual(data["2"]["escalations"][-1]["rung"], "stale-escalation")
