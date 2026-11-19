@@ -4063,7 +4063,9 @@ jobs:
     # across runners; the aggregates read the matrix result. Three shards since
     # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
     # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
-    # waiting on the lanes pytest.
+    # waiting on the lanes pytest. JOV-13107: each shard starts at 3 Playwright
+    # workers (documented exception: browser-bound, not nproc/4) on the same
+    # 4 vCPU runner. Shard count is unchanged (JOV-13072 owns shards).
     strategy:
       fail-fast: true
       matrix:
@@ -4161,7 +4163,7 @@ jobs:
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
-                  --workers=2 --shard="$STORYBOOK_SHARD/3"
+                  --workers=3 --shard="$STORYBOOK_SHARD/3"
               exit 0
             fi
             sleep 2
@@ -6041,12 +6043,14 @@ jobs:
             > "$RUNNER_TEMP/blog-content-qualification/plan.json"
           jq -e '.mode == "selected" and .blogCandidateBuild == true' \
             "$RUNNER_TEMP/blog-content-qualification/plan.json" >/dev/null
+      # JOV-13107: derive workers from nproc. Vitest 5.1 does not accept the
+      # token `auto` (it would become NaN); $(nproc) is the repo equivalent.
       - name: Run publication and agent-certification contracts
         run: >-
           pnpm --filter @jovie/web exec vitest run
           tests/unit/lib/blog/publication.test.ts
           scripts/marketing-factory/blog-adapter.test.ts
-          --maxWorkers 2
+          --maxWorkers=$(nproc)
       - name: Build the exact rendered candidate
         id: candidate-build
         env:
