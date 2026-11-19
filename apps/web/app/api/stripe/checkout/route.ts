@@ -149,21 +149,16 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
     return jsonServiceUnavailable();
   }
 
-  if (error instanceof Error) {
-    const knownError = getCheckoutErrorResponse(error);
-    if (knownError) {
-      return jsonError(knownError.message, knownError.status);
-    }
-  }
-
-  if (isTransientStripeError(error)) {
-    return jsonServiceUnavailable();
-  }
-
   // E2E dogfood observability (JOV-8805): the claim-checkout dogfood server
   // has no Sentry DSN and the production logger is a no-op, so the real
   // cause of a 500 was invisible to the journey. Under the test-mode flag,
   // name the actual failing error in the body the spec already prints.
+  // This runs BEFORE the substring mapping below on purpose: the price-lock
+  // fail-closed errors contain "price" ("The locked price exceeds the
+  // requested offer", "Cannot preserve an unknown subscriber price") and
+  // used to be masked as 400 "Invalid pricing configuration", which hid the
+  // root cause of the 2026-11-17..19 dogfood red for two days. Prod is
+  // unchanged: E2E_TEST_MODE is never set outside the dogfood journey.
   if (
     process.env.E2E_TEST_MODE === '1' &&
     error instanceof Error &&
@@ -173,6 +168,17 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
       `Failed to create checkout session: ${error.message}`,
       500
     );
+  }
+
+  if (error instanceof Error) {
+    const knownError = getCheckoutErrorResponse(error);
+    if (knownError) {
+      return jsonError(knownError.message, knownError.status);
+    }
+  }
+
+  if (isTransientStripeError(error)) {
+    return jsonServiceUnavailable();
   }
 
   return jsonError('Failed to create checkout session', 500);
