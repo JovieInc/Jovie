@@ -22,7 +22,7 @@ function jobBlock(jobId) {
 }
 
 const ciFastTypecheckBlock = jobBlock('ci-fast-typecheck');
-const ciFastRemainingBlock = jobBlock('ci-fast-remaining');
+const ciFastRemainingBlock = jobBlock('ci-fast-remaining-shards');
 const ciFastAggregateBlock = jobBlock('ci-fast');
 
 test('CI prevention verifier runs for every source PR and exact merge-group head', () => {

@@ -100,6 +100,13 @@
       "expiresOn": "2027-02-09"
     },
     {
+      "job": "ci.yml#ci-fast-remaining-shards",
+      "kind": "gap",
+      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
       "job": "ci.yml#ci-profile-admission-browser",
       "kind": "gap",
       "reason": "The profile admission browser proof runs only in the queue; no PR job runs the same Playwright spec.",
@@ -122,6 +129,13 @@
     },
     {
       "job": "ci.yml#ci-fast-structural-lanes",
+      "kind": "gap",
+      "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-structural-lanes-shards",
       "kind": "gap",
       "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
       "createdOn": "2026-11-11",

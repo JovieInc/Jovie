@@ -229,10 +229,10 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
-  'ci-fast-remaining',
+  'ci-fast-remaining-shards',
 ]);
 
-const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
+const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining-shards']);
 
 describe('merge_group workflow contract', () => {
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
@@ -311,7 +311,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining-shards ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes-shards ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -577,7 +577,7 @@ describe('merge_group workflow contract', () => {
       admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS
     ).toBeGreaterThanOrEqual(MERGE_GROUP_ADMISSION_WAIT_MS + 90_000);
 
-    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
+    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining-shards']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
       expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
@@ -591,7 +591,7 @@ describe('merge_group workflow contract', () => {
       );
     }
 
-    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain('github.event_name }}" != "pull_request"');
@@ -1271,7 +1271,7 @@ describe('merge_group workflow contract', () => {
 
   it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
     for (const jobId of [
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser',
       'ci-exact-head-coverage-shard',
       'ci-exact-head-coverage',
@@ -1310,7 +1310,7 @@ describe('merge_group workflow contract', () => {
   });
 
   it('overlaps the full ci-fast (remaining) base fetch with dependency install and fails closed', () => {
-    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     const start = getStepRunScript(job, 'Start base-branch history fetch');
     const wait = getStepRunScript(job, 'Fetch base-branch history');
     const startAt = job.indexOf('- name: Start base-branch history fetch');
@@ -2011,7 +2011,7 @@ describe('merge_group workflow contract', () => {
         .trim()
         .split('\n')
     ).toContain('pnpm --filter @jovie/release-channel-contracts test');
-    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
+    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards')).toContain(
       'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
     );
     expect(aggregate).toContain(
