@@ -14,4 +14,5 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_codex_launcher.py',
   'scripts/tests/test_loose_exec_guard.py',
   'scripts/tests/test_noabandon_ledger.py',
+  'scripts/tests/test_poll_loop_guard.py',
 ]);
