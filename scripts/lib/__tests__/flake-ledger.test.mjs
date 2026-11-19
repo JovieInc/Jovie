@@ -9,6 +9,8 @@ import {
   recordRetry,
   recordRun,
   repeatOffenders,
+  reportMetrics,
+  wilson95,
 } from '../flake-ledger.mjs';
 
 const sha = n => `${n}`.repeat(10).padEnd(40, '0').slice(0, 40);
@@ -25,16 +27,18 @@ const run = over => ({
   baseSha: BASE_1,
   conclusion: 'failure',
   observedAt: '2026-11-19T10:00:00Z',
+  failedSubjects: ['job:Unit Tests'],
   ...over,
 });
+const fresh = () => loadLedger(null, { now });
 
-test('a red to green flip on the same head and base is recorded', () => {
-  let ledger = loadLedger(null, { now });
-  ledger = recordRun(ledger, run(), { now }).ledger;
+test('a verified flip (v1) is attempt-1 failure or timeout, later-attempt success', () => {
+  let ledger = fresh();
+  ledger = recordRun(ledger, run({ conclusion: 'timed_out' }), { now }).ledger;
   const result = recordRun(
     ledger,
     run({
-      runId: 2,
+      runId: 1,
       runAttempt: 2,
       conclusion: 'success',
       observedAt: '2026-11-19T11:00:00Z',
@@ -42,20 +46,33 @@ test('a red to green flip on the same head and base is recorded', () => {
     { now }
   );
   assert.equal(result.flips.length, 1);
-  assert.equal(
-    result.flips[0].subject,
-    'workflow:.github/workflows/source-validation.yml'
+  assert.equal(result.flips[0].subject, 'job:Unit Tests');
+  assert.equal(result.flips[0].kind, 'test');
+});
+
+test('attempt-1 success, or a first-observed later-attempt success, is not a flip', () => {
+  const ledger = fresh();
+  let result = recordRun(ledger, run({ conclusion: 'success' }), { now });
+  assert.deepEqual(result.flips, []);
+  // Same run, no recorded attempt-1 failure: unverifiable, not a flip.
+  result = recordRun(
+    result.ledger,
+    run({
+      runAttempt: 2,
+      conclusion: 'success',
+      observedAt: '2026-11-19T11:00:00Z',
+    }),
+    { now }
   );
-  assert.deepEqual(result.flips[0].failedRunIds, [1]);
+  assert.deepEqual(result.flips, []);
 });
 
 test('a flip after main moved is a different base and is not a flake', () => {
-  let ledger = loadLedger(null, { now });
+  let ledger = fresh();
   ledger = recordRun(ledger, run(), { now }).ledger;
   const result = recordRun(
     ledger,
     run({
-      runId: 3,
       runAttempt: 2,
       conclusion: 'success',
       baseSha: BASE_2,
@@ -68,64 +85,170 @@ test('a flip after main moved is a different base and is not a flake', () => {
 });
 
 test('runs without a base SHA are never recorded as flake evidence', () => {
-  const ledger = loadLedger(null, { now });
-  const result = recordRun(
-    ledger,
-    run({ baseSha: null, observedAt: '2026-11-19T10:00:00Z' }),
-    { now }
-  );
+  const result = recordRun(fresh(), run({ baseSha: null }), { now });
   assert.deepEqual(result.flips, []);
   assert.deepEqual(result.ledger.failures, []);
 });
 
-test('two or more flips in seven days make a repeat offender with a test file', () => {
-  let ledger = loadLedger(null, { now });
-  const failure = over =>
-    run({ testFile: 'apps/web/tests/unit/ci/example.test.ts', ...over });
-  ledger = recordRun(ledger, failure({ runId: 1 }), { now }).ledger;
+test('two verified test flips in seven days make a repeat offender keyed on the test file', () => {
+  let ledger = fresh();
+  const flip = (runId, headSha, attempt, conclusion, at) =>
+    recordRun(
+      ledger,
+      run({
+        runId,
+        headSha,
+        runAttempt: attempt,
+        conclusion,
+        observedAt: at,
+        testFile: 'apps/web/tests/unit/ci/example.test.ts',
+      }),
+      { now }
+    ).ledger;
+  ledger = flip(1, HEAD_A, 1, 'failure', '2026-11-18T09:00:00Z');
+  ledger = flip(1, HEAD_A, 2, 'success', '2026-11-18T10:00:00Z');
+  ledger = flip(2, HEAD_B, 1, 'timed_out', '2026-11-19T09:00:00Z');
+  ledger = flip(2, HEAD_B, 2, 'success', '2026-11-19T10:00:00Z');
+  const offenders = repeatOffenders(ledger, { now });
+  assert.equal(offenders.length, 1);
+  assert.equal(offenders[0].test, 'apps/web/tests/unit/ci/example.test.ts');
+  assert.equal(offenders[0].flips, 2);
+});
+
+test('evidence-gate flips are counted separately and never quarantine a test', () => {
+  let ledger = fresh();
+  const gate = over => run({ failedSubjects: ['job:PR Ready'], ...over });
+  ledger = recordRun(ledger, gate(), { now }).ledger;
   ledger = recordRun(
     ledger,
-    failure({
-      runId: 2,
+    gate({
       runAttempt: 2,
       conclusion: 'success',
       observedAt: '2026-11-19T11:00:00Z',
     }),
     { now }
   ).ledger;
-  ledger = recordRun(ledger, failure({ runId: 3, headSha: HEAD_B }), {
-    now,
-  }).ledger;
-  ledger = recordRun(
+  assert.deepEqual(repeatOffenders(ledger, { now }), []);
+  const metrics = reportMetrics(ledger, { now });
+  assert.equal(metrics.verifiedFlips, 1);
+  assert.equal(metrics.evidenceGateFlips, 1);
+  assert.equal(metrics.testFlips, 0);
+});
+
+test('bulk reruns (5+ runs by one actor in 10 minutes) never count as flakes', () => {
+  let ledger = fresh();
+  // The Nov 14 shape: five failing runs, then one actor bulk-reruns all five
+  // within ten minutes. Every flip lands on the bulk line, none on flakes.
+  for (let i = 1; i <= 5; i++)
+    ledger = recordRun(
+      ledger,
+      run({
+        runId: i,
+        conclusion: 'failure',
+        observedAt: '2026-11-19T09:00:00Z',
+      }),
+      { now }
+    ).ledger;
+  for (let i = 1; i <= 5; i++) {
+    const at = new Date(
+      Date.parse('2026-11-19T10:00:00Z') + i * 60_000
+    ).toISOString();
+    ledger = recordRun(
+      ledger,
+      run({
+        runId: i,
+        runAttempt: 2,
+        conclusion: 'success',
+        actor: 'itstimwhite',
+        rerunAt: at,
+        observedAt: at,
+      }),
+      { now }
+    ).ledger;
+  }
+  assert.deepEqual(repeatOffenders(ledger, { now }), []);
+  const metrics = reportMetrics(ledger, { now });
+  assert.equal(metrics.bulkRerunRuns, 5);
+  assert.equal(metrics.verifiedFlips, 0);
+  // A different actor's rerun outside any bulk window still flips.
+  const solo = recordRun(
     ledger,
-    failure({
-      runId: 4,
-      headSha: HEAD_B,
-      runAttempt: 2,
-      conclusion: 'success',
+    run({
+      runId: 9,
+      runAttempt: 1,
+      conclusion: 'failure',
       observedAt: '2026-11-19T12:00:00Z',
     }),
     { now }
   ).ledger;
-  const offenders = repeatOffenders(ledger, { now });
-  assert.equal(offenders.length, 1);
-  assert.equal(offenders[0].flips, 2);
-  assert.deepEqual(offenders[0].testFiles, [
-    'apps/web/tests/unit/ci/example.test.ts',
-  ]);
+  const flipped = recordRun(
+    solo,
+    run({
+      runId: 9,
+      runAttempt: 2,
+      conclusion: 'success',
+      actor: 'ci-bot',
+      rerunAt: '2026-11-19T13:00:00Z',
+      observedAt: '2026-11-19T13:00:00Z',
+    }),
+    { now }
+  );
+  assert.equal(flipped.flips.length, 1);
+  assert.equal(flipped.flips[0].kind, 'test');
+});
+
+test('reportMetrics publishes n and Wilson 95% intervals', () => {
+  let ledger = fresh();
+  for (let i = 1; i <= 100; i++) {
+    ledger = recordRun(
+      ledger,
+      run({
+        runId: i,
+        conclusion: i <= 2 ? 'failure' : 'success',
+        observedAt: '2026-11-19T10:00:00Z',
+      }),
+      { now }
+    ).ledger;
+    if (i <= 2)
+      ledger = recordRun(
+        ledger,
+        run({
+          runId: i,
+          runAttempt: 2,
+          conclusion: 'success',
+          observedAt: '2026-11-19T10:05:00Z',
+        }),
+        { now }
+      ).ledger;
+  }
+  const metrics = reportMetrics(ledger, { now });
+  assert.equal(metrics.n, 102);
+  assert.equal(metrics.verifiedFlips, 2);
+  assert.equal(metrics.testFlips, 2);
+  assert.ok(Math.abs(metrics.flipRate - 2 / 102) < 1e-9);
+  assert.ok(metrics.flipCi95.lo >= 0 && metrics.flipCi95.hi <= 1);
+  assert.ok(metrics.testFlipCi95.lo > 0 && metrics.testFlipCi95.hi < 1);
+});
+
+test('wilson95 is exact on a known value and null without samples', () => {
+  // k=2, n=100, z=1.96: Wilson interval ~[0.0055, 0.0700]
+  const ci = wilson95(2, 100);
+  assert.ok(Math.abs(ci.lo - 0.0055) < 0.0005, JSON.stringify(ci));
+  assert.ok(Math.abs(ci.hi - 0.07001) < 0.0005, JSON.stringify(ci));
+  assert.equal(wilson95(0, 0), null);
 });
 
 test('the seven day window prunes old evidence', () => {
-  let ledger = loadLedger(null, { now });
-  ledger = recordRun(ledger, run({ observedAt: '2026-11-05T00:00:00Z' }), {
-    now,
-  }).ledger;
-  const pruned = loadLedger(ledger, { now });
-  assert.deepEqual(pruned.failures, []);
+  const ledger = recordRun(
+    fresh(),
+    run({ observedAt: '2026-11-05T00:00:00Z' }),
+    { now }
+  ).ledger;
+  assert.deepEqual(loadLedger(ledger, { now }).failures, []);
 });
 
 test('retry quota allows one rerun per head base workflow per day', () => {
-  let ledger = loadLedger(null, { now });
+  let ledger = fresh();
   const key = {
     headSha: HEAD_A,
     baseSha: BASE_1,

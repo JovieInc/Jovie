@@ -47,10 +47,12 @@ function ledgerWithFlips() {
       },
       { now }
     ).ledger;
+  // Verified flip (v1): attempt 2 of the SAME run id flips the attempt-1
+  // failure; runs 1 and 2 are two runs on two heads, same fetched base.
   ledger = attempt(1, sha40('a'), 'failure', 1, '2026-11-18T09:00:00.000Z');
-  ledger = attempt(2, sha40('a'), 'success', 2, '2026-11-18T10:00:00.000Z');
-  ledger = attempt(3, sha40('b'), 'failure', 1, '2026-11-19T09:00:00.000Z');
-  ledger = attempt(4, sha40('b'), 'success', 2, '2026-11-19T10:00:00.000Z');
+  ledger = attempt(1, sha40('a'), 'success', 2, '2026-11-18T10:00:00.000Z');
+  ledger = attempt(2, sha40('b'), 'failure', 1, '2026-11-19T09:00:00.000Z');
+  ledger = attempt(2, sha40('b'), 'success', 2, '2026-11-19T10:00:00.000Z');
   return ledger;
 }
 
