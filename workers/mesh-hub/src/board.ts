@@ -6,7 +6,14 @@
  * that opens when every child is terminal. Every stage is timestamped per task and agent.
  * Pure store over the DO SqlStorage shape so node:sqlite tests cover it.
  */
-import { HubError, KIND, LIMITS, percentile, type Sql } from './core.ts';
+
+import {
+  listTasks,
+  taskFromRow as row,
+  taskMetrics,
+  taskStages,
+} from './board-query.ts';
+import { HubError, KIND, LIMITS, type Sql } from './core.ts';
 
 export const BOARD_KIND = 'board';
 export const BOARD = {
@@ -129,34 +136,6 @@ function leaseMs(value: unknown): number {
   const ms = Number(value) * 1_000;
   if (!Number.isFinite(ms)) throw new HubError(422, 'invalid_lease');
   return Math.min(Math.max(ms, BOARD.minLeaseMs), BOARD.maxLeaseMs);
-}
-
-function row(raw: Record<string, unknown>): Task {
-  const num = (v: unknown) =>
-    v === null || v === undefined ? null : Number(v);
-  return {
-    id: String(raw.id),
-    parent: (raw.parent as string | null) ?? null,
-    type: raw.type as TaskType,
-    title: String(raw.title),
-    body: String(raw.body),
-    caps: JSON.parse(String(raw.caps)) as string[],
-    poster: String(raw.poster),
-    assignee: (raw.assignee as string | null) ?? null,
-    status: raw.status as TaskStatus,
-    claimant: (raw.claimant as string | null) ?? null,
-    leaseUntil: num(raw.leaseUntil),
-    leaseMs: Number(raw.leaseMs),
-    attempts: Number(raw.attempts),
-    result: (raw.result as string | null) ?? null,
-    answers: JSON.parse(String(raw.answers ?? '[]')),
-    merge: raw.merge ? JSON.parse(String(raw.merge)) : null,
-    postedAt: Number(raw.postedAt),
-    firstClaimedAt: num(raw.firstClaimedAt),
-    claimedAt: num(raw.claimedAt),
-    doneAt: num(raw.doneAt),
-    updatedAt: Number(raw.updatedAt),
-  };
 }
 
 /** Message ids/correlations the board sends look like `t:<taskId>:<stageId>`. */
@@ -828,117 +807,16 @@ export class BoardStore {
   }
 
   list(filter: { status?: string | null; limit?: number }) {
-    const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200);
-    const rows = filter.status
-      ? this.sql.exec(
-          'SELECT * FROM tasks WHERE status = ? ORDER BY postedAt DESC LIMIT ?',
-          filter.status,
-          limit
-        )
-      : this.sql.exec(
-          'SELECT * FROM tasks ORDER BY postedAt DESC LIMIT ?',
-          limit
-        );
-    return rows
-      .toArray()
-      .map(row)
-      .map(task => ({
-        ...task,
-        body: task.body.slice(0, 500),
-        result: task.result?.slice(0, 500) ?? null,
-      }));
+    return listTasks(this.sql, filter);
   }
 
   stages(taskId: string) {
-    return this.sql
-      .exec(
-        'SELECT at, actor, stage, note FROM stages WHERE taskId = ? ORDER BY id',
-        taskId
-      )
-      .toArray()
-      .map(raw => ({
-        at: new Date(Number(raw.at)).toISOString(),
-        actor: String(raw.actor),
-        stage: String(raw.stage),
-        note: raw.note ?? null,
-      }));
+    return taskStages(this.sql, taskId);
   }
 
   /** p50/p95 per agent: post->claim (pickup), claim->done (work), post->done (total). */
   metrics(windowMs: number, now: number) {
-    const rows = this.sql
-      .exec(
-        "SELECT * FROM tasks WHERE doneAt >= ? AND status IN ('done','failed') AND type != 'question'",
-        now - windowMs
-      )
-      .toArray()
-      .map(row)
-      // A fan-out parent closes with its merge result; counting it would double-count the merger.
-      .filter(task => task.merge === null);
-    const lease = this.sql
-      .exec(
-        "SELECT actor, COUNT(*) AS n FROM stages WHERE stage = 'lease_expired' AND at >= ? GROUP BY actor",
-        now - windowMs
-      )
-      .toArray();
-    const by: Record<
-      string,
-      {
-        pickup: number[];
-        work: number[];
-        total: number[];
-        done: number;
-        failed: number;
-      }
-    > = {};
-    for (const task of rows) {
-      const agent = task.claimant ?? 'unknown';
-      const entry = (by[agent] ??= {
-        pickup: [],
-        work: [],
-        total: [],
-        done: 0,
-        failed: 0,
-      });
-      entry[task.status === 'done' ? 'done' : 'failed']++;
-      if (task.firstClaimedAt !== null)
-        entry.pickup.push(task.firstClaimedAt - task.postedAt);
-      if (task.claimedAt !== null && task.doneAt !== null)
-        entry.work.push(task.doneAt - task.claimedAt);
-      if (task.doneAt !== null) entry.total.push(task.doneAt - task.postedAt);
-    }
-    const stat = (values: number[]) => ({
-      p50: percentile(values, 50),
-      p95: percentile(values, 95),
-    });
-    return {
-      windowHours: Math.round(windowMs / 3_600_000),
-      agents: Object.fromEntries(
-        Object.entries(by).map(([agent, entry]) => [
-          agent,
-          {
-            done: entry.done,
-            failed: entry.failed,
-            pickupMs: stat(entry.pickup),
-            workMs: stat(entry.work),
-            totalMs: stat(entry.total),
-          },
-        ])
-      ),
-      leaseExpired: Object.fromEntries(
-        lease.map(raw => [String(raw.actor), Number(raw.n)])
-      ),
-      open: Number(
-        this.sql
-          .exec("SELECT COUNT(*) AS n FROM tasks WHERE status = 'open'")
-          .toArray()[0]?.n ?? 0
-      ),
-      claimed: Number(
-        this.sql
-          .exec("SELECT COUNT(*) AS n FROM tasks WHERE status = 'claimed'")
-          .toArray()[0]?.n ?? 0
-      ),
-    };
+    return taskMetrics(this.sql, windowMs, now);
   }
 
   /** One entry point for REST and `to: board` mesh sends. */

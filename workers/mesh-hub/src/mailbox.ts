@@ -1,7 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   type Delivered,
-  dlqFallbackFull,
   type EnqueueResult,
   type Envelope,
   LIMITS,
@@ -22,6 +21,12 @@ import {
   validateReply,
 } from './executor.ts';
 import { type Liveness, mailboxLiveness } from './mailbox-liveness.ts';
+import {
+  alarmStaleMail,
+  flushDlqSummary,
+  noticeTtlMs,
+  notifyDeadLetter,
+} from './mailbox-sweep.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
 
 export type { Liveness } from './mailbox-liveness.ts';
@@ -481,150 +486,23 @@ export class Mailbox extends DurableObject<Env> {
 
   /** Automated-notice TTL: AUTO_NOTICE_TTL_MS override, clamped to [1 minute, 7 days]. */
   private autoNoticeTtlMs(): number {
-    const raw = Number(this.env.AUTO_NOTICE_TTL_MS);
-    if (!Number.isFinite(raw) || raw <= 0) return LIMITS.autoNoticeTtlMs;
-    return Math.min(Math.max(raw, 60_000), 7 * 86_400_000);
+    return noticeTtlMs(this.env.AUTO_NOTICE_TTL_MS);
   }
 
-  /**
-   * Mail received but not handled within MAIL_STALE_MS (default 10 min) alarms once per
-   * oldest message through the registry (-> Summer + ALERT_KINDS), whatever the cause:
-   * dead reader, executor failure, or no reader at all.
-   */
   private async alarmStale(config: MailboxConfig | null, now: number) {
-    const oldest = this.store.oldestUnackedMessage();
-    if (!config || !oldest) return;
-    const staleMs = Math.max(60_000, Number(this.env.MAIL_STALE_MS ?? 600_000));
-    const age = now - oldest.acceptedAt;
-    if (age < staleMs || this.store.getMeta('staleAlarmedFor') === oldest.id)
-      return;
-    this.store.setMeta('staleAlarmedFor', oldest.id);
-    const registry = this.env.REGISTRY.get(
-      this.env.REGISTRY.idFromName('registry')
-    );
-    await registry.recordEvent('mail.stale', config.kind, {
-      id: oldest.id,
-      from: oldest.from,
-      ageMin: Math.round(age / 60_000),
-      unhandled: this.store.unackedCount(),
-    });
+    await alarmStaleMail(this.env, this.store, config, now);
   }
 
-  /**
-   * Dead-letter bookkeeping: the registry event fires now; the fallback wrapper
-   * is no longer sent per dead message — flushDlq coalesces it per window.
-   */
   private async notifyDead(
     config: MailboxConfig,
     dead: Delivered,
     now: number
   ) {
-    const fallback =
-      config.fallback && config.fallback !== config.kind
-        ? config.fallback
-        : null;
-    const registry = this.env.REGISTRY.get(
-      this.env.REGISTRY.idFromName('registry')
-    );
-    await registry.recordEvent('message.dead', config.kind, {
-      id: dead.id,
-      from: dead.from,
-      fallback,
-    });
-    if (!fallback) return;
-    this.store.recordDlqDead(
-      config.kind,
-      fallback,
-      dead.seq,
-      now,
-      LIMITS.dlqCoalesceMs
-    );
+    await notifyDeadLetter(this.env, this.store, config, dead, now);
   }
 
-  /**
-   * Coalesced DLQ: at most one summary wrapper per (mailbox, fallback) per
-   * LIMITS.dlqCoalesceMs, carrying a count plus first/last seq instead of one
-   * wrapper per dead message. A fallback that is itself full (or at
-   * LIMITS.dlqFullFraction of cap) gets no wrapper at all — just a registry
-   * event. Automated notices are never accumulated here (see sweepDead).
-   */
   private async flushDlq(config: MailboxConfig, now: number) {
-    const fallback =
-      config.fallback && config.fallback !== config.kind
-        ? config.fallback
-        : null;
-    if (!fallback) return;
-    const summary = this.store.pendingDlqSummary(
-      config.kind,
-      fallback,
-      now,
-      LIMITS.dlqCoalesceMs
-    );
-    if (!summary) return;
-    const registry = this.env.REGISTRY.get(
-      this.env.REGISTRY.idFromName('registry')
-    );
-    const stub = this.env.MAILBOX.get(this.env.MAILBOX.idFromName(fallback));
-    let fallbackUnacked: number | null = null;
-    try {
-      fallbackUnacked = await stub.unacked();
-    } catch {
-      fallbackUnacked = null; // unknown fullness: try the enqueue and let 507 decide
-    }
-    const suppress = async (why: string) => {
-      await registry.recordEvent('dlq.suppressed', config.kind, {
-        fallback,
-        fallbackUnacked: fallbackUnacked ?? -1,
-        count: summary.count,
-        firstSeq: summary.firstSeq,
-        lastSeq: summary.lastSeq,
-        why,
-      });
-      this.store.clearDlqSummary(config.kind, fallback);
-    };
-    if (dlqFallbackFull(fallbackUnacked)) {
-      await suppress('fallback_full');
-      return;
-    }
-    const body = JSON.stringify({
-      schema: 'jovie.mesh-undeliverable/v1',
-      summary: true,
-      originalTo: config.kind,
-      count: summary.count,
-      firstSeq: summary.firstSeq,
-      lastSeq: summary.lastSeq,
-      windowStart: new Date(summary.windowStart).toISOString(),
-      note: `Summary of ${summary.count} unhandled message(s) in ${config.kind}'s mailbox between seq ${summary.firstSeq} and ${summary.lastSeq}. The originals stay queued for ${config.kind}; reply on the mesh to take any of them over.`,
-    });
-    const wrapper: Envelope = {
-      id: `mesh-hub:dlq-sum:${config.kind}:${summary.windowStart}`,
-      from: 'mesh-hub',
-      to: fallback,
-      correlationId: `dlq-sum:${config.kind}:${summary.windowStart}`,
-      sha256: await sha256Hex(body),
-      body,
-      refs: [],
-      inReplyTo: null,
-      sentAt: null,
-      acceptedAt: Date.now(),
-      kind: 'undeliverable',
-    };
-    let result: EnqueueResult;
-    try {
-      result = await stub.enqueue(wrapper);
-    } catch {
-      // Transport error: keep the summary; the next sweep retries it.
-      return;
-    }
-    if (result.ok || result.status === 409) {
-      this.store.clearDlqSummary(config.kind, fallback);
-      return;
-    }
-    if (result.status === 507) {
-      await suppress('fallback_full');
-      return;
-    }
-    throw new Error(`dead-letter summary enqueue failed: ${result.code}`);
+    await flushDlqSummary(this.env, this.store, config, now);
   }
 
   /** Push to Summer's webhook; 2xx = durable handoff to Summer's receiver. Only bad-message 4xx is terminal. */
