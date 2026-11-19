@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "1bd8b0d403e47bcb0b23fdbd8e8afc642136d978489bb415a7db05169bb98d4c"
+    "bodySha256": "1446014ed54249c991905ac56b9551be78a2f9fa86b2d569f1db048c5bda50e7"
   },
   {
     "file": ".claude/rules/code-style.md",
