@@ -56,6 +56,7 @@ import {
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { STRUCTURAL_PYTEST_XDIST_N } from '../ci-runner-worker-policy.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
 import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
@@ -282,6 +283,12 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(shim, 0o755);
+      // Hosted ubuntu-latest is 4 vCPU; the nproc/2 expression must resolve
+      // to 2 here so the overlapping shards fill the machine without
+      // oversubscribing.
+      const nprocShim = join(root, 'nproc');
+      writeFileSync(nprocShim, '#!/bin/sh\necho 4\n');
+      chmodSync(nprocShim, 0o755);
       const result = spawnSync('/bin/sh', ['-c', command], {
         encoding: 'utf8',
         env: {
@@ -351,7 +358,7 @@ describe('ci-fast bounded parallel workflow', () => {
     const version = /^pytest-xdist==(\S+)$/mu.exec(requirementsIn)?.[1];
     expect(version).toBeTruthy();
     // xdist and its execnet dependency must be hash-pinned: the structural
-    // step installs with --require-hashes and `-n 2` fails without xdist.
+    // step installs with --require-hashes and `-n` >1 fails without xdist.
     for (const pkg of [`pytest-xdist==${version}`, 'execnet==']) {
       const start = requirementsTxt.indexOf(`\n${pkg}`);
       expect(start, `${pkg} missing from pytest.txt`).toBeGreaterThan(-1);
@@ -398,8 +405,10 @@ describe('ci-fast bounded parallel workflow', () => {
     for (const shard of shards) {
       expect(shard.files).toEqual([...STRUCTURAL_PYTEST_FILES]);
       expect(shard.command).toContain('--durations=20 -v');
-      // Each shard fans out over two xdist workers (both shards overlap).
-      expect(shard.command).toContain('-m pytest -n 2 ');
+      // Each shard fans out over nproc/2 xdist workers (both shards overlap).
+      expect(shard.command).toContain(
+        `-m pytest -n ${STRUCTURAL_PYTEST_XDIST_N} `
+      );
       // Shards overlap in the pool: no shared .pytest_cache or basetemp.
       expect(shard.command).toContain('-p no:cacheprovider');
       expect(structuralLocks(shard.command)).toEqual([]);
@@ -1075,7 +1084,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
     expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
     expect(surfaces).toContain('--project=chromium --reporter=line');
-    expect(surfaces).toContain('--workers=2');
+    expect(surfaces).toContain('--workers=3');
   });
 
   it('runs destructive Button contrast proof through the guarded Storybook matrix', () => {

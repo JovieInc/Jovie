@@ -151,7 +151,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayout.if).not.toContain("github.event_name == 'pull_request'");
   });
 
-  it('runs three two-worker browser shards beside one merge-group certification', () => {
+  it('runs three three-worker browser shards beside one merge-group certification', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
     // Three disjoint Playwright shards cover the full spec list. Merge groups
@@ -168,7 +168,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}');
     const command = String(matrix.step.run).replace(/\s*\\\n\s*/g, ' ');
     expect(command).toMatch(
-      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD\/3"/
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=3 --shard="\$STORYBOOK_SHARD\/3"/
     );
     expect(command).not.toMatch(/--update-snapshots|--retries|--repeat-each/);
     const config = readFileSync(

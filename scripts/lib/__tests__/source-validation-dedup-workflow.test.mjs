@@ -165,7 +165,11 @@ test('cancellation is isolated from every original source job and required check
   assert.equal(cleanup.name, 'Source Validation / cancel superseded heads');
   const reservedNames = new Set([
     ...requiredContexts(root),
-    ...Object.values(baseline.jobs).map(job => job.name),
+    // The base may already carry this cleanup job once it lands on main;
+    // only the original source jobs' names are reserved.
+    ...Object.entries(baseline.jobs)
+      .filter(([id]) => id !== 'cancel-superseded')
+      .map(([, job]) => job.name),
   ]);
   assert.ok(!reservedNames.has(cleanup.name));
   for (const job of Object.values(workflow.jobs)) {

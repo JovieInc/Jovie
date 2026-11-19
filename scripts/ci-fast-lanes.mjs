@@ -84,6 +84,7 @@ import {
   affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { STRUCTURAL_PYTEST_XDIST_N } from './lib/ci-runner-worker-policy.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
@@ -803,11 +804,12 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
 
 /** @param {string} shard @param {string} expression */
 // The suite spawns thousands of short-lived jq/gh/node processes, so it is
-// CPU-bound on process startup: pytest-xdist spreads each shard over two
-// workers. Two, not auto: both shards run concurrently on the 4 vCPU
-// structural python job; more workers measured slower (JovieInc/Jovie#18657).
+// CPU-bound on process startup. JOV-13107: each shard's xdist N is nproc
+// divided by the two overlapping shards on this 4 vCPU job. Literal `-n auto`
+// per shard was measured slower (JovieInc/Jovie#18657). This is not a shard
+// count change (JOV-13072).
 const structuralPytestShard = (shard, expression) =>
-  `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
+  `python3 -m pytest -n ${STRUCTURAL_PYTEST_XDIST_N} --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
 export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
   structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
@@ -1136,6 +1138,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
   'scripts/lib/__tests__/ci-structural-shards.test.mjs',
+  'scripts/lib/__tests__/ci-runner-worker-policy.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',

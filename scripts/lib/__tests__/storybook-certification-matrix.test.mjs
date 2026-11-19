@@ -119,7 +119,7 @@ describe('combined-head Storybook certification deduplication', () => {
       expect(
         result.stdout.match(/tests\/e2e\/storybook-scoped-theme\.spec\.ts/g)
       ).toHaveLength(1);
-      expect(result.stdout).toContain(`--workers=2 --shard=${shard}/3`);
+      expect(result.stdout).toContain(`--workers=3 --shard=${shard}/3`);
     },
     40_000
   );
