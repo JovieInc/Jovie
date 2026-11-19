@@ -1004,6 +1004,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:notify-failure
     jobCount: 10
+  - name: PR Body Lint
+    path: .github/workflows/pr-body-lint.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:lint
+    jobCount: 1
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false

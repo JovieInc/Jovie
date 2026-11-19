@@ -231,6 +231,7 @@
     "preflight:remote": "node scripts/preflight-remote.mjs",
     "pr:comment": "node scripts/pr-comment.mjs",
     "pr:open": "node scripts/pr-open.mjs",
+    "pr:body-lint": "node scripts/pr-body-lint.mjs",
     "copy-inventory": "node scripts/copy-inventory/extract.mjs",
     "test:copy-inventory": "node --test scripts/copy-inventory/extract.test.mjs",
     "ci:rounds": "node scripts/ci-rounds-report.mjs",
