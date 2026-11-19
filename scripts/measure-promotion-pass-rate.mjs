@@ -12,9 +12,12 @@ const q = `query($q:String!,$c:String){search(type:ISSUE,query:$q,first:50,after
 const client = createGitHubClient({
   token: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
 });
-let c = null,
-  rows = [];
-do {
+// One bounded cursor walk over a fixed cohort (not polling): GitHub search
+// caps results at 1,000, so 20 pages of 50 is the whole window.
+const MAX_PAGES = 20;
+let c = null;
+const rows = [];
+for (let page = 0; page < MAX_PAGES; page += 1) {
   const data = await client.graphql(
     q,
     { q: `repo:${repo} is:pr updated:>=${since}`, c },
@@ -22,8 +25,9 @@ do {
   );
   const s = data.search;
   rows.push(...s.nodes);
-  c = s.pageInfo.hasNextPage ? s.pageInfo.endCursor : null;
-} while (c);
+  if (!s.pageInfo.hasNextPage) break;
+  c = s.pageInfo.endCursor;
+}
 const promoted = rows.filter(r =>
   r.timelineItems.nodes.some(
     n => n.__typename === 'ReadyForReviewEvent' && n.createdAt >= since

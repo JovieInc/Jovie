@@ -219,6 +219,7 @@ jobs:
             scripts/lib
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
+            scripts/lib/admission-hold-labels.json
           sparse-checkout-cone-mode: false
       - name: Generate Jovie Bot token
         id: app-token
@@ -1121,6 +1122,10 @@ jobs:
             scripts/version-fanout-guard.mjs
             packages/api-client
             scripts/lib
+            scripts/lib/admission-hold-labels.json
+            scripts/lib/admission-hold-labels.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
