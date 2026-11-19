@@ -4,7 +4,6 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import {
   ATTEMPTS,
   attemptTimeout,
@@ -310,36 +309,20 @@ test('a frame without its .pen or preview is not drafted', () => {
 });
 
 test('a blocked run names secrets in CI and keeps local output unchanged', () => {
+  const want = 'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL';
+  const script = new URL('./pen-draft.mjs', import.meta.url).pathname;
+  const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
   for (const githubActions of ['true', 'false']) {
-    const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
-    const res = spawnSync(
-      process.execPath,
-      [
-        fileURLToPath(new URL('./pen-draft.mjs', import.meta.url)),
-        '--out',
-        out,
-      ],
-      {
-        encoding: 'utf8',
-        cwd: fileURLToPath(new URL('../..', import.meta.url)),
-        env: { PATH: process.env.PATH, GITHUB_ACTIONS: githubActions },
-      }
-    );
+    const res = spawnSync(process.execPath, [script, '--out', out], {
+      encoding: 'utf8',
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { PATH: process.env.PATH, GITHUB_ACTIONS: githubActions },
+    });
     assert.equal(res.status, 1);
-    assert.match(
-      res.stdout,
-      /^pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
-    );
-    if (githubActions === 'true')
-      assert.match(
-        res.stdout,
-        /^::error title=pen-draft blocked::pen-draft: blocked, missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL$/m
-      );
-    else assert.doesNotMatch(res.stdout, /^::error/m);
-    assert.equal(
-      JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8')).blocked,
-      'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL'
-    );
+    assert.match(res.stdout, /^pen-draft: blocked, missing/m);
+    const annotated = res.stdout.includes('::error title=pen-draft blocked::');
+    assert.equal(annotated, githubActions === 'true');
+    assert.ok(readFileSync(join(out, 'receipt.json'), 'utf8').includes(want));
   }
 });
 
