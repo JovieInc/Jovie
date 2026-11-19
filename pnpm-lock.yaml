@@ -13171,6 +13171,7 @@ packages:
         optional: true
       socks:
         optional: true
+
   mongodb@7.7.0:
     resolution: {integrity: sha512-XG1xXEqyouAV8GCb3PuRaujofeXKpAJAPvXYWZgHl6Dz4QHSJ1nRLl0+GpqaLTwKvC0RFE9truOur34RNFY1nw==}
     engines: {node: '>=20.19.0'}
