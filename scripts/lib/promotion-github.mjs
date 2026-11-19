@@ -1,3 +1,4 @@
+// api-budget: github-app-core 1200/hr - bounded evidence for enqueue candidates and event-driven ejection feedback
 // Trusted GitHub transport shared by the shadow collector and ejection feedback.
 // No PR code is checked out or executed. Every request/clock is injectable.
 import { createHash } from 'node:crypto';
@@ -35,7 +36,12 @@ export async function reconcileQueueRetry(input, net) {
       evidence,
     };
   } catch {
-    return { allow: false, reason: 'head-unchanged-non-infra', retry: false };
+    return {
+      allow: false,
+      reason: 'head-unchanged-non-infra',
+      retry: false,
+      evidence: undefined,
+    };
   }
 }
 
@@ -43,7 +49,7 @@ export async function reconcileQueueRetry(input, net) {
 export async function reconcileVictimRearms(
   candidates,
   net,
-  { plan, apply, enqueue, exec, log = console.log, ...io }
+  { plan, apply, enqueue, exec = undefined, log = console.log, ...io }
 ) {
   for (const candidate of candidates) {
     const decision = await reconcileQueueRetry(
@@ -137,8 +143,8 @@ export function artifactJson(buffer, filename) {
 }
 
 export function githubIo({
-  repo,
-  token,
+  repo = '',
+  token = '',
   fetch: request = globalThis.fetch,
   now = Date.now,
   clientOptions = {},
@@ -168,7 +174,10 @@ export function githubIo({
       });
     },
   });
-  const api = async (path, { method = 'GET', body, binary = false } = {}) => {
+  /** @overload @param {string} path @param {{method?: string, body?: unknown, binary: true}} options @returns {Promise<Buffer>} */
+  /** @overload @param {string} path @param {{method?: string, body?: unknown, binary?: false}} [options] @returns {Promise<import('./promotion-github-types.js').GitHubJson>} */
+  /** @param {string} path @param {{method?: string, body?: unknown, binary?: boolean}} [options] */
+  async function api(path, { method = 'GET', body, binary = false } = {}) {
     if (!token) throw new Error('trusted token unavailable');
     const response = await client.rest(method, path, body, {
       priority: 'merge',
@@ -179,12 +188,16 @@ export function githubIo({
     });
     if (response.status < 200 || response.status >= 300)
       throw new Error(`GitHub ${response.status}: ${path.split('?')[0]}`);
+    const json =
+      /** @type {import('./promotion-github-types.js').GitHubJson} */ (
+        response.json()
+      );
     return binary
-      ? Buffer.from(response.json().archiveBase64, 'base64')
+      ? Buffer.from(json.archiveBase64, 'base64')
       : response.status === 204
         ? null
-        : response.json();
-  };
+        : json;
+  }
   const get = path => api(`repos/${repo}/${path}`);
   const pages = async (path, key) => {
     const rows = [];

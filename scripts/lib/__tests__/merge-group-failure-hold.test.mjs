@@ -55,7 +55,7 @@ import {
 
 const REPOSITORY = 'JovieInc/Jovie';
 
-it('imports the real failure policy from both workflow sparse checkouts', () => {
+it('imports the real failure policy from all three workflow sparse checkouts', () => {
   const root = fileURLToPath(new URL('../../../', import.meta.url));
   const workflow = readFileSync(
     join(root, '.github/workflows/merge-queue-green-enroll.yml'),
@@ -71,7 +71,7 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         .map(line => line.trim())
     )
     .filter(paths => paths.includes('scripts/merge-group-failure-hold.mjs'));
-  expect(manifests).toHaveLength(2);
+  expect(manifests).toHaveLength(3);
   for (const paths of manifests) {
     const dir = mkdtempSync(join(tmpdir(), 'failure-hold-sparse-'));
     const execute = (command, args, input) => {

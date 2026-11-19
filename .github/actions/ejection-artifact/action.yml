@@ -1,0 +1,5 @@
+name: Upload advisory ejection receipt
+description: Run the pinned artifact uploader and log failures without failing admission
+runs:
+  using: node24
+  main: upload.mjs

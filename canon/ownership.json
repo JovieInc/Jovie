@@ -42,6 +42,7 @@
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
+    {"id": "workflow:ejection-classifier", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ejection-classifier.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},
     {"id": "workflow:fleet-gate-refresh", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/fleet-gate-refresh.yml"},

@@ -35,7 +35,7 @@ export function lowerBound(successes, n) {
 }
 export function evaluate(
   x,
-  { now, maxAgeMs = 30 * 60 * 1000, calibrated = false } = {}
+  { now = NaN, maxAgeMs = 30 * 60 * 1000, calibrated = false } = {}
 ) {
   const failures = [],
     warnings = [];

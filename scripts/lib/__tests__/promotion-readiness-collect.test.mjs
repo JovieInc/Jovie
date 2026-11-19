@@ -50,6 +50,7 @@ function fixture() {
     outsideReview: async () => ({ pass: true }),
     retry: async () => ({ complete: true, runs: [], receipts: [], retries: 0 }),
     selectedSuites: async () => selected,
+    /** @returns {Promise<Array<Partial<typeof bundle>>>} */
     bundles: async () => [bundle],
     queue: async () => ({ complete: true, version: 'q1', entries: [] }),
     health: async () => ({ complete: true, circuitOpen: false }),

@@ -13,24 +13,17 @@
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
  *
  * Env:
- *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
- *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
- *   CI_FAST_LANES_OUT  — optional path for JSON lane results
- *   TURBO_SCM_BASE     — for typecheck --affected
- *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
- *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
+ *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY;
+ *   CI_FAST_LANE_GROUP selects a hosted group (default all); CI_FAST_LANES_OUT writes JSON.
+ *   TURBO_SCM_BASE scopes typecheck; CI_FAST_SKIP_STRUCTURAL / CI_FAST_ONLY_STRUCTURAL select structural lanes.
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
- *   CI_FAST_STRUCTURAL_LANES — only|skip the lanes coverage pytest (its own
- *     matrix job), or only:<group> for one matrix leg (see
- *     LANES_COVERAGE_GROUP_COMMANDS)
+ *   CI_FAST_STRUCTURAL_LANES — only|skip coverage pytest, or only:<group> for one LANES_COVERAGE_GROUP_COMMANDS matrix leg.
  *   CI_FAST_STRUCTURAL_SHARD — "k/n" (1-based) runs only shard k of the
  *     structural command pool (ci-fast (structural core) matrix); unset runs
  *     the whole pool. Invalid values fail closed.
- *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
- *     non-zero stops starting structural commands (fail-fast)
+ *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE stops new commands on a non-zero background cheap-lane status.
  */
-
 import {
   LANES_COVERAGE_FLOORS,
   LANES_PYTEST_SHARDS,
@@ -1029,6 +1022,12 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/merge-queue-guard-hold.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
+  'scripts/lib/__tests__/ejection-classifier.test.mjs',
+  'scripts/lib/__tests__/merge-queue-retry-policy.test.mjs',
+  'scripts/lib/__tests__/promotion-bar-wiring.test.mjs',
+  'scripts/lib/__tests__/promotion-github.test.mjs',
+  'scripts/lib/__tests__/promotion-readiness-collect.test.mjs',
+  'scripts/lib/__tests__/promotion-readiness.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/automation-liveness-gate.test.mjs',
   'scripts/dequeue-held-reason.test.mjs',

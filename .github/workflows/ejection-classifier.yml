@@ -24,7 +24,7 @@ jobs:
       contains(fromJSON('["failure","timed_out","startup_failure","action_required"]'), github.event.workflow_run.conclusion) &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       vars.EJECTION_CLASSIFIER_OFF != '1'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,26 +38,35 @@ jobs:
             scripts/version-fanout-guard.mjs
             packages/api-client
             .github/actions/prime-node-toolcache
+            .github/actions/ejection-artifact
       - name: Prime Node toolcache
         uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      # github-token-budget: 120 calls/run - event-driven ejection evidence and labels; no roster polling
       - name: Classify and record
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-        run: node scripts/lib/ejection-classifier.mjs
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
-        continue-on-error: true
+        run: |
+          node scripts/lib/ejection-classifier.mjs || echo "::notice::Ejection classifier unavailable; admission is unchanged"
+      # Run the pinned uploader in a child process so artifact service errors
+      # are observations; merge gates keep their existing failure behavior.
+      - name: Stage pinned artifact uploader
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          if-no-files-found: ignore
-          name: ejection-${{ github.event.workflow_run.id }}
-          path: ejection.json
-          retention-days: 30
+          repository: actions/upload-artifact
+          ref: ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          path: .ejection-upload
+          persist-credentials: false
+          sparse-checkout: dist/upload
+      - name: Upload advisory receipt
+        if: always()
+        uses: ./.github/actions/ejection-artifact
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}

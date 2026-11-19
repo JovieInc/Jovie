@@ -66,7 +66,7 @@ export function parityMatches(bundle, context, selected, now) {
   );
 }
 
-export async function collectPromotion(input, io, { now } = {}) {
+export async function collectPromotion(input, io, { now = NaN } = {}) {
   if (!Number.isFinite(now)) throw new Error('trusted clock required');
   const context = await io.context(input);
   const tuple = {
@@ -187,12 +187,12 @@ export async function collectPromotion(input, io, { now } = {}) {
 }
 
 export function collectorIo({
-  repo,
-  token,
-  policy,
+  repo = '',
+  token = '',
+  policy = '',
   maxLines = 800,
   maxFiles = 40,
-  transport,
+  transport = undefined,
 } = {}) {
   const net = transport ?? githubIo({ repo, token });
   const main = async () => (await net.get('git/ref/heads/main')).object.sha;
@@ -382,7 +382,7 @@ export function collectorIo({
   };
 }
 
-export async function promotionVerdict(input, io, { now } = {}) {
+export async function promotionVerdict(input, io, { now = NaN } = {}) {
   try {
     const collected = await collectPromotion(input, io, { now });
     // Every REQUIRED gate is included even when an individual adapter fails.
@@ -409,7 +409,7 @@ export async function promotionVerdict(input, io, { now } = {}) {
 export async function logPromotion(
   input,
   io,
-  { now = Date.now(), summary, log = console.log } = {}
+  { now = Date.now(), summary = '', log = console.log } = {}
 ) {
   const verdict = await promotionVerdict(input, io, { now });
   const json = JSON.stringify(verdict);

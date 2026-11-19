@@ -42,6 +42,7 @@
     "desktop-release.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:Production Controller"]},
     "doc-gardening-agent.yml": {"runsPerMergedPr":0,"triggers":["push","workflow_dispatch"]},
     "e2e-full-matrix.yml": {"runsPerMergedPr":0.1,"triggers":["repository_dispatch:clock_e2e_full_matrix","workflow_dispatch"]},
+    "ejection-classifier.yml": {"runsPerMergedPr":19.1,"triggers":["workflow_run:CI","workflow_run:Company Guards","workflow_run:PR Size Guard"]},
     "eve-pilot.yml": {"runsPerMergedPr":0,"triggers":["pull_request","push","workflow_dispatch"]},
     "fixed-runner-canary.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "fleet-gate-refresh.yml": {"runsPerMergedPr":1.7,"triggers":["push","repository_dispatch:linear_triage_assess","workflow_dispatch","workflow_run:CI"]},

@@ -12,7 +12,7 @@ export function parseQueueBranch(branch) {
 }
 
 export function retryDisposition({
-  head,
+  head = '',
   labels = [],
   receipts = [],
   runs = [],
@@ -23,7 +23,7 @@ export function retryDisposition({
   manual = false,
   released = false,
   cascade = false,
-  cascadeRun,
+  cascadeRun = NaN,
 } = {}) {
   const decision = (allow, reason, retry = false) => ({ allow, reason, retry });
   if (circuitOpen) return decision(false, 'circuit-open');

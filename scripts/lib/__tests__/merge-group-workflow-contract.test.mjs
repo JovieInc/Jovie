@@ -42,7 +42,6 @@ import {
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
-
 import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -131,7 +130,6 @@ const EVENT = JSON.parse(
     'utf8'
   )
 );
-
 function getJobBlock(workflow, jobKey) {
   const lines = workflow.split('\n');
   const start = lines.findIndex(line => line === `  ${jobKey}:`);
@@ -4879,19 +4877,17 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(ENROLL).toContain(
       "failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval"
     );
-    // Only a manual removal with a later blocking-label release, and no
-    // revision failure hold, may re-enroll an unchanged removed head.
+    // A later blocking-label release can re-enroll a manual removal without a revision hold.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
-    // JOV-13053: absence of a revision hold no longer grants a blind retry.
-    // Only a classified infra retry or positive cascade can use this path;
-    // existing failure holds still block and admission stays event-driven.
+    // JOV-13053: only classified infra or positive cascades may retry;
+    // existing failure holds block and admission stays event-driven.
     expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
     expect(ENROLL).toContain(
       "['infra-retry', 'cascade-rearm'].includes(retryDecision.reason)"
     );
-    expect(ENROLL).toContain('reason: retryDecision.reason');
-    expect(ENROLL).toContain('promotionGitHub.reconcileQueueRetry({');
+    expect(ENROLL).toContain('failure.reason = retryDecision.reason');
+    expect(ENROLL).toContain('await promotion.retry({');
     expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
     expect(ENROLL).toContain('!humanDequeued');
     expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);

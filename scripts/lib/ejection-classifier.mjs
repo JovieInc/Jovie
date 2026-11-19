@@ -1,3 +1,4 @@
+// api-budget: linear-requests 120/hr - repeated merge-queue failure issue reconciliation
 // Event-driven feedback only. Protected-main policy; never enqueues or emits a check.
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -135,10 +136,10 @@ export function planLinearUpserts({ receipt, history, issues = [], now }) {
 }
 
 export async function upsertLinear({
-  receipt,
-  history,
-  now,
-  key,
+  receipt = undefined,
+  history = [],
+  now = NaN,
+  key = '',
   request = globalThis.fetch,
   clientOptions = {},
 }) {
@@ -214,8 +215,8 @@ export async function runClassifier({
   runId,
   io,
   now,
-  linearKey,
-  request,
+  linearKey = '',
+  request = globalThis.fetch,
   writeReceipt = value => writeFileSync('ejection.json', JSON.stringify(value)),
 }) {
   const run = await io.get(`actions/runs/${runId}`);

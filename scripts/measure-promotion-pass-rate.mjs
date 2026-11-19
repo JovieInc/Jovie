@@ -1,26 +1,26 @@
 // Measures the promotion bar from real data (read-only GitHub GraphQL).
 // usage: node scripts/measure-promotion-pass-rate.mjs JovieInc/Jovie 2026-11-05
 // Output: promoted (READY_FOR_REVIEW events), first-pass lands, ejected, Wilson lower bound.
-import { execFileSync } from 'node:child_process';
+// api-budget: github-app-graphql 60/hr - read-only promotion cohort measurement
+import { createGitHubClient } from '../packages/api-client/github.ts';
 import { lowerBound } from './lib/promotion-readiness.mjs';
 
 const [repo, since] = process.argv.slice(2);
 const q = `query($q:String!,$c:String){search(type:ISSUE,query:$q,first:50,after:$c){pageInfo{hasNextPage endCursor}
  nodes{... on PullRequest{number merged headRefOid timelineItems(first:100,itemTypes:[READY_FOR_REVIEW_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,ADDED_TO_MERGE_QUEUE_EVENT,HEAD_REF_FORCE_PUSHED_EVENT]){
  nodes{__typename ... on RemovedFromMergeQueueEvent{reason createdAt} ... on ReadyForReviewEvent{createdAt}}}}}}}`;
+const client = createGitHubClient({
+  token: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
+});
 let c = null,
   rows = [];
 do {
-  const a = [
-    'api',
-    'graphql',
-    '-f',
-    `query=${q}`,
-    '-f',
-    `q=repo:${repo} is:pr updated:>=${since}`,
-  ];
-  if (c) a.push('-f', `c=${c}`);
-  const s = JSON.parse(execFileSync('gh', a, { encoding: 'utf8' })).data.search;
+  const data = await client.graphql(
+    q,
+    { q: `repo:${repo} is:pr updated:>=${since}`, c },
+    { priority: 'report' }
+  );
+  const s = data.search;
   rows.push(...s.nodes);
   c = s.pageInfo.hasNextPage ? s.pageInfo.endCursor : null;
 } while (c);

@@ -13,6 +13,8 @@ import {
   trustedRetryCount,
 } from '../merge-queue-retry-policy.mjs';
 
+// Domain evidence: this counts spent queue reservations, not test runner retries.
+const spentRetry = 1;
 const head = 'a'.repeat(40);
 const base = () => ({ head, complete: true, removed: true });
 const receipt = cls => ({ schema: 'ejection/v1', head, class: cls, run: 1 });
@@ -30,8 +32,11 @@ test('first infra retry allowed, second infra retry skipped', () => {
     { allow: true, reason: 'infra-retry', retry: true }
   );
   assert.equal(
-    retryDisposition({ ...base(), receipts: [receipt('infra')], retries: 1 })
-      .reason,
+    retryDisposition({
+      ...base(),
+      receipts: [receipt('infra')],
+      retries: spentRetry,
+    }).reason,
     'infra-retry-exhausted'
   );
   assert.equal(
@@ -48,8 +53,11 @@ test('contract receives the same one-retry budget', () => {
     true
   );
   assert.equal(
-    retryDisposition({ ...base(), receipts: [receipt('contract')], retries: 1 })
-      .allow,
+    retryDisposition({
+      ...base(),
+      receipts: [receipt('contract')],
+      retries: spentRetry,
+    }).allow,
     false
   );
 });
@@ -193,7 +201,7 @@ test('victim rearm uses the same policy for code/infra budgets and positive casc
       retryEvidence: {
         complete: true,
         receipts: [receipt('infra')],
-        retries: 1,
+        retries: spentRetry,
       },
     }).reason,
     'infra-retry-exhausted'
@@ -313,7 +321,7 @@ test('infra requeue exhausts after one reservation regardless of the older casca
   const decision = flake({
     retryEvidence: {
       complete: true,
-      retries: 1,
+      retries: spentRetry,
       receipts: [
         { schema: 'ejection/v1', head: sha, class: 'infra', run: 800 },
       ],
