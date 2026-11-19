@@ -259,6 +259,19 @@ describe('launch-core-flag-check (JOV-13132)', () => {
         patterns: ['allowlist-gate'],
         matched: 'allowlist gate',
       });
+      // Casing games the same gate word (camelCase identifiers count).
+      expect(
+        scanLine('if (betaAllowlist.has(user.id)) return <FullProfile />;')
+      ).toEqual({
+        patterns: ['allowlist-gate'],
+        matched: 'allowlist gate',
+      });
+      expect(
+        scanLine('if (whiteList.includes(email)) return <Checkout />;')
+      ).toEqual({
+        patterns: ['allowlist-gate'],
+        matched: 'allowlist gate',
+      });
       expect(scanLine('if (NEW_CHECKOUT_ENABLED) return null;')).toEqual({
         patterns: ['flag-identifier'],
         matched: 'gate identifier',

@@ -76,8 +76,9 @@ const FLAG_LIB =
 const ROLLOUT =
   /(?:Math\.random\(\)|\b(?:rollout(?:Percentage|Percent)?|percent(?:age)?Enabled|percentRollout|abTest(?:ing)?|bucketUser|bucketFor|cohortFor|holdback)\b)/i;
 
-/** Allowlist / whitelist gating of who sees the behavior. */
-const ALLOWLIST = /\b(?:allow[-_]?list|white[-_]?list)s?\b/i;
+/** Allowlist / whitelist gating of who sees the behavior (any casing). */
+const ALLOWLIST =
+  /\b\w*[Aa]llow(?:[-_]?[Ll]ist|list)\b|\b\w*[Ww]hite(?:[-_]?[Ll]ist|list)\b/;
 
 /** A runtime environment read. */
 const ENV_READ =
