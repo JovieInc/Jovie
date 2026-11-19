@@ -158,6 +158,14 @@ export function buildFlipQuarantinePlan({
  * Applies the plan: Linear owner issues, validated ledger mutation, draft
  * PR. The ledger evidence lives in the PR body so the quarantine is never
  * asserted without receipts.
+ * @param {{
+ *   ledger: object,
+ *   quarantine: object,
+ *   root?: string,
+ *   now?: number,
+ *   execute?: (command: string, args: string[], options?: object) => string,
+ *   upsert?: (issue: object) => Promise<{ ok?: boolean, url?: string, identifier?: string }>,
+ * }} input
  */
 export async function applyFlipQuarantinePlan({
   ledger,

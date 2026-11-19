@@ -76,8 +76,11 @@ export function normalizeRun(record) {
   };
 }
 
-/** Drops events older than the window; bounds the ledger size. */
-export function pruneLedger(ledger, { now } = {}) {
+/** Drops events older than the window; bounds the ledger size.
+ *  @param {{ now?: number }} [options]
+ */
+export function pruneLedger(ledger, options = {}) {
+  const now = options.now ?? Date.now();
   const floor = now - FLIP_WINDOW_MS;
   const inWindow = event => Date.parse(event.at) >= floor;
   return {
@@ -300,13 +303,14 @@ const INFRA_PATTERNS = [
   },
 ];
 
+const verdict = (retryable, kind, reason) => ({ retryable, kind, reason });
+
 /**
  * One-bounded-retry classifier for CI reruns. Test assertions win over
  * infrastructure words in the same evidence: a run that shows a real
  * assertion is never rerun to green. Unclassified evidence fails closed.
+ * @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string }} [failure]
  */
-const verdict = (retryable, kind, reason) => ({ retryable, kind, reason });
-
 export function classifyRerunEligibility({
   conclusion,
   failedSteps = [],
