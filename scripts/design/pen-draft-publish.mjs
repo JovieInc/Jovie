@@ -44,9 +44,7 @@ export const CREATE_STATE_NAME = 'Backlog';
  * @typedef {{apiKey?: string, fetchImpl: typeof fetch, env: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} Context
  */
 
-// One standing issue for run-level deferral notes (JOV-12708): a frame the
-// drafting agent could not draw for want of model quota has no draft to
-// approve, so it gets no approval issue — it gets a comment here.
+// One standing issue for run-level deferral notes (JOV-12708): no draft to approve gets a comment here, not an approval issue.
 export const DEFERRED_TITLE =
   'Pen drafts deferred: drafting agent out of quota';
 export const DEFERRED_DESCRIPTION =
