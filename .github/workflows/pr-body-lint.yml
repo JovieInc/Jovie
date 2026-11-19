@@ -1,0 +1,75 @@
+# PR description fleet-rules lint: advisory, event-driven, never required.
+# Runs the SAME validator as "PR Fleet Rules" (scripts/pr-fleet-rules.mjs via
+# scripts/lib/pr-body-fleet.mjs), taken from the BASE commit so a PR cannot
+# weaken the judge that reads it. Output: ::warning annotations without
+# file/line (no review threads, no comments) + a job summary table of
+# rule -> fix + a JSON receipt artifact for hit-rate measurement.
+# Never posts comments or reviews; zero GitHub REST calls (files come from git).
+# Mode: .github/pr-body-lint.json on the base (off|warn|enforce, default warn).
+# Kill switch: repo variable PR_BODY_LINT_MODE=off. Do NOT add this check to
+# required status checks; promotion criteria live in docs (pr-body-check README).
+name: PR Body Lint
+on:
+  # Uses pull_request, not the privileged target event: fork PRs run
+  # base-scoped with a read-only token and no secrets, which is all this job needs.
+  pull_request:
+    types: [opened, edited, reopened]
+permissions:
+  contents: read
+concurrency:
+  # Non-required and idempotent: only the latest body revision matters.
+  group: pr-body-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    name: PR Body Lint (advisory)
+    # Skip edits that change only the base branch; body or title edits run.
+    if: github.event.action != 'edited' || github.event.changes.body != null || github.event.changes.title != null
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-24.04"') }}
+    timeout-minutes: 3
+    steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+      # Merge ref (default for pull_request) with its first parent = base tip.
+      # Unmergeable PRs have no merge ref; the script then lints body only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Lint PR description (advisory)
+        shell: bash
+        env:
+          PR_BODY_LINT_MODE_OVERRIDE: ${{ vars.PR_BODY_LINT_MODE }}
+          PR_BODY_LINT_RECEIPT: ${{ runner.temp }}/pr-body-lint-receipt.json
+        run: |
+          set -uo pipefail
+          judge="$RUNNER_TEMP/pr-body-judge"
+          rm -rf "$judge" && mkdir -p "$judge"
+          # Validator from the base commit, never from the PR head.
+          if ! git archive HEAD^1 scripts/lib/pr-body-fleet.mjs scripts/pr-fleet-rules.mjs scripts/lib/wins-ledger.mjs 2>/dev/null | tar -x -C "$judge"; then
+            echo "::notice title=PR body lint::Validator not on the base branch yet (bootstrap PR or no merge ref); skipped."
+            exit 0
+          fi
+          node "$judge/scripts/lib/pr-body-fleet.mjs" --ci
+      - name: Upload hit-rate receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-body-lint-receipt-${{ github.event.pull_request.number }}-${{ github.run_attempt }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr-body-lint-receipt.json
+          if-no-files-found: ignore
+          retention-days: 30

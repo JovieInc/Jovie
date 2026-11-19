@@ -1,0 +1,4 @@
+{
+  "$comment": "Shadow switch for the PR description fleet-rules check (scripts/lib/pr-body-fleet.mjs). off | warn | enforce. Read from the BASE commit, so a PR cannot change the mode that judges it. Promote to enforce only through a reviewed PR after the bar in pr-body-check/README.md (>=20 runs and >=7 days in warn, 0 false positives, non-Grok review). The repo variable PR_BODY_LINT_MODE can only force off.",
+  "mode": "warn"
+}
