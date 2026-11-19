@@ -226,7 +226,7 @@ test('worst-case body at the GitHub 65,536-char cap stays fast', () => {
   const body = pre + '```\n'.repeat(((MAX_BODY - pre.length) / 4) | 0);
   const t0 = Date.now();
   fleetFindings({ title: 'fix: x', body, files: [] });
-  assert.ok(Date.now() - t0 < 1500, `took ${Date.now() - t0}ms`);
+  assert.ok(Date.now() - t0 < 1500, `took ${Date.now() - t0}ms`); // wall-clock-ok: GitHub 65,536-char body cap must stay under the 3-minute job budget
 });
 
 test('unmergeable PR (no merge parent): body-only, marked partial, still exit 0', () => {

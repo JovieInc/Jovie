@@ -1,6 +1,6 @@
 {
   "schema": "jovie-ownership-registry/v1",
-  "updated": "2026-10-23",
+  "updated": "2026-11-19",
   "policy": "Every repo, service, workflow, CI lane, runner pool, Linear team/area, canon doc, data store and control loop has one agent owner and an escalation chain that ends at the one human owner of last resort. Humans are never routine owners. scripts/ownership-registry.mjs enforces it in ci:control:test.",
   "roles": {
     "summer": {"kind": "agent", "name": "Summer", "identity": "summer", "job": "Company governor: admission, Linear lifecycle, founder decision cards, canon stewardship.", "escalation": ["summer-improvement-loop", "tim"]},
@@ -86,6 +86,7 @@
     {"id": "workflow:observability-issue", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/observability-issue.yml"},
     {"id": "workflow:postdeploy-probes", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/postdeploy-probes.yml"},
     {"id": "workflow:private-data-guard", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/private-data-guard.yml", "note": "Calls JovieInc/ci private-data-guard on every PR to keep private paths and internal hostnames out of this public repo."},
+    {"id": "workflow:pr-body-lint", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-body-lint.yml", "note": "Advisory PR-description fleet-rules lint; never required. Same validator as PR Fleet Rules."},
     {"id": "workflow:pr-conflict-handler", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/pr-conflict-handler.yml"},
     {"id": "workflow:pr-fleet-rules", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-fleet-rules.yml"},
     {"id": "workflow:pr-preparation-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-preparation-canary.yml"},

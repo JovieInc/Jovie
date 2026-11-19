@@ -5,7 +5,7 @@
  *
  *   pnpm pr:body-lint --body-file body.md [--title "fix: ..."] [--label bug]...
  *                     [--base main] [--fleet-only] [--json]
- *   pnpm pr:body-lint --pr 123        # lint an open PR's current body (gh)
+ *   pnpm pr:body-lint --pr 123        # lint an already-open PR's current body
  *
  * Default = the full pr-open gate: fleet rules (evaluateFleetRules, via
  * lintPrBody) + pr-open's placeholder rule. --fleet-only = exactly the CI
@@ -22,6 +22,7 @@ import { pathToFileURL } from 'node:url';
 
 import { filesFromGit, fleetFindings, MAX_BODY } from './lib/pr-body-fleet.mjs';
 import { proseOnly } from './lib/pr-prose.mjs';
+import { runGithub } from './lib/pr-publication.mjs';
 import { lintPrBody } from './lib/preflight-changed.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 
@@ -65,15 +66,12 @@ export function parseArgs(argv) {
 }
 
 function fromOpenPr(number) {
-  const r = spawnSync(
-    'gh',
+  const r = runGithub(
+    process.cwd(),
     ['pr', 'view', String(number), '--json', 'title,body,labels,baseRefName'],
-    {
-      encoding: 'utf8',
-      timeout: 15000,
-    }
+    { timeout: 15000 }
   );
-  if (r.status !== 0) throw new Error(`gh pr view ${number} failed`);
+  if (r.status !== 0) throw new Error(`failed to load pull request ${number}`);
   const pr = JSON.parse(r.stdout);
   return {
     title: pr.title,

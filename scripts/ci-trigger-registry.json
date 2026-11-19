@@ -87,6 +87,7 @@
     "pen-still-diff.yml": {"runsPerMergedPr":0.3,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","workflow_dispatch"]},
     "pen-token-parity.yml": {"runsPerMergedPr":0.5,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","push","workflow_dispatch"]},
     "postdeploy-probes.yml": {"runsPerMergedPr":0.9,"triggers":["repository_dispatch:clock_prod_golden_path_cert","workflow_dispatch","workflow_run:Production Controller"]},
+    "pr-body-lint.yml": {"runsPerMergedPr":3,"triggers":["pull_request:edited","pull_request:opened","pull_request:reopened"]},
     "pr-conflict-handler.yml": {"runsPerMergedPr":0,"triggers":["pull_request_target:opened","pull_request_target:reopened","pull_request_target:synchronize","push","workflow_dispatch","workflow_run:CI"]},
     "pr-fleet-rules.yml": {"runsPerMergedPr":8,"triggers":["pull_request:edited","pull_request:labeled","pull_request:opened","pull_request:reopened","pull_request:synchronize","pull_request:unlabeled"]},
     "pr-preparation-canary.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
