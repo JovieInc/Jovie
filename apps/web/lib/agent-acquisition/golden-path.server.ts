@@ -7,10 +7,7 @@ import { requiresClaimVerification } from '@/lib/claim/claim-verification';
 import { lookupArtistReach } from '@/lib/claim/claim-verification.server';
 import { db } from '@/lib/db';
 import { agentVisibilityDrafts } from '@/lib/db/schema/agent-drafts';
-import {
-  fetchOnboardingCatalogPreview,
-  isValueBeforePaywallEnabled,
-} from '@/lib/onboarding/catalog-preview.server';
+import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
 import { checkOnboardingHandleAvailability } from '@/lib/onboarding/reserved-handle';
 import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { getProfileByUsername } from '@/lib/services/profile/queries';
@@ -45,8 +42,7 @@ import {
  * - qualification: the shared admission decision
  *   (`decideGoldenPathAdmissionForArtist`) via the `presentGoldenPathQualification`
  *   seam — the parallel `decideQualification` PR swaps in there;
- * - setup: the value-before-paywall catalog preview
- *   (`ONBOARDING_VALUE_BEFORE_PAYWALL`);
+ * - setup: the value-before-paywall catalog preview;
  * - publish: never agent-side. Claiming never publishes (draft-claim.server);
  *   the person publishes from their signed-in dashboard. The tool routes
  *   there instead of inventing an unauthenticated publish;
@@ -322,7 +318,7 @@ export async function buildProfile(input: unknown) {
           releases: catalog.releases,
         }
       : null,
-    value_enabled: isValueBeforePaywallEnabled(),
+    value_enabled: true,
     next_action: 'get_qualification' as const,
     retryable: false,
   };

@@ -185,6 +185,11 @@ const AUTHENTICATED_ROUTES = [
     path: APP_ROUTES.SETTINGS_BILLING,
     readySelectors: ['section#billing', 'main'],
   },
+  {
+    id: 'settings-payments',
+    path: APP_ROUTES.SETTINGS_PAYMENTS,
+    readySelectors: ['section#payments', 'main'],
+  },
 ] as const satisfies readonly MobileOverflowRoute[];
 
 async function waitForAnySelector(

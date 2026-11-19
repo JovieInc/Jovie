@@ -4,8 +4,8 @@ import { useStoredAppFlagOverrides } from '@/lib/flags/client';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
-const VALID_KEY_A = APP_FLAG_OVERRIDE_KEYS.SMARTLINK_PRE_SAVE;
-const VALID_KEY_B = APP_FLAG_OVERRIDE_KEYS.STRIPE_CONNECT_ENABLED;
+const VALID_KEY_A = APP_FLAG_OVERRIDE_KEYS.MERCH_MVP;
+const VALID_KEY_B = APP_FLAG_OVERRIDE_KEYS.PLAYLIST_ENGINE;
 const ORPHAN_KEY = 'code:RENAMED_OR_REMOVED_FLAG';
 
 function seed(record: Record<string, boolean>) {

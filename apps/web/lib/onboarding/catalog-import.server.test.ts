@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
     void task();
     return true;
   }),
-  flag: vi.fn(() => true),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -35,9 +34,6 @@ vi.mock('@/lib/cache/releases', () => ({
 vi.mock('@/lib/next/schedule-after', () => ({
   scheduleAfter: mocks.scheduleAfter,
 }));
-vi.mock('./catalog-preview.server', () => ({
-  isValueBeforePaywallEnabled: mocks.flag,
-}));
 
 import {
   runOnboardingCatalogImport,
@@ -54,7 +50,6 @@ const input = {
 describe('runOnboardingCatalogImport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.flag.mockReturnValue(true);
   });
 
   it('imports releases with tracks, then discovers DSP links', async () => {
@@ -134,7 +129,6 @@ describe('scheduleOnboardingCatalogImport', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('schedules the import after the response', () => {
-    mocks.flag.mockReturnValue(true);
     mocks.sync.mockResolvedValue({
       success: true,
       imported: 0,
@@ -146,11 +140,5 @@ describe('scheduleOnboardingCatalogImport', () => {
     });
     expect(scheduleOnboardingCatalogImport(input)).toBe(true);
     expect(mocks.scheduleAfter).toHaveBeenCalledTimes(1);
-  });
-
-  it('does nothing when the kill switch is off', () => {
-    mocks.flag.mockReturnValue(false);
-    expect(scheduleOnboardingCatalogImport(input)).toBe(false);
-    expect(mocks.scheduleAfter).not.toHaveBeenCalled();
   });
 });

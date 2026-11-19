@@ -46,24 +46,13 @@ const dashboardData = {
   isAdmin: false,
 } as unknown as DashboardData;
 
-function renderNav({
-  stripeConnectEnabled = APP_FLAG_DEFAULTS.STRIPE_CONNECT_ENABLED,
-  artistName,
-}: {
-  stripeConnectEnabled?: boolean;
-  artistName?: string;
-} = {}) {
+function renderNav({ artistName }: { artistName?: string } = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <AppFlagProvider
-        initialFlags={{
-          ...APP_FLAG_DEFAULTS,
-          STRIPE_CONNECT_ENABLED: stripeConnectEnabled,
-        }}
-      >
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS }}>
         <DashboardDataProvider
           value={
             artistName && dashboardData.selectedProfile
@@ -197,42 +186,24 @@ describe('SettingsNavigation', () => {
     expect(search).toHaveFocus();
   });
 
-  it.each([false, true])(
-    'keeps Payments search gated when Stripe Connect is %s',
-    async stripeConnectEnabled => {
-      renderNav({ stripeConnectEnabled });
-      const search = screen.getByRole('searchbox', { name: 'Search Settings' });
-      const nav = screen.getByRole('navigation', {
-        name: 'settings navigation',
-      });
+  it('keeps Payments reachable from search', async () => {
+    renderNav();
+    const search = screen.getByRole('searchbox', { name: 'Search Settings' });
+    const nav = screen.getByRole('navigation', {
+      name: 'settings navigation',
+    });
 
-      if (stripeConnectEnabled) {
-        const links = within(nav).getAllByRole('link');
-        const billingIndex = links.findIndex(
-          link => link.getAttribute('href') === APP_ROUTES.SETTINGS_BILLING
-        );
-        expect(links[billingIndex + 1]).toHaveAccessibleName('Payments');
-      } else {
-        expect(
-          within(nav).queryByRole('link', { name: 'Payments' })
-        ).not.toBeInTheDocument();
-      }
+    const links = within(nav).getAllByRole('link');
+    const billingIndex = links.findIndex(
+      link => link.getAttribute('href') === APP_ROUTES.SETTINGS_BILLING
+    );
+    expect(links[billingIndex + 1]).toHaveAccessibleName('Payments');
 
-      await userEvent.type(search, 'setup payout');
-      if (stripeConnectEnabled) {
-        expect(within(nav).getAllByRole('link')).toHaveLength(1);
-        expect(
-          within(nav).getByRole('link', { name: 'Payments' })
-        ).toBeVisible();
-      } else {
-        expect(within(nav).queryByRole('link')).not.toBeInTheDocument();
-        expect(screen.getByRole('status')).toHaveTextContent(
-          'No settings match'
-        );
-      }
-      expect(search).toHaveFocus();
-    }
-  );
+    await userEvent.type(search, 'setup payout');
+    expect(within(nav).getAllByRole('link')).toHaveLength(1);
+    expect(within(nav).getByRole('link', { name: 'Payments' })).toBeVisible();
+    expect(search).toHaveFocus();
+  });
 
   it('finds an accented synthetic artist label and its existing Profile destination', async () => {
     renderNav({ artistName: 'Beyoncé 東京' });

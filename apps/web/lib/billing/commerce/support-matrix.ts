@@ -287,7 +287,12 @@ export function getCommerceSupportMatrix(now = new Date()): SupportMatrix {
       },
       runtime: {
         ...runtime(tips),
-        featureFlag: flag('STRIPE_CONNECT_ENABLED'),
+        featureFlag: {
+          source: noSku,
+          name: null,
+          defaultValue: null,
+          evaluation: 'not_applicable',
+        },
         fulfillment: ref(
           'app/api/webhooks/stripe-tips/route.ts',
           'POST: verified tip payment'

@@ -8,7 +8,6 @@ const {
   mockGetSessionErrorResponse,
   mockGetCurrentOnboardingSessionId,
   mockWithDbSessionTx,
-  mockGetAppFlagValue,
   mockSeedOnboardingPresenceBuild,
 } = vi.hoisted(() => ({
   mockBuildWelcomeMessage: vi.fn(),
@@ -17,7 +16,6 @@ const {
   mockGetSessionErrorResponse: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
-  mockGetAppFlagValue: vi.fn(),
   mockSeedOnboardingPresenceBuild: vi.fn(),
 }));
 
@@ -40,10 +38,6 @@ vi.mock('@/app/api/chat/session-error-response', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
-}));
-
-vi.mock('@/lib/flags/server', () => ({
-  getAppFlagValue: mockGetAppFlagValue,
 }));
 
 vi.mock('@/lib/onboarding/presence-build', () => ({
@@ -117,7 +111,6 @@ describe('POST /api/onboarding/welcome-chat', () => {
     mockBuildWelcomeMessage.mockReturnValue('Welcome to Jovie');
     mockGetSessionErrorResponse.mockReturnValue(null);
     mockGetCurrentOnboardingSessionId.mockResolvedValue(null);
-    mockGetAppFlagValue.mockResolvedValue(true);
     mockSeedOnboardingPresenceBuild.mockResolvedValue({
       workflowRunId: 'run_presence_1',
       toolEvents: [],
@@ -244,41 +237,6 @@ describe('POST /api/onboarding/welcome-chat', () => {
       conversationId: 'conv_new',
       messageId: 'msg_welcome',
     });
-  });
-
-  it('skips presence-build seed when the kill-switch flag is off', async () => {
-    mockGetAppFlagValue.mockResolvedValueOnce(false);
-    const tx = createTransaction([
-      [],
-      [],
-      [{ value: 0 }],
-      [{ value: 0 }],
-      [{ value: 0 }],
-      [{ value: 0 }],
-      [
-        {
-          careerHighlights: null,
-          displayName: 'Artist',
-          spotifyId: null,
-          spotifyUrl: null,
-          username: 'artist',
-        },
-      ],
-    ]);
-    mockWithDbSessionTx.mockImplementationOnce(async callback => callback(tx));
-
-    const { POST } = await import('@/app/api/onboarding/welcome-chat/route');
-    const response = await POST(
-      new Request('http://localhost/api/onboarding/welcome-chat', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      })
-    );
-    const payload = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(payload.presenceBuildRunId).toBeNull();
-    expect(mockSeedOnboardingPresenceBuild).not.toHaveBeenCalled();
   });
 
   it('adopts the claimed anonymous conversation onto the active profile', async () => {

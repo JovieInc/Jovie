@@ -49,7 +49,7 @@ describe('POST /api/admin/feature-flags/rollback', () => {
     mockSelect.mockResolvedValue([
       {
         id: EVENT_ID,
-        flagKey: 'SPOTIFY_OAUTH',
+        flagKey: 'MERCH_MVP',
         envTier: 'prod',
         action: 'disable',
         actor: 'admin_999',
@@ -108,12 +108,12 @@ describe('POST /api/admin/feature-flags/rollback', () => {
     expect(res.status).toBe(200);
     expect(data).toMatchObject({
       ok: true,
-      flagKey: 'SPOTIFY_OAUTH',
+      flagKey: 'MERCH_MVP',
       envTier: 'prod',
       enabled: null,
     });
     expect(mockWriteFlagOverride).toHaveBeenCalledWith({
-      flagKey: 'SPOTIFY_OAUTH',
+      flagKey: 'MERCH_MVP',
       envTier: 'prod',
       enabled: null,
       actor: 'admin_123',

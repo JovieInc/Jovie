@@ -65,7 +65,6 @@ create rollout flags, billing entitlements, or admin certification items.
 | Smart Links | Vanity URLs / content slugs | Shipped | Free+ | None | Custom slug support |
 | Smart Links | Auto DSP detection & linking | Shipped | Free+ | None | MusicFetch integration |
 | Smart Links | "Use This Sound" pages | Shipped | Free+ | None | /{username}/{slug}/sounds — TikTok, Reels, Shorts |
-| Smart Links | Spotify pre-save campaigns | Shipped (internal v1 default-on) | Free+ | Former key: `smartlink_pre_save_campaigns` | Product rollout flag defaults on |
 | Release Workflows | Auto-sync from Spotify | Shipped | Free+ | None | Base ingestion flow |
 | Release Workflows | Manual release creation | Shipped | Free+ | None | Entitlement-backed (`canCreateManualReleases`) |
 | Release Workflows | Pre-release and countdown pages | Shipped | Pro+ | None | Entitlement-backed (`canAccessFutureReleases`) |
@@ -76,8 +75,7 @@ create rollout flags, billing entitlements, or admin certification items.
 | Profile | About page | Shipped | Free+ | None | /username/about |
 | Profile | DSP bulk press-photo import | Shipped (internal v1 default-on) | Evidence-gated | Former key: `bulk_press_photo_import` | Product flag defaults on; platform activation evidence still controls auto-ingestion quality |
 | Profile | Tour dates (Bandsintown) | Shipped | Free+ | None | /username/tour |
-| Profile | Apple Wallet profile pass | Shipped (internal v1 default-on) | Free+ | Former key: `apple_wallet_profile_pass` | First-party generic Wallet pass with tracked QR source link and PassKit update service |
-| Profile | Latest release card on profile | Shipped (flagged) | Free+ | `feature_latest_release_card` | Rollout-controlled UI module |
+| Profile | Latest release card on profile | Shipped | Free+ | None | Permanent profile UI module; no rollout flag |
 | Profile | Verified badge | Shipped | Pro+ | None | Entitlement-backed (`canBeVerified`) |
 | Analytics | Click & visit tracking | Shipped | Free+ | None | Default analytics |
 | Analytics | Basic analytics (30-day retention) | Shipped | Free+ | None | Default retention on free |
@@ -104,8 +102,6 @@ create rollout flags, billing entitlements, or admin certification items.
 | Growth (Coming Soon) | A/B testing | Planned | Growth | None | Smart link variant testing |
 | Growth (Coming Soon) | Automated follow-ups | Planned | Growth | None | Auto-follow-up emails to fans |
 | Growth (Coming Soon) | Catalog monitoring | Planned | Growth | None | Monitor catalog across DSPs |
-| Integrations | Spotify OAuth sign-in method | Shipped (internal v1 default-on) | Free+ | Former key: `feature_spotify_oauth` | Available in auth method selector |
-| Billing | Direct upgrade checkout flow | Shipped (internal v1 default-on) | Free+ | Former key: `billing.upgradeDirect` | Billing UX experiment |
 | Billing | Subscription and billing management | Shipped | Free+ | None | Plan status, Stripe portal, and cancellation controls |
 | Account | Account data export and deletion | Shipped | Authenticated users | None | Settings controls backed by account export and deletion routes |
 | Support | Support and incorrect data reporting | Shipped | Public | None | Contextual Help Center handoff plus direct email fallback |
@@ -143,23 +139,17 @@ The source defaults below are preserved in this slice.
 | `AGENT_PROFILE_CREATE` | `true` | Keep public anonymous-write abuse stop; auth and ownership checks remain separate. |
 | `AI_CONNECTORS_BETA` | `true` | Remove rollout gate; preserve connector consent, lifecycle, outbound-send and provider stops. |
 | `ALBUM_ART_GENERATION` | `true` | Keep provider-work/spend stop; generation budgets and entitlement remain required. |
-| `APPLE_WALLET_PROFILE_PASS` | `true` | Remove rollout gate in favor of supported Wallet pass behavior. |
-| `BILLING_UPGRADE_DIRECT` | `true` | Remove checkout-path experiment gate in favor of supported direct upgrade; retain billing authorization. |
 | `BULK_PRESS_PHOTO_IMPORT` | `true` | Remove rollout gate; keep platform activation/ingestion evidence checks. |
 | `CHAT_JANK_MONITOR` | `true` | Keep optional performance-instrumentation stop. |
 | `CREATOR_FINANCE` | `false` | Keep privacy/correctness release gate and independent FINANCE_DISABLE stop (JOV-4621). |
 | `IOS_APPLE_MUSIC_PRIORITY` | `true` | Remove rollout gate in favor of supported iOS destination ordering. |
 | `JOVIE_WORK_NAV` | `false` | Remove discoverability gate in favor of supported Work destination; preserve execution admission. |
 | `MERCH_MVP` | `true` | Remove product rollout gate; retain commerce/fulfillment incident stops and paid entitlements. |
-| `ONBOARDING_WOW_TASK_QUEUE` | `true` | Keep onboarding task-queue incident stop (JOV-3988). |
 | `PAID_WELCOME_EMAIL` | `false` | Keep founder first-send/transactional-delivery stop (JOV-6445). |
 | `PLAYLIST_ENGINE` | `true` | Keep scheduled playlist-generation provider-work stop; cron auth/budgets remain. |
 | `PROFILE_SEARCH_MONITORING` | `false` | Keep provider runner enable/stop; preserve scheduler, provider-health and budget controls. Do not flip its default or delete its live enable override. |
 | `RELEASE_PLAN_DEMO` | `false` | Delete mock demo route or replace only with real accepted behavior; never enable the mock in production. |
 | `RELEASE_TO_REVENUE_AUTOPILOT` | `true` | Keep single-design-partner automation stop; do not widen pilot audience. |
-| `SMARTLINK_PRE_SAVE` | `true` | Remove rollout gate in favor of supported pre-save flow; retain OAuth consent and provider limits. |
-| `SPOTIFY_OAUTH` | `true` | Keep provider login/connection incident stop; do not change authorization or scopes. |
-| `STRIPE_CONNECT_ENABLED` | `true` | Keep payout/checkout operational stop; paid entitlements and settlement restrictions remain. |
 | `TELEPROMPTER_RECORDING` | `true` | Remove recording rollout gate; keep permission/consent and experiment assignment separate. |
 | `VISIBILITY_AUDIT_OFFER` | `false` | Keep paid-offer checkout-readiness gate requiring the configured Stripe Payment Link. |
 | `YOUTUBE_WORKSPACE_NAV` | `false` | Remove discoverability gate in favor of supported workspace; retain generation spend/publication controls. |
@@ -172,12 +162,10 @@ The source defaults below are preserved in this slice.
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |
 | `IN_HOUSE_RESOLVER` | `false` | Keep resolver rollback compatibility control (JOV-7323). |
-| `MARKETING_GENERIC_CREATOR_NAV` | `true` | Remove presentation switch in favor of supported creator wording; no new capability claim. |
 | `MEMORY_STUDIO_SESSION_V0` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `MUSICFETCH_FALLBACK` | `false` | Keep vendor spend/provider fallback stop (JOV-7323). |
 | `MUSIC_RESOLVER_PROVIDER_LINKS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `MUSIC_RESOLVER_RELEASE_FACTS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
-| `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
 | `PUBLIC_SIGNUP_CLOSED` | `true` | Keep access-control switch: on sends `/signup` and anonymous `/start` to the `/waitlist` role form; sign-in and invite links still create accounts. Reopen criteria: golden path certified and first paying artists live (canon/PRODUCT.md). |
 | `SOCIAL_HTML_ISOLATED_PROVIDER` | `false` | Keep off: isolation provider is absent; server-IP scraping remains prohibited. |

@@ -581,16 +581,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'default-off workspace navigation; no public capability claim',
   },
-  BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
-  SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
-  STRIPE_CONNECT_ENABLED: { capabilityId: 'pay' },
   PLAYLIST_ENGINE: { nonMarketing: 'internal playlist generation job' },
   ALBUM_ART_GENERATION: { capabilityId: 'album-art-generation' },
   CHAT_JANK_MONITOR: { nonMarketing: 'client performance telemetry' },
-  APPLE_WALLET_PROFILE_PASS: {
-    nonMarketing: 'wallet pass rollout; no public claim yet',
-  },
   RELEASE_PLAN_DEMO: { capabilityId: 'release-launch' },
   RELEASE_TO_REVENUE_AUTOPILOT: { capabilityId: 'release-launch' },
   AI_CONNECTORS_BETA: { capabilityId: 'ai-assistant' },
@@ -598,7 +592,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   BULK_PRESS_PHOTO_IMPORT: { nonMarketing: 'workspace import utility' },
   TELEPROMPTER_RECORDING: { nonMarketing: 'internal recording tool' },
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
-  ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
   CREATOR_FINANCE: {
@@ -615,16 +608,8 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   VISIBILITY_AUDIT_OFFER: {
     nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
   },
-  ONBOARDING_VALUE_BEFORE_PAYWALL: {
-    nonMarketing:
-      'onboarding funnel order: real catalog preview before pricing; env kill switch (JOV-9758)',
-  },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
-  MARKETING_GENERIC_CREATOR_NAV: {
-    nonMarketing:
-      'marketing copy presentation; default on, env kill switch; does not change smart-link certification (JOV-7580)',
-  },
   ...PUBLIC_ACCESS_FLAG_CAPABILITIES,
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:

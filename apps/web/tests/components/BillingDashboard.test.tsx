@@ -11,7 +11,6 @@ import { BillingDashboard } from '@/components/organisms/BillingDashboard';
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
   useFeatureFlag: vi.fn().mockReturnValue(false),
-  FEATURE_FLAGS: { BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect' },
 }));
 
 vi.mock('next/navigation', () => ({

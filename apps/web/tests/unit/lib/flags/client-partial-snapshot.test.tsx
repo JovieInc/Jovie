@@ -49,19 +49,19 @@ describe('AppFlagProvider partial snapshots', () => {
 
   it('uses a supplied value from a trimmed payload', () => {
     render(
-      <AppFlagProvider initialFlags={{ STRIPE_CONNECT_ENABLED: false }}>
-        <FlagProbe flagName='STRIPE_CONNECT_ENABLED' />
+      <AppFlagProvider initialFlags={{ PLAYLIST_ENGINE: false }}>
+        <FlagProbe flagName='PLAYLIST_ENGINE' />
       </AppFlagProvider>
     );
 
-    expect(screen.getByTestId('flag-STRIPE_CONNECT_ENABLED')).toHaveTextContent(
+    expect(screen.getByTestId('flag-PLAYLIST_ENGINE')).toHaveTextContent(
       'false'
     );
   });
 
   it('falls back to local defaults for flags omitted from the payload', () => {
     render(
-      <AppFlagProvider initialFlags={{ STRIPE_CONNECT_ENABLED: true }}>
+      <AppFlagProvider initialFlags={{ PLAYLIST_ENGINE: true }}>
         <FlagProbe flagName='ALBUM_ART_GENERATION' />
       </AppFlagProvider>
     );

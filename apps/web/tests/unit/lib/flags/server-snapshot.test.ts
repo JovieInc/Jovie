@@ -18,16 +18,15 @@ vi.mock('@/lib/admin/roles', () => ({
 
 vi.mock('@/lib/flags/registry', () => ({
   APP_FLAG_REGISTRY: {
-    STRIPE_CONNECT_ENABLED: {
-      run: (...args: unknown[]) =>
-        registryRunMock('STRIPE_CONNECT_ENABLED', ...args),
+    PLAYLIST_ENGINE: {
+      run: (...args: unknown[]) => registryRunMock('PLAYLIST_ENGINE', ...args),
     },
     MERCH_MVP: {
       run: (...args: unknown[]) => registryRunMock('MERCH_MVP', ...args),
     },
-    APPLE_WALLET_PROFILE_PASS: {
+    TELEPROMPTER_RECORDING: {
       run: (...args: unknown[]) =>
-        registryRunMock('APPLE_WALLET_PROFILE_PASS', ...args),
+        registryRunMock('TELEPROMPTER_RECORDING', ...args),
     },
   },
   PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
@@ -38,7 +37,7 @@ describe('getAppFlagsSnapshot flagNames option', () => {
   beforeEach(() => {
     registryRunMock.mockReset();
     registryRunMock.mockImplementation(async (flagName: string) => {
-      if (flagName === 'STRIPE_CONNECT_ENABLED') return false;
+      if (flagName === 'PLAYLIST_ENGINE') return false;
       return true;
     });
   });
@@ -48,17 +47,17 @@ describe('getAppFlagsSnapshot flagNames option', () => {
 
     const snapshot = await getAppFlagsSnapshot({
       userId: 'user_123',
-      flagNames: ['MERCH_MVP', 'STRIPE_CONNECT_ENABLED'],
+      flagNames: ['MERCH_MVP', 'PLAYLIST_ENGINE'],
     });
 
     const resolvedFlagNames = registryRunMock.mock.calls.map(call => call[0]);
     expect(resolvedFlagNames).toEqual(
-      expect.arrayContaining(['MERCH_MVP', 'STRIPE_CONNECT_ENABLED'])
+      expect.arrayContaining(['MERCH_MVP', 'PLAYLIST_ENGINE'])
     );
-    expect(resolvedFlagNames).not.toContain('APPLE_WALLET_PROFILE_PASS');
+    expect(resolvedFlagNames).not.toContain('TELEPROMPTER_RECORDING');
     expect(snapshot).toEqual({
       MERCH_MVP: true,
-      STRIPE_CONNECT_ENABLED: false,
+      PLAYLIST_ENGINE: false,
     });
     expect(Object.keys(snapshot)).toHaveLength(2);
   });

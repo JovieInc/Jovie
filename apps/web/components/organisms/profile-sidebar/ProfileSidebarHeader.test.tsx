@@ -208,4 +208,17 @@ describe('useProfileHeaderParts', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('keeps the Apple Wallet affordance on with the legacy flag override off (JOV-13131: no longer flag-gated)', async () => {
+    // beforeEach leaves the legacy flag override false; the affordance must
+    // not depend on it anymore.
+    expect(walletFlag.enabled).toBe(false);
+    const user = userEvent.setup();
+    render(<Header />);
+
+    await openMenu(user);
+    expect(
+      screen.getByRole('menuitem', { name: 'Add To Apple Wallet' })
+    ).toBeInTheDocument();
+  });
 });

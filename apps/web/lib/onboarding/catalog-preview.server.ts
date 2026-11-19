@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { spotifyClient } from '@/lib/spotify/client';
 import { logger } from '@/lib/utils/logger';
 import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
@@ -17,14 +16,6 @@ interface AlbumsPage {
 }
 
 /**
- * JOV-9758 kill switch: FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL=false turns
- * off the catalog preview and the onboarding catalog import.
- */
-export function isValueBeforePaywallEnabled(): boolean {
-  return isCodeFlagEnabled('ONBOARDING_VALUE_BEFORE_PAYWALL');
-}
-
-/**
  * Newest releases for the onboarding preview. Spotify lists albums before
  * singles, each newest first, so the first page of each group holds the
  * newest overall. Two bounded requests, no pagination. Never throws: a
@@ -33,7 +24,6 @@ export function isValueBeforePaywallEnabled(): boolean {
 export async function fetchOnboardingCatalogPreview(
   spotifyArtistId: string
 ): Promise<OnboardingCatalogPreview | null> {
-  if (!isValueBeforePaywallEnabled()) return null;
   if (!spotifyArtistIdSchema.safeParse(spotifyArtistId).success) return null;
 
   try {

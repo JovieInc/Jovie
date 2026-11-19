@@ -392,9 +392,9 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 
 ### Spotify OAuth
 - **One-line:** Sign in to Jovie with your Spotify account.
-- **Plan:** Flag-gated (feature_spotify_oauth, in rollout)
+- **Plan:** Shipped (Free+)
 - **Problem it solves:** Reduces signup friction for artists who are already on Spotify.
-- **How it works:** OAuth sign-in method available in the auth method selector. Currently in controlled rollout via Statsig gate.
+- **How it works:** OAuth sign-in method available in the auth method selector.
 - **Key benefits:** Faster onboarding, one-click sign-in for Spotify users
 - **Dashboard route:** N/A (auth flow)
 - **Docs page:** N/A

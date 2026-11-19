@@ -17,7 +17,6 @@ import {
   captureWarning,
   sanitizeErrorResponse,
 } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
 import {
@@ -31,16 +30,6 @@ export const runtime = 'nodejs';
 export async function POST() {
   const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
-
-  // Check feature flag
-  if (
-    !(await getAppFlagValue('STRIPE_CONNECT_ENABLED', { userId: clerkUserId }))
-  ) {
-    return NextResponse.json(
-      { error: 'Stripe Connect is not enabled' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
 
   try {
     if (isStripeConnectPlatformProfileBlocked()) {

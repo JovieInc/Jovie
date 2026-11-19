@@ -65,6 +65,20 @@ beforeEach(() => {
 });
 
 describe('ProfilePaySurface', () => {
+  it('renders the Stripe-connected primary action without any flag provider (JOV-13131: Stripe Connect is no longer flag-gated)', () => {
+    const setup: ProfileMonetizationSummaryResponse = {
+      ...active,
+      paymentState: 'not_setup',
+      provider: 'none',
+      manageHref: null,
+      tipUrl: null,
+    };
+    renderSurface(setup);
+    expect(
+      screen.getByRole('button', { name: 'Set Up Payments' })
+    ).toBeEnabled();
+  });
+
   it('copies the pay link from an active surface and reports it', async () => {
     const user = userEvent.setup();
     mocks.copyToClipboard.mockResolvedValue(true);

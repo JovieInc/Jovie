@@ -76,9 +76,7 @@ export function LocalCheckoutApi({
   // Direct checkout is the only path that calls the endpoint, so the flag is
   // pinned on regardless of the repo default.
   return (
-    <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, BILLING_UPGRADE_DIRECT: true }}
-    >
+    <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS }}>
       {children}
     </AppFlagProvider>
   );

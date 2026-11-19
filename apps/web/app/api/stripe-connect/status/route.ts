@@ -12,7 +12,6 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { isStripeConnectPlatformProfileBlocked } from '@/lib/stripe/connect-errors';
 import { getStripeConnectReadiness } from '@/lib/stripe/connect-readiness';
@@ -22,16 +21,6 @@ export const runtime = 'nodejs';
 export async function GET() {
   const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
-
-  // Check feature flag
-  if (
-    !(await getAppFlagValue('STRIPE_CONNECT_ENABLED', { userId: clerkUserId }))
-  ) {
-    return NextResponse.json(
-      { error: 'Stripe Connect is not enabled' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
 
   try {
     const user = await getUserByClerkId(db, clerkUserId);

@@ -4,7 +4,6 @@ import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const STEP_BODIES = [
@@ -14,9 +13,7 @@ const STEP_BODIES = [
 ] as const;
 
 export function SmartLinksLanding() {
-  const hero = getSmartLinksHeroCopy(
-    isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')
-  );
+  const hero = getSmartLinksHeroCopy(true);
 
   return (
     <MarketingPageShell className='bg-base text-primary-token'>

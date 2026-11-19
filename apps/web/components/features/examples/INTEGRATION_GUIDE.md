@@ -77,12 +77,12 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 ```tsx
 import { useAppFlag } from '@/lib/flags/client';
 
-function UpgradeButton() {
-  const directUpgrade = useAppFlag('BILLING_UPGRADE_DIRECT');
+function MerchSection() {
+  const merchEnabled = useAppFlag('MERCH_MVP');
 
-  if (!directUpgrade) return <PricingLink />;
+  if (!merchEnabled) return null;
 
-  return <DirectCheckoutButton />;
+  return <MerchCreator />;
 }
 ```
 

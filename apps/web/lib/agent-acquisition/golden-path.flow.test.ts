@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   admission: vi.fn(),
   handleAvailability: vi.fn(),
   catalogPreview: vi.fn(),
-  valueBeforePaywall: vi.fn(),
   profileByUsername: vi.fn(),
   creatorName: vi.fn(),
   dbUpdate: vi.fn(),
@@ -54,7 +53,6 @@ vi.mock('@/lib/onboarding/reserved-handle', () => ({
 }));
 vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
   fetchOnboardingCatalogPreview: mocks.catalogPreview,
-  isValueBeforePaywallEnabled: mocks.valueBeforePaywall,
 }));
 vi.mock('@/lib/services/profile/queries', () => ({
   getProfileByUsername: mocks.profileByUsername,
@@ -127,7 +125,6 @@ beforeEach(() => {
     admit: true,
     reason: 'admit_resolved_artist',
   });
-  mocks.valueBeforePaywall.mockReturnValue(true);
   mocks.catalogPreview.mockResolvedValue(null);
 });
 
