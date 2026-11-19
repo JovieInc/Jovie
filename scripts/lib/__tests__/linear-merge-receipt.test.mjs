@@ -63,7 +63,10 @@ function linearWorld({ teamKey = 'JOV', identifier = 'JOV-1' } = {}) {
         states: {
           nodes: [
             { id: 'state-merging', name: 'Merging' },
-            { id: 'state-inreview', name: 'In Review' },
+            { id: 'state-validating', name: 'Validating' },
+            { id: 'state-rework', name: 'Rework' },
+            { id: 'state-inprogress', name: 'In Progress' },
+            { id: 'state-done', name: 'Done' },
           ],
         },
       },
@@ -204,13 +207,13 @@ describe('merge receipt writes (JOV-13075)', () => {
       });
       expect(result.action).toBe('receipt');
       expect(result.key).toBe('JOV-1');
-      expect(result.stateTarget).toBe('Merging');
+      expect(result.stateTarget).toBe('Validating');
       expect(world.comments).toHaveLength(1);
       expect(world.comments[0]).toContain('linear-merge-receipt/v1 pr=101');
       const receiptBody = world.issue.comments.nodes[0].body;
       expect(receiptBody).toContain(MERGE_SHA);
       expect(receiptBody).toContain('pull/101');
-      expect(world.stateUpdates).toEqual(['Merging']);
+      expect(world.stateUpdates).toEqual(['Validating']);
       expect(readFileSync(summary, 'utf8')).toContain('receipted');
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -230,11 +233,11 @@ describe('merge receipt writes (JOV-13075)', () => {
       writeLinearMergeReceipt({ env, fetchImpl, log: () => {} });
     await run();
     expect(world.comments).toHaveLength(1);
-    expect(world.stateUpdates).toEqual(['Merging']);
+    expect(world.stateUpdates).toEqual(['Validating']);
     const result = await run();
     expect(result.action).toBe('already');
     expect(world.comments).toHaveLength(1);
-    expect(world.stateUpdates).toEqual(['Merging']);
+    expect(world.stateUpdates).toEqual(['Validating']);
   });
 
   it('receipts LYB and SYM team keys', async () => {
@@ -260,64 +263,69 @@ describe('merge receipt writes (JOV-13075)', () => {
       expect(result.key).toBe(`${teamKey}-42`);
       expect(result.action).toBe('receipt');
       expect(world.comments).toHaveLength(1);
-      expect(world.stateUpdates).toEqual(['Merging']);
+      expect(world.stateUpdates).toEqual(['Validating']);
     }
   });
 
-  it('keeps the LYB state mapping configurable and held away from terminal states', async () => {
-    const { world, fetchImpl } = linearWorld({
-      teamKey: 'LYB',
-      identifier: 'LYB-42',
-    });
-    world.issue.team.states.nodes.push({ id: 'state-done', name: 'Done' });
-    const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-lyb-hold-'));
-    try {
-      const result = await writeLinearMergeReceipt({
-        env: {
-          LINEAR_API_KEY: 'lin_test',
-          GITHUB_EVENT_PATH: writeEvent(
-            dir,
-            eventPayload({ title: 'fix: thing (LYB-42)' })
-          ),
-          // An override cannot point a held team at a terminal state.
-          LINEAR_MERGED_STATE_NAMES: JSON.stringify({ LYB: 'Done' }),
-        },
-        fetchImpl,
-        log: () => {},
-      });
-      expect(result.action).toBe('receipt');
-      expect(result.key).toBe('LYB-42');
-      // Held: the receipt lands but the state never jumps to Done.
-      expect(world.stateUpdates).toEqual([]);
-      expect(world.issue.state.name).toBe('In Review');
-      expect(world.comments).toHaveLength(1);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
+  it('moves a revert merge to Rework for JOV and SYM, and In Progress for LYB', async () => {
+    for (const [teamKey, identifier, target] of [
+      ['JOV', 'JOV-1', 'Rework'],
+      ['SYM', 'SYM-7', 'Rework'],
+      ['LYB', 'LYB-42', 'In Progress'],
+    ]) {
+      const { world, fetchImpl } = linearWorld({ teamKey, identifier });
+      const dir = mkdtempSync(
+        join(tmpdir(), `merge-receipt-revert-${teamKey}-`)
+      );
+      try {
+        const result = await writeLinearMergeReceipt({
+          env: {
+            LINEAR_API_KEY: 'lin_test',
+            GITHUB_EVENT_PATH: writeEvent(
+              dir,
+              eventPayload({
+                title: `Revert "feat: thing (${identifier})"`,
+                head: { ref: 'revert/x' },
+              })
+            ),
+          },
+          fetchImpl,
+          log: () => {},
+        });
+        expect(result.action).toBe('receipt');
+        expect(result.key).toBe(identifier);
+        expect(result.stateTarget).toBe(target);
+        expect(world.stateUpdates).toEqual([target]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     }
   });
 
-  it('honors a LINEAR_MERGED_STATE_NAMES override for a non-held team', async () => {
+  it('fails loudly when the team is missing the receipt state name', async () => {
     const { world, fetchImpl } = linearWorld();
-    world.issue.team.states.nodes.push({
-      id: 'state-shipped',
-      name: 'Shipped',
-    });
-    const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-override-'));
+    world.issue.team.states.nodes = world.issue.team.states.nodes.filter(
+      state => state.name !== 'Validating'
+    );
+    const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-missing-'));
     try {
-      const result = await writeLinearMergeReceipt({
-        env: {
-          LINEAR_API_KEY: 'lin_test',
-          GITHUB_EVENT_PATH: writeEvent(
-            dir,
-            eventPayload({ body: '<!-- linear-issue-identifier:JOV-1 -->' })
-          ),
-          LINEAR_MERGED_STATE_NAMES: JSON.stringify({ JOV: 'Shipped' }),
-        },
-        fetchImpl,
-        log: () => {},
-      });
-      expect(result.action).toBe('receipt');
-      expect(world.stateUpdates).toEqual(['Shipped']);
+      await expect(
+        writeLinearMergeReceipt({
+          env: {
+            LINEAR_API_KEY: 'lin_test',
+            GITHUB_EVENT_PATH: writeEvent(
+              dir,
+              eventPayload({ body: 'Refs JOV-1' })
+            ),
+          },
+          fetchImpl,
+          log: () => {},
+        })
+      ).rejects.toThrow(/no 'Validating' state/);
+      // The receipt already landed (durable evidence); the state move is the
+      // loud failure, and the run exits non-zero with an annotation.
+      expect(world.comments).toHaveLength(1);
+      expect(world.stateUpdates).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

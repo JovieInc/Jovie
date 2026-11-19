@@ -12,12 +12,17 @@
  *
  * It writes ONE Linear comment under a stable marker carrying the PR
  * number, PR URL and 40-character merge SHA, and moves the issue to the
- * team's merged state. Replayed events recognize their own marker and
- * write nothing. It writes to Linear only and never writes back to
- * GitHub; a Linear failure retries with backoff and then fails the run
- * visibly (::error annotation + step summary) — no silent drop and no
- * GitHub-issue fallback. A run without LINEAR_API_KEY (fork pull
- * requests) skips visibly with exit 0.
+ * team's receipt state by NAME (the same names on every team, verified
+ * 2026-11-19): a plain merge lands in Validating; a revert or failure merge
+ * lands JOV and SYM in Rework and LYB (no Rework state) in In Progress.
+ * Replayed events recognize their own marker and write nothing. Done is
+ * never auto-moved to, and a missing state name fails the run loudly.
+ *
+ * It writes to Linear only and never writes back to GitHub; a Linear
+ * failure retries with backoff and then fails the run visibly (::error
+ * annotation + step summary) — no silent drop and no GitHub-issue fallback.
+ * A run without LINEAR_API_KEY (fork pull requests) skips visibly with
+ * exit 0.
  */
 
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -27,48 +32,23 @@ export const LINEAR_API = 'https://api.linear.app/graphql';
 export const MERGE_RECEIPT_MARKER = 'linear-merge-receipt/v1';
 /** Teams whose issues this writer receipts. */
 export const TEAM_KEYS = ['JOV', 'LYB', 'SYM'];
-/** The per-team state a merged pull request lands in. A team without a
- * state of this name gets the receipt comment without the state move.
- * LYB is HELD pending Grok's Linear workflow-state audit (Tim, 2026-11-19
- * 10:24 AM PT): its mapping stays configurable and may never resolve to a
- * direct Done move until the audited names arrive. */
-export const TEAM_MERGED_STATE_NAME = {
-  JOV: 'Merging',
-  LYB: 'Merging',
-  SYM: 'Merging',
-};
-/** Teams whose merged-state mapping is held pending an audit. A held team
- * skips the state move when the resolved target would be a terminal state. */
-export const STATE_MAPPING_HELD_TEAMS = new Set(['LYB']);
 
 /**
- * The merged-state name for a team: `LINEAR_MERGED_STATE_NAMES` (a JSON
- * object of TEAM -> state name) overrides the default map, so a mapping
- * stays configurable without a code edit.
- *
- * @param {string} teamKey
- * @param {NodeJS.ProcessEnv} [env]
- * @returns {string}
+ * Receipt states map by NAME with the same names on every team (verified
+ * 2026-11-19, Grok audit). Merging covers a pull request in the merge queue
+ * or merging; Validating covers merged-or-deployed work whose receipts or
+ * acceptance are still open; Done is granted only by the validation
+ * lifecycle when acceptance is met — this writer never auto-moves anything
+ * to Done. A missing state name fails the run loudly; it never falls back
+ * silently. (Suggested, not required: nudge after 3 days in Validating and
+ * move to Rework — In Progress on LYB — after 7 days.)
  */
-export function mergedStateNameFor(teamKey, env = process.env) {
-  let overrides = {};
-  try {
-    overrides = JSON.parse(env.LINEAR_MERGED_STATE_NAMES ?? '{}') ?? {};
-  } catch {
-    overrides = {};
-  }
-  const fromEnv =
-    overrides && typeof overrides === 'object'
-      ? /** @type {{ JOV?: unknown, LYB?: unknown, SYM?: unknown }} */ (
-          overrides
-        )[/** @type {'JOV' | 'LYB' | 'SYM'} */ (teamKey)]
-      : undefined;
-  if (typeof fromEnv === 'string' && fromEnv) return fromEnv;
-  return (
-    TEAM_MERGED_STATE_NAME[/** @type {'JOV' | 'LYB' | 'SYM'} */ (teamKey)] ??
-    'Merging'
-  );
-}
+export const RECEIPT_STATE_NAME = 'Validating';
+export const REVERT_STATE_NAME = {
+  JOV: 'Rework',
+  SYM: 'Rework',
+  LYB: 'In Progress', // LYB has no Rework state.
+};
 
 const KEY_TOKEN_RE = /^(JOV|LYB|SYM)-([1-9]\d*)$/i;
 const TITLE_KEY_RE = /\b((?:JOV|LYB|SYM)-[1-9]\d*)(?![A-Za-z0-9-])/i;
@@ -193,6 +173,19 @@ export function hasMergeReceipt(comments, number, sha) {
     typeof comment === 'string'
       ? comment.includes(needle)
       : String(comment?.body ?? '').includes(needle)
+  );
+}
+
+/**
+ * A revert or failure merge for a linked issue: the pull request title
+ * starts with "Revert" or the body names the reverted pull request.
+ * @param {{ title?: unknown, body?: unknown }} payload
+ * @returns {boolean}
+ */
+export function isRevertEvent(payload) {
+  return (
+    /^revert\b/i.test(String(payload?.title ?? '')) ||
+    /this reverts pull request/i.test(String(payload?.body ?? ''))
   );
 }
 
@@ -370,23 +363,31 @@ export async function writeLinearMergeReceipt(options = {}) {
     },
     sleep
   );
+  // Tim 2026-11-19: a plain merge lands the issue in Validating; a revert
+  // or failure merge sends JOV and SYM to Rework and LYB (no Rework state)
+  // to In Progress. Done is never auto-moved to, and a missing state name
+  // fails the run loudly — never a silent fallback.
   const teamKey = String(issue.team?.key ?? '').toUpperCase();
-  const stateTarget = mergedStateNameFor(teamKey, env);
-  // Tim 2026-11-19: the LYB mapping is held pending Grok's workflow-state
-  // audit. A held team never moves to a terminal state; it keeps its receipt
-  // and stays in place until the audited names arrive.
-  const held = STATE_MAPPING_HELD_TEAMS.has(teamKey);
+  const reverted = isRevertEvent(payload);
+  const stateTarget = reverted
+    ? (REVERT_STATE_NAME[/** @type {'JOV' | 'LYB' | 'SYM'} */ (teamKey)] ??
+      'Rework')
+    : RECEIPT_STATE_NAME;
   const target = (issue.team?.states?.nodes ?? []).find(
-    state => state.name === stateTarget && !(held && state.name === 'Done')
+    state => state.name === stateTarget
   );
-  let movedTo = '';
   if (!target?.id) {
-    log(
-      `Linear merge receipt: team ${teamKey} has no '${stateTarget}' state; receipt written without a state move`
+    throw new Error(
+      `Team ${teamKey} has no '${stateTarget}' state; the merge receipt for ${key} cannot be projected. Add the state to the team workflow.`
     );
-  } else if (issue.state?.id === target.id) {
-    movedTo = target.name;
-  } else {
+  }
+  if (target.name === 'Done') {
+    throw new Error(
+      `Team ${teamKey} maps its receipt state to Done; this writer never auto-moves anything to Done.`
+    );
+  }
+  let movedTo = '';
+  if (issue.state?.id !== target.id) {
     const updated = await linearGraphql(
       fetchImpl,
       apiKey,
@@ -397,6 +398,8 @@ export async function writeLinearMergeReceipt(options = {}) {
       sleep
     );
     movedTo = String(updated.issueUpdate?.issue?.state?.name ?? target.name);
+  } else {
+    movedTo = target.name;
   }
   summarize(
     `Linear merge receipt: ${key} receipted for PR #${payload.number} at ${payload.sha}${movedTo ? `; state moved to ${movedTo}` : ''}.`
