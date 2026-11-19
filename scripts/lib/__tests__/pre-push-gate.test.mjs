@@ -208,9 +208,8 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
 
   it('wires ssh keepalives into setup so long gates do not SIGPIPE git push', () => {
     // git push holds the ssh receive-pack connection open across the hook;
-    // GitHub closes idle connections (~10 min) and git then dies with exit
-    // 141 right after a long gate. setup.sh must set core.sshCommand
-    // keepalives, and the hook must document why they matter.
+    // GitHub closes idle connections (~10 min) and git then dies with exit 141
+    // after a long gate. setup.sh must set core.sshCommand keepalives; the hook documents why.
     const setupSh = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     expect(setupSh).toContain(
       'ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=10'
@@ -241,8 +240,7 @@ describe('publication range failures', () => {
     const env = {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
-      // HOME is the fixture so scanners cannot write into the user home.
-      // Resolve pinned Node from host nvm so older ambient Node reaches the scan.
+      // HOME is the fixture so scanners cannot write into the user home; nvm from the host so older ambient Node still reaches the scan.
       NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
@@ -294,6 +292,8 @@ describe('publication range failures', () => {
       'scripts/hooks/pre-push-gate.test.mjs',
       'scripts/preflight-changed.mjs',
       'scripts/hooks/prepush-preflight.mjs',
+      'scripts/hooks/pr-size-local.mjs',
+      'scripts/hooks/company-size-local.sh',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');

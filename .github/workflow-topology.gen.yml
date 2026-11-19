@@ -6,7 +6,7 @@ measuredBaseline:
   checkRecords: 487
 budgets:
   blockingPrChecks: 12
-  normalPrCheckRecords: 25
+  normalPrCheckRecords: 26
   normalPrExternalAllowance: 8
   mainShaWorkflowRuns: 72
 authoritativeOwners:
@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 25
+normalPrCheckRecords: 26
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -840,8 +840,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:warm
-    jobCount: 1
+    terminalReceipt: job:warm-ovie
+    jobCount: 2
   - name: Nightly Testing Agent
     path: .github/workflows/nightly-testing-agent.yml
     active: true
@@ -1456,7 +1456,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 7
+    jobCount: 8
   - name: Spend Guard
     path: .github/workflows/spend-guard.yml
     active: true
