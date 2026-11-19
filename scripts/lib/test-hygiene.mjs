@@ -1,7 +1,7 @@
 // Static test-hygiene rules for slop mutation testing can't see (2026-11-15 sweep): a test that can never fail, never runs,
 // or only checks its own mocks still scores as coverage. Pure: path and text in, findings out.
 import ts from 'typescript';
-
+import * as landmines from './test-hygiene-landmines.mjs';
 export const RULES = Object.freeze({
   focused: 'focused test (only modifier, fit, fdescribe) left in',
   skipped:
@@ -20,15 +20,12 @@ export const RULES = Object.freeze({
     'expect inside a .then or timer callback that the test never awaits: it can run after the test ends',
   'over-mocked':
     'a vi.mock beyond the 8th in one file: the test mostly checks its own mocks',
-  'mocked-subject':
-    "mocks the module the test file is named after (vi.mock('./X') in X.test.ts): a green run proves the mock, not the code; mock the unit's dependencies (network/MSW, db, clock, child modules) instead, or use vi.spyOn for pure observation",
-  'flake-mask':
-    'retries, this.retries, test.retry() or a raised per-test timeout mask nondeterminism: fix the race with a real waitFor condition or fake timers; the reviewed retry budget is the quarantine ledger (apps/web/tests/quarantine.json), not the test file',
 });
-
 /** Rules with no baseline: any finding fails. */
-export const ZERO_TOLERANCE = Object.freeze(['focused', 'mocked-subject']);
-
+export const ZERO_TOLERANCE = Object.freeze([
+  'focused',
+  ...landmines.LANDMINE_ZERO_TOLERANCE,
+]);
 const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
 // Members that keep test(...) one test; test.describe, test.step and hooks are not tests of their own.
@@ -61,24 +58,6 @@ const ASSERTING_CALL =
 const SLEEP_CALL = /^(sleep|delay|wait|pause)$/iu;
 const SLEEP_FLOOR_MS = 50;
 const MOCK_BUDGET = 8;
-const SUITE_DEFAULT_TIMEOUT_MS = 5000;
-
-/** 'components/ui/Foo.certificate.test.tsx' -> 'Foo': the module the file is named after. */
-export function testSubject(file) {
-  const base = file.split('/').pop() ?? file;
-  return base
-    .replace(/\.[cm]?[jt]sx?$/u, '')
-    .split('.')
-    .filter(s => !['test', 'spec', 'certificate'].includes(s))
-    .join('.');
-}
-
-function mockedBaseName(specifier) {
-  return (specifier.split('/').pop() ?? specifier).replace(
-    /\.[cm]?[jt]sx?$/u,
-    ''
-  );
-}
 
 /** Root identifier and member names of a call's callee: it.each(...) -> ['it', 'each']. */
 function calleePath(expr) {
@@ -376,51 +355,12 @@ export function scanTestFile(file, text, { unit = true } = {}) {
   const findings = [];
   const imports = importBindings(source);
   const helpers = assertingHelpers(source);
-  const subject = testSubject(file);
   const fakeTimers =
     /\b(vi|jest)\.useFakeTimers\(|mock\.timers\.enable\(/u.test(text);
   let mocks = 0;
   const line = node =>
     source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   const visit = node => {
-    // retry:/retries:/testTimeout: keys with a positive retry budget or a
-    // raised timeout, in a test option object, a helper's nav options or a
-    // configure call, convert nondeterminism into a hidden retry budget.
-    // `retry: false` (React Query config) and callback props named retry are
-    // not budgets and stay clean.
-    if (ts.isPropertyAssignment(node)) {
-      const propName = ts.isIdentifier(node.name)
-        ? node.name.text
-        : ts.isStringLiteral(node.name)
-          ? node.name.text
-          : '';
-      const numeric = ts.isNumericLiteral(node.initializer)
-        ? Number(node.initializer.text.replace(/_/gu, ''))
-        : null;
-      if (
-        ((propName === 'retry' || propName === 'retries') &&
-          numeric !== null &&
-          numeric > 0) ||
-        (propName === 'testTimeout' &&
-          numeric !== null &&
-          numeric > SUITE_DEFAULT_TIMEOUT_MS)
-      )
-        findings.push({
-          rule: 'flake-mask',
-          line: line(node),
-          name: `${propName}: ${numeric}`,
-        });
-    }
-    if (
-      ts.isPropertyAccessExpression(node) &&
-      node.name.text === 'retries' &&
-      node.expression.kind === ts.SyntaxKind.ThisKeyword
-    )
-      findings.push({
-        rule: 'flake-mask',
-        line: line(node),
-        name: 'this.retries',
-      });
     if (ts.isCallExpression(node)) {
       const path = calleePath(node.expression);
       const [root, ...members] = path;
@@ -437,50 +377,8 @@ export function scanTestFile(file, text, { unit = true } = {}) {
         SUITE_FNS.has(root) ||
         FOCUS_ALIASES.has(root) ||
         SKIP_ALIASES.has(root);
-      if ((root === 'vi' || root === 'jest') && members[0] === 'mock') {
+      if ((root === 'vi' || root === 'jest') && members[0] === 'mock')
         mocks += 1;
-        // Mocking the module the file is named after (a relative specifier
-        // whose basename is the file's subject): a green run proves the mock,
-        // not the unit. Alias and package specifiers collide on basename with
-        // real dependencies ('@/lib/rate-limit' vs a colocated './rate-limit'),
-        // so only relative paths count. Spies and MSW are untouched.
-        const spec = ts.isStringLiteralLike(first) ? first.text : '';
-        if (/^\.{1,2}\//u.test(spec) && mockedBaseName(spec) === subject)
-          findings.push({
-            rule: 'mocked-subject',
-            line: line(node),
-            name: spec,
-          });
-      }
-      // test.retry(2) and jest.setTimeout(30000): hidden retry/timeout budgets.
-      const firstArg = node.arguments[0];
-      const argMs = firstArg
-        ? ts.isNumericLiteral(firstArg)
-          ? Number(firstArg.text.replace(/_/gu, ''))
-          : null
-        : null;
-      if (
-        path.length >= 2 &&
-        path.at(-1) === 'retry' &&
-        argMs !== null &&
-        argMs > 0
-      )
-        findings.push({
-          rule: 'flake-mask',
-          line: line(node),
-          name: `${path.join('.')}(${argMs})`,
-        });
-      if (
-        root === 'jest' &&
-        members[0] === 'setTimeout' &&
-        argMs !== null &&
-        argMs > SUITE_DEFAULT_TIMEOUT_MS
-      )
-        findings.push({
-          rule: 'flake-mask',
-          line: line(node),
-          name: `jest.setTimeout(${argMs})`,
-        });
       // .only is focus whatever names it; an alias like fit needs a string name, so a helper fit(box, cb) stays clean.
       if (
         isTest &&
@@ -496,29 +394,6 @@ export function scanTestFile(file, text, { unit = true } = {}) {
             SKIP_ALIASES.has(root))
         )
           findings.push({ rule: 'skipped', line: line(node), name });
-        // A per-test timeout raised above the 5s suite default (vitest/jest)
-        // is flake masking; a waitFor/assertion budget is not (not a test arg).
-        for (const arg of node.arguments) {
-          if (!ts.isObjectLiteralExpression(arg)) continue;
-          for (const prop of arg.properties) {
-            if (!ts.isPropertyAssignment(prop)) continue;
-            const propName = ts.isIdentifier(prop.name)
-              ? prop.name.text
-              : ts.isStringLiteral(prop.name)
-                ? prop.name.text
-                : '';
-            if (propName !== 'timeout') continue;
-            const ms = ts.isNumericLiteral(prop.initializer)
-              ? Number(prop.initializer.text.replace(/_/gu, ''))
-              : null;
-            if (ms !== null && ms > SUITE_DEFAULT_TIMEOUT_MS)
-              findings.push({
-                rule: 'flake-mask',
-                line: line(node),
-                name: `timeout: ${ms}`,
-              });
-          }
-        }
         const isLeafTest =
           (TEST_FNS.has(root) ||
             root === 'fit' ||
@@ -538,6 +413,7 @@ export function scanTestFile(file, text, { unit = true } = {}) {
   visit(source);
   for (let n = MOCK_BUDGET + 1; n <= mocks; n++)
     findings.push({ rule: 'over-mocked', line: 1, name: `vi.mock #${n}` });
+  findings.push(...landmines.landmineFindings(file, source, line));
   return findings;
 }
 

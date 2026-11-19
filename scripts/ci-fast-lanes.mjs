@@ -599,7 +599,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
     inputs:
-      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
     prOnly: false,
   }),
   Object.freeze({
