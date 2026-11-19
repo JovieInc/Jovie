@@ -424,19 +424,25 @@ test('maybe-retry is fail-closed when the HA entrypoint or rate limit blocks it'
 
 test('recordAndReport calls the HA CLI and skips it when the entrypoint is missing', async () => {
   const calls = [];
+  const missingDir = mkdtempSync(join(tmpdir(), 'flake-ledger-wf-'));
   const missing = await recordAndReport(
     {
-      root: '/tmp/missing-collector',
-      outDir: '/tmp/out',
-      ledgerPath: '/tmp/ledger.json',
+      root: missingDir,
+      outDir: join(missingDir, 'out'),
+      ledgerPath: join(missingDir, 'ledger.json'),
     },
     { exists: () => false, execFile: (...args) => calls.push(args) }
   );
   assert.equal(missing.reason, 'collector-entrypoint-missing');
   assert.equal(calls.length, 0);
 
+  const recordedDir = mkdtempSync(join(tmpdir(), 'flake-ledger-wf-'));
   const recorded = await recordAndReport(
-    { root: '/repo', outDir: '/repo/out', ledgerPath: '/repo/out/ledger.json' },
+    {
+      root: recordedDir,
+      outDir: join(recordedDir, 'out'),
+      ledgerPath: join(recordedDir, 'out', 'ledger.json'),
+    },
     {
       exists: path =>
         path.endsWith('scripts/lib/flake-ledger.mjs') ||
