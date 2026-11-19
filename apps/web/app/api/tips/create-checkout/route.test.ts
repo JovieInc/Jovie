@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
-  flag: vi.fn(),
   rateLimit: vi.fn(),
   retrieve: vi.fn(),
   create: vi.fn(),
@@ -31,7 +30,6 @@ vi.mock('@/lib/db', () => ({
     }),
   },
 }));
-vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 vi.mock('@/lib/rate-limit', () => ({
   getClientIP: () => '127.0.0.1',
   tipCheckoutLimiter: { limit: mocks.rateLimit },
@@ -85,7 +83,6 @@ describe('/api/tips/create-checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.select.mockResolvedValue([publicProfile]);
-    mocks.flag.mockResolvedValue(true);
     mocks.rateLimit.mockResolvedValue({ success: true });
     mocks.retrieve.mockResolvedValue({
       charges_enabled: true,
@@ -103,11 +100,6 @@ describe('/api/tips/create-checkout', () => {
       available: true,
       profileId,
     });
-    mocks.flag.mockResolvedValue(false);
-    expect(await (await GET(request('GET'))).json()).toEqual({
-      available: false,
-    });
-    mocks.flag.mockResolvedValue(true);
     mocks.select.mockResolvedValue([
       { ...publicProfile, stripePayoutsEnabled: false },
     ]);
@@ -137,20 +129,6 @@ describe('/api/tips/create-checkout', () => {
       })
     );
     expect(response.status).toBe(409);
-    expect(mocks.create).not.toHaveBeenCalled();
-  });
-
-  it('refuses checkout when Stripe Connect is disabled', async () => {
-    mocks.flag.mockResolvedValue(false);
-    const response = await POST(
-      request('POST', {
-        profileId,
-        handle: 'artist',
-        amountCents: 1000,
-      })
-    );
-    expect(response.status).toBe(409);
-    expect(mocks.retrieve).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
