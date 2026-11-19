@@ -10,6 +10,6 @@ permissions:
   contents: read
 jobs:
   certify:
-    uses: JovieInc/ci/.github/workflows/public-app-certification.yml@6b3f0077d9d0ad0b2d9547c5848e006084f94056
+    uses: JovieInc/ci/.github/workflows/public-app-certification.yml@b818185fd150667a1346bc57a9b448f4dfab3b68
     with:
-      ci-ref: 6b3f0077d9d0ad0b2d9547c5848e006084f94056
+      ci-ref: b818185fd150667a1346bc57a9b448f4dfab3b68
