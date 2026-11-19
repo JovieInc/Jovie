@@ -51,6 +51,7 @@ export function createGreenSourceController({
                   state: 'OPEN',
                   mergeable: pr.mergeable,
                   mergeStateStatus: pr.mergeStateStatus,
+                  reviewDecision: pr.reviewDecision ?? '',
                   labels: { nodes: pr.labels },
                   timelineItems: { nodes: pr.timeline ?? [] },
                 },

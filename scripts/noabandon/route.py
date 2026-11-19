@@ -8,10 +8,11 @@ shared apiclient LinearClient with the SAME LINEAR_API_KEY secret linear-sync-on
 external-api guard keeps provider hosts inside scripts/apiclient, and no new secret is added.
 
 # api-budget: github-user-core 12/hr - per routed red event (relay wake): one comments read, one jobs read, up to three annotation reads, one files read, one comment write, at most one label write and one dispatch, all at repair priority
-# api-budget: linear-requests 6/hr - one handoff comment per linear-delivered lane change, only when the holder changes
+# api-budget: linear-requests 6/hr - one handoff comment per linear-delivered lane change or new failing head under the same holder (JOV-13117)
 
 Calls per event (budget): 1 comments read, 1 jobs read, <=3 annotation reads, 1 workflow-state read,
-1 files read, 1 comment write, <=1 label write (only when a new lease is granted), <=1 dispatch.
+1 files read, 1 comment write, <=1 label write (only when a new lease is granted), <=1 dispatch,
+<=1 linear handoff comment (on a lane change or a new failing head).
 No polling: lease expiry of OTHER items is checked lazily by invariant.py on the same wake, bounded
 to 20 items.
 """
@@ -152,7 +153,14 @@ def route(event: dict, gh, now: float | None = None, cooldowns: dict | None = No
     if event.get("paths") is None:  # one read; sensitive paths skip the cheap model rungs
         files = _json(gh, ["api", f"repos/{repo}/pulls/{pr}/files?per_page=100"], [])
         event = {**event, "paths": [f.get("filename", "") for f in files]}
-    if lease and lease.get("holder_lane") and lease.get("head_sha") == head and fails:
+    head_renewed = False
+    if lease and lease.get("holder_lane") and not lease.get("released") and fails:
+        if lease.get("head_sha") != head:
+            # Same holder, new head (JOV-13117): the lease must follow the head, or every
+            # later CI failure on the new head is silently dropped (never recorded, holder
+            # never woken). A holder push is a full heartbeat per the ledger contract.
+            lease = L.renew(lease, now, head, pushed=True)
+            head_renewed = True
         lease = L.record_attempt(lease, {"lane": lease["holder_lane"], "sig": sig, "head": head,
                                          "outcome": "red", "at": now})
     enabled = receivers(gh, repo)
@@ -184,9 +192,12 @@ def route(event: dict, gh, now: float | None = None, cooldowns: dict | None = No
     receipt = {"pr": pr, "head": head, "sig": sig, "lane": lane, "epoch": new["epoch"], "lease_written": ok,
                "labeled": labeled,
                "action": action[2] if action and len(action) > 2 else (action[1] if action else None),
-               "acted": acted, "swarm_receiver_enabled": enabled.get("swarm"),
+               "acted": acted, "head_renewed": head_renewed,
+               "swarm_receiver_enabled": enabled.get("swarm"),
                "delivery": "github" if lane in GITHUB_LANES else "linear"}
-    if receipt["delivery"] == "linear" and holder_changed:
+    if receipt["delivery"] == "linear" and (holder_changed or head_renewed):
+        # JOV-13117: a same-holder failure on a NEW head must wake the holder too; a
+        # re-delivered failure on a head it was already notified about stays quiet.
         receipt["linear"] = notify(new["item"], new["handoff"])
     print(json.dumps({"schema": "noabandon.route-receipt/v1", **receipt}, sort_keys=True))
     return receipt
