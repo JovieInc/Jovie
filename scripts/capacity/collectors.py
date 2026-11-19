@@ -5,7 +5,7 @@ Each collector returns {"value", "limit", "burnPerHour"?, "observedAt"?} or None
 (2026-11, size-500 guard): forecast.py owns the store/forecast/delivery loop and re-exports the
 names its CLI and tests use; collector tests patch THIS module's bindings.
 
-api-budget: github-user-core 4/hr - gh rate_limit and env secret counts via run_gh, a few reads per 15-30 min collector pass
+api-budget: github-user-core 8/hr - gh rate_limit and env/repo secret counts via run_gh, a few reads per 15-30 min collector pass plus one bounded retry per deferred secret read
 api-budget: neon-api 4/hr - month-to-date Neon usage reads, at most two calls per collector pass
 """
 from __future__ import annotations
@@ -252,22 +252,42 @@ def c_gh_env_secrets(spec: dict, now: float) -> dict | None:
     """Secret count in one GitHub Actions environment (or the repo when `environment` is absent).
 
     GitHub caps each environment and repo at 100 secrets; the Doppler sync writes into these, so this
-    is the binding cap (2026-10-31: Production and Preview were both at 100/100). Names only.
+    is the binding cap (2026-10-31: Production and Preview were both at 100/100). Names only. A
+    report-priority read sheds whenever the shared core bucket runs low (the rate_limit read costs
+    zero, so only this collector goes blind, JOV-13032): one bounded retry rides out the shed at
+    default priority, and every remaining failure names its cause instead of a bare blind card.
     """
     import urllib.parse
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    key = "gh-env-secrets:"
     env = spec.get("environment")
     path = (f"repos/{spec['repo']}/environments/{urllib.parse.quote(env, safe='')}/secrets" if env
             else f"repos/{spec['repo']}/actions/secrets")
     try:
         from apiclient.gh import run_gh
-        result = run_gh(["api", f"{path}?per_page=1", "--jq", ".total_count"], priority="report")
-    except (ImportError, OSError):
+    except ImportError:
+        COLLECTOR_ERRORS[key] = ("apiclient is missing on this host; install scripts/apiclient beside "
+                                 "scripts/capacity, the collector cannot read GitHub without it")
+        return None
+    argv = ["api", f"{path}?per_page=1", "--jq", ".total_count"]
+    result = run_gh(argv, priority="report")
+    if result.get("deferred"):
+        result = run_gh(argv, priority="default")
+    if result.get("deferred"):
+        COLLECTOR_ERRORS[key] = ("GitHub core quota deferred both reads (report shed, default waited out); "
+                                 f"readings resume with bucket headroom; reason: {(result.get('stderr') or 'unknown')[:120]}")
+        return None
+    if result.get("code") != 0:
+        COLLECTOR_ERRORS[key] = f"gh api {path} failed: {(result.get('stderr') or '').strip()[:120] or 'no stderr'}"
+        return None
+    value = (result.get("stdout") or "").strip()
+    if not value:
+        COLLECTOR_ERRORS[key] = "gh api returned an empty total_count"
         return None
     try:
-        return {"value": int((result.get("stdout") or "").strip()), "limit": spec.get("cap", 100)} \
-            if result.get("code") == 0 else None
+        return {"value": int(value), "limit": spec.get("cap", 100)}
     except ValueError:
+        COLLECTOR_ERRORS[key] = f"unparseable total_count: {value[:40]!r}"
         return None
 
 
