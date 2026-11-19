@@ -490,6 +490,23 @@ test.describe('profile publication gate', () => {
     expect(html).not.toContain('profile-compact-shell');
   });
 
+  // JOV-13104: the miss destination itself must render the branded boundary
+  // in the first HTML — not Next's flight-only __next_error__ shell — when
+  // visited directly. The route is pinned force-dynamic; this is the same
+  // response the publication gate's rewrite serves for unknown handles.
+  test('profile-miss route serves the branded boundary in the SSR HTML', async ({
+    page,
+  }) => {
+    const response = await page.request.get(
+      '/zz-no-such-artist-e2e-gate/profile-miss'
+    );
+    expect(response.status()).toBe(404);
+    const html = await response.text();
+    expect(html).not.toContain('__next_error__');
+    expect(html).toContain('data-testid="not-found"');
+    expect(html).not.toContain('profile-compact-shell');
+  });
+
   // JOV-12081: `?mode=` must survive the prerendered profile route. The
   // rewrite used to sit in afterFiles, which never wins over a prerendered
   // route, so ?mode=listen silently rendered the home document and the DSP
