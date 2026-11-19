@@ -121,6 +121,21 @@
       }
     },
     {
+      "id": "warden-local-review",
+      "name": "Local AI review (Sentry Warden)",
+      "intent": "Advisory local AI code review before commit/push (warden.toml). Local-only: warns when the CLI or credentials are missing, never blocks, and must never be wired as a PR status check or merge gate.",
+      "hardBlock": false,
+      "preCommit": {
+        "web": "bash scripts/hooks/warden-local-review.sh staged",
+        "ios": "bash scripts/hooks/warden-local-review.sh staged"
+      },
+      "prePush": {
+        "web": "bash scripts/hooks/warden-local-review.sh branch",
+        "ios": "bash scripts/hooks/warden-local-review.sh branch"
+      },
+      "pr": null
+    },
+    {
       "id": "aggregate",
       "name": "PR Ready aggregate",
       "intent": "Single required check so red PRs cannot merge.",

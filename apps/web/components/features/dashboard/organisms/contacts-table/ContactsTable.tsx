@@ -15,8 +15,10 @@ import {
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { AudienceWorkspaceSwitch } from '@/features/dashboard/molecules/AudienceWorkspaceSwitch';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { cn } from '@/lib/utils';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
@@ -187,27 +189,30 @@ export const ContactsTable = memo(function ContactsTable({
 
         <PageToolbar
           start={
-            <span
-              className={PAGE_TOOLBAR_META_TEXT_CLASS}
-              data-testid='contacts-toolbar-count'
-            >
-              {isLoading && contacts.length === 0 ? (
-                // One loading signal: the rows already show skeletons, so the
-                // count slot holds a quiet placeholder, not a sentence.
-                <>
-                  <span className='sr-only'>Loading contacts</span>
-                  <span
-                    aria-hidden='true'
-                    data-testid='contacts-toolbar-count-skeleton'
-                    className='inline-block h-3 w-16 animate-pulse rounded-sm bg-surface-1 align-middle motion-reduce:animate-none'
-                  />
-                </>
-              ) : (
-                `${contacts.length} ${
-                  contacts.length === 1 ? 'contact' : 'contacts'
-                }`
-              )}
-            </span>
+            <>
+              <AudienceWorkspaceSwitch value='contacts' />
+              <span
+                className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'ml-2 shrink-0')}
+                data-testid='contacts-toolbar-count'
+              >
+                {isLoading && contacts.length === 0 ? (
+                  // One loading signal: the rows already show skeletons, so the
+                  // count slot holds a quiet placeholder, not a sentence.
+                  <>
+                    <span className='sr-only'>Loading contacts</span>
+                    <span
+                      aria-hidden='true'
+                      data-testid='contacts-toolbar-count-skeleton'
+                      className='inline-block h-3 w-16 animate-pulse rounded-sm bg-surface-1 align-middle motion-reduce:animate-none'
+                    />
+                  </>
+                ) : (
+                  `${contacts.length} ${
+                    contacts.length === 1 ? 'contact' : 'contacts'
+                  }`
+                )}
+              </span>
+            </>
           }
           end={
             <>

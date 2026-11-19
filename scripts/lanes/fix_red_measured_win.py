@@ -1,4 +1,4 @@
-"""Publish a measured company-guard pin Win without a model.
+"""Publish a measured company-guard or GitHub Action pin Win without a model.
 
 pin_revisions fails closed before claim_route, so a non-pin head still reaches
 the model. A body edit returns infra-rerun:measured-win. An unchanged body
@@ -49,10 +49,21 @@ def read_files(pr, sh):
     return flatten_files(payload)
 
 
+def _target(files):
+    try:
+        old, new, cert_old = repair_win.pin_revisions(files)
+        return "JovieInc/ci", old, new, cert_old, False
+    except ValueError:
+        repository, old, new = repair_win.github_action_revisions(files)
+        return repository, old, new, None, True
+
+
 def section_for(files, sh) -> str:
-    old, new, cert_old = repair_win.pin_revisions(files)
-    comparison = _read_json(sh, ["api", f"repos/JovieInc/ci/compare/{old}...{new}"])
-    adopted = _read_json(sh, ["api", f"repos/JovieInc/ci/compare/{new}...{new}"])
+    repository, old, new, cert_old, action = _target(files)
+    comparison = _read_json(sh, ["api", f"repos/{repository}/compare/{old}...{new}"])
+    adopted = _read_json(sh, ["api", f"repos/{repository}/compare/{new}...{new}"])
+    if action:
+        return repair_win.github_action_pin(files, comparison, adopted_comparison=adopted)
     kwargs = {}
     if cert_old is not None:
         kwargs["certification_comparison"] = _read_json(
@@ -81,7 +92,7 @@ def apply(host, pr, claim_route, sh=None) -> str | None:
     shell = _shell(sh)
     try:
         files = read_files(pr, shell)
-        repair_win.pin_revisions(files)
+        _target(files)
     except _READ_ERRORS:
         return None
     if not claim_route(host, pr, ACTION):

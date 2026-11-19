@@ -1,11 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { validateDesktopSidebarContract } from './desktop-sidebar-contract.mjs';
+import {
+  validateDesktopSidebarContract,
+  validateSidebarHeaderControls,
+} from './desktop-sidebar-contract.mjs';
 
 const shell = `const isElectron = useIsElectronRuntime();
 const sidebarTrigger = isMobile || isElectron ? null : <SidebarCollapseButton />;`;
 const header = `<div data-web-sidebar-control='true'>{sidebarTrigger}</div>
 <div data-web-sidebar-control='true'><VerticalDivider /></div>`;
 const css = `html[data-desktop-runtime="electron"] [data-web-sidebar-control="true"] { display: none; }`;
+
+describe('shared sidebar header control ownership', () => {
+  const sidebar = '<SidebarHeaderActions />';
+  const actions =
+    'const isDesktop = useIsElectronRuntime(); return isDesktop ? null : (<SidebarCollapseButton />);';
+  it('accepts the extracted owner with one browser-only toggle', () => {
+    expect(validateSidebarHeaderControls(sidebar, actions)).toEqual([]);
+  });
+  it('rejects a duplicate toggle in the composing sidebar', () => {
+    expect(
+      validateSidebarHeaderControls(
+        `${sidebar}<SidebarCollapseButton />`,
+        actions
+      )
+    ).toHaveLength(1);
+  });
+  it('rejects a toggle that also renders on desktop', () => {
+    expect(
+      validateSidebarHeaderControls(
+        sidebar,
+        actions.replace('isDesktop ? null : ', '')
+      )
+    ).toHaveLength(1);
+  });
+  it('rejects a second toggle inside the extracted owner', () => {
+    expect(
+      validateSidebarHeaderControls(
+        sidebar,
+        actions.replace(
+          '<SidebarCollapseButton />',
+          '<SidebarCollapseButton /><SidebarCollapseButton />'
+        )
+      )
+    ).toHaveLength(1);
+  });
+});
 
 describe('desktop sidebar hydration contract', () => {
   it('accepts hydration-stable detection with both controls hidden before paint', () => {

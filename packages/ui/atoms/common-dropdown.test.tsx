@@ -55,6 +55,49 @@ const basicItems: CommonDropdownItem[] = [
 ];
 
 describe('CommonDropdown', () => {
+  it('returns keyboard focus and retains distinct targets when moving between root menus', async () => {
+    const user = userEvent.setup();
+    const rowAction = vi.fn();
+    const inspectorAction = vi.fn();
+    render(
+      <>
+        <CommonDropdown
+          trigger={<button type='button'>Jovie row</button>}
+          items={[
+            {
+              type: 'action',
+              id: 'view',
+              label: 'View Details',
+              onClick: rowAction,
+            },
+          ]}
+        />
+        <CommonDropdown
+          trigger={<button type='button'>Tidal inspector</button>}
+          items={[
+            {
+              type: 'action',
+              id: 'view',
+              label: 'View Details',
+              onClick: inspectorAction,
+            },
+          ]}
+        />
+      </>
+    );
+    const row = screen.getByRole('button', { name: 'Jovie row' });
+    await user.click(row);
+    await user.keyboard('{Escape}');
+    expect(row).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Tidal inspector' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View Details' }));
+    expect(inspectorAction).toHaveBeenCalledOnce();
+    expect(rowAction).not.toHaveBeenCalled();
+    await user.click(row);
+    await user.click(screen.getByRole('menuitem', { name: 'View Details' }));
+    expect(rowAction).toHaveBeenCalledOnce();
+    expect(inspectorAction).toHaveBeenCalledOnce();
+  });
   it('flattens deep menus into a searchable chooser while preserving disabled policy', async () => {
     const choose = vi.fn();
     const blocked = vi.fn();

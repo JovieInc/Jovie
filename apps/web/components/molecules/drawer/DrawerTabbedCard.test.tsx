@@ -28,6 +28,8 @@ describe('DrawerTabbedCard', () => {
 
     const card = screen.getByTestId('tabbed');
     expect(card).toHaveAttribute('data-variant', 'card');
+    expect(card).toHaveClass('p-2.5');
+    expect(screen.getByTestId('tabbed-scroll-region')).toHaveClass('pr-2');
     expect(card).toHaveAttribute('data-right-rail-section', 'details');
     expect(screen.getByTestId('tabbed-scroll-region')).toHaveAttribute(
       'data-scroll-mode',
@@ -52,6 +54,11 @@ describe('DrawerTabbedCard', () => {
     expect(screen.getByTestId('tabbed')).toHaveAttribute(
       'data-variant',
       'flat'
+    );
+    expect(screen.getByTestId('tabbed')).toHaveClass('px-3', 'pb-3', 'pt-1.5');
+    expect(screen.getByTestId('tabbed-scroll-region')).toHaveClass(
+      '-mr-3',
+      'pr-3'
     );
     expect(screen.getByText('No activity yet.')).toBeVisible();
     await expectNoA11yViolations(container);

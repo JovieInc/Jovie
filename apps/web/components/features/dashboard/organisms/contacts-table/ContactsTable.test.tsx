@@ -12,6 +12,12 @@ import type { EditableContact } from '@/features/dashboard/hooks/useContactsMana
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ContactsTable } from './ContactsTable';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock('./ContactDetailSidebar', () => ({
   ContactDetailSidebar: ({
     contact,
@@ -98,6 +104,10 @@ describe('ContactsTable certificate', () => {
 
     expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
       '1 contact'
+    );
+    expect(screen.getByRole('tab', { name: 'Contacts' })).toHaveAttribute(
+      'aria-selected',
+      'true'
     );
     await expectNoA11yViolations(container);
     await user.click(screen.getByText('Kelly Strickland'));

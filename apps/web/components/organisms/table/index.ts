@@ -177,6 +177,11 @@ export {
   TABLE_TOOLBAR_RIGHT_CLASS,
   TABLE_TOOLBAR_SHELL_CLASS,
 } from './molecules/PageToolbar';
+export type {
+  PageToolbarSelectOption,
+  PageToolbarSelectProps,
+} from './molecules/PageToolbarSelect';
+export { PageToolbarSelect } from './molecules/PageToolbarSelect';
 export {
   TableBody,
   TableHead,

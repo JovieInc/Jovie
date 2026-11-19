@@ -83,6 +83,17 @@ describe('AudienceMemberSidebar certificate', () => {
     expect(screen.getByTestId('audience-sources-card')).toBeInTheDocument();
   });
 
+  it('shows location and visits once in the details and once in the fallback header', () => {
+    renderSidebar({ ...member, email: null, phone: null });
+    expect(screen.getByTestId('entity-header-details-row')).toHaveTextContent(
+      'Brooklyn, NY · 8 visits'
+    );
+    expect(screen.getByTestId('audience-details-card')).toHaveTextContent(
+      'Brooklyn, NY'
+    );
+    expect(screen.queryByTestId('entity-header-meta-slot')).toBeNull();
+  });
+
   it('closes from the header action', async () => {
     const user = userEvent.setup();
     const { onClose } = renderSidebar(member);

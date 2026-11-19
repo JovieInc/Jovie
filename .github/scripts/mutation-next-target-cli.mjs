@@ -18,6 +18,7 @@ import {
   command,
   directory,
   github,
+  historicalPublication,
   json,
   optional,
   publication,
@@ -87,7 +88,7 @@ async function history(request) {
       // The canonical snapshot retains the result even after a later crash.
       if (t.run.status === 'completed') {
         try {
-          const p = await publication({
+          const p = await historicalPublication({
             runId: claim.runId,
             runAttempt: claim.runAttempt,
             sha: claim.transportSha,

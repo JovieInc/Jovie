@@ -1,7 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateDesktopSidebarContract } from './desktop-sidebar-contract.mjs';
+import {
+  validateDesktopSidebarContract,
+  validateSidebarHeaderControls,
+} from './desktop-sidebar-contract.mjs';
 
 const ovieRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -162,12 +165,6 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
       text => text.includes('<AdminPeopleRightPanelProvider>'),
       'people entity detail must use the shared right-rail provider',
     ],
-    sidebar: [
-      'apps/web/components/organisms/UnifiedSidebar.tsx',
-      text =>
-        text.includes('!isDesktop') && text.includes('SidebarCollapseButton'),
-      'desktop sidebar must not render a second collapse control',
-    ],
     titlebar: [
       'apps/web/components/organisms/DesktopTitlebar.tsx',
       text =>
@@ -187,6 +184,18 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
     source(repoRoot, 'apps/web/app/globals.css'),
   ]);
   violations.push(...validateDesktopSidebarContract(...desktopSources));
+  violations.push(
+    ...validateSidebarHeaderControls(
+      await source(
+        repoRoot,
+        'apps/web/components/organisms/UnifiedSidebar.tsx'
+      ),
+      await source(
+        repoRoot,
+        'apps/web/components/shell/SidebarHeaderActions.tsx'
+      )
+    )
+  );
 
   for (const [file, predicate, message] of Object.values(required)) {
     const contents = await source(repoRoot, file);

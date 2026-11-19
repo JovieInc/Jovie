@@ -23,7 +23,9 @@ import type { ReleaseType } from '@/lib/discography/types';
 
 // ── Mock dependencies ──
 
-vi.mock('@jovie/ui', () => {
+vi.mock('@jovie/ui', async () => {
+  const { PlainButton } =
+    await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
   // Simple passthrough mocks for Radix dropdown primitives
   const Slot = ({
     children,
@@ -49,6 +51,7 @@ vi.mock('@jovie/ui', () => {
   };
 
   return {
+    PlainButton,
     Button: ({
       children,
       ...props
