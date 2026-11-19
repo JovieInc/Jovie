@@ -107,6 +107,8 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         'user.name=Fixture',
         '-c',
         'user.email=fixture@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
         'commit',
         '-qm',
         'fixture',
