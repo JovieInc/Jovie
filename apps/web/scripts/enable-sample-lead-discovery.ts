@@ -15,7 +15,7 @@
  *   pnpm --filter @jovie/web exec tsx scripts/enable-sample-lead-discovery.ts --apply
  */
 import { fileURLToPath } from 'node:url';
-import { neon } from '@neondatabase/serverless';
+import { type NeonQueryFunction, neon } from '@neondatabase/serverless';
 import {
   hasEnabledMusicArtistQuery,
   SAMPLE_LEAD_DISCOVERY_PATCH,
@@ -61,7 +61,7 @@ function assertOutboundClosed(): void {
   }
 }
 
-async function readState(sql: ReturnType<typeof neon>) {
+async function readState(sql: NeonQueryFunction<false, false>) {
   const settings = (await sql`
     SELECT id, enabled, discovery_enabled, auto_ingest_enabled, daily_query_budget,
            daily_send_cap, max_per_hour, ramp_mode::text AS ramp_mode,
@@ -92,7 +92,9 @@ function publicState(
   };
 }
 
-async function seedKeywords(sql: ReturnType<typeof neon>): Promise<number> {
+async function seedKeywords(
+  sql: NeonQueryFunction<false, false>
+): Promise<number> {
   const { FEATURE_FM_SEED_KEYWORDS } = await import(
     '@/lib/leads/seed-keywords'
   );
@@ -115,7 +117,9 @@ async function seedKeywords(sql: ReturnType<typeof neon>): Promise<number> {
   return inserted;
 }
 
-async function applyPatch(sql: ReturnType<typeof neon>): Promise<SettingsRow> {
+async function applyPatch(
+  sql: NeonQueryFunction<false, false>
+): Promise<SettingsRow> {
   const patch = SAMPLE_LEAD_DISCOVERY_PATCH;
   const updated = (await sql`
     UPDATE lead_pipeline_settings
@@ -149,9 +153,9 @@ function sendColumnsUnchanged(
   );
 }
 
-async function main(): Promise<void> {
+export async function main(args = process.argv.slice(2)): Promise<void> {
   assertOutboundClosed();
-  const apply = process.argv.includes('--apply');
+  const apply = args.includes('--apply');
   const sql = neon(databaseUrl());
   const before = await readState(sql);
   if (!before.settings) {

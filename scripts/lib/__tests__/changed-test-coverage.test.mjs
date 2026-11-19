@@ -18,6 +18,7 @@ import {
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
   evaluateChangedLineCoverage,
   findReferencingTests,
+  formatChangedLineCoverage,
   isCoverageSourcePath,
   mergeCoverageMaps,
   parseChangedLines,
@@ -109,6 +110,17 @@ describe('changed test coverage', () => {
       percentage: 33.3,
       minimum: 60,
     });
+  });
+
+  it('identifies the largest uncovered files when patch coverage fails', () => {
+    const result = evaluateChangedLineCoverage({
+      changedLines: new Map([[path, new Set([2, 3, 4])]]),
+      coverage: coverage([1, 0, 0]),
+      repoRoot: '/repo',
+    });
+    expect(formatChangedLineCoverage(result)).toContain(
+      `Uncovered changed lines: ${path} (2/3)`
+    );
   });
 
   it('deliberate red: fails closed when changed product code is absent from coverage', () => {
