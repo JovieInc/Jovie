@@ -375,17 +375,11 @@ export async function bulkLookupByIsrc(
 
   if (result.data) {
     for (const track of result.data) {
-      // Boundary where ISRCs from the provider payload enter our key space:
-      // normalize (uppercase, separators stripped) and validate. Malformed or
-      // numeric-coerced values are skipped instead of poisoning the
-      // match-map/cache keys.
-      const trackIsrc = track.attributes?.isrc
-        ? safeParseIsrc(track.attributes.isrc)
-        : null;
+      // Provider-payload boundary: normalize + validate ISRCs; malformed values skipped.
+      const trackIsrc = safeParseIsrc(track.attributes?.isrc);
       if (trackIsrc) {
         trackMap.set(trackIsrc, track);
-        // Cache the result for future lookups
-        setCachedIsrcTrack(trackIsrc, track);
+        setCachedIsrcTrack(trackIsrc, track); // Cache for future lookups
       }
     }
   }

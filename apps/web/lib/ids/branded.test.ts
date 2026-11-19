@@ -64,6 +64,7 @@ describe('Isrc', () => {
     expect(safeParseIsrc('12ABC1234567')).toBeNull(); // country code not letters
     expect(safeParseIsrc('USABC123456A')).toBeNull(); // trailing designator
     expect(safeParseIsrc('')).toBeNull();
+    expect(safeParseIsrc(undefined)).toBeNull(); // absent payload field
   });
 
   it('isIsrc guards on normalized+validated values', () => {

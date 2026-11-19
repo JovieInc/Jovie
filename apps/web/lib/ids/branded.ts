@@ -113,7 +113,8 @@ export function parseIsrc(value: string): Isrc {
 }
 
 /** Normalize and validate; returns null instead of throwing on invalid input. */
-export function safeParseIsrc(value: string): Isrc | null {
+export function safeParseIsrc(value: string | null | undefined): Isrc | null {
+  if (value == null) return null;
   const result = IsrcSchema.safeParse(value);
   return result.success ? result.data : null;
 }
