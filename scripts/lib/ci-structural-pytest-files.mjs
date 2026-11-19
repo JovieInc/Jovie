@@ -3,6 +3,8 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/prod-errors/test_prod_errors.py',
   'scripts/tests/test_noabandon_route.py',
   'scripts/tests/test_gh_retry.py',
+  'scripts/tests/test_noabandon_invariant.py',
+  'scripts/tests/test_noabandon_adapters.py',
   'scripts/tests/test_vercel_prebuilt_deploy.py',
   'scripts/tests/test_brand_scrub.py',
   'scripts/tests/test_agent_workflow_hygiene.py',
@@ -14,4 +16,5 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_codex_launcher.py',
   'scripts/tests/test_loose_exec_guard.py',
   'scripts/tests/test_noabandon_ledger.py',
+  'scripts/tests/test_poll_loop_guard.py',
 ]);

@@ -1215,6 +1215,7 @@ export const RELEASE_LINEAGE_CONTRACT_COMMAND =
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
   'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
@@ -1261,6 +1262,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/next-build-cache-contract.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
@@ -1437,6 +1439,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-capacity.test.mjs',
   'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
+  'scripts/lib/__tests__/merge-queue-cancel-causes.test.mjs', // JOV-13109 MQ cancel causes.
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
@@ -2964,10 +2967,22 @@ export async function runStructural(opts = {}) {
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).
+  // Landing events (push to main, merge groups) validate the exact tree the
+  // PR fleet judges: the PR-time script-contracts source guard runs the FULL
+  // lists on every PR, and its repo-wide ratchets scan the tree dynamically
+  // (git ls-files + whole-repo scans), so the static derived selector can
+  // never pick them. #25864's apps/ios-only landing carried a wall-clock
+  // assertion that kept every open PR's merged-tree guard red for ~53h while
+  // main's own push stayed green (JOV-13095). On landing events run the full
+  // lists too, so the break reds main/merge-group itself instead of
+  // stranding PRs on stale heads.
+  const landingEvent = event === 'push' || event === 'merge_group';
   const dependentScriptTests =
     selected.has('operations') || !changed?.length
       ? []
-      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
+      : landingEvent
+        ? SCRIPT_CONTRACT_NODE_TESTS
+        : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2996,6 +3011,12 @@ export async function runStructural(opts = {}) {
     ...scriptContractNodeArgs(dependentScriptTests).map(
       args => `node ${args.join(' ')}`
     ),
+    // The vitest half of the script contracts (workspace-scripts project:
+    // wall-clock ratchet, copy inventory, ...) is otherwise operations-only.
+    // Reuse the same command operations runs; operations still runs it once.
+    ...(landingEvent && !selected.has('operations')
+      ? [SCRIPT_CONTRACT_VITEST_COMMAND]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
