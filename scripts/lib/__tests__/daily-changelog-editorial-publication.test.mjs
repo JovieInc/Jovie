@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertEditorialPublication } from '../customer-changelog-editorial.mjs';
+import { publicationEditorialFindings } from '../customer-changelog-editorial.mjs';
 import { planDailyPublication } from '../daily-changelog-publication.mjs';
 
 const HEAD = 'a'.repeat(40),
@@ -56,7 +56,7 @@ const input = overrides => ({
   ...overrides,
 });
 describe('publication editorial preflight', () => {
-  it('rejects planned copy that would fail the published editorial guard, and accepts an overlay', () => {
+  it('reports planned copy that would fail the published editorial guard, and accepts an overlay', () => {
     const legacyNote = {
       ...note,
       text: 'The Inbox is calmer: statuses are quieter.',
@@ -70,22 +70,22 @@ describe('publication editorial preflight', () => {
     );
     const overlay = { schema: 'customer-changelog-editorial/v1', entries: {} };
     const migrations = { entries: [] };
-    expect(() =>
-      assertEditorialPublication({
+    expect(
+      publicationEditorialFindings({
         content: plan.content,
         overlay,
         migrations,
       })
-    ).toThrow(/followed by a lowercase explanation/);
+    ).toEqual([expect.stringContaining('followed by a lowercase explanation')]);
     overlay.entries['customer-update:profile-claim'] = {
       headline: 'The Inbox is calmer',
     };
-    expect(() =>
-      assertEditorialPublication({
+    expect(
+      publicationEditorialFindings({
         content: plan.content,
         overlay,
         migrations,
       })
-    ).not.toThrow();
+    ).toEqual([]);
   });
 });

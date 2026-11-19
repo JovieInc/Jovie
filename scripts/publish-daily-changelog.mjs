@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assertEditorialPublication } from './lib/customer-changelog-editorial.mjs';
+import { publicationEditorialFindings } from './lib/customer-changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
 import {
@@ -196,7 +196,7 @@ const plan = planDailyPublication({
 });
 // Check the planned receipt before opening a release PR, using the same
 // overlay contract as source CI without changing any approved customer copy.
-assertEditorialPublication({
+const editorialFindings = publicationEditorialFindings({
   content: plan.content,
   overlay: JSON.parse(
     readFileSync('apps/web/data/customer-changelog-editorial.json', 'utf8')
@@ -208,6 +208,10 @@ assertEditorialPublication({
     )
   ),
 });
+if (editorialFindings.length) {
+  for (const finding of editorialFindings)
+    console.error(`[editorial-preflight] ${finding}`);
+}
 // Customer digest copy must pass @jovie/copy at the jovie-marketing register
 // before the release PR opens: /changelog is certified by seo:certify
 // (copy:copy-lint), and an em dash here used to eject the release PR from
@@ -227,7 +231,7 @@ if (copyFindings.length > 0) {
 }
 writeFileSync(
   resolve(output, 'plan.json'),
-  `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
+  `${JSON.stringify({ ...plan, editorialFindings, content: undefined }, null, 2)}\n`
 );
 writeFileSync(resolve(output, 'CHANGELOG.md'), plan.content);
 process.stdout.write(

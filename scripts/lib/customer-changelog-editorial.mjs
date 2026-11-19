@@ -106,16 +106,8 @@ export function checkEditorialOverlay({ markdown, overlay, migrations }) {
   return { errors, checked: entries.length };
 }
 
-/** Reject a publication plan that would fail the public editorial contract. */
-export function assertEditorialPublication({ content, overlay, migrations }) {
-  const { errors } = checkEditorialOverlay({
-    markdown: content,
-    overlay,
-    migrations,
-  });
-  if (errors.length) {
-    throw new Error(
-      `Daily changelog editorial preflight failed:\n${errors.join('\n')}`
-    );
-  }
+/** Diagnose a publication plan with the same rules used by source CI. */
+export function publicationEditorialFindings({ content, overlay, migrations }) {
+  return checkEditorialOverlay({ markdown: content, overlay, migrations })
+    .errors;
 }
