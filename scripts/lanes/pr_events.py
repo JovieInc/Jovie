@@ -40,6 +40,9 @@ from atomic_state import append_json_object
 from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
 from pr_repair_evidence import with_locking_pr
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
+from intake_linear import (  # noqa: E402  (Linear intake filing split out; size-500)
+    ensure_linear_intake, intake_destination, linear_intake_issue, linear_intake_team,
+    upsert_intake)  # noqa: E402
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
@@ -1245,72 +1248,6 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
     return cleared + added
 
 
-_UNSET = object()  # upsert_intake(linear=...) default: construct the client from the environment
-
-
-def relay_linear_client():
-    """The lane Linear client from this process's environment, or None when this context
-    cannot file Linear (JOV-13077). The lane host keeps the app credential at the default
-    path; the hosted relay gains one only when the workflow half exports LANES_LINEAR_APP_ENV.
-    There is no GitHub-issue fallback: an unavailable client defers the intake visibly and
-    the next derivation of the same fingerprint re-files it."""
-    try:
-        from lane_runner import Linear  # function-level: lane_runner imports this module
-        return Linear()
-    except Exception:  # noqa: BLE001 - no credential, no state dir or no module: defer
-        return None
-
-
-def upsert_intake(event: dict, sh=run, now: float | None = None, linear=_UNSET) -> str | None:
-    """File the remediation intake on Linear now (JOV-13077: Linear is the single source of
-    truth). One Linear issue per fingerprint — ensure_linear_intake fences the create with a
-    deterministic UUID — and a recurrence with new evidence updates the same issue with one
-    occurrence comment instead of filing again. No GitHub issue is created: without a Linear
-    client the intake defers visibly and never falls back to `gh issue create`. Legacy GitHub
-    intake issues still convert once (convert_intake)."""
-    del sh, now  # call compatibility: the fingerprint is the only identity; no clock to race
-    fingerprint = event.get("fingerprint")
-    if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
-        return None
-    if linear is _UNSET:
-        linear = relay_linear_client()
-    if linear is None:
-        print(f"intake deferred: fingerprint {fingerprint} has no Linear client in this context "
-              "(JOV-13077); nothing filed, no GitHub issue created", file=sys.stderr)
-        return None
-    try:
-        team = linear_intake_team(linear)
-        destination = intake_destination(team["id"], fingerprint)
-        existing = linear_intake_issue(linear, team["id"], fingerprint, destination)
-        if not existing:
-            return ensure_linear_intake(linear, event) or None
-        update_intake_recurrence(linear, existing, event)
-        return existing
-    except Exception as error:  # noqa: BLE001 - a cooled-down or erroring Linear defers visibly
-        print(f"intake deferred: fingerprint {fingerprint} could not reach Linear "
-              f"({type(error).__name__}: {error}); nothing filed, no GitHub issue created",
-              file=sys.stderr)
-        return None
-
-
-def update_intake_recurrence(linear, issue_id: str, event: dict) -> None:
-    """A repeated fingerprint updates its one Linear issue once per distinct occurrence
-    (JOV-13077): identical evidence re-upserts silently, new evidence records one comment."""
-    marker = f"<!-- {remediation.INTAKE_LABEL}-occurrence:{remediation.intake_occurrence(event)} -->"
-    try:
-        data = linear.gql('query($i:String!,$m:String!){issue(id:$i){comments(filter:{body:{contains:$m}},first:5){nodes{body}}}}',
-                          {"i": issue_id, "m": marker})
-        nodes = (((data or {}).get("issue") or {}).get("comments") or {}).get("nodes") or []
-        if any(isinstance(note, dict) and marker in (note.get("body") or "") for note in nodes):
-            return
-        linear.gql('mutation($i:String!,$b:String!){commentCreate(input:{issueId:$i,body:$b}){success}}',
-                   {"i": issue_id, "b": remediation.intake_recurrence_body(event)})
-    except Exception as error:  # noqa: BLE001 - the issue exists; the next occurrence re-attempts
-        print(f"intake recurrence deferred: issue {issue_id} could not record occurrence "
-              f"({type(error).__name__}: {error})", file=sys.stderr)
-        return
-
-
 def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
     """Legacy staging only (JOV-13077): after the 30-minute claim window, one Linear issue per
     fingerprint, linked once, then the GitHub issue closes. No new secret."""
@@ -1393,96 +1330,6 @@ def close_legacy_intake(number: int, sh=run) -> bool:
     closed = sh(["gh", "issue", "close", str(number), "--repo", REPO, "--comment",
                  "Linear issue filed; Linear is the source of truth for remediation intake (JOV-13077)."])
     return closed.returncode == 0
-
-
-def ensure_linear_intake(linear, event: dict) -> str | None:
-    """Resolve authoritative history first; a stable destination fences racing creates."""
-    fingerprint = event.get("fingerprint")
-    if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
-        return None
-    team = linear_intake_team(linear)
-    issue_id = intake_destination(team["id"], fingerprint)
-    existing = linear_intake_issue(linear, team["id"], fingerprint, issue_id)
-    if existing:
-        return existing
-    names = {label["name"]: label["id"] for label in team["labels"]["nodes"]}
-    wanted = remediation.intake_labels(str(event.get("ws") or "ci"))
-    ids = []
-    for name in wanted:
-        if name in names:
-            ids.append(names[name])
-            continue
-        if name != remediation.REMEDIATION_LABEL:
-            continue
-        created = linear.gql('mutation($n:String!,$t:String!){issueLabelCreate(input:{name:$n,teamId:$t}){issueLabel{id}}}',
-                             {"n": name, "t": team["id"]})
-        ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
-    todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
-    plan = remediation.linear_intake_plan(event)
-    try:
-        data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id}}}',
-                          {"i": {"id": issue_id, "teamId": team["id"], "stateId": todo, "labelIds": ids,
-                                 "title": plan["title"], "description": plan["description"] +
-                                 f"\n<!-- symphony-remediation-repository:{REPO} -->"}})
-        if data.get("issueCreate", {}).get("success") is True and data["issueCreate"]["issue"]["id"] == issue_id:
-            return issue_id
-    except Exception:
-        pass  # No second mutation: a race or unknown result requires a fresh read.
-    return linear_intake_issue(linear, team["id"], fingerprint, issue_id)
-
-
-def linear_intake_team(linear) -> dict:
-    """The JOV team node (id, states, labels) remediation intake files against."""
-    return linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
-                      {})["teams"]["nodes"][0]
-
-
-def intake_destination(team_id: str, fingerprint: str) -> str:
-    """Linear accepts a client-supplied UUID v4. Its unique entity ID is the
-    cross-host fence, including a committed create whose response was lost."""
-    digest = hashlib.sha256(f"symphony-remediation:{REPO}:{team_id}:{fingerprint}".encode()).digest()
-    return str(uuid.UUID(bytes=digest[:16], version=4))
-
-
-def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -> str | None:
-    """Only a complete, bounded authoritative inventory can authorize creation."""
-    marker = f"Fingerprint: `{fingerprint}`"
-    query = ('query($filter:IssueFilter!,$after:String){issues(filter:$filter,includeArchived:true,first:100,after:$after)'
-             '{nodes{id description createdAt} pageInfo{hasNextPage endCursor}}}')
-    filters = {"team": {"id": {"eq": team_id}},
-               "or": [{"id": {"eq": issue_id}}, {"description": {"contains": marker}}]}
-    matches, cursors, after = [], set(), None
-    for _ in range(10):
-        page = linear.gql(query, {"filter": filters, "after": after})["issues"]
-        nodes, info = page["nodes"], page["pageInfo"]
-        if not isinstance(nodes, list) or not isinstance(info, dict):
-            raise ValueError("intake-inventory-unreadable")
-        for row in nodes:
-            if not isinstance(row, dict) or not all(isinstance(row.get(key), str) and row[key]
-                                                   for key in ("id", "description", "createdAt")):
-                raise ValueError("intake-inventory-unreadable")
-            stamp = iso_ts(row["createdAt"])
-            if stamp is None:
-                raise ValueError("intake-inventory-unreadable")
-            uuid.UUID(row["id"])
-            # Intake files under its real source word (deploy, sentry, infra-incident, ...).
-            # The destination fence is the fingerprint marker plus the repository marker,
-            # not the source word.
-            bound = re.match(r"Symphony remediation intake \([^)\n]*\)\.\n" + re.escape(marker) + r"\n",
-                             row["description"]) is not None
-            repository = re.search(r"<!-- symphony-remediation-repository:([^ ]+) -->", row["description"])
-            bound = bound and (repository.group(1) == REPO if repository else REPO == "JovieInc/Jovie")
-            if row["id"] == issue_id and not bound:
-                raise ValueError("intake-destination-binding-mismatch")
-            if bound:
-                matches.append((stamp, row["id"]))
-        if info.get("hasNextPage") is False:
-            return min(matches)[1] if matches else None
-        after = info.get("endCursor")
-        if info.get("hasNextPage") is not True or not isinstance(after, str) or not after or after in cursors:
-            raise ValueError("intake-inventory-incomplete")
-        cursors.add(after)
-    raise ValueError("intake-inventory-incomplete")
 
 
 def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "green", "orphan")) -> list[tuple[int, str]]:

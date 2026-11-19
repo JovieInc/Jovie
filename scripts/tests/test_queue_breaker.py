@@ -194,12 +194,13 @@ class MainPoisonTest(unittest.TestCase):
         JOV-13077: the intake files Linear directly — there is no `gh issue` argv to mis-route —
         and convert-style fingerprints stay pure hex."""
         import re
-        from scripts.tests.test_pr_events import FakeIntakeLinear, events as pr_events
+        from scripts.tests.test_pr_events_red_repair import FakeIntakeLinear
+        import intake_linear as filing
         qb, world_calls = load_breaker(), []
         world = poisoned_world(world_calls, [1, 2, 3])
         linear = FakeIntakeLinear()
         with tempfile.TemporaryDirectory() as raw:
-            with patch.object(pr_events, "relay_linear_client", return_value=linear):
+            with patch.object(filing, "relay_linear_client", return_value=linear):
                 out = qb.sweep(Path(raw), world, NOW)
         self.assertEqual(len(linear.creates), 1)
         self.assertTrue(all(c[0] != "gh" for c in world_calls), "the lanes runner never sees a leading gh")
