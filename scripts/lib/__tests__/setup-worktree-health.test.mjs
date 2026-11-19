@@ -349,6 +349,13 @@ describe('package prepare hook lifecycle', () => {
       configurator
     );
     writeFileSync(
+      join(root, 'scripts/hooks/verify-git-hooks.sh'),
+      readFileSync(
+        resolve(repoRoot, 'scripts/hooks/verify-git-hooks.sh'),
+        'utf8'
+      )
+    );
+    writeFileSync(
       join(root, 'package.json'),
       JSON.stringify({
         name: 'prepare-fixture',
@@ -356,6 +363,7 @@ describe('package prepare hook lifecycle', () => {
         scripts: { prepare },
       })
     );
+    writeExecutable(join(root, '.husky/pre-commit'), '#!/bin/sh\nexit 0\n');
     writeExecutable(
       join(root, '.husky/pre-push'),
       '#!/bin/sh\nprintf "gate executed\\n" > "$HOOK_MARKER"\nexit 17\n'
@@ -406,6 +414,7 @@ describe('package prepare hook lifecycle', () => {
       'add',
       'package.json',
       'scripts/hooks/configure-git-hooks.sh',
+      '.husky/pre-commit',
       '.husky/pre-push',
     ]);
     git(['commit', '-m', 'seed fixture']);
