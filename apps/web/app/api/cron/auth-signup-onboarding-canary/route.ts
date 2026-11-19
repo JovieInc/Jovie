@@ -29,7 +29,7 @@ import {
   AUTH_SIGNUP_ONBOARDING_CANARY_REDIS_KEY,
   AUTH_SIGNUP_ONBOARDING_ROUTES,
   bodyContainsAuthShellReady,
-  bodyContainsOnboardingSessionBoundary,
+  bodyContainsInitializedInterview,
   buildReport,
   type CanaryReport,
   checkAuthSurfaceGet,
@@ -105,11 +105,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         checkAuthSurfaceGet(
           'start-200',
           `${base}${AUTH_SIGNUP_ONBOARDING_ROUTES.start}`,
-          // Robust signal at the HTTP level: /start must SSR the onboarding
-          // session boundary. The interview itself mounts client-side after
-          // the session restore fetch, so init markers are asserted by the
-          // browser Playwright spec, not here.
-          bodyContainsOnboardingSessionBoundary
+          // Strongest HTTP-level signal (JOV-8073): a fresh anonymous visitor
+          // (the canary's exact case — no cookies) gets a server-seeded
+          // initialSnapshot, so a healthy /start SSRs the fully initialized
+          // onboarding interview directly. The restore-boundary shell is
+          // client-transition-only and its absence is expected; asserting it
+          // false-FAILed the canary daily against a healthy surface. A stuck
+          // restore render or a chat container that never initializes still
+          // fails this check.
+          bodyContainsInitializedInterview
         ),
         checkOnboardingChatProbe(
           'onboarding-chat-gate',

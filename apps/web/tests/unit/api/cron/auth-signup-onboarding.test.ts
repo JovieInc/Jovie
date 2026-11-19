@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { bodyContainsOnboardingSessionBoundary } from '@/lib/canaries/auth-signup-onboarding';
+import { bodyContainsInitializedInterview } from '@/lib/canaries/auth-signup-onboarding';
 
 const {
   checkAuthSurfaceGetMock,
@@ -76,7 +76,7 @@ describe('GET /api/cron/auth-signup-onboarding-canary', () => {
     expect(checkAuthSurfaceGetMock).not.toHaveBeenCalled();
   });
 
-  it('asserts the SSR session boundary on /start', async () => {
+  it('asserts the initialized onboarding interview on /start', async () => {
     const { GET } = await import(
       '@/app/api/cron/auth-signup-onboarding-canary/route'
     );
@@ -89,9 +89,12 @@ describe('GET /api/cron/auth-signup-onboarding-canary', () => {
       ([name]) => name === 'start-200'
     );
     expect(startCall?.[1]).toBe('https://jov.ie/start');
-    // The interview mounts client-side after the restore fetch, so the HTTP
-    // check must look for the SSR boundary marker, not init markers.
-    expect(startCall?.[2]).toBe(bodyContainsOnboardingSessionBoundary);
+    // Since the server-seeded initialSnapshot path (PR #25189), a healthy
+    // fresh-visitor /start SSRs the initialized interview directly and the
+    // restore-boundary shell never appears — asserting the boundary marker
+    // false-FAILed the canary daily (JOV-8073). The cron must look for the
+    // init markers; a stuck restore shell still fails this check.
+    expect(startCall?.[2]).toBe(bodyContainsInitializedInterview);
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
   });

@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { investorLinks, investorViews } from '@/lib/db/schema/investors';
 import { captureError } from '@/lib/error-tracking';
@@ -11,6 +12,13 @@ import { apiLimiter } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
+/** Schema for the duration-heartbeat tracking body. */
+const trackInvestorViewSchema = z.object({
+  token: z.string().min(1),
+  pagePath: z.string().min(1),
+  durationHintMs: z.number().int().positive(),
+});
+
 /**
  * POST /api/investors/track
  *
@@ -21,12 +29,13 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { token, pagePath, durationHintMs } = body;
-
-    if (!token || !pagePath || !durationHintMs) {
+    const parsed = trackInvestorViewSchema.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
+    const { token, pagePath, durationHintMs } = parsed.data;
 
     if (!isInvestorClaimTokenShape(token)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
