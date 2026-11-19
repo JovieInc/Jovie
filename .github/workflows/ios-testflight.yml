@@ -980,6 +980,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Pin Xcode 27.1
+        run: bash .github/scripts/pin-xcode-27.sh
+
       - name: Show Xcode version
         run: xcodebuild -version
 
@@ -1020,7 +1023,7 @@ jobs:
           printf '%s\n' "$TESTFLIGHT_LEASE" > "$TESTFLIGHT_LEASE_PATH"
           node "$TESTFLIGHT_GUARD_PATH" archive
 
-      - name: Upload internal TestFlight build
+      - name: Archive internal TestFlight build
         env:
           GH_API_HOLD_BUDGET_SECONDS: '600'
         shell: bash
@@ -1030,7 +1033,28 @@ jobs:
           if [[ -z "${match_git_private_key//[[:space:]]/}" ]]; then
             unset MATCH_GIT_PRIVATE_KEY
           fi
-          bundle exec fastlane ios beta
+          bundle exec fastlane ios beta_archive
+
+      - name: Verify archived IPA minimum SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="apps/ios/scripts/verify-app-store-min-sdk.mjs"
+          if [ ! -f "$script" ]; then
+            echo "::error::Missing min-SDK guard script at $script (JOV-13089 HA Flash non-workflow half, PR #26026, is not yet merged). Refusing to upload."
+            exit 1
+          fi
+          # Check the exported binary, not the runner's available SDK list.
+          sdk_plist="$RUNNER_TEMP/jovie-sdk-info.plist"
+          unzip -p "artifacts/ios-build/Jovie.ipa" "Payload/Jovie.app/Info.plist" > "$sdk_plist"
+          plutil -convert xml1 "$sdk_plist"
+          node "$script" --info-plist "$sdk_plist"
+
+      - name: Upload internal TestFlight build
+        env:
+          GH_API_HOLD_BUDGET_SECONDS: '600'
+        shell: bash
+        run: bundle exec fastlane ios beta_upload
 
       - name: Preserve exact uploaded binary attestation
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

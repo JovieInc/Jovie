@@ -264,6 +264,13 @@ platform :ios do
 
   desc "Archive and upload an internal TestFlight build"
   lane :beta do
+    current_build_number = build_number
+    beta_archive(build_number: current_build_number)
+    beta_upload(build_number: current_build_number)
+  end
+
+  desc "Archive an internal TestFlight build without uploading"
+  lane :beta_archive do |options|
     api_key = app_store_api_key_from_env
     apple_team_id = require_env!("APPLE_TEAM_ID")
     require_env!("MATCH_GIT_URL")
@@ -277,7 +284,7 @@ platform :ios do
       "JOVIE_IOS_OBSERVABILITY_ENVIRONMENT",
       ENV.fetch("OBSERVABILITY_ENVIRONMENT", "production")
     )
-    current_build_number = build_number
+    current_build_number = options[:build_number] || build_number
 
     # Bind build provenance to the authorized release SHA, not whatever HEAD a
     # later checkout mutation might report.
@@ -358,6 +365,15 @@ platform :ios do
 
     # Re-prove the pinned certificate, current policy, ancestry and immutable
     # upload intent at the last safe boundary after archive work.
+    verify_release_sha_is_current_main!
+  end
+
+  desc "Upload an archived internal TestFlight build"
+  lane :beta_upload do |options|
+    api_key = app_store_api_key_from_env
+    current_build_number = options[:build_number] || build_number
+    # The workflow's SDK guard runs between lanes. Revalidate the certified
+    # lease again at the final boundary so guard latency cannot stale it.
     verify_release_sha_is_current_main!
 
     upload_to_testflight(

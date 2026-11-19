@@ -54,6 +54,9 @@ jobs:
           ref: ${{ inputs.checkout-ref || github.sha }}
           persist-credentials: false
 
+      - name: Pin Xcode 27.1
+        run: bash .github/scripts/pin-xcode-27.sh
+
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Chromium for the compositor
