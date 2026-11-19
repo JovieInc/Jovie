@@ -139,7 +139,7 @@ runs:
     # changes in the 7 days to 2026-10-13), and each such producer fetched
     # all ~3,100 packages: workspace prep p50 29s -> 71s, p90 153s.
     # Self-hosted runners never use Actions caches.
-    # Bump v4 when the install command, its environment or the pruned set
+    # Bump v5 when the install command, its environment or the pruned set
     # below changes; scripts/lib/actions-cache-supersede.mjs tracks it.
     - name: Restore installed node_modules (GitHub-hosted)
       id: node-modules-cache
@@ -151,9 +151,9 @@ runs:
           apps/*/node_modules
           packages/*/node_modules
           workers/*/node_modules
-        key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}
+        key: pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}
         restore-keys: |
-          pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-
+          pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-
 
     # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
     # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
@@ -288,6 +288,16 @@ runs:
         find . -maxdepth 1 \( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \
           -o -name '@openai+codex@*-linux-*' \
           -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \) \
+          -exec find {}/node_modules -type f ! -name package.json -delete \;
+        # Foreign-OS optional natives. Linux jobs never load darwin/win/BSD/
+        # Android/sunos copies. Keep package.json so a frozen install stays
+        # linked. Do not match JS helpers such as @electron/windows-sign.
+        # android-arm* / android-x64* avoid @peculiar/asn1-android (JS).
+        find . -maxdepth 1 \( \
+          -name '*darwin*@*' -o -name '*win32*@*' -o -name '*windows-*@*' \
+          -o -name '*freebsd*@*' -o -name '*openbsd*@*' -o -name '*sunos*@*' \
+          -o -name '*netbsd*@*' -o -name '*android-arm*@*' -o -name '*android-x64*@*' \
+        \) ! -name '*windows-sign*' \
           -exec find {}/node_modules -type f ! -name package.json -delete \;
 
     - name: Prepare browser contracts for remote preflight

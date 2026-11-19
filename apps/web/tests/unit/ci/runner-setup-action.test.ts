@@ -94,10 +94,10 @@ describe('self-hosted runner setup action', () => {
     // .npmrc. The only fallback is a prior tree for the same OS, arch and
     // Node pin, which the frozen install then reconciles (cache-hit false).
     const key =
-      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}";
+      "pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}";
     expect(restore.with?.key).toBe(key);
     const prefix =
-      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-";
+      "pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-";
     expect(String(restore.with?.['restore-keys']).trim().split('\n')).toEqual([
       prefix,
     ]);
@@ -259,6 +259,11 @@ describe('self-hosted runner setup action', () => {
     pkg('@anthropic-ai+claude-agent-sdk-linux-x64@1.0.0', ['claude/cli']);
     pkg('@anthropic-ai+claude-agent-sdk@1.0.0', ['sdk/dist/index.js']);
     pkg('@rollup+rollup-linux-x64-gnu@4.0.0', ['rollup.node']);
+    pkg('@esbuild+darwin-arm64@0.25.0', ['esbuild/bin']);
+    pkg('@pagefind+windows-x64@1.0.0', ['pagefind/bin']);
+    pkg('@rollup+rollup-android-arm64@4.0.0', ['rollup.node']);
+    pkg('@electron+windows-sign@1.0.0', ['windows-sign/index.js']);
+    pkg('@peculiar+asn1-android@1.0.0', ['asn1-android/index.js']);
     const result = spawnSync(
       'bash',
       ['-c', String(actionStep('Drop unloadable binaries before save').run)],
@@ -282,6 +287,9 @@ describe('self-hosted runner setup action', () => {
       ['onnxruntime-node@1.20.0', 'onnxruntime-node/bin/runtime.node'],
       ['@openai+codex@0.1.0-linux-x64', 'codex/bin/codex'],
       ['@anthropic-ai+claude-agent-sdk-linux-x64@1.0.0', 'claude/cli'],
+      ['@esbuild+darwin-arm64@0.25.0', 'esbuild/bin'],
+      ['@pagefind+windows-x64@1.0.0', 'pagefind/bin'],
+      ['@rollup+rollup-android-arm64@4.0.0', 'rollup.node'],
     ] as const) {
       expect(kept(dir, file), dir).toBe(false);
       // package.json stays so a frozen install keeps them linked.
@@ -292,6 +300,8 @@ describe('self-hosted runner setup action', () => {
       ['@openai+codex-sdk@0.1.0', 'codex-sdk/dist/index.js'],
       ['@anthropic-ai+claude-agent-sdk@1.0.0', 'sdk/dist/index.js'],
       ['@rollup+rollup-linux-x64-gnu@4.0.0', 'rollup.node'],
+      ['@electron+windows-sign@1.0.0', 'windows-sign/index.js'],
+      ['@peculiar+asn1-android@1.0.0', 'asn1-android/index.js'],
     ] as const)
       expect(kept(dir, file), dir).toBe(true);
   });
@@ -343,7 +353,7 @@ describe('self-hosted runner setup action', () => {
     );
     // A prior tree: install fetches only the delta; the receipt is re-stamped
     // and validated exactly as before.
-    expect(run('pnpm-node-modules-v4-prior')).toBe(
+    expect(run('pnpm-node-modules-v5-prior')).toBe(
       [
         'pnpm install --frozen-lockfile',
         'node scripts/lib/ci-dependency-workspace.mjs prepare',
