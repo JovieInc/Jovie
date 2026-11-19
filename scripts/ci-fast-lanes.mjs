@@ -86,10 +86,6 @@ import {
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
-import {
-  loadSourceGuardHistory,
-  orderSourceGuardsByFailureRate,
-} from './lib/source-guard-scheduler.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -621,6 +617,100 @@ export const SOURCE_GUARDS = Object.freeze([
 ]);
 
 /**
+ * Cheap-first ordering for the Source Validation guard pool (JOV-13111).
+ *
+ * Orders the selected guards by historical fail-probability ÷ duration so a
+ * cheap guard that fails often reports first, instead of surfacing minutes
+ * into the "Validate disk-read source contracts" step (3 sampled failures in
+ * 2026-11 surfaced after 253-317s on a daily-changelog PR). This only
+ * reorders; callers keep run-all semantics — every selected guard still runs,
+ * none is skipped or weakened.
+ *
+ * History lives in scripts/lib/source-guard-history.json, refreshed offline
+ * from the `[source-guards] <id>: exit <code>; duration_ms=<n>` receipt lines
+ * the disk-read step prints for every guard run. Lives HERE, not in its own
+ * module: workflows sparse-check this file out by name
+ * (rolling-ci-dispatch.yml), so a new import would break the sparse-checkout
+ * import closure — a workflow edit this task may not make. A sparse checkout
+ * that omits the ledger (or any read/schema failure) degrades to null:
+ * manifest order, deterministically.
+ */
+export const SOURCE_GUARD_HISTORY_SCHEMA = 'jovie.source-guard-history/v1';
+const SOURCE_GUARD_HISTORY_URL = new URL(
+  './lib/source-guard-history.json',
+  import.meta.url
+);
+
+/**
+ * Guard-id → { failures, runs, durationMs? } from the committed ledger.
+ * Returns null when the ledger is absent, unreadable, or has the wrong
+ * schema — the deterministic fallback keeps manifest order. `read` is
+ * injectable so tests can exercise the malformed fallbacks.
+ * @param {(path: URL) => string} [read]
+ * @returns {Record<string, { failures: number, runs: number, durationMs?: number }> | null}
+ */
+export function loadSourceGuardHistory(
+  read = path => readFileSync(path, 'utf8')
+) {
+  try {
+    const parsed = JSON.parse(read(SOURCE_GUARD_HISTORY_URL));
+    if (
+      parsed?.schema !== SOURCE_GUARD_HISTORY_SCHEMA ||
+      !parsed.entries ||
+      typeof parsed.entries !== 'object' ||
+      Array.isArray(parsed.entries)
+    )
+      return null;
+    return parsed.entries;
+  } catch {
+    return null;
+  }
+}
+
+/** Score: fail-probability per second of guard duration (0 without data). */
+function guardFailureScore(entry) {
+  const runs = Number(entry?.runs);
+  const failures = Number(entry?.failures);
+  if (
+    !Number.isInteger(runs) ||
+    runs <= 0 ||
+    !Number.isInteger(failures) ||
+    failures < 0
+  )
+    return 0;
+  const failProbability = Math.min(failures / runs, 1);
+  const durationMs = Number(entry?.durationMs);
+  const durationSeconds =
+    Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 0;
+  // Without a measured duration the score degrades to the fail-probability
+  // alone — never to a fabricated duration.
+  return durationSeconds > 0
+    ? failProbability / durationSeconds
+    : failProbability;
+}
+
+/**
+ * Reorder guards: highest fail-probability ÷ duration first. Stable sort —
+ * ties (including the no-data score of 0) keep manifest order.
+ *
+ * @template {{ id: string }} G
+ * @param {readonly G[]} guards selected guards in manifest order
+ * @param {Record<string, unknown> | null} entries ledger entries or null
+ * @returns {G[]} ordered copy (same elements, same set, new order)
+ */
+export function orderSourceGuardsByFailureRate(guards, entries) {
+  if (!entries) return [...guards];
+  return guards
+    .map((guard, index) => ({
+      guard,
+      index,
+      score: guardFailureScore(entries[guard?.id]),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.guard);
+}
+
+/**
  * @param {string} event GITHUB_EVENT_NAME ('' locally)
  * @param {readonly string[] | null} changed changed paths; null = unreadable
  * @returns {Array<(typeof SOURCE_GUARDS)[number]>}
@@ -890,6 +980,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
+  'scripts/linear-team-drift.test.mjs', // JOV-13101 team drift guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -1057,6 +1148,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
+  'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',

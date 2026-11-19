@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import {
   loadSourceGuardHistory,
   orderSourceGuardsByFailureRate,
   SOURCE_GUARD_HISTORY_SCHEMA,
-} from '../source-guard-scheduler.mjs';
+  selectSourceGuards,
+} from '../../ci-fast-lanes.mjs';
 
 const guard = id => ({ id, command: `node ${id}.mjs` });
 const ids = guards => guards.map(guard => guard.id);
