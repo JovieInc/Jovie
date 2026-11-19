@@ -40,14 +40,6 @@ vi.mock('@/lib/chat/title', () => ({
   ),
 }));
 
-vi.mock('@/lib/chat/conversation-queries', () => ({
-  getCreatorConversationDetail: vi.fn(),
-}));
-
-vi.mock('@/lib/chat/conversation-access', () => ({
-  ownedConversationCondition: vi.fn(),
-}));
-
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
