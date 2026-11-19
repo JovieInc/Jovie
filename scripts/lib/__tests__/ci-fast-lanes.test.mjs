@@ -511,7 +511,13 @@ describe('runStructural screenshot contract discovery', () => {
           !command.includes('scripts/agent-context/check.test.mjs')
       );
       expect(dependent).toHaveLength(expected ? 1 : 0);
-      expect(commands).not.toContain(SCRIPT_CONTRACT_VITEST_COMMAND);
+      // Without operations, a source PR never runs the full vitest contract
+      // list; with operations, operationsParts runs exactly that command.
+      if (lanes.includes('operations')) {
+        expect(commands).toContain(SCRIPT_CONTRACT_VITEST_COMMAND);
+      } else {
+        expect(commands).not.toContain(SCRIPT_CONTRACT_VITEST_COMMAND);
+      }
     }
   );
 
