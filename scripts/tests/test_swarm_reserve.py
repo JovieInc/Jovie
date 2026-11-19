@@ -55,7 +55,7 @@ class ReserveThenAdmit(unittest.TestCase):
         def one(run):
             if gate:
                 gate.wait()  # every selector read "spent" before anyone wrote: the bypass on main
-            results[run] = sw.reserve("1", run, cents, cap_cents)
+            results[run] = "oop" in sw.reserve("1", run, {"oop": cents}, {"oop": cap_cents})
         with mock.patch.object(sw, "gh", issue.gh), mock.patch.object(sw, "gh_json", issue.gh_json):
             ts = [threading.Thread(target=one, args=(r,)) for r in runs]
             [t.start() for t in ts]
@@ -82,7 +82,15 @@ class ReserveThenAdmit(unittest.TestCase):
         issue = FakeIssue()
         with mock.patch.object(sw, "gh", lambda *a, **k: types.SimpleNamespace(returncode=1)), \
                 mock.patch.object(sw, "gh_json", issue.gh_json):
-            self.assertFalse(sw.reserve("1", "1", 10, 500))
+            self.assertEqual(sw.reserve("1", "1", {"oop": 10}, {"oop": 500}), set())
+
+
+    def test_tiers_are_capped_separately(self):
+        """Credit spend has its own cap; a full out-of-pocket day does not block credit-backed attempts."""
+        issue = FakeIssue([f"🤖 swarm-ledger run=1 cents=500 at={self.today} credit_cents=0"])
+        with mock.patch.object(sw, "gh", issue.gh), mock.patch.object(sw, "gh_json", issue.gh_json):
+            self.assertEqual(sw.day_spend("1"), {"oop": 500, "credit": 0})
+            self.assertEqual(sw.reserve("1", "2", {"oop": 10, "credit": 10}, {"oop": 500, "credit": 500}), {"credit"})
 
 
 if __name__ == "__main__":
