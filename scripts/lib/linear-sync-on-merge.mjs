@@ -21,6 +21,12 @@ import {
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
+import {
+  ensureMergeReceipt,
+  readMergeEventPayload,
+  reportQuotaDeferral,
+  reportSweepDeferral,
+} from './merge-receipt.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
   formatValidationReceipt,
@@ -38,6 +44,8 @@ import {
   readClosedPullSnapshot,
   reconcileValidation,
 } from './validation-sync.mjs';
+
+export { reportQuotaDeferral, reportSweepDeferral };
 
 /**
  * The three classifiers merge-mode needs from github-installation-quota.mjs.
@@ -261,11 +269,13 @@ export function linearIdentifierFromText(value) {
  * @param {{
  *   readonly body?: string,
  *   readonly headRef?: string,
+ *   readonly title?: string,
  * }} input
  * @returns {{ identifier: string, issueId: string }}
  */
 export function extractMergeIssueRef(input = {}) {
   const body = String(input.body ?? '');
+  const title = String(input.title ?? '');
   const identifierMarker =
     /linear-issue-identifier:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
   const idMarker = /linear-issue-id:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
@@ -273,16 +283,42 @@ export function extractMergeIssueRef(input = {}) {
     /<!--\s*summer-issue-bind\s*-->\s*(JOV-\d+)(?![A-Za-z0-9-])/i.exec(
       body
     )?.[1] ?? '';
+  // Precedence (JOV-13063): markers > summer-issue-bind > branch >
+  // `Refs JOV-` > title. An empty `Refs JOV-` template is terminal ('').
+  const branchIdentifier = linearIdentifierFromText(input.headRef);
+  const refsIdentifier = refsLineIdentifier(body);
+  const titleIdentifier = linearIdentifierFromText(title);
   const identifier = IDENTIFIER_RE.test(identifierMarker)
     ? identifierMarker.toUpperCase()
     : IDENTIFIER_RE.test(idMarker)
       ? idMarker.toUpperCase()
       : summerIdentifier
         ? summerIdentifier.toUpperCase()
-        : linearIdentifierFromText(input.headRef);
+        : branchIdentifier
+          ? branchIdentifier
+          : refsIdentifier === undefined
+            ? titleIdentifier
+            : refsIdentifier;
   const issueId =
     idMarker && !IDENTIFIER_RE.test(idMarker) ? idMarker : identifier;
   return { identifier, issueId };
+}
+
+/**
+ * The `Refs JOV-<number>` line of a pull request body. A present-but-empty
+ * `Refs JOV-` resolves to '' (an unlinked PR is never guessed from its
+ * title); no Refs line returns undefined and the caller tries the title.
+ *
+ * @param {unknown} body
+ * @returns {string | undefined}
+ */
+export function refsLineIdentifier(body) {
+  for (const line of String(body ?? '').split(/\r?\n/)) {
+    const match = /^\s*refs\s*:?\s*(jov-\S*)\s*$/i.exec(line);
+    if (!match) continue;
+    return IDENTIFIER_RE.test(match[1]) ? match[1].toUpperCase() : '';
+  }
+  return undefined;
 }
 
 /**
@@ -1217,6 +1253,7 @@ function lifecyclePreimage(issue) {
  *   readonly assuranceMatrix: unknown,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
+ *   readonly eventMerge?: { number: number, sha: string },
  *   readonly closedPulls?: ReadonlyMap<number, import('./validation-sync.mjs').ClosedPullSnapshotEntry>,
  *   readonly dryRun?: boolean,
  *   readonly issue?: Awaited<ReturnType<typeof readLifecycleIssue>>,
@@ -1274,7 +1311,63 @@ export async function reconcileIssueLifecycle(ctx) {
   /** @param {string} query @param {Record<string, unknown>} variables */
   const linear = (query, variables) =>
     linearGraphql(ctx.fetchImpl, ctx.apiKey, query, variables);
-  return reconcileValidation({
+  const lifecycleLinear = {
+    readStateId: async issueId => {
+      // Only moving decisions pay for this complete read. Issue updatedAt
+      // alone cannot prove unchanged comments or child delivery/acceptance.
+      const current = await readLifecycleIssue(
+        ctx.fetchImpl,
+        ctx.apiKey,
+        issueId
+      );
+      if (current?.id !== issueId) {
+        throw new Error(`Unreadable lifecycle preimage for ${issueId}`);
+      }
+      return lifecyclePreimage(current) === lifecyclePreimage(issue)
+        ? current.state.id
+        : '';
+    },
+    setState: async (issueId, stateId) =>
+      String(
+        (
+          await linear(
+            `mutation SetLifecycleState($issueId: String!, $stateId: String!) {
+      issueUpdate(id: $issueId, input: { stateId: $stateId }) { success issue { state { name } } }
+    }`,
+            { issueId, stateId }
+          )
+        ).issueUpdate?.issue?.state?.name ?? ''
+      ),
+    addComment: async (issueId, body) =>
+      (
+        await linear(
+          `mutation AddLifecycleComment($issueId: String!, $body: String!) {
+      commentCreate(input: { issueId: $issueId, body: $body }) { success }
+    }`,
+          { issueId, body }
+        )
+      ).commentCreate?.success === true,
+    readDescription: async issueId => {
+      const data = await linear(
+        `query IssueLifecycleDescription($issueId: String!) {
+      issue(id: $issueId) { description }
+    }`,
+        { issueId }
+      );
+      if (!data.issue) throw new Error(`Could not re-read ${issueId}`);
+      return String(data.issue.description ?? '');
+    },
+    setDescription: async (issueId, description) =>
+      (
+        await linear(
+          `mutation SetLifecycleDescription($issueId: String!, $description: String!) {
+      issueUpdate(id: $issueId, input: { description: $description }) { success }
+    }`,
+          { issueId, description }
+        )
+      ).issueUpdate?.success === true,
+  };
+  const result = await reconcileValidation({
     issue,
     holds,
     completionHolds: issue.blockingIssues
@@ -1304,63 +1397,12 @@ export async function reconcileIssueLifecycle(ctx) {
         : undefined,
     dryRun: ctx.dryRun,
     log: ctx.log,
-    linear: {
-      readStateId: async issueId => {
-        // Only moving decisions pay for this complete read. Issue updatedAt
-        // alone cannot prove unchanged comments or child delivery/acceptance.
-        const current = await readLifecycleIssue(
-          ctx.fetchImpl,
-          ctx.apiKey,
-          issueId
-        );
-        if (current?.id !== issueId) {
-          throw new Error(`Unreadable lifecycle preimage for ${issueId}`);
-        }
-        return lifecyclePreimage(current) === lifecyclePreimage(issue)
-          ? current.state.id
-          : '';
-      },
-      setState: async (issueId, stateId) =>
-        String(
-          (
-            await linear(
-              `mutation SetLifecycleState($issueId: String!, $stateId: String!) {
-        issueUpdate(id: $issueId, input: { stateId: $stateId }) { success issue { state { name } } }
-      }`,
-              { issueId, stateId }
-            )
-          ).issueUpdate?.issue?.state?.name ?? ''
-        ),
-      addComment: async (issueId, body) =>
-        (
-          await linear(
-            `mutation AddLifecycleComment($issueId: String!, $body: String!) {
-        commentCreate(input: { issueId: $issueId, body: $body }) { success }
-      }`,
-            { issueId, body }
-          )
-        ).commentCreate?.success === true,
-      readDescription: async issueId => {
-        const data = await linear(
-          `query IssueLifecycleDescription($issueId: String!) {
-        issue(id: $issueId) { description }
-      }`,
-          { issueId }
-        );
-        if (!data.issue) throw new Error(`Could not re-read ${issueId}`);
-        return String(data.issue.description ?? '');
-      },
-      setDescription: async (issueId, description) =>
-        (
-          await linear(
-            `mutation SetLifecycleDescription($issueId: String!, $description: String!) {
-        issueUpdate(id: $issueId, input: { description: $description }) { success }
-      }`,
-            { issueId, description }
-          )
-        ).issueUpdate?.success === true,
-    },
+    linear: lifecycleLinear,
   });
+  // JOV-13063: with native GitHub -> Linear sync off, this receipt is the
+  // proof a merge reached its issue; a failed write throws and retries.
+  await ensureMergeReceipt(lifecycleLinear, issue, ctx.eventMerge, ctx.dryRun);
+  return result;
 }
 
 /**
@@ -1426,9 +1468,15 @@ async function runSync(options) {
   if (sweep && receiptIssue && !IDENTIFIER_RE.test(receiptIssue)) {
     throw new Error('Malformed LINEAR_VALIDATION_ISSUE: expected JOV-<number>');
   }
+  // The closed-PR payload (title, merge SHA) rides in GITHUB_EVENT_PATH,
+  // so no workflow change is needed to pass them (JOV-13063).
+  const eventPayload = sweep
+    ? null
+    : readMergeEventPayload(env.GITHUB_EVENT_PATH);
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
+    title: env.PR_TITLE || eventPayload?.title || '',
   });
   if (!sweep && !ref.identifier && !ref.issueId) {
     log('No linear issue marker or branch identifier found; skipping');
@@ -1615,6 +1663,11 @@ async function runSync(options) {
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
+  // A merge receipt needs the closed payload's merge SHA; dispatch replays
+  // without one just re-evaluate as before.
+  const { number: mergeNumber, sha: mergeSha } = eventPayload ?? {};
+  const eventMerge =
+    !sweep && mergeSha ? { number: mergeNumber, sha: mergeSha } : undefined;
   const cursorDir =
     sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
@@ -1681,6 +1734,7 @@ async function runSync(options) {
             assuranceMatrix,
             allowlist: options.allowlist,
             eventPull,
+            eventMerge,
             closedPulls,
             dryRun: env.LIFECYCLE_DRY_RUN === '1',
             issue,
@@ -1802,60 +1856,6 @@ export async function recordValidationReceipt(args, options = {}) {
     throw new Error('Linear refused the validation receipt');
   }
   return body;
-}
-
-/**
- * Make a quota deferral visible: step output for the workflow's hold-and-retry
- * and a summary line. Exit stays 0 (the 403 is not a verdict on any issue).
- * @param {{ softFailed: boolean }} disposition
- * @param {NodeJS.ProcessEnv} [env]
- */
-export function reportQuotaDeferral(disposition, env = process.env) {
-  if (!disposition?.softFailed) return false;
-  try {
-    if (env.GITHUB_OUTPUT)
-      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
-    if (env.GITHUB_STEP_SUMMARY)
-      appendFileSync(
-        env.GITHUB_STEP_SUMMARY,
-        '- Linear sync DEFERRED: GitHub installation quota 403; no lifecycle evaluation completed.\n'
-      );
-  } catch {
-    // Visibility must never turn a deferral into a crash.
-  }
-  return true;
-}
-
-/**
- * A resolved deferral must set quota_deferred (exit stays 0). Without the
- * flag the hold skipped and the run went green unfinished (41157880216).
- * deferral_kind=linear skips that GitHub hold (43041615689).
- *
- * @param {{ action?: string, deferred?: number, deferralKind?: string } | null | undefined} result
- * @param {NodeJS.ProcessEnv} [env]
- */
-export function reportSweepDeferral(result, env = process.env) {
-  if (!result || result.action !== 'deferred') return false;
-  const detail =
-    result.deferred && result.deferred > 0
-      ? `${result.deferred} issue(s) deferred to the next sweep by the rate limit; the retry resumes from the cursor`
-      : 'the rate limit stopped the sweep before any lifecycle evaluation';
-  try {
-    if (env.GITHUB_OUTPUT) {
-      const kind = result.deferralKind
-        ? `deferral_kind=${result.deferralKind}\n`
-        : '';
-      appendFileSync(env.GITHUB_OUTPUT, `quota_deferred=true\n${kind}`);
-    }
-    if (env.GITHUB_STEP_SUMMARY)
-      appendFileSync(
-        env.GITHUB_STEP_SUMMARY,
-        `- Linear sync DEFERRED: ${detail}.\n`
-      );
-  } catch {
-    // Visibility must never turn a deferral into a crash.
-  }
-  return true;
 }
 
 const isDirectRun =
