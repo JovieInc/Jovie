@@ -119,8 +119,10 @@ export function createMainLoopLagMeter(options?: {
   }, intervalMs);
 
   return {
-    latestLagMs: () =>
-      samples.length > 0 ? samples[samples.length - 1] : null,
+    latestLagMs: () => {
+      const last = samples[samples.length - 1];
+      return samples.length > 0 && last !== undefined ? last : null;
+    },
     samples: () => [...samples],
     dispose: () => clearTimer(handle),
   };

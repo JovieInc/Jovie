@@ -18,7 +18,10 @@ import {
 } from '../projected-tree-budget.mjs';
 import {
   HYGIENE_LIMITS,
+  logTrackedBytesBudgetWarnings,
+  trackedBytesBudgetPlanWarning,
   trackedBytesBudgetWarning,
+  trackedBytesBudgetWarnings,
 } from '../repo-hygiene-limits.mjs';
 
 const BASE = '1'.repeat(40);
@@ -237,6 +240,48 @@ process.exit(17);
     expect(trackedBytesBudgetWarning(2_100_000, 1_000_000)).toMatch(
       /1\.10 MB over budget/
     );
+  });
+
+  it('stays quiet at or below the 90% plan line', () => {
+    expect(trackedBytesBudgetPlanWarning(90, 100)).toBeNull();
+    expect(trackedBytesBudgetWarnings(90, 100)).toEqual([]);
+  });
+
+  it('plans the next prune in the 90-95% band without failing', () => {
+    expect(trackedBytesBudgetWarning(93, 100)).toBeNull();
+    const plan = trackedBytesBudgetPlanWarning(93, 100);
+    expect(plan).toMatch(/93\.00% .*headroom/);
+    expect(plan).toMatch(/90% plan line/);
+    expect(trackedBytesBudgetWarnings(93, 100)).toEqual([plan]);
+  });
+
+  it('keeps the shrink-now warning first and silent plan level above 95%', () => {
+    expect(trackedBytesBudgetPlanWarning(MAX - 1)).toBeNull();
+    const logs = [];
+    logTrackedBytesBudgetWarnings(MAX - 1, line => logs.push(line), 'X: ');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatch(/^::warning::X: .*shrink tracked bytes/);
+  });
+
+  it('emits the plan warning from the projected combined-tree check', () => {
+    const logs = [];
+    const bytes = Math.floor(MAX * 0.92);
+    const result = enforceProjectedTreeBudget({
+      baseSha: BASE,
+      git: fakeGit({
+        [BASE_TREE]: [regular(bytes - 10)],
+        [HEAD_TREE]: [regular(bytes)],
+        [MERGED_TREE]: [regular(bytes)],
+      }),
+      headSha: HEAD,
+      log: line => logs.push(line),
+      mergeBaseSha: MERGE_BASE,
+    });
+    expect(result.bytes).toBe(bytes);
+    expect(logs[0]).toMatch(
+      /^::warning::Projected combined tree: .*90% plan line/
+    );
+    expect(logs.at(-1)).toMatch(/^Projected combined tree: PASS/);
   });
 
   it('selects the same lowest merge base as CI in a criss-cross history', () => {

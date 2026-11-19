@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ActionDescriptor } from '../descriptor';
+import type { ActionDescriptor, ActionRequirement } from '../descriptor';
 
 export const FLEET_ACTION_IDS = [
   'fleet.register',
@@ -242,20 +242,26 @@ export const FLEET_INPUT_SCHEMAS = {
   'work.request': fleetRequestInputSchema,
 };
 export const FLEET_ACTIONS: readonly ActionDescriptor[] = FLEET_ACTION_IDS.map(
-  (id, index) => ({
-    id,
-    schemaVersion: 1,
-    titleKey: `actions.${id}.title`,
-    descriptionKey: `actions.${id}.description`,
-    effect: id === 'defect.report' ? 'external_write' : 'internal_write',
-    confirmation: 'none',
-    supportedChannels: ['cli', 'mcp'],
-    requirements: [
-      { type: 'auth' },
-      { type: 'profile_ownership' },
-      { type: 'worker_scope', key: FLEET_SCOPES[index] },
-    ],
-    inputSchema: FLEET_INPUT_SCHEMAS[id],
-    outputSchema: output[id],
-  })
+  (id, index) => {
+    const scope: ActionRequirement | null =
+      FLEET_SCOPES[index] === undefined
+        ? null
+        : { type: 'worker_scope', key: FLEET_SCOPES[index] };
+    return {
+      id,
+      schemaVersion: 1,
+      titleKey: `actions.${id}.title`,
+      descriptionKey: `actions.${id}.description`,
+      effect: id === 'defect.report' ? 'external_write' : 'internal_write',
+      confirmation: 'none',
+      supportedChannels: ['cli', 'mcp'],
+      requirements: [
+        { type: 'auth' },
+        { type: 'profile_ownership' },
+        ...(scope === null ? [] : [scope]),
+      ],
+      inputSchema: FLEET_INPUT_SCHEMAS[id],
+      outputSchema: output[id],
+    };
+  }
 );

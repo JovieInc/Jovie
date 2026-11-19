@@ -711,6 +711,8 @@ interface OnboardingMessageRegionProps {
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
+  /** Sends the selected default-walkthrough prompt through the real submit path. */
+  readonly onSuggestionSelect: (prompt: string) => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -733,6 +735,7 @@ function OnboardingMessageRegion({
   profileBuilderState,
   shouldDockComposer,
   pinThreadToTop,
+  onSuggestionSelect,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -769,6 +772,7 @@ function OnboardingMessageRegion({
               mode={entryMode}
               entryProfile={entryProfile}
               onTryAnotherName={onTryAnotherName}
+              onSuggestionSelect={onSuggestionSelect}
             />
           </div>
         }
@@ -1448,6 +1452,7 @@ export function OnboardingChat({
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
             pinThreadToTop={hasInitialStarterPrompt}
+            onSuggestionSelect={submitText}
           />
         </div>
       </section>
