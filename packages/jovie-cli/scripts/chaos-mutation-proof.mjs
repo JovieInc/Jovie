@@ -24,10 +24,14 @@ import { parseArgs } from 'node:util';
 
 export const MUTANTS = [
   {
+    // The closed-pipe defense is layered (stdio listeners plus the
+    // uncaughtException fallback) but both consult this one classifier, so a
+    // single stale code defeats every layer and the gate must red (JOV-13096).
     name: 'stack trace on a closed pipe',
-    file: 'cli.js',
-    from: "process.stdout.on('error', onClosedPipe);",
-    to: '',
+    file: 'closed-pipe.js',
+    // Single-token anchor: survives any printer wrapping of the module.
+    from: "'EPIPE'",
+    to: "'XPIPE'",
     scenario: 'closed-stdout-pipe',
   },
   {
