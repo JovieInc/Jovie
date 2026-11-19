@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertEditorialPublication } from './lib/customer-changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
 import {
@@ -192,6 +193,20 @@ const plan = planDailyPublication({
   windowKey: observedAt.slice(0, 10),
   observedAt,
   catchUp: process.argv.includes('--catch-up'),
+});
+// Check the planned receipt before opening a release PR, using the same
+// overlay contract as source CI without changing any approved customer copy.
+assertEditorialPublication({
+  content: plan.content,
+  overlay: JSON.parse(
+    readFileSync('apps/web/data/customer-changelog-editorial.json', 'utf8')
+  ),
+  migrations: JSON.parse(
+    readFileSync(
+      'apps/web/data/customer-changelog-permalink-migrations.json',
+      'utf8'
+    )
+  ),
 });
 // Customer digest copy must pass @jovie/copy at the jovie-marketing register
 // before the release PR opens: /changelog is certified by seo:certify
