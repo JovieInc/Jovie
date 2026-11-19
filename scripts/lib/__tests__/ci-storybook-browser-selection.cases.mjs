@@ -86,7 +86,7 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
 
   it('selects the crawler state proof through the maintained Storybook browser path', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/CRAWLER_STORYBOOK_PATTERN='([^']+)'/)?.[1];
@@ -194,7 +194,7 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
 
   it('selects smart-link reachability for the shell and runs its maintained browser proof', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(
@@ -313,7 +313,7 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
 
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/TASKS_STORYBOOK_PATTERN='([^']+)'/)?.[1];
