@@ -13,8 +13,7 @@ if [[ -z "$REPO_ROOT" ]]; then
   exit 0
 fi
 
-for name in pre-commit pre-push; do
-  hook="$REPO_ROOT/.husky/$name"
+for hook in "$REPO_ROOT/.husky/pre-commit" "$REPO_ROOT/.husky/pre-push"; do
   if [[ ! -x "$hook" ]]; then
     echo "[git-hooks] expected tracked hook missing or not executable: $hook" >&2
     exit 1
