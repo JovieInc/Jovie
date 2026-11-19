@@ -30,4 +30,3 @@ class DesignSourcePathsTest(unittest.TestCase):
         for log in (diagnostic.replace('FAIL', 'PASS'), '\n'.join(identities)):
             route = classes.classify(pr, {'Source Validation': log})
             self.assertEqual(route['files'], [])
-
