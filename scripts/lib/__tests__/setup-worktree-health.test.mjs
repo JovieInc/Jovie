@@ -390,7 +390,7 @@ describe('package prepare hook lifecycle', () => {
     expect(prepare).toContain('scripts/hooks/configure-git-hooks.sh');
     expect(prepare).toContain('[ -f scripts/hooks/configure-git-hooks.sh ]');
     expect(prepare).toContain('${VERCEL:-}');
-    expect(prepare).toContain('${CI:-}');
+    expect(prepare).toContain('${GITHUB_ACTIONS:-}');
   });
 
   it('keeps tracked push gates active in another linked worktree after package prepare', () => {
@@ -451,13 +451,13 @@ describe('package prepare hook lifecycle', () => {
     ).toBe('');
   });
 
-  it('skips hook setup on Vercel and CI even when the helper is present', () => {
+  it('skips hook setup on Vercel and GitHub Actions even when the helper is present', () => {
     const { root, env, run } = fixture();
     expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
     expect(run('git', ['config', 'core.hooksPath', '.husky/_']).status).toBe(0);
     for (const [key, value] of [
       ['VERCEL', '1'],
-      ['CI', 'true'],
+      ['GITHUB_ACTIONS', 'true'],
     ]) {
       const result = spawnSync('pnpm', ['run', 'prepare'], {
         cwd: root,
@@ -472,6 +472,21 @@ describe('package prepare hook lifecycle', () => {
         run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
       ).toBe('.husky/_');
     }
+  });
+
+  it('configures hooks when only CI is set so agent containers keep the gate', () => {
+    const { root, env, run } = fixture();
+    expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
+    const result = spawnSync('pnpm', ['run', 'prepare'], {
+      cwd: root,
+      env: { ...env, CI: 'true' },
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(
+      run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
+    ).toBe('.husky');
   });
 
   it('propagates a broken tracked-hook configuration inside Git', () => {

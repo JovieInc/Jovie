@@ -997,6 +997,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
   'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
