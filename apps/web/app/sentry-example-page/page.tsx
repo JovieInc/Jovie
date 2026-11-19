@@ -4,7 +4,7 @@ export default function SentryExamplePage() {
   return (
     <main className='mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-6 px-6 py-16'>
       <div className='space-y-3'>
-        <p className='text-sm font-medium uppercase tracking-[0.2em] text-tertiary-token'>
+        <p className='text-sm font-medium text-tertiary-token'>
           Sentry Example
         </p>
         <h1 className='text-4xl font-semibold tracking-tight text-primary-token'>
