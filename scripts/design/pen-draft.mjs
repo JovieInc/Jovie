@@ -35,7 +35,6 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { deferralReason, writeDeferredSummary } from './pen-draft-quota.mjs';
 import { spliceDraft, trimCanonical } from './pen-trim.mjs';
 
 export { deferralReason, writeDeferredSummary } from './pen-draft-quota.mjs';
@@ -348,6 +347,9 @@ async function main() {
   // A quota refusal is the account's, not one frame's: once the drafting
   // agent reports it, the frames still queued in this run are deferred
   // without another pen call (run 43621008907).
+  const { deferralReason, writeDeferredSummary } = await import(
+    './pen-draft-quota.mjs'
+  );
   let quotaRefusal = null;
   for (const brief of briefs) {
     const startedAt = Date.now();
