@@ -24,7 +24,7 @@ import { ClaimArtistSearch } from './ClaimArtistSearch';
 const PRO_CLAIM = getPublicPriceClaim('pro');
 const PRICE_DISPLAY = formatPublicPriceDisplay(PRO_CLAIM);
 // /claim shows the whole offer: the free profile AND the paid step (Tim,
-// 2026-11-19, not only "$12/mo"). Free sentence comes from offer truth.
+// 2026-11-19: never only the paid price). Free sentence comes from offer truth.
 const FREE_CLAIM = getPublicPriceClaim('free');
 
 export const metadata: Metadata = {
