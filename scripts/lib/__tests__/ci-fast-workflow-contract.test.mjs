@@ -372,6 +372,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
       'scripts/prod-errors/test_prod_errors.py',
+      'scripts/tests/test_noabandon_route.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
@@ -384,7 +385,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_codex_launcher.py',
       'scripts/tests/test_loose_exec_guard.py',
       'scripts/tests/test_noabandon_ledger.py',
-      'scripts/tests/test_noabandon_route.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
