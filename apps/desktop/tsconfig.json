@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "node16",
     "lib": ["ES2022"],
     "outDir": "dist-electron",
     "rootDir": "src",
@@ -9,8 +9,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "noEmit": false
+    "moduleResolution": "node16",
+    "noEmit": false,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist-electron", "dist"]

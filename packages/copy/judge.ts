@@ -60,7 +60,7 @@ export interface CopyBrief {
   /** Customer voice samples (customer-voice register only). */
   readonly voiceSamples?: readonly string[];
   /** Model that wrote the draft. Its family never judges its own output. */
-  readonly generatorModel?: string;
+  readonly generatorModel?: string | undefined;
 }
 
 export interface JudgeVerdict {
@@ -315,7 +315,7 @@ export async function writeUntilPass(
   brief: CopyBrief,
   write: (input: {
     round: number;
-    previous?: string;
+    previous?: string | undefined;
     critique: readonly string[];
   }) => Promise<string>,
   transport?: JudgeTransport
