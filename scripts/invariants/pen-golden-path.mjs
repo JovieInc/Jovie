@@ -149,6 +149,34 @@ async function fetchPenSource({ out, env, run, fetchImpl }) {
 }
 
 /**
+ * Install the Playwright Chromium browser pen-still-diff captures with.
+ * `--with-deps` shells out to apt, which 503s during Ubuntu mirror outages
+ * (2026-11-19, run 44519990567). Each retry re-runs apt's own internal
+ * fetch retries, so the attempts are naturally spaced; after the last one
+ * the error still propagates and the probe fails red.
+ */
+export async function installPlaywrightBrowser({ root, run, log }) {
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      run(
+        'pnpm',
+        ['exec', 'playwright', 'install', '--with-deps', 'chromium'],
+        { cwd: root, stdio: 'inherit' }
+      );
+      return;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      log(
+        `playwright install failed (attempt ${attempt}/${attempts}): ${
+          error?.message ?? error
+        }; retrying`
+      );
+    }
+  }
+}
+
+/**
  * `report` gets each workflow output as soon as it is known, so an export
  * that finished still reports itself when the diff after it throws.
  * @param {{ out: string, baseUrl?: string, env?: NodeJS.ProcessEnv, root?: string, run?: typeof defaultRun, fetchImpl?: typeof fetch, log?: (line: string) => void, fetchOnly?: boolean, report?: (name: string, value: string) => void }} options
@@ -249,10 +277,11 @@ export async function runGoldenPathPen({
   report('export_cacheable', String(cacheable));
   if (exported.length) {
     // pen-still-diff captures production with Playwright's Chromium.
-    run('pnpm', ['exec', 'playwright', 'install', '--with-deps', 'chromium'], {
-      cwd: root,
-      stdio: 'inherit',
-    });
+    // --with-deps shells out to apt, which fails with 503s during Ubuntu
+    // mirror outages (2026-11-19, run 44519990567). Retry a bounded number
+    // of times — each attempt re-runs apt's own fetch retries — and still
+    // fail red if the browser never installs.
+    await installPlaywrightBrowser({ root, run, log });
     run(
       'node',
       [

@@ -311,3 +311,63 @@ test('a partial export is never cached', async () => {
   assert.equal(outputs.export_cacheable, 'false');
   assert.ok(!existsSync(join(out, 'png', EXPORT_KEY_FILE)));
 });
+
+test('a transient browser-install failure is retried before the strict diff runs', async () => {
+  const root = fixtureRoot();
+  const out = join(root, 'out');
+  const calls = [];
+  const installAttempts = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (args.includes('install')) {
+      installAttempts.push(1);
+      // Fail the first two installs like an apt mirror 503 would.
+      if (installAttempts.length < 3) throw new Error('apt-get failed: 503');
+    }
+    if (args.includes('interactive'))
+      for (const id of ['oaz9c', 'hLRZB'])
+        writeFileSync(join(out, 'png', `${id}.png`), `png-${id}`);
+    return Buffer.from('');
+  };
+  const result = await runGoldenPathPen({
+    out,
+    root,
+    env: penEnv('https://blob.example/x.pen'),
+    run,
+    fetchImpl: penSource('{"v":1}'),
+    log: () => {},
+  });
+  assert.equal(installAttempts.length, 3, 'the browser install is retried');
+  assert.equal(result.exported.length, 2);
+  const diff = calls.find(c =>
+    c.includes('scripts/invariants/pen-still-diff.mjs')
+  );
+  assert.ok(diff?.includes('--strict'), 'the diff still runs after the retry');
+});
+
+test('a persistent browser-install failure still fails red', async () => {
+  const root = fixtureRoot();
+  const installAttempts = [];
+  await assert.rejects(
+    () =>
+      runGoldenPathPen({
+        out: join(root, 'out'),
+        root,
+        env: penEnv('https://blob.example/x.pen'),
+        run: (cmd, args) => {
+          if (args.includes('interactive'))
+            for (const id of ['oaz9c', 'hLRZB'])
+              writeFileSync(join(root, 'out', 'png', `${id}.png`), `png-${id}`);
+          if (args.includes('install')) {
+            installAttempts.push(1);
+            throw new Error('apt-get failed: 503');
+          }
+          return Buffer.from('');
+        },
+        fetchImpl: penSource('{"v":1}'),
+        log: () => {},
+      }),
+    /apt-get failed/u
+  );
+  assert.equal(installAttempts.length, 3, 'every attempt is used up first');
+});
