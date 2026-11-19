@@ -37,11 +37,6 @@ export const WRITER_PROMOTION_HOLD_LABELS = Object.freeze([
   'incident',
   'needs-conflict-resolution',
   'needs-manual-rebase',
-  // JOV-13139: the writer pins a draft that must wait on a designated outside
-  // review (or must not be readied at all). Neither label has a machine
-  // releaser — a person removes it when the hold ends.
-  'needs-outside-review',
-  'do-not-ready',
   'queue-deferred',
   'security',
   'needs:security',

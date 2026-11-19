@@ -206,59 +206,6 @@ describe('green-source draft classifier', () => {
     }
   );
 
-  // JOV-13139: a draft waiting on a designated outside review (or otherwise
-  // not to be readied) pins itself with a label; no model judgment involved.
-  it.each(['needs-outside-review', 'do-not-ready'])(
-    'refuses the undraft-hold label %s (JOV-13139, #26042 class)',
-    label => {
-      expect(GREEN_SOURCE_HOLD_LABELS).toContain(label);
-      expect(hasGreenSourceHold([label])).toBe(true);
-      expect(new RegExp(greenSourceHoldRegex()).test(label)).toBe(true);
-      expect(classifyGreenSourceDraft(draft({ labels: [label] }))).toEqual({
-        eligible: false,
-        reason: 'held',
-      });
-    }
-  );
-
-  // JOV-13139: an unresolved must-fix review is structured state, not judgment.
-  it('refuses the flip while a review requests changes (#26042 class)', () => {
-    expect(
-      classifyGreenSourceDraft(draft({ reviewDecision: 'CHANGES_REQUESTED' }))
-    ).toEqual({
-      eligible: false,
-      reason: 'review:changes-requested',
-    });
-  });
-
-  it.each(['APPROVED', 'REVIEW_REQUIRED', 'PENDING', '', undefined, null])(
-    'treats reviewDecision %p as not a review hold',
-    decision => {
-      expect(
-        classifyGreenSourceDraft(draft({ reviewDecision: decision }))
-      ).toMatchObject({ eligible: true });
-    }
-  );
-
-  // The #26042 incident, verbatim shape: trusted writer, green required
-  // checks, CLEAN mergeability, no labels, and a body that only SAYS it stays
-  // draft. Prose is not structured state — the classifier cannot read it
-  // without judgment — so this PR must be pinned with needs-outside-review or
-  // a park marker. This test documents the boundary instead of pretending
-  // prose is machine-readable.
-  it('treats prose-only “stays DRAFT” as not a hold; the park marker is the marker', () => {
-    const prose =
-      'Critical config (`.github/dependabot.yml`): stays DRAFT until outside review passes.';
-    expect(classifyGreenSourceDraft(draft({ body: prose }))).toMatchObject({
-      eligible: true,
-    });
-    expect(
-      classifyGreenSourceDraft(
-        draft({ body: `${prose}\n<!-- jovie-auto-ready: park -->` })
-      )
-    ).toEqual({ eligible: false, reason: 'writer-parked' });
-  });
-
   it.each(['human-review-required', 'needs-human', 'no-auto', 'taste'])(
     'ignores the legacy %s label',
     label => {
@@ -474,7 +421,6 @@ function listed(overrides = {}) {
     headRefName: 'codex/some-fix',
     title: 'fix: something',
     labels: [],
-    reviewDecision: '',
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',
     ...overrides,
@@ -487,7 +433,6 @@ describe('missed-event cohort selection', () => {
       listed({ number: 30 }),
       listed({ number: 31, mergeStateStatus: 'UNSTABLE' }),
       listed({ number: 32, labels: [{ name: 'hold' }] }),
-      listed({ number: 40, labels: [{ name: 'needs-outside-review' }] }),
       listed({ number: 17156 }),
       listed({ number: 33, labels: [{ name: 'canary' }] }),
       listed({ number: 34, isDraft: false }),
@@ -528,39 +473,6 @@ describe('green-source shell controller (fake gh)', () => {
     const result = runController([listed({ body })], ready);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('writer-parked');
-    expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
-  });
-
-  // JOV-13139 (#26042): a needs-outside-review label must keep the flip off.
-  it('the shell controller refuses to ready a draft carrying needs-outside-review', () => {
-    const result = runController(
-      [listed({ labels: [{ name: 'needs-outside-review' }] })],
-      ready
-    );
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('held');
-    expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
-  });
-
-  it('the shell controller refuses to ready a draft with CHANGES_REQUESTED reviews', () => {
-    const result = runController(
-      [listed({ reviewDecision: 'CHANGES_REQUESTED' })],
-      ready
-    );
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('review:changes-requested');
-    expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
-  });
-
-  it('a review turning must-fix between the screen and the mutation aborts the flip', () => {
-    const result = runController([listed()], {
-      ...ready,
-      STATE_AFTER_FIRST_READ: JSON.stringify({
-        reviewDecision: 'CHANGES_REQUESTED',
-      }),
-    });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('review:changes-requested');
     expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
   });
 

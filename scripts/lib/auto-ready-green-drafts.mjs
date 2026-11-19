@@ -20,6 +20,7 @@ import {
 import {
   classifyAutoReadyPromotion,
   hasControlledProofMarker,
+  UNDRAFT_HOLD_LABELS,
 } from './auto-ready-provenance.mjs';
 import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
@@ -36,6 +37,8 @@ const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,
+    // JOV-13139: outside-review / do-not-ready pins.
+    ...UNDRAFT_HOLD_LABELS,
     ...ADMISSION_BLOCKING_LABELS.filter(label => !MACHINE_BLOCKS.has(label)),
   ]),
 ]);

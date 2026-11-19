@@ -180,16 +180,16 @@ describe('Auto-Ready provenance selector', () => {
       reason: 'held',
     });
     // JOV-13139: outside-review and do-not-ready holds block the writer-proof
-    // promotion path too.
+    // promotion path too (AUTO_READY_HOLD_LABELS).
     expect(
       promotion({ body, greenSource, labels: ['needs-outside-review'] })
     ).toEqual({
       eligible: false,
-      reason: 'held-by-needs-outside-review',
+      reason: 'held',
     });
     expect(promotion({ body, greenSource, labels: ['do-not-ready'] })).toEqual({
       eligible: false,
-      reason: 'held-by-do-not-ready',
+      reason: 'held',
     });
     expect(
       promotion({
