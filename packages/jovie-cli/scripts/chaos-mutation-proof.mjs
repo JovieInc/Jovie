@@ -24,9 +24,29 @@ import { parseArgs } from 'node:util';
 
 export const MUTANTS = [
   {
+    // The closed-pipe defense is layered (stdio listeners plus the
+    // uncaughtException fallback), so the deliberate red has to remove the
+    // whole guard block to prove the gate still catches a CLI that dies
+    // noisily when its stdout consumer hangs up (JOV-13096).
     name: 'stack trace on a closed pipe',
     file: 'cli.js',
-    from: "process.stdout.on('error', onClosedPipe);",
+    from: `    const onClosedPipe = closedPipeListener(code => process.exit(code));
+    process.stdout.on('error', onClosedPipe);
+    process.stderr.on('error', onClosedPipe);
+    const fatal = (error) => {
+        if (isClosedPipeError(error)) {
+            // A closed pipe that escaped the stdio listeners (an 'error' emitted
+            // with no listener attached surfaces here) still means only that the
+            // consumer hung up: exit with the pending code, never a bug report.
+            process.exit(Number(process.exitCode ?? 0));
+        }
+        reportFatal(argv, error);
+        process.exitCode = 1;
+        // Let the one-line report flush, but never keep a broken process alive.
+        setTimeout(() => process.exit(1), 50).unref();
+    };
+    process.on('uncaughtException', fatal);
+    process.on('unhandledRejection', fatal);`,
     to: '',
     scenario: 'closed-stdout-pipe',
   },

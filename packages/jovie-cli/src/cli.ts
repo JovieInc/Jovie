@@ -608,17 +608,29 @@ export function isEntrypoint(
   }
 }
 
+/**
+ * Every way a vanished stdout consumer surfaces on the stdio streams, across
+ * platforms and timings: POSIX writes to a closed reader give EPIPE, Windows
+ * gives EOF, and a write that races the stream's own teardown gives
+ * ERR_STREAM_DESTROYED or ERR_STREAM_WRITE_AFTER_END. All of them mean
+ * "output is gone", never "the CLI failed" (JOV-13096).
+ */
+export function isClosedPipeError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined | null)?.code;
+  return (
+    code === 'EPIPE' ||
+    code === 'EOF' ||
+    code === 'ERR_STREAM_DESTROYED' ||
+    code === 'ERR_STREAM_WRITE_AFTER_END'
+  );
+}
+
 /** A closed pipe (`jovie ... | head`) ends output, not the process with a trace. */
 export function closedPipeListener(
   exit: (code: number) => void
 ): (error: NodeJS.ErrnoException) => void {
   return error => {
-    // Windows reports a closed pipe as EOF rather than EPIPE.
-    if (
-      error.code === 'EPIPE' ||
-      error.code === 'EOF' ||
-      error.code === 'ERR_STREAM_DESTROYED'
-    ) {
+    if (isClosedPipeError(error)) {
       exit(Number(process.exitCode ?? 0));
       return;
     }
@@ -682,6 +694,12 @@ if (isEntrypoint(import.meta.url, process.argv[1])) {
   process.stdout.on('error', onClosedPipe);
   process.stderr.on('error', onClosedPipe);
   const fatal = (error: unknown) => {
+    if (isClosedPipeError(error)) {
+      // A closed pipe that escaped the stdio listeners (an 'error' emitted
+      // with no listener attached surfaces here) still means only that the
+      // consumer hung up: exit with the pending code, never a bug report.
+      process.exit(Number(process.exitCode ?? 0));
+    }
     reportFatal(argv, error);
     process.exitCode = 1;
     // Let the one-line report flush, but never keep a broken process alive.

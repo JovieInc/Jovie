@@ -543,7 +543,11 @@ await scenario('closed-stdout-pipe', async () => {
     onSpawn: child => child.stdout.once('data', () => child.stdout.destroy()),
   });
   const failures = contract(result);
-  check(failures, result.code === 0, `exit ${result.code} after a closed pipe`);
+  check(
+    failures,
+    result.code === 0,
+    `exit ${result.code} after a closed pipe${result.stderr ? ` (stderr: ${JSON.stringify(result.stderr.slice(0, 300))})` : ''}`
+  );
   return failures;
 });
 
