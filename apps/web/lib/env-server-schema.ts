@@ -214,6 +214,9 @@ export const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+  // HMAC secret shared with the mesh hub for the Vercel Board shadow mirror
+  // (one-week pilot; workers/mesh-hub/BOARD-PILOT.md). Unset = route 404s.
+  BOARD_MIRROR_SECRET: z.string().optional(),
   // HMAC-SHA256 key the dogfood judge signs admission records with.
   DOGFOOD_JUDGE_SIGNING_KEY: z.string().optional(),
   // Optional allowlist of additional hosts (comma-separated) whose
@@ -615,6 +618,7 @@ export const ENV_KEYS = [
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'BOARD_MIRROR_SECRET',
   'DOGFOOD_JUDGE_SIGNING_KEY',
   'CRON_TRUSTED_HOSTS',
   'METADATA_HASH_KEY',

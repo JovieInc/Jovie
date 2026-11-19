@@ -238,6 +238,15 @@ async function boardRoute(
       >),
     });
   }
+  if (request.method === 'GET' && path === '/v1/board/mirror') {
+    // Vercel Board shadow-mirror health (pilot). Agent-bearer auth like the
+    // other /v1/board reads; never the secret or the receiver URL.
+    return json(200, {
+      ok: true,
+      dataNotInstructions: true,
+      ...((await board(env).mirrorStatus()) as Record<string, unknown>),
+    });
+  }
   const op = path.slice('/v1/board/'.length);
   if (request.method === 'POST' && BOARD_OPS.has(op)) {
     const input = await readJson(request, 32_768);

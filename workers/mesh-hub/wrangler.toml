@@ -47,6 +47,8 @@ enabled = true
 #   HUB_ADMIN_TOKEN            registry writes only
 #   MCP_OWNER_TOTP_SECRET      base32 TOTP secret of Tim; without it /mcp consent refuses everyone
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
+#   BOARD_MIRROR_SECRET        HMAC for the Vercel Board shadow mirror (pilot, BOARD-PILOT.md);
+#                              without it (or without BOARD_MIRROR_URL) the mirror is off
 
 [vars]
 # Stand-ins are disabled: registered agent mail must wait for its real runtime.
@@ -57,6 +59,13 @@ EXECUTOR_GRACE_MS = "20000"
 MAIL_STALE_MS = "600000"
 # summer-config #387: Summer consumes hub pushes here (HMAC with SUMMER_HUB_WEBHOOK_SECRET).
 SUMMER_HUB_WEBHOOK_URL = "https://summer.jov.ie/summer/v1/mesh/hub"
+
+# Vercel Board shadow mirror (one-week pilot, workers/mesh-hub/BOARD-PILOT.md).
+# Uncomment the receiver URL to arm the mirror once BOARD_MIRROR_SECRET is put;
+# with either value unset the mirror is a no-op (no fetch, no DO storage writes).
+# BOARD_MIRROR_URL = "https://jov.ie/api/internal/mesh-board-mirror"
+# Set BOARD_MIRROR_BODY = "1" to also mirror bodies/results/answers, not just titles.
+# BOARD_MIRROR_BODY = "1"
 
 # Registry sweep (presence, silence, probes) every minute; also the dead-man for DO alarms.
 [triggers]

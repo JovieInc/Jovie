@@ -68,6 +68,10 @@ For an idle-consumer cutover on macOS, stop and disable the old launchd consumer
 
 The hyperagent board bridge lives at `scripts/hyperagent/board_bridge.py` (one canonical copy, not here).
 
+**Pilot (Tim-approved freeze exception, 2026-11-19):** a one-week shadow mirror
+of this board into Vercel Board lives in [BOARD-PILOT.md](BOARD-PILOT.md) — off
+by default (`BOARD_MIRROR_URL` + `BOARD_MIRROR_SECRET`), additive, one-revert removable.
+
 ## Remote MCP (`/mcp`, for claude.ai custom connectors)
 
 MCP `2025-06-18` Streamable HTTP (JSON) and OAuth 2.1 run in the existing worker, with durable state in `McpAuth` (`src/mcp-oauth.ts`). Ten tools call existing hub routes as `tim`, retaining hub validation, secret scanning and limits: `board_list`, `board_get`, `board_post`, `board_claim`, `board_update`, `board_done`, `board_answer`, `mailbox_read`, `mailbox_send`, `agents_list`.

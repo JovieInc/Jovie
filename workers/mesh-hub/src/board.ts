@@ -6,6 +6,8 @@
  * that opens when every child is terminal. Every stage is timestamped per task and agent.
  * Pure store over the DO SqlStorage shape so node:sqlite tests cover it.
  */
+
+import type { MirrorRow } from './board-mirror.ts';
 import { HubError, KIND, percentile, type Sql } from './core.ts';
 
 export const BOARD_KIND = 'board';
@@ -777,6 +779,51 @@ export class BoardStore {
         stage: String(raw.stage),
         note: raw.note ?? null,
       }));
+  }
+
+  /** Highest stage id ever written (0 until the first change); the mirror's watermark. */
+  maxStageId(): number {
+    const raw = this.sql.exec('SELECT MAX(id) AS id FROM stages').toArray()[0];
+    return Number(raw?.id ?? 0);
+  }
+
+  /** Stage rows past a watermark, joined to their task, for the Vercel Board mirror. */
+  mirrorRows(afterId: number, limit: number): MirrorRow[] {
+    return this.sql
+      .exec(
+        `SELECT s.id AS stageId, s.at AS at, s.actor AS actor, s.stage AS stage,
+          s.note AS note, t.id AS taskId, t.type AS type, t.title AS title,
+          t.body AS body, t.caps AS caps, t.poster AS poster, t.assignee AS assignee,
+          t.parent AS parent, t.status AS status, t.result AS result, t.answers AS answers
+        FROM stages s JOIN tasks t ON t.id = s.taskId
+        WHERE s.id > ? ORDER BY s.id LIMIT ?`,
+        afterId,
+        limit
+      )
+      .toArray()
+      .map(raw => {
+        const caps: string[] = JSON.parse(String(raw.caps));
+        const answers: Array<{ from: string; at: number; text: string }> =
+          JSON.parse(String(raw.answers ?? '[]'));
+        return {
+          stageId: Number(raw.stageId),
+          taskId: String(raw.taskId),
+          at: Number(raw.at),
+          actor: String(raw.actor),
+          stage: String(raw.stage),
+          note: (raw.note as string | null) ?? null,
+          type: String(raw.type),
+          title: String(raw.title),
+          poster: String(raw.poster),
+          assignee: (raw.assignee as string | null) ?? null,
+          caps,
+          parent: (raw.parent as string | null) ?? null,
+          status: String(raw.status),
+          result: (raw.result as string | null) ?? null,
+          body: String(raw.body ?? ''),
+          answers,
+        };
+      });
   }
 
   /** p50/p95 per agent: post->claim (pickup), claim->done (work), post->done (total). */
