@@ -153,4 +153,59 @@ describe('POST /api/admin/leads', () => {
       { route: '/api/admin/leads', handle: 'test-artist' }
     );
   });
+
+  it('stores a matching public page on the modern insert', async () => {
+    const values = vi.fn(() => ({
+      returning: vi.fn().mockResolvedValue([{ id: 'lead-public' }]),
+    }));
+    mockInsert.mockReturnValue({ values });
+    mockSeedLeadFromUrl.mockReturnValue({
+      handle: 'ffmto-northline',
+      normalizedUrl: 'https://ffm.to/northline',
+      hasSpotifyLink: false,
+      spotifyUrl: null,
+      hasInstagram: false,
+      instagramHandle: null,
+      kind: 'website',
+    });
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        urls: ['https://ffm.to/northline'],
+        pages: [
+          {
+            url: 'https://FFM.to/northline?utm_source=ig',
+            displayName: 'Northline',
+            bio: 'DJ and producer',
+            links: [
+              { url: 'https://open.spotify.com/artist/northlinefixture' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const request = new NextRequest('http://localhost/api/admin/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls: ['https://ffm.to/northline'] }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+    const inserted = values.mock.calls[0]?.[0] as {
+      signalSnapshot?: { publicPage?: { platform?: string; url?: string } };
+      sourceUrl?: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(data.summary.created).toBe(1);
+    expect(inserted.signalSnapshot?.publicPage).toMatchObject({
+      platform: 'featurefm',
+      source: 'direct_public_page',
+      url: 'https://ffm.to/northline',
+    });
+    expect(inserted.sourceUrl).toBe('https://ffm.to/northline');
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
 });
