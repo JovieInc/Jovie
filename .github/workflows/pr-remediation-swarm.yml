@@ -130,6 +130,7 @@ jobs:
         id: prep
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE || 'off' }}
         run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --agent "${{ matrix.agent }}" --plan "$PLAN" --log "$LOG"
       - name: Checkout PR head (no persisted credentials)
         if: steps.prep.outputs.action != 'none'
@@ -165,15 +166,19 @@ jobs:
       - name: Regenerate with an allowlisted command (no model)
         if: steps.prep.outputs.action == 'regen'
         run: python3 scripts/swarm/pr_remediation_swarm.py regen --plan "$PLAN" --cwd pr
+      # SWARM_MODEL_MODE defaults to off (unset included). Phase 1 is deterministic rungs only
+      # (sync-main, wire-ci-fast, regen), $0 model spend. Key staging and the cheap-agent step
+      # run only when the variable is exactly 'on', after the owner confirms the existing
+      # SWARM_DAILY_USD_CAP still stands (the swarm has been off since 2026-11-02).
       - name: Stage provider key outside the checkout (no repo code runs here)
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' && vars.SWARM_MODEL_MODE == 'on'
         env:
           SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
         run: |
           umask 077
           printf '%s' "$SWARM_API_KEY" > "$RUNNER_TEMP/swarm-key"
       - name: Cheap agent (no shell, no key or GitHub token in env, hard cost stop)
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' && vars.SWARM_MODEL_MODE == 'on'
         env:
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}

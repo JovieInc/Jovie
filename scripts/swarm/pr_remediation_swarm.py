@@ -400,7 +400,7 @@ REGEN = (
 NOT_MODEL_FIXABLE = frozenset({"pr-body"})
 GATE_SKIPS = frozenset({"ci-running", "no-failing-checks", "no-concrete-error", "already-handled-sha",
                         "deterministic-unsupported->lanes", "not-model-fixable->lanes", "sensitive-paths->codex",
-                        "model-budget-closed", "attempt-cap->lanes"})
+                        "model-budget-closed", "model-mode-off", "attempt-cap->lanes"})
 
 
 def concrete_error(text: str) -> bool:
@@ -439,14 +439,14 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN, classes.BIOME_FORMAT}:
         skip = "deterministic-unsupported->lanes"
     elif action == classes.AGENT:
-        if cls["cls"] in NOT_MODEL_FIXABLE:
+        if os.environ.get("SWARM_MODEL_MODE", "off").strip() != "on":
+            skip = "model-mode-off"
+        elif cls["cls"] in NOT_MODEL_FIXABLE:
             skip = "not-model-fixable->lanes"
         elif not concrete_error(joined):
             skip = "no-concrete-error"
-        elif plan.get("sensitive"):
-            skip = "sensitive-paths->codex"
-        elif a.agent != "true":
-            skip = "model-budget-closed"
+        elif plan.get("sensitive"): skip = "sensitive-paths->codex"
+        elif a.agent != "true": skip = "model-budget-closed"
     elif action == classes.WIRE_CI_FAST and plan.get("sensitive"):
         skip = "sensitive-paths->codex"
     if not skip:

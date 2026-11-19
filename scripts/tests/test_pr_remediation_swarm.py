@@ -1,13 +1,8 @@
-import json
-import re
-import sys
-import tempfile
-import unittest
+import json, os, re, sys, tempfile, types, unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "swarm"))
 import pr_remediation_swarm as swarm  # noqa: E402
-
 
 class SwarmPolicyTest(unittest.TestCase):
     def test_sensitive_paths_route_to_the_codex_ladder(self):
@@ -17,10 +12,11 @@ class SwarmPolicyTest(unittest.TestCase):
         for path in ("apps/web/components/Button.tsx", "docs/README.md", "scripts/ci-fast-lanes.mjs"):
             self.assertFalse(swarm.SENSITIVE.search(path), path)
 
-    def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None, mergeable="blocked"):
-        import types, tempfile
+    def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None, mergeable="blocked", model_mode="on"):
         calls = {"claim": 0, "rerun": 0}
         saved = {k: getattr(swarm, k) for k in ("latest_failures", "job_log_tail", "receipts_for", "take_claim", "finish_plan", "rerun_failed")}
+        saved_mode = os.environ.pop("SWARM_MODEL_MODE", None)
+        if model_mode is not None: os.environ["SWARM_MODEL_MODE"] = model_mode
         swarm.latest_failures = lambda sha: (failures, pending)
         swarm.job_log_tail = lambda run: log
         swarm.receipts_for = lambda n, sha, key: receipts or {"fp": 0, "sha": 0}
@@ -36,6 +32,8 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             for k, v in saved.items():
                 setattr(swarm, k, v)
+            os.environ.pop("SWARM_MODEL_MODE", None)
+            if saved_mode is not None: os.environ["SWARM_MODEL_MODE"] = saved_mode
 
     def test_gate_skips_for_free_and_only_claims_real_work(self):
         red = [{"name": "Source Validation", "conclusion": "failure", "id": 1}]
@@ -58,6 +56,13 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertEqual((plan["fix"], c["claim"], c["rerun"]), ("rerun-failed-jobs", 1, 1))
         plan, c = self._gate(red, False, "generated workflow DAG is stale; run pnpm ci:topology:write\n::error::x")
         self.assertEqual((plan["action"], plan["regen"], c["claim"]), ("regen", "pnpm ci:topology:write", 1))
+        for mode in ("off", None, "", "false", "yes", "ON"):
+            plan, c = self._gate(red, False, err, model_mode=mode)
+            self.assertEqual((plan["action"], plan.get("reason"), c["claim"]), ("none", "model-mode-off", 0), mode)
+        plan, c = self._gate(red, False, "generated workflow DAG is stale; run pnpm ci:topology:write\n::error::x", model_mode="off")
+        self.assertEqual((plan["action"], plan["regen"], c["claim"]), ("regen", "pnpm ci:topology:write", 1))
+        plan, c = self._gate(red, False, err, mergeable="dirty", model_mode=None)
+        self.assertEqual((plan["action"], c["claim"]), ("sync-main", 1))
 
     def test_alias_review_owner_handoff_never_claims_or_reruns(self):
         error = ('Error: public-profile alias graduation review was due 2026-11-07T06:00:00Z '
@@ -490,7 +495,6 @@ class SwarmPolicyTest(unittest.TestCase):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)
         self.assertEqual((fields["kind"], fields["sha"], fields["host"]), ("fix", "abc", "gha-swarm"))
-
 
 if __name__ == "__main__":
     unittest.main()
