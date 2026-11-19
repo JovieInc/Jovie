@@ -58,13 +58,34 @@ def may_close_abandon(item: dict, now: float) -> bool:
     return kind == "live" and bool(item.get("progress_since_open"))
 
 
+def _timestamp(value) -> float | None:
+    """Parse a timestamp field. Missing, None or non-numeric values are UNKNOWN — never epoch 0
+    (JOV-13158: defaulting to 0 made every PR-less issue look ~1.7e9 s idle and "stale"), and
+    never a ValueError that aborts the sweep."""
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def reconcile_linear(issue: dict, pr: dict | None, now: float) -> dict | None:
     """One Linear issue in a started state -> the correction, or None.
 
-    issue: {id, state, progress_at (last PR push/merge/receipt, NOT updatedAt), labels}
+    issue: {id, state, progress_at (last PR push/merge/receipt, NOT updatedAt; falls back to
+    startedAt when absent), labels}
     pr:    {state: open|merged|closed, merge_sha, main_ci: success|failure|None} or None
+
+    A missing/None/non-numeric progress_at falls back to startedAt; with neither timestamp the
+    issue's age is UNKNOWN and stale reconciliation is skipped — an unknown age is never stale
+    (JOV-13158). The PR-present branches never depend on the age.
     """
-    state, idle = issue.get("state"), now - float(issue.get("progress_at") or 0)
+    state = issue.get("state")
+    progress = _timestamp(issue.get("progress_at"))
+    if progress is None:
+        progress = _timestamp(issue.get("startedAt"))
+    idle = None if progress is None else now - progress
     if pr and pr.get("state") == "merged":
         if pr.get("main_ci") == "success":
             return {"to": "Done", "receipt": {"merge_sha": pr["merge_sha"], "main_ci": "success"}}
@@ -75,9 +96,9 @@ def reconcile_linear(issue: dict, pr: dict | None, now: float) -> dict | None:
         return {"to": "Rework", "why": "PR closed without merge", "owner": owning_agent(issue["id"])}
     if pr and pr.get("state") == "open":
         return None  # the PR's lease and the PR invariant own it
-    if state == "Validating" and idle >= VALIDATING_GRACE_S:
+    if state == "Validating" and idle is not None and idle >= VALIDATING_GRACE_S:
         return {"to": "Rework", "why": "Validating without a PR or receipt", "owner": owning_agent(issue["id"])}
-    if state in ("In Progress", "Merging") and idle >= STALE_START_S:
+    if state in ("In Progress", "Merging") and idle is not None and idle >= STALE_START_S:
         return {"to": "Todo", "why": f"{state} with no PR and no progress for {int(idle // 3600)}h; claim cleared",
                 "owner": owning_agent(issue["id"]), "clear_assignee": True}
     return None
