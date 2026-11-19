@@ -503,5 +503,7 @@ describe('SearchableSubmenu', () => {
     fireEvent.keyDown(trigger as HTMLElement, { key: 'ArrowRight' });
     const reopened = await screen.findByRole('combobox', { name: 'Search...' });
     expect(reopened).toHaveValue('');
+    // The focus-on-open effect re-arms on every open, including reopens.
+    await waitFor(() => expect(reopened).toHaveFocus());
   });
 });
