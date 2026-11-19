@@ -16,6 +16,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { safeParseIsrc } from '@/lib/ids/branded';
 import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import {
@@ -374,12 +375,17 @@ export async function bulkLookupByIsrc(
 
   if (result.data) {
     for (const track of result.data) {
-      const trackIsrc = track.attributes?.isrc;
+      // Boundary where ISRCs from the provider payload enter our key space:
+      // normalize (uppercase, separators stripped) and validate. Malformed or
+      // numeric-coerced values are skipped instead of poisoning the
+      // match-map/cache keys.
+      const trackIsrc = track.attributes?.isrc
+        ? safeParseIsrc(track.attributes.isrc)
+        : null;
       if (trackIsrc) {
-        const normalizedIsrc = trackIsrc.toUpperCase();
-        trackMap.set(normalizedIsrc, track);
+        trackMap.set(trackIsrc, track);
         // Cache the result for future lookups
-        setCachedIsrcTrack(normalizedIsrc, track);
+        setCachedIsrcTrack(trackIsrc, track);
       }
     }
   }
