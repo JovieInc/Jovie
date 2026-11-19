@@ -77,8 +77,9 @@ function mergeRepo(changes, { mode } = {}) {
   return dir;
 }
 
+let tmpSeq = 0;
 function ci(dir, pr, extraEnv = {}) {
-  const ev = join(dir, '..', `${Math.random()}.json`);
+  const ev = join(dir, '..', `pbl-ev-${++tmpSeq}.json`);
   writeFileSync(
     ev,
     JSON.stringify({
@@ -88,8 +89,8 @@ function ci(dir, pr, extraEnv = {}) {
     })
   );
   const out = [];
-  const summary = join(dir, '..', `${Math.random()}.md`);
-  const receipt = join(dir, '..', `${Math.random()}.json`);
+  const summary = join(dir, '..', `pbl-summary-${++tmpSeq}.md`);
+  const receipt = join(dir, '..', `pbl-receipt-${++tmpSeq}.json`);
   const r = runCi({
     cwd: dir,
     env: {
