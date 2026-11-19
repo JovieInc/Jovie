@@ -26,8 +26,8 @@ const codexSetupSh = readFileSync(
 );
 
 const tempRoots = [];
-const { makeWorktree, makeLinkedWorktreeWithBarePrimary } =
-  createWorktreeFixtures(makeTempDir);
+const { makeWorktree, makeLinkedWorktreeWithBarePrimary, makeToolStubs } =
+  createWorktreeFixtures(makeTempDir, writeExecutable);
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -43,16 +43,6 @@ function makeTempDir(prefix) {
 function writeExecutable(filePath, contents) {
   writeFileSync(filePath, contents);
   chmodSync(filePath, 0o755);
-}
-
-function makeToolStubs({
-  nodeVersion = 'v24.21.0',
-  pnpmVersion = '9.15.9',
-} = {}) {
-  const bin = makeTempDir('jovie-setup-health-bin-');
-  writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
-  writeExecutable(join(bin, 'pnpm'), `#!/bin/sh\necho ${pnpmVersion}\n`);
-  return bin;
 }
 
 /**
