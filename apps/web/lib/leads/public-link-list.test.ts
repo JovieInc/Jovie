@@ -54,8 +54,8 @@ function lead(
 
 describe('public link list selection', () => {
   it('reads arguments and samples evenly', () => {
-    expect(argumentValue(['--out', '/tmp/leads.json'], '--out')).toBe(
-      '/tmp/leads.json'
+    expect(argumentValue(['--out', 'out/leads.json'], '--out')).toBe(
+      'out/leads.json'
     );
     expect(argumentValue(['--out', '--target'], '--out')).toBeNull();
     expect(numberArgumentValue(['--target', '80'], '--target', 120)).toBe(80);
@@ -196,10 +196,9 @@ describe('public link list selection', () => {
     expect(payload.intake.pages[0]?.links.map(link => link.url)).not.toContain(
       'https://ffm.to/northline'
     );
-    expect(renderPublicLinkList(payload)).toContain('[redacted]');
-    expect(renderPublicLinkList(payload)).not.toContain(
-      'northline@example.com'
-    );
+    const rendered = renderPublicLinkList(payload);
+    expect(rendered).toContain('Mail ');
+    expect(rendered).not.toContain('northline@example.com');
   });
 
   it('collects laylo, feature.fm, and linktree pages from a supplied reader', async () => {
