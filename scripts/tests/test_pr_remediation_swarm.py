@@ -18,9 +18,11 @@ class SwarmPolicyTest(unittest.TestCase):
             self.assertFalse(swarm.SENSITIVE.search(path), path)
 
     def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None, mergeable="blocked"):
-        import types, tempfile
+        import os, types, tempfile
         calls = {"claim": 0, "rerun": 0}
         saved = {k: getattr(swarm, k) for k in ("latest_failures", "job_log_tail", "receipts_for", "take_claim", "finish_plan", "rerun_failed")}
+        saved_mode = os.environ.get("SWARM_MODEL_MODE")
+        os.environ["SWARM_MODEL_MODE"] = "on"
         swarm.latest_failures = lambda sha: (failures, pending)
         swarm.job_log_tail = lambda run: log
         swarm.receipts_for = lambda n, sha, key: receipts or {"fp": 0, "sha": 0}
@@ -36,6 +38,8 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             for k, v in saved.items():
                 setattr(swarm, k, v)
+            os.environ.pop("SWARM_MODEL_MODE", None)
+            if saved_mode is not None: os.environ["SWARM_MODEL_MODE"] = saved_mode
 
     def test_gate_skips_for_free_and_only_claims_real_work(self):
         red = [{"name": "Source Validation", "conclusion": "failure", "id": 1}]
