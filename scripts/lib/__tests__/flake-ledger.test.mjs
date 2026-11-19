@@ -340,3 +340,23 @@ test('unclassified and non-failure evidence fails closed', () => {
   for (const conclusion of ['success', 'cancelled', 'timed_out', undefined])
     assert.equal(classifyRerunEligibility({ conclusion }).retryable, false);
 });
+
+test('attempt-1 job subjects survive a success attempt that reports no subjects', () => {
+  let ledger = fresh();
+  // The hook records attempt 1 first (with its real failed job subjects),
+  // then the later attempt whose event carries no failedSubjects.
+  ledger = recordRun(ledger, run({ conclusion: 'failure' }), { now }).ledger;
+  const result = recordRun(
+    ledger,
+    run({
+      runAttempt: 2,
+      conclusion: 'success',
+      failedSubjects: [],
+      observedAt: '2026-11-19T11:00:00Z',
+    }),
+    { now }
+  );
+  assert.equal(result.flips.length, 1);
+  assert.equal(result.flips[0].subject, 'job:Unit Tests');
+  assert.equal(result.flips[0].kind, 'test');
+});

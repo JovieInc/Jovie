@@ -243,6 +243,8 @@ export function recordRun(ledgerInput, runInput, { now = Date.now() } = {}) {
       });
   } else if (run.conclusion === 'success' && run.runAttempt > 1) {
     // Verified flip (v1): attempt 1 of this same run failed or timed out.
+    // The attempt-1 failure rows are the truth for WHAT flipped: their job
+    // subjects are kept even when the later success reports no subjects.
     const prior = failures.filter(
       row =>
         row.runId === run.runId &&
@@ -250,20 +252,18 @@ export function recordRun(ledgerInput, runInput, { now = Date.now() } = {}) {
         row.runAttempt === 1 &&
         FLIPPABLE.has(row.conclusion)
     );
-    const priorSubjects = new Set(prior.map(row => row.subject));
     const flipped = new Set(
       flips.filter(row => row.runId === run.runId).map(row => row.subject)
     );
-    for (const subject of run.subjects) {
-      if (!priorSubjects.has(subject) || flipped.has(subject)) continue;
-      const row = prior.find(item => item.subject === subject);
+    for (const row of prior) {
+      if (flipped.has(row.subject)) continue;
       recorded = {
         headSha: run.headSha,
         baseSha: run.baseSha,
-        subject,
+        subject: row.subject,
         runId: run.runId,
         kind: row.kind,
-        workflowPath: run.workflowPath,
+        workflowPath: row.workflowPath,
         failedRunIds: [run.runId],
         testFile: row.testFile,
         at,
