@@ -18,7 +18,6 @@ import { requiresWin } from './lib/wins-ledger.mjs';
 import { gate, PR_URL_PLACEHOLDER } from './pr-body-lint.mjs';
 import { isLockedArea, section } from './pr-fleet-rules.mjs';
 
-export { gate };
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
@@ -247,6 +246,9 @@ export function missingEvidence(input) {
     );
   return needs;
 }
+
+/** The PR body gate lives in scripts/pr-body-lint.mjs (also `pnpm pr:body-lint`), so the local command and pr-open can never disagree. Re-exported for existing importers/tests. */
+export { gate };
 
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
