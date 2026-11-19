@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -49,7 +50,7 @@ const disabledOutputs = [
 ];
 
 export function assertNoopPathOutputs(repoRoot, detect, scenario, status) {
-  const root = mkdtempSync(join(tmpdir(), 'noop-path-outputs-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'noop-path-outputs-')));
   const cleanEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
   );
