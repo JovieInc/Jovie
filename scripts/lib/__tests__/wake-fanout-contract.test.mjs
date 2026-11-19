@@ -123,8 +123,42 @@ test('Lane Fix Relay keeps every real-work trigger path', () => {
     'types: [created]',
     'branches: [main]',
     'workflow_dispatch',
+    'deployment_status:',
   ])
     assert.ok(text.includes(fragment), `lane fix relay keeps ${fragment}`);
+  // Every subscribed workflow's failures can be a red-repair wake and Source
+  // Validation's success is the green-draft/clear-settled-red wake, so the
+  // subscription list is pinned exhaustively — pruning a name silently drops
+  // a repair path. Merge-group refs are deliberately ignored (no relay path
+  // handles them) and `types: [completed]` is the only activity type that
+  // carries a verdict. (The relay's list is block-style YAML; the inline
+  // `subscribed()` helper only fits the Green Enroll shape.)
+  const relayRun = text.match(
+    /\n {2}workflow_run:\n {4}workflows:\n((?: {6}- .*\n)+)(?: {4}[#b].*\n)* {4}types: \[(.*?)\]/
+  );
+  assert.ok(relayRun, 'relay workflow_run subscription block exists');
+  assert.deepEqual(
+    relayRun[1]
+      .split('\n')
+      .filter(line => line.startsWith('      - '))
+      .map(line => line.replace(/^ {6}- /, '').trim()),
+    [
+      'Source Validation',
+      'Fork PR Gate',
+      'PR Size Guard',
+      'PR Fleet Rules',
+      'CI',
+      'Golden Path Nightly',
+      'Golden Path Prod Autofix',
+      'Production Controller',
+      'Changed-Evidence Test Suites',
+    ]
+  );
+  assert.ok(
+    text.includes("branches-ignore: ['gh-readonly-queue/**']"),
+    'merge-group refs stay ignored'
+  );
+  assert.ok(relayRun[2] === 'completed', 'workflow_run types stay [completed]');
 });
 
 test('Main Red Eject keeps its full wake surface (2026-11-19 audit: no safe on: filter)', () => {
@@ -140,4 +174,7 @@ test('Main Red Eject keeps its full wake surface (2026-11-19 audit: no safe on: 
     ['CI', 'Main Health', 'Merge Queue Green Enroll']
   );
   assert.ok(text.includes('types: [closed]'));
+  // Manual stuck-head / reopen commands and the plan/apply dispatches are
+  // operator-only wake classes.
+  assert.ok(text.includes('workflow_dispatch'));
 });
