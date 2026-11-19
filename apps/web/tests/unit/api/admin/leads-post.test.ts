@@ -155,7 +155,7 @@ describe('POST /api/admin/leads', () => {
   });
 
   it('stores a matching public page on the modern insert', async () => {
-    const values = vi.fn(() => ({
+    const values = vi.fn((_row: Record<string, unknown>) => ({
       returning: vi.fn().mockResolvedValue([{ id: 'lead-public' }]),
     }));
     mockInsert.mockReturnValue({ values });
@@ -193,19 +193,19 @@ describe('POST /api/admin/leads', () => {
 
     const response = await POST(request);
     const data = await response.json();
-    const inserted = values.mock.calls[0]?.[0] as {
-      signalSnapshot?: { publicPage?: { platform?: string; url?: string } };
-      sourceUrl?: string;
-    };
+    const inserted = values.mock.calls[0]?.[0];
+    const snapshot = inserted?.signalSnapshot as
+      | { publicPage?: { platform?: string; source?: string; url?: string } }
+      | undefined;
 
     expect(response.status).toBe(200);
     expect(data.summary.created).toBe(1);
-    expect(inserted.signalSnapshot?.publicPage).toMatchObject({
+    expect(snapshot?.publicPage).toMatchObject({
       platform: 'featurefm',
       source: 'direct_public_page',
       url: 'https://ffm.to/northline',
     });
-    expect(inserted.sourceUrl).toBe('https://ffm.to/northline');
+    expect(inserted?.sourceUrl).toBe('https://ffm.to/northline');
     expect(mockExecute).not.toHaveBeenCalled();
   });
 });

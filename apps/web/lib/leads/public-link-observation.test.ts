@@ -13,11 +13,13 @@ import {
 
 const OBSERVED_AT = '2026-11-19T00:00:00.000Z';
 
-function page(overrides: Parameters<typeof observePublicLinkPage>[0]) {
+function page(
+  overrides: Omit<Parameters<typeof observePublicLinkPage>[0], 'observedAt'>
+) {
   const observed = observePublicLinkPage({
-    observedAt: OBSERVED_AT,
     links: [],
     ...overrides,
+    observedAt: OBSERVED_AT,
   });
   if (!observed) throw new Error(`fixture rejected: ${overrides.url}`);
   return observed;
