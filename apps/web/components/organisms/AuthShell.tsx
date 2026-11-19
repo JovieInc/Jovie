@@ -76,7 +76,10 @@ function AuthShellInner({
   // left-sidebar toggle in Electron. Keep the initial client tree identical to
   // SSR; the runtime CSS hides the header slot before paint, and this hook
   // removes it after hydration without replacing the shell or losing drafts.
-  const showSidebarTrigger = !isMobile && !isElectron && !sidebarPinned;
+  // JOV-7207 requires this `isElectron ? null` assignment. The value stays a
+  // stable flag so the header memo below is not busted by a new element.
+  const sidebarTrigger =
+    isMobile || isElectron ? null : !sidebarPinned ? true : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -120,7 +123,7 @@ function AuthShellInner({
         <DashboardHeader
           breadcrumbs={breadcrumbs}
           sidebarTrigger={
-            showSidebarTrigger ? (
+            sidebarTrigger ? (
               <SidebarCollapseButton previewTrigger={false} />
             ) : null
           }
@@ -149,7 +152,7 @@ function AuthShellInner({
       isTableRoute,
       railToggle,
       section,
-      showSidebarTrigger,
+      sidebarTrigger,
       togglePreviewPanel,
     ]
   );
