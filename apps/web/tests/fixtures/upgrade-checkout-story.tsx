@@ -38,11 +38,15 @@ export function LocalCheckoutApi({
   useLayoutEffect(() => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async input => {
+      if (String(input).includes('/api/billing/price-lock')) {
+        return Response.json({ priceLock: null });
+      }
       if (String(input).includes('/api/stripe/pricing-options')) {
         return Response.json({
           options: [
             {
               priceId: STORY_PRICE_ID,
+              plan: 'pro',
               amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
               currency: ARTIST_VISIBILITY_OFFER.pro.currency,
               interval: 'month',

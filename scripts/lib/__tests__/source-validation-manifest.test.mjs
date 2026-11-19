@@ -19,6 +19,36 @@ const runs = deriveSteps(read(WORKFLOW_PATH))
 const commands = workflowCommands(runs, pkg.scripts, coveredBy);
 
 describe('Source Validation manifest parity', () => {
+  it('assigns each CI guard one manifest owner before local overrides', () => {
+    const ids = SOURCE_VALIDATION_GUARDS.map(guard => guard.id);
+    expect(ids).toEqual([...new Set(ids)]);
+  });
+
+  it('checks offer prose when a new billing helper has no direct guard import', () => {
+    const guard = selectManifestGuards([
+      'apps/web/lib/billing/price-versions.ts',
+    ]).find(g => g.id === 'duplicate-literals');
+    expect(guard?.command).toContain(
+      'node scripts/invariants/offer-claims/check.mjs'
+    );
+    expect(guard?.command).toContain('node scripts/invariants/validate.mjs');
+  });
+
+  it.each([
+    'apps/web/components/features/pricing/LockedPlanPrice.tsx',
+    'apps/web/components/features/pricing/LockedPlanPrice.stories.tsx',
+    'packages/ui/atoms/card.stories.ts',
+    'packages/ui/atoms/card.states.stories.tsx',
+  ])('runs the unchanged certificate gate for %s', path => {
+    const guard = selectManifestGuards([path]).find(
+      g => g.id === 'component-certificate'
+    );
+    expect(guard?.command).toBe(
+      'pnpm component-certificate:gate --screens-base origin/main'
+    );
+    expect(guard?.covers).toContain('pnpm component-certificate:gate');
+  });
+
   it('runs overlapping local and CI guards once, preserving the worktree-aware command', () => {
     const guards = selectManifestGuards(
       ['apps/web/app/[username]/tip/thank-you/page.tsx'],
@@ -69,6 +99,26 @@ describe('Source Validation manifest parity', () => {
     expect(dead.map(n => n.match)).toEqual([]);
   });
 
+  it.each([
+    'apps/web/components/features/profile/ClaimAttributionLink.test.tsx',
+    'apps/web/app/[username]/page.tsx',
+    'apps/web/hooks/useLocationSearch.ts',
+    'packages/ui/atoms/button.tsx',
+    'docs/design-system/cert-screens.json',
+    'scripts/lib/component-certificate.mjs',
+  ])('runs the screen/component certificate for %s', changedPath => {
+    const guards = selectManifestGuards([changedPath], 'release-test');
+    const certificates = guards.filter(g => g.id === 'component-certificate');
+    expect(certificates).toHaveLength(1);
+    expect(certificates[0].command).toBe(
+      'pnpm component-certificate:gate --screens-base origin/release-test'
+    );
+    expect(certificates[0].heavy).not.toBe(true);
+    expect(NOT_LOCAL.some(g => g.match === 'component-certificate:gate')).toBe(
+      false
+    );
+  });
+
   it('selects path-scoped guards, including the ones that failed PR #24021', () => {
     const ids = selectManifestGuards(['.github/workflows/x.yml']).map(
       g => g.id
@@ -117,7 +167,9 @@ describe('Source Validation manifest parity', () => {
     const gate = selectManifestGuards([file]).find(
       guard => guard.id === 'component-certificate'
     );
-    expect(gate?.command).toBe('pnpm component-certificate:gate');
+    expect(gate?.command).toBe(
+      'pnpm component-certificate:gate --screens-base origin/main'
+    );
     expect(gate?.heavy).not.toBe(true);
   });
 });

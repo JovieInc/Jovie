@@ -35,6 +35,10 @@ export const DROPDOWN_TRANSITIONS =
   'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
   'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none';
 
+/** Default root action menus leave the paint tree as soon as Radix closes.
+ * Apply only at CommonDropdown roots; nested and explicit motion keep theirs. */
+export const CLOSED_MENU_ROOT_CLASS = 'data-[state=closed]:hidden';
+
 /**
  * @deprecated Positional slide/zoom motion is intentionally disabled.
  */

@@ -1,4 +1,26 @@
 /** Source guard supplements the real SSR/hydration and rendered CSS regressions. */
+export function validateSidebarHeaderControls(sidebar, actions) {
+  const violations = [];
+  if (
+    !sidebar.includes('<SidebarHeaderActions') ||
+    sidebar.includes('<SidebarCollapseButton')
+  ) {
+    violations.push(
+      'UnifiedSidebar: header controls must compose the shared owner without a duplicate toggle'
+    );
+  }
+  if (
+    !actions.includes('const isDesktop = useIsElectronRuntime()') ||
+    !/isDesktop\s*\?\s*null\s*:\s*\(/.test(actions) ||
+    (actions.match(/<SidebarCollapseButton\b/g) ?? []).length !== 1
+  ) {
+    violations.push(
+      'SidebarHeaderActions: desktop sidebar must not render a second collapse control'
+    );
+  }
+  return violations;
+}
+
 export function validateDesktopSidebarContract(authShell, header, css) {
   const violations = [];
   if (

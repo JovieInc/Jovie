@@ -14,6 +14,7 @@ import { certifyCanonicalArtistSite } from './certify-canonical-artist-site';
 import {
   cleanupFixtures,
   fixture,
+  isolatedGitRoot,
 } from './certify-canonical-artist-site.fixtures';
 import { reportCanonicalCertificate } from './certify-canonical-artist-site-evidence';
 import { classifyDeployedRevisionFromGit } from './certify-canonical-artist-site-lineage';
@@ -62,6 +63,7 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
       })
     );
     return {
+      gitRoot: isolatedGitRoot(directory),
       candidateId: 'acquisition:premade-artist-profile:tim-white:test',
       runId: 'test-1',
       sourceRevision: source,
@@ -133,6 +135,7 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
       })
     );
     const certificate = certifyCanonicalArtistSite({
+      gitRoot: isolatedGitRoot(directory),
       candidateId: 'acquisition:premade-artist-profile:tim-white:test',
       runId: 'test-1',
       sourceRevision: source,

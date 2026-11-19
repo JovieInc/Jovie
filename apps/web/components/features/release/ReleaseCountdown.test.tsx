@@ -58,11 +58,11 @@ describe('ReleaseCountdown', () => {
 
     expect(screen.getByText('Release starts in')).toBeVisible();
     expect(screen.getByText('2')).toBeVisible();
-    expect(screen.getByText('days')).toBeVisible();
+    expect(screen.getByText('Days')).toBeVisible();
     expect(screen.getByText('3')).toBeVisible();
-    expect(screen.getByText('hrs')).toBeVisible();
+    expect(screen.getByText('Hrs')).toBeVisible();
     expect(screen.getByText('4')).toBeVisible();
-    expect(screen.getByText('min')).toBeVisible();
+    expect(screen.getByText('Min')).toBeVisible();
   });
 
   it('updates the countdown and refreshes once when the release arrives', () => {
@@ -129,7 +129,7 @@ describe('ReleaseCountdown', () => {
     );
 
     expect(screen.getByText('Drops in')).toHaveClass('text-secondary-token');
-    for (const unit of ['days', 'hrs', 'min']) {
+    for (const unit of ['Days', 'Hrs', 'Min']) {
       const label = screen.getByText(unit);
       expect(label).toHaveClass('text-secondary-token');
       expect(label.className).not.toMatch(/text-white\/\d+/u);
@@ -153,9 +153,9 @@ describe('ReleaseCountdown states (axe)', () => {
     const { container } = render(
       <ReleaseCountdown releaseDate={inMs((3 * 60 + 5) * 60_000)} />
     );
-    expect(screen.queryByText(/^days?$/)).toBeNull();
+    expect(screen.queryByText(/^days?$/i)).toBeNull();
     expect(screen.getByText('3')).toBeVisible();
-    expect(screen.getByText('hrs')).toBeVisible();
+    expect(screen.getByText('Hrs')).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

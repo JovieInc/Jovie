@@ -8,6 +8,9 @@ const {
   mockPanelOpen,
   mockPanelClose,
   mockQueryBehavior,
+  setViewMock,
+  setSegmentsMock,
+  setUrlParamsMock,
 } = vi.hoisted(() => ({
   mockDestinationReady: vi.fn(),
   mockPanelOpen: vi.fn(),
@@ -15,6 +18,9 @@ const {
   // 'throw' simulates useAudienceInfiniteQuery's throwOnError surfacing a
   // failed fetch during render (retry: false in lib/queries/audience-infinite).
   mockQueryBehavior: { current: 'ok' as 'ok' | 'throw' },
+  setViewMock: vi.fn(),
+  setSegmentsMock: vi.fn(),
+  setUrlParamsMock: vi.fn(),
 }));
 
 vi.mock('nuqs', () => {
@@ -30,8 +36,12 @@ vi.mock('nuqs', () => {
     parseAsArrayOf: createParser,
     parseAsString: createParser(),
     parseAsStringLiteral: createParser,
-    useQueryState: () => [null, vi.fn()],
-    useQueryStates: () => [{}, vi.fn()],
+    useQueryState: (key: string) => {
+      if (key === 'view') return ['all', setViewMock];
+      if (key === 'segments') return [[], setSegmentsMock];
+      return [null, vi.fn()];
+    },
+    useQueryStates: () => [{}, setUrlParamsMock],
   };
 });
 
@@ -101,7 +111,18 @@ vi.mock('./AudiencePanelContext', () => ({
 }));
 
 vi.mock('./DashboardAudienceWorkspace', () => ({
-  DashboardAudienceWorkspace: () => <div>Audience workspace</div>,
+  DashboardAudienceWorkspace: ({
+    onViewChange,
+  }: {
+    readonly onViewChange: (view: string) => void;
+  }) => (
+    <div>
+      Audience workspace
+      <button type='button' onClick={() => onViewChange('identified')}>
+        Change identity
+      </button>
+    </div>
+  ),
 }));
 
 import { DashboardAudienceClient } from './DashboardAudienceClient';
@@ -135,6 +156,19 @@ describe('DashboardAudienceClient', () => {
     mockPanelOpen.mockReset();
     mockPanelClose.mockReset();
     mockQueryBehavior.current = 'ok';
+    setViewMock.mockReset();
+    setSegmentsMock.mockReset();
+    setUrlParamsMock.mockReset();
+  });
+
+  it('sets only the view when identity changes', () => {
+    renderClient();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change identity' }));
+
+    expect(setViewMock).toHaveBeenCalledExactlyOnceWith('identified');
+    expect(setSegmentsMock).not.toHaveBeenCalled();
+    expect(setUrlParamsMock).not.toHaveBeenCalled();
   });
 
   it('never opens a secondary panel implicitly on mount', () => {

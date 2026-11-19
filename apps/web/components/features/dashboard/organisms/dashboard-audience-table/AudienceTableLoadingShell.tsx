@@ -1,11 +1,13 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/audience-workspace-evals.test.tsx
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   UnifiedTableSkeleton,
 } from '@/components/organisms/table';
+import { AudienceWorkspaceSwitch } from '@/features/dashboard/molecules/AudienceWorkspaceSwitch';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import {
   AUDIENCE_TABLE_CONTAINER_CLASS,
@@ -13,7 +15,6 @@ import {
   buildAudienceMemberColumns,
 } from './table-config';
 
-const AUDIENCE_LOADING_TAB_KEYS = ['all', 'identified', 'anonymous'] as const;
 const AUDIENCE_MOBILE_ROW_KEYS = Array.from(
   { length: SKELETON_ROW_COUNT.MOBILE },
   (_, i) => `audience-mobile-${i + 1}`
@@ -31,22 +32,14 @@ export function AudienceTableLoadingShell() {
       surfaceMode='table'
       toolbar={
         <PageToolbar
-          start={
-            <div className='flex flex-wrap items-center gap-1'>
-              {AUDIENCE_LOADING_TAB_KEYS.map(key => (
-                <LoadingSkeleton
-                  key={key}
-                  height='h-8'
-                  width='w-24'
-                  rounded='md'
-                />
-              ))}
-            </div>
-          }
+          start={<AudienceWorkspaceSwitch value='audience' />}
           end={
             <>
-              <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
-              <LoadingSkeleton height='h-8' width='w-8' rounded='md' />
+              <LoadingSkeleton height='h-7' width='w-28' rounded='full' />
+              <LoadingSkeleton height='h-7' width='w-28' rounded='full' />
+              <LoadingSkeleton height='h-7' width='w-28' rounded='full' />
+              <LoadingSkeleton height='h-7' width='w-7' rounded='full' />
+              <LoadingSkeleton height='h-7' width='w-7' rounded='full' />
             </>
           }
         />

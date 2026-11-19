@@ -496,3 +496,28 @@ Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),
 [`ci-branching.md`](../.claude/rules/ci-branching.md),
 [`release.md`](../.claude/rules/release.md),
 [`docs/company/autonomous-shipping-doctrine.md`](company/autonomous-shipping-doctrine.md).
+
+## Local AI review (Sentry Warden)
+
+AI code review runs LOCALLY through Sentry Warden (`warden.toml`), never as a
+remote gate. The husky hooks run it for you:
+`warden --staged` on pre-commit (staged diff), `warden` on pre-push (branch vs
+`main`), via `scripts/hooks/warden-local-review.sh` (advisory rung
+`warden-local-review` in the gate ladder). A missing `warden` CLI or model
+credentials only warns — commits and pushes proceed, and Warden must never be
+wired as a status check, branch-protection rule, or merge gate (no
+`.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW` switches
+behavior: `off` skips, `warn` (default) reports findings and proceeds, `strict`
+fails the hook on a non-zero Warden exit.
+
+One-time local setup (not committed):
+
+```sh
+pnpm add -g @sentry/warden
+export WARDEN_MODEL=openai/gpt-5.5        # or anthropic/claude-sonnet-4-6
+export WARDEN_OPENAI_API_KEY=sk-...       # or WARDEN_ANTHROPIC_API_KEY=...
+warden                                    # review the current branch
+```
+
+Without a provider key, Warden falls back to local Claude Code auth when
+available. Never commit keys.

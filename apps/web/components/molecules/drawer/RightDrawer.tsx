@@ -424,7 +424,9 @@ export function RightDrawer({
         // The shell owns placement, the gap and the route's yield. The drawer
         // owns its raised surface, interrupted reveal, focus and interaction
         // lifecycle; its width transition is the allocation the route follows.
-        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
+        // The border is the only hairline; a ring is clipped on three sides
+        // by the main plane and doubles the left seam. Use the shell's soft shadow.
+        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
         SHELL_RAIL_ALLOCATION,

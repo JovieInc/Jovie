@@ -85,7 +85,16 @@ vi.mock('./LibraryPageClient', () => ({
   LibraryPageClient: vi.fn(() => null),
 }));
 
-import LibraryPage from './page';
+import LibraryPage, { metadata } from './page';
+
+describe('Library page metadata', () => {
+  it('keeps the Work title and description', () => {
+    expect(metadata).toEqual({
+      title: 'Work',
+      description: 'Manage what you make and put into the world',
+    });
+  });
+});
 
 const profileId = '22222222-2222-4222-8222-222222222222';
 const privateDocument = {

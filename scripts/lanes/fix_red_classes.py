@@ -25,12 +25,14 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import fix_red_size_split
 import machine_gap
 import migration_renumber
 import remediation
 from reviewable_split import measured_changes, reviewable_split
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs, promote_body_and_sync  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
+from fix_red_conflict_resolvers import merge_additive_quoted_entries
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
@@ -131,7 +133,6 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
-_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
@@ -167,6 +168,7 @@ SIGNATURES = (
     ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
     ("tree-byte-budget", TREE_BYTE_BUDGET, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    ("copy-registry-gap", re.compile(r"✖ committed ID registry covers every extracted row"), SYNC_MAIN),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
@@ -204,19 +206,22 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
+        hit = fix_red_size_split.legacy_hit(text, hit)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
             hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes & {"size-baseline-grew", "copy-registry-gap"} and all(item_action == SYNC_MAIN for _, item_action in per_check):
+        cls, action = BEHIND_CLASS, SYNC_MAIN
     elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
         import fix_red_compose
         cls, action, actions = fix_red_compose.composed_route(
@@ -442,7 +447,7 @@ def resolve_and_chain_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").resolve_coverage_include_hunk(hunk.group("ours"), hunk.group("theirs"))
         if resolved is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -592,32 +597,6 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     return resolved
 
 
-def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
-    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
-
-    def rows(side: str) -> list[str] | None:
-        if not str(side or "").endswith("\n"):
-            return None
-        lines = side[:-1].split("\n")
-        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
-            return None
-        return lines
-
-    ours_rows = rows(ours)
-    theirs_rows = rows(theirs)
-    if ours_rows is None or theirs_rows is None:
-        return None
-    seen: list[str] = []
-    for line in theirs_rows + ours_rows:
-        if line not in seen:
-            seen.append(line)
-    # Double-quoted rows are JSON path registries. Those files must stay sorted.
-    if seen and all(line.strip().startswith('"') for line in seen):
-        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
-        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
-    return "\n".join(seen) + "\n"
-
-
 def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     """Union two one-line comma-separated identifier lists.
 
@@ -667,8 +646,8 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
 
 
 def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only a one-line identifier list. None when any
-    hunk has another shape, so the caller leaves that merge to a model."""
+    """Replace hunks that are one identifier list or one quoted pytest path list.
+    None when any hunk has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -679,7 +658,7 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").merge_pytest_file_list(hunk.group("ours"), hunk.group("theirs"))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

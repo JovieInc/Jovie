@@ -20,9 +20,14 @@ export function buildInfoPath(name, cache, tools, libraries) {
   check(existsSync(path), `Pinned standard library missing: ${name}`);
   return path;
 }
-export const info = value =>
+// Native 7.1 compact strings encode CommonJS, not an absent format:
+// microsoft/TypeScript@3e923636, tsc/internal/execute/incremental/buildInfo.go:95-124.
+export const info = (value, schemaVersion = '6.0.3') =>
   typeof value === 'string'
-    ? { version: value }
+    ? {
+        version: value,
+        ...(schemaVersion === '7.1.0-beta' ? { impliedFormat: 1 } : {}),
+      }
     : {
         ...value,
         impliedFormat: value.impliedFormat ?? value.impliedNodeFormat,
@@ -44,7 +49,7 @@ export function readGraph(cache, root, tools, libraries = null) {
     'Invalid buildinfo fileInfo graph'
   );
   for (const value of raw.fileInfos) {
-    const item = info(value);
+    const item = info(value, raw.version);
     check(
       item &&
         typeof item.version === 'string' &&

@@ -33,7 +33,7 @@ export function DrawerTabbedCard({
       data-right-rail-section={sectionKind}
       className={cn(
         'flex min-h-0 flex-1 flex-col overflow-hidden',
-        'p-2.5',
+        surfaceVariant === 'flat' ? 'px-3 pb-3 pt-1.5' : 'p-2.5',
         className
       )}
       testId={testId}
@@ -54,7 +54,7 @@ export function DrawerTabbedCard({
         data-testid={testId ? `${testId}-scroll-region` : undefined}
         className={cn(
           'min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain',
-          'pb-2 pr-2 pt-2',
+          surfaceVariant === 'flat' ? '-mr-3 pb-2 pr-3 pt-2' : 'pb-2 pr-2 pt-2',
           contentClassName
         )}
       >

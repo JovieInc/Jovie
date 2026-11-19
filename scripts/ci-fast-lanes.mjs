@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -63,6 +61,7 @@ export {
 } from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -360,7 +359,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs lib/__tests__/synthetic-canary-catchup.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.cases\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -692,6 +691,8 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
   'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+  'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
 ]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
@@ -901,6 +902,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/typecheck-native-qualification.test.mjs',
   'scripts/lib/native-typecheck-evidence.test.mjs',
   'scripts/lib/native-typecheck-graph.test.mjs',
+  'scripts/lib/native-typecheck-redirect.test.mjs',
+  'scripts/lib/native-typecheck-redirect-worker.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -908,6 +911,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-process-timeout.test.mjs',
   'scripts/lib/preflight-failure-summary.test.mjs',
   'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-changed-format.test.mjs',
@@ -974,6 +978,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/product-crawl/closed-in-production.test.mjs',
+  'scripts/product-crawl/crawl.test.mjs',
   'scripts/product-crawl/orphaned-overlays.test.mjs',
   'scripts/product-crawl/overlay-walk.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
@@ -989,6 +994,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/company-size.test.mjs',
+  'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -1225,6 +1232,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
+  'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
@@ -1263,6 +1271,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/lanes-linear-status.test.mjs',
+  'scripts/lib/__tests__/spend-expiry-status.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',
   'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/fleet-registry.test.mjs',
@@ -1341,6 +1350,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
 ]);
@@ -1358,7 +1368,8 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
+/** @typedef {{ catalogId: string | null, rows: object[], wallMs?: number, state?: string }} StructuralCommandReceipt */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number, structuralCommands?: StructuralCommandReceipt }} LaneResult */
 
 const LANES = [
   {
@@ -2749,7 +2760,7 @@ export async function runStructural(opts = {}) {
     API_CLIENT_PY_COMMAND,
     RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
-    'node --test .github/scripts/dependency-parity-evidence.test.mjs',
+    'node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-run.test.mjs',
@@ -2995,6 +3006,32 @@ export async function runStructural(opts = {}) {
   const timings = results.flatMap((result, index) =>
     result ? [{ index, command: parts[index], ...result }] : []
   );
+  // Keep every selected index, including holes left by fail-fast or stop. Only
+  // digests cross into the artifact; command arguments and output stay in logs.
+  const catalog = parts.map((command, index) => ({
+    index,
+    id: createHash('sha256').update(command).digest('hex'),
+  }));
+  const commandReceipt = {
+    catalogId: createHash('sha256')
+      .update(JSON.stringify(catalog))
+      .digest('hex'),
+    wallMs,
+    rows: catalog.map(({ index, id }) => {
+      const result = results[index];
+      return {
+        index,
+        recipe: id,
+        ...(result
+          ? {
+              status: 'completed',
+              durationMs: result.durationMs,
+              exit: result.code,
+            }
+          : { status: 'unstarted' }),
+      };
+    }),
+  };
   // First failure in list order, not completion order.
   const failedIndex = results.findIndex(result => result && result.code !== 0);
   if (failedIndex !== -1) {
@@ -3010,6 +3047,7 @@ export async function runStructural(opts = {}) {
       ),
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // findIndex, not some(): unstarted commands are holes in the results array.
@@ -3021,11 +3059,12 @@ export async function runStructural(opts = {}) {
       skipped: true,
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // Deterministic list order regardless of completion order.
   const combined = results.map(result => result.output).join('');
-  return { code: 0, output: combined, timings, wallMs };
+  return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -3094,6 +3133,13 @@ function writeLaneResults(results, laneGroup, setupError) {
         schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
+        execution: {
+          runId: process.env.GITHUB_RUN_ID || null,
+          runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+          sha: process.env.GITHUB_SHA || null,
+          eventName: process.env.GITHUB_EVENT_NAME || null,
+          jobId: process.env.GITHUB_JOB || null,
+        },
         lanes: results,
         setupError: setupError || null,
         generatedAt: new Date().toISOString(),
@@ -3158,6 +3204,15 @@ async function main() {
           status: 'skipped',
           logExcerpt,
           durationMs,
+          ...(lane.id === 'structural'
+            ? {
+                structuralCommands: {
+                  state: 'not-run',
+                  catalogId: null,
+                  rows: [],
+                },
+              }
+            : {}),
         });
         continue;
       }
@@ -3215,6 +3270,15 @@ async function main() {
         status,
         logExcerpt,
         durationMs,
+        ...(lane.id === 'structural'
+          ? {
+              structuralCommands: outcome.commandReceipt ?? {
+                state: skipped ? 'not-run' : 'missing',
+                catalogId: null,
+                rows: [],
+              },
+            }
+          : {}),
       });
     }
   } catch (error) {

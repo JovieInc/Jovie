@@ -35,6 +35,24 @@ const receipt = pages => ({
   pages,
 });
 
+test('budget-stopped coverage fails readiness while unknown traffic costs stay unknown', () => {
+  const good = receipt([clean('/', 'stranger'), clean('/app', 'signed-in')]);
+  const accounting = { complete: false, absoluteAllNetworkCapEnforced: false };
+  assert.equal(
+    productReady({ ...good, traffic: { accounting } }, { now }).ready,
+    true
+  );
+  const stopped = productReady(
+    {
+      ...good,
+      traffic: { accounting, admission: { blocked: 1, visitsNotStarted: 2 } },
+    },
+    { now }
+  );
+  assert.equal(stopped.ready, false);
+  assert.match(stopped.reasons.join('; '), /admission budget/);
+});
+
 test('a clean crawl of every route, as a stranger and signed in, is ready', () => {
   const r = productReady(
     receipt([
@@ -363,4 +381,51 @@ test('a frozen-frame finding names the scripts that ran in the longest frame', (
     f => f.kind === 'frozen-frame'
   );
   assert.equal(bare.detail, 'main thread blocked 267ms (median of 3 loads)');
+});
+
+test('partial overlay walks or unconfirmed cleanup cannot certify complete coverage', () => {
+  const now = Date.parse('2026-11-17T06:00:00Z');
+  const complete = {
+    schema: 'product-crawl/v1',
+    origin: 'https://fixture.invalid',
+    at: new Date(now).toISOString(),
+    routes: [],
+    uncovered: [],
+    pages: [
+      { route: '/', identity: 'stranger', viewport: 'desktop', status: 200 },
+      { route: '/', identity: 'signed-in', viewport: 'desktop', status: 200 },
+    ],
+  };
+  for (const gap of [
+    { overlayWalks: { walks: [], left: 2 } },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', stoppedForTime: true, steps: [] },
+        ],
+        left: 0,
+      },
+    },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', error: 'closed', steps: [] },
+        ],
+        left: 0,
+      },
+    },
+    {
+      overlayWalks: {
+        walks: [
+          { route: '/', identity: 'stranger', cleanupPending: true, steps: [] },
+        ],
+        left: 0,
+      },
+    },
+  ])
+    assert.equal(
+      productReady({ ...complete, ...gap }, { now }).ready,
+      false,
+      JSON.stringify(gap)
+    );
 });

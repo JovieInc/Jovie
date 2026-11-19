@@ -1,220 +1,27 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { regenerateStewardshipAudit } from '../../apps/web/lib/ovie/invariant-stewardship.js';
+import {
+  CURRENT_ARTIFACT_NOW,
+  candidate,
+  clone,
+  FIXTURE_NOW,
+  fixedGrowthLearningIntake,
+} from './audit-fixtures.mjs';
+import './__tests__/source-binding.cases.mjs';
+import './__tests__/workflow-pipeline.cases.mjs';
 import { GROWTH_LEARNING_SCHEMA } from '../invariants/growth-learning-policy.mjs';
 import {
   DEFAULT_AUDIT_PATH,
   GROWTH_LEARNING_INTAKE_SCHEMA,
-  GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM,
   growthLearningEventDedupeKey,
+  loadCanonicalSource,
   loadStewardshipAudit,
   projectStewardshipAudit,
   validateGrowthLearningIntake,
   validateStewardshipAudit,
 } from './audit.mjs';
-
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function candidate(overrides) {
-  return {
-    id: 'TEST',
-    statement: 'Test invariant.',
-    semanticKey: 'test.key',
-    semanticValue: 'test-value',
-    scope: ['test-surface'],
-    owner: 'summer',
-    classification: 'approved',
-    authorityStatus: 'approved',
-    implementationAuthority: 'none',
-    source: { kind: 'test', ref: 'test:deliberate-red', date: '2026-08-22' },
-    provenance: ['test:deliberate-red'],
-    consumers: [{ name: 'consumer', path: 'scripts', status: 'active' }],
-    tests: [
-      {
-        name: 'deliberate red',
-        path: 'scripts/invariant-stewardship/audit.test.mjs',
-        kind: 'deliberate-red',
-        status: 'active',
-      },
-    ],
-    relations: {
-      overlaps: [],
-      conflicts: [],
-      supersedes: [],
-      scopeSeparated: [],
-    },
-    lifecycle: 'active',
-    ...overrides,
-  };
-}
-
-const FIXTURE_NOW = new Date('2026-01-05T00:00:00.000Z');
-const CURRENT_ARTIFACT_NOW = new Date('2026-09-09T00:00:00.000Z');
-
-function fixedGrowthSource(id, ref, sourceRevision) {
-  return {
-    id,
-    ref,
-    title: `Fixed ${id}`,
-    kind: 'internal-test-source',
-    publishedAt: null,
-    publishedAtKnown: false,
-    publishedAtPrecision: 'unknown',
-    accessedAt: '2026-01-04T00:00:00.000Z',
-    sourceRevision,
-    provenance: 'fixed test fixture',
-    incentiveOrBias: 'Fixed test evidence is not customer evidence.',
-    observedFacts: ['The fixed source provides bounded test evidence.'],
-    inferences: ['The fixed source supports a measured policy test.'],
-    freshness: {
-      status: 'current',
-      checkedAt: '2026-01-04T00:00:00.000Z',
-      ttlDays: 30,
-    },
-    status: 'active',
-    duplicateOf: null,
-  };
-}
-
-function fixedGrowthLearningIntake() {
-  const sourceDigest = `sha256:${'a'.repeat(64)}`;
-  const sourceRevisionDigest =
-    'sha256:db78761ac11460e636a4932650c9d358962bf587e0414ed932000f7327a44c67';
-  const record = {
-    schemaVersion: GROWTH_LEARNING_SCHEMA,
-    id: 'fixed-growth-learning',
-    phase: 'propose',
-    assessedAt: '2026-01-04T00:00:00.000Z',
-    sourceDigest,
-    sources: [
-      fixedGrowthSource(
-        'fixed-source-a',
-        'repo:test/source-a',
-        'fixed-source-a:v1'
-      ),
-      fixedGrowthSource(
-        'fixed-source-b',
-        'repo:test/source-b',
-        'fixed-source-b:v1'
-      ),
-    ],
-    claim: {
-      evidenceClass: 'mixed-source-study',
-      causalStatus: 'unproven',
-      causalCertification: 'not-certified',
-      measurementVerified: false,
-      observedFacts: ['The fixed sources support a bounded policy test.'],
-      inferences: ['A bounded test can measure downstream product value.'],
-      counterevidence: ['The fixture does not establish customer demand.'],
-    },
-    fit: {
-      product: 'Jovie',
-      audience: 'Independent creators with a verified product-fit signal.',
-      painSignal:
-        'A public product-fit signal corroborated by a second source.',
-      decision: 'fit-hypothesis',
-      evidenceRefs: ['fixed-source-a', 'fixed-source-b'],
-      disqualifiers: ['No verified product-fit signal.'],
-    },
-    proposal: {
-      status: 'proposed',
-      hypothesis: 'A bounded preview may increase qualified activation.',
-      sourceSignal: 'A fixed public product-fit signal.',
-      audienceRule: 'Eligible creator accounts with a corroborated signal.',
-      comparator: 'A 50% no-contact holdout.',
-      cohortProtocol: {
-        qualifiedCohortFrozenAt: '2026-01-02T00:00:00.000Z',
-        assignmentAt: '2026-01-03T00:00:00.000Z',
-        allocation: {
-          method: 'reproducible-account-level-randomization',
-          seedRef: 'growth-learning:2026-W01',
-        },
-      },
-      signalTiming: {
-        announcementAt: '2026-01-02T00:00:00.000Z',
-        eventAt: '2026-01-04T00:00:00.000Z',
-      },
-      outcomeObservation: {
-        bothArmsObservable: true,
-        matchMethod: 'fixed-account-level-event-join',
-        holdoutContacted: false,
-        missingnessReportedByArm: true,
-        unknownOutcomesAreMissing: true,
-      },
-      owner: 'Summer',
-      authorizationOwner: 'Founder',
-      authorizationScope: 'external-consequential',
-      executionAuthority: 'pending-founder-authorization',
-      externalActions: ['prepare-only'],
-      effortCap: { amount: 1, unit: 'hours' },
-      spendCap: { amount: 0, unit: 'USD' },
-      primaryMetric: {
-        name: 'qualified activation rate',
-        numerator: 'Assigned creator accounts reaching qualified activation.',
-        denominator: 'All assigned eligible creator accounts.',
-        windowDays: 14,
-      },
-      negativeMetrics: ['complaint rate'],
-      minimumDetectableEffect: {
-        metric: 'qualified activation rate',
-        absolute: 0.15,
-      },
-      sampleSize: {
-        treatment: 2,
-        control: 2,
-        unit: 'eligible creator account',
-        designIntent: 'exploratory-pilot',
-        powerStatus: 'not-powered',
-      },
-      stopRules: ['Stop on unauthorized external contact.'],
-      dataBoundary: ['Public sources only.'],
-      expiresAt: '2026-02-01T00:00:00.000Z',
-      outcomeReviewAt: '2026-11-18T00:00:00.000Z',
-      rollback:
-        'Withdraw the prepared preview without changing product policy.',
-      decisionWriteback: 'Write the measured result to the fixed test receipt.',
-    },
-    amendment: {
-      status: 'none',
-      scope: [],
-      sourceRevision: null,
-      measuredOutcome: { state: 'not-run' },
-      compatibilityCheck: 'not-run',
-      conflictCheck: 'not-run',
-      conflictsWith: [],
-      rollback: '',
-      reviewAt: null,
-    },
-  };
-  return {
-    schemaVersion: GROWTH_LEARNING_INTAKE_SCHEMA,
-    authority: 'evidence-only',
-    causalEvent: {
-      id: 'work-result:fixed-growth-learning',
-      kind: 'terminal-result',
-      sourceRevision: 'fixed-result:v1',
-    },
-    sourceDigest,
-    sourceRevisionDigestAlgorithm:
-      GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM,
-    sourceRevisionDigest,
-    dedupeKey: growthLearningEventDedupeKey(
-      {
-        id: 'work-result:fixed-growth-learning',
-        kind: 'terminal-result',
-        sourceRevision: 'fixed-result:v1',
-      },
-      sourceRevisionDigest
-    ),
-    maxSources: 5,
-    maxProposals: 1,
-    noDuplicateScheduler: true,
-    priorDedupeKeys: [],
-    records: [record],
-  };
-}
 
 function coreAudit() {
   const audit = clone(loadStewardshipAudit());
@@ -222,10 +29,22 @@ function coreAudit() {
   return audit;
 }
 
+function sourceBoundAudit() {
+  return regenerateStewardshipAudit(loadCanonicalSource(), {
+    generatedAt: FIXTURE_NOW.toISOString(),
+    causalEvent: {
+      kind: 'source-change',
+      id: 'canonical-invariants:test-fixture',
+      sourceRevision: 'canonical-invariants:test-fixture:v1',
+    },
+  });
+}
+
 function growthAudit() {
-  const audit = coreAudit();
-  audit.growthLearningIntake = fixedGrowthLearningIntake();
-  return audit;
+  return {
+    ...sourceBoundAudit(),
+    growthLearningIntake: fixedGrowthLearningIntake(),
+  };
 }
 
 function growthLearningIntake() {
@@ -240,7 +59,10 @@ test('historical weekly artifact remains readable without admission or live reev
   const result = validateStewardshipAudit(audit, {
     now: CURRENT_ARTIFACT_NOW,
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.shapeValid, true);
+  assert.equal(result.evidence.state, 'historical');
+  assert.deepEqual(result.findings, []);
   assert.equal(result.growthLearning.status, 'historical');
   assert.equal(result.growthLearning.records, 1);
   assert.equal(result.growthLearning.results[0]?.nextAction, 'historical-only');
@@ -276,11 +98,14 @@ test('historical weekly artifact remains readable without admission or live reev
   );
 });
 
-test('current-week audit records source, date, authority, and lifecycle', () => {
+test('historical audit retains source, date, authority, and lifecycle without current actions', () => {
   const audit = coreAudit();
-  const result = validateStewardshipAudit(audit, { now: FIXTURE_NOW });
-  assert.deepEqual(result.errors, []);
-  assert.equal(result.ok, true);
+  const result = validateStewardshipAudit(audit, { now: CURRENT_ARTIFACT_NOW });
+  assert.equal(result.ok, false);
+  assert.equal(result.shapeValid, true);
+  assert.equal(result.evidence.state, 'historical');
+  assert.ok(result.errors.length > 0);
+  assert.deepEqual(result.findings, []);
   assert.ok(audit.candidates.length >= 27);
   for (const item of audit.candidates) {
     assert.equal(typeof item.source.kind, 'string');
@@ -296,7 +121,10 @@ test('current-week audit records source, date, authority, and lifecycle', () => 
     projection.summary.actionableExceptions,
     projection.actionableExceptions.length
   );
-  assert.ok(projection.actionableExceptions.every(item => item.owner));
+  assert.equal(projection.summary.actionableExceptions, 0);
+  assert.deepEqual(projection.actionableExceptions, []);
+  assert.deepEqual(projection.summerQueue, []);
+  assert.ok(result.historicalFindings.length > 0);
   assert.equal('candidates' in projection, false);
   assert.ok(
     projection.actionableExceptions.every(item => item.kind !== 'approved')
@@ -325,7 +153,7 @@ test('deliberate red: an undeclared semantic contradiction fails closed', () => 
     /conflict:P04-precedence:RED-recent-always-wins/
   );
   assert.equal(
-    result.findings.some(item => item.kind === 'conflicting'),
+    result.historicalFindings.some(item => item.kind === 'conflicting'),
     true
   );
 });
@@ -344,7 +172,7 @@ test('deliberate red: an approved orphan consumer fails closed', () => {
   );
 });
 
-test('semantic validation identifies duplicates, overlaps, conflicts, and supersession', () => {
+test('historical semantic lint identifies duplicates, overlaps, conflicts, and supersession', () => {
   const audit = coreAudit();
   const base = candidate({
     id: 'RED-left',
@@ -388,7 +216,7 @@ test('semantic validation identifies duplicates, overlaps, conflicts, and supers
     })
   );
   const result = validateStewardshipAudit(audit);
-  const kinds = new Set(result.findings.map(item => item.kind));
+  const kinds = new Set(result.historicalFindings.map(item => item.kind));
   assert.equal(kinds.has('duplicate'), true);
   assert.equal(kinds.has('conflicting'), true);
   assert.equal(kinds.has('supersession'), true);
@@ -427,7 +255,7 @@ test('scope-separated stewardship and coding admission policies are compatible',
   const audit = coreAudit();
   const result = validateStewardshipAudit(audit, { now: FIXTURE_NOW });
   assert.equal(
-    result.findings.some(item => item.kind === 'conflicting'),
+    result.historicalFindings.some(item => item.kind === 'conflicting'),
     false
   );
   const wip = audit.candidates.find(
@@ -529,7 +357,9 @@ test('event-driven stewardship caller rejects authority escalation and duplicate
   };
   audit.growthLearningIntake = intake;
 
-  const baseline = validateStewardshipAudit(coreAudit(), { now: FIXTURE_NOW });
+  const baseline = validateStewardshipAudit(sourceBoundAudit(), {
+    now: FIXTURE_NOW,
+  });
   const result = validateStewardshipAudit(audit, { now: FIXTURE_NOW });
   assert.equal(result.ok, false);
   assert.equal(result.growthLearning.status, 'invalid');
@@ -665,4 +495,84 @@ test('event dedupe survives week rollover and historical keys while revisions re
     ),
     intake.dedupeKey
   );
+});
+
+test('malformed historical relations stay invalid without throwing or creating current work', () => {
+  const audit = coreAudit();
+  audit.candidates[0].relations = {
+    overlaps: [],
+    conflicts: [],
+    supersedes: [],
+    scopeSeparated: null,
+  };
+  const result = validateStewardshipAudit(audit, { now: FIXTURE_NOW });
+  assert.equal(result.ok, false);
+  assert.equal(result.shapeValid, false);
+  assert.match(result.errors.join('\n'), /relations/);
+  assert.deepEqual(result.findings, []);
+  const projection = projectStewardshipAudit(audit, result);
+  assert.deepEqual(projection.summerQueue, []);
+  assert.deepEqual(projection.founderQueue, []);
+});
+
+test('source-unbound historical stewardship cannot admit an otherwise valid causal growth receipt', () => {
+  const audit = coreAudit();
+  audit.generatedAt = FIXTURE_NOW.toISOString();
+  audit.growthLearningIntake = growthLearningIntake();
+  const standalone = validateGrowthLearningIntake(audit.growthLearningIntake, {
+    now: FIXTURE_NOW,
+  });
+  assert.equal(standalone.admissionEligible, true);
+  const result = validateStewardshipAudit(audit, { now: FIXTURE_NOW });
+  assert.equal(result.ok, false);
+  assert.equal(result.evidence.state, 'historical');
+  assert.equal(result.growthLearning.admissionEligible, false);
+  assert.equal(result.growthLearning.results[0].eligible, false);
+  assert.equal(
+    result.growthLearning.results[0].nextAction,
+    'verify-stewardship-source'
+  );
+  const projection = projectStewardshipAudit(audit, result);
+  assert.equal(projection.growthLearning.admissionEligible, false);
+  assert.deepEqual(projection.summerQueue, []);
+  assert.deepEqual(projection.founderQueue, []);
+});
+
+// The outer reader must preserve the evaluator's clock, including its fail-closed state.
+test('audit projection preserves the injected future-evidence rejection', () => {
+  const audit = sourceBoundAudit();
+  const validation = validateStewardshipAudit(audit, {
+    now: new Date('2026-01-04T00:00:00Z'),
+  });
+  assert.equal(validation.evidence.state, 'invalid');
+  const projection = projectStewardshipAudit(audit, validation);
+  assert.equal(projection.evidence.state, 'invalid');
+  assert.deepEqual(projection.summerQueue, []);
+});
+
+test('malformed historical sources and proof arrays remain diagnostics', () => {
+  for (const mutate of [
+    audit => {
+      audit.sources = [null];
+    },
+    audit => {
+      audit.candidates[0].consumers = {};
+    },
+    audit => {
+      audit.candidates[0].tests = [null];
+    },
+    audit => {
+      audit.candidates[0].scope = 'invalid';
+    },
+  ]) {
+    const audit = coreAudit();
+    mutate(audit);
+    const validation = validateStewardshipAudit(audit);
+    assert.equal(validation.ok, false);
+    assert.deepEqual(validation.findings, []);
+    assert.deepEqual(
+      projectStewardshipAudit(audit, validation).summerQueue,
+      []
+    );
+  }
 });

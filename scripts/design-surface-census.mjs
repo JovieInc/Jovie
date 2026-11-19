@@ -2,6 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  readRetainedSurfaceEvidence,
+  validateRetainedEvidence,
+} from './lib/retained-surface-evidence.mjs';
 
 export const CENSUS_PATH = 'apps/web/data/designSystem/surfaceCensus.json';
 const DAY = 86_400_000;
@@ -111,6 +115,12 @@ export function readEvidence(root, groupId) {
   return entries;
 }
 
+/** Historical reads do not renew the current source qualification. */
+export function readRetainedEvidence(root, groupId) {
+  const census = JSON.parse(readFileSync(join(root, CENSUS_PATH), 'utf8'));
+  return readRetainedSurfaceEvidence(root, groupId, census);
+}
+
 /** Certified files of a row whose bytes no longer match recorded evidence. */
 export function staleFiles(root, row, evidence = readEvidence(root, row.id)) {
   return certifiedFiles(row)
@@ -141,6 +151,7 @@ export function validateCensus(
     'Sort unique census groups'
   );
   for (const group of census.groups) {
+    validateRetainedEvidence(group.retainedEvidence);
     requireValue(
       STATUSES.includes(group.status),
       `${group.id}: invalid status`
@@ -431,15 +442,35 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
 }
 
 if (process.argv[1] === import.meta.filename) {
-  const result = checkCensus(
-    process.cwd(),
-    process.argv.slice(2).find(arg => !arg.startsWith('--')) || 'origin/main'
-  );
-  console.log(
-    JSON.stringify(
-      process.argv.includes('--rows') ? result : result.summary,
-      null,
-      2
-    )
-  );
+  const retained = process.argv.indexOf('--retained');
+  if (retained !== -1) {
+    try {
+      console.log(
+        JSON.stringify(
+          readRetainedEvidence(process.cwd(), process.argv[retained + 1]),
+          null,
+          2
+        )
+      );
+    } catch (error) {
+      console.error(
+        error instanceof Error && error.message.startsWith('retained evidence:')
+          ? error.message
+          : 'retained evidence: unavailable'
+      );
+      process.exitCode = 1;
+    }
+  } else {
+    const result = checkCensus(
+      process.cwd(),
+      process.argv.slice(2).find(arg => !arg.startsWith('--')) || 'origin/main'
+    );
+    console.log(
+      JSON.stringify(
+        process.argv.includes('--rows') ? result : result.summary,
+        null,
+        2
+      )
+    );
+  }
 }

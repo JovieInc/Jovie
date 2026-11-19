@@ -4,9 +4,11 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
 } from '@/components/organisms/table';
+import { AudienceWorkspaceSwitch } from '@/features/dashboard/molecules/AudienceWorkspaceSwitch';
 import { ContactsManager } from '@/features/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useContactsQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import type { DashboardContact } from '@/types/contacts';
 
 const EMPTY_CONTACTS: DashboardContact[] = [];
@@ -30,7 +32,15 @@ export function ContactsPageClient({
       >
         <PageToolbar
           start={
-            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 contacts</span>
+            <>
+              <AudienceWorkspaceSwitch value='contacts' />
+              <span
+                className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'ml-2 shrink-0')}
+                data-testid='contacts-toolbar-count'
+              >
+                0 contacts
+              </span>
+            </>
           }
         />
         <div className='flex min-h-0 flex-1 items-center justify-center'>
