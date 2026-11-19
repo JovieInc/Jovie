@@ -92,14 +92,11 @@ test('the Pen agent drafts on Fable 5.2 unless PEN_DRAFT_MODEL names another mod
   assert.equal(args[args.indexOf('--model') + 1], 'claude-fable-5-2');
   const other = penArgs(brief, { ...opts, model: 'gpt-5.5' });
   assert.equal(other[other.indexOf('--model') + 1], 'gpt-5.5');
-  // Pen CLI 0.3.14 doesn't list claude-fable-5-2 and rejects unknown models.
   const [major, minor, patch] = PEN_CLI_VERSION.split('.').map(Number);
   assert.ok(major > 0 || minor > 3 || (minor === 3 && patch >= 16));
 });
 
 test('the Pen agent sees why a tool call failed and has room to recover', () => {
-  // Run 42457693051: three drafts aborted at 8 failed calls with no error
-  // text; the one that finished needed 7.
   const args = penArgs(
     { frame: 'claim', prompt: 'P' },
     { input: 'i.pen', outDir: 'o' }
@@ -116,24 +113,19 @@ test('the agent is told the editor loads slowly and may retry timed-out calls', 
   const prompt = args[args.indexOf('--prompt') + 1];
   assert.ok(prompt.includes(LOAD_NOTE));
   assert.ok(prompt.endsWith('P'));
-  // 8 allowed failures ended 3 of 4 drafts before the 25 MB file loaded.
   assert.ok(Number(args[args.indexOf('--max-failed-calls') + 1]) >= 24);
   assert.ok(ATTEMPTS >= 2);
 });
 
 test('one attempt gets 23 minutes of the 25-minute frame job', () => {
-  // audience-analytics was still building when its 14-minute first attempt
-  // and 6-minute restart were each stopped (run 43339513257).
   assert.equal(attemptTimeout(0), 23 * 60_000);
   assert.equal(attemptTimeout(10 * 60_000), 13 * 60_000);
   assert.equal(attemptTimeout(0, 4 * 60_000), 0);
 });
 
 test('a retry starts from scratch, so it needs room for a whole draft', () => {
-  // An attempt that ran out its time is not restarted in what is left.
   assert.equal(attemptTimeout(23 * 60_000 + 10), 0);
   assert.equal(attemptTimeout(13 * 60_000 + 1), 0);
-  // One that failed early (a rate limit, the failed-call cap) is.
   assert.equal(attemptTimeout(3 * 60_000), 20 * 60_000);
   assert.equal(attemptTimeout(13 * 60_000), 10 * 60_000);
 });
