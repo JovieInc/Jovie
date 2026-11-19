@@ -68,6 +68,42 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
     expect(stored.expiresAt).toBeGreaterThan(Date.now());
   });
 
+  test('golden path: a real homepage intent restores and auto-sends on /start', async ({
+    page,
+  }) => {
+    // The full signup-intent golden path with REAL intent — captured by the
+    // homepage UI, never seeded or injected: submit on / → /start?intent_id=
+    // → the onboarding chat restores the intent into the composer and sends
+    // the first turn with it.
+    const input = await openHomepageIntentInput(page);
+
+    await page.getByRole('button', { name: 'Plan A Release' }).click();
+    await input.pressSequentially('my new EP');
+    await input.press('Enter');
+
+    await page.waitForURL(/\/start/);
+
+    const htmlPrompt = 'Plan a release for my new EP';
+    const composer = page.getByLabel('Chat Message Input');
+    const userBubble = page.getByTestId('chat-user-bubble');
+    let composerHeld = false;
+    await expect
+      .poll(async () => {
+        if ((await userBubble.count()) > 0) {
+          const bubbleText = await userBubble.first().innerText();
+          if (bubbleText.includes(htmlPrompt)) return 'text';
+        }
+        if ((await composer.inputValue()) === htmlPrompt) {
+          if (composerHeld) return 'text';
+          composerHeld = true;
+          return 'pending';
+        }
+        composerHeld = false;
+        return 'pending';
+      })
+      .toBe('text');
+  });
+
   test('free-form submit stores intent with pillId=null', async ({ page }) => {
     const input = await openHomepageIntentInput(page);
     await input.pressSequentially('something completely custom');
