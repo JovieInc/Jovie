@@ -78,6 +78,10 @@ describe('Auto-Ready fleet live-state guard', () => {
   it('pins promotion to the exact live head and hold-label snapshot', () => {
     expect(fleetScript).toContain('headRefOid headRefName body state');
     expect(fleetScript).toContain('labels(first:100){nodes{name}}');
+    // JOV-13139: the live-state guard refuses a CHANGES_REQUESTED review.
+    expect(fleetScript).toContain('reviewDecision');
+    expect(fleetScript).toContain('!= "CHANGES_REQUESTED"');
+    expect(fleetScript).toContain('review_after=');
     expect(fleetScript).toContain('HOLD_LABEL_RE=');
     expect(fleetScript).toContain('.head == $expected_head');
     expect(fleetScript).toContain('.branch == $expected_branch');
@@ -174,6 +178,18 @@ describe('Auto-Ready provenance selector', () => {
     expect(promotion({ body, greenSource, labels: ['hold'] })).toEqual({
       eligible: false,
       reason: 'held',
+    });
+    // JOV-13139: outside-review and do-not-ready holds block the writer-proof
+    // promotion path too.
+    expect(
+      promotion({ body, greenSource, labels: ['needs-outside-review'] })
+    ).toEqual({
+      eligible: false,
+      reason: 'held-by-needs-outside-review',
+    });
+    expect(promotion({ body, greenSource, labels: ['do-not-ready'] })).toEqual({
+      eligible: false,
+      reason: 'held-by-do-not-ready',
     });
     expect(
       promotion({

@@ -101,6 +101,14 @@ export function classifyGreenSourceDraft(input = {}) {
   if (hasGreenSourceHold(input.labels)) {
     return { eligible: false, reason: 'held' };
   }
+  // JOV-13139: an unresolved must-fix review is a deterministic hold. GitHub's
+  // reviewDecision is structured state, not judgment; a later approving
+  // review (or an opened review resolving the request) clears it.
+  if (
+    String(input.reviewDecision ?? '').toUpperCase() === 'CHANGES_REQUESTED'
+  ) {
+    return { eligible: false, reason: 'review:changes-requested' };
+  }
 
   const state = String(input.state ?? 'OPEN').toUpperCase();
   if (state !== 'OPEN') {
