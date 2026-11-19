@@ -372,7 +372,10 @@ describe('ci-fast bounded parallel workflow', () => {
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
       'scripts/prod-errors/test_prod_errors.py',
+      'scripts/tests/test_noabandon_route.py',
       'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_noabandon_invariant.py',
+      'scripts/tests/test_noabandon_adapters.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',

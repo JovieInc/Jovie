@@ -48,6 +48,7 @@
     "lint:contrast-ratchet": "node scripts/lint-contrast-ratchet.mjs && tsx scripts/lint-contrast-computed.ts",
     "lint:contrast-computed": "tsx scripts/lint-contrast-computed.ts",
     "lint:motion-css": "node scripts/lint-motion-css.mjs",
+    "lint:review-findings": "node scripts/lint-review-findings.mjs",
     "lint:touch-target": "tsx scripts/lint-touch-target.ts",
     "lint:ui-feel": "node scripts/lint-ui-feel.mjs",
     "lint:composite-field": "node scripts/lint-composite-field.mjs",
