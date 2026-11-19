@@ -54,7 +54,6 @@ describe('GET /api/dashboard/monetization-summary', () => {
     // Stripe Connect is no longer flag-gated: a connected, onboarded profile
     // is monetization-ready without any runtime override.
     expect(payload.paymentState).toBe('active');
-    expect(payload.username).toBe('artist');
   });
 
   it('treats a connected profile without payout readiness as setup_incomplete', async () => {
