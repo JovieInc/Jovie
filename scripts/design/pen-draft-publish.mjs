@@ -29,13 +29,6 @@ export const TITLE_PREFIX = 'Pen draft for approval: ';
 export const APPROVAL_LABEL = 'pen-draft:needs-tim';
 export const APPROVAL_LINE = 'Move to Todo to accept, cancel to reject.';
 export const CREATE_STATE_NAME = 'Backlog';
-// One standing issue for run-level deferral notes (JOV-12708): a frame the
-// drafting agent could not draw for want of model quota has no draft to
-// approve, so it gets no approval issue — it gets a comment here.
-export const DEFERRED_TITLE =
-  'Pen drafts deferred: drafting agent out of quota';
-export const DEFERRED_DESCRIPTION =
-  'Frames a pen-draft run could not draw because the drafting agent was out of its model quota. One comment per run; the next run after the quota resets drafts these frames again.';
 
 /**
  * @typedef {{ok: false, reason: string, detail?: string}} Failure
@@ -50,6 +43,14 @@ export const DEFERRED_DESCRIPTION =
  * @typedef {{ok: boolean, reason?: string, detail?: string, frames: FrameRow[]}} PublishResult
  * @typedef {{apiKey?: string, fetchImpl: typeof fetch, env: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} Context
  */
+
+// One standing issue for run-level deferral notes (JOV-12708): a frame the
+// drafting agent could not draw for want of model quota has no draft to
+// approve, so it gets no approval issue — it gets a comment here.
+export const DEFERRED_TITLE =
+  'Pen drafts deferred: drafting agent out of quota';
+export const DEFERRED_DESCRIPTION =
+  'Frames a pen-draft run could not draw because the drafting agent was out of its model quota. One comment per run; the next run after the quota resets drafts these frames again.';
 
 /**
  * scripts checkJs runs without strict null checks, so `!result.ok` does not
