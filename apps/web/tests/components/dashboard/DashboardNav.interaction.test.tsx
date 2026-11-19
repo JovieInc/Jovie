@@ -23,6 +23,10 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
+function conversationsResult(result: Record<string, unknown>) {
+  return result as unknown as ReturnType<typeof mockUseChatConversationsQuery>;
+}
+
 function RouteRefresh() {
   const { setOpenMobile } = useSidebar();
   return (
@@ -166,16 +170,18 @@ describe('DashboardNav interactions', () => {
 
   it('hides recent chats until history is opened', async () => {
     const user = userEvent.setup();
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'thread-newer',
-          title: 'Pitch tasks',
-          createdAt: '2026-05-02T00:00:00.000Z',
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      ],
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-newer',
+            title: 'Pitch tasks',
+            createdAt: '2026-05-02T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      })
+    );
 
     renderDashboardNav({
       renderFn: render,
@@ -201,16 +207,18 @@ describe('DashboardNav interactions', () => {
   it('keeps history available on Work and updates the selected chat on route changes', async () => {
     const user = userEvent.setup();
     mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'thread-1',
-          title: 'Saved chat',
-          createdAt: '2026-05-01T00:00:00.000Z',
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      ],
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-1',
+            title: 'Saved chat',
+            createdAt: '2026-05-01T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      })
+    );
     renderDashboardNav({ renderFn: render, children: <RouteRefresh /> });
     const history = screen.getByRole('button', { name: 'Chat History' });
     expect(history).toHaveAttribute('aria-expanded', 'false');
@@ -228,10 +236,12 @@ describe('DashboardNav interactions', () => {
   });
 
   it('keeps compact loading and empty thread states free of duplicate New Chat controls', () => {
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: undefined,
+        isLoading: true,
+      })
+    );
     const loading = renderDashboardNav({
       renderFn: render,
     });
@@ -241,11 +251,13 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByText('Loading chats')).not.toBeInTheDocument();
     loading.unmount();
 
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [],
+        isLoading: false,
+        isError: false,
+      })
+    );
     renderDashboardNav({
       renderFn: render,
     });
@@ -256,19 +268,21 @@ describe('DashboardNav interactions', () => {
 
   it('marks an active thread read without changing primary navigation', async () => {
     mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-1`);
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'thread-1',
-          title: 'Active thread',
-          createdAt: '2026-05-01T00:00:00.000Z',
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-1',
+            title: 'Active thread',
+            createdAt: '2026-05-01T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+    );
 
     renderDashboardNav({
       renderFn: render,
