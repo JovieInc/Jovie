@@ -8,7 +8,7 @@ export default function SentryExamplePage() {
           Sentry Example
         </p>
         <h1 className='text-4xl font-semibold tracking-tight text-primary-token'>
-          Frontend error example
+          Frontend Error Example
         </h1>
         <p className='max-w-2xl text-base leading-7 text-secondary-token'>
           This page exists only to verify that the client-side Sentry bundle
