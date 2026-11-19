@@ -69,6 +69,10 @@ def apply_identifier_resolution(worktree: Path, conflicted, sh, log) -> bool:
             ancestor = sh(["git", "show", f":1:{path}"], cwd=worktree)
             base = ancestor.stdout if ancestor.returncode == 0 and target.suffix in {".js", ".mjs"} else ""
             text = resolve_additive_identifier_list_text(target.read_text(), base=base)
+            if text is None:
+                from fix_red_source_edits import resolve_pytest_count_file
+
+                text = resolve_pytest_count_file(worktree, path, conflicted, sh)
         except (OSError, UnicodeError):
             text = None
         if text is None:
