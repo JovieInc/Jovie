@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
+
+from atomic_state import atomic_write_text
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -305,12 +308,63 @@ console.log(JSON.stringify(load(readFileSync(0, 'utf8'))));
     return {"manifest": json.loads(read("package.json")), "config": json.loads(yaml.stdout)}
 
 
+def pen_retry_win(before_sha: str, after_sha: str) -> str:
+    """Measure one injected transient failure using the same test on both revisions.
+
+    This is a controlled scenario, not a claim about live outage frequency or time saved.
+    Refuse missing tests, unrelated failures, and non-ancestral or unchanged revisions.
+    """
+    if any(not re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (before_sha, after_sha)):
+        raise ValueError("retry evidence requires exact Git revisions")
+    if before_sha == after_sha or subprocess.run(
+            ["git", "merge-base", "--is-ancestor", before_sha, after_sha], cwd=ROOT).returncode:
+        raise ValueError("retry evidence requires distinct ancestral revisions")
+    source = "scripts/invariants/pen-golden-path.mjs"
+    test = "scripts/invariants/pen-golden-path.test.mjs"
+    name = "a transient browser-install failure is retried before the strict diff runs"
+
+    def read(sha, path):
+        return subprocess.check_output(["git", "show", f"{sha}:{path}"], cwd=ROOT, text=True)
+
+    test_text = read(after_sha, test)
+    with tempfile.TemporaryDirectory(prefix="pen-retry-win-") as tmp:
+        directory = Path(tmp)
+        atomic_write_text(directory / "pen-golden-path.test.mjs", test_text)
+        results = []
+        for sha in (before_sha, after_sha):
+            atomic_write_text(directory / "pen-golden-path.mjs", read(sha, source))
+            results.append(subprocess.run(
+                ["node", "--test-reporter=tap", f"--test-name-pattern=^{name}$",
+                 str(directory / "pen-golden-path.test.mjs")],
+                cwd=ROOT, text=True, capture_output=True, timeout=30))
+    old, new = results
+    if (old.returncode != 1 or "# tests 1\n" not in old.stdout
+            or "# fail 1\n" not in old.stdout or "apt-get failed: 503" not in old.stdout
+            or new.returncode != 0 or "# tests 1\n" not in new.stdout
+            or "# pass 1\n" not in new.stdout or "# fail 0\n" not in new.stdout):
+        raise ValueError("retry scenario did not produce the expected red-before-green outcome")
+    section = "\n".join([
+        "## Win", "",
+        "- Claim: Reach the strict Pen diff after injected transient browser-install failures in a controlled test.",
+        "- Area: ci", "- Theme: probe-reliability",
+        "- Metric: controlled transient-install scenarios reaching strict diff | scenarios | higher | 0 | 1 | "
+        "same deterministic regression test against both Git revisions; not live outage frequency | "
+        f"python3 scripts/lanes/repair_win.py pen-retry {before_sha} {after_sha}",
+        f"- Verify: https://github.com/JovieInc/Jovie/compare/{before_sha}...{after_sha}", "",
+    ])
+    validate(section)
+    return section
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=["dependabot-patches"])
+    parser.add_argument("kind", choices=["dependabot-patches", "pen-retry"])
     parser.add_argument("before_sha")
     parser.add_argument("after_sha")
     args = parser.parse_args()
-    print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
-                                  before_sha=args.before_sha, after_sha=args.after_sha), end="")
+    if args.kind == "pen-retry":
+        print(pen_retry_win(args.before_sha, args.after_sha), end="")
+    else:
+        print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
+                                      before_sha=args.before_sha, after_sha=args.after_sha), end="")
