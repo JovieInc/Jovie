@@ -7,7 +7,7 @@ steps call — each bounded, each printing one JSON receipt line.
 
 Linear I/O goes through the shared apiclient LinearClient (`ql.graphql(query, variables)`), using the
 SAME LINEAR_API_KEY secret linear-sync-on-merge.yml already consumes: no new secret, and the
-external-api guard keeps provider hosts inside scripts/apiclient. Writes stay off until an owning
+external-api guard keeps provider hosts inside scripts/apiclient. Writes stay off unless an owning
 agent has read one dry-run receipt: NOABANDON_LINEAR_WRITES=true (or --write) turns them on; the
 default prints the would-be mutation and mutates nothing.
 
@@ -25,6 +25,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from noabandon import invariant as I  # noqa: E402
 from noabandon import ledger as L  # noqa: E402
 from noabandon import route as R  # noqa: E402
+
+# api-budget: github-user-core 10/hr - per event-driven wake (relay push-to-main or main-CI verify): one issue search, at most five lease-comment reads, one commits-pulls read
+# api-budget: github-search 6/hr - one leased-PR search per relay wake plus one per shared-red pass, coalesced on the exact head
+# api-budget: linear-requests 10/hr - fingerprint upsert, receipt comment and state move per item, write-mode only
 
 VERIFIED_HOSTED_CAPACITY = 60
 ABANDON_LABEL = "remediation:abandoned"
