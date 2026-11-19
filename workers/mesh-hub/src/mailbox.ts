@@ -1,10 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   type Delivered,
+  dlqFallbackFull,
   type EnqueueResult,
   type Envelope,
   LIMITS,
+  type MailboxSelector,
   MailboxStore,
+  type PeekRow,
   project,
   sha256Hex,
 } from './core.ts';
@@ -193,6 +196,28 @@ export class Mailbox extends DurableObject<Env> {
   async ack(ids: string[]) {
     this.touchConsumer();
     return this.store.ack(ids, Date.now());
+  }
+
+  /** Fallback-fullness probe for DLQ senders (unacked, probes excluded). */
+  async unacked(): Promise<number> {
+    return this.store.unackedCount();
+  }
+
+  /** Admin peek: read-only metadata page; never claims a lease or mutates state. */
+  async peek(selector: MailboxSelector): Promise<{
+    messages: PeekRow[];
+    nextAfter: number | null;
+  }> {
+    return this.store.peek(selector, Date.now());
+  }
+
+  /** Admin bulk-ack: acks the selector's unacked matches with a recorded reason. */
+  async bulkAck(
+    selector: MailboxSelector,
+    maxIds: number
+  ): Promise<{ manifest: PeekRow[]; matched: number; acked: number }> {
+    this.touchConsumer();
+    return this.store.bulkAck(selector, maxIds, Date.now());
   }
 
   async receipt(ids: string[]) {
@@ -416,11 +441,20 @@ export class Mailbox extends DurableObject<Env> {
 
   private async sweep(now: number) {
     const config = this.config();
+    const expired = this.store.sweepExpired(now, this.autoNoticeTtlMs());
+    if (expired.length)
+      console.log(
+        JSON.stringify({
+          channel: 'mesh-hub',
+          task: 'expireNotices',
+          count: expired.length,
+        })
+      );
     this.store.purge(now);
     if (config) {
       for (const dead of this.store.sweepDead(now, config.deadAfterMs)) {
         try {
-          await this.notifyDead(config, dead);
+          await this.notifyDead(config, dead, now);
         } catch (error) {
           // Un-flag so the next sweep retries instead of losing the DLQ wrapper.
           this.store.clearDead(dead.seq);
@@ -434,10 +468,22 @@ export class Mailbox extends DurableObject<Env> {
           );
         }
       }
+      await this.flushDlq(config, now);
     }
     await this.alarmStale(config, now);
-    if (this.store.unackedCount() > 0 || this.outbox.open(1).length)
+    if (
+      this.store.unackedCount() > 0 ||
+      this.outbox.open(1).length ||
+      (config !== null && this.store.dlqPending(config.kind))
+    )
       this.outbox.schedule('sweep', now + SWEEP_MS);
+  }
+
+  /** Automated-notice TTL: AUTO_NOTICE_TTL_MS override, clamped to [1 minute, 7 days]. */
+  private autoNoticeTtlMs(): number {
+    const raw = Number(this.env.AUTO_NOTICE_TTL_MS);
+    if (!Number.isFinite(raw) || raw <= 0) return LIMITS.autoNoticeTtlMs;
+    return Math.min(Math.max(raw, 60_000), 7 * 86_400_000);
   }
 
   /**
@@ -464,34 +510,19 @@ export class Mailbox extends DurableObject<Env> {
     });
   }
 
-  /** DLQ: one deterministic wrapper per dead message to the fallback owner. */
-  private async notifyDead(config: MailboxConfig, dead: Delivered) {
+  /**
+   * Dead-letter bookkeeping: the registry event fires now; the fallback wrapper
+   * is no longer sent per dead message — flushDlq coalesces it per window.
+   */
+  private async notifyDead(
+    config: MailboxConfig,
+    dead: Delivered,
+    now: number
+  ) {
     const fallback =
       config.fallback && config.fallback !== config.kind
         ? config.fallback
         : null;
-    const body = JSON.stringify({
-      schema: 'jovie.mesh-undeliverable/v1',
-      originalId: dead.id,
-      originalTo: config.kind,
-      from: dead.from,
-      acceptedAt: new Date(dead.acceptedAt).toISOString(),
-      note: `Unhandled by ${config.kind} after ${Math.round(config.deadAfterMs / 3_600_000)}h. The original stays queued for ${config.kind}; reply on the mesh if you take it over.`,
-      quotedBody: JSON.stringify(dead.body.slice(0, 2500)),
-    });
-    const wrapper: Envelope = {
-      id: `mesh-hub:dlq:${config.kind}:${dead.seq}`,
-      from: 'mesh-hub',
-      to: fallback ?? config.kind,
-      correlationId: `dlq:${config.kind}:${dead.seq}`,
-      sha256: await sha256Hex(body),
-      body,
-      refs: [],
-      inReplyTo: dead.id,
-      sentAt: null,
-      acceptedAt: Date.now(),
-      kind: 'undeliverable',
-    };
     const registry = this.env.REGISTRY.get(
       this.env.REGISTRY.idFromName('registry')
     );
@@ -500,12 +531,100 @@ export class Mailbox extends DurableObject<Env> {
       from: dead.from,
       fallback,
     });
-    if (fallback) {
-      const stub = this.env.MAILBOX.get(this.env.MAILBOX.idFromName(fallback));
-      const result = await stub.enqueue(wrapper);
-      if (!result.ok)
-        throw new Error(`dead-letter enqueue failed: ${result.code}`);
+    if (!fallback) return;
+    this.store.recordDlqDead(
+      config.kind,
+      fallback,
+      dead.seq,
+      now,
+      LIMITS.dlqCoalesceMs
+    );
+  }
+
+  /**
+   * Coalesced DLQ: at most one summary wrapper per (mailbox, fallback) per
+   * LIMITS.dlqCoalesceMs, carrying a count plus first/last seq instead of one
+   * wrapper per dead message. A fallback that is itself full (or at
+   * LIMITS.dlqFullFraction of cap) gets no wrapper at all — just a registry
+   * event. Automated notices are never accumulated here (see sweepDead).
+   */
+  private async flushDlq(config: MailboxConfig, now: number) {
+    const fallback =
+      config.fallback && config.fallback !== config.kind
+        ? config.fallback
+        : null;
+    if (!fallback) return;
+    const summary = this.store.pendingDlqSummary(
+      config.kind,
+      fallback,
+      now,
+      LIMITS.dlqCoalesceMs
+    );
+    if (!summary) return;
+    const registry = this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName('registry')
+    );
+    const stub = this.env.MAILBOX.get(this.env.MAILBOX.idFromName(fallback));
+    let fallbackUnacked: number | null = null;
+    try {
+      fallbackUnacked = await stub.unacked();
+    } catch {
+      fallbackUnacked = null; // unknown fullness: try the enqueue and let 507 decide
     }
+    const suppress = async (why: string) => {
+      await registry.recordEvent('dlq.suppressed', config.kind, {
+        fallback,
+        fallbackUnacked: fallbackUnacked ?? -1,
+        count: summary.count,
+        firstSeq: summary.firstSeq,
+        lastSeq: summary.lastSeq,
+        why,
+      });
+      this.store.clearDlqSummary(config.kind, fallback);
+    };
+    if (dlqFallbackFull(fallbackUnacked)) {
+      await suppress('fallback_full');
+      return;
+    }
+    const body = JSON.stringify({
+      schema: 'jovie.mesh-undeliverable/v1',
+      summary: true,
+      originalTo: config.kind,
+      count: summary.count,
+      firstSeq: summary.firstSeq,
+      lastSeq: summary.lastSeq,
+      windowStart: new Date(summary.windowStart).toISOString(),
+      note: `Summary of ${summary.count} unhandled message(s) in ${config.kind}'s mailbox between seq ${summary.firstSeq} and ${summary.lastSeq}. The originals stay queued for ${config.kind}; reply on the mesh to take any of them over.`,
+    });
+    const wrapper: Envelope = {
+      id: `mesh-hub:dlq-sum:${config.kind}:${summary.windowStart}`,
+      from: 'mesh-hub',
+      to: fallback,
+      correlationId: `dlq-sum:${config.kind}:${summary.windowStart}`,
+      sha256: await sha256Hex(body),
+      body,
+      refs: [],
+      inReplyTo: null,
+      sentAt: null,
+      acceptedAt: Date.now(),
+      kind: 'undeliverable',
+    };
+    let result: EnqueueResult;
+    try {
+      result = await stub.enqueue(wrapper);
+    } catch {
+      // Transport error: keep the summary; the next sweep retries it.
+      return;
+    }
+    if (result.ok || result.status === 409) {
+      this.store.clearDlqSummary(config.kind, fallback);
+      return;
+    }
+    if (result.status === 507) {
+      await suppress('fallback_full');
+      return;
+    }
+    throw new Error(`dead-letter summary enqueue failed: ${result.code}`);
   }
 
   /** Push to Summer's webhook; 2xx = durable handoff to Summer's receiver. Only bad-message 4xx is terminal. */

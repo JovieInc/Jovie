@@ -81,11 +81,11 @@ test('claim is a lease: one winner, expiry returns it to the pool and re-notifie
   const task = store.get('l-1');
   assert.equal(task.status, 'open');
   assert.equal(task.claimant, null);
-  const reopened = notices(store).map(n => JSON.parse(n.body));
-  assert.ok(
-    reopened.every(
-      n => n.event === 'task.reopened' && n.previousClaimant === 'aeon'
-    )
+  // Re-offer dedupe: the expired lease does not fan out again while the
+  // original task.open notices are still fresh in the recipients' mailboxes.
+  assert.deepEqual(
+    notices(store).filter(n => JSON.parse(n.body).event === 'task.reopened'),
+    []
   );
   assert.equal(store.claim('grokbot', {}, 100_000).task.id, 'l-1');
   assert.equal(store.get('l-1').attempts, 2);
@@ -276,6 +276,45 @@ test('done replays for the same result; a closed task rejects a different one', 
     .filter(n => n.to === 'summer')
     .map(n => JSON.parse(n.body).event);
   assert.deepEqual(toPoster, ['task.done']);
+});
+
+test('expired-lease re-offers dedupe per task until the dedupe window passes', () => {
+  const store = board();
+  const reopened = () =>
+    notices(store).filter(n => JSON.parse(n.body).event === 'task.reopened');
+  store.post(
+    'summer',
+    { id: 'ro-1', title: 'Work', caps: ['research'], leaseSec: 60 },
+    ACTIVE,
+    0
+  );
+  store.claim('aeon', { id: 'ro-1' }, 10);
+  assert.deepEqual(store.sweep(ACTIVE, 70_000).expired, ['ro-1']);
+  assert.equal(
+    reopened().length,
+    0,
+    'first expiry is deduped: the original post notice is still fresh'
+  );
+  store.claim('claude', { id: 'ro-1' }, 80_000);
+  assert.deepEqual(store.sweep(ACTIVE, 140_000).expired, ['ro-1']);
+  assert.equal(
+    reopened().length,
+    0,
+    'every expiry inside the window is deduped per task'
+  );
+  // Past the window a fresh re-offer fans out again.
+  store.claim('grokbot', { id: 'ro-1' }, 150_000);
+  assert.deepEqual(store.sweep(ACTIVE, 70_000 + BOARD.noticeDedupeMs).expired, [
+    'ro-1',
+  ]);
+  assert.equal(
+    reopened().length,
+    3,
+    're-offer after the window notifies every capable agent'
+  );
+  assert.ok(
+    reopened().every(n => JSON.parse(n.body).previousClaimant === 'grokbot')
+  );
 });
 
 test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', () => {

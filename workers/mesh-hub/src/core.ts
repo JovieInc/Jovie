@@ -27,6 +27,15 @@ export const LIMITS = {
   retentionAfterAckMs: 30 * 86_400_000,
   deadAfterActiveMs: 6 * 3_600_000,
   deadAfterDormantMs: 72 * 3_600_000,
+  // Automated notices (board fan-outs, DLQ wrappers, events/probes) expire:
+  // the mailbox sweep acks them unhandled past this age so they never pile up
+  // to the unacked cap. Real messages keep full retention. Override with the
+  // AUTO_NOTICE_TTL_MS env var (clamped to [1 minute, 7 days]).
+  autoNoticeTtlMs: 6 * 3_600_000,
+  // At most one summary DLQ notice per (mailbox, fallback) per window.
+  dlqCoalesceMs: 3_600_000,
+  // A fallback at >= 90% of the unacked cap counts as full: never add DLQ weight.
+  dlqFullFraction: 0.9,
 } as const;
 
 export const KIND = /^[a-z][a-z0-9-]{1,31}$/;
@@ -34,6 +43,32 @@ export const CORRELATION = /^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$/;
 export const SHA256 = /^[a-f0-9]{64}$/;
 /** Hub-internal senders; never registrable as agents. */
 export const SYSTEM_KINDS = new Set(['mesh-hub', 'mesh-probe', 'board']);
+
+/** Marker that a message (or its quoted copy) came from or is bound for the founder. */
+export const TIM_RELAY = 'TIM-RELAY';
+
+export type EnvelopeClass = 'automated' | 'direct';
+
+/**
+ * One classifier for every mailbox decision that must treat noise differently
+ * from mail (TTL expiry, dead-lettering, DLQ). Automated = board fan-out
+ * notices (kind 'message' from 'board') plus every event/probe/undeliverable
+ * envelope. Direct = a real peer message (registered agent or the 'tim'
+ * identity), and anything carrying the TIM-RELAY marker in body or refs, which
+ * always keeps normal retention and dead-letter behavior.
+ */
+export function classifyEnvelope(
+  envelope: Pick<Envelope, 'kind' | 'from' | 'body' | 'refs'>
+): EnvelopeClass {
+  if (
+    envelope.body.includes(TIM_RELAY) ||
+    envelope.refs.some(ref => ref.includes(TIM_RELAY))
+  )
+    return 'direct';
+  if (envelope.kind === 'message')
+    return envelope.from === 'board' ? 'automated' : 'direct';
+  return 'automated';
+}
 
 /** Shallow RPC-serializable record (Durable Object stub types reject deep/unknown). */
 export type Detail = Record<
@@ -63,6 +98,111 @@ export type Delivered = Envelope & {
   ackedAt: number | null;
   deadAt: number | null;
 };
+
+/** Coalescing state for summary DLQ notices: one per (mailbox, fallback) window. */
+export type DlqAccumulator = {
+  windowStart: number;
+  count: number;
+  firstSeq: number;
+  lastSeq: number;
+};
+
+/** Fold one dead message into the coalescing window; a lapsed window restarts. */
+export function nextDlqAccumulator(
+  acc: DlqAccumulator | null,
+  seq: number,
+  now: number,
+  windowMs: number
+): DlqAccumulator {
+  if (!acc || now - acc.windowStart >= windowMs)
+    return { windowStart: now, count: 1, firstSeq: seq, lastSeq: seq };
+  return { ...acc, count: acc.count + 1, lastSeq: seq };
+}
+
+/** The window's summary is due once the coalesce window has fully elapsed. */
+export function isDlqSummaryDue(
+  acc: DlqAccumulator | null,
+  now: number,
+  windowMs: number
+): boolean {
+  return acc !== null && acc.count > 0 && now - acc.windowStart >= windowMs;
+}
+
+/** A fallback at >= dlqFullFraction of the unacked cap is treated as full. */
+export function dlqFallbackFull(unacked: number | null): boolean {
+  return (
+    unacked !== null &&
+    unacked >= Math.ceil(LIMITS.dlqFullFraction * LIMITS.unackedPerMailbox)
+  );
+}
+
+/** Shared, strictly read-only selection for admin peek and bulk-ack. */
+export type MailboxSelector = {
+  afterSeq: number;
+  limit: number;
+  olderThanMs: number | null;
+  newerThanMs: number | null;
+  msgKinds: string[];
+  from: string[];
+  unackedOnly: boolean;
+  excludeBodyContains: string[];
+  excludeRefsContains: string[];
+  excludeFrom: string[];
+};
+
+/** Excludes are case-insensitive substrings over body / refs; excludeFrom is exact. */
+export function matchesExcludes(
+  message: Pick<Delivered, 'body' | 'refs' | 'from'>,
+  selector: Pick<
+    MailboxSelector,
+    'excludeBodyContains' | 'excludeRefsContains' | 'excludeFrom'
+  >
+): boolean {
+  const body = message.body.toLowerCase();
+  const refs = message.refs.join('\n').toLowerCase();
+  return (
+    !selector.excludeBodyContains.some(term =>
+      body.includes(term.toLowerCase())
+    ) &&
+    !selector.excludeRefsContains.some(term =>
+      refs.includes(term.toLowerCase())
+    ) &&
+    !selector.excludeFrom.includes(message.from)
+  );
+}
+
+const PREVIEW_CHARS = 120;
+
+/** Admin peek metadata: never the full body, never a lease claim. */
+export type PeekRow = {
+  seq: number;
+  id: string;
+  from: string;
+  kind: string;
+  correlationId: string;
+  sentAt: string | null;
+  acceptedAt: string;
+  acked: boolean;
+  bodyLength: number;
+  preview: string;
+  refs: string[];
+};
+
+export function toPeekRow(message: Delivered): PeekRow {
+  return {
+    seq: message.seq,
+    id: message.id,
+    from: message.from,
+    kind: message.kind,
+    correlationId: message.correlationId,
+    sentAt: message.sentAt,
+    acceptedAt: new Date(message.acceptedAt).toISOString(),
+    acked: message.ackedAt !== null,
+    bodyLength: message.body.length,
+    preview: message.body.slice(0, PREVIEW_CHARS),
+    refs: message.refs,
+  };
+}
 
 export class HubError extends Error {
   readonly status: number;
@@ -222,6 +362,14 @@ export class MailboxStore {
   constructor(sql: Sql) {
     this.sql = sql;
     for (const statement of SCHEMA) sql.exec(statement);
+    // Migration for mailboxes created before ack reasons existed: CREATE TABLE
+    // IF NOT EXISTS cannot add a column to an existing store. The ALTER throws
+    // "duplicate column" on stores that already have it; both cases are fine.
+    try {
+      sql.exec('ALTER TABLE messages ADD COLUMN ack_reason TEXT');
+    } catch {
+      // column already exists
+    }
   }
 
   getMeta(key: string): string | null {
@@ -409,15 +557,21 @@ export class MailboxStore {
   }
 
   /** Stage 2: the agent handled these. Idempotent; unknown or acked ids are no-ops. */
-  ack(ids: readonly string[], now: number): { acked: number } {
+  ack(
+    ids: readonly string[],
+    now: number,
+    reason: string | null = null
+  ): { acked: number } {
     let acked = 0;
     for (const id of ids) {
       const row = this.sql
         .exec(
-          `UPDATE messages SET acked_at = ?, received_at = COALESCE(received_at, ?),
+          `UPDATE messages SET acked_at = ?, ack_reason = COALESCE(?, ack_reason),
+             received_at = COALESCE(received_at, ?),
              first_delivered_at = COALESCE(first_delivered_at, ?)
            WHERE id = ? AND acked_at IS NULL RETURNING seq`,
           now,
+          reason,
           now,
           now,
           id
@@ -456,20 +610,64 @@ export class MailboxStore {
   }
 
   /**
+   * TTL for automated notices: board fan-outs, DLQ wrappers, events and probes
+   * unhandled past `ttlMs` are auto-acked with reason 'expired' and their body
+   * dropped, exactly like retention. They stop counting toward the unacked cap
+   * and never reach the DLQ. Direct mail (classifyEnvelope) is never touched.
+   */
+  sweepExpired(now: number, ttlMs: number): Delivered[] {
+    const candidates = this.sql
+      .exec(
+        `SELECT * FROM messages WHERE acked_at IS NULL AND accepted_at <= ?
+           AND (kind != 'message' OR from_kind = 'board') ORDER BY seq LIMIT 500`,
+        now - ttlMs
+      )
+      .toArray()
+      .map(toDelivered);
+    const expired = candidates.filter(
+      message => classifyEnvelope(message) === 'automated'
+    );
+    for (const message of expired) {
+      this.sql.exec(
+        `UPDATE messages SET acked_at = ?, ack_reason = 'expired',
+           received_at = COALESCE(received_at, ?),
+           first_delivered_at = COALESCE(first_delivered_at, ?),
+           body = NULL, refs = '[]'
+         WHERE id = ? AND acked_at IS NULL`,
+        now,
+        now,
+        now,
+        message.id
+      );
+    }
+    return expired;
+  }
+
+  /**
    * Flags messages unhandled past `deadAfterMs` as dead, once. Dead is a flag,
    * not a deletion: the original stays deliverable. Probes, events and DLQ
-   * wrappers never die (no wrapper-of-wrapper loops).
+   * wrappers never die (no wrapper-of-wrapper loops), and neither do automated
+   * notices like board fan-outs — their TTL sweep handles them instead.
    */
   sweepDead(now: number, deadAfterMs: number): Delivered[] {
-    return this.sql
+    const candidates = this.sql
       .exec(
-        `UPDATE messages SET dead_at = ? WHERE acked_at IS NULL AND dead_at IS NULL
-           AND kind = 'message' AND accepted_at <= ? RETURNING *`,
-        now,
+        `SELECT * FROM messages WHERE acked_at IS NULL AND dead_at IS NULL
+           AND kind = 'message' AND accepted_at <= ? ORDER BY seq LIMIT 500`,
         now - deadAfterMs
       )
       .toArray()
       .map(toDelivered);
+    const dying = candidates.filter(
+      message => classifyEnvelope(message) === 'direct'
+    );
+    for (const message of dying)
+      this.sql.exec(
+        'UPDATE messages SET dead_at = ? WHERE seq = ?',
+        now,
+        message.seq
+      );
+    return dying.map(message => ({ ...message, deadAt: now }));
   }
 
   /** Drops bodies of acked messages past retention; keeps id + digest for replay. */
@@ -481,6 +679,130 @@ export class MailboxStore {
         now - LIMITS.retentionAfterAckMs
       )
       .toArray().length;
+  }
+
+  private dlqKey(target: string, fallback: string): string {
+    return `dlqSum:${target}:${fallback}`;
+  }
+
+  /** Folds one dead direct message into the (mailbox, fallback) coalescing window. */
+  recordDlqDead(
+    target: string,
+    fallback: string,
+    seq: number,
+    now: number,
+    windowMs: number
+  ): void {
+    const key = this.dlqKey(target, fallback);
+    const raw = this.getMeta(key);
+    const acc = nextDlqAccumulator(
+      raw ? (JSON.parse(raw) as DlqAccumulator) : null,
+      seq,
+      now,
+      windowMs
+    );
+    this.setMeta(key, JSON.stringify(acc));
+  }
+
+  /** The window's summary once the coalesce window has elapsed; null otherwise. */
+  pendingDlqSummary(
+    target: string,
+    fallback: string,
+    now: number,
+    windowMs: number
+  ): DlqAccumulator | null {
+    const raw = this.getMeta(this.dlqKey(target, fallback));
+    if (!raw) return null;
+    const acc = JSON.parse(raw) as DlqAccumulator;
+    return isDlqSummaryDue(acc, now, windowMs) ? acc : null;
+  }
+
+  clearDlqSummary(target: string, fallback: string): void {
+    this.setMeta(this.dlqKey(target, fallback), null);
+  }
+
+  /** Any un-flushed DLQ summary for this mailbox (keeps the sweep armed). */
+  dlqPending(target: string): boolean {
+    return Boolean(
+      this.sql
+        .exec('SELECT k FROM meta WHERE k LIKE ? LIMIT 1', `dlqSum:${target}:%`)
+        .toArray().length
+    );
+  }
+
+  /**
+   * Strictly read-only selection shared by peek and bulk-ack: seq-windowed,
+   * time-windowed, kind/from filtered, with case-insensitive excludes applied
+   * after the page (excludes never touch SQL so the page size stays honest).
+   */
+  private selectMessages(selector: MailboxSelector, now: number): Delivered[] {
+    const where: string[] = ['seq > ?'];
+    const bindings: unknown[] = [selector.afterSeq];
+    if (selector.olderThanMs !== null) {
+      where.push('accepted_at <= ?');
+      bindings.push(now - selector.olderThanMs);
+    }
+    if (selector.newerThanMs !== null) {
+      where.push('accepted_at >= ?');
+      bindings.push(now - selector.newerThanMs);
+    }
+    if (selector.msgKinds.length) {
+      where.push(`kind IN (${selector.msgKinds.map(() => '?').join(', ')})`);
+      bindings.push(...selector.msgKinds);
+    }
+    if (selector.from.length) {
+      where.push(`from_kind IN (${selector.from.map(() => '?').join(', ')})`);
+      bindings.push(...selector.from);
+    }
+    if (selector.unackedOnly) where.push('acked_at IS NULL');
+    return this.sql
+      .exec(
+        `SELECT * FROM messages WHERE ${where.join(' AND ')} ORDER BY seq LIMIT ?`,
+        ...bindings,
+        selector.limit
+      )
+      .toArray()
+      .map(toDelivered)
+      .filter(message => matchesExcludes(message, selector));
+  }
+
+  /**
+   * Admin peek: metadata for one page of messages. Never claims a lease and
+   * never changes state; `nextAfter` is non-null when the page was full.
+   */
+  peek(
+    selector: MailboxSelector,
+    now: number
+  ): { messages: PeekRow[]; nextAfter: number | null } {
+    const limit = Math.min(Math.max(selector.limit, 1), 200);
+    const rows = this.selectMessages({ ...selector, limit }, now);
+    return {
+      messages: rows.map(toPeekRow),
+      nextAfter:
+        rows.length && rows.length >= limit ? rows[rows.length - 1].seq : null,
+    };
+  }
+
+  /**
+   * Admin bulk-ack: exactly the unacked messages the selector matches, capped
+   * at `maxIds` per call, acked with reason 'admin-bulk-ack'. Idempotent:
+   * already-acked rows are never selected again, so re-runs converge.
+   */
+  bulkAck(
+    selector: MailboxSelector,
+    maxIds: number,
+    now: number
+  ): { manifest: PeekRow[]; matched: number; acked: number } {
+    const rows = this.selectMessages(
+      { ...selector, unackedOnly: true, limit: maxIds },
+      now
+    );
+    const { acked } = this.ack(
+      rows.map(message => message.id),
+      now,
+      'admin-bulk-ack'
+    );
+    return { manifest: rows.map(toPeekRow), matched: rows.length, acked };
   }
 
   /** Oldest unhandled peer message (not events/wrappers: alarms must not alarm on themselves). */
