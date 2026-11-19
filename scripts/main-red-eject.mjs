@@ -76,18 +76,18 @@ async function gh(args, priority = 'repair') {
     });
   }
   if (r.deferred === true || r.code === EX_TEMPFAIL) {
-    // Run 44577317270: both buckets shed after failover and the generic throw redded the wake; a shed is transport, not a verdict (JOV-13073).
     console.error(
       `::warning::github-quota-deferred: gh ${args.slice(0, 2).join(' ')} ${r.stderr.trim().slice(0, 200)}; not a verdict. The next ejector wake retries.`
     );
-    const shed = new Error(
-      `gh ${args.slice(0, 3).join(' ')} deferred: ${r.stderr.trim().slice(0, 300)}`
+    throw Object.assign(
+      new Error(`gh deferred: ${r.stderr.trim().slice(0, 300)}`),
+      {
+        name: 'GithubShedDeferError',
+        code: 'github_shed_deferred',
+        deferred: true,
+        exitCode: EX_TEMPFAIL,
+      }
     );
-    shed.name = 'GithubShedDeferError';
-    shed.code = 'github_shed_deferred';
-    shed.deferred = true;
-    shed.exitCode = EX_TEMPFAIL;
-    throw shed;
   }
   if (r.code !== 0)
     throw new Error(
@@ -824,7 +824,7 @@ export async function alertFailure() {
 // ---- cli -------------------------------------------------------------------
 
 if (process.argv[1] === import.meta.filename) {
-  // A shed deferral exits 75 (warned at the throw site); all else stays red.
+  // A shed deferral exits 75; every other failure stays a hard red (JOV-13073).
   const onCliError = error => {
     if (error?.deferred === true)
       process.exitCode = error.exitCode ?? EX_TEMPFAIL;
