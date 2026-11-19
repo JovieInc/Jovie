@@ -415,8 +415,10 @@ test('the trusted snapshot engine is present in every rolling sparse checkout an
     .map(match => match[1])
     .filter(block => block.includes('scripts/run-affected-tests.mjs'));
   assert.equal(blocks.length, 4);
-  for (const block of blocks)
+  for (const block of blocks) {
     assert.match(block, /scripts\/lib\/trusted-test-planner-snapshot\.mjs/);
+    assert.match(block, /scripts\/lib\/ci-source-guard-pool\.mjs/);
+  }
   const file = 'scripts/lib/trusted-test-planner-snapshot.mjs';
   const guard = selectSourceGuards('pull_request', [file]);
   assert.ok(guard.some(candidate => candidate.id === 'script-contracts'));

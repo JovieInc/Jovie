@@ -71,6 +71,7 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -575,6 +576,7 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -865,6 +867,7 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -1010,6 +1013,7 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
