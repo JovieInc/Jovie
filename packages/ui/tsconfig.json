@@ -20,7 +20,10 @@
     "paths": {
       "@jovie/ui": ["."],
       "@jovie/ui/*": ["./*"]
-    }
+    },
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": [

@@ -329,7 +329,7 @@ async function asTim(
   const request = new Request(target, {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   let response: Response;
   try {
