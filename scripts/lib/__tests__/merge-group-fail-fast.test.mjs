@@ -66,7 +66,7 @@ describe('merge-group required lanes cancel only their own run', () => {
     });
     expect(Object.keys(CANCEL.jobs)).toEqual(['cancel']);
     expect(CANCEL.jobs.cancel).toEqual({
-      'runs-on': 'ubuntu-latest',
+      'runs-on': 'ubuntu-24.04',
       'timeout-minutes': 5,
       permissions: { actions: 'write', contents: 'read' },
       steps: [
@@ -75,9 +75,15 @@ describe('merge-group required lanes cancel only their own run', () => {
           uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
           with: {
             ref: '${{ github.event.repository.default_branch }}',
-            'sparse-checkout': 'packages/api-client/cancel-github-run.mjs',
+            'sparse-checkout':
+              'packages/api-client/cancel-github-run.mjs\n.node-version\n',
             'persist-credentials': false,
           },
+        },
+        {
+          name: 'Set up pinned Node',
+          uses: 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1',
+          with: { 'node-version-file': '.node-version' },
         },
         {
           name: 'Cancel the rest of this merge-group run',
