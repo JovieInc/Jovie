@@ -28,9 +28,13 @@ const openMoreMenu: MenuStory['play'] = async function openMoreMenu({
 }) {
   const canvas = within(canvasElement);
   await userEvent.click(canvas.getByRole('button', { name: 'More options' }));
-  await expect(
-    await canvas.findByRole('button', { name: 'Close menu' })
-  ).toHaveAttribute('aria-expanded', 'true');
+  // While the expanded menu is open the background bar is inert +
+  // aria-hidden (useModalFocusBoundary), so the toggle leaves the
+  // accessibility tree under its old name; assert the open dialog itself.
+  await expect(await canvas.findByRole('dialog')).toHaveAttribute(
+    'aria-modal',
+    'true'
+  );
 };
 
 /**

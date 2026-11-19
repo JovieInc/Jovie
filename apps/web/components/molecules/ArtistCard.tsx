@@ -91,14 +91,17 @@ export function ArtistCard({
       <Link
         href={`/${handle}`}
         // The no-photo fallback renders the artist's initials as visible text
-        // inside the link; the accessible name must include them or speech
-        // input pointing at the rendered glyphs cannot match (axe
-        // label-content-name-mismatch). The image path's visible text is the
+        // inside the link, and axe's label-content-name-mismatch requires the
+        // link's rendered text to appear CONTIGUOUSLY in the accessible name.
+        // The initials render before the name, so the fallback name leads
+        // with them ("AG Ariana Grande's profile"); the whitespace between
+        // the avatar block and the name keeps the two text runs from fusing
+        // into one unmatchable token. The image path's visible text is the
         // name itself, which the base label already carries.
         aria-label={
           src
             ? `View ${name}'s profile`
-            : `View ${name}'s profile — ${getInitials(name)}`
+            : `View ${getInitials(name)} ${name}'s profile`
         }
         title={name}
         className='group block cursor-pointer'
@@ -117,7 +120,8 @@ export function ArtistCard({
               verified={isVerified}
             />
           </motion.div>
-          {showName && (
+          {/* Whitespace text node: without it the rendered initials and the
+           * name fuse into one token for axe's visible-text walk. */} {showName && (
             <motion.p
               className={`mt-2 font-medium text-primary-token ${
                 size === 'sm' ? 'text-xs' : 'text-sm'
