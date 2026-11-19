@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "62b91cddba6fb6b74cb0e43f37691238fc0c88eb0e13cb30d092ca2d7369ff54"
+    "bodySha256": "f0601db128861684e7e5defaaaa541e9d7e0a34d9ea119ccdbeb7cc025bffeae"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -218,7 +218,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
+    "bodySha256": "85ca0524f0c139b54e2e5b7e9d6992d287ecab2ac27b68c9352d90b0a2f1f68a"
   },
   {
     "file": ".claude/rules/testing.md",
