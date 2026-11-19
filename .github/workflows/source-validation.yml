@@ -189,6 +189,43 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      # JOV-13063: every PR references an existing Linear issue (Linear is the
+      # system of record; native GitHub<->Linear sync is disabled). Runs the
+      # evaluator, its Linear client and the policy from the trusted base so a
+      # PR cannot weaken its own check. Mode comes from
+      # .github/linear-reference-policy.json: observe (warning + step summary,
+      # exit 0) until the autonomous promotion bar is met, then enforce. A
+      # Linear outage or a fork PR (no secret) is "unverified" and never
+      # blocks; if the evaluator itself errors, observe mode reports a warning
+      # and enforce mode fails. The merge writer re-verifies after merge.
+      - name: Require a Linear issue reference from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          LINEAR_API_KEY: ${{ github.event.pull_request.head.repo.fork == false && secrets.LINEAR_API_KEY || '' }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          if ! git cat-file -e "$trusted_ref:scripts/lib/linear-reference-requirement.mjs" 2>/dev/null; then
+            echo "Linear reference check not on base yet (bootstrap PR); skipping."
+            exit 0
+          fi
+          guard_root="$(mktemp -d "$RUNNER_TEMP/linear-reference.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/lib/linear-reference-requirement.mjs packages/api-client .github/linear-reference-policy.json | tar -x -C "$guard_root"
+          policy="$guard_root/.github/linear-reference-policy.json"
+          status=0
+          LINEAR_REFERENCE_POLICY="$policy" \
+            node "$guard_root/scripts/lib/linear-reference-requirement.mjs" || status=$?
+          if [ "$status" -ne 0 ]; then
+            mode="$(node -e 'const p=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(p.mode==="enforce"?"enforce":"observe")' "$policy")"
+            if [ "$mode" = "enforce" ]; then
+              exit "$status"
+            fi
+            echo "::warning title=Linear reference (observe)::evaluator exited $status; observe mode does not block."
+          fi
       - name: Check agent-context size after merge onto base
         shell: bash
         env:
