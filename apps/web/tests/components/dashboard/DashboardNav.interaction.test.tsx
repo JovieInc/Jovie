@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { useSidebar } from '@/components/shell/SidebarContext';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockOpenPreviewPanel,
@@ -21,6 +22,15 @@ const { prefetchForRouteMock } = vi.hoisted(() => ({
 vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
+
+function RouteRefresh() {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <button type='button' onClick={() => setOpenMobile(true)}>
+      Refresh route
+    </button>
+  );
+}
 
 const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
 
@@ -154,7 +164,8 @@ describe('DashboardNav interactions', () => {
     ).not.toHaveAttribute('aria-current');
   });
 
-  it('renders recent chats as App Router links', () => {
+  it('hides recent chats until history is opened', async () => {
+    const user = userEvent.setup();
     mockUseChatConversationsQuery.mockReturnValue({
       data: [
         {
@@ -170,10 +181,49 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
+    const history = screen.getByRole('button', { name: 'Chat History' });
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Pitch tasks' })).toBeNull();
+    await user.click(history);
+    expect(history).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
       '/app/chat/thread-newer'
+    );
+    screen.getByRole('link', { name: 'Pitch tasks' }).focus();
+    await user.keyboard('{Escape}');
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    expect(history).toHaveFocus();
+    expect(screen.queryByRole('link', { name: 'Pitch tasks' })).toBeNull();
+  });
+
+  it('keeps history available on Work and updates the selected chat on route changes', async () => {
+    const user = userEvent.setup();
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'thread-1',
+          title: 'Saved chat',
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+      ],
+    });
+    renderDashboardNav({ renderFn: render, children: <RouteRefresh /> });
+    const history = screen.getByRole('button', { name: 'Chat History' });
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    await user.click(history);
+    expect(
+      screen.getByRole('link', { name: 'Saved chat' })
+    ).not.toHaveAttribute('aria-current');
+    mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-1`);
+    await user.click(screen.getByRole('button', { name: 'Refresh route' }));
+    expect(history).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: 'Saved chat' })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
   });
 
@@ -186,6 +236,7 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(document.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByText('Loading chats')).not.toBeInTheDocument();
     loading.unmount();
