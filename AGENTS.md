@@ -73,7 +73,7 @@ Domain canon: [index](canon/README.md). API/cron/webhook:
 
 Use repo-root `pnpm` / `pnpm turbo`; `.nvmrc` and `package.json` pins are
 authoritative. Secret-bound commands use Doppler. Never bypass hooks, weaken
-gates, or use `--no-verify`.
+gates, or use `--no-verify`. Installs: offline-first (environment.md).
 
 Select skills by intent; load their entry and references. Edit `.tmpl` sources
 and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
