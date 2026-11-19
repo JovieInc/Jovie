@@ -187,6 +187,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
+          # JOV-13077: reuse the existing repo secret; no new secret. LANES_RELAY_LINEAR
+          # scopes this key to the hosted relay so the Gem lane host does not fall back
+          # to a personal key (Tim 2026-10-20).
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LANES_RELAY_LINEAR: "1"
         run: python3 scripts/lanes/pr_events.py "$MODE"
 
       # 2026-10-29: this relay is the one topology-approved remediation dispatcher, but nothing

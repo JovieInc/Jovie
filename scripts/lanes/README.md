@@ -876,7 +876,7 @@ single source of truth): one issue per fingerprint, labeled `remediation`, `agen
 `ws:ci` / `ws:release-deploy` / `ws:reliability`, created through the deterministic-UUID
 fence in `pr_events.ensure_linear_intake`. A recurrence with new evidence updates the same
 issue with one occurrence comment. No GitHub issue is created; when a context has no Linear
-client (the hosted relay before the workflow half exports `LANES_LINEAR_APP_ENV`) the intake
+client (hosted relay without `LANES_RELAY_LINEAR=1` + `LINEAR_API_KEY`) the intake
 defers visibly and the next derivation re-files it — never a GitHub fallback. Legacy GitHub
 intake issues (including ones `main-red-remediate.mjs` still files) convert once via
 `convert_intake` after the 30-minute claim window and then close. `ws:ci` is the first

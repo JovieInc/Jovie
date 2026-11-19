@@ -6,15 +6,20 @@ module instead of raising one). One Linear issue per fingerprint — ensure_line
 fences the create with a deterministic UUID — and a recurrence with new evidence updates
 the same issue with one occurrence comment. No GitHub issue is ever created here: without
 a Linear client the intake defers visibly and never falls back to `gh issue create`.
-Legacy GitHub intake issues still convert once (pr_events.convert_intake).
+Legacy GitHub intake issues still convert once (pr_events.convert_intake /
+`python3 scripts/lanes/intake_linear.py convert-legacy-intake`).
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import sys
+import time
 import uuid
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -25,17 +30,63 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 _UNSET = object()  # upsert_intake(linear=...) default: construct the client from the environment
 
 
+LINEAR_API_URL = "https://api.linear.app/graphql"
+RELAY_LINEAR_FLAG = "LANES_RELAY_LINEAR"
+
+
+class ActionsLinear:
+    """Minimal GraphQL client for the hosted relay (JOV-13077).
+
+    Uses the existing Actions secret LINEAR_API_KEY. The key is never printed.
+    This class is not used on the Gem lane host (see relay_linear_client).
+    """
+
+    def __init__(self, api_key: str, urlopen=urllib.request.urlopen, timeout: float = 30):
+        key = (api_key or "").strip()
+        if not key:
+            raise ValueError("LINEAR_API_KEY missing")
+        self._authorization = key if key.lower().startswith("bearer ") else f"Bearer {key}"
+        self._urlopen = urlopen
+        self._timeout = timeout
+
+    def gql(self, query: str, variables: dict) -> dict:
+        body = json.dumps({"query": query, "variables": variables}).encode()
+        request = urllib.request.Request(
+            LINEAR_API_URL, data=body, method="POST",
+            headers={"Content-Type": "application/json", "Authorization": self._authorization})
+        try:
+            with self._urlopen(request, timeout=self._timeout) as response:
+                payload = json.loads(response.read().decode() or "{}")
+        except urllib.error.HTTPError as error:
+            raise RuntimeError(f"linear http {error.code}") from None
+        if payload.get("errors"):
+            raise RuntimeError(payload["errors"][0])
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise RuntimeError("linear response missing data")
+        return data
+
+
 def relay_linear_client():
     """The lane Linear client from this process's environment, or None when this context
-    cannot file Linear (JOV-13077). The lane host keeps the app credential at the default
-    path; the hosted relay gains one only when the workflow half exports LANES_LINEAR_APP_ENV.
+    cannot file Linear (JOV-13077). The lane host keeps the Jovie Lanes app credential
+    (no personal-key fallback, Tim 2026-10-20). The hosted relay files with the existing
+    Actions secret LINEAR_API_KEY only when the job exports LANES_RELAY_LINEAR=1.
     There is no GitHub-issue fallback: an unavailable client defers the intake visibly and
     the next derivation of the same fingerprint re-files it."""
     try:
         from lane_runner import Linear  # function-level: lane_runner imports this module
         return Linear()
     except Exception:  # noqa: BLE001 - no credential, no state dir or no module: defer
-        return None
+        pass
+    if os.environ.get(RELAY_LINEAR_FLAG) == "1":
+        key = (os.environ.get("LINEAR_API_KEY") or "").strip()
+        if key:
+            try:
+                return ActionsLinear(key)
+            except Exception:  # noqa: BLE001
+                return None
+    return None
 
 
 def upsert_intake(event: dict, sh=None, now: float | None = None, linear=_UNSET) -> str | None:
@@ -196,3 +247,55 @@ def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -
             raise ValueError("intake-inventory-incomplete")
         cursors.add(after)
     raise ValueError("intake-inventory-incomplete")
+
+
+def operator_linear_client():
+    """Linear client for the one-shot convert-legacy-intake command.
+
+    Prefers the Jovie Lanes app credential (lane host). Otherwise uses LINEAR_API_KEY
+    when the operator exported it. This is not a silent lanes fallback.
+    """
+    try:
+        from lane_runner import Linear
+        return Linear()
+    except Exception:  # noqa: BLE001
+        pass
+    key = (os.environ.get("LINEAR_API_KEY") or "").strip()
+    if key:
+        return ActionsLinear(key)
+    return None
+
+
+def convert_legacy_intake_main(now: float | None = None, sh=None, linear_factory=None) -> int:
+    """Convert due open symphony-remediation GitHub issues once, then close them."""
+    from pr_events import convert_intake, run as default_run
+    factory = linear_factory or operator_linear_client
+    try:
+        client = factory()
+    except Exception as error:  # noqa: BLE001
+        print(f"convert-legacy-intake: no Linear client ({type(error).__name__}: {error})", file=sys.stderr)
+        return 2
+    if client is None:
+        print("convert-legacy-intake: no Linear client (need Jovie Lanes app "
+              "credentials or LINEAR_API_KEY)", file=sys.stderr)
+        return 2
+    linked = convert_intake(None, lambda: client, default_run if sh is None else sh,
+                            time.time() if now is None else now)
+    if not linked:
+        print("convert-legacy-intake: no due symphony-remediation GitHub issues converted "
+              "(none open, still in the 30-minute claim window, or already linked)")
+        return 0
+    print("convert-legacy-intake: converted and closed " + ", ".join(f"#{n}" for n in linked))
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "convert-legacy-intake":
+        return convert_legacy_intake_main()
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
