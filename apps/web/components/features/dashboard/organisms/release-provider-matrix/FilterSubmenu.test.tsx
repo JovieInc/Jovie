@@ -28,7 +28,7 @@ vi.mock('@jovie/ui', async importOriginal => {
     }: {
       readonly children?: ReactNode;
       readonly role?: string;
-      readonly 'aria-orientation'?: string;
+      readonly 'aria-orientation'?: React.AriaAttributes['aria-orientation'];
     }) => (
       <div
         data-testid='dropdown-sub-content'
