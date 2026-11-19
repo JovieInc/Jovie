@@ -2,6 +2,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { replaySessionRead } from '@/lib/auth/session-read-replay';
 import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import {
   applyRlsSessionUser,
@@ -13,7 +14,6 @@ import {
 } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
-import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -58,13 +58,9 @@ export function validateClerkUserId(userId: string): void {
 }
 
 /**
- * Sets up the database session for the authenticated user
- * This enables RLS policies to work properly with the app user id.
- *
- * `getCachedAuth().userId` is the app `users.id` UUID post-cutover
- * (Clerk → Better Auth identity flip). RLS `set_config` is keyed on
- * the same value; legacy Clerk-era RLS policies that compared against
- * `clerk_user_id` are updated in lockstep with this commit.
+ * Resolves the app user id for session/RLS setup (`getCachedAuth()` returns
+ * the app `users.id` UUID post-cutover; Clerk-era RLS policies that compared
+ * against `clerk_user_id` are updated in lockstep).
  */
 async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   if (clerkUserId) {
@@ -115,12 +111,9 @@ async function applySessionUserId(userId: string): Promise<void> {
 }
 
 /**
- * Sets up the database session for the authenticated user
- * This enables RLS policies to work properly with Clerk user ID
- *
- * Uses session-scoped `set_config` calls and retry logic.
- * Avoid introducing new transaction usage in app code; keep legacy
- * transaction wrappers isolated in `lib/db/legacy-transaction.ts`.
+ * Sets up the database session for the authenticated user (enables RLS
+ * policies). Uses session-scoped `set_config` calls and retry logic; keep
+ * legacy transaction wrappers isolated in `lib/db/legacy-transaction.ts`.
  */
 export async function setupDbSession(clerkUserId?: string) {
   let userId: string;
@@ -279,30 +272,9 @@ export interface SessionContext {
 }
 
 /**
- * Bounded read replay for the session-lookup selects (JOV-13156, Sentry
- * JOVIE-WEB-10T 7857366572): getDbUser, getProfileByUserId and
- * getSessionContext are single indexed SELECTs on `users` /
- * `creator_profiles` — replaying once after a transient Neon transport kill
- * is unambiguous (JOV-12188/JOV-8837 read-recovery doctrine, same policy as
- * APP_USER_READ_RETRY in lib/auth/app-user.ts). Admission is
- * `isRetryableError`'s transport class, never statement or
- * idle-in-transaction timeouts (JOV-5754); non-transport errors still
- * propagate after one attempt. Reads only — no write path in this module is
- * replayed.
- */
-const SESSION_READ_RETRY = {
-  operation: 'read',
-  maxAttempts: 2,
-  retryBudgetMs: QUERY_TIMEOUTS.api,
-} as const;
-
-/**
- * Get the current user's database record by app user id.
- * This is the single source of truth for user lookups.
- *
+ * Get the current user's database record by app user id (single source of
+ * truth for user lookups).
  * @param clerkUserId - App `users.id` UUID (uses auth() if not provided).
- *   Parameter name preserved for churn reduction; was a Clerk user id
- *   pre-cutover.
  * @returns User record or null if not found
  */
 export async function getDbUser(
@@ -310,7 +282,7 @@ export async function getDbUser(
 ): Promise<DbUserContext | null> {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  const [user] = await withRetry(
+  const [user] = await replaySessionRead(
     () =>
       db
         .select({
@@ -324,24 +296,22 @@ export async function getDbUser(
         .from(users)
         .where(eq(users.id, userId))
         .limit(1),
-    'session_getDbUser',
-    SESSION_READ_RETRY
+    'session_getDbUser'
   );
 
   return user ?? null;
 }
 
 /**
- * Get the current user's claimed profile.
- * Returns the profile associated with the user's database record.
- *
+ * Get the current user's claimed profile (the profile associated with the
+ * user's database record).
  * @param dbUserId - Database user ID
  * @returns Profile record or null if not found
  */
 export async function getProfileByDbUserId(
   dbUserId: string
 ): Promise<ProfileContext | null> {
-  const [row] = await withRetry(
+  const [row] = await replaySessionRead(
     () =>
       db
         .select({
@@ -363,8 +333,7 @@ export async function getProfileByDbUserId(
         )
         .where(eq(users.id, dbUserId))
         .limit(1),
-    'session_getProfileByDbUserId',
-    SESSION_READ_RETRY
+    'session_getProfileByDbUserId'
   );
 
   if (!row) return null;
@@ -376,21 +345,9 @@ export async function getProfileByDbUserId(
 }
 
 /**
- * Get the full session context: clerkUserId, user, and profile.
- * This is the recommended way to get user/profile data in server actions and API routes.
- *
- * Replaces the common pattern:
- * ```typescript
- * const { userId } = await getCachedAuth();
- * const [user] = await db.select().from(users).where(eq(users.id, userId));
- * const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
- * ```
- *
- * With:
- * ```typescript
- * const { user, profile } = await getSessionContext();
- * ```
- *
+ * Get the full session context: clerkUserId, user, and profile — the
+ * recommended way to get user/profile data in server actions and API routes
+ * (one JOIN query instead of two sequential user+profile lookups).
  * @param options.clerkUserId - Optional explicit Clerk user ID
  * @param options.requireUser - If true, throws if user not found (default: true)
  * @param options.requireProfile - If true, throws if profile not found (default: false)
@@ -407,7 +364,7 @@ export async function getSessionContext(options?: {
 
   // Performance optimization: Single JOIN query instead of two sequential queries
   // This reduces database round trips from 2 to 1 (50% reduction)
-  const [result] = await withRetry(
+  const [result] = await replaySessionRead(
     () =>
       db
         .select({
@@ -435,8 +392,7 @@ export async function getSessionContext(options?: {
         )
         .where(eq(users.id, clerkUserId))
         .limit(1),
-    'session_getSessionContext',
-    SESSION_READ_RETRY
+    'session_getSessionContext'
   );
 
   // User not found
