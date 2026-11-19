@@ -1305,7 +1305,9 @@ def update_intake_recurrence(linear, issue_id: str, event: dict) -> None:
             return
         linear.gql('mutation($i:String!,$b:String!){commentCreate(input:{issueId:$i,body:$b}){success}}',
                    {"i": issue_id, "b": remediation.intake_recurrence_body(event)})
-    except Exception:  # noqa: BLE001 - the issue exists; the next occurrence re-attempts the comment
+    except Exception as error:  # noqa: BLE001 - the issue exists; the next occurrence re-attempts
+        print(f"intake recurrence deferred: issue {issue_id} could not record occurrence "
+              f"({type(error).__name__}: {error})", file=sys.stderr)
         return
 
 
