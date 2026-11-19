@@ -79,7 +79,9 @@ describe('budget-reserve shed defers instead of redding (JOV-13073)', () => {
   });
 
   it('a non-deferred gh failure stays a hard error (no silent pass)', async () => {
-    const { runGh } = await import('../../../packages/api-client/gh.ts');
+    const runGh = /** @type {import('vitest').Mock} */ (
+      await import('../../../packages/api-client/gh.ts')
+    ).runGh;
     runGh.mockImplementationOnce(async () => ({
       code: 1,
       stdout: '',
