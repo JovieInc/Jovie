@@ -56,7 +56,10 @@ export const selected = (
       'lighthouse-baseline': { outputs: { built: String(baseline) } },
       'background-build-start': { outputs: { started } },
       check_changes: { outputs: { run_full_ci: String(relevant) } },
-      'download-build': { outcome: download },
+      'download-build': {
+        outcome: download,
+        outputs: { found: String(download === 'success') },
+      },
       'neon-branch': { outputs: { branch_id: branch } },
     },
     needs: {
