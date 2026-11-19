@@ -36,18 +36,16 @@ export const MERGE_GROUP_REQUIRED_LANES = Object.freeze({
 });
 
 const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-const requiredJobNames = Object.values(MERGE_GROUP_REQUIRED_LANES).map(
-  name =>
-    new RegExp(
-      '^' +
-        name
-          .split(/\$\{\{[^}]+\}\}/u)
-          .map(escapeRegExp)
-          .join('.+') +
-        '$',
-      'u'
-    )
-);
+// Exact names, matrix templates, and an optional " (shard)" suffix so a later
+// PR can shard the same job id (JOV-13072 storybook legs) without a miss.
+const requiredJobNames = Object.values(MERGE_GROUP_REQUIRED_LANES).map(name => {
+  const body = name
+    .split(/\$\{\{[^}]+\}\}/u)
+    .map(escapeRegExp)
+    .join('.+');
+  const suffix = name.includes('${{ matrix.shard }}') ? '' : '(?: \\(.+\\))?';
+  return new RegExp('^' + body + suffix + '$', 'u');
+});
 
 export function failedRequiredMergeGroupJobs(jobs = []) {
   return jobs.filter(
@@ -67,4 +65,60 @@ export function shouldHoldMergeGroupRun(run, jobs = []) {
       run.workflow_id === CI_WORKFLOW_ID &&
       failedRequiredMergeGroupJobs(jobs).length > 0)
   );
+}
+
+function failedStepsFromJobs(jobs) {
+  return jobs.flatMap(job =>
+    (job.steps ?? [])
+      .filter(step => step?.conclusion === 'failure')
+      .map(step => step.name)
+  );
+}
+
+export function failedStepsForHold(run, jobs = []) {
+  const evidenceJobs =
+    run?.conclusion === 'cancelled' ? failedRequiredMergeGroupJobs(jobs) : jobs;
+  return failedStepsFromJobs(evidenceJobs);
+}
+
+export function holdJobsUrl(repository, run) {
+  return run.conclusion === 'cancelled'
+    ? `repos/${repository}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`
+    : `repos/${repository}/actions/runs/${run.id}/jobs?filter=latest`;
+}
+
+export function holdClassification(conclusion) {
+  return conclusion === 'cancelled' ? 'failure' : conclusion;
+}
+
+export function cancelledWithoutRequiredLaneFailure(run) {
+  return {
+    skipped: true,
+    reason: 'cancelled-without-required-lane-failure',
+    workflowRunId: run.id,
+  };
+}
+
+export function isMergeGroupHoldConclusion(conclusion) {
+  return (
+    MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion) ||
+    conclusion === 'cancelled'
+  );
+}
+
+export function writeJson(value) {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+export function admitHoldFailure(run, jobs = [], failedSteps) {
+  if (!shouldHoldMergeGroupRun(run, jobs)) {
+    return { skip: cancelledWithoutRequiredLaneFailure(run) };
+  }
+  return {
+    failedSteps:
+      run?.conclusion === 'cancelled' || failedSteps === undefined
+        ? failedStepsForHold(run, jobs)
+        : failedSteps,
+    conclusion: holdClassification(run.conclusion),
+  };
 }

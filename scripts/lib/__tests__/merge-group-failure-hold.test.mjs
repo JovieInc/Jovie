@@ -48,16 +48,10 @@ import {
   retryReleasedDescription,
   retrySpentDescription,
   revisionFailureDisposition,
-  shouldHoldMergeGroupRun,
   sourceHeadForRun,
   supersededByLiveEntry,
   WORKFLOW_LOAD_STEP,
 } from '../../merge-group-failure-hold.mjs';
-import {
-  failedRequiredMergeGroupJobs,
-  MERGE_GROUP_REQUIRED_LANES,
-} from '../merge-group-required-lanes.mjs';
-import { MERGE_GROUP_FAILURE_CONCLUSIONS } from '../merge-queue-guard.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
 
@@ -94,8 +88,6 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
       return result;
     };
     try {
-      // Seed all real imports, then let Git enforce the workflow's actual
-      // non-cone manifest. Omitting the client or providers.json must fail.
       for (const path of new Set([...paths, 'packages/api-client'])) {
         mkdirSync(dirname(join(dir, path)), { recursive: true });
         cpSync(join(root, path), join(dir, path), { recursive: true });
@@ -145,22 +137,6 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         paths.join('\n')
       );
       execute(process.execPath, importArgs);
-      if (paths.includes('scripts/merge-group-failure-evidence.mjs')) {
-        const eventPath = join(dir, 'event.json');
-        writeFileSync(
-          eventPath,
-          JSON.stringify({
-            repository: { full_name: REPOSITORY },
-            workflow_run: run,
-          })
-        );
-        const checked = execute(process.execPath, [
-          'scripts/merge-group-failure-evidence.mjs',
-          '--event-path',
-          eventPath,
-        ]);
-        expect(JSON.parse(checked.stdout)).toMatchObject({ shouldHold: true });
-      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -746,199 +722,6 @@ const failureInput = {
   statuses: [],
 };
 
-describe('cancel-after-required-lane-failure (JOV-13106)', () => {
-  const redJob = (name = 'ci-fast', step = 'Run structural ci-fast lane') => ({
-    name,
-    status: 'completed',
-    conclusion: 'failure',
-    steps: [{ name: step, conclusion: 'failure' }],
-  });
-  const cancelled = { ...run, conclusion: 'cancelled' };
-
-  it('keeps plain cancellation out of the generic failure/retry conclusion set', () => {
-    expect([...MERGE_GROUP_FAILURE_CONCLUSIONS]).toEqual([
-      'failure',
-      'timed_out',
-      'action_required',
-      'startup_failure',
-      'stale',
-    ]);
-    expect(() => classify('cancelled')).toThrow(
-      /unsupported terminal conclusion/
-    );
-    for (const conclusion of MERGE_GROUP_FAILURE_CONCLUSIONS) {
-      expect(shouldHoldMergeGroupRun({ ...run, conclusion })).toBe(true);
-    }
-    expect(
-      shouldHoldMergeGroupRun({ ...run, conclusion: 'success' }, [redJob()])
-    ).toBe(false);
-  });
-
-  it('recognizes every pinned required lane, including matrix shard REST names', () => {
-    for (const template of Object.values(MERGE_GROUP_REQUIRED_LANES)) {
-      const name = template.replace('${{ matrix.shard }}', '1/14');
-      expect(shouldHoldMergeGroupRun(cancelled, [redJob(name)]), name).toBe(
-        true
-      );
-      expect(
-        shouldHoldMergeGroupRun(cancelled, [redJob(`${name} optional`)])
-      ).toBe(false);
-    }
-    expect(
-      failedRequiredMergeGroupJobs([redJob('Unit Tests (packages/ui)')])
-    ).toHaveLength(1);
-    expect(
-      shouldHoldMergeGroupRun(
-        { ...cancelled, workflow_id: PR_SIZE_GUARD_WORKFLOW_ID },
-        [redJob()]
-      )
-    ).toBe(false);
-  });
-
-  it.each(
-    [
-      [],
-      [redJob('PR Ready')],
-      [redJob('Merge Group Fail Fast (ci-fast)')],
-      [{ ...redJob(), status: 'in_progress' }],
-      [{ ...redJob(), conclusion: 'cancelled' }],
-      [{ ...redJob(), conclusion: 'success' }],
-      [{ ...redJob(), conclusion: 'skipped' }],
-    ].map(jobs => ({ jobs }))
-  )(
-    'skips supersession and unrelated failures without reads or writes: $jobs',
-    async ({ jobs }) => {
-      expect(shouldHoldMergeGroupRun(cancelled, jobs)).toBe(false);
-      const effects = {
-        writeStatus: vi.fn(),
-        readPullRequest: vi.fn(),
-        dequeuePullRequest: vi.fn(),
-        disableAutoMerge: vi.fn(),
-      };
-      const result = await applyMergeGroupFailure(
-        { ...failureInput, run: cancelled, jobs, timeline: [] },
-        effects
-      );
-      expect(result).toMatchObject({
-        skipped: true,
-        reason: 'cancelled-without-required-lane-failure',
-      });
-      for (const effect of Object.values(effects))
-        expect(effect).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    ['ci-fast', 'Run structural ci-fast lane', 'deterministic-source'],
-    ['Unit Tests (3/14)', 'Run unit tests', 'retryable-product'],
-    ['Mac Build + Test (combined)', 'Set up job', 'transient-infrastructure'],
-  ])(
-    'classifies cancelled %s using only its completed required failure',
-    async (name, step, classification) => {
-      const effects = {
-        writeStatus: vi.fn(),
-        dequeuePullRequest: vi.fn(),
-        disableAutoMerge: vi.fn(),
-        readPullRequest: vi.fn(async () => ({
-          id: 'PR_42',
-          state: 'OPEN',
-          headRefOid: SOURCE,
-          isInMergeQueue: false,
-          mergeQueueEntry: null,
-          autoMergeRequest: null,
-        })),
-      };
-      const result = await applyMergeGroupFailure(
-        {
-          ...failureInput,
-          run: cancelled,
-          // A supplied unrelated deterministic step cannot taint a cancelled job.
-          failedSteps: ['Run structural ci-fast lane'],
-          jobs: [redJob(name, step), redJob('Optional audit')],
-        },
-        effects
-      );
-      expect(result).toMatchObject({ classification, statusWritten: true });
-      expect(effects.writeStatus).toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    ['failure', [], true],
-    ['cancelled', [redJob('Unit Tests (packages/ui)')], true],
-    ['cancelled', [redJob('Optional audit')], false],
-    ['cancelled', [], false],
-  ])(
-    'pre-token CLI inspects %s with paginated, attempt-bound read-only requests',
-    (conclusion, jobs, shouldHold) => {
-      const dir = mkdtempSync(join(tmpdir(), 'failure-hold-precheck-'));
-      try {
-        const input = join(dir, 'fixture.json');
-        writeFileSync(
-          input,
-          JSON.stringify({ run: { ...run, conclusion }, jobs })
-        );
-        const eventPath = join(dir, 'event.json');
-        writeFileSync(
-          eventPath,
-          JSON.stringify({
-            repository: { full_name: REPOSITORY },
-            workflow_run: { ...run, conclusion },
-          })
-        );
-        writeFileSync(
-          join(dir, 'gh'),
-          `#!${process.execPath}
-const fs = require('node:fs');
-const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
-const args = process.argv.slice(2);
-const endpoint = args[2];
-if (args[0] !== 'api' || args[1] !== '--include' || args.length !== 3) throw new Error('precheck attempted a write');
-if (endpoint === 'repos/JovieInc/Jovie/actions/runs/123') {
-  process.stdout.write(JSON.stringify(fixture.run));
-} else if (endpoint === 'repos/JovieInc/Jovie/actions/runs/123/attempts/1/jobs?per_page=100&page=1') {
-  process.stdout.write(JSON.stringify({ jobs: Array.from({length:100}, () => ({ name: 'Optional audit', status: 'completed', conclusion: 'success' })) }));
-} else if (endpoint === 'repos/JovieInc/Jovie/actions/runs/123/attempts/1/jobs?per_page=100&page=2') {
-  process.stdout.write(JSON.stringify({ jobs: fixture.jobs }));
-} else { throw new Error('unexpected precheck request: ' + endpoint); }
-`,
-          { mode: 0o755 }
-        );
-        const outputPath = join(dir, 'output');
-        const execution = spawnSync(
-          process.execPath,
-          [
-            resolve(
-              import.meta.dirname,
-              '../../merge-group-failure-evidence.mjs'
-            ),
-            '--event-path',
-            eventPath,
-          ],
-          {
-            encoding: 'utf8',
-            env: {
-              ...process.env,
-              PATH: `${dir}:${process.env.PATH}`,
-              HOLD_TEST_FIXTURE: input,
-              GITHUB_OUTPUT: outputPath,
-              JOVIE_API_STATE_DIR: dir,
-            },
-            timeout: 60_000,
-          }
-        );
-        expect(execution.status, execution.stderr).toBe(0);
-        expect(JSON.parse(execution.stdout)).toMatchObject({ shouldHold });
-        expect(readFileSync(outputPath, 'utf8')).toBe(
-          `should_hold=${shouldHold}\n`
-        );
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    }
-  );
-});
-
 it('passes the actual failure-hold CLI receipt to enrollment without a replicated status', () => {
   const dir = mkdtempSync(join(tmpdir(), 'failure-hold-cli-'));
   try {
@@ -1460,23 +1243,17 @@ process.stdout.write(JSON.stringify(result));
   }
 );
 
-it.each(['failure', 'cancelled'])(
-  'completes the %s hold CLI when gh denies dequeuePullRequest',
-  conclusion => {
-    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-deny-'));
-    try {
-      const fixturePath = join(dir, 'fixture.json');
-      writeFileSync(
-        fixturePath,
-        JSON.stringify({
-          run: { ...run, conclusion },
-          timeline,
-          source: SOURCE,
-        })
-      );
-      writeFileSync(
-        join(dir, 'gh'),
-        `#!${process.execPath}
+it('completes the hold CLI when gh denies dequeuePullRequest', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-deny-'));
+  try {
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({ run, timeline, source: SOURCE })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
 const args = process.argv.slice(2);
 const fs = require('node:fs');
 const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
@@ -1499,7 +1276,7 @@ if (args[1] === 'graphql') {
   process.stdout.write('{}');
 } else if (args[1].includes('/jobs?')) {
   process.stdout.write(JSON.stringify({ jobs: [
-    { name: 'ci-fast', status: 'completed', conclusion: 'failure', steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] }
+    { steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] }
   ] }));
 } else if (args[1].includes('/statuses')) {
   process.stdout.write('[]');
@@ -1507,53 +1284,52 @@ if (args[1] === 'graphql') {
   process.stdout.write(JSON.stringify(fixture.run));
 }
 `,
-        { mode: 0o755 }
-      );
-      const eventPath = join(dir, 'event.json');
-      writeFileSync(
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const outputPath = join(dir, 'output');
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
         eventPath,
-        JSON.stringify({
-          repository: { full_name: REPOSITORY },
-          workflow_run: { id: run.id },
-        })
-      );
-      const outputPath = join(dir, 'output');
-      const execution = spawnSync(
-        process.execPath,
-        [
-          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
-          '--event-path',
-          eventPath,
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${dir}:${process.env.PATH}`,
-            HOLD_TEST_FIXTURE: fixturePath,
-            GITHUB_OUTPUT: outputPath,
-          },
-        }
-      );
-      expect(execution.status, execution.stderr).toBe(0);
-      expect(execution.stderr).toContain(
-        'Resource not accessible by integration'
-      );
-      const receipt = JSON.parse(execution.stdout);
-      expect(receipt).toMatchObject({
-        statusWritten: true,
-        dequeued: false,
-        dequeueOutcome: 'inaccessible',
-        autoMergeDisabled: false,
-      });
-      expect(readFileSync(outputPath, 'utf8')).toBe(
-        `failure_receipt=${JSON.stringify(receipt)}\n`
-      );
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: outputPath,
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    expect(execution.stderr).toContain(
+      'Resource not accessible by integration'
+    );
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt).toMatchObject({
+      statusWritten: true,
+      dequeued: false,
+      dequeueOutcome: 'inaccessible',
+      autoMergeDisabled: false,
+    });
+    expect(readFileSync(outputPath, 'utf8')).toBe(
+      `failure_receipt=${JSON.stringify(receipt)}\n`
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-);
+});
 
 const status = ({
   classification = 'deterministic-source',

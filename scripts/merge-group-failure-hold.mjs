@@ -10,23 +10,14 @@ import {
   attributeAgainstPeerRuns,
   selectCiFastEvidenceJobs,
 } from './lib/merge-group-ahead-attribution.mjs';
-import {
-  CI_WORKFLOW_ID,
-  failedRequiredMergeGroupJobs,
-  shouldHoldMergeGroupRun,
-} from './lib/merge-group-required-lanes.mjs';
-
-export {
-  CI_WORKFLOW_ID,
-  shouldHoldMergeGroupRun,
-} from './lib/merge-group-required-lanes.mjs';
-
+import * as lanes from './lib/merge-group-required-lanes.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
   RETRYABLE_PRODUCT_FAILURE_STEPS,
 } from './lib/merge-queue-guard.mjs';
 
+export const { CI_WORKFLOW_ID, shouldHoldMergeGroupRun } = lanes;
 export const FAILURE_HOLD_SCHEMA = 'jovie-merge-group-failure-hold/v1';
 export const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 export const FAILURE_RETRY_CONTEXT = 'jovie-queue-failure-retry/v1';
@@ -47,14 +38,6 @@ const MERGE_GROUP_FAILURE_WORKFLOWS = new Map([
   [CI_WORKFLOW_ID, '.github/workflows/ci.yml'],
   [PR_SIZE_GUARD_WORKFLOW_ID, '.github/workflows/pr-size-guard.yml'],
 ]);
-
-function failedStepsFromJobs(jobs) {
-  return jobs.flatMap(job =>
-    (job.steps ?? [])
-      .filter(step => step?.conclusion === 'failure')
-      .map(step => step.name)
-  );
-}
 
 /** Only the workflow-load step makes a PR Size Guard failure a source hold. */
 export function isHeldWorkflowFailure(run, failedSteps = []) {
@@ -974,8 +957,7 @@ function validateRun(run, repository) {
     run.path !== MERGE_GROUP_FAILURE_WORKFLOWS.get(run.workflow_id) ||
     run.repository?.full_name !== repository ||
     run.head_repository?.full_name !== repository ||
-    (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion) &&
-      run.conclusion !== 'cancelled') ||
+    !lanes.isMergeGroupHoldConclusion(run.conclusion) ||
     !Number.isSafeInteger(run.id) ||
     run.id < 1 ||
     !Number.isSafeInteger(run.run_attempt) ||
@@ -1085,19 +1067,12 @@ export async function applyMergeGroupFailure(
   }
 ) {
   const front = validateRun(run, repository);
-  if (!shouldHoldMergeGroupRun(run, jobs)) {
-    return {
-      skipped: true,
-      reason: 'cancelled-without-required-lane-failure',
-      workflowRunId: run.id,
-    };
-  }
-  if (run.conclusion === 'cancelled') {
-    failedSteps = failedStepsFromJobs(failedRequiredMergeGroupJobs(jobs));
-  }
+  const admitted = lanes.admitHoldFailure(run, jobs, failedSteps);
+  if (admitted.skip) return admitted.skip;
+  failedSteps = admitted.failedSteps;
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
   const classification = classifyMergeGroupFailure({
-    conclusion: run.conclusion === 'cancelled' ? 'failure' : run.conclusion,
+    conclusion: admitted.conclusion,
     failedSteps,
     annotationText,
     changedFiles,
@@ -1786,28 +1761,17 @@ async function main(argv) {
     fail('live workflow run identity does not match the event');
   }
   const front = validateRun(run, repository);
-  // Pin cancelled evidence to this attempt, never to a later rerun's jobs.
-  const jobs = restPages(
-    run.conclusion === 'cancelled'
-      ? `repos/${repository}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`
-      : `repos/${repository}/actions/runs/${run.id}/jobs?filter=latest`
-  );
-  const shouldHold = shouldHoldMergeGroupRun(run, jobs);
-  if (!shouldHold) {
-    process.stdout.write(
-      `${JSON.stringify({ skipped: true, reason: 'cancelled-without-required-lane-failure', workflowRunId: run.id })}\n`
-    );
-    return;
-  }
-  const evidenceJobs =
-    run.conclusion === 'cancelled' ? failedRequiredMergeGroupJobs(jobs) : jobs;
-  const failedSteps = failedStepsFromJobs(evidenceJobs);
+  const jobs = restPages(lanes.holdJobsUrl(repository, run));
+  const admitted = lanes.admitHoldFailure(run, jobs);
+  if (admitted.skip) return lanes.writeJson(admitted.skip);
+  const { failedSteps } = admitted;
   if (!isHeldWorkflowFailure(run, failedSteps)) {
     // Other PR Size Guard failures keep their existing handling: no hold.
-    process.stdout.write(
-      `${JSON.stringify({ skipped: true, reason: 'not-a-held-workflow-failure', workflowRunId: run.id })}\n`
-    );
-    return;
+    return lanes.writeJson({
+      skipped: true,
+      reason: 'not-a-held-workflow-failure',
+      workflowRunId: run.id,
+    });
   }
   const timeline = readTimeline(repository, front.prNumber);
   const evidence = instructionContractEvidence(
@@ -1831,7 +1795,7 @@ async function main(argv) {
       })
     : '';
   const preview = classifyMergeGroupFailure({
-    conclusion: run.conclusion === 'cancelled' ? 'failure' : run.conclusion,
+    conclusion: admitted.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,

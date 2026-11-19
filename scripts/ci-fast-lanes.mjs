@@ -5,13 +5,11 @@
  * Each hosted job checks out and installs once, invokes one value from
  * LANE_GROUPS, and publishes an isolated lane artifact; the aggregate
  * `ci-fast` job also requires the dedicated profile browser admission job.
- *
  * Fail-fast: the first failed lane skips the expensive structural lane so
  * biome/typecheck red does not pay for structural Playwright. Cheap lanes
  * always run so one CI cycle reports every cheap failure instead of hiding
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
@@ -1029,6 +1027,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
+  'scripts/merge-queue-green-enroll-cancelled.test.mjs',
   'scripts/merge-queue-guard-hold.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
@@ -1133,6 +1132,7 @@ export const RELEASE_LINEAGE_CONTRACT_COMMAND =
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/merge-group-cancelled-hold.test.mjs',
   'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
