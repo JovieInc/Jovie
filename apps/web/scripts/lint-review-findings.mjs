@@ -3,9 +3,10 @@
  * Review-findings lint (founder directive 2026-11-19, 'reviews raise the
  * baseline'): deterministic encoding of design/code review findings.
  *
- * Inputs (both under apps/web/review-findings/):
- *   findings.jsonl     append-only ledger; one JSON object per line.
- *   banned-values.json rules grown ONLY from encoded ledger findings.
+ * Input (apps/web/review-findings/findings.jsonl): the append-only ledger,
+ * one JSON object per line. A finding encoded at the `lint` layer carries
+ * its own deterministic rule (`rule_pattern` + optional `rule_status` /
+ * `rule_title` / `rule_source`) — the finding IS the rule.
  *
  * Behavior:
  *   - Ledger and rules integrity are always validated (code 2 when either is
@@ -30,7 +31,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = resolve(SCRIPT_DIR, '..');
-const FINDINGS_DIR = join(WEB_ROOT, 'review-findings');
 
 const LAYERS = ['token', 'component', 'lint', 'visual', 'env', 'doc'];
 const RULE_STATUSES = ['shadow', 'enforced', 'planned'];
@@ -109,55 +109,44 @@ export function parseLedger(text, error = console.error) {
   return { entries };
 }
 
-/** @returns {{ rules: object[] } | { code: 2 }} */
-export function parseRules(text, error = console.error) {
-  let doc;
-  try {
-    doc = JSON.parse(text);
-  } catch {
-    return {
-      code: integrity(
-        `cannot read rules (invalid JSON) — see ${relative(WEB_ROOT, join(FINDINGS_DIR, 'banned-values.json'))}`,
-        error
-      ).code,
-    };
-  }
-  if (doc.schema !== 'jovie.review-findings.banned-values/v1') {
-    return {
-      code: integrity('banned-values.json: unexpected schema id', error).code,
-    };
-  }
-  if (!Array.isArray(doc.rules)) {
-    return {
-      code: integrity('banned-values.json: rules must be an array', error).code,
-    };
-  }
+/**
+ * Derive lint rules from ledger entries. A finding encoded at the `lint`
+ * layer carries `rule_pattern` (regex source), optional `rule_status`
+ * (shadow | enforced | planned, default shadow) and `rule_source` (the
+ * canonical id it implements, e.g. an ASR id). The finding IS the rule —
+ * no second rules file to drift.
+ *
+ * @param {{ entries: object[] }} ledger
+ * @param {{ error?: (...a: unknown[]) => void }} [options]
+ * @returns {{ rules: object[] } | { code: 2 }}
+ */
+export function rulesFromLedger(ledger, options = {}) {
+  const error = options.error ?? console.error;
   const rules = [];
-  for (const rule of doc.rules) {
-    for (const field of ['id', 'title', 'source', 'justification']) {
-      if (typeof rule[field] !== 'string' || !rule[field]) {
-        return {
-          code: integrity(
-            `banned-values.json rule ${rule.id ?? '?'}: missing ${field}`,
-            error
-          ).code,
-        };
-      }
-    }
-    if (!RULE_STATUSES.includes(rule.status)) {
+  for (const entry of ledger.entries) {
+    if (entry.rule_pattern === undefined) continue;
+    const status = entry.rule_status ?? 'shadow';
+    if (!RULE_STATUSES.includes(status)) {
       return {
         code: integrity(
-          `banned-values.json rule ${rule.id}: status must be one of ${RULE_STATUSES.join(' | ')}`,
+          `findings.jsonl ${entry.id}: rule_status must be one of ${RULE_STATUSES.join(' | ')}`,
           error
         ).code,
       };
     }
     try {
-      rules.push({ ...rule, regex: new RegExp(rule.pattern, 'g') });
+      rules.push({
+        id: entry.id,
+        title: entry.rule_title ?? entry.finding_class,
+        source: entry.rule_source ?? 'ledger',
+        status,
+        ledgerEntry: entry.id,
+        regex: new RegExp(entry.rule_pattern, 'g'),
+      });
     } catch (error_) {
       return {
         code: integrity(
-          `banned-values.json rule ${rule.id}: invalid pattern (${error_})`,
+          `findings.jsonl ${entry.id}: invalid rule_pattern (${error_})`,
           error
         ).code,
       };
@@ -211,7 +200,6 @@ export function lintReviewFindings(options = {}) {
   const {
     args = [],
     ledgerText,
-    rulesText,
     webRoot = WEB_ROOT,
     scanRoots = ['components', 'app'].map(dir => join(webRoot, dir)),
     log = () => {},
@@ -226,15 +214,7 @@ export function lintReviewFindings(options = {}) {
       );
   if ('code' in ledger) return ledger;
 
-  const rules = rulesText
-    ? parseRules(rulesText, error)
-    : parseRules(
-        readFileSync(
-          join(webRoot, 'review-findings/banned-values.json'),
-          'utf8'
-        ),
-        error
-      );
+  const rules = rulesFromLedger(ledger, { error });
   if ('code' in rules) return rules;
 
   const sources = scanRoots.flatMap(dir => collectSources(dir));

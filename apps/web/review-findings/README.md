@@ -9,11 +9,12 @@ taxonomy live in
 ## Files
 
 - `findings.jsonl` — the ledger. Append-only, one JSON object per line.
-- `banned-values.json` — lint rules grown **only** from encoded findings.
-  Consumed by `apps/web/scripts/lint-review-findings.mjs`.
+  A finding encoded at the `lint` layer carries its own deterministic rule
+  (see "Rule fields" below) — the finding IS the rule, so there is no
+  second rules file to drift.
 - `scripts/lint-review-findings.mjs` — the deterministic check
-  (`pnpm lint:review-findings`). Informational by default; `--strict` is the
-  promotion target for CI.
+  (`pnpm lint:review-findings`). Informational by default; `--strict` is
+  the promotion target for CI.
 
 ## Entry schema (`findings.jsonl`)
 
@@ -26,6 +27,15 @@ taxonomy live in
 | `pr_url`      | yes      | PR URL where the finding was made; `null` only for process/meta entries (put context in `notes`) |
 | `notes`       | yes      | what was found, where it was encoded (rule id / test path / doc section), evidence |
 
+### Rule fields (findings encoded at the `lint` layer)
+
+| field         | required | notes                                                     |
+| ------------- | -------- | --------------------------------------------------------- |
+| `rule_pattern` | for `lint` | regex source scanned over apps/web/{components,app} .ts/.tsx (tests excluded, stories scanned — same conventions as the design-system count ratchets) |
+| `rule_status` | no       | `shadow` (default) \| `enforced` \| `planned`             |
+| `rule_title`  | no       | human label; defaults to `finding_class`                   |
+| `rule_source` | no       | canonical id the rule implements, e.g. `ASR-022` — cite ids, never restate them |
+
 ## How to append
 
 1. Append one line to `findings.jsonl` (valid JSONL — the lint validates
@@ -35,8 +45,9 @@ taxonomy live in
    and encode it in the **same or a linked auto-merging PR** — a token rule,
    a colocated test, a lint pattern, a Storybook state, an env fixture, or
    (last resort) a doc.
-3. Reference the encoding (rule id, test path, doc section) in `notes`.
-4. Run `pnpm lint:review-findings` to confirm ledger + rules integrity.
+3. For a `lint` encoding, add the `rule_pattern` fields to the entry.
+4. Reference the encoding (test path, doc section) in `notes`.
+5. Run `pnpm lint:review-findings` to confirm ledger integrity + rule health.
 
 ## Repeat-finding rate
 
@@ -53,7 +64,7 @@ A rate above 0 after encoding means the guardrail has a hole: **fix the
 guardrail** (the rule/test that should have caught it) before adding more
 rules for the same class.
 
-## Rule lifecycle (`banned-values.json`)
+## Rule lifecycle
 
 - `shadow` — report only; the default lint run exits 0.
 - `enforced` — the CI step runs `pnpm lint:review-findings --strict`, which

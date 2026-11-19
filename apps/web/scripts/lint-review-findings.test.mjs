@@ -6,33 +6,24 @@ import {
   collectSources,
   lintReviewFindings,
   parseLedger,
-  parseRules,
+  rulesFromLedger,
 } from './lint-review-findings.mjs';
 
-const VALID_LEDGER = `${JSON.stringify({
+const RULE_PATTERN =
+  'uppercase[^\'"`\\n]*tracking-widest|tracking-widest[^\'"`\\n]*uppercase';
+
+const LEDGER_ENTRY = {
   id: 'RF-0001',
   date: '2026-11-19',
   finding_class: 'design/all-caps-wide-tracking',
   layer_encoded: 'lint',
   pr_url: null,
   notes: 'seed entry',
-})}\n`;
-
-const VALID_RULES = JSON.stringify({
-  schema: 'jovie.review-findings.banned-values/v1',
-  note: 'test rules',
-  rules: [
-    {
-      id: 'RF-TEST-001',
-      title: 'No uppercase wide tracking',
-      source: 'ASR-TEST',
-      status: 'shadow',
-      pattern: 'uppercase[^\'"`\\n]*tracking-widest',
-      justification: 'test rule',
-      ledgerEntry: 'RF-0001',
-    },
-  ],
-});
+  rule_pattern: RULE_PATTERN,
+  rule_status: 'shadow',
+  rule_source: 'ASR-022',
+};
+const VALID_LEDGER = `${JSON.stringify(LEDGER_ENTRY)}\n`;
 
 /** @returns {{ root: string, scanRoot: string }} */
 function makeFixture({
@@ -69,7 +60,6 @@ describe('review-findings lint', () => {
     const out = [];
     const result = lintReviewFindings({
       ledgerText: VALID_LEDGER,
-      rulesText: VALID_RULES,
       webRoot: root,
       scanRoots: [scanRoot],
       log: (...lines) => out.push(lines.join(' ')),
@@ -77,7 +67,7 @@ describe('review-findings lint', () => {
     expect(result.code).toBe(0);
     const text = out.join('\n');
     expect(text).toContain('1 ledger entry');
-    expect(text).toContain('[shadow] RF-TEST-001');
+    expect(text).toContain('[shadow] RF-0001 (ASR-022)');
     expect(text).toContain('components/Sample.tsx:1');
     expect(text).toContain('arbitrary-tracking: 0');
     expect(text).toContain('arbitrary-px-font-size: 1');
@@ -92,7 +82,6 @@ describe('review-findings lint', () => {
     const result = lintReviewFindings({
       args: ['--json'],
       ledgerText: VALID_LEDGER,
-      rulesText: VALID_RULES,
       webRoot: root,
       scanRoots: [scanRoot],
       log: (...lines) => out.push(lines.join(' ')),
@@ -100,7 +89,7 @@ describe('review-findings lint', () => {
     expect(result.code).toBe(0);
     const parsed = JSON.parse(out.join(''));
     expect(parsed.ledgerEntries).toBe(1);
-    expect(parsed.hits['RF-TEST-001']).toEqual([
+    expect(parsed.hits['RF-0001']).toEqual([
       { file: 'components/Sample.tsx', line: 1 },
     ]);
   });
@@ -111,7 +100,6 @@ describe('review-findings lint', () => {
     const result = lintReviewFindings({
       args: ['--strict'],
       ledgerText: VALID_LEDGER,
-      rulesText: VALID_RULES,
       webRoot: root,
       scanRoots: [scanRoot],
     });
@@ -121,16 +109,12 @@ describe('review-findings lint', () => {
   it('fails --strict when an enforced rule has hits', () => {
     const { root, scanRoot } = makeFixture();
     fixtureRoot = root;
-    const enforced = JSON.stringify({
-      ...JSON.parse(VALID_RULES),
-      rules: [{ ...JSON.parse(VALID_RULES).rules[0], status: 'enforced' }],
-    });
+    const enforced = `${JSON.stringify({ ...LEDGER_ENTRY, rule_status: 'enforced' })}\n`;
     /** @type {string[]} */
     const err = [];
     const result = lintReviewFindings({
       args: ['--strict'],
-      ledgerText: VALID_LEDGER,
-      rulesText: enforced,
+      ledgerText: enforced,
       webRoot: root,
       scanRoots: [scanRoot],
       error: (...lines) => err.push(lines.join(' ')),
@@ -139,12 +123,17 @@ describe('review-findings lint', () => {
     expect(err.join('')).toContain('--strict failed with 1 enforced-rule hit');
   });
 
+  it('derives rules only from entries that carry a pattern', () => {
+    const docOnly = `${JSON.stringify({ ...LEDGER_ENTRY, layer_encoded: 'doc', rule_pattern: undefined })}\n`;
+    const derived = rulesFromLedger(parseLedger(docOnly, () => {}));
+    expect('rules' in derived && derived.rules).toEqual([]);
+  });
+
   it('rejects a malformed ledger line with code 2', () => {
     /** @type {string[]} */
     const err = [];
     const result = lintReviewFindings({
       ledgerText: 'not json at all\n',
-      rulesText: VALID_RULES,
       scanRoots: [],
       error: (...lines) => err.push(lines.join(' ')),
     });
@@ -183,46 +172,21 @@ describe('review-findings lint', () => {
     expect('code' in result).toBe(true);
   });
 
-  it('rejects rules with an invalid regex pattern', () => {
-    /** @type {string[]} */
-    const err = [];
-    const result = parseRules(
-      JSON.stringify({
-        schema: 'jovie.review-findings.banned-values/v1',
-        rules: [
-          {
-            id: 'RF-BAD',
-            title: 't',
-            source: 's',
-            status: 'shadow',
-            pattern: '([unclosed',
-            justification: 'j',
-          },
-        ],
-      }),
-      (...lines) => err.push(lines.join(' '))
-    );
+  it('rejects an invalid rule_pattern with code 2', () => {
+    const result = lintReviewFindings({
+      ledgerText: `${JSON.stringify({ ...LEDGER_ENTRY, rule_pattern: '([unclosed' })}\n`,
+      scanRoots: [],
+      error: () => {},
+    });
     expect('code' in result).toBe(true);
-    expect(err.join('')).toContain('invalid pattern');
   });
 
-  it('rejects rules with an unknown status', () => {
-    const result = parseRules(
-      JSON.stringify({
-        schema: 'jovie.review-findings.banned-values/v1',
-        rules: [
-          {
-            id: 'RF-BAD',
-            title: 't',
-            source: 's',
-            status: 'aggressive',
-            pattern: 'x',
-            justification: 'j',
-          },
-        ],
-      }),
-      () => {}
-    );
+  it('rejects an unknown rule_status with code 2', () => {
+    const result = lintReviewFindings({
+      ledgerText: `${JSON.stringify({ ...LEDGER_ENTRY, rule_status: 'aggressive' })}\n`,
+      scanRoots: [],
+      error: () => {},
+    });
     expect('code' in result).toBe(true);
   });
 
@@ -249,7 +213,6 @@ describe('review-findings lint', () => {
   it('tolerates missing scan directories', () => {
     const result = lintReviewFindings({
       ledgerText: VALID_LEDGER,
-      rulesText: VALID_RULES,
       scanRoots: [join(tmpdir(), 'review-findings-does-not-exist')],
     });
     expect(result.code).toBe(0);
