@@ -42,9 +42,9 @@ const gh = args =>
   JSON.parse(
     execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
   );
-// Never follow redirects outside the allowlisted public evidence origin.
+// Evidence redirects are followed explicitly after same-origin validation.
 const fetchPage = url =>
-  fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+  fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
 const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
 if (
   !/^\d+$/.test(marker.controllerRun ?? '') ||

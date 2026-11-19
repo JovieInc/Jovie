@@ -1705,7 +1705,9 @@ jobs:
   publish-customer-changelog:
     name: Publish verified customer changelog
     needs: [authorize-production, production-verified]
-    if: ${{ needs.production-verified.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
+    # Optional upstream probes can be skipped even after Production Verified
+    # succeeds. Do not let their skipped status suppress publication.
+    if: ${{ !cancelled() && needs.authorize-production.result == 'success' && needs.production-verified.result == 'success' && needs.production-verified.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
