@@ -173,6 +173,7 @@
     },
     {
       "includes": [
+        "scripts/ci/mq-parity-manifest.json",
         "scripts/invariants/copy-leak/config.json",
         "scripts/invariants/copy-leak/positive-fixtures.json"
       ],
