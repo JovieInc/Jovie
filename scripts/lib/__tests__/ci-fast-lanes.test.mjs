@@ -37,6 +37,7 @@ import {
   runMergeGroupGuards,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_COMMAND,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -486,28 +487,36 @@ describe('runStructural screenshot contract discovery', () => {
     120_000
   );
 
+  const LEADS_CHANGED = ['apps/web/lib/leads/constants.ts'];
   it.each([
-    ['web', ['apps/web/lib/leads/constants.ts'], true],
-    ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
-    ['web', ['apps/web/app/page.tsx'], false],
+    ['pull_request', 'web', LEADS_CHANGED, true],
+    ['pull_request', 'web,operations', LEADS_CHANGED, false],
+    ['pull_request', 'web', ['apps/web/app/page.tsx'], false],
+    ['merge_group', 'web', LEADS_CHANGED, true],
+    ['push', 'web', LEADS_CHANGED, true],
   ])(
-    'runs script contracts that read a changed file without operations (%s)',
-    async (lanes, changed, expected) => {
+    'runs the script contracts a changed file reads; landing events run the full lists (%s)',
+    async (event, lanes, changed, expected) => {
       // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
-      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
-      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
+      // PRs keep the derived selection; landing events run the FULL lists.
+      process.env.GITHUB_EVENT_NAME = event;
       process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
       await runStructural({ execute, changedFileList: changed });
       const commands = execute.mock.calls.map(([command]) => String(command));
+      const landing = event !== 'pull_request';
       const dependent = commands.filter(
         command =>
           command.startsWith('node --test ') &&
           command.includes('scripts/funnel-judge/rubric.test.mjs') &&
-          !command.includes('scripts/agent-context/check.test.mjs')
+          command.includes('scripts/agent-context/check.test.mjs') === landing
       );
       expect(dependent).toHaveLength(expected ? 1 : 0);
+      expect(commands.includes(SCRIPT_CONTRACT_VITEST_COMMAND)).toBe(
+        landing || lanes.includes('operations')
+      );
     }
   );
 
