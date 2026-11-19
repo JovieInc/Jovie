@@ -61,13 +61,14 @@ export {
 } from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
   readFileSync,
   writeFileSync,
 } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -194,6 +195,118 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
     'run on the PR merged with base by merged-with-base-invariants (~88s)',
   'pnpm ci:control:test': 'control-plane suite, ~40s; merge-group only',
 });
+
+/**
+ * The merged-with-base guard runs its scans as one bounded pool instead of a
+ * serial `;` chain. Same commands, same fail-closed outcome (any failure fails
+ * the guard); run-all means a failure no longer hides later failures.
+ */
+export const MERGED_WITH_BASE_POOL_CONCURRENCY = 4;
+
+/** Measured long poles inside the merged-with-base pool (ordering only). */
+const MERGED_WITH_BASE_POOL_LONG_POLES = Object.freeze([
+  // The node --test invariants batch (~120s) and the web vitest run.
+  'scripts/invariants/registry.test.mjs',
+  'tests/unit/api/webhooks/linear.test.ts',
+]);
+
+/** Short, stable pool id for a scan command. */
+function mergedBasePoolId(command) {
+  return command
+    .replace(/^pnpm (?:--filter(?:=| )\S+ )?/u, '')
+    .replace(/^run /u, '')
+    .replace(/^node \.github\/scripts\//u, '.github/scripts/')
+    .trim();
+}
+
+/**
+ * Pool spec for the merged-with-base guard: the design-surface scans, every
+ * PR_CHEAP_SCAN_COMMANDS entry, and the `pnpm invariants:check` chain. The
+ * chain entry is split into one pool entry per top-level `&&` segment at run
+ * time (expandSourcePoolEntries) so the real long pole parallizes too.
+ */
+export const MERGED_WITH_BASE_POOL_SPEC = Object.freeze({
+  concurrency: MERGED_WITH_BASE_POOL_CONCURRENCY,
+  commands: Object.freeze([
+    Object.freeze({
+      id: 'design-surfaces',
+      command: 'node scripts/invariants/design-surfaces.mjs',
+    }),
+    Object.freeze({
+      id: 'stack-pattern-ratchet',
+      command:
+        'if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi',
+    }),
+    ...PR_CHEAP_SCAN_COMMANDS.map(command =>
+      Object.freeze({ id: mergedBasePoolId(command), command })
+    ),
+    Object.freeze({
+      id: 'invariants-check',
+      command: 'pnpm invariants:check',
+      splitChain: true,
+    }),
+  ]),
+});
+
+/**
+ * Expand a pool spec into runnable entries. A `splitChain` entry becomes one
+ * entry per top-level `&&` segment of the named pnpm script, read from the
+ * package.json of the current directory (the merged worktree when the guard
+ * runs). Every segment still runs and any failure fails — segment-level
+ * fail-closed, like the old `set -e` chain. If the script is missing the
+ * whole chain runs as one entry: same commands, never fewer.
+ * @param {{commands: readonly {id: string, command: string, splitChain?: boolean}[], concurrency?: number}} spec
+ * @param {Record<string, string>} [scripts] defaults to package.json scripts in cwd
+ * @returns {{id: string, command: string}[]}
+ */
+export function expandSourcePoolEntries(spec, scripts = packageScripts('.')) {
+  return spec.commands.flatMap(entry => {
+    if (!entry.splitChain) {
+      return [{ id: entry.id, command: entry.command }];
+    }
+    const scriptName = entry.command.replace(/^pnpm (?:run )?/u, '');
+    const chain = scripts[scriptName];
+    if (!chain) return [{ id: entry.id, command: entry.command }];
+    return chain.split(' && ').map((segment, index) => ({
+      id: `${entry.id}:${index + 1} ${commandLabel(segment, 64)}`,
+      command: segment,
+    }));
+  });
+}
+
+/** Serial setup of the merged-with-base guard (unchanged from the old chain). */
+const MERGED_WITH_BASE_SETUP = Object.freeze([
+  'set -euo pipefail',
+  't="$(mktemp -d)"',
+  'root="$PWD"',
+  'git worktree add -q --detach "$t" HEAD',
+  'for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done',
+  'trap \'git worktree remove --force "$t"\' EXIT',
+  'cd "$t"',
+  'git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true',
+  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
+  '[ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }',
+]);
+
+const MERGED_WITH_BASE_RUNNER_PATH = fileURLToPath(
+  new URL('./ci-fast-lanes.mjs', import.meta.url)
+);
+
+/**
+ * The merged-with-base guard command: identical setup, then the pool runner.
+ * The spec is embedded as a quoted heredoc so the exact scan commands stay
+ * readable in the guard command (the structural inventory test reads them).
+ * @returns {string}
+ */
+function mergedWithBaseCommand() {
+  const pool = [
+    `cat > "$t/subpool.json" <<'JOVIE_SOURCE_GUARD_POOL'`,
+    JSON.stringify(MERGED_WITH_BASE_POOL_SPEC),
+    'JOVIE_SOURCE_GUARD_POOL',
+    `node ${shellQuote(MERGED_WITH_BASE_RUNNER_PATH)} --run-source-guard-pool "$t/subpool.json"`,
+  ].join('\n');
+  return `bash -c ${shellQuote(`${MERGED_WITH_BASE_SETUP.join('; ')};\n${pool}`)}`;
+}
 
 /**
  * Body of the lanes-selftest-changed-tests guard (run under bash -c). Exported
@@ -551,8 +664,12 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     // Merged-with-base invariants. Textual merge conflicts stay on their gates.
+    // Setup is unchanged (worktree, node_modules links, fetch, merge with base,
+    // conflict and registry skip-outs); the scans and the invariants chain run
+    // as one bounded pool with run-all semantics — same commands, same
+    // fail-closed outcome, and a failure no longer hides later failures.
     id: 'merged-with-base-invariants',
-    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; [ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
+    command: mergedWithBaseCommand(),
     inputs: /./u,
     prOnly: true,
   }),
@@ -630,25 +747,206 @@ export function selectSourceGuards(event, changed) {
   });
 }
 
-export function runSourceGuards() {
+/**
+ * Measured source-guard long poles start first when pooling (the merged-with-base
+ * guard is 216-250s and script contracts ~75s of the ~360s serial shard). A
+ * stale entry only loses the head start; output order is unchanged.
+ */
+const SOURCE_GUARD_LONG_POLES = Object.freeze([
+  'merged-with-base-invariants',
+  'script-contracts',
+]);
+
+/** Guards that touch shared git state (worktrees, fetches, merges) share one
+ * lock so they never overlap on the same checkout's git metadata. */
+const SOURCE_GUARD_GIT_PATTERN =
+  /\bgit (?:worktree|fetch|merge|checkout|reset|stash)\b/u;
+
+/**
+ * Shared writable state a source guard touches, derived from the command text:
+ * the structuralLocks taxonomy (coverage dirs, COVERAGE_FILE, the pytest
+ * cache, opaque entry points) plus one shared "git" lock — two guards running
+ * `git worktree`/`git fetch`/`git merge` on the same checkout race on
+ * .git/worktrees state and refs, so the merged-with-base and lanes-selftest
+ * guards serialize.
+ * @param {string} command
+ * @returns {string[]}
+ */
+export function sourceGuardLocks(command) {
+  const locks = new Set(structuralLocks(command));
+  if (SOURCE_GUARD_GIT_PATTERN.test(command)) locks.add('git');
+  return [...locks].sort();
+}
+
+/**
+ * Bounded concurrency for source guards. Default: at most 3 — the vitest-based
+ * guards are CPU-hungry and oversubscribing 4-vCPU runners invites timeout
+ * flakes. SOURCE_GUARD_CONCURRENCY=1 reproduces today's serial loop exactly.
+ * @param {string | undefined} [value] defaults to SOURCE_GUARD_CONCURRENCY
+ * @returns {number}
+ */
+export function sourceGuardConcurrency(
+  value = process.env.SOURCE_GUARD_CONCURRENCY
+) {
+  const parsed = Number(String(value ?? '').trim());
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  return Math.max(1, Math.min(3, availableParallelism()));
+}
+
+/**
+ * One buffered output block for a finished guard, wrapped in the workflow's
+ * stop-commands window (guard tests print mocked `::error::` lines; a fake
+ * rate-limit reset misled three workers on 2026-10-25) followed by the summary
+ * line the Source Validation logs measure, and a real annotation on failure.
+ * @param {string} id
+ * @param {{code: number, output: string, durationMs?: number} | undefined} result
+ * @returns {string}
+ */
+function sourceGuardBlock(id, result) {
+  const token = randomUUID();
+  const output = String(result?.output ?? '');
+  return [
+    `::stop-commands::${token}`,
+    output === '' || output.endsWith('\n') ? output : `${output}\n`,
+    `::${token}::`,
+    `[source-guards] ${id}: exit ${result?.code ?? 1}; duration_ms=${Math.round(result?.durationMs ?? 0)}`,
+    ...(result && result.code !== 0
+      ? [
+          `::error title=source guard ${id}::${id} failed (exit ${result.code}); read its output above.`,
+        ]
+      : []),
+  ].join('\n');
+}
+
+/**
+ * Repo-wide source guards (design-system ratchets, metrics layer, the locked
+ * Pen marketing chrome contract) plus the PR's own changed unit tests. The
+ * full Unit Tests shards run only in merge groups, so without this a PR that
+ * trips a guard or breaks its own test is green on PR CI and fails every
+ * merge group behind it (JOV-5301, JOV-6904; locked-pen-chrome-contract
+ * poisoned a batch on #19266).
+ *
+ * Guards run with bounded concurrency instead of strictly serially, keeping
+ * today's guarantees exactly: run-all (every selected guard runs even after
+ * one fails), the exit code is the first failing guard in list order, each
+ * guard's output prints as one contiguous block in list order, and guards
+ * sharing writable state never overlap (sourceGuardLocks). Independent guards
+ * report every failure in one run.
+ * @param {readonly {id: string, command: string}[]} [guards]
+ *   defaults to the guards selected for this diff
+ * @param {{execute?: (command: string) => {code: number, output: string} | Promise<{code: number, output: string}>, concurrency?: number, now?: () => number}} [opts]
+ * @returns {Promise<{code: number, output: string, skipped?: boolean}>}
+ */
+export async function runSourceGuards(guards, opts = {}) {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  const guards = selectSourceGuards(event, listAllChangedFiles());
-  if (guards.length === 0) {
+  const selected = guards ?? selectSourceGuards(event, listAllChangedFiles());
+  if (selected.length === 0) {
     return {
       code: 0,
       output: 'Source-read guards skipped (no guard input changed)\n',
       skipped: true,
     };
   }
-  // Independent guards: report every failure in one run.
-  let combined = '';
+  const concurrency = opts.concurrency ?? sourceGuardConcurrency();
+  // Blocks print the moment every earlier guard's block has printed, so the
+  // log stays in list order even though completion order differs.
+  let nextToPrint = 0;
+  /** @type {Map<number, string>} */
+  const blocks = new Map();
+  const results = await runCommandPool(
+    selected.map(guard => guard.command),
+    {
+      execute: opts.execute ?? shellAsync,
+      concurrency,
+      locks: selected.map(guard => sourceGuardLocks(guard.command)),
+      // Run-all: a failing guard must not hide later guards' failures.
+      keepGoing: true,
+      // Long poles start first; serial runs keep strict list order.
+      first:
+        concurrency > 1
+          ? selected.flatMap((guard, index) =>
+              SOURCE_GUARD_LONG_POLES.includes(guard.id) ? [index] : []
+            )
+          : [],
+      now: opts.now,
+      onSettle: (index, result) => {
+        blocks.set(index, sourceGuardBlock(selected[index].id, result));
+        while (blocks.has(nextToPrint)) {
+          console.log(blocks.get(nextToPrint));
+          blocks.delete(nextToPrint);
+          nextToPrint += 1;
+        }
+      },
+    }
+  );
   let code = 0;
-  for (const guard of guards) {
-    const result = shell(guard.command);
-    combined += `[source-guards] ${guard.id}: exit ${result.code}\n${result.output}`;
-    if (result.code !== 0 && code === 0) code = result.code;
-  }
-  return { code, output: combined };
+  const combined = results
+    .map((result, index) => {
+      const block = sourceGuardBlock(selected[index].id, result);
+      if (result?.code !== 0 && code === 0) code = result?.code ?? 1;
+      return block;
+    })
+    .join('\n');
+  return { code, output: `${combined}\n` };
+}
+
+/**
+ * Pool runner for the merged-with-base guard's sub-commands, invoked as
+ * `node <this module> --run-source-guard-pool <spec.json>` from inside the
+ * merged worktree. Run-all semantics: every entry runs even after one fails,
+ * and the exit code is the first failure in list order (the old `set -e`
+ * chain stopped at the first failure; any-failure → fail is at least as
+ * strict). Each entry's stdout+stderr prints as one buffered contiguous
+ * block, in list order, followed by a measurable summary line.
+ * @param {{commands: readonly {id: string, command: string, splitChain?: boolean}[], concurrency?: number}} spec
+ * @param {{execute?: (command: string) => {code: number, output: string} | Promise<{code: number, output: string}>, now?: () => number}} [opts]
+ * @returns {Promise<{code: number, output: string}>}
+ */
+export async function runSourceGuardPool(spec, opts = {}) {
+  const entries = expandSourcePoolEntries(spec);
+  const commands = entries.map(entry => entry.command);
+  const concurrency = Math.max(
+    1,
+    Math.min(
+      spec.concurrency ?? MERGED_WITH_BASE_POOL_CONCURRENCY,
+      sourceGuardConcurrency()
+    )
+  );
+  const results = await runCommandPool(commands, {
+    execute: opts.execute ?? shellAsync,
+    concurrency,
+    locks: commands.map(command => structuralLocks(command)),
+    keepGoing: true,
+    first:
+      concurrency > 1
+        ? entries.flatMap((entry, index) =>
+            MERGED_WITH_BASE_POOL_LONG_POLES.some(pole =>
+              entry.command.includes(pole)
+            )
+              ? [index]
+              : []
+          )
+        : [],
+    now: opts.now,
+  });
+  let code = 0;
+  const output = results
+    .map((result, index) => {
+      if (result?.code !== 0 && code === 0) code = result?.code ?? 1;
+      const text = String(result?.output ?? '');
+      const separator = text === '' || text.endsWith('\n') ? '' : '\n';
+      return `${text}${separator}[merged-with-base] ${entries[index].id}: exit ${result?.code ?? 1}; duration_ms=${Math.round(result?.durationMs ?? 0)}`;
+    })
+    .join('\n');
+  return { code, output: `${output}\n` };
+}
+
+/** CLI entry: node <module> --run-source-guard-pool <spec.json> */
+async function runSourceGuardPoolCli(specPath) {
+  const spec = JSON.parse(readFileSync(specPath, 'utf8'));
+  const { code, output } = await runSourceGuardPool(spec);
+  process.stdout.write(output);
+  return code;
 }
 
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
@@ -2582,13 +2880,18 @@ export function structuralLocks(command) {
  * jump an earlier command that shares one of their locks. `stop` is consulted
  * before each start; once it returns true nothing new starts (in-flight
  * commands still finish) and the unstarted commands stay undefined.
+ * `keepGoing: true` keeps starting commands after a failure (run-all) — the
+ * first failure in list order still decides the exit code.
+ * `onSettle(index, result)` fires when a command finishes, so callers can
+ * stream output while later commands are still in flight.
  * @param {readonly string[]} commands
- * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean}} opts
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean, keepGoing?: boolean, onSettle?: (index: number, result: ExecResult & {durationMs: number}) => void}} opts
  * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
  * @typedef {{code: number, output: string}} ExecResult
  */
 export function runCommandPool(commands, opts) {
   const { execute, concurrency } = opts;
+  const keepGoing = opts.keepGoing === true;
   const locks = opts.locks ?? commands.map(() => []);
   const now = opts.now ?? Date.now;
   const results = new Array(commands.length);
@@ -2619,6 +2922,7 @@ export function runCommandPool(commands, opts) {
         durationMs: Math.max(0, now() - startedAt),
       };
       if (code !== 0) failed = true;
+      opts.onSettle?.(index, results[index]);
       pump();
     };
     const start = index => {
@@ -2654,7 +2958,7 @@ export function runCommandPool(commands, opts) {
       pumping = true;
       do {
         repump = false;
-        while (!failed && !stopped && running < concurrency) {
+        while (!(failed && !keepGoing) && !stopped && running < concurrency) {
           if (pending.length > 0 && opts.stop?.()) {
             stopped = true;
             break;
@@ -2665,7 +2969,10 @@ export function runCommandPool(commands, opts) {
         }
       } while (repump);
       pumping = false;
-      if (running === 0 && (failed || stopped || pending.length === 0)) {
+      if (
+        running === 0 &&
+        (stopped || pending.length === 0 || (failed && !keepGoing))
+      ) {
         resolveAll(results);
       }
     };
@@ -3309,5 +3616,9 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 ) {
-  await main();
+  if (process.argv[2] === '--run-source-guard-pool') {
+    process.exitCode = await runSourceGuardPoolCli(process.argv[3]);
+  } else {
+    await main();
+  }
 }
