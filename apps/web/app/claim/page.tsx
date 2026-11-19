@@ -23,6 +23,9 @@ import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const PRO_CLAIM = getPublicPriceClaim('pro');
 const PRICE_DISPLAY = formatPublicPriceDisplay(PRO_CLAIM);
+// /claim shows the whole offer: the free profile AND the paid step (Tim,
+// 2026-11-19, not only "$12/mo"). Free sentence comes from offer truth.
+const FREE_CLAIM = getPublicPriceClaim('free');
 
 export const metadata: Metadata = {
   // The root layout's title template appends the brand.
@@ -117,7 +120,7 @@ export default async function ClaimPage({
             titleClassName='text-base'
             subtitleClassName='mt-1 text-sm leading-5'
             title='Claim Your Artist Profile'
-            subtitle={`${PRO_CLAIM.displayName} is ${PRICE_DISPLAY}. Cancel anytime.`}
+            subtitle={`${FREE_CLAIM.note} ${PRO_CLAIM.displayName} is ${PRICE_DISPLAY}. Cancel anytime.`}
           />
           <div className='px-5 py-5 sm:px-6'>
             {/* /claim has no layout of its own and the root layout provides no
