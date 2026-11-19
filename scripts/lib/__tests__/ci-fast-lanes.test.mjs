@@ -2883,10 +2883,10 @@ describe('source guard pool', () => {
       const token = opener.slice('::stop-commands::'.length);
       expect(lines).toContain(`::${token}::`);
     }
-    const summaryIndexes = lines
-      .map((line, index) => [line, index])
-      .filter(([line]) => line.startsWith('[source-guards] '))
-      .map(([, index]) => index);
+    const summaryIndexes = [];
+    for (const [index, line] of lines.entries()) {
+      if (line.startsWith('[source-guards] ')) summaryIndexes.push(index);
+    }
     expect(summaryIndexes).toHaveLength(3);
     expect(summaryIndexes).toEqual([...summaryIndexes].sort((a, b) => a - b));
     expect(
@@ -3019,6 +3019,11 @@ describe('source guard pool', () => {
     expect(
       sourceGuardLocks(
         'pnpm exec vitest run --coverage lib/__tests__/x.test.mjs'
+      )
+    ).toEqual(['coverage:.']);
+    expect(
+      sourceGuardLocks(
+        'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage lib/__tests__/x.test.mjs'
       )
     ).toEqual(['coverage:scripts']);
     expect(
