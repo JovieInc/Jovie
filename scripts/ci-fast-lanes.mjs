@@ -590,14 +590,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
-    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Slop-test ratchet (2026-11-15; landmine rules 2026-11-19): no new focused,
+    // skipped, assertion-free, tautological, mock-only, snapshot-only, real-sleep,
+    // over-mocked, mocked-subject (interfere-inc/landmines rule A) or flake-mask
+    // (rules B/C: retry budgets, raised per-test timeouts) tests.
     // Existing ones are baselined per file and may only go down.
     id: 'test-hygiene',
     command:
       'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
     inputs:
-      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
     prOnly: false,
   }),
   Object.freeze({
