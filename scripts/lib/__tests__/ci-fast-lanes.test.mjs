@@ -37,6 +37,7 @@ import {
   runMergeGroupGuards,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_COMMAND,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -491,11 +492,13 @@ describe('runStructural screenshot contract discovery', () => {
     ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
     ['web', ['apps/web/app/page.tsx'], false],
   ])(
-    'runs script contracts that read a changed file without operations (%s)',
+    'runs the derived script contracts that read a changed file without operations on pull_request (%s)',
     async (lanes, changed, expected) => {
       // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
-      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
-      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
+      // PRs keep the derived selection; landing events run the full lists
+      // (JOV-13095 test below).
+      process.env.GITHUB_EVENT_NAME = 'pull_request';
       process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
@@ -508,6 +511,36 @@ describe('runStructural screenshot contract discovery', () => {
           !command.includes('scripts/agent-context/check.test.mjs')
       );
       expect(dependent).toHaveLength(expected ? 1 : 0);
+      expect(commands).not.toContain(SCRIPT_CONTRACT_VITEST_COMMAND);
+    }
+  );
+
+  // JOV-13095: the PR-time script-contracts guard runs the FULL lists against
+  // the merged tree on every PR, and its repo-wide ratchets scan the tree
+  // dynamically, so the derived selector can never pick them. #25864's
+  // apps/ios-only landing carried a wall-clock assertion that red every open
+  // PR's Affected Unit Tests (4/4) for ~53h while main stayed green. Landing
+  // events must run the full lists themselves.
+  it.each(['merge_group', 'push'])(
+    'runs the full script-contract lists on %s without operations',
+    async event => {
+      process.env.GITHUB_EVENT_NAME = event;
+      process.env.CI_PRODUCT_LANES = 'web';
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({
+        execute,
+        changedFileList: ['apps/web/lib/leads/constants.ts'],
+      });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      const fullBatch = commands.filter(
+        command =>
+          command.startsWith('node --test ') &&
+          command.includes('scripts/funnel-judge/rubric.test.mjs') &&
+          command.includes('scripts/agent-context/check.test.mjs')
+      );
+      expect(fullBatch).toHaveLength(1);
+      expect(commands).toContain(SCRIPT_CONTRACT_VITEST_COMMAND);
     }
   );
 
