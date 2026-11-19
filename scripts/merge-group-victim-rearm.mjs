@@ -18,9 +18,11 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import { AGGREGATE_JOBS } from './lib/merge-group-ahead-attribution.mjs';
+import { retryDisposition } from './lib/merge-queue-retry-policy.mjs';
+import { githubIo, reconcileQueueRetry } from './lib/promotion-github.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
-export const REARM_CAP = 2;
+export const REARM_CAP = 2; // Cascade cap; infra/contract retries have their own one-retry budget.
 // The CI workflow whose merge_group and push runs gate the queue.
 export const CI_WORKFLOW_ID = 178737329;
 const SHA = /^[0-9a-f]{40}$/;
@@ -214,6 +216,16 @@ export function planVictimRearms({
     ) {
       return skip('front-failure-passed-on-base');
     }
+    const retry = retryDisposition({
+      head: candidate.headSha,
+      labels: candidate.labels,
+      complete: candidate.retryEvidence?.complete ?? true,
+      ...candidate.retryEvidence,
+      removed: true,
+      cascade: ['another-pr', 'base-branch'].includes(verdict.classification),
+      cascadeRun: runId,
+    });
+    if (!retry.allow) return skip(retry.reason);
     const records = trustedRearmRecords(candidate.statuses).filter(
       record => record.sha === candidate.headSha
     );
@@ -224,6 +236,8 @@ export function planVictimRearms({
         prNumber: candidate.prNumber,
         headSha: candidate.headSha,
         classification: verdict.classification,
+        retry: retry.retry,
+        reason: retry.reason,
         n: seen.n,
         increment: false,
         runId,
@@ -236,6 +250,8 @@ export function planVictimRearms({
       prNumber: candidate.prNumber,
       headSha: candidate.headSha,
       classification: verdict.classification,
+      retry: retry.retry,
+      reason: retry.reason,
       n,
       increment: true,
       runId,
@@ -637,7 +653,7 @@ function readArmState(repository, prNumber) {
   };
 }
 
-function main() {
+async function main() {
   const eventFlag = process.argv.indexOf('--event-path');
   const eventPath = eventFlag === -1 ? '' : process.argv[eventFlag + 1];
   if (!eventPath)
@@ -666,6 +682,21 @@ function main() {
     String(run.head_sha).toLowerCase(),
     Number(front[1])
   );
+  const retryNet = githubIo({ repo: repository, token: process.env.GH_TOKEN });
+  for (const candidate of candidates) {
+    const decision = await reconcileQueueRetry(
+      {
+        pr: candidate.prNumber,
+        head: candidate.headSha,
+        labels: candidate.labels,
+      },
+      retryNet
+    );
+    candidate.retryEvidence = {
+      ...(decision.evidence ?? { complete: false }),
+      circuitOpen: decision.reason === 'circuit-open',
+    };
+  }
   const decisions = planVictimRearms({
     runId: run.id,
     implicatedPaths,
@@ -678,7 +709,7 @@ function main() {
     ),
   });
   const targetUrl = `https://github.com/${repository}/actions/runs/${run.id}`;
-  applyVictimRearms(decisions, {
+  await applyVictimRearms(decisions, {
     targetUrl,
     readPullRequest(prNumber) {
       return readArmState(repository, prNumber);
@@ -697,7 +728,17 @@ function main() {
         `target_url=${url}`,
       ]);
     },
-    enable(prNumber, current) {
+    async enable(prNumber, current) {
+      const decision = decisions.find(d => d.prNumber === prNumber);
+      if (decision?.retry) {
+        const candidate = candidates.find(c => c.prNumber === prNumber);
+        const last = candidate.retryEvidence.receipts.at(-1);
+        await retryNet.reserveRetry({
+          head: current.headSha,
+          run: last.run,
+          attempt: last.attempt,
+        });
+      }
       const result = enqueueVictim({
         prNumber,
         nodeId: current?.nodeId,
@@ -711,7 +752,7 @@ function main() {
       for (const decision of decisions) {
         console.log(
           decision.action === 'rearm'
-            ? `rearm #${decision.prNumber} class=${decision.classification} reason=${decision.classification === 'unattributed' ? 'github-dequeued-green-head-no-implicated-path' : 'victim-of-group-failure'} n=${decision.n} increment=${decision.increment} run=${decision.runId}`
+            ? `rearm #${decision.prNumber} class=${decision.classification} reason=${decision.reason} n=${decision.n} increment=${decision.increment} run=${decision.runId}`
             : `skip #${decision.prNumber} ${decision.reason}`
         );
       }
@@ -726,5 +767,7 @@ if (
   process.argv[1] &&
   process.argv[1].endsWith('merge-group-victim-rearm.mjs')
 ) {
-  main();
+  main().catch(error => {
+    process.exitCode = commitRearmFailure(error);
+  });
 }

@@ -1,7 +1,7 @@
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Summer
+# accountable-writer: Eve-Runtime-Owner
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
-# removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
+# removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Eve Runtime Owner's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
 
 # Tim 2026-09-26: production holds never stall merging. A held production
@@ -233,6 +233,14 @@ jobs:
             scripts/version-fanout-guard.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/merge-queue-guard-hold.mjs
+            scripts/lib/promotion-*.mjs
+            scripts/lib/ejection-classifier.mjs
+            scripts/lib/merge-queue-retry-policy.mjs
+            scripts/lib/pr-size-*.mjs
+            scripts/lib/prepush-offload.mjs
+            scripts/lib/product-lane-classifier.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 
       - name: Generate Jovie Bot token
@@ -276,6 +284,9 @@ jobs:
           BLOCKED_RECHECK: ${{ inputs.blocked_recheck || '0' }}
           RECHECK_TOKEN: ${{ github.token }}
           MERGE_STATE_RETRY_MS: '3000'
+          PROMOTION_BAR_MODE: shadow
+          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
+          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
         with:
@@ -288,6 +299,32 @@ jobs:
             const guardPolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/merge-queue-guard-hold.mjs`
             ));
+            const reportPromotionError = error => {
+              const json = JSON.stringify({ schema: 'promotion-bar/v1', mode: 'shadow',
+                ready: false, failures: ['collector'], errors: [error.message] });
+              core.info(json);
+              if (process.env.GITHUB_STEP_SUMMARY) {
+                try { require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${json}\n`); }
+                catch { /* observation never fails admission */ }
+              }
+            };
+            let promotion;
+            try {
+              promotion = await import(pathToFileURL(
+                `${process.env.GITHUB_WORKSPACE}/scripts/lib/promotion-readiness-collect.mjs`
+              ));
+            } catch (error) {
+              reportPromotionError(error);
+            }
+            const promotionGitHub = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/scripts/lib/promotion-github.mjs`
+            ));
+            let policySha;
+            try {
+              policySha = require('node:child_process').execFileSync(
+                'git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }
+              ).trim();
+            } catch { /* collector emits an identity HOLD; admission stays shadow */ }
             // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
             // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
             // deletes a stale lane-fix-red; this token cannot remove labels.
@@ -313,6 +350,11 @@ jobs:
                 : 0;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const { owner, repo } = context.repo;
+            const retryNet = promotionGitHub.githubIo({ repo: `${owner}/${repo}`,
+              token: process.env.RECHECK_TOKEN });
+            const readHealth = retryNet.health;
+            let retryHealth;
+            retryNet.health = () => retryHealth ??= readHealth();
             // Main's SHA only resolves a base-branch failure hold, so read it
             // once, lazily, for a held candidate (most wakes never need it).
             let currentMainSha;
@@ -627,6 +669,16 @@ jobs:
                 prNumber: pr.number,
                 headSha: pr.headRefOid,
               });
+              // JOV-13053/JOV-7589: labels alone cannot race an Actions failure
+              // into a free retry. The same pure policy also protects victim rearm.
+              let retryDecision = await promotionGitHub.reconcileQueueRetry({
+                pr: pr.number, head: pr.headRefOid,
+                labels: pr.labels.nodes.map(l => l.name),
+              }, retryNet);
+              if (!retryDecision.allow) {
+                receipt(pr, 'skip', retryDecision.reason);
+                continue;
+              }
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
                 receipt(pr, 'held', failure.reason);
@@ -676,6 +728,19 @@ jobs:
                 (breakerRestore || (pr.releases?.nodes || []).some(event =>
                   typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
                   BLOCKING.has(String(event.label?.name || '').toLowerCase())));
+              retryDecision = { ...retryDecision, ...promotionGitHub.retryDisposition({
+                ...retryDecision.evidence, head: pr.headRefOid,
+                labels: pr.labels.nodes.map(l => l.name),
+                removed: Boolean(removedUnchangedHead),
+                manual: Boolean(removedUnchangedHead) && removalReason === 'manual',
+                released: releasedAfterManualRemoval,
+                cascade: ['base_branch_changed', 'base_branch_updated'].includes(removalReason),
+                circuitOpen: retryDecision.reason === 'circuit-open',
+              }) };
+              if (!retryDecision.allow) {
+                receipt(pr, 'skip', retryDecision.reason);
+                continue;
+              }
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
@@ -701,13 +766,14 @@ jobs:
               // removals on this head, and REENROLL_DWELL_MS after the last
               // removal. A merge-group failure at the head writes a failure
               // hold, which still blocks above (JOV-6620 is untouched).
-              const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
+              const REENROLL_MAX_REMOVALS = 2, REENROLL_DWELL_MS = 5 * 60 * 1000;
               const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
                 event.__typename === 'RemovedFromMergeQueueEvent' &&
                 (!headCommittedAt || event.createdAt > headCommittedAt)).length;
-              const automaticRemoval = removalReason === 'failed_checks' ||
+              const automaticRemoval = ['failed_checks', 'base_branch_changed', 'base_branch_updated'].includes(removalReason) ||
                 (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
               const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
+                retryDecision.allow && ['infra-retry', 'cascade-rearm'].includes(retryDecision.reason) &&
                 failureBeforeReenroll === 'allow' && failure.action === 'block' &&
                 ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
                 removalsOnHead < REENROLL_MAX_REMOVALS &&
@@ -737,7 +803,7 @@ jobs:
                 }
                 core.info(`#${pr.number} guard hold not applied: ${guardHold.reason}`);
               }
-              if (ejectionReenroll) failure = { action: 'allow', reason: 'ejection-reenroll' };
+              if (ejectionReenroll) failure = { action: 'allow', reason: retryDecision.reason };
               if (failure.action === 'block' ||
                   (humanDequeued && failure.action === 'retry-once' &&
                    failure.reason !== 'human-failure-release') ||
@@ -858,6 +924,23 @@ jobs:
                 }
                 // Append through native exact-head admission. Even an empty queue
                 // snapshot can race a build start, so automatic admission never jumps.
+                // Observe again immediately before enqueue; HOLD is shadow only.
+                // Existing eligibility and failure guards above remain authoritative.
+                try {
+                  await promotion.logPromotion({ repo: `${owner}/${repo}`, pr: pr.number,
+                    expectedHead: pr.headRefOid }, promotion.collectorIo({
+                    repo: `${owner}/${repo}`, token: process.env.RECHECK_TOKEN, policy: policySha,
+                    maxLines: Number(process.env.MAX_LINES), maxFiles: Number(process.env.MAX_FILES),
+                  }), { summary: process.env.GITHUB_STEP_SUMMARY, log: json => core.info(json) });
+                } catch (error) {
+                  reportPromotionError(error);
+                }
+                // Reserve the sole infra/contract retry before mutating. Never refund
+                // an uncertain enqueue; a later wake observes the spent reservation.
+                if (retryDecision.retry && failure.action !== 'retry-once') {
+                  const last = retryDecision.evidence.receipts.at(-1);
+                  await retryNet.reserveRetry({ head: pr.headRefOid, run: last.run, attempt: last.attempt });
+                }
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
@@ -1095,8 +1178,8 @@ jobs:
   # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
   # that still cannot enqueue names the PR with ::error:: and the step
   # summary. Two rearms per SHA; the enroll job is not involved. A failure with
-  # no implicated path (a flake) re-enqueues a green head that github-merge-queue[bot]
-  # removed within 30 minutes, tagged why=unattributed in the receipt (#23562: 24 min lag).
+  # no implicated path requires a trusted infra receipt and gets at most one
+  # retry on that SHA. Positive cascade victims retain the JOV-7589 rearm path.
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]
@@ -1122,6 +1205,16 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/merge-group-failure-hold.mjs
+            scripts/version-fanout-guard.mjs
+            packages/api-client
+            scripts/lib/promotion-github.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/ejection-classifier.mjs
+            scripts/lib/merge-queue-retry-policy.mjs
+            scripts/lib/merge-group-admission.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs

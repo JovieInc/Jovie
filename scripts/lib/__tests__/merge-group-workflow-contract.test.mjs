@@ -4883,11 +4883,15 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // revision failure hold, may re-enroll an unchanged removed head.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
-    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
-    // failure hold is re-admitted (bounded); a failure hold still blocks first
-    // and admission never runs from a cron (JOV-INV-042).
+    // JOV-13053: absence of a revision hold no longer grants a blind retry.
+    // Only a classified infra retry or positive cascade can use this path;
+    // existing failure holds still block and admission stays event-driven.
     expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
-    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain(
+      "['infra-retry', 'cascade-rearm'].includes(retryDecision.reason)"
+    );
+    expect(ENROLL).toContain('reason: retryDecision.reason');
+    expect(ENROLL).toContain('promotionGitHub.reconcileQueueRetry({');
     expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
     expect(ENROLL).toContain('!humanDequeued');
     expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);
