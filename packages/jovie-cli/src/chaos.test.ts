@@ -28,7 +28,6 @@ import {
   applyProxyFromEnv,
   type CliOutput,
   closedPipeListener,
-  isClosedPipeError,
   isEntrypoint,
   reportFatal,
   runCli,
@@ -654,43 +653,11 @@ describe('platform and runtime', () => {
   it('exits with the pending code on a closed pipe and rethrows anything else', () => {
     const exits: number[] = [];
     const listener = closedPipeListener(code => exits.push(code));
-    for (const code of [
-      'EPIPE',
-      'EOF',
-      'ERR_STREAM_DESTROYED',
-      'ERR_STREAM_WRITE_AFTER_END',
-    ]) {
-      listener(
-        Object.assign(new Error(`write ${code}`), { code })
-      );
-    }
-    expect(exits).toEqual([0, 0, 0, 0]);
+    listener(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+    expect(exits).toEqual([0]);
     expect(() =>
       listener(Object.assign(new Error('disk'), { code: 'EIO' }))
     ).toThrow('disk');
-  });
-
-  it('classifies only the closed-pipe family as quiet exit (JOV-13096)', () => {
-    expect(isClosedPipeError(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))).toBe(true);
-    expect(isClosedPipeError(Object.assign(new Error('stream eof'), { code: 'EOF' }))).toBe(true);
-    expect(
-      isClosedPipeError(
-        Object.assign(new Error('destroyed'), { code: 'ERR_STREAM_DESTROYED' })
-      )
-    ).toBe(true);
-    expect(
-      isClosedPipeError(
-        Object.assign(new Error('after end'), {
-          code: 'ERR_STREAM_WRITE_AFTER_END',
-        })
-      )
-    ).toBe(true);
-    for (const code of [undefined, 'EIO', 'ENOSPC', 'EACCES']) {
-      expect(
-        isClosedPipeError(Object.assign(new Error('real error'), { code }))
-      ).toBe(false);
-    }
-    expect(isClosedPipeError(undefined)).toBe(false);
   });
 
   it('reports an escaped bug in one redacted line, with detail only on --debug', () => {

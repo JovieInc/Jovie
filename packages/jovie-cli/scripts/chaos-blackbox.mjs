@@ -8,10 +8,8 @@
  * one actionable line (plus the --help hint for usage errors), no stack trace,
  * no secret, no terminal escapes, and no hang. It uses Node built-ins only, so
  * it runs unchanged on macOS, Linux, and Windows against a packed tarball.
- *
  *   node chaos-blackbox.mjs --bin <cli.js> [--profile pr|release|nightly]
  *     [--prod] [--shim <node_modules/.bin/jovie>] [--only a,b] [--report f]
- *
  * Exit 0 only when every scenario passed.
  */
 import { spawn } from 'node:child_process';
@@ -543,11 +541,8 @@ await scenario('closed-stdout-pipe', async () => {
     onSpawn: child => child.stdout.once('data', () => child.stdout.destroy()),
   });
   const failures = contract(result);
-  check(
-    failures,
-    result.code === 0,
-    `exit ${result.code} after a closed pipe${result.stderr ? ` (stderr: ${JSON.stringify(result.stderr.slice(0, 300))})` : ''}`
-  );
+  check(failures, result.code === 0, `exit ${result.code} after a closed pipe`);
+  if (result.code !== 0) console.error(result.stderr || '(no stderr)');
   return failures;
 });
 
