@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BOARD, BoardStore, parseBoardSend, taskIdFromRef } from './board.ts';
-import { sqlite } from './test-fixture.mjs';
+import { sqlite } from './fixtures/test-fixture.mjs';
 
 const ACTIVE = ['summer', 'claude', 'codex', 'aeon', 'grokbot'];
 

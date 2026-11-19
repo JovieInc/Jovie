@@ -5,15 +5,8 @@
  * route()): every /v1/admin/ path is behind the existing HUB_ADMIN_TOKEN
  * isAdmin() check; nothing here widens auth to any other route.
  */
-import {
-  type Detail,
-  HubError,
-  KIND,
-  LIMITS,
-  type MailboxSelector,
-  type PeekRow,
-  sha256Hex,
-} from './core.ts';
+import { type Detail, HubError, KIND, LIMITS, sha256Hex } from './core.ts';
+import type { MailboxSelector, PeekRow } from './envelope-policy.ts';
 
 export const MSG_KINDS = new Set([
   'message',

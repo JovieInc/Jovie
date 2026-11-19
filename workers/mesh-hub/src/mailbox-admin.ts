@@ -2,7 +2,7 @@
  * TTL expiry, dead-letter flags, coalesced DLQ windows, and the read-only
  * peek / bulk-ack selection. MailboxStore keeps the public methods.
  */
-import type { Delivered, Sql } from './core.ts';
+import { type Delivered, type Sql, toDelivered } from './core.ts';
 import {
   classifyEnvelope,
   type DlqAccumulator,
@@ -13,7 +13,6 @@ import {
   type PeekRow,
   toPeekRow,
 } from './envelope-policy.ts';
-import { toDelivered } from './mailbox-row.ts';
 
 type DlqMeta = {
   getMeta(key: string): string | null;

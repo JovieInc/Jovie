@@ -9,9 +9,9 @@ import {
   sha256Hex,
   validateSend,
 } from './core.ts';
+import { envelope, sqlite } from './fixtures/test-fixture.mjs';
 import { backoffFor, isOpen, Outbox } from './outbox.ts';
 import { scanBody } from './scan.ts';
-import { envelope, sqlite } from './test-fixture.mjs';
 
 export { sqlite };
 

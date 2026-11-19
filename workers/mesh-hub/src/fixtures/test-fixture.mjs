@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { sha256Hex } from './core.ts';
+import { sha256Hex } from '../core.ts';
 
 /** node:sqlite with the DO SqlStorage call shape. */
 export function sqlite() {

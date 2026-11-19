@@ -4,13 +4,11 @@ import {
   type EnqueueResult,
   type Envelope,
   LIMITS,
-  type MailboxSelector,
-  MailboxStore,
-  type PeekRow,
   project,
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
+import type { MailboxSelector, PeekRow } from './envelope-policy.ts';
 import {
   allowedUrls,
   buildPrompt,
@@ -21,6 +19,7 @@ import {
   validateReply,
 } from './executor.ts';
 import { type Liveness, mailboxLiveness } from './mailbox-liveness.ts';
+import { MailboxStore } from './mailbox-store.ts';
 import {
   alarmStaleMail,
   flushDlqSummary,

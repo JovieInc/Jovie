@@ -4,15 +4,15 @@
  */
 import {
   type Delivered,
-  dlqFallbackFull,
   type EnqueueResult,
   type Envelope,
   LIMITS,
-  type MailboxStore,
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
+import { dlqFallbackFull } from './envelope-policy.ts';
 import type { MailboxConfig } from './mailbox.ts';
+import type { MailboxStore } from './mailbox-store.ts';
 
 /** AUTO_NOTICE_TTL_MS override, clamped to [1 minute, 7 days]. */
 export function noticeTtlMs(rawValue: string | undefined): number {

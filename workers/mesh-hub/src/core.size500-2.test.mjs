@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { classifyEnvelope, LIMITS, MailboxStore } from './core.ts';
+import { LIMITS } from './core.ts';
+import { classifyEnvelope } from './envelope-policy.ts';
 import {
   boardEnvelope,
   EMPTY_SELECTOR,
   envelope,
   sqlite,
-} from './test-fixture.mjs';
+} from './fixtures/test-fixture.mjs';
+import { MailboxStore } from './mailbox-store.ts';
 
 test('classifyEnvelope: board fan-outs and machine envelopes are automated; peer mail and TIM-RELAY are direct', async () => {
   assert.equal(

@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { LIMITS } from './core.ts';
 import {
   dlqFallbackFull,
   isDlqSummaryDue,
-  LIMITS,
-  MailboxStore,
   nextDlqAccumulator,
-} from './core.ts';
+} from './envelope-policy.ts';
 import {
   boardEnvelope,
   EMPTY_SELECTOR,
   envelope,
   sqlite,
-} from './test-fixture.mjs';
+} from './fixtures/test-fixture.mjs';
+import { MailboxStore } from './mailbox-store.ts';
 
 test('bulkAck caps ids per call', async () => {
   const store = new MailboxStore(sqlite());
