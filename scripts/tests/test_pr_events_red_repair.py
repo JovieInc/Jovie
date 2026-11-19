@@ -485,5 +485,3 @@ class IntakeConversionTest(unittest.TestCase):
         linear = self.linear()
         self.assertIsNone(self.convert(linear, self.shell(body='unbound remediation')))
         self.assertFalse(linear.creates)
-
-
