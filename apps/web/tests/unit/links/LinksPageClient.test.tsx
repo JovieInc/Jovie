@@ -450,4 +450,33 @@ describe('LinksPageClient', () => {
     expect(inspector).toHaveTextContent('Neon Sky');
     expect(inspector).not.toHaveTextContent('Midnight City');
   });
+  it('keeps the registered inspector element stable across page renders', async () => {
+    const user = userEvent.setup();
+    const panels: unknown[] = [];
+    function PanelProbe() {
+      panels.push(useRightPanel());
+      return null;
+    }
+    const rows = [baseRow];
+    const view = () => (
+      <RightPanelProvider>
+        <LinksPageClient rows={rows} />
+        <PanelProbe />
+      </RightPanelProvider>
+    );
+    const { rerender } = render(view());
+
+    await user.click(screen.getByText('Midnight City'));
+    const openPanel = panels.at(-1);
+    expect(openPanel).not.toBeNull();
+    const rendersWhileOpen = panels.length;
+
+    // A page render with an unchanged selection must not push a new panel
+    // element through the shell frame (which would re-render the frame).
+    rerender(view());
+    rerender(view());
+
+    expect(panels.at(-1)).toBe(openPanel);
+    expect(panels.length - rendersWhileOpen).toBe(2);
+  });
 });
