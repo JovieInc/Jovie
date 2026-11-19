@@ -1992,7 +1992,8 @@ export function formatBlockedByPrReason(result) {
 
 // Conclusions that prove a group attempt failed. `cancelled` is excluded:
 // supersession cancels in-flight runs when the group is rebuilt, which is not
-// evidence that the front item is bad.
+// evidence that the front item is bad. merge-group-failure-hold separately
+// admits cancelled attempts only with a completed required-lane failure.
 export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
   'failure',
   'timed_out',

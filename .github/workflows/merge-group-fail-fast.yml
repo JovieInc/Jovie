@@ -1,0 +1,18 @@
+# JOV-13106: LYB's own-run cancellation; no inputs can select another run.
+# github-token-budget: 1 calls/run - one own-run cancel after a required lane failure; no green-group calls
+name: Merge Group Fail Fast
+on:
+  workflow_call:
+permissions:
+  actions: write
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel the rest of this merge-group run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"

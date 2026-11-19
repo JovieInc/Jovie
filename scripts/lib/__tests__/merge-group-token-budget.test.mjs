@@ -33,11 +33,17 @@ const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
  * - skipped-in-merge-group: the script returns before any API read.
  * - owned: REST reads owned by another lane, budgeted separately.
  * - on-rebuild: spends calls only when a superseded run exists.
+ * - on-required-failure: one own-run cancel request per started companion;
+ *   all companions are skipped in a green group.
  * - on-download-failure: release asset reads only after an anonymous
  *   pinned download fails (scripts/lib/github-release-asset.sh).
  * @type {Record<string, { kind: string, greenGroupCalls: number }>}
  */
 const LEDGER = {
+  'merge-group-fail-fast/cancel/Cancel the rest of this merge-group run': {
+    kind: 'on-required-failure',
+    greenGroupCalls: 0,
+  },
   'ci-merge-group-workspace/Compare verified constituent dependency digests': {
     kind: 'off',
     greenGroupCalls: 0,
@@ -157,7 +163,17 @@ const MAX_GREEN_GROUP_CALLS = 5;
 
 function tokenSteps() {
   const steps = [];
-  for (const [job, definition] of Object.entries(CI.jobs)) {
+  const cancel = load(
+    readFileSync(
+      resolve(ROOT, '.github/workflows/merge-group-fail-fast.yml'),
+      'utf8'
+    )
+  );
+  const jobs = {
+    ...CI.jobs,
+    'merge-group-fail-fast/cancel': cancel.jobs.cancel,
+  };
+  for (const [job, definition] of Object.entries(jobs)) {
     for (const step of definition.steps ?? []) {
       const exposed = JSON.stringify([step.env ?? {}, step.with ?? {}]);
       if (!/github\.token|GITHUB_TOKEN/.test(exposed)) continue;
@@ -168,6 +184,21 @@ function tokenSteps() {
 }
 
 describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
+  it('spends only own-run cancellation calls after a required lane fails', () => {
+    const cancel = tokenSteps().find(
+      ({ job }) => job === 'merge-group-fail-fast/cancel'
+    );
+    expect(cancel.step.run).toBe(
+      'gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"'
+    );
+    for (const [id, job] of Object.entries(CI.jobs)) {
+      if (!id.startsWith('merge-group-cancel-')) continue;
+      expect(job.if).toBe(
+        "${{ github.event_name == 'merge_group' && failure() }}"
+      );
+      expect(job.permissions).toEqual({ actions: 'write' });
+    }
+  });
   it('classifies every token-bearing step except failure-only ejection', () => {
     const steps = tokenSteps().filter(
       ({ step }) => step.name !== FAIL_FAST_STEP

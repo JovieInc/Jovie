@@ -1,6 +1,7 @@
 {
   "comment": "Ratchet: jobs still on floating ubuntu-latest. Pin to an explicit image and delete the entry; Playwright jobs may never be listed. See scripts/workflow-runner-pin-check.mjs.",
   "jobs": [
+    "merge-group-fail-fast.yml#cancel",
     "actionlint.yml#actionlint",
     "actions-cache-gc.yml#gc",
     "agent-harness-health-report.yml#report",

@@ -2,6 +2,12 @@
   "schema": "jovie-external-api-allowlist/v1",
   "entries": [
     {
+      "path": ".github/workflows/merge-group-fail-fast.yml",
+      "rule": "gh-shell",
+      "max": 1,
+      "reason": "JOV-13106 requires LYB's exact gh run cancel of GITHUB_RUN_ID without checkout or head code. This reusable workflow has one cancel step and actions: write only; the fail-fast contract pins the command and forbids other inputs or steps."
+    },
+    {
       "path": ".github/workflows/merge-queue-green-enroll.yml",
       "rule": "provider-host",
       "max": 2,
