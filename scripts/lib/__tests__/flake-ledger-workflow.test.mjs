@@ -10,6 +10,7 @@ import {
   maybeRetry,
   RECORD_COMMAND,
   REPORT_COMMAND,
+  recordAndReport,
   runRecordFromEvent,
 } from '../../flake-ledger-workflow-hook.mjs';
 
@@ -73,11 +74,11 @@ test('workflow_run completed collector is event-driven and limited to Source Val
 
 test('the workflow calls the HA collector entrypoint and does not reimplement flips in YAML', () => {
   assert.match(
-    WORKFLOW,
+    HOOK,
     new RegExp(RECORD_COMMAND.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   );
   assert.match(
-    WORKFLOW,
+    HOOK,
     new RegExp(REPORT_COMMAND.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   );
   assert.match(
@@ -86,8 +87,13 @@ test('the workflow calls the HA collector entrypoint and does not reimplement fl
   );
   assert.match(
     WORKFLOW,
+    /scripts\/flake-ledger-workflow-hook\.mjs record-and-report/
+  );
+  assert.match(
+    WORKFLOW,
     /scripts\/flake-ledger-workflow-hook\.mjs maybe-retry/
   );
+  assert.doesNotMatch(WORKFLOW, /node scripts\/lib\/flake-ledger\.mjs/);
   assert.equal(COLLECTOR_ENTRYPOINT, 'scripts/lib/flake-ledger.mjs');
   assert.doesNotMatch(WORKFLOW, /run_attempt\s*>\s*1 and now green/);
   assert.doesNotMatch(WORKFLOW, /if:.*run_attempt\s*>\s*1/);
@@ -414,4 +420,37 @@ test('maybe-retry is fail-closed when the HA entrypoint or rate limit blocks it'
     }
   );
   assert.equal(limited.reason, 'retry-rate-limited');
+});
+
+test('recordAndReport calls the HA CLI and skips it when the entrypoint is missing', async () => {
+  const calls = [];
+  const missing = await recordAndReport(
+    {
+      root: '/tmp/missing-collector',
+      outDir: '/tmp/out',
+      ledgerPath: '/tmp/ledger.json',
+    },
+    { exists: () => false, execFile: (...args) => calls.push(args) }
+  );
+  assert.equal(missing.reason, 'collector-entrypoint-missing');
+  assert.equal(calls.length, 0);
+
+  const recorded = await recordAndReport(
+    { root: '/repo', outDir: '/repo/out', ledgerPath: '/repo/out/ledger.json' },
+    {
+      exists: path =>
+        path.endsWith('scripts/lib/flake-ledger.mjs') ||
+        path.endsWith('attempt1.json') ||
+        path.endsWith('run.json'),
+      execFile: (_node, args) => {
+        calls.push(args);
+        return '{}';
+      },
+    }
+  );
+  assert.equal(recorded.recorded, true);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every(args => args[1] === 'record' || args[1] === 'report'));
+  assert.deepEqual(calls[0].slice(1, 3), ['record', '--ledger']);
+  assert.deepEqual(calls[2].slice(1, 3), ['report', '--ledger']);
 });

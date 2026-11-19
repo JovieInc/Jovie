@@ -44,6 +44,7 @@ jobs:
             .github/actions/prime-node-toolcache/prime.sh
             scripts/flake-ledger-workflow-hook.mjs
             scripts/lib/flake-ledger.mjs
+            packages/api-client
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
@@ -83,16 +84,10 @@ jobs:
         run: node scripts/flake-ledger-workflow-hook.mjs build-run-file
 
       - name: Record and report with the HA collector
-        run: |
-          if [ ! -f scripts/lib/flake-ledger.mjs ]; then
-            echo '::notice::HA collector scripts/lib/flake-ledger.mjs is not on this ref; the run-file was written and no flips were recorded.'
-            exit 0
-          fi
-          if [ -f .flake-ledger/attempt1.json ]; then
-            node scripts/lib/flake-ledger.mjs record --ledger .flake-ledger/ledger.json --run-file .flake-ledger/attempt1.json
-          fi
-          node scripts/lib/flake-ledger.mjs record --ledger .flake-ledger/ledger.json --run-file .flake-ledger/run.json
-          node scripts/lib/flake-ledger.mjs report --ledger .flake-ledger/ledger.json
+        env:
+          FLAKE_LEDGER_OUT_DIR: .flake-ledger
+          FLAKE_LEDGER_PATH: .flake-ledger/ledger.json
+        run: node scripts/flake-ledger-workflow-hook.mjs record-and-report
 
       - name: Save flake ledger
         if: ${{ !cancelled() }}
@@ -151,6 +146,7 @@ jobs:
             .github/actions/prime-node-toolcache/prime.sh
             scripts/flake-ledger-workflow-hook.mjs
             scripts/lib/flake-ledger.mjs
+            packages/api-client
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)

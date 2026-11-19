@@ -8,10 +8,14 @@
  *
  *   node scripts/flake-ledger-workflow-hook.mjs build-run-file
  *   node scripts/flake-ledger-workflow-hook.mjs maybe-retry
+ *   node scripts/flake-ledger-workflow-hook.mjs record-and-report
  */
+// api-budget: github-app-core 200/hr - every same-repo Source Validation pull_request completion: one jobs page, plus attempt-1 run and jobs when run_attempt>1, plus annotation pages only on a failed first attempt
+// api-budget: github-actions-token 40/hr - one rerun-failed-jobs POST only when the HA classifier allows a first infra retry
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const LEDGER_SCHEMA = 'jovie-flake-ledger/v1';
 export const COLLECTOR_ENTRYPOINT = 'scripts/lib/flake-ledger.mjs';
@@ -33,32 +37,57 @@ const CONCLUSIONS = new Set(['success', 'failure', 'timed_out', 'cancelled']);
 const SOURCE_VALIDATION_PATH = '.github/workflows/source-validation.yml';
 const PR_READY = 'PR Ready';
 
-function githubRequest(
-  path,
-  { token, method = 'GET', fetchImpl = fetch } = {}
-) {
-  const apiUrl = (
-    process.env.GITHUB_API_URL || 'https://api.github.com'
-  ).replace(/\/$/, '');
-  return fetchImpl(`${apiUrl}${path}`, {
-    method,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  }).then(async response => {
-    const text = await response.text();
+const API_CLIENT = fileURLToPath(
+  new URL('../packages/api-client/cli.ts', import.meta.url)
+);
+
+function githubRequest(path, { token, method = 'GET' } = {}) {
+  try {
+    const stdout = execFileSync(
+      process.execPath,
+      [
+        API_CLIENT,
+        'gh',
+        '--priority',
+        'repair',
+        '--once',
+        '--',
+        'api',
+        '-X',
+        method,
+        path,
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, GH_TOKEN: token },
+      }
+    );
+    return {
+      ok: true,
+      status: method === 'POST' ? 201 : 200,
+      data: stdout ? JSON.parse(stdout) : null,
+    };
+  } catch (error) {
+    const statusMatch = String(error.stderr ?? error.message ?? '').match(
+      /HTTP (\d{3})/
+    );
+    const status = statusMatch
+      ? Number(statusMatch[1])
+      : error.status === 75
+        ? 429
+        : 1;
+    if (status === 409) return { ok: false, status: 409, data: null };
     let data = null;
+    const text = String(error.stdout ?? '');
     if (text) {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error('GitHub returned invalid JSON');
+        data = null;
       }
     }
-    return { ok: response.ok, status: response.status, data };
-  });
+    return { ok: false, status, data };
+  }
 }
 
 function ensureLedger(ledgerPath, { readFile, writeFile, exists }) {
@@ -385,10 +414,45 @@ export async function maybeRetry(options = {}, dependencies = {}) {
   });
 }
 
+export async function recordAndReport(options = {}, dependencies = {}) {
+  const {
+    root = process.cwd(),
+    outDir = process.env.FLAKE_LEDGER_OUT_DIR || '.flake-ledger',
+    ledgerPath = process.env.FLAKE_LEDGER_PATH || '.flake-ledger/ledger.json',
+  } = options;
+  const exists = dependencies.exists ?? existsSync;
+  const execFile = dependencies.execFile ?? execFileSync;
+  const notice =
+    dependencies.notice ?? (msg => console.log(`::notice::${msg}`));
+  if (!ensureCollectorEntrypoint(root, exists)) {
+    notice(
+      `HA collector ${COLLECTOR_ENTRYPOINT} is not on this ref; the run-file was written and no flips were recorded.`
+    );
+    return { recorded: false, reason: 'collector-entrypoint-missing' };
+  }
+  const collector = resolve(root, COLLECTOR_ENTRYPOINT);
+  const run = args =>
+    execFile(process.execPath, [collector, ...args], { encoding: 'utf8' });
+  const attempt1 = resolve(outDir, 'attempt1.json');
+  if (exists(attempt1))
+    run(['record', '--ledger', ledgerPath, '--run-file', attempt1]);
+  run([
+    'record',
+    '--ledger',
+    ledgerPath,
+    '--run-file',
+    resolve(outDir, 'run.json'),
+  ]);
+  const report = run(['report', '--ledger', ledgerPath]);
+  if (report) console.log(report.trim());
+  return { recorded: true, reason: 'recorded' };
+}
+
 export function main(argv = process.argv.slice(2), dependencies = {}) {
   const mode = argv[0];
   if (mode === 'build-run-file') return buildRunFile({}, dependencies);
   if (mode === 'maybe-retry') return maybeRetry({}, dependencies);
+  if (mode === 'record-and-report') return recordAndReport({}, dependencies);
   throw new Error(`Unsupported mode ${JSON.stringify(mode)}`);
 }
 
