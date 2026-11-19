@@ -127,8 +127,10 @@ function jobBlock(jobId, nextJobId) {
 }
 
 /**
- * @typedef {{run?: string, uses?: string, if?: string | boolean,
- *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{name?: string, run?: string, uses?: string, if?: string | boolean,
+ *   env?: Record<string, string>,
+ *   with?: {'go-version'?: string, cache?: boolean,
+ *     reuse_merge_group_workspace?: string, path?: string}}} ActionlintWorkflowStep
  * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
  */
 function assertActionlintCompiler(steps) {
@@ -2732,7 +2734,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
-    const steps = loadYaml(WORKFLOW).jobs['ci-fast-remaining'].steps;
+    const steps = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW)).jobs[
+      'ci-fast-remaining'
+    ].steps;
     const nodeSetup = steps.findIndex(
       step => step.uses === './.github/actions/setup-node-pnpm'
     );

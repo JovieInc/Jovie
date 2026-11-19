@@ -198,7 +198,13 @@ test('successful reads pass on the first attempt and real policy/API failures st
   assert.match(policy.error.message, /Policy violation/);
 });
 test('Retry-After HTTP dates are honored and repeated short hints cannot defeat backoff', () => {
-  const options = { status: 429, nowMs: 0, deadlineMs: 60_000, attempt: 4 };
+  const options = {
+    status: 429,
+    message: '',
+    nowMs: 0,
+    deadlineMs: 60_000,
+    attempt: 4,
+  };
   assert.equal(
     apiRetryDelay({ ...options, headers: new Headers({ 'retry-after': '0' }) }),
     8_000

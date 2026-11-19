@@ -157,10 +157,10 @@ test('root graph changes hydrate source runners before the path-selected typeche
   const command = workflow.jobs.unit.steps
     .find(step => step.name === 'Select unit-affecting diff')
     .run.replaceAll('${{ github.base_ref }}', 'main');
-  for (const [path, expected] of [
+  for (const [path, expected] of /** @type {Array<[string, boolean]>} */ ([
     ['tsconfig.json', true],
     ['docs/guide.md', false],
-  ]) {
+  ])) {
     const dir = mkdtempSync(join(tmpdir(), 'mq-parity-hydration-'));
     try {
       mkdirSync(join(dir, 'bin'));

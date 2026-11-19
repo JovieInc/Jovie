@@ -12,6 +12,23 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const root = resolve(import.meta.dirname, '../..');
+
+/**
+ * @typedef {{
+ *   workflow: string,
+ *   job: string,
+ *   mq_step: string,
+ *   pr_step: string,
+ *   command: string,
+ *   env?: Record<string, string>,
+ * }} MqParityTwin
+ * @typedef {{
+ *   twins?: MqParityTwin[],
+ *   needs_merged_tree?: { reason: string, inputs?: string[] },
+ *   rollup_lanes?: string[],
+ * }} MqParityJob
+ * @typedef {{ jobs: Record<string, MqParityJob> }} MqParityManifest
+ */
 test('every reachable MQ job has a valid parity classification and command', () => {
   assert.deepEqual(validateRepositoryMqParity(root), []);
 });
@@ -23,6 +40,7 @@ function fixture() {
   const pr = load(
     `on:\n  pull_request:\njobs:\n  source:\n    steps:\n      - name: Run source\n        run: node scripts/check.mjs\n`
   );
+  /** @type {MqParityManifest} */
   const manifest = {
     jobs: {
       lane: {
@@ -53,6 +71,7 @@ test('a newly introduced MQ lane fails until classified, even with unknown path 
 });
 
 test('event restrictions exclude manual and source-only jobs while preserving conditional MQ lanes', () => {
+  /** @type {Array<[string, boolean | null]>} */
   const cases = [
     ["github.event_name == 'workflow_dispatch'", false],
     ["always() && github.event_name == 'pull_request'", false],
@@ -109,7 +128,8 @@ test('broken workflows, removed commands, skipped PR twins and changed selectors
 
 test('merged-tree reasons name actual inputs and rollups name existing underlying lanes', () => {
   const { workflow, manifest } = fixture();
-  for (const reason of [
+  /** @type {Array<{ reason: string, inputs?: string[] }>} */
+  const reasons = [
     { reason: 'Needs merged tree' },
     {
       reason: 'Needs merged tree',
@@ -117,7 +137,8 @@ test('merged-tree reasons name actual inputs and rollups name existing underlyin
     },
     { reason: 'input invented', inputs: ['invented'] },
     { reason: 'needs.missing.result', inputs: ['needs.missing.result'] },
-  ]) {
+  ];
+  for (const reason of reasons) {
     manifest.jobs.lane = { needs_merged_tree: reason };
     assert.ok(validateMqParity(manifest, workflow, () => {}).length > 0);
   }
