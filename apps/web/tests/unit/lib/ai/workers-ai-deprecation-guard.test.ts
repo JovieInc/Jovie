@@ -114,7 +114,7 @@ describe('Workers AI deprecated-model guard (JOV-13141)', () => {
     // additions to either.
     const relaySource = readFileSync(
       new URL(
-        '../../../../../infra/workers-ai-relay/src/index.ts',
+        '../../../../../../infra/workers-ai-relay/src/index.ts',
         import.meta.url
       ),
       'utf8'
