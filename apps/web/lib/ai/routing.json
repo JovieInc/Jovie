@@ -129,7 +129,7 @@
       "fallback": null,
       "models": ["@cf/deepseek-ai/deepseek-v4.1-flash-1017"],
       "gatewayKey": null,
-      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Vision tier (JOV-13141): Cloudflare retired @cf/zai-org/glm-5.3-flash on 2026-11-20, replaced by @cf/deepseek-ai/deepseek-v4.1-flash-1017 (1M context, vision, function calling; $0.30/M input, $1.20/M output, $0.006/M cached input); @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
+      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Replaced the claude -p subscription route. Vision tier (JOV-13141): Cloudflare retired @cf/zai-org/glm-5.3-flash on 2026-11-20, replaced by @cf/deepseek-ai/deepseek-v4.1-flash-1017 (1M context, vision, function calling; catalog pricing recorded in apps/web/lib/ai/workers-ai.ts); @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091)."
     },
     {
       "id": "dev.investor-eval",
