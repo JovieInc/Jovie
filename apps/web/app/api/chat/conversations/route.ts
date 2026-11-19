@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { listCreatorConversations } from '@/lib/chat/conversation-queries';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { conversationTitleSource } from '@/lib/chat/title-source';
 import { db } from '@/lib/db';
@@ -27,7 +28,7 @@ const MAX_INITIAL_MESSAGE_LENGTH = 4000;
 const MAX_CONVERSATIONS_PER_USER = 200;
 
 /** Schema for the create-conversation request body (both fields optional). */
-const createConversationSchema = z.object({
+const createConversationSchema = chatToolSchema({
   title: z.string().optional(),
   initialMessage: z.string().optional(),
 });

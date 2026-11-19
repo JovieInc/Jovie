@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { getCreatorConversationDetail } from '@/lib/chat/conversation-queries';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
   sanitizeConversationTitle,
   withSanitizedConversationTitle,
@@ -21,7 +22,7 @@ const NO_STORE_HEADERS = {
 } as const;
 
 /** Schema for the rename-conversation request body. */
-const renameConversationSchema = z.object({
+const renameConversationSchema = chatToolSchema({
   title: z.string().optional(),
 });
 
