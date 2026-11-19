@@ -3039,7 +3039,7 @@ class RunIssueTest(unittest.TestCase):
 
         def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
             if args[:3] == ["git", "worktree", "add"]:
-                Path(args[-2]).mkdir(parents=True)
+                make_synthetic_worktree(args[-2])
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.sh = fake_sh
 
@@ -3053,8 +3053,10 @@ class RunIssueTest(unittest.TestCase):
 
     def test_success_writes_prompt_log_and_receipt(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
-        receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
-                                 FakeLinear([]), issue("JOV-8"))
+        with patch.object(lane.worktree_pool, "install_git_hooks", wraps=lane.worktree_pool.install_git_hooks) as install:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
+                                     FakeLinear([]), issue("JOV-8"))
+        install.assert_called_once()
         self.assertEqual((receipt["verdict"], receipt["agentExit"], receipt["pr"]), ("landing", 0, 9))
         self.assertEqual(self.ledger()[0]["runId"], receipt["runId"])
         prompt = next((self.host.state / "runs").glob("*.prompt.md")).read_text()
@@ -9521,6 +9523,8 @@ class UpdateTest(unittest.TestCase):
             calls = []
 
             def run(argv, **kwargs):
+                if argv[0] == "bash":
+                    return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
                 calls.append(argv)
                 if argv[0] == "node":
                     # A real maintained take must skip the leased slot and use
@@ -9530,10 +9534,7 @@ class UpdateTest(unittest.TestCase):
                             patch.object(lane.worktree_pool, "claim") as claim:
                         dest = Path(tmp) / "other"
                         def fresh(argv, **kwargs):
-                            installer = dest / "scripts/hooks/configure-git-hooks.sh"
-                            installer.parent.mkdir(parents=True, exist_ok=True)
-                            installer.write_text("#!/usr/bin/env bash\nexit 0\n")
-                            installer.chmod(0o755)
+                            make_synthetic_worktree(dest)
                             return subprocess.CompletedProcess(argv, 0)
                         fresh = unittest.mock.Mock(side_effect=fresh)
                         self.assertEqual(lane.worktree_pool.take(host.repo, dest, None,
@@ -17815,7 +17816,7 @@ class MixedBodyRepairTest(unittest.TestCase):
         stamp.assert_called_once_with(self.host, self.pr)
 
 
-from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin, make_synthetic_worktree
 
 
 class CloudLaneGateTest(CloudLaneGateMixin, unittest.TestCase):
