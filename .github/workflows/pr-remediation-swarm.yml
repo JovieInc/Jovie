@@ -86,7 +86,11 @@ jobs:
           SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
           # Model kill switch: only the exact value "on" opens model slots. Unset = off (fails closed).
           SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
+          # Credits-first provider order: off unless exactly "on"; off = the single SWARM_BASE_URL relay.
+          SWARM_PROVIDER_ORDER: ${{ vars.SWARM_PROVIDER_ORDER }}
+          SWARM_PROVIDERS: ${{ vars.SWARM_PROVIDERS }}
+          CREDIT_CAP: ${{ vars.SWARM_CREDIT_DAILY_USD_CAP || '5' }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --credit-cap-usd "$CREDIT_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
 
   remediate:
     name: Remediate #${{ matrix.pr }}
@@ -180,6 +184,10 @@ jobs:
         if: steps.prep.outputs.action == 'agent' && vars.SWARM_MODEL_MODE == 'on'
         env:
           SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE }}
+          SWARM_TIERS: ${{ matrix.tiers }}
+          SWARM_PROVIDER_ORDER: ${{ vars.SWARM_PROVIDER_ORDER }}
+          SWARM_PROVIDERS: ${{ vars.SWARM_PROVIDERS }}
+          SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}
           SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
@@ -262,4 +270,4 @@ jobs:
       - name: Append spend to the ledger issue
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py ledger --issue "${{ vars.SWARM_LEDGER_ISSUE }}" --run "${{ github.run_id }}" --cents "${{ steps.sum.outputs.cents }}"
+        run: python3 scripts/swarm/pr_remediation_swarm.py ledger --issue "${{ vars.SWARM_LEDGER_ISSUE }}" --run "${{ github.run_id }}" --cents "${{ steps.sum.outputs.cents }}" --credit-cents "${{ steps.sum.outputs.credit_cents }}"
