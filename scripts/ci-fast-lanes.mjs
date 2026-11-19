@@ -1138,6 +1138,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
   'scripts/lib/__tests__/ci-structural-shards.test.mjs',
+  'scripts/lib/__tests__/ci-runner-worker-policy.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
