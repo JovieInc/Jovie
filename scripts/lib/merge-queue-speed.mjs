@@ -116,6 +116,67 @@ export function queueWaits(mergedPrs) {
   return waits;
 }
 
+function mainFirstAdmission(mergedPrs, inventoryComplete) {
+  const seconds = [];
+  const seen = new Set();
+  let merged = 0;
+  let withoutNativeEntry = 0;
+  let reenteredPrs = 0;
+  let unknownPrs = 0;
+  let duplicateRows = 0;
+  for (const pr of mergedPrs) {
+    if (!pr.baseRefName || !Number.isInteger(pr.number)) {
+      unknownPrs++;
+      continue;
+    }
+    if (pr.baseRefName !== 'main') continue;
+    if (seen.has(pr.number)) {
+      duplicateRows++;
+      continue;
+    }
+    seen.add(pr.number);
+    merged++;
+    const count = pr.admissionCount;
+    const first = pr.firstAdmission?.nodes;
+    if (count === 0 && first?.length === 0 && pr.enqueuedAt?.length === 0) {
+      withoutNativeEntry++;
+      continue;
+    }
+    const elapsed = sec(pr.mergedAt, first?.[0]?.createdAt);
+    const latest = pr.enqueuedAt?.at(-1);
+    const span = sec(latest, first?.[0]?.createdAt);
+    if (
+      !Number.isInteger(count) ||
+      count < 1 ||
+      first?.length !== 1 ||
+      !Number.isFinite(elapsed) ||
+      !Number.isFinite(span) ||
+      span < 0 ||
+      span > elapsed ||
+      (count === 1 && span !== 0)
+    ) {
+      unknownPrs++;
+      continue;
+    }
+    seconds.push(elapsed);
+    if (count > 1) reenteredPrs++;
+  }
+  const complete = inventoryComplete && unknownPrs === 0 && duplicateRows === 0;
+  return {
+    basis:
+      'First native ADD through GitHub mergedAt for PRs merged to main during the window. Excludes still-open and closed-unmerged PRs.',
+    firstEntryToMergeSeconds: complete
+      ? stat(seconds)
+      : { n: seconds.length, p50: null, p95: null },
+    mergedPrs: merged,
+    withoutNativeEntry,
+    reenteredPrs,
+    unknownPrs,
+    duplicateRows,
+    complete,
+  };
+}
+
 /** Group success over trailing windows, so the 85%-for-2h gate is checkable. */
 export function successByWindow(runs, nowMs, hoursList = [2, 6, 24]) {
   const out = {};
@@ -202,12 +263,20 @@ export function summarize({
         ? { n: windowGroups.length, p50: null, p95: null }
         : okWall(windowGroups),
     groupOutcomes: windows,
+    unfinishedGroupRuns:
+      collection?.groupRunsComplete === true
+        ? windowGroups.length - completedGroups.length
+        : null,
     groupSuccessRate: windows[`${windowHours}h`]?.successRate ?? null,
     mergesPerHour:
       collection?.mergedPrsComplete === false
         ? null
         : round(merges / windowHours, 2),
     merges,
+    mainFirstAdmission: mainFirstAdmission(
+      windowMerged,
+      collection?.mergedPrsComplete === true
+    ),
     queueWaitSeconds:
       collection?.mergedPrsComplete === false ||
       collection?.queueEventsComplete === false
