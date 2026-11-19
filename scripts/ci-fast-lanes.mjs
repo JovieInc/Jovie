@@ -978,6 +978,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
+  'scripts/pr-body-lint.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -1188,7 +1189,7 @@ export const DEPRECATION_COVERAGE_COMMAND =
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
-  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs';
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs scripts/pr-body-lint.test.mjs';
 
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
@@ -1262,6 +1263,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/next-build-cache-contract.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
@@ -2966,10 +2968,22 @@ export async function runStructural(opts = {}) {
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).
+  // Landing events (push to main, merge groups) validate the exact tree the
+  // PR fleet judges: the PR-time script-contracts source guard runs the FULL
+  // lists on every PR, and its repo-wide ratchets scan the tree dynamically
+  // (git ls-files + whole-repo scans), so the static derived selector can
+  // never pick them. #25864's apps/ios-only landing carried a wall-clock
+  // assertion that kept every open PR's merged-tree guard red for ~53h while
+  // main's own push stayed green (JOV-13095). On landing events run the full
+  // lists too, so the break reds main/merge-group itself instead of
+  // stranding PRs on stale heads.
+  const landingEvent = event === 'push' || event === 'merge_group';
   const dependentScriptTests =
     selected.has('operations') || !changed?.length
       ? []
-      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
+      : landingEvent
+        ? SCRIPT_CONTRACT_NODE_TESTS
+        : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2998,6 +3012,12 @@ export async function runStructural(opts = {}) {
     ...scriptContractNodeArgs(dependentScriptTests).map(
       args => `node ${args.join(' ')}`
     ),
+    // The vitest half of the script contracts (workspace-scripts project:
+    // wall-clock ratchet, copy inventory, ...) is otherwise operations-only.
+    // Reuse the same command operations runs; operations still runs it once.
+    ...(landingEvent && !selected.has('operations')
+      ? [SCRIPT_CONTRACT_VITEST_COMMAND]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
