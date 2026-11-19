@@ -2,9 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
+  applyVictimRearms,
+  enqueueVictim,
+  planVictimRearms,
+} from '../../merge-group-victim-rearm.mjs';
+import {
   artifactJson,
   githubIo,
   reconcileQueueRetry,
+  reconcileVictimRearms,
 } from '../promotion-github.mjs';
 
 const now = 1800000000000;
@@ -145,4 +151,148 @@ test('malformed artifact members cannot provide evidence', () => {
     () => artifactJson(Buffer.from('not a ZIP'), 'evidence.json'),
     /absent/
   );
+});
+
+const victim = (prNumber, files = ['docs/guide.md']) => ({
+  prNumber,
+  headSha: String(prNumber).repeat(40),
+  state: 'OPEN',
+  baseRefName: 'main',
+  mergeStateStatus: 'CLEAN',
+  labels: [],
+  files,
+  statuses: [],
+});
+const infraEvidence = head => ({
+  complete: true,
+  retries: 0,
+  receipts: [
+    { schema: 'ejection/v1', head, class: 'infra', run: 6, attempt: 2 },
+  ],
+});
+
+test('victim reconciliation loads evidence before planning, reserves before enqueue and leaves changed heads alone', async () => {
+  const candidates = [
+    victim(1),
+    victim(2),
+    victim(3, ['other.mjs']),
+    victim(4),
+  ];
+  const calls = [];
+  const logs = [];
+  const net = {
+    readRetryEvidence: async ({ pr, head, labels }) => {
+      calls.push(`evidence:${pr}`);
+      assert.deepEqual(labels, []);
+      return pr === 1 || pr === 4
+        ? infraEvidence(head)
+        : { complete: true, receipts: [], retries: 0 };
+    },
+    health: async () => ({ complete: true, circuitOpen: false }),
+    reserveRetry: async reservation => {
+      await Promise.resolve();
+      calls.push(reservation);
+    },
+  };
+  await reconcileVictimRearms(candidates, net, {
+    plan() {
+      calls.push('plan');
+      return planVictimRearms({
+        runId: 7,
+        implicatedPaths: ['other.mjs'],
+        candidates,
+        now,
+      });
+    },
+    apply: applyVictimRearms,
+    targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/7',
+    readPullRequest(prNumber) {
+      calls.push(`read:${prNumber}`);
+      return {
+        nodeId: `PR_${prNumber}`,
+        headSha: prNumber === 4 ? head : candidates[prNumber - 1].headSha,
+        mergeStateStatus: 'CLEAN',
+      };
+    },
+    enqueue: enqueueVictim,
+    exec(args) {
+      const id = args.find(arg => arg.startsWith('id=')).slice(3);
+      const pr = Number(id.slice(3));
+      assert.ok(args.includes(`oid=${candidates[pr - 1].headSha}`));
+      calls.push(`enqueue:${pr}`);
+      return {
+        data: { enqueuePullRequest: { mergeQueueEntry: { position: pr } } },
+      };
+    },
+    writeStatus(status) {
+      calls.push(`status:${status.sha}`);
+      assert.equal(
+        status.targetUrl,
+        'https://github.com/JovieInc/Jovie/actions/runs/7'
+      );
+      assert.equal(
+        status.description,
+        `n=1;sha=${status.sha};run=7;why=another-pr`
+      );
+    },
+    log: line => logs.push(line),
+  });
+  assert.deepEqual(calls, [
+    'evidence:1',
+    'evidence:2',
+    'evidence:3',
+    'evidence:4',
+    'plan',
+    'read:1',
+    { head: candidates[0].headSha, run: 6, attempt: 2 },
+    'enqueue:1',
+    `status:${candidates[0].headSha}`,
+    'read:2',
+    'enqueue:2',
+    `status:${candidates[1].headSha}`,
+    'read:4',
+  ]);
+  assert.deepEqual(logs, [
+    'enqueued #1 at position 1',
+    'enqueued #2 at position 2',
+    'rearm #1 class=another-pr reason=infra-retry n=1 increment=true run=7',
+    'rearm #2 class=another-pr reason=cascade-rearm n=1 increment=true run=7',
+    'skip #3 own-failure',
+    'rearm #4 class=another-pr reason=infra-retry n=1 increment=true run=7',
+    'applied=2',
+  ]);
+});
+
+test('a rejected victim retry reservation prevents enqueue and success receipts', async () => {
+  const candidates = [victim(1)];
+  const failure = new Error('reservation denied');
+  const effects = [];
+  await assert.rejects(
+    reconcileVictimRearms(
+      candidates,
+      {
+        readRetryEvidence: async ({ head }) => infraEvidence(head),
+        health: async () => ({ complete: true, circuitOpen: false }),
+        reserveRetry: async () => {
+          throw failure;
+        },
+      },
+      {
+        plan: () =>
+          planVictimRearms({
+            runId: 7,
+            implicatedPaths: ['other.mjs'],
+            candidates,
+            now,
+          }),
+        apply: applyVictimRearms,
+        readPullRequest: () => ({ ...candidates[0], nodeId: 'PR_1' }),
+        enqueue: () => effects.push('enqueue'),
+        writeStatus: () => effects.push('status'),
+        log: () => effects.push('log'),
+      }
+    ),
+    error => error === failure
+  );
+  assert.deepEqual(effects, []);
 });

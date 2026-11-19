@@ -110,3 +110,15 @@ export function trustedRetryCount(statuses) {
       .map(s => s.description)
   ).size;
 }
+
+export function victimRetryPolicy(candidate, classification, runId) {
+  return retryDisposition({
+    head: candidate.headSha,
+    labels: candidate.labels,
+    complete: candidate.retryEvidence?.complete ?? true,
+    ...candidate.retryEvidence,
+    removed: true,
+    cascade: ['another-pr', 'base-branch'].includes(classification),
+    cascadeRun: runId,
+  });
+}

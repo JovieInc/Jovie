@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { planVictimRearms } from '../../merge-group-victim-rearm.mjs';
+import {
+  planVictimRearms,
+  REARM_CONTEXT,
+  rearmDescription,
+  trustedRearmRecords,
+} from '../../merge-group-victim-rearm.mjs';
 import {
   parseQueueBranch,
   RETRY_CONTEXT,
@@ -220,4 +225,100 @@ test('positive cascade attribution releases its group run, never an older same-h
       .reason,
     'head-unchanged-non-infra'
   );
+});
+
+const sha = head;
+const other = 'b'.repeat(40);
+
+function candidate(overrides = {}) {
+  return {
+    prNumber: 10,
+    state: 'OPEN',
+    isDraft: false,
+    baseRefName: 'main',
+    isCrossRepository: false,
+    headSha: sha,
+    mergeStateStatus: 'CLEAN',
+    inQueue: false,
+    autoMerge: false,
+    labels: [],
+    files: ['apps/web/README.md'],
+    statuses: [],
+    ...overrides,
+  };
+}
+
+function status(n, head = sha, runId = 100) {
+  return {
+    context: REARM_CONTEXT,
+    state: 'success',
+    creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+    description: `n=${n};sha=${head};run=${runId}`,
+  };
+}
+
+const NOW = Date.parse('2026-10-29T12:00:00Z');
+const dequeue = (actor, minutesAgo) => ({
+  actor,
+  atMs: NOW - minutesAgo * 60_000,
+});
+const flake = (overrides, extra = {}) =>
+  planVictimRearms({
+    runId: 800,
+    implicatedPaths: [],
+    now: NOW,
+    candidates: [
+      candidate({
+        dequeue: dequeue('github-merge-queue[bot]', 2),
+        ...overrides,
+      }),
+    ],
+    ...extra,
+  })[0];
+
+test('cascade rearm status round-trips the exact head and source run', () => {
+  const description = rearmDescription({
+    n: 1,
+    headSha: sha,
+    runId: 800,
+    classification: 'another-pr',
+  });
+  const parsed = trustedRearmRecords([{ ...status(1, sha, 800), description }]);
+  assert.deepEqual(parsed, [{ n: 1, sha, runId: 800 }]);
+});
+
+test('unattributed flake is held even when GitHub just dropped a green head', () => {
+  const decision = flake({});
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.reason, 'head-unchanged-non-infra');
+});
+
+test('a new head does not inherit old infra strikes, but still needs positive infra evidence', () => {
+  const decision = flake({
+    headSha: other,
+    statuses: [status(1, sha, 1), status(2, sha, 2)],
+    retryEvidence: {
+      complete: true,
+      retries: 0,
+      receipts: [
+        { schema: 'ejection/v1', head: other, class: 'infra', run: 800 },
+      ],
+    },
+  });
+  assert.equal(decision.action, 'rearm');
+  assert.equal(decision.n, 1);
+});
+
+test('infra requeue exhausts after one reservation regardless of the older cascade cap', () => {
+  const decision = flake({
+    retryEvidence: {
+      complete: true,
+      retries: 1,
+      receipts: [
+        { schema: 'ejection/v1', head: sha, class: 'infra', run: 800 },
+      ],
+    },
+  });
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.reason, 'infra-retry-exhausted');
 });

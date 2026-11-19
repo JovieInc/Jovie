@@ -17,7 +17,6 @@ import {
   REARM_CAP,
   REARM_CONTEXT,
   RearmPermissionError,
-  rearmDescription,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -714,53 +713,6 @@ const flake = (overrides, extra = {}) =>
     ],
     ...extra,
   })[0];
-
-test('cascade rearm status round-trips the exact head and source run', () => {
-  const description = rearmDescription({
-    n: 1,
-    headSha: sha,
-    runId: 800,
-    classification: 'another-pr',
-  });
-  const parsed = trustedRearmRecords([{ ...status(1, sha, 800), description }]);
-  assert.deepEqual(parsed, [{ n: 1, sha, runId: 800 }]);
-});
-
-test('unattributed flake is held even when GitHub just dropped a green head', () => {
-  const decision = flake({});
-  assert.equal(decision.action, 'skip');
-  assert.equal(decision.reason, 'head-unchanged-non-infra');
-});
-
-test('a new head does not inherit old infra strikes, but still needs positive infra evidence', () => {
-  const decision = flake({
-    headSha: other,
-    statuses: [status(1, sha, 1), status(2, sha, 2)],
-    retryEvidence: {
-      complete: true,
-      retries: 0,
-      receipts: [
-        { schema: 'ejection/v1', head: other, class: 'infra', run: 800 },
-      ],
-    },
-  });
-  assert.equal(decision.action, 'rearm');
-  assert.equal(decision.n, 1);
-});
-
-test('infra requeue exhausts after one reservation regardless of the older cascade cap', () => {
-  const decision = flake({
-    retryEvidence: {
-      complete: true,
-      retries: 1,
-      receipts: [
-        { schema: 'ejection/v1', head: sha, class: 'infra', run: 800 },
-      ],
-    },
-  });
-  assert.equal(decision.action, 'skip');
-  assert.equal(decision.reason, 'infra-retry-exhausted');
-});
 
 test('flake requeue: a human or bot dequeue is never reversed', () => {
   assert.equal(

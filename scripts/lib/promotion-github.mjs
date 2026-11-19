@@ -39,6 +39,60 @@ export async function reconcileQueueRetry(input, net) {
   }
 }
 
+// Keep evidence reads, retry reservations and enqueue effects in their original order.
+export async function reconcileVictimRearms(
+  candidates,
+  net,
+  { plan, apply, enqueue, exec, log = console.log, ...io }
+) {
+  for (const candidate of candidates) {
+    const decision = await reconcileQueueRetry(
+      {
+        pr: candidate.prNumber,
+        head: candidate.headSha,
+        labels: candidate.labels,
+      },
+      net
+    );
+    candidate.retryEvidence = {
+      ...(decision.evidence ?? { complete: false }),
+      circuitOpen: decision.reason === 'circuit-open',
+    };
+  }
+  const decisions = plan();
+  return apply(decisions, {
+    ...io,
+    async enable(prNumber, current) {
+      const decision = decisions.find(d => d.prNumber === prNumber);
+      if (decision?.retry) {
+        const candidate = candidates.find(c => c.prNumber === prNumber);
+        const last = candidate.retryEvidence.receipts.at(-1);
+        await net.reserveRetry({
+          head: current.headSha,
+          run: last.run,
+          attempt: last.attempt,
+        });
+      }
+      const result = enqueue({
+        prNumber,
+        nodeId: current?.nodeId,
+        headOid: current?.headSha,
+        exec,
+      });
+      log(`enqueued #${prNumber} at position ${result.position}`);
+    },
+  }).then(applied => {
+    for (const decision of decisions) {
+      log(
+        decision.action === 'rearm'
+          ? `rearm #${decision.prNumber} class=${decision.classification} reason=${decision.reason} n=${decision.n} increment=${decision.increment} run=${decision.runId}`
+          : `skip #${decision.prNumber} ${decision.reason}`
+      );
+    }
+    log(`applied=${applied.length}`);
+  });
+}
+
 // Read a single bounded JSON member without extracting paths or executing tools.
 export function artifactJson(buffer, filename) {
   const data = Buffer.from(buffer);
