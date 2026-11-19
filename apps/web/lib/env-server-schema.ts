@@ -316,6 +316,10 @@ export const ServerEnvSchema = z.object({
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),
+  // Company registry webhook relay (JovieInc/ci only; separate from GH_DISPATCH_TOKEN)
+  REGISTRY_GITHUB_WEBHOOK_SECRET: z.string().optional(),
+  REGISTRY_VERCEL_WEBHOOK_SECRET: z.string().optional(),
+  REGISTRY_DISPATCH_TOKEN: z.string().optional(),
   // Release communications merge-event webhook signing
   RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
@@ -678,6 +682,9 @@ export const ENV_KEYS = [
   'SENTRY_AUTH_TOKEN',
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
+  'REGISTRY_GITHUB_WEBHOOK_SECRET',
+  'REGISTRY_VERCEL_WEBHOOK_SECRET',
+  'REGISTRY_DISPATCH_TOKEN',
   'LINEAR_API_KEY',
   'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'JOVIE_FLEET_ENABLED',
