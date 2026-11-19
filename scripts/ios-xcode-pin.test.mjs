@@ -150,18 +150,26 @@ test('TestFlight runs the artifact SDK guard after archive and before upload', (
     guard,
     workflow.lastIndexOf('      - name:', upload)
   );
-  assert.match(step, /if \[ ! -f "\$script" \]/);
-  assert.match(step, /::error::Missing min-SDK guard/);
   assert.match(
     step,
-    /unzip -p.*artifacts\/ios-build\/Jovie\.ipa.*Payload\/Jovie\.app\/Info\.plist/
+    /unzip -p.*artifacts\/ios-build\/Jovie\.ipa.*Payload\/Jovie\.app\/Info.plist/
   );
   assert.match(step, /plutil -convert xml1/);
-  assert.match(step, /node "\$script" --info-plist/);
+  assert.match(
+    step,
+    /bash \.github\/scripts\/run-app-store-min-sdk-guard\.sh --info-plist/
+  );
   assert.doesNotMatch(
     step,
     /continue-on-error|--showsdks|--dtsdkname|\|\| true/
   );
+  const wrapper = readFileSync(
+    path.join(root, '.github/scripts/run-app-store-min-sdk-guard.sh'),
+    'utf8'
+  );
+  assert.match(wrapper, /if \[ ! -f "\$script" \]/);
+  assert.match(wrapper, /::error::Missing min-SDK guard/);
+  assert.match(wrapper, /verify-app-store-min-sdk\.mjs/);
 });
 
 function runSdkStep(
@@ -172,7 +180,15 @@ function runSdkStep(
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const scriptDir = path.join(dir, 'apps/ios/scripts');
   mkdirSync(scriptDir, { recursive: true });
+  mkdirSync(path.join(dir, '.github/scripts'), { recursive: true });
   mkdirSync(path.join(dir, 'artifacts/ios-build'), { recursive: true });
+  writeFileSync(
+    path.join(dir, '.github/scripts/run-app-store-min-sdk-guard.sh'),
+    readFileSync(
+      path.join(root, '.github/scripts/run-app-store-min-sdk-guard.sh'),
+      'utf8'
+    )
+  );
   mkdirSync(path.join(dir, 'Payload/Jovie.app'), { recursive: true });
   writeFileSync(
     path.join(dir, 'Payload/Jovie.app/Info.plist'),

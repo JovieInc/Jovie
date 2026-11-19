@@ -1039,16 +1039,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          script="apps/ios/scripts/verify-app-store-min-sdk.mjs"
-          if [ ! -f "$script" ]; then
-            echo "::error::Missing min-SDK guard script at $script (JOV-13089 HA Flash non-workflow half, PR #26026, is not yet merged). Refusing to upload."
-            exit 1
-          fi
           # Check the exported binary, not the runner's available SDK list.
+          # The wrapper exists in this PR; it fail-closes if the #26026 companion
+          # script is not in the tree yet.
           sdk_plist="$RUNNER_TEMP/jovie-sdk-info.plist"
           unzip -p "artifacts/ios-build/Jovie.ipa" "Payload/Jovie.app/Info.plist" > "$sdk_plist"
           plutil -convert xml1 "$sdk_plist"
-          node "$script" --info-plist "$sdk_plist"
+          bash .github/scripts/run-app-store-min-sdk-guard.sh --info-plist "$sdk_plist"
 
       - name: Upload internal TestFlight build
         env:
