@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -31,6 +31,40 @@ describe('TourDatesEmptyState', () => {
     mocks.savePending.value = false;
     mocks.connectPending.value = false;
   });
+
+  it.each([
+    [false, 'Bandsintown API Key', { isComposing: true }],
+    [false, 'Bandsintown API Key', { keyCode: 229 }],
+    [true, 'Bandsintown Artist Name', { isComposing: true }],
+    [true, 'Bandsintown Artist Name', { keyCode: 229 }],
+  ] as const)(
+    'keeps IME candidate selection separate from submission (hasApiKey=%s, %s, %j)',
+    async (hasApiKey, label, composition) => {
+      const mutation = hasApiKey ? mocks.connect : mocks.saveKey;
+      mutation.mockResolvedValue({
+        success: true,
+        message: 'Saved',
+        tourDates: [],
+      });
+      render(
+        <TourDatesEmptyState
+          profileId='synthetic-tour-profile'
+          hasApiKey={hasApiKey}
+        />
+      );
+      const input = screen.getByLabelText(label);
+      fireEvent.change(input, { target: { value: 'synthetic-value' } });
+      fireEvent.keyDown(input, { key: 'Enter', ...composition });
+      expect(mutation).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await waitFor(() =>
+        expect(mutation).toHaveBeenCalledExactlyOnceWith({
+          [hasApiKey ? 'artistName' : 'apiKey']: 'synthetic-value',
+        })
+      );
+    }
+  );
 
   it('saves a trimmed API key and reports success', async () => {
     const user = userEvent.setup();

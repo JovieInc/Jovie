@@ -1,6 +1,9 @@
 {
   "schema": "customer-changelog-editorial/v1",
   "entries": {
+    "customer-update:quieter-status-inbox-identity": {
+      "headline": "The Inbox and Identity pages are calmer"
+    },
     "customer-update:profile-qr-local-generation": {
       "headline": "QR codes, drawn on your device",
       "lead": "Your profile QR code is now made right on the visitor's device, so your page loads with no outside requests."

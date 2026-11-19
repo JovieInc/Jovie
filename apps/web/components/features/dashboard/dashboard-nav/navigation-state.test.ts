@@ -9,9 +9,17 @@ import {
 } from './config';
 import {
   getRailNavigation,
+  INBOX_NAVIGATION_ITEM_ID,
   isNavigationItemActive,
   isNavigationItemHighlighted,
 } from './navigation-state';
+
+describe('Inbox navigation identity', () => {
+  it('keeps the header bell and the retired rail row on the warm-probe id', () => {
+    expect(INBOX_NAVIGATION_ITEM_ID).toBe('home');
+    expect(INBOX_NAVIGATION_ITEM_ID).toBe(homeNavItem.id);
+  });
+});
 
 describe('isNavigationItemActive', () => {
   it('keeps Home scoped to the shell root', () => {

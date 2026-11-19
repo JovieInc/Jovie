@@ -70,6 +70,7 @@ from fix_red_conflict_resolvers import (  # noqa: F401
     resolve_additive_certificate_waivers, resolve_additive_node_test_file,
     resolve_additive_node_tests_text, resolve_additive_statement_file,
 )
+from fix_red_pytest_count import resolve_pytest_count_file  # noqa: F401
 from fix_red_liveness_quota import resolve_liveness_quota_text  # noqa: F401
 from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
 

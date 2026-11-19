@@ -105,3 +105,9 @@ export function checkEditorialOverlay({ markdown, overlay, migrations }) {
   }
   return { errors, checked: entries.length };
 }
+
+/** Diagnose a publication plan with the same rules used by source CI. */
+export function publicationEditorialFindings({ content, overlay, migrations }) {
+  return checkEditorialOverlay({ markdown: content, overlay, migrations })
+    .errors;
+}

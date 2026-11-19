@@ -302,9 +302,13 @@ test.describe('Claim checkout dogfood', () => {
 
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator-ready');
-    await ensureUserIsFree(page, stripeClient).catch(async () => {
-      await resetDogfoodBilling(buyerEmail);
-    });
+    // Reset the persona's derived billing state up front: the price-lock era
+    // (JOV-INV-048) fails checkout closed on a stale lock or subscription row,
+    // and one poisoned run then fails every later run with a masked 400
+    // (JOV-8805, red 2026-11-17..19). This normalizes pre-existing persona
+    // state only; the checkout under test is still exercised end to end.
+    await resetDogfoodBilling(buyerEmail);
+    await ensureUserIsFree(page, stripeClient);
     await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);

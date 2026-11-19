@@ -49,16 +49,25 @@ class FakeLinear:
     def __init__(self, states=None):
         self.states = states or {}
         self.moved, self.created, self.filed = [], [], {}
+        self.descriptions, self.updated, self.comments, self.completed = {}, [], [], set()
 
     def gql(self, query, variables):
-        if "issues(first:1" in query:
-            hit = [{"identifier": i} for marker, i in self.filed.items() if marker in variables["q"]]
-            return {"issues": {"nodes": hit}}
+        if "issues(" in query:
+            nodes = [{"id": "uuid-" + ident, "identifier": ident, "title": f"{marker} t",
+                      "description": self.descriptions.get(ident, "")}
+                     for marker, ident in self.filed.items()
+                     if variables["q"] in marker and ident not in self.completed]
+            return {"issues": {"nodes": nodes}}
         if "issueCreate" in query:
             self.created.append(variables["i"])
             ident = f"JOV-{9000 + len(self.filed)}"
             self.filed[variables["i"]["title"].split(" ")[0]] = ident
+            self.descriptions[ident] = variables["i"]["description"]
             return {"issueCreate": {"issue": {"id": "new", "identifier": ident}}}
+        if "issueUpdate" in query:
+            self.updated.append((variables["id"], variables["d"]))
+            self.descriptions[variables["id"].replace("uuid-", "")] = variables["d"]
+            return {"issueUpdate": {"success": True}}
         if "teams(" in query:
             return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
                                          "labels": {"nodes": [{"id": "l1", "name": "symphony"}]}}]}}
@@ -67,6 +76,9 @@ class FakeLinear:
 
     def move(self, issue_id, state):
         self.moved.append((issue_id, state))
+
+    def comment(self, issue_id, body):
+        self.comments.append((issue_id, body))
 
 
 def gh_with(states, calls=None):
@@ -112,6 +124,52 @@ class PolicyTest(unittest.TestCase):
     def test_goal_key_strips_the_hourly_suffix(self):
         self.assertEqual(bi.goal_key(task("goal-mq-merge-rate-2026110203")), "goal-mq-merge-rate")
         self.assertEqual(bi.goal_key(task("prod-stale-staged-alias-gate-20261101")), "prod-stale-staged-alias-gate")
+
+    def test_goal_key_strips_summer_date_and_slot_suffix(self):
+        self.assertEqual(bi.goal_key(task("goal-rev-cert-onboarding-auth-claim-20261118-3")),
+                         "goal-rev-cert-onboarding-auth-claim")
+        self.assertEqual(bi.goal_key(task("goal-rev-start-chat-20261119-0")), "goal-rev-start-chat")
+        self.assertEqual(bi.goal_key(task("goal-rev-cert-homepage-entry-20261119-12")),
+                         "goal-rev-cert-homepage-entry")
+
+    def test_reposted_goal_refreshes_its_open_issue_instead_of_filing_a_duplicate(self):
+        linear = FakeLinear()
+        first = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0", body="evidence A"))
+        again = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1", body="evidence B"))
+        self.assertEqual(first, again)
+        self.assertEqual(len(linear.created), 1)
+        self.assertEqual(len(linear.updated), 1)
+        self.assertEqual(len(linear.comments), 1)
+        self.assertIn("instead of filing a duplicate", linear.comments[0][1])
+
+    def test_repost_with_unchanged_evidence_leaves_the_issue_alone(self):
+        linear = FakeLinear()
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        self.assertEqual(bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1")), ident)
+        self.assertEqual(linear.updated, [])
+        self.assertEqual(linear.comments, [])
+
+    def test_dated_marker_issue_from_before_the_stable_key_is_reused(self):
+        linear = FakeLinear()
+        linear.filed["[board:goal-rev-start-chat-20261119-2]"] = "JOV-13027"
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-3"))
+        self.assertEqual(ident, "JOV-13027")
+        self.assertEqual(len(linear.created), 0)
+
+    def test_a_marker_for_a_different_goal_is_never_matched(self):
+        linear = FakeLinear()
+        linear.filed["[board:goal-rev-start-chat-v2]"] = "JOV-13101"
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        self.assertEqual(len(linear.created), 1)
+        self.assertNotEqual(ident, "JOV-13101")
+
+    def test_completed_goal_issue_lets_a_repost_file_a_fresh_one(self):
+        linear = FakeLinear()
+        first = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        linear.completed.add(first)
+        second = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1"))
+        self.assertNotEqual(second, first)
+        self.assertEqual(len(linear.created), 2)
 
     def test_metrics_report_pickup_work_success_and_rate(self):
         rows = [{"event": "claimed", "postedEpoch": NOW - 100, "claimedEpoch": NOW - 40},
@@ -225,6 +283,18 @@ class TickTest(unittest.TestCase):
         self.assertEqual(len(linear.created), 1)
         held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
         self.assertEqual(len({row["issue"] for row in held.values()}), 1)
+
+    def test_slot_reposts_of_one_goal_share_one_issue_across_ticks(self):
+        hub = FakeHub([task("goal-rev-start-chat-20261119-0")])
+        linear = FakeLinear()
+        self.run_tick(hub, linear)
+        hub.tasks["goal-rev-start-chat-20261119-1"] = task("goal-rev-start-chat-20261119-1")
+        self.run_tick(hub, linear, now=NOW + 60)
+        self.assertEqual(len(linear.created), 1)
+        self.assertEqual(len(linear.comments), 0)
+        held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
+        self.assertEqual({row["issue"] for row in held.values()},
+                         {linear.filed["[board:goal-rev-start-chat]"]})
 
     def test_merged_pr_closes_done_with_sha_and_closed_pr_fails(self):
         hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-2-bbbbbbb-a1")])

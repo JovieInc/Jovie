@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
@@ -15,6 +16,45 @@ from types import SimpleNamespace
 from scripts.tests import test_pr_events_repair_evidence as fixtures
 
 events = fixtures.events
+
+
+class PenRetryWinTests(unittest.TestCase):
+    OLD, NEW = "a" * 40, "b" * 40
+
+    def measure(self, old, new):
+        with patch.object(repair_win.subprocess, "check_output", return_value="fixture"), \
+                patch.object(repair_win.subprocess, "run", side_effect=[
+                    SimpleNamespace(returncode=0), old, new]), \
+                patch.object(repair_win, "validate"):
+            return repair_win.pen_retry_win(self.OLD, self.NEW)
+
+    def test_reports_the_controlled_scenario_without_a_live_or_per_merge_claim(self):
+        old = SimpleNamespace(returncode=1, stdout="# tests 1\n# fail 1\napt-get failed: 503\n")
+        new = SimpleNamespace(returncode=0, stdout="# tests 1\n# pass 1\n# fail 0\n")
+        win = self.measure(old, new)
+        self.assertIn("| scenarios | higher | 0 | 1 |", win)
+        self.assertIn("not live outage frequency", win)
+        self.assertNotIn("Per-merge", win)
+        repair_win.validate(win)
+
+    def test_refuses_missing_tests_and_unrelated_failures(self):
+        old = SimpleNamespace(returncode=1, stdout="# tests 1\n# fail 1\napt-get failed: 503\n")
+        new = SimpleNamespace(returncode=0, stdout="# tests 1\n# pass 1\n# fail 0\n")
+        for failed, passed in (
+                (SimpleNamespace(returncode=1, stdout="# tests 1\n# fail 1\nsyntax error\n"), new),
+                (old, SimpleNamespace(returncode=0, stdout="# tests 0\n# pass 0\n# fail 0\n")),
+                (old, SimpleNamespace(returncode=1, stdout=new.stdout))):
+            with self.subTest(failed=failed, passed=passed), \
+                    self.assertRaisesRegex(ValueError, "red-before-green"):
+                self.measure(failed, passed)
+
+    def test_requires_exact_distinct_ancestral_revisions(self):
+        for before, after in (("main", self.NEW), (self.OLD, self.OLD)):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                repair_win.pen_retry_win(before, after)
+        with patch.object(repair_win.subprocess, "run", return_value=SimpleNamespace(returncode=1)):
+            with self.assertRaisesRegex(ValueError, "ancestral"):
+                repair_win.pen_retry_win(self.OLD, self.NEW)
 
 
 class CompanyGuardPinWinTests(unittest.TestCase):

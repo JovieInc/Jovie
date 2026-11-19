@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -45,6 +45,7 @@ test('every checked-in brief parses and names a unique frame', () => {
       'page-skeletons',
       'profile-analytics-card',
       'request-access',
+      'tour-dates-connect',
       'workspace-table',
     ]
   );
@@ -305,6 +306,24 @@ test('a frame without its .pen or preview is not drafted', () => {
     missingOutputs(b, 'o', p => String(p).endsWith('.pen')),
     ['claim.png']
   );
+});
+
+test('a blocked run names secrets in CI and keeps local output unchanged', () => {
+  const want = 'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL';
+  const script = new URL('./pen-draft.mjs', import.meta.url).pathname;
+  const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
+  for (const githubActions of ['true', 'false']) {
+    const res = spawnSync(process.execPath, [script, '--out', out], {
+      encoding: 'utf8',
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { PATH: process.env.PATH, GITHUB_ACTIONS: githubActions },
+    });
+    assert.equal(res.status, 1);
+    assert.match(res.stdout, /^pen-draft: blocked, missing/m);
+    const annotated = res.stdout.includes('::error title=pen-draft blocked::');
+    assert.equal(annotated, githubActions === 'true');
+    assert.ok(readFileSync(join(out, 'receipt.json'), 'utf8').includes(want));
+  }
 });
 
 test('a draft counts only when it adds the named top-level frame', () => {

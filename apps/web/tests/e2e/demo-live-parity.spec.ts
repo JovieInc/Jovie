@@ -152,12 +152,8 @@ async function collectAudienceShape(
         .allInnerTexts()
     ),
     toolbarButtons: {
-      all: await page.getByRole('button', { name: 'All' }).isVisible(),
-      identified: await page
-        .getByRole('button', { name: 'Identified' })
-        .isVisible(),
-      anonymous: await page
-        .getByRole('button', { name: 'Anonymous' })
+      identity: await page
+        .getByRole('button', { name: /^Identity:/ })
         .isVisible(),
       filter: await page.getByRole('button', { name: 'Filter' }).isVisible(),
       export: await page

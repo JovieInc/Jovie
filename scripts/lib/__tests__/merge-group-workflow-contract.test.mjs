@@ -43,6 +43,8 @@ import {
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
 
+import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
+
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
@@ -1525,13 +1527,6 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
-    expect(pathChanges).toContain(
-      'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
-    );
-    expect(pathChanges).toContain(
-      'for output in run_build run_test run_test_performance'
-    );
-    expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
     expect(pathChanges).toContain('elif [[ "${EVENT_NAME}" == "push" ]]; then');
     expect(pathChanges).toContain(
       'Unsupported event for path change detection'
@@ -1875,43 +1870,17 @@ describe('merge_group workflow contract', () => {
   });
 
   it.each([
-    ['equal trees', 'a'.repeat(40), 0, 0],
-    ['different trees', 'b'.repeat(40), 0, 1],
-    ['unreadable trees', '', 128, 128],
+    ['equal trees', 0],
+    ['different trees', 1],
+    ['unreadable trees', 128],
   ])(
     'allows no-op classification only with exact proof: %s',
-    (_, headTree, gitStatus, status) => {
+    (scenario, status) => {
       const detect = getStepRunScript(
         getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
         'Detect path changes for all job types'
       );
-      const start = detect.indexOf('    NOOP_BASE_TREE=');
-      const end = detect.indexOf('    PRODUCT_LANE_DIR=', start);
-      expect(start).toBeGreaterThanOrEqual(0);
-      const proof = detect.slice(start, end);
-      const root = mkdtempSync(join(tmpdir(), 'noop-tree-proof-'));
-      writeFileSync(
-        join(root, 'git'),
-        '#!/bin/sh\n[ "$STUB_GIT_STATUS" = 0 ] || exit "$STUB_GIT_STATUS"\ncase "$3" in "$MERGE_GROUP_BASE_SHA^{tree}") printf "%s\n" "$STUB_BASE_TREE" ;; *) printf "%s\n" "$STUB_HEAD_TREE" ;; esac\n'
-      );
-      chmodSync(join(root, 'git'), 0o755);
-      try {
-        const result = spawnSync('bash', ['-ec', proof], {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${root}${delimiter}${process.env.PATH}`,
-            MERGE_GROUP_BASE_SHA: 'c'.repeat(40),
-            MERGE_GROUP_HEAD_SHA: 'd'.repeat(40),
-            STUB_BASE_TREE: 'a'.repeat(40),
-            STUB_HEAD_TREE: headTree,
-            STUB_GIT_STATUS: String(gitStatus),
-          },
-        });
-        expect(result.status, result.stderr).toBe(status);
-      } finally {
-        rmSync(root, { recursive: true, force: true });
-      }
+      assertNoopPathOutputs(REPO_ROOT, detect, scenario, status);
     }
   );
 

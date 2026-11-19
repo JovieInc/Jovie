@@ -69,6 +69,11 @@ describe('OutboundRail', () => {
       screen.queryByText('Message', { exact: true })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Source' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'jov.ie/ada' })).toBeVisible();
+    expect(screen.getByTestId('outbound-profile-source')).toBeVisible();
+    expect(
+      screen.queryByRole('navigation', { name: 'Profile And Source' })
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
       'No draft is available for this profile yet.'
     );

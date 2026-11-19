@@ -607,10 +607,10 @@ describe('chat title tooltip eligibility', () => {
     vi.stubGlobal(
       'ResizeObserver',
       class {
-        constructor(private callback: () => void) {}
+        constructor(private cb: (e: { target: Element }[]) => void) {}
         observe(target: Element) {
           if (target.classList.contains('text-ellipsis'))
-            resize = this.callback;
+            resize = () => this.cb([{ target }]);
         }
         disconnect() {}
       }

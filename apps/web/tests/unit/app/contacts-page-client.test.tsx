@@ -22,6 +22,12 @@ vi.mock('@/lib/queries', () => ({
   useContactsQuery: useContactsQueryMock,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { ContactsPageClient } from '@/app/app/(shell)/contacts/ContactsPageClient';
 
 const baseProps = {
@@ -84,6 +90,13 @@ describe('ContactsPageClient', () => {
     render(<ContactsPageClient {...baseProps} />);
 
     expect(screen.getByTestId('contacts-table')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Contacts' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
+      '0 contacts'
+    );
     expect(
       screen.getByText('Failed to load contacts. Please refresh the page.')
     ).toBeInTheDocument();

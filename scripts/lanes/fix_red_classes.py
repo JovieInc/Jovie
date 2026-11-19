@@ -32,6 +32,7 @@ import remediation
 from reviewable_split import measured_changes, reviewable_split
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs, promote_body_and_sync  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
+from fix_red_conflict_resolvers import merge_additive_quoted_entries
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
@@ -42,6 +43,7 @@ from fix_red_source_edits import (  # noqa: F401
 )
 from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
 from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
+import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -132,7 +134,6 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
-_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
@@ -597,32 +598,6 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     return resolved
 
 
-def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
-    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
-
-    def rows(side: str) -> list[str] | None:
-        if not str(side or "").endswith("\n"):
-            return None
-        lines = side[:-1].split("\n")
-        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
-            return None
-        return lines
-
-    ours_rows = rows(ours)
-    theirs_rows = rows(theirs)
-    if ours_rows is None or theirs_rows is None:
-        return None
-    seen: list[str] = []
-    for line in theirs_rows + ours_rows:
-        if line not in seen:
-            seen.append(line)
-    # Double-quoted rows are JSON path registries. Those files must stay sorted.
-    if seen and all(line.strip().startswith('"') for line in seen):
-        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
-        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
-    return "\n".join(seen) + "\n"
-
-
 def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     """Union two one-line comma-separated identifier lists.
 
@@ -671,9 +646,10 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     return text + "\n"
 
 
-def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace hunks that are one identifier list or one quoted pytest path list.
-    None when any hunk has another shape, so the caller leaves that merge to a model."""
+def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str | None:
+    """Replace identifier lists, quoted pytest path lists, or base-proven
+    additive named Node imports. None when any hunk has another shape, so the
+    caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -684,7 +660,13 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").merge_pytest_file_list(hunk.group("ours"), hunk.group("theirs"))
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None and base:
+            merged = fix_red_node_imports.merge_additive_node_imports(
+                hunk.group("ours"), hunk.group("theirs"), base)
+        if merged is None:
+            merged = __import__("fix_red_conflict_resolvers").merge_pytest_file_list(
+                hunk.group("ours"), hunk.group("theirs"))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

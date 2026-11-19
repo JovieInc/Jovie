@@ -97,13 +97,14 @@ export function bodyContainsInitializedInterview(body: string): boolean {
 }
 
 /**
- * SSR-visible marker for the `/start` onboarding session boundary.
- * `OnboardingSessionBoundary` (JOV-7689) resolves conversation history on the
- * client before mounting the chat, so the SSR/HTML body only ever contains the
- * boundary's restore shell — the `INITIALIZED_INTERVIEW_MARKERS` can never
- * appear over plain HTTP. This marker proves `/start` dispatched to the
- * onboarding session flow without a surface error; the Playwright spec still
- * asserts real interview initialization in the browser.
+ * SSR marker for the `/start` onboarding session restore boundary.
+ * `OnboardingSessionBoundary` renders this only while a restore is on screen
+ * (no server-seeded snapshot, or an identity change mid-restore). Since the
+ * server-seeded `initialSnapshot` path (PR #25189), a healthy fresh-visitor
+ * /start skips the restore state entirely and SSRs the initialized interview
+ * instead — so the cron canary must assert `bodyContainsInitializedInterview`,
+ * not this marker. This predicate stays for the restoring-state contract and
+ * the browser-side helpers that share the selector.
  */
 export function bodyContainsOnboardingSessionBoundary(body: string): boolean {
   return (

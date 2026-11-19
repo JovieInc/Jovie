@@ -61,6 +61,7 @@ export {
 } from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -358,7 +359,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs lib/__tests__/synthetic-canary-catchup.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.cases\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -589,14 +590,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
-    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Slop-test ratchet (2026-11-15; landmine rules 2026-11-19): no new focused,
+    // skipped, assertion-free, tautological, mock-only, snapshot-only, real-sleep,
+    // over-mocked, mocked-subject (interfere-inc/landmines rule A) or flake-mask
+    // (rules B/C: retry budgets, raised per-test timeouts) tests.
     // Existing ones are baselined per file and may only go down.
     id: 'test-hygiene',
     command:
       'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
     inputs:
-      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -690,6 +693,8 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
   'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+  'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
 ]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
@@ -992,6 +997,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/hooks/company-size.test.mjs',
+  'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -1182,6 +1188,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/brand-deals-skill-contract.test.mjs',
   'scripts/lib/__tests__/brand-construction.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
+  'scripts/lib/__tests__/changelog-publication-recovery.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/no-wall-clock-assertions.test.mjs',
   'scripts/lib/__tests__/run-actionlint.test.mjs',
@@ -1197,6 +1204,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/daily-changelog-editorial-publication.test.mjs',
   'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
@@ -1364,7 +1372,8 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
+/** @typedef {{ catalogId: string | null, rows: object[], wallMs?: number, state?: string }} StructuralCommandReceipt */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number, structuralCommands?: StructuralCommandReceipt }} LaneResult */
 
 const LANES = [
   {
@@ -3001,6 +3010,32 @@ export async function runStructural(opts = {}) {
   const timings = results.flatMap((result, index) =>
     result ? [{ index, command: parts[index], ...result }] : []
   );
+  // Keep every selected index, including holes left by fail-fast or stop. Only
+  // digests cross into the artifact; command arguments and output stay in logs.
+  const catalog = parts.map((command, index) => ({
+    index,
+    id: createHash('sha256').update(command).digest('hex'),
+  }));
+  const commandReceipt = {
+    catalogId: createHash('sha256')
+      .update(JSON.stringify(catalog))
+      .digest('hex'),
+    wallMs,
+    rows: catalog.map(({ index, id }) => {
+      const result = results[index];
+      return {
+        index,
+        recipe: id,
+        ...(result
+          ? {
+              status: 'completed',
+              durationMs: result.durationMs,
+              exit: result.code,
+            }
+          : { status: 'unstarted' }),
+      };
+    }),
+  };
   // First failure in list order, not completion order.
   const failedIndex = results.findIndex(result => result && result.code !== 0);
   if (failedIndex !== -1) {
@@ -3016,6 +3051,7 @@ export async function runStructural(opts = {}) {
       ),
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // findIndex, not some(): unstarted commands are holes in the results array.
@@ -3027,11 +3063,12 @@ export async function runStructural(opts = {}) {
       skipped: true,
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // Deterministic list order regardless of completion order.
   const combined = results.map(result => result.output).join('');
-  return { code: 0, output: combined, timings, wallMs };
+  return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -3100,6 +3137,13 @@ function writeLaneResults(results, laneGroup, setupError) {
         schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
+        execution: {
+          runId: process.env.GITHUB_RUN_ID || null,
+          runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+          sha: process.env.GITHUB_SHA || null,
+          eventName: process.env.GITHUB_EVENT_NAME || null,
+          jobId: process.env.GITHUB_JOB || null,
+        },
         lanes: results,
         setupError: setupError || null,
         generatedAt: new Date().toISOString(),
@@ -3164,6 +3208,15 @@ async function main() {
           status: 'skipped',
           logExcerpt,
           durationMs,
+          ...(lane.id === 'structural'
+            ? {
+                structuralCommands: {
+                  state: 'not-run',
+                  catalogId: null,
+                  rows: [],
+                },
+              }
+            : {}),
         });
         continue;
       }
@@ -3221,6 +3274,15 @@ async function main() {
         status,
         logExcerpt,
         durationMs,
+        ...(lane.id === 'structural'
+          ? {
+              structuralCommands: outcome.commandReceipt ?? {
+                state: skipped ? 'not-run' : 'missing',
+                catalogId: null,
+                rows: [],
+              },
+            }
+          : {}),
       });
     }
   } catch (error) {

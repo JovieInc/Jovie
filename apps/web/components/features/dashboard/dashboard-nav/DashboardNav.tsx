@@ -478,27 +478,41 @@ export function DashboardNav({
         )}
 
         {threadsVisible ? (
-          <div className='pt-5'>
-            <SidebarThreadsSection
-              threads={sidebarThreads}
-              activeThreadId={activeThreadId}
-              allThreadsActive={
-                normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
-              }
-              onThreadContextMenu={onThreadContextMenu}
-              newThreadAction={false}
-              state={
-                conversationsError
-                  ? 'error'
-                  : conversationsLoading
-                    ? 'loading'
-                    : 'idle'
-              }
-              onRetry={handleRetryThreads}
-              calm
-              collapsed={false}
-            />
-          </div>
+          <SidebarCollapsibleGroup
+            label='Chat History'
+            className='pt-5'
+            defaultOpen={false}
+            dismissOnEscape
+            unmountWhenClosed
+          >
+            {!conversationsLoading &&
+            !conversationsError &&
+            conversations?.length === 0 ? (
+              <p className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'>
+                No chats yet
+              </p>
+            ) : (
+              <SidebarThreadsSection
+                threads={sidebarThreads}
+                activeThreadId={activeThreadId}
+                allThreadsActive={
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
+                }
+                onThreadContextMenu={onThreadContextMenu}
+                newThreadAction={false}
+                state={
+                  conversationsError
+                    ? 'error'
+                    : conversationsLoading
+                      ? 'loading'
+                      : 'idle'
+                }
+                onRetry={handleRetryThreads}
+                calm
+                collapsed={false}
+              />
+            )}
+          </SidebarCollapsibleGroup>
         ) : null}
       </nav>
       {contextMenuOverlay}

@@ -18,6 +18,11 @@ vi.mock('@/lib/utils/download', () => ({
   downloadCSVBlob: download,
   generateTimestampedFilename: () => 'export.csv',
 }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 const profileId = '11111111-1111-4111-8111-111111111111';
 const fetchMock = vi.fn();
@@ -65,10 +70,19 @@ describe('AudienceTableSubheader certificate', () => {
 
   it('switches audience views and keeps the toolbar axe-clean', async () => {
     const user = userEvent.setup();
-    const { container, onViewChange } = renderSubheader();
+    const { container, onViewChange } = renderSubheader({
+      totalAudienceCount: 482,
+    });
 
-    expect(screen.getByText('All (482)')).toBeInTheDocument();
-    await user.click(screen.getByText('Identified (120)'));
+    expect(screen.getAllByRole('tablist')).toHaveLength(1);
+    const trigger = screen.getByRole('button', {
+      name: 'Identity: All People',
+    });
+    expect(trigger).not.toHaveTextContent('482');
+    await user.click(trigger);
+    await user.click(
+      screen.getByRole('menuitemradio', { name: 'Identified (120)' })
+    );
     expect(onViewChange).toHaveBeenCalledWith('identified');
     expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -103,11 +117,23 @@ describe('AudienceTableSubheader certificate', () => {
   });
 
   it('renders long counts inside an RTL document', async () => {
+    const user = userEvent.setup();
     const { container } = renderSubheader(
-      { subscriberCount: 2_345_678, total: 12_345_678 },
+      {
+        subscriberCount: 2_345_678,
+        total: 12_345_678,
+        totalAudienceCount: 12_345_678,
+      },
       'rtl'
     );
-    expect(screen.getByText('All (12345678)')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', {
+      name: 'Identity: All People',
+    });
+    expect(trigger).not.toHaveTextContent('12,345,678');
+    await user.click(trigger);
+    expect(
+      screen.getByRole('menuitemradio', { name: 'All People (12,345,678)' })
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 });

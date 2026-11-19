@@ -151,10 +151,17 @@ export function OutboundRailReadiness({
             blockers.map(blocker => (
               <li
                 key={blocker}
-                role={blocker === error ? 'alert' : undefined}
                 className={blocker === error ? 'text-error' : undefined}
               >
-                {blocker}
+                {/* role="alert" moves to an inner span: putting it on the <li>
+                 * overrides the listitem role, leaving the <ul> with no
+                 * listitem children (axe list rule). The announcement timing
+                 * is unchanged — the span inserts with the item. */}
+                {blocker === error ? (
+                  <span role='alert'>{blocker}</span>
+                ) : (
+                  blocker
+                )}
               </li>
             ))
           ) : (

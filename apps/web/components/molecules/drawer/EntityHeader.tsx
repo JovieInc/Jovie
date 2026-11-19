@@ -224,8 +224,9 @@ export function EntityHeaderStatusGlyph({
 export type EntityHeaderMetaOverflow = 'wrap' | 'scroll';
 
 /**
- * `inline` = compact flow; `grid` = explicit media/identity/metadata/actions
- * cells; `chrome` = utility title bar (title left, actions right).
+ * `inline` = compact flow; `grid` = media | identity centred on the media,
+ * with actions in the title row and optional metadata below the identity;
+ * `chrome` = utility title bar (title left, actions right).
  */
 export type EntityHeaderLayout = 'inline' | 'grid' | 'chrome';
 
@@ -333,6 +334,8 @@ export function EntityHeader({
   const resolvedMetaOverflow: EntityHeaderMetaOverflow =
     metaOverflow ?? (stableLayout ? 'scroll' : 'wrap');
 
+  const isGrid = layout === 'grid';
+
   const identityContent = (
     <>
       {eyebrow || shouldReserveEyebrow ? (
@@ -345,7 +348,9 @@ export function EntityHeader({
           {eyebrow}
         </StableHeaderTextSlot>
       ) : null}
-      <div className='flex items-start gap-1'>
+      <div
+        className={cn('flex gap-1', isGrid ? 'items-center' : 'items-start')}
+      >
         <h2
           title={typeof title === 'string' ? title : undefined}
           data-testid='entity-header-title'
@@ -356,6 +361,7 @@ export function EntityHeader({
               : 'truncate',
             stableLayout &&
               resolvedTitleLineClamp &&
+              !(isGrid && resolvedTitleLineClamp === 1) &&
               STABLE_HEADER_TITLE_HEIGHT_CLASSNAME[resolvedTitleLineClamp],
             titleClassName
           )}
@@ -363,6 +369,14 @@ export function EntityHeader({
           {title}
         </h2>
         {badge}
+        {isGrid && actions ? (
+          <div
+            className='flex h-0 shrink-0 items-center'
+            data-entity-header-actions
+          >
+            {actions}
+          </div>
+        ) : null}
       </div>
       {subtitle || statusGlyph || shouldReserveSubtitle ? (
         <StableHeaderTextSlot
@@ -432,37 +446,27 @@ export function EntityHeader({
     return (
       <div
         className={cn(
-          'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-1.5',
+          'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2',
           className
         )}
         data-layout='grid'
         data-testid={testId}
       >
         {thumbnail ? (
-          <div
-            className='col-start-1 row-span-2 row-start-1'
-            data-entity-header-image
-          >
+          <div className='col-start-1 row-start-1' data-entity-header-image>
             {thumbnail}
           </div>
         ) : null}
+        {/* The third grid track remains empty; identity spans it to the edge. */}
         <div
           className={cn(
-            'col-start-2 row-start-1 min-w-0 space-y-1',
+            'col-span-2 col-start-2 row-start-1 min-w-0 space-y-0.5',
             bodyClassName
           )}
           data-entity-header-identity
         >
           {identityContent}
         </div>
-        {actions ? (
-          <div
-            className='col-start-3 row-start-1 justify-self-end'
-            data-entity-header-actions
-          >
-            {actions}
-          </div>
-        ) : null}
         {meta || shouldReserveMeta || footer || shouldReserveFooter ? (
           <div
             className='col-span-2 col-start-2 row-start-2 min-w-0'

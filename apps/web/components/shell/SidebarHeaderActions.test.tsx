@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarContext, type SidebarContextValue } from './SidebarContext';
@@ -23,6 +24,10 @@ vi.mock('next/link', () => ({
   >(function TestLink({ prefetch, ...props }, ref) {
     return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
   }),
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => APP_ROUTES.CHAT,
 }));
 
 const electron = vi.hoisted(() => ({ value: false }));

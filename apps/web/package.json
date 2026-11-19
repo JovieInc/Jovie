@@ -37,6 +37,7 @@
     "compare-chunks": "tsx scripts/compare-chunks.ts",
     "build:validate": "pnpm run validate-env && pnpm run build",
     "start": "next start",
+    "leads:public-link-list": "tsx scripts/build-public-link-list.ts",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "lint:eslint": "eslint --max-warnings=0 --cache --cache-location .cache/eslint --cache-strategy content .",

@@ -172,7 +172,9 @@ export function SearchableSubmenu({
 
   // Focus search input once the submenu content has mounted
   useEffect(() => {
-    if (isOpen) return focusOnNextTick(searchInputRef);
+    if (isOpen) {
+      focusOnNextTick(searchInputRef);
+    }
   }, [isOpen]);
 
   // Reset highlighted index when search results change

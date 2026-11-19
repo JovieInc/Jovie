@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { publicationEditorialFindings } from './lib/customer-changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
 import {
@@ -42,9 +43,9 @@ const gh = args =>
   JSON.parse(
     execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
   );
-// Never follow redirects outside the allowlisted public evidence origin.
+// Evidence redirects are followed explicitly after same-origin validation.
 const fetchPage = url =>
-  fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+  fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
 const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
 if (
   !/^\d+$/.test(marker.controllerRun ?? '') ||
@@ -193,6 +194,24 @@ const plan = planDailyPublication({
   observedAt,
   catchUp: process.argv.includes('--catch-up'),
 });
+// Check the planned receipt before opening a release PR, using the same
+// overlay contract as source CI without changing any approved customer copy.
+const editorialFindings = publicationEditorialFindings({
+  content: plan.content,
+  overlay: JSON.parse(
+    readFileSync('apps/web/data/customer-changelog-editorial.json', 'utf8')
+  ),
+  migrations: JSON.parse(
+    readFileSync(
+      'apps/web/data/customer-changelog-permalink-migrations.json',
+      'utf8'
+    )
+  ),
+});
+if (editorialFindings.length) {
+  for (const finding of editorialFindings)
+    console.error(`[editorial-preflight] ${finding}`);
+}
 // Customer digest copy must pass @jovie/copy at the jovie-marketing register
 // before the release PR opens: /changelog is certified by seo:certify
 // (copy:copy-lint), and an em dash here used to eject the release PR from
@@ -212,7 +231,7 @@ if (copyFindings.length > 0) {
 }
 writeFileSync(
   resolve(output, 'plan.json'),
-  `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
+  `${JSON.stringify({ ...plan, editorialFindings, content: undefined }, null, 2)}\n`
 );
 writeFileSync(resolve(output, 'CHANGELOG.md'), plan.content);
 process.stdout.write(

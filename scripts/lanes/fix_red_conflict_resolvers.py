@@ -19,6 +19,41 @@ from fix_red_statement_merge import (resolve_additive_statements_text,
                                      resolve_shared_closer_it_text, unique_import_bindings)
 
 
+_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
+
+
+def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
+    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
+
+    def rows(side: str) -> list[str] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        lines = side[:-1].split("\n")
+        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
+            return None
+        return lines
+
+    ours_rows = rows(ours)
+    theirs_rows = rows(theirs)
+    if ours_rows is None or theirs_rows is None:
+        return None
+    rows = ours_rows + theirs_rows
+    styles = {(line[:len(line) - len(line.lstrip(" \t"))], line.strip()[0]) for line in rows}
+    if len(styles) != 1 or len(set(ours_rows)) != len(ours_rows) or len(set(theirs_rows)) != len(theirs_rows):
+        return None
+    if [line for line in ours_rows if line in theirs_rows] != [line for line in theirs_rows if line in ours_rows]:
+        return None
+    seen: list[str] = []
+    for line in theirs_rows + ours_rows:
+        if line not in seen:
+            seen.append(line)
+    # Double-quoted rows are JSON path registries. Those files must stay sorted.
+    if seen and all(line.strip().startswith('"') for line in seen):
+        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
+        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
+    return "\n".join(seen) + "\n"
+
+
 _BRACE_GROUP = re.compile(r"\{([A-Za-z0-9_,-]+)\}")
 _JSON_SCRIPT_LINE = re.compile(
     r'^(?P<indent>[ \t]*)"(?P<key>[^"\n]+)"\s*:\s*"(?P<command>(?:\\.|[^"\\])*)"(?P<suffix>,?)\s*$'
@@ -183,6 +218,7 @@ def merge_pytest_file_list(ours: str, theirs: str) -> str | None:
     left, right = parse(ours), parse(theirs)
     ordered = left and right and left[0] == right[0] and [t for t in left[1] if t in right[1]] == [t for t in right[1] if t in left[1]]
     return f"{right[0]}'{' '.join(dict.fromkeys([*right[1], *left[1]]))}'.split(\n" if ordered else None
+
 
 def resolve_additive_node_tests_text(text: str) -> str | None:
     """Union complete top-level node:test additions against an empty diff3 base.

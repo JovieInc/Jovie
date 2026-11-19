@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -82,5 +84,10 @@ describe('DrawerTabs', () => {
     expect(screen.getByText('Last 28 days')).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Entity tabs' })).toBeVisible();
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps drawer rails separate from the retired audience identity tabs', () => {
+    const source = readFileSync(join(__dirname, 'DrawerTabs.tsx'), 'utf8');
+    expect(source).not.toContain('AudienceHeaderBadge');
   });
 });

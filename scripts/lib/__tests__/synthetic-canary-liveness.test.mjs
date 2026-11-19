@@ -7,6 +7,7 @@ import {
   checkSyntheticCanary,
   main,
 } from '../../synthetic-canary-liveness.mjs';
+import { QUOTA_DEFERRED_MARKER } from '../github-rate-limit.mjs';
 import {
   check,
   githubFor,
@@ -312,9 +313,89 @@ describe('synthetic canary dead-man', () => {
     const github = {
       rest: vi.fn().mockRejectedValue(new Error('sensitive response body')),
     };
-    expect(JSON.stringify(await check(github))).not.toContain(
-      'sensitive response body'
-    );
+    const verdict = await check(github);
+    expect(verdict).toMatchObject({
+      ok: false,
+      reason: 'Synthetic canary evidence unavailable',
+    });
+    expect(verdict.deferred).toBeUndefined();
+    expect(JSON.stringify(verdict)).not.toContain('sensitive response body');
+  });
+
+  it.each(['shed', 'budget', 'exhausted', 'budget_exhausted'])(
+    'defers a thrown GitHub %s read instead of calling the canary dead',
+    async kind => {
+      const secret = 'raw-api-secret';
+      const verdict = await check({
+        rest: vi.fn().mockRejectedValue({
+          exitCode: 75,
+          kind,
+          message: `github ${kind}: ${secret}`,
+        }),
+      });
+      expect(verdict).toMatchObject({
+        ok: false,
+        reason: 'Synthetic canary evidence deferred',
+        missedSlot: false,
+        deferred: true,
+      });
+      expect(JSON.stringify(verdict)).not.toContain(secret);
+    }
+  );
+
+  it.each([
+    null,
+    'network down',
+    { exitCode: 75, kind: 'client' },
+    { exitCode: 74, kind: 'shed' },
+    { exitCode: 75, kind: 75 },
+  ])('keeps a non-infrastructure throw fail-closed (%j)', async error => {
+    const verdict = await check({
+      rest: vi.fn().mockRejectedValue(error),
+    });
+    expect(verdict).toMatchObject({
+      ok: false,
+      reason: 'Synthetic canary evidence unavailable',
+    });
+    expect(verdict.deferred).toBeUndefined();
+  });
+
+  it('publishes a deferred read as a warning and does not re-dispatch', async () => {
+    const secret = 'raw-api-secret';
+    const dir = mkdtempSync(join(tmpdir(), 'synthetic-deferred-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const github = {
+      rest: vi.fn().mockRejectedValue({
+        exitCode: 75,
+        kind: 'shed',
+        message: `github shed: ${secret}`,
+      }),
+    };
+    const env = {
+      GITHUB_REPOSITORY: repo,
+      SYNTHETIC_CANARY_DISPATCH: '1',
+      GITHUB_OUTPUT: join(dir, 'output'),
+      GITHUB_STEP_SUMMARY: join(dir, 'summary'),
+    };
+    try {
+      expect(await main({ github, env, now: NOW })).toBe(0);
+      expect(github.rest.mock.calls.every(([method]) => method === 'GET')).toBe(
+        true
+      );
+      const output = readFileSync(env.GITHUB_OUTPUT, 'utf8');
+      const summary = readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
+      expect(output).toContain('test_status=deferred\n');
+      expect(output).not.toContain(secret);
+      expect(summary).toContain('**deferred**');
+      expect(summary).not.toContain(secret);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(QUOTA_DEFERRED_MARKER)
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it.each([true, false])(
