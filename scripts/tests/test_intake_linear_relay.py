@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -129,3 +130,31 @@ class ConvertLegacyIntakeCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(shell.made("gh", "issue", "create"), [])
         self.assertTrue(shell.made("gh", "issue", "list"))
+
+
+class RelayWorkflowSecretWiringTest(unittest.TestCase):
+    """Outside-review must-fix (2026-11-19): the relay's LINEAR_API_KEY exposure surface is
+    pinned, not just currently correct — step-scoped env on exactly one step, flag-gated."""
+
+    def workflow(self) -> str:
+        root = Path(__file__).resolve().parents[2]
+        return (root / ".github/workflows/lane-fix-relay.yml").read_text()
+
+    def step_block(self, text: str, step_name: str) -> list[str]:
+        lines = text.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.strip() == f"- name: {step_name}")
+        end = next((i for i in range(start + 1, len(lines))
+                    if lines[i].strip().startswith("- name:")
+                    or (lines[i] and not lines[i][0].isspace() and not lines[i].lstrip().startswith("#"))),
+                   len(lines))
+        return lines[start:end]
+
+    def test_relay_secret_is_step_scoped_to_one_flag_gated_step(self):
+        text = self.workflow()
+        key_lines = [line for line in text.splitlines() if line.strip().startswith("LINEAR_API_KEY:")]
+        self.assertEqual(len(key_lines), 1, f"the Actions key must be set on exactly one line, got {key_lines}")
+        flag_lines = [line for line in text.splitlines() if line.strip().startswith("LANES_RELAY_LINEAR:")]
+        self.assertEqual(len(flag_lines), 1, f"the relay flag must be set on exactly one line, got {flag_lines}")
+        block = "\n".join(self.step_block(text, "Label the PR for the lanes"))
+        self.assertIn("LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}", block)
+        self.assertIn('LANES_RELAY_LINEAR: "1"', block)
