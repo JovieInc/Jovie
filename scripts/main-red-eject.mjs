@@ -15,6 +15,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { EX_TEMPFAIL } from '../packages/api-client/client.ts';
 import { runGh } from '../packages/api-client/gh.ts';
 import {
   attributeCulprit,
@@ -73,6 +74,20 @@ async function gh(args, priority = 'repair') {
       priority,
       env: { ...process.env, GH_TOKEN: process.env.GH_FALLBACK_TOKEN },
     });
+  }
+  if (r.deferred === true || r.code === EX_TEMPFAIL) {
+    // Run 44577317270: both buckets shed after failover and the generic throw redded the wake; a shed is transport, not a verdict (JOV-13073).
+    console.error(
+      `::warning::github-quota-deferred: gh ${args.slice(0, 2).join(' ')} ${r.stderr.trim().slice(0, 200)}; not a verdict. The next ejector wake retries.`
+    );
+    const shed = new Error(
+      `gh ${args.slice(0, 3).join(' ')} deferred: ${r.stderr.trim().slice(0, 300)}`
+    );
+    shed.name = 'GithubShedDeferError';
+    shed.code = 'github_shed_deferred';
+    shed.deferred = true;
+    shed.exitCode = EX_TEMPFAIL;
+    throw shed;
   }
   if (r.code !== 0)
     throw new Error(
@@ -809,6 +824,12 @@ export async function alertFailure() {
 // ---- cli -------------------------------------------------------------------
 
 if (process.argv[1] === import.meta.filename) {
+  // A shed deferral exits 75 (warned at the throw site); all else stays red.
+  const onCliError = error => {
+    if (error?.deferred === true)
+      process.exitCode = error.exitCode ?? EX_TEMPFAIL;
+    else throw error;
+  };
   const { positionals, values } = parseArgs({
     allowPositionals: true,
     options: {
@@ -817,28 +838,30 @@ if (process.argv[1] === import.meta.filename) {
       out: { type: 'string' },
     },
   });
-  const [cmd = 'plan'] = positionals;
-  const mode = process.env.MAIN_RED_EJECT_MODE || 'apply';
-  let result;
-  if (mode === 'off')
-    result = { mode, action: 'none', reason: 'kill-switch-off' };
-  else if (cmd === 'plan') result = await plan({ mode: 'dry' });
-  else if (cmd === 'apply') {
-    const p = await plan({ mode });
-    result = await apply(p);
-  } else if (cmd === 'reopen') result = await reopen(Number(values.pr));
-  else if (cmd === 'stuck-head')
-    result = await stuckHead({
-      doApply: values.apply === true && mode === 'apply',
-    });
-  else if (cmd === 'alert-failure') result = await alertFailure();
-  else throw new Error(`unknown command: ${cmd}`);
-  const text = JSON.stringify(result, null, 2);
-  if (values.out) writeFileSync(values.out, `${text}\n`);
-  console.log(text);
-  if (process.env.GITHUB_STEP_SUMMARY)
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `## main-red-eject ${cmd}\n\n\`\`\`json\n${text}\n\`\`\`\n`
-    );
+  (async () => {
+    const [cmd = 'plan'] = positionals;
+    const mode = process.env.MAIN_RED_EJECT_MODE || 'apply';
+    let result;
+    if (mode === 'off')
+      result = { mode, action: 'none', reason: 'kill-switch-off' };
+    else if (cmd === 'plan') result = await plan({ mode: 'dry' });
+    else if (cmd === 'apply') {
+      const p = await plan({ mode });
+      result = await apply(p);
+    } else if (cmd === 'reopen') result = await reopen(Number(values.pr));
+    else if (cmd === 'stuck-head')
+      result = await stuckHead({
+        doApply: values.apply === true && mode === 'apply',
+      });
+    else if (cmd === 'alert-failure') result = await alertFailure();
+    else throw new Error(`unknown command: ${cmd}`);
+    const text = JSON.stringify(result, null, 2);
+    if (values.out) writeFileSync(values.out, `${text}\n`);
+    console.log(text);
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `## main-red-eject ${cmd}\n\n\`\`\`json\n${text}\n\`\`\`\n`
+      );
+  })().catch(onCliError);
 }
