@@ -57,17 +57,51 @@ PR Size Guard member policy, are budgeted in their own scripts.
 token-bearing step with its per-group cost. A new one fails that test until it
 is classified, and the green-group total must stay at 5 or less.
 
-### Red lanes do not rebuild the queue
+### Required red lanes cancel their own run
 
 A failed merge-group lane used to post a failing `PR Ready` commit status
 immediately (`ejected before the slowest lane`). GitHub ejected that entry and
 rebuilt every group behind it. Each rebuild ran PR Size Guard and Merge Group
 Admission again on the shared GITHUB_TOKEN bucket (5,000 REST calls/hour),
-which is what exhausted the quota before the hourly reset. A red lane no longer
-posts that status. `ci-merge-group-ready` still runs with `always()` and fails
-`PR Ready` when the group is actually red, so the entry is ejected once, after
-the lanes already in flight finish. No job in `ci.yml` holds `statuses: write`.
-`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` locks that.
+which is what exhausted the quota before the hourly reset. We still never post
+an early `PR Ready` commit status, and no job in `ci.yml` holds `statuses: write`.
+
+JOV-13106 ports LogYourBody's event-driven cancellation: every required lane in
+`ci-merge-group-ready.needs` has a `merge-group-cancel-<lane>` companion that
+depends only on that lane and runs on `merge_group && failure()`. A reusable
+workflow has `actions: write` and `contents: read` only to check out the
+trusted default-branch cancel helper (`packages/api-client/cancel-github-run.mjs`),
+never the merge-group head, and then cancels `GITHUB_RUN_ID`. A raw `gh run
+cancel` call site would grow the shrink-only external API ratchet. It cancels
+this run, while `ci-merge-group-supersede` retains its separate older-run behavior.
+Green groups make no cancel calls. Concurrent failures can start multiple cancel
+requests; the first wins. The completed failing lane keeps its logs and
+annotations; in-progress lanes retain partial logs and a second failure's
+diagnosis may be cut short.
+
+`ci-merge-group-ready` keeps `always()` and fails when a required result is not
+`success`. Cancellation may instead conclude `PR Ready` as `cancelled` before
+the aggregator starts. Both are non-success and eject the entry; when the
+aggregator runs it must still exit 1 on a red gate. The companions are not
+required checks and do not post commit statuses.
+
+Failure-hold reads the triggering attempt's jobs with `GITHUB_TOKEN` before
+minting an app token. A cancelled CI run is terminal red only if a required
+merge-group lane completed with `failure`; classification uses those failed
+steps and the existing exact-head hold/retry policy. Supersession cancels with
+no required-lane failure mint no app token, write no hold, and start no enroll
+wake. A cancelled completion can wake enroll only after a nonempty failure
+receipt. The generic failure-conclusion set still excludes plain cancellation.
+`scripts/lib/merge-group-required-lanes.mjs` pins the lane IDs and REST job
+names to `PR Ready`'s dependencies via
+`scripts/lib/__tests__/merge-group-fail-fast.test.mjs`; the hold tests cover
+both cancelled paths.
+
+**Ship now:** own-run cancellation with required-failure evidence and no early
+status posts. **Re-evaluate when:** post-landing per-merged-PR measurements show
+cancel latency or repeated failure wakes remain a bottleneck (baseline unknown).
+**Then:** assess the measured path without weakening gates or broadening
+supersession holds.
 
 Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
 lanes are hosted manual, scheduled, repository-event, or post-merge work. They

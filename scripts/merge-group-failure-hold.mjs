@@ -10,19 +10,20 @@ import {
   attributeAgainstPeerRuns,
   selectCiFastEvidenceJobs,
 } from './lib/merge-group-ahead-attribution.mjs';
+import * as lanes from './lib/merge-group-required-lanes.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
   RETRYABLE_PRODUCT_FAILURE_STEPS,
 } from './lib/merge-queue-guard.mjs';
 
+export const { CI_WORKFLOW_ID, shouldHoldMergeGroupRun } = lanes;
 export const FAILURE_HOLD_SCHEMA = 'jovie-merge-group-failure-hold/v1';
 export const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 export const FAILURE_RETRY_CONTEXT = 'jovie-queue-failure-retry/v1';
 export const ADMISSION_RECOVERY_CONTEXT = 'jovie-queue-admission-recovery/v1';
 export const ADMISSION_RECOVERY_SCHEMA =
   'jovie-merge-group-admission-recovery/v1';
-export const CI_WORKFLOW_ID = 178737329;
 // PR Size Guard owns the merge-group "Require combined-head workflows to
 // load" step. A ci.yml GitHub cannot load runs zero jobs and reports no
 // merge_group check (2026-10-20, #21826), so that required context is the
@@ -956,7 +957,7 @@ function validateRun(run, repository) {
     run.path !== MERGE_GROUP_FAILURE_WORKFLOWS.get(run.workflow_id) ||
     run.repository?.full_name !== repository ||
     run.head_repository?.full_name !== repository ||
-    !MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion) ||
+    !lanes.isMergeGroupHoldConclusion(run.conclusion) ||
     !Number.isSafeInteger(run.id) ||
     run.id < 1 ||
     !Number.isSafeInteger(run.run_attempt) ||
@@ -1046,6 +1047,7 @@ export async function applyMergeGroupFailure(
   {
     repository,
     run,
+    jobs = [],
     timeline,
     failedSteps,
     statuses,
@@ -1065,9 +1067,12 @@ export async function applyMergeGroupFailure(
   }
 ) {
   const front = validateRun(run, repository);
+  const admitted = lanes.admitHoldFailure(run, jobs, failedSteps);
+  if (admitted.skip) return admitted.skip;
+  failedSteps = admitted.failedSteps;
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
   const classification = classifyMergeGroupFailure({
-    conclusion: run.conclusion,
+    conclusion: admitted.conclusion,
     failedSteps,
     annotationText,
     changedFiles,
@@ -1756,24 +1761,19 @@ async function main(argv) {
     fail('live workflow run identity does not match the event');
   }
   const front = validateRun(run, repository);
-  const timeline = readTimeline(repository, front.prNumber);
-  const jobs = restPages(
-    `repos/${repository}/actions/runs/${run.id}/jobs?filter=latest`
-  );
-  const failedSteps = jobs.flatMap(job =>
-    Array.isArray(job.steps)
-      ? job.steps
-          .filter(step => step?.conclusion === 'failure')
-          .map(step => step.name)
-      : []
-  );
+  const jobs = restPages(lanes.holdJobsUrl(repository, run));
+  const admitted = lanes.admitHoldFailure(run, jobs);
+  if (admitted.skip) return lanes.writeJson(admitted.skip);
+  const { failedSteps } = admitted;
   if (!isHeldWorkflowFailure(run, failedSteps)) {
     // Other PR Size Guard failures keep their existing handling: no hold.
-    process.stdout.write(
-      `${JSON.stringify({ skipped: true, reason: 'not-a-held-workflow-failure', workflowRunId: run.id })}\n`
-    );
-    return;
+    return lanes.writeJson({
+      skipped: true,
+      reason: 'not-a-held-workflow-failure',
+      workflowRunId: run.id,
+    });
   }
+  const timeline = readTimeline(repository, front.prNumber);
   const evidence = instructionContractEvidence(
     repository,
     run,
@@ -1795,7 +1795,7 @@ async function main(argv) {
       })
     : '';
   const preview = classifyMergeGroupFailure({
-    conclusion: run.conclusion,
+    conclusion: admitted.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
@@ -1816,6 +1816,7 @@ async function main(argv) {
     {
       repository,
       run,
+      jobs,
       timeline,
       failedSteps,
       statuses,

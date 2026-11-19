@@ -1,0 +1,35 @@
+# JOV-13106: LYB's own-run cancellation; no inputs can select another run.
+# A new `gh` call site would grow the shrink-only external API ratchet, so this
+# job checks out only the trusted default-branch client helper (never the
+# merge-group head) and cancels GITHUB_RUN_ID.
+# github-token-budget: 1 calls/run - one own-run cancel after a required lane failure; no green-group calls
+name: Merge Group Fail Fast
+on:
+  workflow_call:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Check out the trusted cancel helper
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: |
+            packages/api-client/cancel-github-run.mjs
+            .node-version
+          persist-credentials: false
+      - name: Set up pinned Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Cancel the rest of this merge-group run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node packages/api-client/cancel-github-run.mjs

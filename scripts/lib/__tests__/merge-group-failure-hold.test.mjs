@@ -88,8 +88,6 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
       return result;
     };
     try {
-      // Seed all real imports, then let Git enforce the workflow's actual
-      // non-cone manifest. Omitting the client or providers.json must fail.
       for (const path of new Set([...paths, 'packages/api-client'])) {
         mkdirSync(dirname(join(dir, path)), { recursive: true });
         cpSync(join(root, path), join(dir, path), { recursive: true });
@@ -101,6 +99,8 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         'user.name=Fixture',
         '-c',
         'user.email=fixture@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
         'commit',
         '-qm',
         'fixture',

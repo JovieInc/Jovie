@@ -182,6 +182,33 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
+      - Merge Group Fail Fast
       - Component Certificate
       - Fleet Gate Refresh
       - Lane Fix Relay
@@ -197,7 +224,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 71
+    jobCount: 98
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -776,6 +803,17 @@ nodes:
       - pull_request_target
       - workflow_dispatch
     terminalReceipt: job:sweep
+    jobCount: 1
+  - name: Merge Group Fail Fast
+    path: .github/workflows/merge-group-fail-fast.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:cancel
     jobCount: 1
   - name: Merge Queue Green Enroll
     path: .github/workflows/merge-queue-green-enroll.yml
@@ -1688,6 +1726,87 @@ edges:
     type: workflow_call
   - from: CI
     to: Mac CI
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
+    type: workflow_call
+  - from: CI
+    to: Merge Group Fail Fast
     type: workflow_call
   - from: Staging Controller
     to: Claim Checkout Dogfood
