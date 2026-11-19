@@ -155,3 +155,19 @@ describe('SidebarNavItem active chrome', () => {
     ).not.toHaveAttribute('aria-pressed');
   });
 });
+
+describe('SidebarNavItem design-system button', () => {
+  it('renders the row through PlainButton with its own focus ring', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+    render(
+      <SidebarNavItem
+        collapsed={false}
+        item={{ label: 'Inbox', icon: TestIcon }}
+      />
+    );
+    const row = screen.getByRole('button', { name: 'Inbox' });
+    expect(row).toHaveAttribute('data-slot', 'plain-button');
+    expect(row).toHaveClass('focus-visible:ring-ring/55');
+    expect(row).not.toHaveClass('focus-visible:ring-focus');
+  });
+});

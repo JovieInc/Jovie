@@ -1,0 +1,46 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      ts6:
+        specifier: npm:typescript@6.0.3
+        version: typescript@6.0.3
+      tsrs:
+        specifier: npm:@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta
+        version: '@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta'
+      upstream:
+        specifier: npm:@typescript/typescript-linux-x64@7.1.0-beta
+        version: '@typescript/typescript-linux-x64@7.1.0-beta'
+
+packages:
+
+  '@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-dGRvubxWQXNP3aow+RLgFAbW3pR4oQ+UPfwrSgdggKCKKL9sAPr8nFGYM50JWAiqGQYSwRJl48AzIC7bHuQ2cQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript/typescript-linux-x64@7.1.0-beta':
+    resolution: {integrity: sha512-kcD51ihf+pnI5KT4uQQYG04OpwznaZYBlIQhDhl8fflFd27NktxXsUeguxZyvUMyWfum7IF2bBS6Jv7ox0AgFQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+snapshots:
+
+  '@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta': {}
+
+  '@typescript/typescript-linux-x64@7.1.0-beta': {}
+
+  typescript@6.0.3: {}

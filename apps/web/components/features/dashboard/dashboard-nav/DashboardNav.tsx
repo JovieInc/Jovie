@@ -15,7 +15,6 @@ import {
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { RailStagedContent } from '@/components/shell/RailStagedContent';
-import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -29,7 +28,6 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
-  NAVIGATION_DROP_OFF_MS,
   type NavigationTelemetryContext,
   navigationInputMethodFromClick,
   startNavigationTelemetry,
@@ -45,8 +43,13 @@ import {
 } from './config';
 import { InboxAttentionLink } from './InboxAttentionLink';
 import { NavMenuItem } from './NavMenuItem';
-import { isNavigationItemActive } from './navigation-state';
+import {
+  getRailNavigation,
+  isNavigationItemActive,
+  isNavigationItemHighlighted,
+} from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
+import { usePendingNavigation } from './use-pending-navigation';
 
 type DashboardNavSection = {
   readonly key: string;
@@ -58,36 +61,22 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
-interface PendingNavigationRecord {
-  readonly itemId: string;
-  readonly startedAt: number;
-}
-
-// The paint-only nav acknowledgment stays visible for a minimum window so it
-// is observable even when a prefetched route commits the URL almost
-// immediately. A transition that fails without committing a URL recovers on
-// the same drop-off window navigation telemetry uses instead of sticking.
-const PENDING_NAVIGATION_MIN_VISIBLE_MS = 400;
 const NEW_CHAT_ROW_ITEM: NavItem = {
   ...chatNavItem,
   icon: Plus,
   iconName: 'Plus',
   tone: undefined,
 };
-const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 
 export function DashboardNav({
   children: searchSurface,
   headerOwnsInbox = false,
 }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
-  const runtimeUpdate = useRuntimeUpdate();
-  const sidebarNavigation = canonicalSidebarNavigation;
-  const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
-  const homeAttentionLabel = inboxNavItem.name;
-  const homeAttentionName = hasRuntimeUpdate
-    ? `${homeAttentionLabel} — App Update Available`
-    : homeAttentionLabel;
+  const sidebarNavigation = useMemo(
+    () => getRailNavigation(canonicalSidebarNavigation, headerOwnsInbox),
+    [headerOwnsInbox]
+  );
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -95,12 +84,8 @@ export function DashboardNav({
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
-  const [pendingNavigation, setPendingNavigation] =
-    useState<PendingNavigationRecord | null>(null);
-  const pendingNavigationTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(
-    new Set()
-  );
-  const previousNavigationHrefRef = useRef(currentNavigationHref);
+  const { pendingNavigation, beginPendingNavigation, cancelPendingNavigation } =
+    usePendingNavigation(currentNavigationHref);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -141,78 +126,6 @@ export function DashboardNav({
     setThreadReadAtById(readThreadReadState());
     setHasHydratedPersistedState(true);
   }, []);
-
-  const schedulePendingNavigationClear = useCallback(
-    (record: PendingNavigationRecord, delayMs: number) => {
-      const timer = setTimeout(() => {
-        pendingNavigationTimersRef.current.delete(timer);
-        setPendingNavigation(current => (current === record ? null : current));
-      }, delayMs);
-      pendingNavigationTimersRef.current.add(timer);
-    },
-    []
-  );
-
-  const beginPendingNavigation = useCallback(
-    (itemId: string) => {
-      const record: PendingNavigationRecord = {
-        itemId,
-        startedAt: Date.now(),
-      };
-      setPendingNavigation(record);
-      schedulePendingNavigationClear(record, PENDING_NAVIGATION_RECOVERY_MS);
-    },
-    [schedulePendingNavigationClear]
-  );
-
-  const cancelPendingNavigation = useCallback((itemId: string) => {
-    setPendingNavigation(current =>
-      current?.itemId === itemId ? null : current
-    );
-  }, []);
-
-  // Route segments keep authenticated content mounted during a warm
-  // transition, so the committed URL — not a loading surface — is what ends
-  // the acknowledgment. Hold the pending state for a minimum visible window
-  // once the URL commits so fast prefetched transitions still expose it.
-  useEffect(() => {
-    const hrefChanged =
-      previousNavigationHrefRef.current !== currentNavigationHref;
-    previousNavigationHrefRef.current = currentNavigationHref;
-    if (!hrefChanged || !pendingNavigation) return;
-
-    const remainingMs =
-      PENDING_NAVIGATION_MIN_VISIBLE_MS -
-      (Date.now() - pendingNavigation.startedAt);
-    if (remainingMs <= 0) {
-      setPendingNavigation(null);
-    } else {
-      schedulePendingNavigationClear(pendingNavigation, remainingMs);
-    }
-  }, [
-    currentNavigationHref,
-    pendingNavigation,
-    schedulePendingNavigationClear,
-  ]);
-
-  useEffect(
-    () => () => {
-      for (const timer of pendingNavigationTimersRef.current) {
-        clearTimeout(timer);
-      }
-      pendingNavigationTimersRef.current.clear();
-    },
-    []
-  );
-
-  // Connectivity loss can retain the source URL. Clear its acknowledgment
-  // immediately; the existing per-navigation recovery timer remains bounded.
-  useEffect(() => {
-    if (!pendingNavigation) return;
-    const clearAcknowledgment = () => setPendingNavigation(null);
-    globalThis.addEventListener('offline', clearAcknowledgment);
-    return () => globalThis.removeEventListener('offline', clearAcknowledgment);
-  }, [pendingNavigation]);
 
   useEffect(() => {
     if (
@@ -381,6 +294,11 @@ export function DashboardNav({
           item={item}
           isActive={isActive}
           pending={pendingNavigation?.itemId === item.id}
+          highlighted={isNavigationItemHighlighted(
+            item.id,
+            isActive,
+            pendingNavigation?.itemId
+          )}
           onNavigate={
             demoUnavailable || isActive
               ? undefined
@@ -463,10 +381,10 @@ export function DashboardNav({
     <div
       data-sidebar-search-slot='true'
       className={cn(
-        'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
+        'flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
         // The command slot keeps its vertical allocation while the
         // surrounding rail narrows; navigation below never moves.
-        'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
+        'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
       )}
     >
       <RailStagedContent
@@ -486,19 +404,17 @@ export function DashboardNav({
         ) : null}
         {headerOwnsInbox ? null : (
           <InboxAttentionLink
-            label={homeAttentionName}
+            // App updates surface in the shell's update pill, not on the
+            // Inbox: the Inbox page shows no update, so the bell names only
+            // pending work.
+            label={inboxNavItem.name}
             itemId={inboxNavItem.id}
-            attention={
-              hasRuntimeUpdate
-                ? 'available'
-                : (inboxNavigation?.state ?? 'unknown')
-            }
+            attention={inboxNavigation?.state ?? 'unknown'}
             pendingCount={
               inboxNavigation?.state === 'available'
                 ? (inboxNavigation.pendingCount ?? 0)
                 : 0
             }
-            runtimeUpdate={hasRuntimeUpdate}
             navigationPending={pendingNavigation?.itemId === inboxNavItem.id}
             onClick={event => handleCommandClick(event, inboxNavItem)}
           />
@@ -511,7 +427,7 @@ export function DashboardNav({
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
-      <SidebarMenu className='gap-1'>
+      <SidebarMenu className='gap-1 lg:gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
@@ -542,16 +458,16 @@ export function DashboardNav({
             </SidebarCollapsibleGroup>
           </>
         ) : (
-          <SidebarGroup className='p-0'>
+          <SidebarGroup className='p-0 lg:pt-1'>
             {newChatOwnsRow ? (
-              // Full 44px touch target; the row has free space around it.
+              // Keep creation on the shared navigation row and icon column.
               <div data-nav-section='create' className='[&_a]:after:-inset-y-2'>
                 {renderSection([NEW_CHAT_ROW_ITEM])}
               </div>
             ) : (
               commandSlot
             )}
-            <SidebarGroupContent className='pb-2 pt-5'>
+            <SidebarGroupContent className='pb-2 pt-5 lg:pt-px'>
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>
                   {renderSection(section.items)}
@@ -562,27 +478,41 @@ export function DashboardNav({
         )}
 
         {threadsVisible ? (
-          <div className='pt-5'>
-            <SidebarThreadsSection
-              threads={sidebarThreads}
-              activeThreadId={activeThreadId}
-              allThreadsActive={
-                normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
-              }
-              onThreadContextMenu={onThreadContextMenu}
-              newThreadAction={false}
-              state={
-                conversationsError
-                  ? 'error'
-                  : conversationsLoading
-                    ? 'loading'
-                    : 'idle'
-              }
-              onRetry={handleRetryThreads}
-              calm
-              collapsed={false}
-            />
-          </div>
+          <SidebarCollapsibleGroup
+            label='Chat History'
+            className='pt-5'
+            defaultOpen={false}
+            dismissOnEscape
+            unmountWhenClosed
+          >
+            {!conversationsLoading &&
+            !conversationsError &&
+            conversations?.length === 0 ? (
+              <p className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'>
+                No chats yet
+              </p>
+            ) : (
+              <SidebarThreadsSection
+                threads={sidebarThreads}
+                activeThreadId={activeThreadId}
+                allThreadsActive={
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
+                }
+                onThreadContextMenu={onThreadContextMenu}
+                newThreadAction={false}
+                state={
+                  conversationsError
+                    ? 'error'
+                    : conversationsLoading
+                      ? 'loading'
+                      : 'idle'
+                }
+                onRetry={handleRetryThreads}
+                calm
+                collapsed={false}
+              />
+            )}
+          </SidebarCollapsibleGroup>
         ) : null}
       </nav>
       {contextMenuOverlay}

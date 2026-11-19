@@ -35,6 +35,27 @@ describe('RightDrawer', () => {
     mockUseBreakpointDown.mockReturnValue(false);
   });
 
+  it('uses the soft shell shadow on desktop and retains the mobile sheet shadow', () => {
+    const view = render(
+      <RightDrawer isOpen width={360} ariaLabel='Details'>
+        Content
+      </RightDrawer>
+    );
+    expect(screen.getByLabelText('Details')).toHaveClass(
+      'border-(--app-shell-frame-seam)',
+      'shadow-(--app-shell-shadow)'
+    );
+    mockUseBreakpointDown.mockReturnValue(true);
+    view.rerender(
+      <RightDrawer isOpen width={360} ariaLabel='Details'>
+        Content
+      </RightDrawer>
+    );
+    expect(screen.getByLabelText('Details')).toHaveClass(
+      'shadow-(--app-shell-drawer-shadow)'
+    );
+  });
+
   it('hands Escape to its keyboard handler while open', async () => {
     const onKeyDown = vi.fn();
     render(

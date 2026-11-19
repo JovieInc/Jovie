@@ -35,7 +35,7 @@ export function DrawerPropertyRow({
   className,
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? 'button' : 'div';
-  const Label = definitionList ? 'dt' : 'span';
+  const LabelElement = definitionList ? 'dt' : 'span';
   const Value = definitionList ? 'dd' : 'span';
 
   const sizeClasses = {
@@ -77,7 +77,7 @@ export function DrawerPropertyRow({
       )}
       style={gridStyle}
     >
-      <Label
+      <LabelElement
         className={cn(
           'font-[500] text-quaternary-token',
           styles.label,
@@ -85,7 +85,7 @@ export function DrawerPropertyRow({
         )}
       >
         {label}
-      </Label>
+      </LabelElement>
       <Value
         className={cn(
           'min-w-0 font-[460] text-primary-token',

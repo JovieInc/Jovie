@@ -100,7 +100,9 @@ def red_episode_route(reply, login="github-actions[bot]", created="2026-01-01T00
     `gh api graphql`; the Shell routes by prefix, so one callable dispatches on the query."""
     def route(args):
         if "LABELED_EVENT" in " ".join(args):
-            actor = {"__typename": "Bot" if login.endswith("[bot]") else "User", "login": login}
+            # Real GraphQL: a Bot's login has no "[bot]" suffix (REST adds it).
+            bot = login.endswith("[bot]")
+            actor = {"__typename": "Bot" if bot else "User", "login": login.removesuffix("[bot]")}
             nodes = [] if absent else [{"createdAt": created, "label": {"name": "lane-fix-red"},
                                         "actor": actor}]
             return {"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": nodes}}}}}
@@ -651,7 +653,7 @@ class RelayTest(unittest.TestCase):
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        for login, cleared in (("github-actions[bot]", True), ("jovie-bot[bot]", False), ("tim", False)):
+        for login, cleared in (("github-actions[bot]", True), ("github-actions", False), ("jovie-bot[bot]", False), ("tim", False)):
             shell = Shell({("gh", "pr", "view"): view,
                            ("gh", "api", "graphql"): red_episode_route(lambda args: None, login=login)})
             result = events.relay("workflow_run", {"workflow_run": run}, shell, set())
@@ -717,10 +719,70 @@ class RelayTest(unittest.TestCase):
         ]
         shell = Shell({("gh", "pr", "list"): rows,
                        ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
-        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
+        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red"), (5, "enroll-wake")])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE",
                            f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+        self.assertEqual(shell.made("gh", "workflow", "run"),
+                         [["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                           "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]])
+
+    def test_a_push_sweep_clears_a_stale_relay_red_on_a_settled_head_and_wakes_enroll(self):
+        # #25157: required-green since 21:04Z, lane-fix-red from an older head (relay, 14:28Z),
+        # merge state lagging after the main push, and 14 skipped jobs in the rollup. No check
+        # completion comes for an unchanged green head, so the push sweep is the exit.
+        def node(name, conclusion, **extra):
+            return {"__typename": "CheckRun", "name": name, "conclusion": conclusion,
+                    "completedAt": "2026-11-12T21:04:00Z", **extra}
+
+        def rollup(*nodes):
+            return {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+                "statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+
+        def sweep(nodes, merge="UNKNOWN", login="github-actions[bot]", **extra):
+            row = pr(number=5, branch="tim/fix", merge=merge, labels=["lane-fix-red"], state="OPEN",
+                     mergeable="MERGEABLE", **extra)
+            shell = Shell({("gh", "pr", "list"): [row],
+                           ("gh", "api", "graphql"): red_episode_route(rollup(*nodes), login=login)})
+            return events.relay("push", {}, shell, set()), shell
+
+        green = [node("Source Validation", "SUCCESS"), node("CodeRabbit", "SKIPPED"),
+                 node("Advisory", "NEUTRAL"), node("Tently", "FAILURE")]
+        for merge in ("UNKNOWN", "BLOCKED"):
+            result, shell = sweep(green, merge)
+            self.assertEqual(result, [(5, "cleared-red"), (5, "enroll-wake")], merge)
+            self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, merge)
+            self.assertEqual(len(shell.made("gh", "workflow", "run")), 1, merge)
+        result, shell = sweep(green, draft=True)
+        self.assertEqual(result, [(5, "cleared-red")], "auto-ready promotes a draft, not enroll")
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+        pending = node("Source Validation", None, completedAt=None, startedAt="2026-11-12T21:27:00Z")
+        for why, nodes in (("red", [node("Source Validation", "FAILURE"), node("CodeRabbit", "SKIPPED")]),
+                           ("pending", [node("CI", "SUCCESS"), pending]),
+                           ("cancelled", [node("Source Validation", "CANCELLED"), node("CI", "SUCCESS")]),
+                           ("nothing succeeded", [node("CodeRabbit", "SKIPPED")])):
+            result, shell = sweep(nodes)
+            self.assertEqual(result, [], why)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], why)
+            self.assertEqual(shell.made("gh", "workflow", "run"), [], why)
+
+        for login in ("jovie-bot[bot]", "tim"):
+            for merge in ("CLEAN", "UNKNOWN"):
+                result, shell = sweep(green, merge, login=login)
+                self.assertEqual(result, [], (login, merge))
+                self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], (login, merge))
+                self.assertEqual(shell.made("gh", "workflow", "run"), [], (login, merge))
+
+    def test_a_push_sweep_bounds_its_enroll_wakes(self):
+        rows = [pr(number=n, branch=f"tim/fix-{n}", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+                for n in range(1, events.SWEEP_ENROLL_WAKES + 3)]
+        shell = Shell({("gh", "pr", "list"): rows,
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
+        result = events.relay("push", {}, shell, set())
+        self.assertEqual(len([row for row in result if row[1] == "cleared-red"]), events.SWEEP_ENROLL_WAKES,
+                         "past the cap the label stays for the next landing: no clear without its wake")
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), events.SWEEP_ENROLL_WAKES)
 
     def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",

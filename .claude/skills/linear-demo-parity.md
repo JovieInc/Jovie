@@ -28,7 +28,7 @@ corepack enable
 corepack prepare pnpm@9.15.9 --activate
 ```
 
-Install dependencies with `pnpm install` only.
+Install dependencies with `pnpm install --offline --frozen-lockfile` only (--prefer-offline if the store is cold; dependency-bump jobs use a normal networked install).
 
 ## Startup
 

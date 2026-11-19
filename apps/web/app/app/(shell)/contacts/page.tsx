@@ -1,16 +1,13 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
-import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
-import { WorkspacePage } from '@/components/organisms/WorkspacePage';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/LazyDashboardAudienceClient';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { withTimeout } from '@/lib/resilience/primitives';
@@ -29,10 +26,7 @@ import {
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
 import { ContactsPageClient } from './ContactsPageClient';
-import {
-  type ContactsWorkspaceTab,
-  resolveContactsWorkspaceTab,
-} from './contacts-workspace';
+import { resolveContactsWorkspaceTab } from './contacts-workspace';
 
 export { resolveContactsWorkspaceTab } from './contacts-workspace';
 
@@ -42,42 +36,6 @@ export const metadata: Metadata = {
   title: 'Audience',
   description: 'Your audience, contacts, and audience insights',
 };
-
-function buildAudienceWorkspaceHref(searchParams: SearchParams): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(searchParams)) {
-    if (key === 'tab' || value === undefined) continue;
-    for (const entry of Array.isArray(value) ? value : [value]) {
-      params.append(key, entry);
-    }
-  }
-  params.set('tab', 'audience');
-  return `${APP_ROUTES.CONTACTS}?${params.toString()}`;
-}
-
-function AudienceWorkspaceTabs({
-  activeTab,
-  searchParams,
-}: Readonly<{
-  activeTab: ContactsWorkspaceTab;
-  searchParams: SearchParams;
-}>) {
-  return (
-    <PageToolbar
-      className='border-b border-subtle'
-      start={
-        <RouteSegmentControl
-          value={activeTab}
-          aria-label='Audience Workspace'
-          className='max-w-72'
-          options={getAudienceWorkspaceNavigation(
-            buildAudienceWorkspaceHref(searchParams)
-          )}
-        />
-      }
-    />
-  );
-}
 
 export default async function ContactsPage({
   searchParams = Promise.resolve({}),
@@ -126,16 +84,10 @@ export default async function ContactsPage({
   }
 
   return (
-    <WorkspacePage
+    <AppShellContentPanel
       frame='none'
       contentPadding='none'
       data-testid='contacts-workspace'
-      toolbar={
-        <AudienceWorkspaceTabs
-          activeTab={activeTab}
-          searchParams={resolvedSearchParams}
-        />
-      }
     >
       <div className='min-h-0 flex-1'>
         {activeTab === 'audience' ? (
@@ -153,7 +105,7 @@ export default async function ContactsPage({
           />
         )}
       </div>
-    </WorkspacePage>
+    </AppShellContentPanel>
   );
 }
 

@@ -1,29 +1,28 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
 import {
-  type ChatEmptyStateAction,
+  type ChatEmptyStateResult,
+  chatEmptyStateResultActionLabel,
+  chatEmptyStateResultProblem,
   getChatEmptyStateGreetingText,
 } from '../chat-empty-greeting';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
 
 /**
- * One personal welcome and one useful next step. Insight prose is never
- * promoted to a verified success claim or substituted for the welcome.
+ * One personal welcome, and under it only work Jovie has already finished for
+ * an item the artist owns (a draft to approve or a finding to open). With no
+ * finished result there is nothing under the greeting: no chore, no canned
+ * suggestion, no placeholder.
  */
 export function ChatEmptyStateGreeting({
   firstName,
-  action,
-  isLoading = false,
-  onSelectAction,
+  result,
 }: {
   readonly firstName: string | null;
-  /** Legacy playground's empty placeholder; unverified Insight prose is unsupported. */
-  readonly insight?: null;
-  readonly action?: ChatEmptyStateAction | null;
-  readonly isLoading?: boolean;
-  readonly onSelectAction?: (prompt: string) => void;
+  readonly result?: ChatEmptyStateResult | null;
 }) {
+  const showable =
+    result && chatEmptyStateResultProblem(result) === null ? result : null;
   return (
     <div
       className={CHAT_CONTENT_SHELL_CLASSNAME}
@@ -36,38 +35,22 @@ export function ChatEmptyStateGreeting({
         >
           {getChatEmptyStateGreetingText(firstName)}
         </h2>
-        <div
-          className='min-h-24 w-full'
-          data-testid='chat-empty-state-next-step'
-        >
-          {isLoading ? (
-            <p className='text-sm text-secondary-token' role='status'>
-              Finding your next step…
+        {showable ? (
+          <div
+            className='flex flex-col items-start gap-3'
+            data-testid='chat-empty-state-result'
+            data-result-id={showable.id}
+          >
+            <p className='text-base text-secondary-token'>
+              {showable.result.summary}
             </p>
-          ) : action && onSelectAction ? (
-            <div
-              className='flex flex-col items-start gap-3'
-              data-insight-id={action.insightId}
-            >
-              <p className='text-base text-secondary-token'>
-                {action.suggestion}
-              </p>
-              <Button
-                type='button'
-                variant='secondary'
-                onClick={() => onSelectAction(action.prompt)}
-              >
-                Draft This With Jovie
-              </Button>
-            </div>
-          ) : (
             <Button variant='secondary' asChild>
-              <Link href={APP_ROUTES.CHAT_PROFILE_PANEL}>
-                Review Your Profile
+              <Link href={showable.result.href}>
+                {chatEmptyStateResultActionLabel(showable)}
               </Link>
             </Button>
-          )}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

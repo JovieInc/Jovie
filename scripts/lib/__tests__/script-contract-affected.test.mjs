@@ -11,15 +11,59 @@ import {
   scriptContractNodeArgs,
   selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
+import { CHROME_SCAN_ROOTS } from '../../invariants/shell-ia.mjs';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import {
   COPY_INVENTORY_TEST,
   copyInventoryScanPath,
+  SHELL_IA_SCAN_ROOTS,
+  SHELL_IA_TEST,
   selectScriptContracts,
+  shellIaScanPath,
 } from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('package source changes select sparse checkout closure in CI and local scope', () => {
+  const closure =
+    'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
+  const options = { root: ROOT, node: [], vitest: [closure] };
+  for (const path of [
+    'packages/api-client/client.ts',
+    'packages/api-client/types.ts',
+    'packages/another-client/removed.ts',
+  ]) {
+    for (const derivedOnly of [false, true]) {
+      assert.deepEqual(
+        selectScriptContracts([path], { ...options, derivedOnly }),
+        {
+          full: false,
+          node: [],
+          vitest: [closure],
+        }
+      );
+    }
+  }
+  assert.deepEqual(
+    selectScriptContracts(['apps/ios/Jovie/App.swift'], options).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts(['packages/api-client/types.ts'], {
+      ...options,
+      vitest: [],
+    }).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts([closure, 'packages/api-client/types.ts'], {
+      ...options,
+      derivedOnly: true,
+    }).vitest,
+    [closure]
+  );
+});
 
 test('a non-JS scripts path does not force the full contract lists', () => {
   const root = mkdtempSync(join(tmpdir(), 'script-contract-affected-'));
@@ -188,6 +232,41 @@ test('a marketing copy source selects the inventory contract without the full li
       vitest: [],
     }).node,
     []
+  );
+});
+
+test('a scannable route or feature tsx selects the shell IA contract without the full lists', () => {
+  const rail = 'apps/web/components/features/admin/outbound/OutboundRail.tsx';
+  const catalog = [SHELL_IA_TEST, 'scripts/agent-context/check.test.mjs'];
+  const options = { root: ROOT, node: catalog, vitest: [] };
+  assert.deepEqual(SHELL_IA_SCAN_ROOTS, CHROME_SCAN_ROOTS);
+  assert.equal(shellIaScanPath(rail), true);
+  assert.equal(shellIaScanPath('apps/web/app/(app)/dashboard/page.tsx'), true);
+  assert.equal(shellIaScanPath(rail.replace(/\.tsx$/u, '.test.tsx')), false);
+  assert.equal(shellIaScanPath(rail.replace(/\.tsx$/u, '.stories.tsx')), false);
+  assert.equal(
+    shellIaScanPath('apps/web/components/organisms/Sidebar.tsx'),
+    false
+  );
+  assert.deepEqual(testsAffectedBy([SHELL_IA_TEST], [rail], ROOT), []);
+  assert.deepEqual(selectScriptContracts([rail], options), {
+    full: false,
+    node: [SHELL_IA_TEST],
+    vitest: [],
+  });
+  assert.deepEqual(
+    selectScriptContracts([rail], { ...options, derivedOnly: true }).node,
+    [SHELL_IA_TEST]
+  );
+  const landing =
+    'apps/web/components/features/waitlist/WaitlistPublicLanding.tsx';
+  assert.deepEqual(
+    selectScriptContracts([landing], {
+      root: ROOT,
+      node: [COPY_INVENTORY_TEST, SHELL_IA_TEST],
+      vitest: [],
+    }).node,
+    [COPY_INVENTORY_TEST, SHELL_IA_TEST]
   );
 });
 

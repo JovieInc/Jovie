@@ -70,6 +70,7 @@ jobs:
             .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
             scripts/lib/github-installation-quota.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
@@ -84,11 +85,13 @@ jobs:
             scripts/lib/screen-audit-receipts.mjs
             scripts/invariants/screen-audit.mjs
             scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-registry.mjs
             scripts/invariants/screen-decision-routing.mjs
             scripts/invariants/browser-owned-input.mjs
             scripts/invariants/browser-owned-input-matrix.json
             scripts/invariants/product-reference-coherence.mjs
             scripts/invariants/screen-proof-resolver.mjs
+            scripts/invariants/screen-proof-transport.mjs
             scripts/invariants/screen-proof-final-paths.mjs
             scripts/invariants/screen-proof-attempt-checks.mjs
             scripts/lib/playwright-png.mjs
@@ -104,6 +107,7 @@ jobs:
             packages/api-client/policy.ts
             packages/api-client/providers.json
             packages/api-client/store.ts
+            packages/api-client/types.ts
             .github/actions/prime-node-toolcache/action.yml
             .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false

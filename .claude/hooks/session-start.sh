@@ -78,19 +78,13 @@ else
   echo "GitHub CLI already installed."
 fi
 
-# 1. Install dependencies if node_modules is missing or empty
+# 1. Install dependencies if node_modules is still missing or empty (setup.sh
+# above normally installs them). Same frozen install as setup.sh and the Codex
+# Cloud lane (JOV-12623): the pnpm version comes from package.json's
+# packageManager pin, and pnpm-lock.yaml is never rewritten.
 if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   echo "Installing dependencies (this may take a moment on first run)..."
-
-  # Check if pnpm is available
-  if ! command -v pnpm &> /dev/null; then
-    echo "Installing pnpm..."
-    corepack enable 2>/dev/null
-    corepack prepare pnpm@9.15.9 --activate
-  fi
-
-  # Install with frozen lockfile for reproducibility
-  pnpm install --frozen-lockfile
+  node "$PROJECT_DIR/scripts/codex-cloud-setup.mjs" install
   echo "Dependencies installed."
 else
   echo "Dependencies already installed."
@@ -128,24 +122,28 @@ PNPM_VER=$(pnpm --version 2>/dev/null || echo 'not found')
 # Check if versions match requirements
 NODE_OK="[OK]"
 PNPM_OK="[OK]"
+REQUIRED_PNPM="not pinned"
+if command -v jovie_setup_required_pnpm >/dev/null 2>&1; then
+  REQUIRED_PNPM="$(jovie_setup_required_pnpm "$PROJECT_DIR" || echo 'not pinned')"
+fi
 if [ "$(echo "$NODE_VER" | sed 's/v\([0-9]*\).*/\1/')" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
   NODE_OK="[WRONG - need v${REQUIRED_NODE_MAJOR}+]"
 fi
-if [ "$PNPM_VER" != "9.15.9" ] && [ "$PNPM_VER" != "not found" ]; then
-  PNPM_OK="[WRONG - need 9.15.9]"
+if [ "$PNPM_VER" != "$REQUIRED_PNPM" ] && [ "$PNPM_VER" != "not found" ]; then
+  PNPM_OK="[WRONG - need $REQUIRED_PNPM (package.json packageManager)]"
 fi
 
 echo "  Node.js: $NODE_VER $NODE_OK"
 echo "  pnpm:    $PNPM_VER $PNPM_OK"
 echo "  jq:      $(jq --version 2>/dev/null || echo 'not installed (hooks will use fallbacks)')"
 echo "  gh CLI:  $(gh --version 2>/dev/null | head -1 || echo 'not installed')"
-echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install first')"
+echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install --offline --frozen-lockfile first')"
 
 # 4. Check for node_modules/.bin in PATH
 if [ -d "node_modules/.bin" ]; then
   echo "  Binaries: available"
 else
-  echo "  Binaries: not found (run pnpm install)"
+  echo "  Binaries: not found (run pnpm install --offline --frozen-lockfile)"
 fi
 
 echo ""

@@ -92,6 +92,124 @@ describe('buildSystemPrompt', () => {
     );
   });
 
+  it('reports the whole-catalog total and truncation beyond the prompt rows', () => {
+    const releases = Array.from({ length: 30 }, (_, i) => ({
+      title: `Track ${i + 1}`,
+      releaseType: 'single',
+      releaseDate: '2025-01-01T00:00:00.000Z',
+      totalTracks: 1,
+    }));
+
+    const prompt = buildSystemPrompt(baseContext, releases, {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'ok', total: 120 },
+    });
+
+    expect(prompt).toContain('- **Total Releases:** 120');
+    // Total / loaded / shown reported distinctly.
+    expect(prompt).toContain('- **Total Releases:** 120 (30 loaded, 25 shown)');
+    expect(prompt).toContain('Track 25');
+    expect(prompt).not.toContain('Track 26');
+    expect(prompt).toContain(
+      '...and 95 more releases in the catalog (120 total, 25 most recent shown).'
+    );
+    expect(prompt).toContain('This list is truncated');
+  });
+
+  it('keeps the loaded-count semantics when no catalog meta is passed', () => {
+    const releases = Array.from({ length: 30 }, (_, i) => ({
+      title: `Track ${i + 1}`,
+      releaseType: 'single',
+      releaseDate: '2025-01-01T00:00:00.000Z',
+      totalTracks: 1,
+    }));
+
+    const prompt = buildSystemPrompt(baseContext, releases);
+
+    expect(prompt).toContain('- **Total Releases:** 30');
+    expect(prompt).toContain('...and 5 more releases in the catalog.');
+    // The prompt list is truncated at 25 rows even when the catalog meta is
+    // absent, so the truncation note fires (Astra review).
+    expect(prompt).toContain('This list is truncated');
+  });
+
+  it('says the catalog is unavailable instead of claiming no releases exist', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'unavailable', total: null },
+    });
+
+    expect(prompt).toContain(
+      '- **Total Releases:** unknown (catalog temporarily unavailable)'
+    );
+    expect(prompt).toContain(
+      'The release catalog could not be read this turn.'
+    );
+    expect(prompt).toContain('Do not say the artist has no releases');
+    // The partial read must not render as the genuine-empty fallback.
+    expect(prompt).not.toContain(
+      'No releases found in the connected discography yet.'
+    );
+    expect(prompt).not.toContain('- **Total Releases:** 0');
+  });
+
+  it('appends a named release that is outside the shown rows', () => {
+    const releases = Array.from({ length: 30 }, (_, index) => ({
+      title: `Track ${index + 1}`,
+      releaseType: 'single',
+      releaseDate: '2025-01-01T00:00:00.000Z',
+      totalTracks: 1,
+    }));
+
+    const prompt = buildSystemPrompt(baseContext, releases, {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'ok', total: 120 },
+      namedReleases: [
+        {
+          title: 'Never Say A Word',
+          releaseType: 'single',
+          releaseDate: '2024-02-02T00:00:00.000Z',
+          totalTracks: 1,
+        },
+        {
+          title: 'Track 1',
+          releaseType: 'single',
+          releaseDate: '2025-01-01T00:00:00.000Z',
+          totalTracks: 1,
+        },
+      ],
+    });
+
+    expect(prompt).toContain(
+      '- Named this turn, resolved from the full catalog:'
+    );
+    expect(prompt).toContain('Never Say A Word');
+    const namedAt = prompt.indexOf('Named this turn');
+    expect(prompt.slice(namedAt)).not.toContain('Track 1');
+  });
+
+  it('does not render named releases when the catalog could not be read', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'unavailable', total: null },
+      namedReleases: [
+        {
+          title: 'Never Say A Word',
+          releaseType: 'single',
+          releaseDate: '2024-02-02T00:00:00.000Z',
+          totalTracks: 1,
+        },
+      ],
+    });
+
+    expect(prompt).not.toContain('Never Say A Word');
+    expect(prompt).not.toContain('Named this turn');
+  });
+
   it('keeps an explicit creator segment together with the pinned release clock', () => {
     const prompt = buildSystemPrompt(
       baseContext,

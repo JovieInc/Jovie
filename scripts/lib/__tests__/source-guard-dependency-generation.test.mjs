@@ -17,6 +17,13 @@ import {
   dependencyInputDigest,
   validateDependencyWorkspace,
 } from '../ci-dependency-workspace.mjs';
+import {
+  expression,
+  interpolate,
+  runInstallAndStamp,
+  stepEnabled,
+  stepOutputs,
+} from './source-guard-composite.test-support.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const workflow = load(
@@ -330,25 +337,6 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
   };
 }
 
-function expression(value, context) {
-  const code = value
-    .trim()
-    .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-    .replace(/\.([\w]+-[\w-]+)/g, (_, key) => `[${JSON.stringify(key)}]`);
-  // GitHub's expression subset used by this local transaction consists of
-  // property reads, comparisons, boolean operators and status functions.
-  return Function(
-    ...Object.keys(context),
-    `return (${code});`
-  )(...Object.values(context));
-}
-
-function interpolate(value, context) {
-  return String(value).replace(/\$\{\{([\s\S]*?)\}\}/g, (_, code) =>
-    String(expression(code, context) ?? '')
-  );
-}
-
 function transaction(f, options = {}) {
   const steps = workflow.jobs.unit.steps;
   const start = steps.findIndex(step => step.id === 'source_guard_merge');
@@ -379,13 +367,6 @@ function transaction(f, options = {}) {
     failure: () => failed,
     cancelled: () => false,
   };
-  const enabled = (step, scope = context) => {
-    if (!step.if) return scope.success();
-    const explicitStatus = /\b(?:always|failure|success|cancelled)\s*\(/.test(
-      step.if
-    );
-    return (explicitStatus || scope.success()) && expression(step.if, scope);
-  };
   // The runner saves a local action's path, then reloads its metadata at job
   // cleanup. Exercise that lifetime with small provider payloads; the composite
   // manifests, snapshot helper, Git transaction and dependency proof are real.
@@ -411,11 +392,11 @@ function transaction(f, options = {}) {
   for (const [index, step] of steps.slice(start, end + 1).entries()) {
     const id = step.id ?? (step.name === guardName ? 'guard' : `step_${index}`);
     state[id] = {
-      outputs: new Proxy({}, { get: (target, key) => target[key] ?? '' }),
+      outputs: stepOutputs(),
       outcome: 'skipped',
       conclusion: 'skipped',
     };
-    if (!enabled(step)) continue;
+    if (!stepEnabled(step, context)) continue;
     options.beforeStep?.(id, f);
     const extra = Object.fromEntries(
       Object.entries(step.env ?? {}).map(([key, value]) => [
@@ -453,42 +434,11 @@ function transaction(f, options = {}) {
       assert.ok(actionReference.endsWith('/setup-node-pnpm'));
       // Provisioning is the only seam: use the real composite's frozen install
       // shell and receipt stamping, with a local pnpm artifact fixture.
-      const setupContext = {
-        ...context,
-        success: () => true,
-        failure: () => false,
-        github: { ...context.github, event_name: 'pull_request' },
-        inputs: {
-          package_cache: 'true',
-          reuse_merge_group_workspace: 'false',
-          ...step.with,
-        },
-        steps: {
-          'runner-prereqs': { outputs: { dependencies_warm: 'false' } },
-        },
-      };
-      const install = action.runs.steps.find(
-        item => item.name === 'Install dependencies'
-      );
-      const stamp = action.runs.steps.find(
-        item => item.name === 'Stamp installed workspace receipt'
-      );
-      assert.ok(install && stamp, 'use the normal installed-tree producer');
-      const scripts = [install, stamp]
-        .filter(item => enabled(item, setupContext))
-        .map(item => interpolate(item.run, setupContext));
-      result = f.bash(`set -euo pipefail\n${scripts.join('\n')}`, extra);
+      result = runInstallAndStamp(f, action, step.with, context, extra);
     } else {
       result = f.bash(interpolate(step.run, context), extra);
     }
-    const output = existsSync(extra.GITHUB_OUTPUT)
-      ? readFileSync(extra.GITHUB_OUTPUT, 'utf8')
-      : '';
-    for (const line of output.trim().split('\n')) {
-      const split = line.indexOf('=');
-      if (split > 0)
-        state[id].outputs[line.slice(0, split)] = line.slice(split + 1);
-    }
+    state[id].outputs = stepOutputs(extra.GITHUB_OUTPUT);
     if (existsSync(extra.GITHUB_ENV)) {
       for (const line of readFileSync(extra.GITHUB_ENV, 'utf8')
         .trim()
@@ -524,6 +474,39 @@ function transaction(f, options = {}) {
     text: results.map(r => r.stdout + r.stderr).join('\n'),
   };
 }
+
+test('the receipt condition reads install outputs only inside the same setup invocation', t => {
+  const f = fixture(t, () => {});
+  const action = load(
+    readFileSync('.github/actions/setup-node-pnpm/action.yml', 'utf8')
+  );
+  const install = action.runs.steps.find(
+    step => step.name === 'Install dependencies'
+  );
+  const stamp = action.runs.steps.find(
+    step => step.name === 'Stamp installed workspace receipt'
+  );
+  // Exercise the real env, step ID and stamp predicate with a controlled producer.
+  install.run = [
+    'test "$USE_PREPARED_WORKSPACE" = false',
+    'if [[ "$EMIT_REUSE" == true ]]; then echo "prepared-workspace-reused=true" >> "$GITHUB_OUTPUT"; fi',
+  ].join('\n');
+  stamp.run = 'echo stamped';
+  const parentOutput = join(f.root, 'parent-output');
+  writeFileSync(parentOutput, 'parent=untouched\n');
+  for (const reuse of ['true', 'false']) {
+    const result = runInstallAndStamp(
+      f,
+      action,
+      { package_cache: 'true' },
+      { runner: { environment: 'github-hosted' } },
+      { EMIT_REUSE: reuse, GITHUB_OUTPUT: parentOutput }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, reuse === 'true' ? '' : 'stamped\n');
+    assert.equal(readFileSync(parentOutput, 'utf8'), 'parent=untouched\n');
+  }
+});
 
 function restored(f) {
   assert.equal(f.git('rev-parse', 'HEAD'), f.head);

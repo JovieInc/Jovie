@@ -13,11 +13,12 @@ vi.mock('next/image', () => ({
 }));
 
 import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { BlancoYNegroLogo, DiscoWaxLogo, RecPlayLogo } from './label-logos';
 
 describe('label-logos', () => {
-  it('renders every vector logo with an accessible label', () => {
-    render(
+  it('renders every vector logo with an accessible label', async () => {
+    const { container } = render(
       <>
         <NormalizedTrustLogo id='umg' />
         <NormalizedTrustLogo id='armada' />
@@ -36,6 +37,37 @@ describe('label-logos', () => {
     expect(screen.getByLabelText('disco:wax')).toBeInTheDocument();
     expect(screen.getByLabelText('Blanco y Negro')).toBeInTheDocument();
     expect(screen.getByLabelText('rec play')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('draws the text lockups in the on-media token, not raw white', () => {
+    render(
+      <>
+        <DiscoWaxLogo />
+        <BlancoYNegroLogo />
+        <RecPlayLogo className='text-lg' />
+      </>
+    );
+
+    for (const label of ['disco:wax', 'Blanco y Negro', 'rec play']) {
+      const lockup = screen.getByLabelText(label);
+      expect(lockup).toHaveClass('text-on-media/92');
+      expect(lockup.className).not.toMatch(/text-white/);
+    }
+    expect(screen.getByLabelText('rec play')).toHaveClass('text-lg');
+  });
+
+  it('keeps the lockups axe-clean in a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <DiscoWaxLogo />
+        <BlancoYNegroLogo />
+        <RecPlayLogo />
+      </div>
+    );
+
+    expect(screen.getByLabelText('Blanco y Negro')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('serves the Black Hole logo as a direct public asset (JOV-6849)', () => {

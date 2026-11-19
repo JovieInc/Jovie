@@ -49,7 +49,7 @@ export function LibraryShareDropHeader({ view }: LibraryShareDropHeaderProps) {
             </span>
           )}
           <div className='min-w-0'>
-            <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='text-xs font-semibold tracking-[0.08em] text-tertiary-token'>
               Press kit · {view.artistName}
             </p>
             <h1 className='mt-1 truncate text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'>

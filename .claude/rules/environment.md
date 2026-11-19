@@ -20,7 +20,19 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 .\scripts\setup.ps1
 ```
 
-`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs the offline-first frozen install, and verifies Doppler auth.
+
+## Dependency installs (offline-first)
+
+Routine agent jobs run against a warm pnpm store. The default install is:
+
+```bash
+pnpm install --offline --frozen-lockfile
+```
+
+If that fails because the store is cold or incomplete, fall back once to `pnpm install --prefer-offline --frozen-lockfile`. If network is also unavailable and the fallback fails, say so and let CI verify — no retry loops, no sleeps, no registry access requests for a routine job. This is what `node scripts/codex-cloud-setup.mjs install` (used by `setup.sh` and the SessionStart hook) does automatically.
+
+**Exception — dependency jobs:** work that adds/bumps/removes dependencies (changes `pnpm-lock.yaml`) needs normal registry access: run a plain `pnpm install --frozen-lockfile` there.
 
 Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it hands out a pre-installed, typecheck-warm worktree from the pool in `~/.cache/jovie` (~35s instead of ~5 min) and falls back to `git worktree add` + install when the pool is empty. A worktree made any other way needs `./scripts/setup.sh` before anything else, because worktrees do not share `node_modules`.
 
@@ -31,6 +43,7 @@ Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it h
 | **Node.js** | **24.x** (24.22.3+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.9** (`packageManager`); engines `>=9.15.4 <10` | `package.json` |
 | **Turbo** | 2.8+ | Root devDependencies |
+| **GitHub CLI** (when installed) | `gh api --slurp` support | Offline setup warning; preflight prerequisite |
 
 AI agents frequently default to Node 18/20/22 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 24 LTS.
 
@@ -146,7 +159,7 @@ Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
 - verify GitHub CLI auth when present, including `GH_TOKEN`/`GITHUB_TOKEN` supplied by the environment or Doppler
 - avoid creating remote infrastructure by default
 
-Warm Claude/Codex SessionStart reuses this script. When the deps fingerprint at `node_modules/.cache/jovie-setup/deps.sha256` matches and Node/pnpm pins are ok, `setup.sh` exits before Doppler, gh, Clerk, migration drift, and cache lsof. Cold or stale worktrees still run the full body. Set `JOVIE_SETUP_FORCE=1` to force a full bootstrap. Codex SessionStart still runs gbrain sync after `setup.sh` returns.
+Warm Claude/Codex SessionStart reuses this script. Setup first checks an installed `gh` offline with `gh api --help` for required `--slurp` support, including the secret-free Codex lane. An incompatible CLI warns with its executable path and how to upgrade that existing installation or fix PATH; setup continues so development environments can start. `pnpm preflight:changed` rejects that unsupported installed CLI before running checks; `--list` remains available. When the deps fingerprint at `node_modules/.cache/jovie-setup/deps.sha256` matches and Node/pnpm pins are ok, `setup.sh` exits before Doppler, gh auth, Clerk, migration drift, and cache lsof. Cold or stale worktrees still run the full body. Set `JOVIE_SETUP_FORCE=1` to force a full bootstrap. Codex SessionStart still runs gbrain sync after `setup.sh` returns.
 
 Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
 
@@ -314,7 +327,7 @@ The web app already uses `NODE_OPTIONS=--max-old-space-size=4096` and `--pool=fo
 
 ### "Type errors after pull"
 ```bash
-pnpm install
+pnpm install --offline --frozen-lockfile   # --prefer-offline --frozen-lockfile if the store is cold
 pnpm typecheck
 ```
 

@@ -8,6 +8,12 @@ import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AuthShell } from './AuthShell';
 
+const mocks = vi.hoisted(() => ({
+  headerRenders: 0,
+  togglePreviewPanel: () => {},
+  audioAction: vi.fn(),
+}));
+
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
@@ -21,17 +27,20 @@ vi.mock('./AppShellFrame', () => ({
     header,
     main,
     mobileBottomNav,
+    audioPlayer,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
+    audioPlayer?: ReactNode;
   }) => (
     <div data-testid='auth-shell-frame'>
       {sidebar}
       {header}
       <main>{main}</main>
       {mobileBottomNav}
+      {audioPlayer}
     </div>
   ),
 }));
@@ -49,25 +58,32 @@ vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
   }: {
     breadcrumbs: DashboardBreadcrumbItem[];
     sidebarTrigger?: ReactNode;
-  }) => (
-    <header>
-      {sidebarTrigger}
-      <nav aria-label='Breadcrumb'>
-        {breadcrumbs.map(crumb => (
-          <span key={crumb.label}>{crumb.label}</span>
-        ))}
-      </nav>
-    </header>
-  ),
+  }) => {
+    mocks.headerRenders += 1;
+    return (
+      <header>
+        {sidebarTrigger}
+        <nav aria-label='Breadcrumb'>
+          {breadcrumbs.map(crumb => (
+            <span key={crumb.label}>{crumb.label}</span>
+          ))}
+        </nav>
+      </header>
+    );
+  },
 }));
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  usePreviewPanelState: () => ({ toggle: mocks.togglePreviewPanel }),
 }));
 vi.mock('@/components/features/chat/Composer', () => ({
   useComposerFocus: () => ({ isComposerFocused: false }),
 }));
 vi.mock('./PersistentAudioBar', () => ({
-  PersistentAudioBar: () => null,
+  PersistentAudioBar: () => (
+    <button type='button' onClick={mocks.audioAction}>
+      Audio playback toggle
+    </button>
+  ),
 }));
 vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
   RuntimeUpdateProvider: ({ children }: { children: ReactNode }) => children,
@@ -116,6 +132,25 @@ function Shell({
 }
 
 describe('AuthShell', () => {
+  it('retains the loaded audio controls and focus through route updates', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Shell />);
+    const transport = await screen.findByRole('button', {
+      name: 'Audio playback toggle',
+    });
+    await user.click(transport);
+    expect(transport).toHaveFocus();
+    const actions = mocks.audioAction.mock.calls.length;
+
+    rerender(<Shell breadcrumbs={[{ label: 'Tasks' }]} />);
+    expect(screen.getByRole('button', { name: 'Audio playback toggle' })).toBe(
+      transport
+    );
+    expect(transport).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(mocks.audioAction).toHaveBeenCalledTimes(actions + 1);
+  });
+
   it('pins a collapsed sidebar from the header toggle and reports the change', async () => {
     const user = userEvent.setup();
     const onSidebarOpenChange = vi.fn();
@@ -133,6 +168,27 @@ describe('AuthShell', () => {
     // Once pinned, the rail owns its toggle and the header trigger leaves.
     expect(toggle).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('reuses the header when only the route content re-renders', () => {
+    const breadcrumbs = [{ label: 'Releases' }];
+    const { rerender } = render(
+      <Shell breadcrumbs={breadcrumbs}>
+        <p>First render</p>
+      </Shell>
+    );
+    const rendersAfterMount = mocks.headerRenders;
+
+    // A route render (or a sidebar hover peek) re-renders the shell; a
+    // rebuilt header element would re-render the whole header each time.
+    rerender(
+      <Shell breadcrumbs={breadcrumbs}>
+        <p>Second render</p>
+      </Shell>
+    );
+
+    expect(screen.getByText('Second render')).toBeInTheDocument();
+    expect(mocks.headerRenders).toBe(rendersAfterMount);
   });
 
   it('renders the customer header, content and mobile tabs', async () => {

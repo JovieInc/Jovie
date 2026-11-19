@@ -107,6 +107,21 @@ describe('TableActionMenu', () => {
     await expectNoA11yViolations(screen.getByRole('menu'));
   });
 
+  // A modal menu aria-hides the page behind it while open, which axe
+  // reports as aria-hidden-focus; held-open audits use the non-modal menu.
+  it('passes the modal through so open-menu audits can run non-modal', () => {
+    render(
+      <TableActionMenu
+        open
+        searchable
+        items={[{ id: 'edit', label: 'Edit', onClick: () => undefined }]}
+        modal={false}
+      />
+    );
+    // A searchable non-modal surface presents as a group.
+    expect(screen.getByRole('group')).toBeInTheDocument();
+  });
+
   it('has no axe violations in a right-to-left document', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn();

@@ -12,8 +12,12 @@
  * contract's inputs or toolchain, so it runs both full lists. That is the
  * 2026-10-12 rule (37 merge-group failures after a green PR). Python, data,
  * and other non-JS paths under scripts/ cannot change those inputs, so they
- * use the derived selector (testsAffectedBy), same as any other diff. The
- * node and vitest lists run concurrently.
+ * use the derived selector (testsAffectedBy), same as any other diff. Package
+ * changes also run sparse-checkout closure: its recursive reads cannot be
+ * inferred from literal imports, including newly added declaration files.
+ * A scannable route or feature tsx is not an import of the shell IA contract,
+ * so that ratchet is unioned the same way as the copy inventory. The node
+ * and vitest lists run concurrently.
  *
  * Usage: node scripts/lib/script-contract-affected.mjs [--list] [changed paths...]
  * With no paths it reads the PR diff via ci-fast-lanes.mjs.
@@ -48,6 +52,15 @@ const FULL_RUN_INPUT =
 // source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
 // FULL_RUN_INPUT), selects the inventory contract without the full lists.
 export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
+export const SHELL_IA_TEST = 'scripts/invariants/shell-ia.test.mjs';
+// Stay aligned with CHROME_SCAN_ROOTS and isScannable in shell-ia.mjs.
+// Importing that module here would pull the layout walker into every selection.
+export const SHELL_IA_SCAN_ROOTS = Object.freeze([
+  'apps/web/app',
+  'apps/web/components/features',
+]);
+const SPARSE_CLOSURE_TEST =
+  'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
 
 /** @param {string} file */
 export function copyInventoryScanPath(file) {
@@ -65,21 +78,26 @@ export function copyInventoryScanPath(file) {
   return /^(?:app|components|data)\//u.test(rel);
 }
 
+/** @param {string} file */
+export function shellIaScanPath(file) {
+  if (!/\.tsx$/u.test(file) || /\.(?:test|spec|stories)\.tsx$/u.test(file)) {
+    return false;
+  }
+  return SHELL_IA_SCAN_ROOTS.some(root => file.startsWith(`${root}/`));
+}
+
 /**
  * @param {readonly string[]} catalog
  * @param {readonly string[]} selected
- * @param {readonly string[]} changed
+ * @param {string} contract
+ * @param {boolean} affected
  * @returns {string[]}
  */
-function unionCopyInventory(catalog, selected, changed) {
-  if (
-    !catalog.includes(COPY_INVENTORY_TEST) ||
-    selected.includes(COPY_INVENTORY_TEST) ||
-    !changed.some(copyInventoryScanPath)
-  ) {
+function unionAffectedContract(catalog, selected, contract, affected) {
+  if (!affected || !catalog.includes(contract) || selected.includes(contract)) {
     return [...selected];
   }
-  return [...selected, COPY_INVENTORY_TEST];
+  return [...selected, contract];
 }
 
 /**
@@ -98,16 +116,18 @@ export function testsNearChange(tests, changed, root) {
       return new Set();
     }
   };
-  return tests.filter(test => {
-    if (changes.has(test)) return true;
-    for (const dep of near(test)) {
-      if (changes.has(dep)) return true;
-      if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
-        for (const upstream of near(dep))
-          if (changes.has(upstream)) return true;
-    }
-    return false;
-  });
+  return tests.filter(test =>
+    test.split(' ').some(part => {
+      if (changes.has(part)) return true;
+      for (const dep of near(part)) {
+        if (changes.has(dep)) return true;
+        if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
+          for (const upstream of near(dep))
+            if (changes.has(upstream)) return true;
+      }
+      return false;
+    })
+  );
 }
 
 /**
@@ -127,7 +147,7 @@ export function selectScriptContracts(changed, options = {}) {
   ) {
     // Partial checkouts (fixtures, sparse archives) run what they contain.
     const present = (/** @type {string} */ test) =>
-      existsSync(join(root, test));
+      test.split(' ').every(part => existsSync(join(root, part)));
     return {
       full: true,
       node: node.filter(present),
@@ -136,14 +156,26 @@ export function selectScriptContracts(changed, options = {}) {
   }
   const select = options.derivedOnly ? testsNearChange : testsAffectedBy;
   const changedFiles = changed ?? [];
+  const nodeSelected = unionAffectedContract(
+    node,
+    select(node, changedFiles, root),
+    COPY_INVENTORY_TEST,
+    changedFiles.some(copyInventoryScanPath)
+  );
   return {
     full: false,
-    node: unionCopyInventory(
+    node: unionAffectedContract(
       node,
-      select(node, changedFiles, root),
-      changedFiles
+      nodeSelected,
+      SHELL_IA_TEST,
+      changedFiles.some(shellIaScanPath)
     ),
-    vitest: select(vitest, changedFiles, root),
+    vitest: unionAffectedContract(
+      vitest,
+      select(vitest, changedFiles, root),
+      SPARSE_CLOSURE_TEST,
+      changedFiles.some(file => file.startsWith('packages/'))
+    ),
   };
 }
 
@@ -184,7 +216,9 @@ async function main(args) {
         '--config',
         'vitest.config.mts',
         'run',
-        ...vitest.map(test => test.replace(/^scripts\//u, '')),
+        ...vitest.flatMap(test =>
+          test.split(' ').map(part => part.replace(/^scripts\//u, ''))
+        ),
       ])
     );
   const codes = await Promise.all(runs);

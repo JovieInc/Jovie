@@ -54,6 +54,9 @@ export const SearchableEntityActions: Story = {
 export const EmptyItems: Story = {
   args: {
     open: true,
+    // Non-modal so the open-menu audit does not aria-hide the page behind
+    // the menu (axe aria-hidden-focus).
+    modal: false,
     items: [],
   },
 };
@@ -62,6 +65,7 @@ export const EmptyItems: Story = {
 export const LongContentLabels: Story = {
   args: {
     open: true,
+    modal: false,
     items: [
       {
         id: 'copy-title',
@@ -85,6 +89,7 @@ export const LongContentLabels: Story = {
 export const RtlActions: Story = {
   args: {
     open: true,
+    modal: false,
     items: [
       {
         id: 'copy',

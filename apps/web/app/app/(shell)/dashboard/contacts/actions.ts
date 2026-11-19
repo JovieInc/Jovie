@@ -3,8 +3,8 @@
 import { and, sql as drizzleSql, eq, notInArray } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
-  revalidateTag,
   unstable_cache,
+  updateTag,
 } from 'next/cache';
 import { cache } from 'react';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -362,7 +362,7 @@ export async function saveContact(
     { clerkUserId: userId }
   );
 
-  revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
+  updateTag(`contacts:${userId}:${sanitized.profileId}`);
   await invalidateProfileCache(result.usernameNormalized);
   return result.saved;
 }
@@ -416,6 +416,6 @@ export async function deleteContact(
     { clerkUserId: userId }
   );
 
-  revalidateTag(`contacts:${userId}:${profileId}`, 'max');
+  updateTag(`contacts:${userId}:${profileId}`);
   await invalidateProfileCache(usernameNormalized);
 }

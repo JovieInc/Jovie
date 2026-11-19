@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -26,6 +25,7 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
+import { spawnSync } from '../child-process.mjs';
 import {
   MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
   MERGE_GROUP_ADMISSION_WAIT_MS,
@@ -42,6 +42,8 @@ import {
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
+
+import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
@@ -230,8 +232,6 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-fast-remaining',
 ]);
 
-// Jobs whose full base fetch runs in the background during dependency
-// install; "Fetch base-branch history" then awaits it before any consumer.
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
@@ -311,7 +311,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -1527,13 +1527,6 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
-    expect(pathChanges).toContain(
-      'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
-    );
-    expect(pathChanges).toContain(
-      'for output in run_build run_test run_test_performance'
-    );
-    expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
     expect(pathChanges).toContain('elif [[ "${EVENT_NAME}" == "push" ]]; then');
     expect(pathChanges).toContain(
       'Unsupported event for path change detection'
@@ -1877,43 +1870,17 @@ describe('merge_group workflow contract', () => {
   });
 
   it.each([
-    ['equal trees', 'a'.repeat(40), 0, 0],
-    ['different trees', 'b'.repeat(40), 0, 1],
-    ['unreadable trees', '', 128, 128],
+    ['equal trees', 0],
+    ['different trees', 1],
+    ['unreadable trees', 128],
   ])(
     'allows no-op classification only with exact proof: %s',
-    (_, headTree, gitStatus, status) => {
+    (scenario, status) => {
       const detect = getStepRunScript(
         getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
         'Detect path changes for all job types'
       );
-      const start = detect.indexOf('    NOOP_BASE_TREE=');
-      const end = detect.indexOf('    PRODUCT_LANE_DIR=', start);
-      expect(start).toBeGreaterThanOrEqual(0);
-      const proof = detect.slice(start, end);
-      const root = mkdtempSync(join(tmpdir(), 'noop-tree-proof-'));
-      writeFileSync(
-        join(root, 'git'),
-        '#!/bin/sh\n[ "$STUB_GIT_STATUS" = 0 ] || exit "$STUB_GIT_STATUS"\ncase "$3" in "$MERGE_GROUP_BASE_SHA^{tree}") printf "%s\n" "$STUB_BASE_TREE" ;; *) printf "%s\n" "$STUB_HEAD_TREE" ;; esac\n'
-      );
-      chmodSync(join(root, 'git'), 0o755);
-      try {
-        const result = spawnSync('bash', ['-ec', proof], {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${root}${delimiter}${process.env.PATH}`,
-            MERGE_GROUP_BASE_SHA: 'c'.repeat(40),
-            MERGE_GROUP_HEAD_SHA: 'd'.repeat(40),
-            STUB_BASE_TREE: 'a'.repeat(40),
-            STUB_HEAD_TREE: headTree,
-            STUB_GIT_STATUS: String(gitStatus),
-          },
-        });
-        expect(result.status, result.stderr).toBe(status);
-      } finally {
-        rmSync(root, { recursive: true, force: true });
-      }
+      assertNoopPathOutputs(REPO_ROOT, detect, scenario, status);
     }
   );
 
@@ -3477,6 +3444,9 @@ ${selectedGateScript}`,
       'ci-secret-scan',
       'ci-golden-path-lock',
       'ci-visual-snapshot-compare',
+      'ci-visual-snapshot-homepage',
+      'ci-visual-marketing-dom',
+      'ci-visual-marketing-routes',
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-merge-group-ready',
@@ -4518,8 +4488,7 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-// Each case builds a 40+ commit fixture repo with real git subprocesses;
-// the default 5s timeout flaked under load and ejected merge-queue groups.
+// Real 40+ commit fixtures need more than 5s under load.
 describe('Storybook Surface Matrix shallow diff-base history', {
   timeout: 30_000,
 }, () => {

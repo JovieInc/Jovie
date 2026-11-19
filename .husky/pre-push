@@ -43,3 +43,6 @@ case "${JOVIE_PUSH_PHASE:-publication}" in
     exit 2
     ;;
 esac
+
+# Advisory local AI review (Sentry Warden): reports findings, never blocks.
+bash scripts/hooks/warden-local-review.sh branch

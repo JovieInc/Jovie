@@ -1298,10 +1298,7 @@ jobs:
           if [ "$auth_performance_configured" = "true" ]; then
             auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
             dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
-            cleanup_performance_gate() {
-              rm -f "$auth_state" "$dynamic_secrets_file"
-            }
-            trap cleanup_performance_gate EXIT
+            trap 'rm -f "$auth_state" "$dynamic_secrets_file"' EXIT
 
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -1550,6 +1547,7 @@ jobs:
             packages/api-client/policy.ts
             packages/api-client/providers.json
             packages/api-client/store.ts
+            packages/api-client/types.ts
           sparse-checkout-cone-mode: false
       - name: Pre-promotion auth/billing journey gate
         id: journey-gate

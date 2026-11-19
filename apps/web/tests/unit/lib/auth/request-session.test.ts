@@ -130,6 +130,48 @@ describe('getRequestSession', () => {
     expect(mockGetSession).toHaveBeenCalledTimes(2);
   });
 
+  it('replays a transport-killed session read once (JOV-12489)', async () => {
+    const { getRequestSession } = await import('@/lib/auth/request-session');
+
+    // Production shape (deploy dpl_46VApNMuKbzgYH9iBeDWvkDmhk4b, Sentry
+    // JOVIE-WEB-ZX 7846802295): a Neon transport kill on the ba_sessions
+    // read surfaced as FAILED_TO_GET_SESSION 500s on authenticated routes.
+    mockGetSession.mockRejectedValueOnce(
+      new Error('Connection terminated unexpectedly')
+    );
+
+    await expect(getRequestSession()).resolves.toBe(SESSION);
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('replays a session read whose deep cause is the transport kill', async () => {
+    const { getRequestSession } = await import('@/lib/auth/request-session');
+
+    // Better Auth wraps adapter failures — FAILED_TO_GET_SESSION names the
+    // session read while the transport text lives on the cause. Admission
+    // walks the deep message, so this shape replays too.
+    mockGetSession.mockRejectedValueOnce(
+      new Error('Failed to get session', {
+        cause: new Error('Connection terminated unexpectedly'),
+      })
+    );
+
+    await expect(getRequestSession()).resolves.toBe(SESSION);
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not replay non-transport session failures (JOV-12489 guardrail)', async () => {
+    const { getRequestSession } = await import('@/lib/auth/request-session');
+
+    // Real auth failures are not transport conditions: a single attempt,
+    // error preserved — never swallowed, never replayed.
+    const authError = new Error('Failed to get session');
+    mockGetSession.mockRejectedValueOnce(authError);
+
+    await expect(getRequestSession()).rejects.toBe(authError);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+  });
+
   it('reports auth resolution failures while preserving the thrown error', async () => {
     const { getCachedAuth } = await import('@/lib/auth/cached');
     const error = Object.assign(new Error('private session error'), {

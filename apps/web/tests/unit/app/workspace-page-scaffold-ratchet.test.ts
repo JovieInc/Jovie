@@ -7,7 +7,7 @@ const LEGACY_WORKSPACE_SURFACE_FLOOR = 18;
 
 const TARGET_SURFACES = [
   'app/app/(shell)/library/LibrarySurface.tsx',
-  'app/app/(shell)/contacts/page.tsx',
+  // Contacts and Audience own their toolbar in the view (one tab level, 2026-11-13).
   'app/app/(shell)/calendar/CalendarPageClient.tsx',
   'components/features/dashboard/tasks/TasksPageClient.tsx',
 ] as const;

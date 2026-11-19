@@ -483,7 +483,7 @@ async function request(
   }
 }
 
-async function requestJson(
+export async function requestJson(
   pathname: string,
   options: ResourceOptions,
   jsonBody?: unknown,

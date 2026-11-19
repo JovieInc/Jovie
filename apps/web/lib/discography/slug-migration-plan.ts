@@ -15,6 +15,7 @@
 import {
   NUMERIC_SUFFIX,
   planSlugs,
+  RESERVED_TRACK_SLUGS,
   type SlugItem,
   slugify,
 } from './slug-policy';
@@ -106,7 +107,8 @@ export interface ReleaseTrackSlugRow {
  * Plan track renames. Track URLs are scoped to their release
  * (`/{handle}/{release}/{track}`), so a legacy track slug becomes its plain
  * title slug whenever no other track on the same release uses it. When the
- * plain slug is taken the track keeps its URL; it is never made worse.
+ * plain slug is taken, or is a reserved route segment (`sounds`), the track
+ * keeps its URL; it is never made worse.
  */
 export function planLegacyTrackSlugRenames(
   tracks: readonly ReleaseTrackSlugRow[]
@@ -125,7 +127,7 @@ export function planLegacyTrackSlugRenames(
     const ordered = [...group].sort((a, b) => a.id.localeCompare(b.id));
     for (const track of ordered) {
       const base = legacySlugBase(track.slug, track.title);
-      if (!base || taken.has(base)) continue;
+      if (!base || taken.has(base) || RESERVED_TRACK_SLUGS.has(base)) continue;
       taken.add(base);
       renames.push({ id: track.id, from: track.slug, to: base });
     }

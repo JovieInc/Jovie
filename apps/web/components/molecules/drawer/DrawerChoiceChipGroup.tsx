@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface DrawerChoiceChipOption<T extends string> {
@@ -42,7 +43,7 @@ export function DrawerChoiceChipGroup<T extends string>({
         const isSelected = selected.has(option.value);
 
         return (
-          <button
+          <PlainButton
             key={option.value}
             type='button'
             aria-pressed={isSelected}
@@ -60,7 +61,7 @@ export function DrawerChoiceChipGroup<T extends string>({
             )}
           >
             {option.label}
-          </button>
+          </PlainButton>
         );
       })}
     </fieldset>

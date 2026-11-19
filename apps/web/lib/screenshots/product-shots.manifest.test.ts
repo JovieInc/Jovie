@@ -28,7 +28,23 @@ const manifest = JSON.parse(
   )
 ) as { shots: Record<string, ShotManifestEntry> };
 
+const FRESHNESS_PRODUCER = 'scripts/lib/product-shot-test-producers.mjs';
+
 describe('committed product-shot provenance', () => {
+  it('binds every declared shot source to this freshness test', () => {
+    const producers = readFileSync(join(repoRoot, FRESHNESS_PRODUCER), 'utf8');
+    const bound = new Set(
+      [...producers.matchAll(/'((?:apps|packages)\/[^']+)'/g)].map(
+        match => match[1]
+      )
+    );
+    for (const spec of PRODUCT_SHOTS) {
+      for (const source of spec.sources) {
+        expect(bound.has(source), source).toBe(true);
+      }
+    }
+  });
+
   it('invalidates the profile hero when its live fixture input changes', () => {
     const fixture =
       'apps/web/components/features/home/homepage-profile-preview-fixture.ts';

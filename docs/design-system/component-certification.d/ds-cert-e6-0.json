@@ -1,0 +1,327 @@
+{
+  "gates": {
+    "apps/web/components/features/agent-room/AgentRoom.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/AuthBranding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/AuthFormContainer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/AuthPageSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/ButtonSpinner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthAppleIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthBackButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthFooterLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthLinkPreviewCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/atoms/AuthTextInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/commands/CommandPalettePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/connectors/ConnectorCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/connectors/SuggestedActionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/creator/CreatorProfile.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoAudienceWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoAuthShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoAvatar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoClientProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoDesignStudioShowcase.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoPlayerCapture.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoPriorityIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoReleasesExperience.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoStatusIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoVideoPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/OnboardingDemoExperience.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/SettingsDemoHarness.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dev/DevToolbarGate.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dev/FlagBadgeContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/developers/AgentConnectorDocs.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/agent-room/AgentRoom.tsx": {
+      "permission-denied": "The room is presentational and takes a projected view; it has no access gate. The detector matched agent.role, which is an agent job title."
+    },
+    "apps/web/components/features/auth/AuthPageSkeleton.tsx": {
+      "offline": "A pure loading placeholder with no data or network calls: it draws the same skeleton whether the browser is online or offline. The detector matched the skeleton it is."
+    },
+    "apps/web/components/features/auth/atoms/AuthBackButton.tsx": {
+      "long-content": "The visible label is the fixed word Back; no caller text is rendered (ariaLabel only names the control), so there is no long content to wrap."
+    },
+    "apps/web/components/features/connectors/SuggestedActionCard.tsx": {
+      "loading": "The card renders a projected suggestion and never fetches. The detector matched the pending approval status, which is shown as Approve and Reject (PartialLocation, ReadOnlyNoHandlers stories).",
+      "offline": "The card never fetches or submits on its own; Approve and Reject are caller callbacks, so a network state belongs to the caller. The detector inferred it from the pending status."
+    },
+    "apps/web/components/features/demo/DemoAudienceWorkspace.tsx": {
+      "empty": "Takes no props and always reads the fixed twelve-member demo audience; the empty audience belongs to DashboardAudienceWorkspace.",
+      "error": "Its only failure paths are toasts for a failed copy or QR download (covered in DemoAudienceWorkspace.test.tsx); the workspace itself has no error view."
+    },
+    "apps/web/components/features/demo/DemoAvatar.tsx": {
+      "empty": "The avatar draws one assignee and has no collection to empty. The detector matched the items-center class."
+    },
+    "apps/web/components/features/demo/DemoPlayerCapture.tsx": {
+      "empty": "Renders null: it only seeds the shared player store with one fixed canonical release. The detector matched releases in the fixture import.",
+      "long-content": "Renders null and takes no props; the seeded track is the fixed canonical release, so there is no caller text.",
+      "rtl-overflow": "Renders null and takes no props, so it draws nothing a document direction could affect."
+    },
+    "apps/web/components/features/demo/DemoPriorityIcon.tsx": {
+      "error": "A static glyph with no failure path. The detector matched the --color-error token used for the urgent bars.",
+      "long-content": "Labels come from a fixed five-entry map and render only inside the SVG title; no caller text is drawn."
+    },
+    "apps/web/components/features/demo/DemoReleasesExperience.tsx": {
+      "empty": "The releases come from fixed demo fixtures for each variant, so no input empties the list; the empty release list belongs to ShellReleasesView and ReleasesEmptyState."
+    },
+    "apps/web/components/features/demo/DemoStatusIcon.tsx": {
+      "long-content": "Labels come from a fixed five-entry map and render only inside the SVG title; no caller text is drawn."
+    },
+    "apps/web/components/features/demo/DemoVideoPage.tsx": {
+      "empty": "The page takes no data and draws fixed copy; with the demo video flag off it renders null (covered in DemoVideoPage.test.tsx). The detector matched the items-center class.",
+      "long-content": "Takes no props: the headline and both calls to action are fixed copy."
+    },
+    "apps/web/components/features/dev/FlagBadgeContext.tsx": {
+      "error": "The provider renders no UI of its own; a blocked storage read falls back to badges off (covered in FlagBadgeContext.test.tsx), so there is no error view."
+    }
+  }
+}

@@ -332,10 +332,10 @@ describe('SidebarThreadsSection', () => {
         collapsed={false}
       />
     );
-
     const threadButton = screen.getByRole('button', { name: 'Draft thread' });
 
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
+    expect(threadButton.innerHTML).toContain('bg-accent/85');
     expect(threadButton).toHaveClass(
       'h-(--app-shell-sidebar-row-height)',
       'bg-sidebar-accent-active'
@@ -607,10 +607,10 @@ describe('chat title tooltip eligibility', () => {
     vi.stubGlobal(
       'ResizeObserver',
       class {
-        constructor(private callback: () => void) {}
+        constructor(private cb: (e: { target: Element }[]) => void) {}
         observe(target: Element) {
           if (target.classList.contains('text-ellipsis'))
-            resize = this.callback;
+            resize = () => this.cb([{ target }]);
         }
         disconnect() {}
       }
