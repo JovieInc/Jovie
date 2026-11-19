@@ -173,15 +173,39 @@ class ClockTest(unittest.TestCase):
     def test_successful_observe_keeps_the_interval_cadence(self):
         canary = next(c for c in clock.CLOCKS if c.name == "summerCanary")
         state = lambda: json.loads((self.path / canary.state_file).read_text())
-        # A current observation must neither shorten nor lengthen the hourly cadence.
+        # A current run is checked again when that run becomes due: not
+        # immediately, and not a second full interval after this tick.
         self.rows = [run_row(30)]
         self.assertEqual(clock.tick(self.path, "gem", self.api, NOW, clocks=(canary,))["clocks"][canary.name]["status"], "current")
-        self.assertEqual(state()["nextAttemptAt"], NOW + canary.interval_s)
+        self.assertEqual(state()["nextAttemptAt"], NOW + canary.interval_s - 30)
         # A successful dispatch also returns the clock to its interval cadence.
         self.rows = [run_row(canary.interval_s)]
         self.assertEqual(clock.tick(self.path, "gem", self.api, NOW + canary.interval_s,
                                     clocks=(canary,))["clocks"][canary.name]["status"], "dispatch-requested")
         self.assertEqual(state()["nextAttemptAt"], NOW + 2 * canary.interval_s)
+
+    def test_mid_interval_push_wakes_when_that_heartbeat_goes_due(self):
+        # JOV-9993: security-advisory-loop's 04:28Z push was still inside the
+        # 4h interval at the next tick, so the clock slept another full 4h.
+        # Liveness then saw 314m of silence against a 300m budget.
+        advisory = next(c for c in clock.CLOCKS if c.name == "securityAdvisory")
+        age = 84 * 60
+        self.rows = [run_row(age, event="push", id=44458554825)]
+        result = clock.tick(self.path, "gem", self.api, NOW, clocks=(advisory,))
+        seen = result["clocks"][advisory.name]
+        self.assertEqual(seen["status"], "current")
+        state = json.loads((self.path / advisory.state_file).read_text())
+        due_at = NOW + (advisory.interval_s - age)
+        self.assertEqual(state["nextAttemptAt"], due_at)
+        self.assertFalse(any("POST" in call for call in self.calls))
+        self.assertEqual(
+            clock.tick(self.path, "gem", self.api, due_at - 61, clocks=(advisory,))["clocks"][advisory.name]["status"],
+            "cooldown",
+        )
+        # The old full-interval sleep is still in cooldown here. Due-aligned
+        # wake dispatches once the push is interval - slack old.
+        woken = clock.tick(self.path, "gem", self.api, due_at - 60, clocks=(advisory,))
+        self.assertEqual(woken["clocks"][advisory.name]["status"], "dispatch-requested")
 
     def test_nonzero_or_invalid_json_get_fails_closed(self):
         for response in (SimpleNamespace(returncode=1, stdout="secret", stderr="secret"),
