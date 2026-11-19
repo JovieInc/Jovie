@@ -33,6 +33,42 @@
     "ci.yml#ci-exact-head-coverage": {
       "pr": "source-validation.yml#coverage",
       "command": "node scripts/check-changed-test-coverage.mjs"
+    },
+    "ci.yml#ci-fast-typecheck": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-remaining": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-structural-python": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-structural-web": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-structural-lanes": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-promptfoo-evals": {
+      "pr": "source-validation.yml#unit",
+      "command": "pnpm --filter @jovie/web run evals:validate"
+    },
+    "ci.yml#ci-golden-eval-set": {
+      "pr": "source-validation.yml#unit",
+      "command": "pnpm run evals:golden"
+    },
+    "ci.yml#ci-build-layout": {
+      "pr": "source-validation.yml#coverage",
+      "command": "pnpm turbo build --filter=@jovie/web"
+    },
+    "ci.yml#ci-storybook-surfaces": {
+      "pr": "source-validation.yml#unit",
+      "command": "bash .github/scripts/run-storybook-surfaces.sh"
     }
   },
   "exemptions": [
@@ -86,44 +122,9 @@
       "expiresOn": "2027-02-09"
     },
     {
-      "job": "ci.yml#ci-fast-typecheck",
-      "kind": "gap",
-      "reason": "The queue runs the typecheck lane of scripts/ci-fast-lanes.mjs; the PR runs a hand-copied typecheck in Source Validation, so a lane-only failure first shows in the queue.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-remaining",
-      "kind": "gap",
-      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
       "job": "ci.yml#ci-profile-admission-browser",
       "kind": "gap",
       "reason": "The profile admission browser proof runs only in the queue; no PR job runs the same Playwright spec.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-structural-python",
-      "kind": "gap",
-      "reason": "Structural python lanes run only in the queue; no PR job runs the same lane commands.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-structural-web",
-      "kind": "gap",
-      "reason": "Structural web lanes run only in the queue; no PR job runs the same lane commands.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-structural-lanes",
-      "kind": "gap",
-      "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
@@ -142,13 +143,6 @@
       "expiresOn": "2027-02-09"
     },
     {
-      "job": "ci.yml#ci-build-layout",
-      "kind": "gap",
-      "reason": "The PR coverage job builds and runs the route JS budget and SEO certification, but the layout guard Playwright pass runs only in the queue.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
       "job": "ci.yml#ci-build-ovie",
       "kind": "gap",
       "reason": "The Ovie production build runs only in the queue; the PR runs Ovie tests but not its build.",
@@ -159,13 +153,6 @@
       "job": "ci.yml#ci-typecheck-ovie",
       "kind": "gap",
       "reason": "The Ovie typecheck runs only in the queue; no PR job runs the same command.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-storybook-surfaces",
-      "kind": "gap",
-      "reason": "The Storybook surface matrix and the extension, ingest, canary and mesh package checks run only in the queue.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
@@ -187,20 +174,6 @@
       "job": "ci.yml#ci-cross-product-integration",
       "kind": "gap",
       "reason": "Cross-product contract package tests run only in the queue; no PR job runs them.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-promptfoo-evals",
-      "kind": "gap",
-      "reason": "Deterministic promptfoo evals run only in the queue; no PR job runs them.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-golden-eval-set",
-      "kind": "gap",
-      "reason": "The golden eval set runs only in the queue; no PR job runs it.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },

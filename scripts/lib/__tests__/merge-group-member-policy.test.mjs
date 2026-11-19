@@ -1167,8 +1167,7 @@ describe('merge-group API outages do not eject a valid group', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
-
-  it('keeps the size cap when a pull read is rate-limited and defers fork metadata', async () => {
+  it('fails closed when member metadata remains rate-limited even for a small local diff', async () => {
     const logs = [];
     const outputs = [];
     const paths = [];
@@ -1187,7 +1186,7 @@ describe('merge-group API outages do not eject a valid group', () => {
       BASE,
       FIRST
     );
-    await runPolicy({
+    const failure = await runPolicy({
       argv: ['--policy=size', '--also=fork'],
       env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
       event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
@@ -1201,18 +1200,19 @@ describe('merge-group API outages do not eject a valid group', () => {
           `GitHub API 403 for ${path}: API rate limit exceeded for installation`
         );
       },
-    });
+    }).catch(error => error);
+    expect(failure).toBeInstanceOf(MergeGroupPolicyBudgetUnavailableError);
+    expect(failure.message).toMatch(/infra-failure.*budget-unavailable/);
     expect(paths).toEqual(['/repos/JovieInc/Jovie/pulls/101']);
-    expect(outputs).toEqual(['fork_verdict=pass']);
+    expect(outputs).toEqual([]);
     expect(logs.some(line => line.includes('within standard size cap'))).toBe(
-      true
+      false
     );
     expect(logs.some(line => line.includes('20 tracked regular-file'))).toBe(
-      true
+      false
     );
     expect(logs.some(line => line.includes('/git/trees/'))).toBe(false);
   });
-
   it('defers with budget-unavailable, never a size-cap verdict, when a 403 hides the exemption', async () => {
     // Run 39927237081 ejected big-pr #22711 with 'exceeds standard size cap'
     // because the installation REST budget was exhausted and the substituted
@@ -1254,7 +1254,7 @@ describe('merge-group API outages do not eject a valid group', () => {
     expect(failure).toBeInstanceOf(MergeGroupPolicyBudgetUnavailableError);
     expect(failure.message).toMatch(/budget-unavailable/);
     expect(failure.message).toMatch(
-      /2000\/800 lines and 1\/40 files over the standard cap/
+      /infra-failure.*member metadata unavailable after bounded API retries/
     );
     expect(failure.message).toMatch(/API rate limit exceeded for installation/);
     expect(logs.some(line => line.includes('exceeds standard size cap'))).toBe(
@@ -1263,9 +1263,8 @@ describe('merge-group API outages do not eject a valid group', () => {
     expect(logs.some(line => line.startsWith('PR #101: FAIL'))).toBe(false);
     expect(logs.some(line => line.includes('kept the size cap'))).toBe(false);
     expect(outputs).toEqual([]);
-
-    // Exactly at the standard cap is not over it: the fallback keeps the cap
-    // and passes without the unread exemption evidence mattering.
+    // Local counts at the cap still cannot prove current hold labels or author.
+    // A quota outage must remain an infrastructure failure.
     const atCap = localCheckoutFromEvidence(
       {
         baseSha: BASE,
@@ -1288,7 +1287,7 @@ describe('merge-group API outages do not eject a valid group', () => {
       FIRST
     );
     const keptLogs = [];
-    await runPolicy({
+    const atCapFailure = await runPolicy({
       argv: ['--policy=size'],
       env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
       event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
@@ -1300,12 +1299,12 @@ describe('merge-group API outages do not eject a valid group', () => {
           'GitHub API 403 for /repos/JovieInc/Jovie/pulls/101: API rate limit exceeded for installation'
         );
       },
-    });
+    }).catch(error => error);
+    expect(atCapFailure).toBeInstanceOf(MergeGroupPolicyBudgetUnavailableError);
     expect(
       keptLogs.some(line => line.includes('within standard size cap'))
-    ).toBe(true);
+    ).toBe(false);
   });
-
   it('does not pass a rate limit when the diff or the tree byte count is missing', async () => {
     const unread = [];
     await expect(
@@ -1518,6 +1517,7 @@ describe('merge-group API outages do not eject a valid group', () => {
       writeOutput: () => {},
       request(path) {
         paths.push(path);
+        if (path.endsWith('/pulls/101')) return { data: openInternal };
         throw new MergeGroupPolicyRateLimitError(
           `GitHub API 403 for ${path}: API rate limit exceeded for installation`
         );

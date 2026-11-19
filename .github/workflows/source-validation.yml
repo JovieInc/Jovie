@@ -278,6 +278,16 @@ jobs:
         with:
           go-version: '1.26.10'
           cache: false
+      - name: Restore verified actionlint Go modules
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: actionlint-go-${{ runner.os }}-${{ runner.arch }}-1.26.10-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            actionlint-go-${{ runner.os }}-${{ runner.arch }}-1.26.10-
       - name: Lint changed workflows and actions (actionlint)
         if: steps.reuse.outputs.reuse != 'true'
         shell: bash
@@ -757,6 +767,25 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
+      - name: Resolve MQ parity tools for older source heads
+        id: mq-parity-tools
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          tool_root="$GITHUB_WORKSPACE"
+          if [[ ! -f scripts/ci/mq-parity-scope.mjs || ! -f .github/scripts/run-storybook-surfaces.sh ]]; then
+            # A PR cut before these tools landed still uses current base policy.
+            # Keep the tools outside its checkout so the merged guard transaction
+            # can add the same paths without an untracked-file merge conflict.
+            tool_root="$(mktemp -d "$RUNNER_TEMP/mq-parity-tools.XXXXXX")"
+            git archive "origin/$BASE_REF" scripts/ci/mq-parity-scope.mjs \
+              scripts/lib/ci-repo-lanes.mjs .github/scripts/run-storybook-surfaces.sh \
+              .github/workflows/ci.yml | tar -x -C "$tool_root"
+          fi
+          echo "root=$tool_root" >> "$GITHUB_OUTPUT"
+          echo "MQ_PARITY_TOOLS_ROOT=$tool_root" >> "$GITHUB_ENV"
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -772,12 +801,16 @@ jobs:
           web=false; ui=false; ovie=false; ci=false
           # Web unit tests also import scripts/ and .github/ modules, so
           # those paths select their related tests too.
-          if changed apps/web packages pnpm-lock.yaml package.json turbo.json scripts .github; then web=true; fi
+          if changed apps/web packages pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json scripts .github; then web=true; fi
           if changed packages/ui; then ui=true; fi
           if changed apps/ovie; then ovie=true; fi
           # tests/unit/ci read workflow YAML and scripts from disk, outside
           # the module graph `--changed` follows: run that suite whole.
           if changed scripts .github; then ci=true; fi
+          # Canonical parity inputs also include root tsconfigs and TS graphs
+          # outside apps/web. Select hydration before the later parity steps.
+          parity_scope="$(node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$base_sha")"
+          if [[ "$parity_scope" == *'=true'* ]]; then web=true; fi
           printf 'web=%s\nui=%s\novie=%s\nci=%s\n' "$web" "$ui" "$ovie" "$ci" >> "$GITHUB_OUTPUT"
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
@@ -788,6 +821,115 @@ jobs:
       - name: Setup Playwright warm path
         if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
+      # JOV-13071: reuse the four required source runners for affected MQ lanes.
+      # No second unit matrix or pre-push hook; the combined-head jobs stay intact.
+      - name: Select MQ parity scope
+        id: mq-parity
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        env:
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: |
+          set -euo pipefail
+          node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$BASE_SHA" >> "$GITHUB_OUTPUT"
+          paths="$RUNNER_TEMP/mq-parity-paths.txt"
+          git diff --name-only "$BASE_SHA" HEAD > "$paths"
+          node scripts/lib/product-lane-classifier.mjs --files-from "$paths" \
+            --base-ref "$BASE_SHA" --head-ref HEAD --github-output "$GITHUB_OUTPUT"
+      - name: Set up Python for affected MQ parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
+      - name: Install pytest for affected MQ parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard != '3/4'
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Validate Promptfoo config
+        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
+        run: pnpm --filter @jovie/web run evals:validate
+      - name: Run deterministic Promptfoo evals
+        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '1/4'
+        env:
+          JOVIE_RUN_LIVE_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
+          PROMPTFOO_DISABLE_TELEMETRY: '1'
+          PROMPTFOO_DISABLE_UPDATE: '1'
+          PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
+        run: pnpm run evals
+      - name: Run golden eval-set CI gate
+        if: steps.mq-parity.outputs.evals == 'true' && matrix.shard == '2/4'
+        env:
+          JOVIE_RUN_LIVE_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
+          JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
+        run: pnpm run evals:golden
+      - name: Run typecheck lane parity
+        if: steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        env:
+          CI_FAST_LANE_GROUP: typecheck
+          CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
+          TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Run structural remaining parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '1/4'
+        env:
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_STRUCTURAL_PYTEST: skip
+          CI_FAST_STRUCTURAL_WEB: skip
+          CI_FAST_STRUCTURAL_LANES: skip
+          CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Run structural Python parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '2/4'
+        env:
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_STRUCTURAL_PYTEST: only
+          CI_FAST_STRUCTURAL_LANES: skip
+          CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Run structural web parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '3/4'
+        env:
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_STRUCTURAL_WEB: only
+          CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Run lanes coverage parity
+        if: steps.mq-parity.outputs.structural == 'true' && matrix.shard == '4/4'
+        env:
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_STRUCTURAL_LANES: only
+          CI_PRODUCT_LANES: ${{ steps.mq-parity.outputs.selected_lanes }}
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Start Storybook dev server for affected parity
+        if: steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
+        working-directory: apps/web
+        env:
+          CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
+        run: |
+          set -euo pipefail
+          nohup pnpm exec storybook dev -p 6006 --no-open \
+            > "$RUNNER_TEMP/storybook-dev.log" 2>&1 &
+          echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"
+      - name: Run surface elevation matrix (Storybook)
+        working-directory: ${{ steps.mq-parity-tools.outputs.root }}
+        if: steps.mq-parity.outputs.storybook == 'true' && matrix.shard != '4/4'
+        env:
+          STORYBOOK_BASE_URL: http://localhost:6006
+          STORYBOOK_SHARD: ${{ matrix.shard == '1/4' && '1' || matrix.shard == '2/4' && '2' || '3' }}
+          CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
+          PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
+        run: bash .github/scripts/run-storybook-surfaces.sh
       - name: Load quarantined unit tests
         id: quarantine
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'

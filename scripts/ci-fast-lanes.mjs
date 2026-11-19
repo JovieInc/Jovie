@@ -876,6 +876,11 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/ci/mq-parity-manifest.test.mjs',
+  'scripts/ci/mq-parity-scope.test.mjs',
+  'scripts/lib/size-guard-github.test.mjs',
+  '.github/scripts/run-storybook-surfaces.test.mjs',
+  '.github/scripts/run-actionlint.test.mjs',
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.

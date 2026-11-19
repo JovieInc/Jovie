@@ -863,6 +863,7 @@ jobs:
             scripts/lib/native-queue-policy-evidence.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/size-guard-github.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-fast-annotations.mjs

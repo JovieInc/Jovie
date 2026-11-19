@@ -190,6 +190,10 @@ function installFixture(mode = 'success', options = {}) {
     `printf '%s\\n' "$@" >> "$TEST_GO_ARGS"
   [ "$GOTOOLCHAIN" = local ] && [ "$GOWORK" = off ] && [ -z "$GOFLAGS" ]
   [ "$CGO_ENABLED" = 0 ] && [ "$GOOS" = "$TEST_GOOS" ] && [ "$GOARCH" = "$TEST_GOARCH" ]
+  if [ "$1 $2" = "mod verify" ]; then
+    [ "$TEST_MODE" != module-checksum-failure ] || exit 8
+    exit 0
+  fi
   if [ "$1" = test ]; then
     [ "$TEST_MODE" != regression-failure ] || exit 7
     case "$*" in *concurrency_queue*)
@@ -445,6 +449,14 @@ describe('checksum-pinned actionlint platform execution', () => {
     expect(result.output).toContain(
       'download failed: https://github.com/koalaman/shellcheck/releases/download/v0.11.0/'
     );
+    expect(result.lintArgs).toBe('');
+  });
+
+  it('fails closed before compiling when restored Go modules fail checksum verification', () => {
+    const result = installFixture('module-checksum-failure');
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('cached Go module checksum mismatch');
+    expect(result.goArgs).not.toContain('test\n');
     expect(result.lintArgs).toBe('');
   });
 

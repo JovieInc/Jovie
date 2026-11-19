@@ -1,3 +1,11 @@
+import {
+  apiRetryDelay,
+  classifyGitHubFailure,
+  SIZE_GUARD_API_BUDGET_MS,
+} from './size-guard-github.mjs';
+
+export { apiRetryDelay, MAX_API_ATTEMPTS } from './size-guard-github.mjs';
+
 import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -38,7 +46,7 @@ const MAX_API_REQUEST_MS = 10_000;
 // separately bounded fetch, and provisioning. A cancelled required check
 // ejects the group the same way a red one does.
 export const MERGE_GROUP_POLICY_DEADLINE_MS = 45_000;
-export const MERGE_GROUP_JOB_BUDGET_MS = 100_000;
+export const MERGE_GROUP_JOB_BUDGET_MS = SIZE_GUARD_API_BUDGET_MS;
 
 export class MergeGroupPolicyEvidenceError extends Error {
   constructor(message) {
@@ -47,7 +55,7 @@ export class MergeGroupPolicyEvidenceError extends Error {
   }
 }
 
-/** A 403/429 that says nothing about the diff. Callers defer instead of failing the required check. */
+/** A quota outage is infrastructure failure, never a successful size verdict. */
 export class MergeGroupPolicyRateLimitError extends MergeGroupPolicyEvidenceError {
   constructor(message) {
     super(message);
@@ -57,12 +65,9 @@ export class MergeGroupPolicyRateLimitError extends MergeGroupPolicyEvidenceErro
 }
 
 /**
- * The exemption evidence (labels, author, body) could not be read while the
- * locally measured diff is over the standard cap, so a size exemption cannot
- * be confirmed. Deferred with a distinct budget-unavailable label, never a
- * size-cap verdict (run 39927237081 ejected big-pr #22711 on an exhausted
- * installation budget). The cap itself never moves and no oversize PR passes:
- * the required check stays red until the quota resets and the read succeeds.
+ * Member metadata (labels, author, body and holds) could not be read after
+ * bounded retries. Keep the required Size Guard red with a distinct infra
+ * classification, even when local line counts fit the standard cap.
  */
 export class MergeGroupPolicyBudgetUnavailableError extends MergeGroupPolicyRateLimitError {
   constructor(message) {
@@ -524,106 +529,12 @@ export async function readBoundedResponseText(
 // 5xx and network errors use bounded exponential backoff with jitter. A
 // rate-limit 403 or 429 holds until x-ratelimit-reset or retry-after when that
 // instant is inside the job budget. Permission 403s and other real answers
-// stay final. Kept self-contained (same rules as scripts/lib/github-rate-limit.mjs):
-// this file runs from sparse checkouts, including a pinned bootstrap base.
-export const MAX_API_ATTEMPTS = 6;
-const RETRY_MARGIN_MS = 2_000;
-const BACKOFF_BASE_MS = 1_000;
-const BACKOFF_CAP_MS = 15_000;
-const JITTER_RATIO = 0.2;
-const PRIMARY = 'primary-rate-limit';
-const NONE = 'none';
+// stay final. The retry rules live in size-guard-github.mjs, included in every
+// trusted sparse checkout; the pinned bootstrap keeps its original policy.
 const memoryCache = new Map();
 
 export function clearCachedGitHubResponses() {
   memoryCache.clear();
-}
-
-function headerNumber(headers, name) {
-  const value = headers?.get?.(name);
-  return value != null && /^[0-9]+$/.test(String(value).trim())
-    ? Number(value)
-    : null;
-}
-
-function retryAfterMs(headers, now) {
-  const raw = headers?.get?.('retry-after');
-  if (raw == null) return null;
-  const text = String(raw).trim();
-  if (/^[0-9]+$/.test(text)) return now + Number(text) * 1000;
-  const parsed = Date.parse(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function classifyGitHubFailure({ status, message, headers, now }) {
-  const remaining = headerNumber(headers, 'x-ratelimit-remaining');
-  const reset = headerNumber(headers, 'x-ratelimit-reset');
-  const retryAfter = retryAfterMs(headers, now);
-  const bounds = [];
-  if (remaining === 0 && reset !== null) bounds.push(reset * 1000);
-  if (retryAfter !== null) bounds.push(retryAfter);
-  const retryAtMs = bounds.length ? Math.max(now, ...bounds) + 1000 : null;
-  const text = String(message ?? '');
-  if (
-    /\bAPI rate limit (?:already )?exceeded for\b/i.test(text) ||
-    ((status === 403 || status === 429) && remaining === 0)
-  ) {
-    return { kind: PRIMARY, retryAtMs };
-  }
-  if (
-    status === 429 ||
-    /\bsecondary rate limit\b|\babuse (?:detection|rate limit)\b/i.test(text) ||
-    (status === 403 && retryAfter !== null)
-  ) {
-    return { kind: 'secondary-rate-limit', retryAtMs };
-  }
-  if (
-    status === 0 ||
-    [500, 502, 503, 504].includes(Number(status)) ||
-    /\bGitHub API request failed for\b/.test(text) ||
-    /\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up)\b/i.test(
-      text
-    )
-  ) {
-    return { kind: 'transient-server', retryAtMs };
-  }
-  return { kind: NONE, retryAtMs: null };
-}
-
-function backoffMs(attempt, random = () => 0.5) {
-  const raw = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
-  const roll = Number(random());
-  const unit = Number.isFinite(roll) ? Math.min(1, Math.max(0, roll)) : 0.5;
-  return Math.max(
-    0,
-    Math.round(raw * (1 - JITTER_RATIO + 2 * JITTER_RATIO * unit))
-  );
-}
-
-/** Wait before the next attempt, or null when the answer is final or the wait misses the deadline. */
-export function apiRetryDelay({
-  status,
-  message,
-  headers,
-  attempt,
-  nowMs,
-  deadlineMs,
-  random = () => 0.5,
-}) {
-  if (attempt >= MAX_API_ATTEMPTS) return null;
-  const failure = classifyGitHubFailure({
-    status,
-    message,
-    headers,
-    now: nowMs,
-  });
-  if (failure.kind === NONE) return null;
-  const waitMs =
-    failure.retryAtMs !== null
-      ? Math.max(0, failure.retryAtMs - nowMs)
-      : backoffMs(attempt, random);
-  if (nowMs + waitMs > deadlineMs - RETRY_MARGIN_MS) return null;
-  return waitMs;
 }
 
 function cacheKey(scope, path) {
@@ -681,6 +592,8 @@ export async function githubRequest(
     cacheDir = undefined,
   } = {}
 ) {
+  deadlineMs ??= now() + SIZE_GUARD_API_BUDGET_MS;
+  deadlineMs = Math.min(deadlineMs, now() + SIZE_GUARD_API_BUDGET_MS);
   const cacheable =
     method === 'GET' && body === undefined && typeof cacheScope === 'string';
   const key = cacheable ? cacheKey(cacheScope, path) : null;
@@ -727,11 +640,14 @@ export async function githubRequest(
         headers: answer.headers,
         now: now(),
       });
-      // A reset outside this job's budget used to fail the required check and
-      // dequeue a group whose diff was already within the cap (2026-10-15
-      // 15:49Z, runs 38763665593 and 38764049235).
-      if (failure.kind === PRIMARY || failure.kind === 'secondary-rate-limit') {
-        throw new MergeGroupPolicyRateLimitError(answer.message);
+      // Exhaustion is infrastructure failure, never a successful policy verdict.
+      if (
+        failure.kind === 'primary-rate-limit' ||
+        failure.kind === 'secondary-rate-limit'
+      ) {
+        throw new MergeGroupPolicyRateLimitError(
+          `PR Size Guard infra-failure (budget-unavailable): GitHub API rate-limit retry budget exhausted after ${attempt} attempt(s); ${answer.message}`
+        );
       }
       fail(answer.message);
     }
@@ -1177,6 +1093,13 @@ export async function runPolicy({
     );
   } catch (error) {
     if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+    // Local counts cannot prove author, labels or hold status. A quota outage
+    // must remain a visible infrastructure failure after bounded retries.
+    if (policy === 'size') {
+      throw new MergeGroupPolicyBudgetUnavailableError(
+        `PR Size Guard infra-failure (budget-unavailable): member metadata unavailable after bounded API retries; ${error.message}`
+      );
+    }
     if (!Array.isArray(local?.files)) {
       log(
         `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`

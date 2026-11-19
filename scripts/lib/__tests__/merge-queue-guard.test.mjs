@@ -502,8 +502,7 @@ describe('aggregate required checks', () => {
     const combinedLayoutBlock = extractWorkflowJobBlock(
       ciWorkflowYaml,
       'ci-storybook-surfaces'
-    );
-
+    ).replace('bash .github/scripts/run-storybook-surfaces.sh', () => readFileSync(resolve(REPO_ROOT, '.github/scripts/run-storybook-surfaces.sh'), 'utf8'));
     expect(combinedLayoutBlock).toMatch(
       /tests\/e2e\/storybook-marketing-faq\.spec\.ts/
     );

@@ -23,6 +23,11 @@ describe('marketing H1 two-visual-line contract', () => {
     const ciWorkflow = readFileSync(
       path.join(repoRoot, '.github/workflows/ci.yml'),
       'utf8'
+    ).replace('bash .github/scripts/run-storybook-surfaces.sh', () =>
+      readFileSync(
+        path.join(repoRoot, '.github/scripts/run-storybook-surfaces.sh'),
+        'utf8'
+      )
     );
     const posterStories = readFileSync(
       path.join(
