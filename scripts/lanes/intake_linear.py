@@ -1,3 +1,5 @@
+# api-budget: linear-requests 60/hr - planning estimate: 10 incidents/hr, six calls each; repair priority.
+# api-budget: linear-complexity 600000/hr - planning estimate: 60 calls/hr at the per-query 10000 point cap.
 """Linear-side remediation intake filing (JOV-13077, Tim 2026-11-19: Linear is the single
 source of truth for CI/ops failure intake).
 
