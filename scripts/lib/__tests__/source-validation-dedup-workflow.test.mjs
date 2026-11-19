@@ -161,7 +161,7 @@ test('cancellation is isolated from every original source job and required check
     "${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}"
   );
   assert.equal(cleanup.needs, undefined);
-  assert.equal(cleanup['continue-on-error'], true);
+  assert.equal(cleanup['continue-on-error'], undefined);
   assert.equal(cleanup.name, 'Source Validation / cancel superseded heads');
   const reservedNames = new Set([
     ...requiredContexts(root),
@@ -225,7 +225,7 @@ test('bootstrap failures skip cleanup with a notice and successful exit', t => {
   assert.equal(cancelStep.if, '${{ !cancelled() }}');
   assert.equal(cleanup.steps[1].if, "${{ steps.client.outcome == 'success' }}");
   assert.equal(cleanup.steps[2].if, "${{ steps.prime.outcome == 'success' }}");
-  // Step-level error tolerance stays off; only the advisory job tolerates errors.
+  // No continue-on-error anywhere (gate-weakening-detector forbids it).
   for (const step of cleanup.steps)
     assert.equal(step['continue-on-error'], undefined);
   assert.equal(

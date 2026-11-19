@@ -33,8 +33,6 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
     timeout-minutes: 5
-    # Only this advisory job tolerates infrastructure/timeouts; checks stay blocking.
-    continue-on-error: true
     permissions:
       actions: write
       contents: read
@@ -68,8 +66,8 @@ jobs:
           node-version-file: .source-validation-client/.nvmrc
       # Fork/Dependabot tokens cannot write Actions; source checks still run.
       - name: Cancel only older runs of superseded PR heads
-        # Runs after a failed bootstrap too, to emit the notice; job-level
-        # continue-on-error keeps this advisory job from failing the run.
+        # Runs after a failed bootstrap too, to emit the notice. This job is
+        # advisory: not required, not needed by any job, never gates admission.
         if: ${{ !cancelled() }}
         timeout-minutes: 3
         shell: bash
