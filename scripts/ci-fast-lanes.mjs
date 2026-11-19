@@ -86,6 +86,10 @@ import {
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
+import {
+  loadSourceGuardHistory,
+  orderSourceGuardsByFailureRate,
+} from './lib/source-guard-scheduler.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -622,14 +626,21 @@ export const SOURCE_GUARDS = Object.freeze([
  * @returns {Array<(typeof SOURCE_GUARDS)[number]>}
  */
 export function selectSourceGuards(event, changed) {
-  return SOURCE_GUARDS.filter(guard => {
-    if (guard.prOnly && event !== 'pull_request' && event !== '') return false;
-    // Manual, local, and unreadable or empty diffs fail closed onto the guard.
-    if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
-      return true;
-    }
-    return changed.some(file => guard.inputs.test(file));
-  });
+  // Cheap-first order (JOV-13111): guards with historical failures report
+  // first, highest fail-probability per second of duration. Order only —
+  // run-all semantics live in the callers; every selected guard still runs.
+  return orderSourceGuardsByFailureRate(
+    SOURCE_GUARDS.filter(guard => {
+      if (guard.prOnly && event !== 'pull_request' && event !== '')
+        return false;
+      // Manual, local, and unreadable or empty diffs fail closed onto the guard.
+      if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
+        return true;
+      }
+      return changed.some(file => guard.inputs.test(file));
+    }),
+    loadSourceGuardHistory()
+  );
 }
 
 export function runSourceGuards() {
@@ -1205,6 +1216,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
   'scripts/lib/__tests__/daily-changelog-editorial-publication.test.mjs',
+  'scripts/lib/__tests__/source-guard-scheduler.test.mjs',
   'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',

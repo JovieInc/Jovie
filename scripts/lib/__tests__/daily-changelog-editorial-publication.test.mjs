@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { publicationEditorialFindings } from '../customer-changelog-editorial.mjs';
 import { planDailyPublication } from '../daily-changelog-publication.mjs';
@@ -87,5 +88,38 @@ describe('publication editorial preflight', () => {
         migrations,
       })
     ).toEqual([]);
+  });
+});
+
+describe('daily changelog writer runs its content checks before pushing (JOV-13111)', () => {
+  const writer = readFileSync(
+    new URL('../../publish-daily-changelog.mjs', import.meta.url),
+    'utf8'
+  );
+  const publishGuard = writer.indexOf(
+    "process.argv.includes('--write') && plan.status === 'publish'"
+  );
+  const changelogWrite = writer.indexOf(
+    "writeFileSync('CHANGELOG.md', plan.content)",
+    publishGuard
+  );
+  const editorialCheck = writer.indexOf(
+    'check-customer-changelog-editorial.mjs'
+  );
+
+  it('spawns the canonical editorial check inside the publish --write path', () => {
+    expect(publishGuard).toBeGreaterThan(-1);
+    expect(editorialCheck).toBeGreaterThan(publishGuard);
+  });
+
+  it('checks the bytes about to be pushed, after the CHANGELOG.md write', () => {
+    expect(changelogWrite).toBeGreaterThan(publishGuard);
+    expect(editorialCheck).toBeGreaterThan(changelogWrite);
+    // The canonical check reads the committed CHANGELOG.md (the file just
+    // written) and exits nonzero on a violation, so a failing writer blocks
+    // the caller's push step instead of opening a PR that fails Source
+    // Validation minutes in.
+    expect(writer).toContain('fileURLToPath(');
+    expect(writer).toContain('execFileSync(');
   });
 });
