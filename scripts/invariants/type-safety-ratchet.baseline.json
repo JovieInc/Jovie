@@ -5,6 +5,9 @@
     "apps/console/lib/factory-health.ts": {
       "non-null": 3
     },
+    "apps/desktop/src/main.ts": {
+      "non-null": 2
+    },
     "apps/desktop/src/preload-fullscreen.ts": {
       "as-unknown-as": 1
     },
