@@ -41,9 +41,26 @@ class PoolTest(unittest.TestCase):
         git(self.repo, "init", "-q", "-b", "main")
         git(self.repo, "config", "user.email", "t@example.com")
         git(self.repo, "config", "user.name", "t")
+        git(self.repo, "config", "commit.gpgsign", "false")
         (self.repo / "a.txt").write_text("one\n")
+        hooks = self.repo / "scripts" / "hooks"
+        hooks.mkdir(parents=True)
+        (self.repo / ".husky").mkdir()
+        for name in ("pre-commit", "pre-push"):
+            hook = self.repo / ".husky" / name
+            hook.write_text("#!/bin/sh\nexit 0\n")
+            hook.chmod(0o755)
+        installer = hooks / "configure-git-hooks.sh"
+        installer.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "root=$(git rev-parse --show-toplevel)\n"
+            'git -C "$root" config core.hooksPath .husky\n'
+        )
+        installer.chmod(0o755)
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-q", "-m", "one")
+
         self.env = patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "", "JOVIE_WORKTREE_POOL": "1"})
         self.env.start()
         self.install = patch.object(pool_mod, "INSTALL", ["true"])
@@ -462,6 +479,23 @@ print(worktree_pool.fill(Path(sys.argv[2]), size=0, base="main", warm=False, roo
                 self.assertTrue(pool_mod.node_env(self.out)["PATH"].startswith(str(bin_dir)))
         self.assertEqual(pool_mod.node_env(self.out / "missing")["PATH"], os.environ["PATH"])
 
+
+
+    def test_take_arms_tracked_git_hooks(self):
+        dest = self.out / "hooked"
+        source = pool_mod.take(self.repo, dest, "feat/hooks", "main", root=self.root)
+        self.assertEqual(source, "fresh")
+        self.assertEqual(git(dest, "config", "--get", "core.hooksPath"), ".husky")
+
+    def test_take_fails_closed_when_the_hook_installer_is_missing(self):
+        git(self.repo, "rm", "-q", "-f", "scripts/hooks/configure-git-hooks.sh")
+        git(self.repo, "commit", "-q", "-m", "drop installer")
+        dest = self.out / "nohooks"
+        with self.assertRaises(RuntimeError) as raised:
+            pool_mod.take(self.repo, dest, "feat/nohooks", "main", root=self.root)
+        self.assertIn("hook installer missing", str(raised.exception))
+        self.assertFalse(dest.exists())
+        self.assertNotIn(str(dest), git(self.repo, "worktree", "list", "--porcelain"))
 
 if __name__ == "__main__":
     unittest.main()
