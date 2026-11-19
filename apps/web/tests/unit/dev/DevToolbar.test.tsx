@@ -475,7 +475,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
-      expect(screen.getByText('spotify oauth')).toBeInTheDocument();
+      expect(screen.getByText('merch mvp')).toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
