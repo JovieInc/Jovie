@@ -5,6 +5,8 @@ import re
 import subprocess
 import tempfile
 
+from atomic_state import atomic_write_text
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -327,10 +329,10 @@ def pen_retry_win(before_sha: str, after_sha: str) -> str:
     test_text = read(after_sha, test)
     with tempfile.TemporaryDirectory(prefix="pen-retry-win-") as tmp:
         directory = Path(tmp)
-        (directory / "pen-golden-path.test.mjs").write_text(test_text)
+        atomic_write_text(directory / "pen-golden-path.test.mjs", test_text)
         results = []
         for sha in (before_sha, after_sha):
-            (directory / "pen-golden-path.mjs").write_text(read(sha, source))
+            atomic_write_text(directory / "pen-golden-path.mjs", read(sha, source))
             results.append(subprocess.run(
                 ["node", "--test-reporter=tap", f"--test-name-pattern=^{name}$",
                  str(directory / "pen-golden-path.test.mjs")],
