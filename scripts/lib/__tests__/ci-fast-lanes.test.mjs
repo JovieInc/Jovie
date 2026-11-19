@@ -487,12 +487,13 @@ describe('runStructural screenshot contract discovery', () => {
     120_000
   );
 
+  const LEADS_CHANGED = ['apps/web/lib/leads/constants.ts'];
   it.each([
-    ['pull_request', 'web', ['apps/web/lib/leads/constants.ts'], true],
-    ['pull_request', 'web,operations', ['apps/web/lib/leads/constants.ts'], false],
+    ['pull_request', 'web', LEADS_CHANGED, true],
+    ['pull_request', 'web,operations', LEADS_CHANGED, false],
     ['pull_request', 'web', ['apps/web/app/page.tsx'], false],
-    ['merge_group', 'web', ['apps/web/lib/leads/constants.ts'], true],
-    ['push', 'web', ['apps/web/lib/leads/constants.ts'], true],
+    ['merge_group', 'web', LEADS_CHANGED, true],
+    ['push', 'web', LEADS_CHANGED, true],
   ])(
     'runs the script contracts a changed file reads; landing events run the full lists (%s)',
     async (event, lanes, changed, expected) => {
@@ -500,8 +501,7 @@ describe('runStructural screenshot contract discovery', () => {
       // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
       // PRs keep the derived selection; landing events run the FULL lists
       // (JOV-13095: tree-scanning ratchets are never statically selectable).
-      process.env.GITHUB_EVENT_NAME = event;
-      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.GITHUB_EVENT_NAME = event;      process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
       await runStructural({ execute, changedFileList: changed });
