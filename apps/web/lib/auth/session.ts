@@ -13,6 +13,7 @@ import {
 } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -278,6 +279,24 @@ export interface SessionContext {
 }
 
 /**
+ * Bounded read replay for the session-lookup selects (JOV-13156, Sentry
+ * JOVIE-WEB-10T 7857366572): getDbUser, getProfileByUserId and
+ * getSessionContext are single indexed SELECTs on `users` /
+ * `creator_profiles` — replaying once after a transient Neon transport kill
+ * is unambiguous (JOV-12188/JOV-8837 read-recovery doctrine, same policy as
+ * APP_USER_READ_RETRY in lib/auth/app-user.ts). Admission is
+ * `isRetryableError`'s transport class, never statement or
+ * idle-in-transaction timeouts (JOV-5754); non-transport errors still
+ * propagate after one attempt. Reads only — no write path in this module is
+ * replayed.
+ */
+const SESSION_READ_RETRY = {
+  operation: 'read',
+  maxAttempts: 2,
+  retryBudgetMs: QUERY_TIMEOUTS.api,
+} as const;
+
+/**
  * Get the current user's database record by app user id.
  * This is the single source of truth for user lookups.
  *
@@ -291,18 +310,23 @@ export async function getDbUser(
 ): Promise<DbUserContext | null> {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  const [user] = await db
-    .select({
-      id: users.id,
-      clerkId: users.clerkId,
-      email: users.email,
-      isAdmin: users.isAdmin,
-      isPro: users.isPro,
-      userStatus: users.userStatus,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const [user] = await withRetry(
+    () =>
+      db
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          isAdmin: users.isAdmin,
+          isPro: users.isPro,
+          userStatus: users.userStatus,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    'session_getDbUser',
+    SESSION_READ_RETRY
+  );
 
   return user ?? null;
 }
@@ -317,23 +341,31 @@ export async function getDbUser(
 export async function getProfileByDbUserId(
   dbUserId: string
 ): Promise<ProfileContext | null> {
-  const [row] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      avatarUrl: creatorProfiles.avatarUrl,
-      isPublic: creatorProfiles.isPublic,
-      isClaimed: creatorProfiles.isClaimed,
-      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-      settings: creatorProfiles.settings,
-    })
-    .from(users)
-    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.id, dbUserId))
-    .limit(1);
+  const [row] = await withRetry(
+    () =>
+      db
+        .select({
+          id: creatorProfiles.id,
+          userId: creatorProfiles.userId,
+          username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          displayName: creatorProfiles.displayName,
+          avatarUrl: creatorProfiles.avatarUrl,
+          isPublic: creatorProfiles.isPublic,
+          isClaimed: creatorProfiles.isClaimed,
+          onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+          settings: creatorProfiles.settings,
+        })
+        .from(users)
+        .innerJoin(
+          creatorProfiles,
+          eq(creatorProfiles.id, users.activeProfileId)
+        )
+        .where(eq(users.id, dbUserId))
+        .limit(1),
+    'session_getProfileByDbUserId',
+    SESSION_READ_RETRY
+  );
 
   if (!row) return null;
   const { settings, ...profile } = row;
@@ -375,29 +407,37 @@ export async function getSessionContext(options?: {
 
   // Performance optimization: Single JOIN query instead of two sequential queries
   // This reduces database round trips from 2 to 1 (50% reduction)
-  const [result] = await db
-    .select({
-      // User fields
-      userId: users.id,
-      userClerkId: users.clerkId,
-      userEmail: users.email,
-      userIsAdmin: users.isAdmin,
-      userIsPro: users.isPro,
-      userStatus: users.userStatus,
-      // Profile fields (nullable from LEFT JOIN)
-      profileId: creatorProfiles.id,
-      profileUsername: creatorProfiles.username,
-      profileUsernameNormalized: creatorProfiles.usernameNormalized,
-      profileDisplayName: creatorProfiles.displayName,
-      profileAvatarUrl: creatorProfiles.avatarUrl,
-      profileIsPublic: creatorProfiles.isPublic,
-      profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-      profileSettings: creatorProfiles.settings,
-    })
-    .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.id, clerkUserId))
-    .limit(1);
+  const [result] = await withRetry(
+    () =>
+      db
+        .select({
+          // User fields
+          userId: users.id,
+          userClerkId: users.clerkId,
+          userEmail: users.email,
+          userIsAdmin: users.isAdmin,
+          userIsPro: users.isPro,
+          userStatus: users.userStatus,
+          // Profile fields (nullable from LEFT JOIN)
+          profileId: creatorProfiles.id,
+          profileUsername: creatorProfiles.username,
+          profileUsernameNormalized: creatorProfiles.usernameNormalized,
+          profileDisplayName: creatorProfiles.displayName,
+          profileAvatarUrl: creatorProfiles.avatarUrl,
+          profileIsPublic: creatorProfiles.isPublic,
+          profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+          profileSettings: creatorProfiles.settings,
+        })
+        .from(users)
+        .leftJoin(
+          creatorProfiles,
+          eq(creatorProfiles.id, users.activeProfileId)
+        )
+        .where(eq(users.id, clerkUserId))
+        .limit(1),
+    'session_getSessionContext',
+    SESSION_READ_RETRY
+  );
 
   // User not found
   if (!result && requireUser) {
