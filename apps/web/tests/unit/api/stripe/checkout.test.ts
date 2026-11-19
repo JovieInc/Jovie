@@ -738,31 +738,30 @@ describe('JOV-8805: dogfood checkout error surfacing', () => {
     );
   });
 
-  it('names a price-domain error under E2E_TEST_MODE=1 instead of masking it as a 400', async () => {
-    // Price-lock fail-closed errors contain "price", which the substring
-    // mapping collapses to 400 "Invalid pricing configuration". Under the
-    // dogfood flag the real cause must win so the journey is diagnosable
-    // (JOV-8805, red 2026-11-17..19 for two days behind that mask).
-    vi.stubEnv('E2E_TEST_MODE', '1');
+  // Price-lock fail-closed errors contain "price"; under the dogfood flag the
+  // real cause must win over the substring 400 mask (red 2026-11-17..19).
+  const priceError = new Error(
+    'The locked price exceeds the requested offer; select the locked price explicitly'
+  );
+  async function postCheckoutWith(priceError: Error) {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-    mockCreateCheckoutSession.mockRejectedValue(
-      new Error(
-        'The locked price exceeds the requested offer; select the locked price explicitly'
-      )
+    mockCreateCheckoutSession.mockRejectedValue(priceError);
+    const response = await POST(
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_123' }),
+      })
     );
+    return { status: response.status, data: await response.json() };
+  }
 
-    const request = new NextRequest('http://localhost/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId: 'price_123' }),
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
+  it('names a price-domain error under E2E_TEST_MODE=1 instead of masking it', async () => {
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    const { status, data } = await postCheckoutWith(priceError);
+    expect(status).toBe(500);
     expect(data.error).toBe(
-      'Failed to create checkout session: The locked price exceeds the requested offer; select the locked price explicitly'
+      `Failed to create checkout session: ${priceError.message}`
     );
   });
 
@@ -770,23 +769,8 @@ describe('JOV-8805: dogfood checkout error surfacing', () => {
     // Prod contract is unchanged: a thrown price-domain error still maps to
     // the customer-safe 400 body.
     vi.stubEnv('E2E_TEST_MODE', '');
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-    mockCreateCheckoutSession.mockRejectedValue(
-      new Error(
-        'The locked price exceeds the requested offer; select the locked price explicitly'
-      )
-    );
-
-    const request = new NextRequest('http://localhost/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId: 'price_123' }),
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
+    const { status, data } = await postCheckoutWith(priceError);
+    expect(status).toBe(400);
     expect(data.error).toBe('Invalid pricing configuration');
   });
 
