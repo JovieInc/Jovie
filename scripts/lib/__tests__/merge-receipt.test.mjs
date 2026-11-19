@@ -80,13 +80,22 @@ describe('extractMergeIssueRef Refs-line and title keys (JOV-13063)', () => {
     ).toBe('JOV-3');
   });
 
-  it('treats a present-but-empty Refs JOV- template as explicitly unlinked', () => {
+  it('falls through to the title when the Refs template is left empty', () => {
     expect(
       extractMergeIssueRef({
         body: 'summary\n\nRefs JOV-\n',
         title: 'feat: add thing (JOV-9)',
       }).identifier
-    ).toBe('');
+    ).toBe('JOV-9');
+  });
+
+  it('reads a Refs key after skipped words and tolerates trailing text', () => {
+    expect(
+      extractMergeIssueRef({
+        body: 'Refs issue JOV-123 closes later',
+        headRef: 'x',
+      }).identifier
+    ).toBe('JOV-123');
   });
 
   it('falls through to the title only when no Refs line exists at all', () => {

@@ -275,7 +275,6 @@ export function linearIdentifierFromText(value) {
  */
 export function extractMergeIssueRef(input = {}) {
   const body = String(input.body ?? '');
-  const title = String(input.title ?? '');
   const identifierMarker =
     /linear-issue-identifier:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
   const idMarker = /linear-issue-id:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
@@ -283,42 +282,26 @@ export function extractMergeIssueRef(input = {}) {
     /<!--\s*summer-issue-bind\s*-->\s*(JOV-\d+)(?![A-Za-z0-9-])/i.exec(
       body
     )?.[1] ?? '';
-  // Precedence (JOV-13063): markers > summer-issue-bind > branch >
-  // `Refs JOV-` > title. An empty `Refs JOV-` template is terminal ('').
-  const branchIdentifier = linearIdentifierFromText(input.headRef);
-  const refsIdentifier = refsLineIdentifier(body);
-  const titleIdentifier = linearIdentifierFromText(title);
+  // JOV-13063: native GitHub<->Linear sync is disabled (2026-11-19), so the
+  // PR-template `Refs JOV-123` line and a title key must resolve here too;
+  // they previously resolved only through Linear's native PR attachment.
+  const refsLine =
+    /^[ \t]*refs:?[ \t]+(?:\S*[ \t]+)*?(JOV-[1-9]\d*)(?![A-Za-z0-9-])/im.exec(
+      body
+    )?.[1] ?? '';
+  const titleIdentifier = linearIdentifierFromText(input.title);
   const identifier = IDENTIFIER_RE.test(identifierMarker)
     ? identifierMarker.toUpperCase()
     : IDENTIFIER_RE.test(idMarker)
       ? idMarker.toUpperCase()
       : summerIdentifier
         ? summerIdentifier.toUpperCase()
-        : branchIdentifier
-          ? branchIdentifier
-          : refsIdentifier === undefined
-            ? titleIdentifier
-            : refsIdentifier;
+        : linearIdentifierFromText(input.headRef) ||
+          refsLine.toUpperCase() ||
+          titleIdentifier;
   const issueId =
     idMarker && !IDENTIFIER_RE.test(idMarker) ? idMarker : identifier;
   return { identifier, issueId };
-}
-
-/**
- * The `Refs JOV-<number>` line of a pull request body. A present-but-empty
- * `Refs JOV-` resolves to '' (an unlinked PR is never guessed from its
- * title); no Refs line returns undefined and the caller tries the title.
- *
- * @param {unknown} body
- * @returns {string | undefined}
- */
-export function refsLineIdentifier(body) {
-  for (const line of String(body ?? '').split(/\r?\n/)) {
-    const match = /^\s*refs\s*:?\s*(jov-\S*)\s*$/i.exec(line);
-    if (!match) continue;
-    return IDENTIFIER_RE.test(match[1]) ? match[1].toUpperCase() : '';
-  }
-  return undefined;
 }
 
 /**
