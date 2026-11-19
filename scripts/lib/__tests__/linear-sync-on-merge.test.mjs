@@ -32,6 +32,7 @@ import {
   recordValidationReceipt,
   reportQuotaDeferral,
   reportSweepDeferral,
+  sweepBudgetRemainingMs,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
 import {
@@ -2887,5 +2888,77 @@ globalThis.fetch = async (url, init) => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('sweep wall-clock budget (JOV-7887)', () => {
+  it('reads the exported deadline only when it parses', () => {
+    expect(sweepBudgetRemainingMs(undefined)).toBe(null);
+    expect(sweepBudgetRemainingMs('')).toBe(null);
+    expect(sweepBudgetRemainingMs('not-a-timestamp')).toBe(null);
+    const now = Date.parse('2026-11-19T12:00:00Z');
+    expect(sweepBudgetRemainingMs('2026-11-19T12:05:00Z', now)).toBe(300_000);
+    expect(sweepBudgetRemainingMs('2026-11-19T11:55:00Z', now)).toBe(-300_000);
+  });
+
+  it('pauses a full sweep at an expired deadline without any lifecycle write', async () => {
+    const { world, fetchImpl } = createWorld();
+    const cursorDir = mkdtempSync(join(tmpdir(), 'linear-budget-cursor-'));
+    try {
+      const result = await syncLinearIssueOnMerge({
+        env: {
+          ...BASE_ENV,
+          LIFECYCLE_MODE: 'sweep',
+          LINEAR_SYNC_CURSOR_DIR: cursorDir,
+          LINEAR_SYNC_DEADLINE_AT: new Date(Date.now() - 1000).toISOString(),
+        },
+        fetchImpl,
+        harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
+        verifyMarker: () => true,
+        log: () => {},
+      });
+      expect(result.action).toBe('budget_deferred');
+      expect(result.deferred).toBeGreaterThanOrEqual(1);
+      expect(world.updates).toEqual([]);
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-1');
+      // A wall-clock pause is not a quota event: the summary keeps it
+      // visible, but the GitHub-quota hold and its retry must not run.
+      const stepSummary = join(cursorDir, 'summary');
+      const stepOutput = join(cursorDir, 'output');
+      expect(
+        reportSweepDeferral(result, {
+          GITHUB_STEP_SUMMARY: stepSummary,
+          GITHUB_OUTPUT: stepOutput,
+        })
+      ).toBe(true);
+      expect(readFileSync(stepSummary, 'utf8')).toContain('wall-clock budget');
+      expect(existsSync(stepOutput)).toBe(false);
+    } finally {
+      rmSync(cursorDir, { recursive: true, force: true });
+    }
+  });
+
+  it('evaluates the sweep normally when the exported deadline is far away', async () => {
+    const { fetchImpl } = createWorld();
+    const result = await syncLinearIssueOnMerge({
+      env: {
+        ...BASE_ENV,
+        LIFECYCLE_MODE: 'sweep',
+        LINEAR_SYNC_DEADLINE_AT: new Date(
+          Date.now() + 30 * 60 * 1000
+        ).toISOString(),
+      },
+      fetchImpl,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: () => {},
+    });
+    expect(result.action).not.toBe('budget_deferred');
+    expect(result.results.length).toBeGreaterThanOrEqual(1);
   });
 });
