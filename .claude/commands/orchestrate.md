@@ -230,7 +230,7 @@ git merge origin/main
 
 3. **After resolving**, run full validation:
 ```bash
-pnpm install
+pnpm install --offline --frozen-lockfile
 pnpm turbo typecheck --filter=@jovie/web
 pnpm biome check .
 pnpm vitest --run --changed

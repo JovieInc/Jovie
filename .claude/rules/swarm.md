@@ -181,7 +181,7 @@ Every coder agent follows this sequence exactly. No shortcuts.
 cd /private/tmp/jovie-worktrees/<chunk-slug>
 export JOVIE_AGENT_PROFILE=coder
 ./scripts/setup.sh
-pnpm install --frozen-lockfile
+pnpm install --offline --frozen-lockfile
 
 git status  # confirm clean
 
