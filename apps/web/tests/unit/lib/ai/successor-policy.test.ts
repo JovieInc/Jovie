@@ -23,7 +23,7 @@ import {
 
 const taskRegistry = JSON.parse(
   readFileSync(
-    new URL('../../../../../ops/models/task-registry.json', import.meta.url),
+    new URL('../../../../../../ops/models/task-registry.json', import.meta.url),
     'utf8'
   )
 ) as { successorPolicy?: { coveredModels: string[]; sourceOfTruth: string } };
