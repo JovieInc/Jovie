@@ -27,4 +27,10 @@ export type Env = {
   EXECUTOR_GRACE_MS?: string;
   /** Unhandled-mail alarm threshold in ms (default 600000, min 60000). */
   MAIL_STALE_MS?: string;
+  /** Vercel Board shadow-mirror receiver URL (pilot). Unset = mirror off. */
+  BOARD_MIRROR_URL?: string;
+  /** HMAC secret for the Board mirror receiver. Unset = off. Lives in Doppler agent-mesh/prd. */
+  BOARD_MIRROR_SECRET?: string;
+  /** "1" also mirrors task bodies (2000 chars) and results/notes/answers (500), not just titles. */
+  BOARD_MIRROR_BODY?: string;
 };

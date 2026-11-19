@@ -308,6 +308,7 @@
     "@vercel/blob": "^2.9.0",
     "@vercel/oidc": "4.0.9",
     "@vercel/toolbar": "^0.2.7",
+    "@vercel/board": "0.50.0",
     "ai": "7.0.173",
     "better-auth": "1.7.25",
     "chart.js": "4.6.1",

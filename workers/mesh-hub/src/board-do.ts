@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { BOARD_KIND, BoardStore, parseBoardSend } from './board.ts';
+import { BoardMirror } from './board-mirror.ts';
 import { type Envelope, HubError, sha256Hex } from './core.ts';
 import type { Env } from './env.ts';
 
@@ -16,10 +17,22 @@ export type BoardResult =
  */
 export class Board extends DurableObject<Env> {
   private readonly store: BoardStore;
+  private readonly mirror: BoardMirror;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.store = new BoardStore(ctx.storage.sql);
+    // Vercel Board shadow mirror (pilot): off unless BOTH the receiver URL and
+    // the HMAC secret are set. Best-effort only — see src/board-mirror.ts.
+    this.mirror = new BoardMirror(
+      {
+        url: env.BOARD_MIRROR_URL,
+        secret: env.BOARD_MIRROR_SECRET,
+        includeBody: env.BOARD_MIRROR_BODY === '1',
+      },
+      ctx.storage,
+      (input, init) => fetch(input, init)
+    );
   }
 
   private async active(): Promise<string[]> {
@@ -44,6 +57,7 @@ export class Board extends DurableObject<Env> {
         Date.now()
       );
       await this.flush();
+      this.mirrorAfterChange();
       return {
         ok: true,
         op,
@@ -104,11 +118,34 @@ export class Board extends DurableObject<Env> {
     ) as Record<string, unknown>;
   }
 
+  /** Mirror health for GET /v1/board/mirror. Never the secret or the URL. */
+  async mirrorStatus() {
+    const status = await this.mirror.status({
+      maxStageId: () => this.store.maxStageId(),
+      rows: (afterId, limit) => this.store.mirrorRows(afterId, limit),
+    });
+    return JSON.parse(JSON.stringify(status)) as Record<string, unknown>;
+  }
+
   /** Cron dead-man and lease alarm both land here. */
   async sweep() {
     const out = this.store.sweep(await this.active(), Date.now());
     await this.flush();
+    this.mirrorAfterChange();
     return out;
+  }
+
+  /** Best-effort mirror push after a successful op or sweep. Never blocks or throws. */
+  private mirrorAfterChange() {
+    if (!this.mirror.enabled) return;
+    this.ctx.waitUntil(
+      this.mirror
+        .drain({
+          maxStageId: () => this.store.maxStageId(),
+          rows: (afterId, limit) => this.store.mirrorRows(afterId, limit),
+        })
+        .catch(() => undefined)
+    );
   }
 
   async alarm() {
@@ -124,7 +161,14 @@ export class Board extends DurableObject<Env> {
     const pending = this.store.pendingNotices(1).length
       ? Date.now() + NOTICE_RETRY_MS
       : null;
-    const due = [lease, pending].filter((v): v is number => v !== null);
+    // The mirror reuses the same 60 s alarm retry when it has a backlog.
+    const mirrorDue = await this.mirror.backoffAt({
+      maxStageId: () => this.store.maxStageId(),
+      rows: (afterId, limit) => this.store.mirrorRows(afterId, limit),
+    });
+    const due = [lease, pending, mirrorDue].filter(
+      (v): v is number => v !== null
+    );
     if (!due.length) return;
     const next = Math.max(Math.min(...due), Date.now() + 1_000);
     const current = await this.ctx.storage.getAlarm();

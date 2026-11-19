@@ -566,6 +566,9 @@ importers:
       '@vercel/blob':
         specifier: ^2.9.0
         version: 2.9.0
+      '@vercel/board':
+        specifier: 0.50.0
+        version: 0.50.0
       '@vercel/oidc':
         specifier: 4.0.9
         version: 4.0.9
@@ -8110,6 +8113,27 @@ packages:
   '@vercel/blob@2.9.0':
     resolution: {integrity: sha512-o+1CMRlT8/RvGo1aGkFv40F7v3MLdSOaVaIccepBXWrXgonKId3hHKSKGQ+iBDPoSe03crmHfhpHtTs0CCXiig==}
     engines: {node: '>=20.0.0'}
+
+  '@vercel/board@0.50.0':
+    resolution: {integrity: sha512-VNIdLzmnMC361qksmeG5+LSWLZiYJvW8H3A9uww0VEZNozOKxYQIwth+3IjOk8Z+Z4D2Oa2YzhH1ugz5PQ+BpQ==}
+    engines: {node: '>=22.18'}
+    peerDependencies:
+      '@chat-adapter/github': ^4.41.1
+      '@chat-adapter/linear': ^4.41.1
+      '@chat-adapter/slack': ^4.41.1
+      '@vercel/connect': ^2.3.4
+      chat: ^4.41.1
+    peerDependenciesMeta:
+      '@chat-adapter/github':
+        optional: true
+      '@chat-adapter/linear':
+        optional: true
+      '@chat-adapter/slack':
+        optional: true
+      '@vercel/connect':
+        optional: true
+      chat:
+        optional: true
 
   '@vercel/build-utils@13.34.0':
     resolution: {integrity: sha512-DhbYXymwjO6N3prqBf7UzQFNpQIcHabe1qbiXxqqfjDJ5Tca9+MMYnU/+uObHrPBfR9FAXMxAwmkIUw59zJ7cw==}
@@ -24044,6 +24068,12 @@ snapshots:
       is-node-process: 1.2.0
       throttleit: 2.1.0
       undici: 8.12.4
+
+  '@vercel/board@0.50.0':
+    dependencies:
+      '@vercel/oidc': 3.8.10
+      jose: 6.2.17
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@vercel/build-utils@13.34.0':
     dependencies:
