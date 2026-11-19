@@ -449,7 +449,7 @@ test('cold Node-only checkout validates and snapshots without installed dependen
   assert.equal(fs.existsSync(path.join(f.root, 'node_modules')), false);
 });
 
-test('supported workflow fields agree with YAML including quota aliases and boolean error tolerance', () => {
+test('supported workflow fields agree with the canonical YAML parser including quota aliases', () => {
   const source = fs.readFileSync(
     new URL('../.github/workflows/source-validation.yml', import.meta.url),
     'utf8'
@@ -469,14 +469,8 @@ test('supported workflow fields agree with YAML including quota aliases and bool
         'continue-on-error',
       ]) {
         if (step.fields.has(key)) {
-          const entry = step.fields.get(key);
-          // Error tolerance is boolean metadata; path/ID fields still require
-          // the strict string reader and reject YAML booleans.
-          const literalBoolean =
-            key === 'continue-on-error' && /^(true|false)$/.test(entry.value);
-          if (literalBoolean) assert.deepEqual(entry.children, []);
           assert.equal(
-            literalBoolean ? entry.value === 'true' : contractScalar(entry),
+            contractScalar(step.fields.get(key)),
             canonical.jobs[id].steps[index][key]
           );
         } else assert.equal(canonical.jobs[id].steps[index][key], undefined);

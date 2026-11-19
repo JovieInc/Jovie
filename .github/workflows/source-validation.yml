@@ -44,7 +44,6 @@ jobs:
       # runtime from the trusted base; it never executes the PR checkout.
       - name: Checkout the trusted cancellation client
         id: client
-        continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -58,19 +57,20 @@ jobs:
       - name: Prime cancellation client runtime
         id: prime
         if: ${{ steps.client.outcome == 'success' }}
-        continue-on-error: true
         env:
           NODE_VERSION_FILE: .source-validation-client/.nvmrc
         run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - name: Setup cancellation client runtime
         id: runtime
         if: ${{ steps.prime.outcome == 'success' }}
-        continue-on-error: true
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .source-validation-client/.nvmrc
       # Fork/Dependabot tokens cannot write Actions; source checks still run.
       - name: Cancel only older runs of superseded PR heads
+        # Runs after a failed bootstrap too, to emit the notice; job-level
+        # continue-on-error keeps this advisory job from failing the run.
+        if: ${{ !cancelled() }}
         timeout-minutes: 3
         shell: bash
         env:

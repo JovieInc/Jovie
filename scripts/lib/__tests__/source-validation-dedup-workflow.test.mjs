@@ -222,11 +222,12 @@ test('cancellation is isolated from every original source job and required check
 });
 
 test('bootstrap failures skip cleanup with a notice and successful exit', t => {
-  assert.equal(cleanup.steps[0]['continue-on-error'], true);
+  assert.equal(cancelStep.if, '${{ !cancelled() }}');
   assert.equal(cleanup.steps[1].if, "${{ steps.client.outcome == 'success' }}");
   assert.equal(cleanup.steps[2].if, "${{ steps.prime.outcome == 'success' }}");
-  for (const step of cleanup.steps.slice(0, 3))
-    assert.equal(step['continue-on-error'], true);
+  // Step-level error tolerance stays off; only the advisory job tolerates errors.
+  for (const step of cleanup.steps)
+    assert.equal(step['continue-on-error'], undefined);
   assert.equal(
     cancelStep.env.CLEANUP_READY,
     "${{ steps.client.outcome == 'success' && steps.prime.outcome == 'success' && steps.runtime.outcome == 'success' }}"
