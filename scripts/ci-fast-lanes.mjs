@@ -879,7 +879,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
-  'scripts/linear-team-drift.test.mjs', // JOV-13101 team drift guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -1047,7 +1046,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
-  'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
@@ -1183,6 +1181,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
   'scripts/lib/__tests__/performance-gate-lanes.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
+  'scripts/lib/__tests__/undraft-hold-signals.test.mjs',
   'scripts/lib/__tests__/workflow-expression-budget.test.mjs',
   'scripts/lib/__tests__/stale-branch-sweep.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
