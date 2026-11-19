@@ -674,6 +674,23 @@ function commandFor(plan: ConsumerExecutionPlan): {
 }
 
 /**
+ * The memo key for one consumer execution: the FULL execution plan — the
+ * kind, the execPath, and everything `commandFor` derives from them (the
+ * executable file, argv, cwd). Two plans share an execution only when all
+ * of these are identical. Consumers receive no per-cell input (no cell id
+ * reaches argv), and `execFileSync` inherits `process.env` uniformly — no
+ * env overrides exist — so nothing per-cell can make two executions with
+ * the same key diverge; if a future change introduces either, that input
+ * must join this key. Deriving the key from the derived command tuple (not
+ * just `kind:execPath`) keeps the memo correct even if `commandFor` grows
+ * per-kind argv/cwd/env variation later.
+ */
+function consumerExecutionCacheKey(plan: ConsumerExecutionPlan): string {
+  const { file, args, cwd } = commandFor(plan);
+  return JSON.stringify([plan.kind, plan.execPath, file, args, cwd]);
+}
+
+/**
  * Actually spawns the consumer's real check. The only place this module
  * runs anything. `timeoutMs` defaults to the production ceiling; tests
  * override it to exercise the timeout path without waiting 120s for real.
@@ -749,7 +766,7 @@ export function evaluateDeterministicRow(
     .filter((plan): plan is ConsumerExecutionPlan => plan !== null);
   const uniquePlans = [
     ...new Map(
-      plans.map(plan => [`${plan.kind}:${plan.execPath}`, plan])
+      plans.map(plan => [consumerExecutionCacheKey(plan), plan])
     ).values(),
   ];
 
@@ -764,7 +781,7 @@ export function evaluateDeterministicRow(
   }
 
   const outcomes = uniquePlans.map(plan => {
-    const key = `${plan.kind}:${plan.execPath}`;
+    const key = consumerExecutionCacheKey(plan);
     let outcome = cache.get(key);
     if (!outcome) {
       outcome = runConsumerExecution(plan, timeoutMs);
