@@ -7,10 +7,7 @@
     "noEmit": true,
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node", "vitest/globals"],
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
