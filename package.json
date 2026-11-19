@@ -318,6 +318,7 @@
     "quality:gaps": "node scripts/quality-gap-finder.mjs",
     "quality:gaps:test": "node --test scripts/quality-gap-finder.test.mjs",
     "design:source-count-ratchet": "node scripts/design-system-source-ratchet.mjs",
+    "guard:launch-core-flags": "node scripts/company-guards/launch-core-flag-check.mjs",
     "design:pen-codegen": "node scripts/design-pen-codegen.mjs",
     "design:pen-codegen:test": "node --test scripts/design-pen-codegen.test.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
