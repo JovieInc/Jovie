@@ -18,11 +18,11 @@ import re
 import sys
 import time
 import uuid
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from apiclient import LinearClient  # noqa: E402
 import remediation  # noqa: E402  (event shapes, fingerprint, occurrence identity)
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
@@ -30,7 +30,6 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 _UNSET = object()  # upsert_intake(linear=...) default: construct the client from the environment
 
 
-LINEAR_API_URL = "https://api.linear.app/graphql"
 RELAY_LINEAR_FLAG = "LANES_RELAY_LINEAR"
 
 
@@ -41,27 +40,15 @@ class ActionsLinear:
     This class is not used on the Gem lane host (see relay_linear_client).
     """
 
-    def __init__(self, api_key: str, urlopen=urllib.request.urlopen, timeout: float = 30):
+    def __init__(self, api_key: str):
         key = (api_key or "").strip()
         if not key:
             raise ValueError("LINEAR_API_KEY missing")
-        self._authorization = key if key.lower().startswith("bearer ") else f"Bearer {key}"
-        self._urlopen = urlopen
-        self._timeout = timeout
+        authorization = key if key.lower().startswith("bearer ") else f"Bearer {key}"
+        self._client = LinearClient(key, lambda rejected=None: authorization)
 
     def gql(self, query: str, variables: dict) -> dict:
-        body = json.dumps({"query": query, "variables": variables}).encode()
-        request = urllib.request.Request(
-            LINEAR_API_URL, data=body, method="POST",
-            headers={"Content-Type": "application/json", "Authorization": self._authorization})
-        try:
-            with self._urlopen(request, timeout=self._timeout) as response:
-                payload = json.loads(response.read().decode() or "{}")
-        except urllib.error.HTTPError as error:
-            raise RuntimeError(f"linear http {error.code}") from None
-        if payload.get("errors"):
-            raise RuntimeError(payload["errors"][0])
-        data = payload.get("data")
+        data = self._client.graphql(query, variables, priority="repair", timeout_ms=30000)
         if not isinstance(data, dict):
             raise RuntimeError("linear response missing data")
         return data

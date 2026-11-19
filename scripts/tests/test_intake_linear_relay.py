@@ -13,35 +13,29 @@ from unittest.mock import patch
 from scripts.tests.test_pr_events import NOW, Shell, events
 from scripts.tests.test_pr_events_red_repair import FakeIntakeLinear
 import intake_linear
+from apiclient import MemoryLedgerStore
 
 
 class ActionsLinearClientTest(unittest.TestCase):
     def test_relay_uses_actions_secret_only_when_the_relay_flag_is_set(self):
         calls = []
 
-        class FakeResponse:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-            def read(self):
-                return b'{"data":{"ok":true}}'
-
-        def urlopen(request, timeout=30):
-            calls.append(request)
-            return FakeResponse()
+        def transport(method, url, headers, body, timeout):
+            calls.append((method, headers, json.loads(body)))
+            return 200, {"content-type": "application/json"}, '{"data":{"ok":true}}'
 
         env = {"LANES_RELAY_LINEAR": "1", "LINEAR_API_KEY": "lin_api_fixture",
                "LANES_EXECUTION_BACKEND": "local-test", "LANES_SELFTEST": "1"}
         with patch.dict(os.environ, env, clear=False):
             client = intake_linear.relay_linear_client()
         self.assertIsInstance(client, intake_linear.ActionsLinear)
-        client._urlopen = urlopen
+        client._client.client.transport = transport
+        client._client.client.store = MemoryLedgerStore()
         self.assertEqual(client.gql("query { ok }", {}), {"ok": True})
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0].get_header("Authorization"), "Bearer lin_api_fixture")
+        self.assertEqual(calls[0][1]["Authorization"], "Bearer lin_api_fixture")
+        self.assertEqual(calls[0][2], {"query": "query { ok }", "variables": {}})
+        self.assertTrue(client._client.client.state())
 
         off = {"LINEAR_API_KEY": "lin_api_fixture", "LANES_EXECUTION_BACKEND": "local-test",
                "LANES_SELFTEST": "1"}
