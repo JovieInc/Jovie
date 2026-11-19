@@ -13,6 +13,7 @@ on:
       - 'apps/ios/Jovie.xcodeproj/project.pbxproj'
       - 'apps/ios/app-store/**'
       - 'apps/ios/scripts/app-store-graphics.mjs'
+      - 'apps/ios/scripts/capture-budget.mjs'
       - 'apps/web/design/ziawi-color-sot.json'
       - 'apps/web/public/fonts/Satoshi-Variable.woff2'
       - 'packages/copy/**'
@@ -22,6 +23,7 @@ on:
     paths:
       - 'apps/ios/app-store/**'
       - 'apps/ios/scripts/app-store-graphics.mjs'
+      - 'apps/ios/scripts/capture-budget.mjs'
       - '.github/workflows/ios-app-store-graphics.yml'
   workflow_call:
     inputs:
@@ -64,7 +66,14 @@ jobs:
       - name: Build simulator app
         timeout-minutes: 20
         run: |
+          set -euo pipefail
           bash apps/ios/scripts/ensure-configuration.sh
+          # Blocking bootstatus overlaps xcodebuild. The node helper kills the
+          # process group; this step's existing limit is unchanged.
+          node apps/ios/scripts/app-store-graphics.mjs boot-status \
+            >"$RUNNER_TEMP/sim-bootstatus.log" 2>&1 &
+          boot_pid=$!
+          set +e
           xcodebuild build \
             -project apps/ios/Jovie.xcodeproj \
             -scheme Jovie \
@@ -72,6 +81,14 @@ jobs:
             -destination "generic/platform=iOS Simulator" \
             -derivedDataPath .build/app-store-graphics \
             CODE_SIGNING_ALLOWED=NO
+          build_status=$?
+          wait "$boot_pid"
+          boot_status=$?
+          set -e
+          echo "----- simulator bootstatus -----"
+          cat "$RUNNER_TEMP/sim-bootstatus.log"
+          test "$build_status" -eq 0
+          test "$boot_status" -eq 0
 
       - name: Capture fixture screens
         timeout-minutes: 15
