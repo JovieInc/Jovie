@@ -4880,12 +4880,10 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // A later blocking-label release can re-enroll a manual removal without a revision hold.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
-    // JOV-13053: only classified infra or positive cascades may retry;
-    // existing failure holds block and admission stays event-driven.
+    // JOV-13053: existing failure holds own classification; retry evidence caps
+    // same-head infrastructure retries and stays advisory when unavailable.
     expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
-    expect(ENROLL).toContain(
-      "['infra-retry', 'cascade-rearm'].includes(retryDecision.reason)"
-    );
+    expect(ENROLL).toContain('if (!retryDecision.allow) {');
     expect(ENROLL).toContain('failure.reason = retryDecision.reason');
     expect(ENROLL).toContain('await promotion.retry({');
     expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');

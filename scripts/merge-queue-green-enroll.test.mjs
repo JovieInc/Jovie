@@ -267,7 +267,7 @@ test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue hea
     result.promotionReads
       .filter(r => r.branch)
       .map(r => Number(/pr-(\d+)-/.exec(r.branch)[1])),
-    [111, 112, 113]
+    [] // Fresh candidates never read the retry ledger.
   );
   assert.deepEqual(
     result.mutations,
@@ -1115,7 +1115,7 @@ test('enrolls a required-green head once lane-fix-red is gone', async () => {
   assert.deepEqual(result.labelRemovals, []);
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
-test('manual release re-enrolls; automatic ejection requires infra proof and source holds block', async () => {
+test('a released manual dequeue and unheld automatic ejection re-enroll; source failure holds block', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
   });
@@ -1139,7 +1139,7 @@ test('manual release re-enrolls; automatic ejection requires infra proof and sou
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({
@@ -1150,7 +1150,7 @@ test('manual release re-enrolls; automatic ejection requires infra proof and sou
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({ ...removal(undefined), ...release('hold') }),

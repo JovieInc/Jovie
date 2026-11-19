@@ -193,3 +193,205 @@ test('exact-run legacy release never releases another deterministic failure on t
   assert.equal(decision.allow, false);
   assert.equal(decision.reason, 'head-unchanged-non-infra');
 });
+
+const retryHead = 'a'.repeat(40);
+const noHold = { action: 'allow', reason: 'ejection-reenroll' };
+const retryInput = { pr: 1, head: retryHead, removed: true, failure: noHold };
+const retryEvidence = (extra = {}) => ({
+  complete: true,
+  retries: 0,
+  runs: [],
+  receipts: [
+    {
+      schema: 'ejection/v1',
+      head: retryHead,
+      run: 99,
+      attempt: 1,
+      class: 'code',
+    },
+  ],
+  ...extra,
+});
+async function enrollPolicy(net, extra = {}) {
+  const { createEnrollPromotion } = await import('../promotion-enroll.mjs');
+  const logs = [];
+  return {
+    logs,
+    policy: createEnrollPromotion({
+      core: { info: line => logs.push(JSON.parse(line)) },
+      env: {},
+      repository: { owner: 'JovieInc', repo: 'Jovie' },
+      net,
+      ...extra,
+    }),
+  };
+}
+
+test('replacement heads inherit no retry reads, health, reservations or ejection labels', async () => {
+  let reads = 0;
+  const unavailable = async () => {
+    reads++;
+    throw new Error('unavailable');
+  };
+  const { policy, logs } = await enrollPolicy({
+    readRetryEvidence: unavailable,
+    health: unavailable,
+    reserveRetry: unavailable,
+  });
+  assert.deepEqual(
+    await policy.retry({
+      ...retryInput,
+      head: 'b'.repeat(40),
+      removed: false,
+      labels: ['mq-ejected:code'],
+    }),
+    { allow: true, reason: 'new-head', retry: false }
+  );
+  assert.equal(reads, 0);
+  assert.deepEqual(logs, []);
+});
+
+test('existing no-hold authority allows the first same-head retry despite advisory code attribution', async () => {
+  let retries = 0;
+  const { policy } = await enrollPolicy({
+    readRetryEvidence: async () => retryEvidence({ retries }),
+    health: async () => ({ complete: true, circuitOpen: false }),
+    reserveRetry: async () => {
+      retries++;
+    },
+  });
+  const first = await policy.retry(retryInput);
+  assert.equal(first.reason, 'infra-retry');
+  await policy.reserveRetry(retryHead, first);
+  assert.equal(
+    (await policy.retry(retryInput)).reason,
+    'infra-retry-exhausted'
+  );
+  // Failed attempts also bound recovery if a classifier races the reservation.
+  const { policy: raced } = await enrollPolicy({
+    readRetryEvidence: async () =>
+      retryEvidence({
+        receipts: [99, 100].map(run => ({
+          ...retryEvidence().receipts[0],
+          run,
+        })),
+      }),
+    health: async () => ({ complete: true, circuitOpen: false }),
+  });
+  assert.equal((await raced.retry(retryInput)).reason, 'infra-retry-exhausted');
+});
+
+test('trusted infrastructure recovery overrides the advisory classifier for its exact run', async () => {
+  const { policy } = await enrollPolicy({
+    readRetryEvidence: async () => retryEvidence(),
+    health: async () => ({ complete: true, circuitOpen: false }),
+  });
+  const first = await policy.retry({
+    ...retryInput,
+    removed: false,
+    failure: {
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+      latest: {
+        runId: 99,
+        runAttempt: 1,
+        classification: 'transient-infrastructure',
+      },
+    },
+  });
+  assert.equal(first.reason, 'infra-retry');
+  assert.equal(first.evidence.receipts[0].class, 'infra');
+});
+
+test('unavailable, incomplete and missing retry evidence preserve prior admission and log a shadow reason', async () => {
+  for (const net of [
+    {},
+    {
+      readRetryEvidence: async () => {
+        throw new Error('offline');
+      },
+      health: async () => ({ complete: true }),
+    },
+    {
+      readRetryEvidence: async () => retryEvidence({ complete: false }),
+      health: async () => ({ complete: true }),
+    },
+    {
+      readRetryEvidence: async () => retryEvidence(),
+      health: async () => ({ complete: false }),
+    },
+    {
+      readRetryEvidence: async () => retryEvidence({ receipts: [] }),
+      health: async () => ({ complete: true }),
+    },
+  ]) {
+    const { policy, logs } = await enrollPolicy(net);
+    for (const head of [retryHead, 'b'.repeat(40)]) {
+      const result = await policy.retry({ ...retryInput, head });
+      assert.equal(result.allow, true);
+      assert.equal(result.retry, false);
+      assert.equal(result.reason, 'retry-evidence-unavailable');
+    }
+    assert.equal(logs.length, 2);
+    assert.ok(logs.every(log => log.mode === 'shadow' && log.error));
+    assert.equal(
+      (await policy.retry({ ...retryInput, removed: false })).reason,
+      'new-head'
+    );
+  }
+});
+
+test('deterministic holds, manual removal and a complete open circuit remain blocking', async () => {
+  const { policy, logs } = await enrollPolicy({
+    readRetryEvidence: async () => retryEvidence(),
+    health: async () => ({ complete: true, circuitOpen: true }),
+  });
+  assert.deepEqual(
+    await policy.retry({
+      ...retryInput,
+      failure: { action: 'block', reason: 'deterministic-source-failure' },
+    }),
+    { allow: false, reason: 'deterministic-source-failure', retry: false }
+  );
+  assert.deepEqual(logs, []);
+  assert.equal((await policy.retry(retryInput)).reason, 'circuit-open');
+  const { policy: manual } = await enrollPolicy({
+    readRetryEvidence: async () => retryEvidence(),
+    health: async () => ({ complete: true, circuitOpen: false }),
+  });
+  assert.equal(
+    (await manual.retry({ ...retryInput, manual: true })).reason,
+    'manual-release-required'
+  );
+});
+
+test('retry reservations use the existing app status writer and remain before enqueue', async () => {
+  const writes = [];
+  const { policy } = await enrollPolicy(
+    {
+      readRetryEvidence: async () => retryEvidence(),
+      health: async () => ({ complete: true, circuitOpen: false }),
+      reserveRetry: async () =>
+        assert.fail('read-only evidence token cannot reserve retries'),
+    },
+    {
+      github: {
+        rest: {
+          repos: { createCommitStatus: async status => writes.push(status) },
+        },
+      },
+    }
+  );
+  await policy.reserveRetry(retryHead, await policy.retry(retryInput));
+  assert.deepEqual(writes, [
+    {
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      sha: retryHead,
+      state: 'success',
+      context: 'mq-retry/v1',
+      description: 'spent:run=99;try=1',
+      target_url: 'https://github.com/JovieInc/Jovie/actions/runs/99',
+    },
+  ]);
+});

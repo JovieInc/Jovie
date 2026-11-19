@@ -23,9 +23,11 @@ export const digest = value =>
 export async function reconcileQueueRetry(input, net) {
   try {
     const [evidence, health] = await Promise.all([
-      net.readRetryEvidence(input),
-      net.health(),
+      Promise.resolve().then(() => net.readRetryEvidence(input)),
+      Promise.resolve().then(() => net.health()),
     ]);
+    if (!evidence.complete || !health.complete)
+      throw new Error('retry evidence or health incomplete');
     return {
       ...retryDisposition({
         ...input,
@@ -35,8 +37,9 @@ export async function reconcileQueueRetry(input, net) {
       }),
       evidence,
     };
-  } catch {
+  } catch (error) {
     return {
+      unavailable: String(error?.message ?? error),
       allow: false,
       reason: 'head-unchanged-non-infra',
       retry: false,

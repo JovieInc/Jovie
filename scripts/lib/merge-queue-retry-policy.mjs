@@ -20,6 +20,7 @@ export function retryDisposition({
   complete = false,
   circuitOpen = false,
   removed = false,
+  unheld = false,
   manual = false,
   released = false,
   cascade = false,
@@ -63,6 +64,7 @@ export function retryDisposition({
   // receipt. A code label from yesterday cannot poison today's infra receipt.
   const labeled = own.filter(r => labels.includes(`mq-ejected:${r.class}`));
   if (
+    !unheld &&
     ['code', 'size', 'conflict'].some(
       c => classes.has(c) || labeled.some(r => r.class === c)
     )
@@ -71,16 +73,23 @@ export function retryDisposition({
   }
   const recordedRuns = new Set(own.map(r => r.run));
   if (
+    !unheld &&
     failed.some(
       r => !recordedRuns.has(r.id) && !(cascade && r.conclusion === 'cancelled')
     )
   ) {
     return decision(false, 'head-unchanged-non-infra');
   }
-  if (classes.has('infra') || classes.has('contract')) {
+  // Enrollment has already run failure-hold and Company Guards. Their no-hold
+  // verdict remains authoritative, including infra/unknown failures that the
+  // advisory ejection classifier defaults to code. Only cap the same-head retry.
+  if (classes.has('infra') || classes.has('contract') || (unheld && removed)) {
     // Count distinct failed attempts as well as reservations, surviving races
     // between classifier, enroll and rearm. One retry means no third flight.
-    const failures = new Set(own.map(r => `${r.run}:${r.attempt ?? 1}`)).size;
+    const failures = new Set([
+      ...own.map(r => `${r.run}:${r.attempt ?? 1}`),
+      ...(unheld ? failed.map(r => `${r.id}:${r.run_attempt ?? 1}`) : []),
+    ]).size;
     if (retries >= 1 || failures >= 2)
       return decision(false, 'infra-retry-exhausted');
     return decision(true, 'infra-retry', true);

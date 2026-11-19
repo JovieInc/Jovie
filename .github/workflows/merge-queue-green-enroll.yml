@@ -278,7 +278,7 @@ jobs:
             const { createEnrollPromotion } = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/promotion-enroll.mjs`
             ));
-            const promotion = createEnrollPromotion({ core, env: process.env, repository: context.repo });
+            const promotion = createEnrollPromotion({ core, env: process.env, repository: context.repo, github });
             // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
             // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
             // deletes a stale lane-fix-red; this token cannot remove labels.
@@ -684,8 +684,8 @@ jobs:
               const removalActor = pr.timelineItems.nodes[0]?.actor;
               const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
                 removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
-              // Preserve the removal cap and dwell. Candidate-only evidence below
-              // separately requires positive attribution and at most one infra retry.
+              // Preserve the removal cap and dwell. Existing holds classify failures;
+              // candidate-only evidence below caps only same-head infra retries.
               const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
               const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
                 event.__typename === 'RemovedFromMergeQueueEvent' &&
@@ -820,8 +820,7 @@ jobs:
                   labels: pr.labels.nodes.map(l => l.name), removed: Boolean(removedUnchangedHead),
                   manual: humanDequeued || releasedAfterManualRemoval, released: releasedAfterManualRemoval,
                   cascade: ['base_branch_changed', 'base_branch_updated'].includes(removalReason), failure });
-                if (!retryDecision.allow || (ejectionReenroll &&
-                    !['infra-retry', 'cascade-rearm'].includes(retryDecision.reason))) {
+                if (!retryDecision.allow) {
                   receipt(pr, 'skip', retryDecision.reason);
                   continue;
                 }
