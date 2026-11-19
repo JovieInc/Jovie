@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { env } from '@/lib/env-server';
 import { ServerEnvSchema } from '@/lib/env-server-schema';
 import { __test__ } from '@/lib/env-validation-rules';
 
@@ -9,43 +10,23 @@ function runRule(input: {
   readonly publicBetterAuthUrl?: string;
   readonly vercelEnv: string;
   readonly appUrl?: string;
+  readonly profileHostname?: string;
   readonly vercelUrl?: string;
   readonly vercelBranchUrl?: string;
 }) {
-  const original = {
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
-    NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    VERCEL_URL: process.env.VERCEL_URL,
-    VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL,
-  };
+  vi.stubEnv('BETTER_AUTH_URL', input.betterAuthUrl);
+  vi.stubEnv('NEXT_PUBLIC_BETTER_AUTH_URL', input.publicBetterAuthUrl);
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', input.appUrl);
+  vi.stubEnv('NEXT_PUBLIC_PROFILE_HOSTNAME', input.profileHostname);
+  vi.stubEnv('VERCEL_URL', input.vercelUrl);
+  vi.stubEnv('VERCEL_BRANCH_URL', input.vercelBranchUrl);
 
-  process.env.NEXT_PUBLIC_BETTER_AUTH_URL = input.publicBetterAuthUrl;
-  process.env.NEXT_PUBLIC_APP_URL = input.appUrl;
-  process.env.VERCEL_URL = input.vercelUrl;
-  process.env.VERCEL_BRANCH_URL = input.vercelBranchUrl;
-
-  try {
-    return checkBetterAuthUrlOrigin({
-      server: {
-        BETTER_AUTH_URL: input.betterAuthUrl,
-      } as never,
-      vercelEnv: input.vercelEnv,
-    });
-  } finally {
-    for (const [key, value] of Object.entries(original)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
-  }
+  return checkBetterAuthUrlOrigin({ server: env, vercelEnv: input.vercelEnv });
 }
 
 describe('checkBetterAuthUrlOrigin', () => {
   afterEach(() => {
-    // ensure no leakage between cases when a test throws
+    vi.unstubAllEnvs();
   });
 
   it('rejects production host when running locally', () => {
@@ -62,21 +43,48 @@ describe('checkBetterAuthUrlOrigin', () => {
     const issue = runRule({
       betterAuthUrl: 'https://staging.jov.ie',
       publicBetterAuthUrl: 'https://staging.jov.ie',
+      appUrl: 'https://staging.jov.ie',
+      profileHostname: 'staging.jov.ie',
       vercelEnv: 'production',
     });
     expect(issue?.type).toBe('critical');
     expect(issue?.message).toMatch(/must be production/i);
   });
 
-  it('rejects production host when staging is expected', () => {
+  it.each([
+    { appUrl: 'https://staging.jov.ie' },
+    { profileHostname: 'staging.jov.ie' },
+  ])('rejects production auth on staging with %j', staging => {
     const issue = runRule({
       betterAuthUrl: 'https://jov.ie',
       publicBetterAuthUrl: 'https://jov.ie',
       vercelEnv: 'preview',
-      appUrl: 'https://staging.jov.ie',
+      ...staging,
     });
     expect(issue?.type).toBe('critical');
     expect(issue?.message).toMatch(/must be staging/i);
+  });
+
+  it('accepts the staging auth origin on the staging preview when the public app URL falls back to production', () => {
+    const issue = runRule({
+      betterAuthUrl: 'https://staging.jov.ie',
+      publicBetterAuthUrl: 'https://staging.jov.ie',
+      vercelEnv: 'preview',
+      profileHostname: 'staging.jov.ie',
+      vercelUrl: 'jovie-preview-abc.vercel.app',
+    });
+    expect(issue).toBeNull();
+  });
+
+  it('rejects the staging auth origin on an ordinary preview', () => {
+    const issue = runRule({
+      betterAuthUrl: 'https://staging.jov.ie',
+      vercelEnv: 'preview',
+      profileHostname: 'staging.jov.ie.example.com',
+      vercelUrl: 'jovie-preview-abc.vercel.app',
+    });
+    expect(issue?.type).toBe('critical');
+    expect(issue?.message).toMatch(/not allowed/i);
   });
 
   it('accepts matching production hosts', () => {

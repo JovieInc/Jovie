@@ -5,6 +5,10 @@ const BETTER_AUTH_URL_HOSTS = {
   local: new Set(['localhost', '127.0.0.1', '[::1]']),
 } as const;
 
+export type BetterAuthUrlEnvironment =
+  | keyof typeof BETTER_AUTH_URL_HOSTS
+  | 'preview';
+
 export function parseUrlHostname(raw: string | undefined): string | null {
   if (!raw?.trim()) return null;
   try {
@@ -16,14 +20,20 @@ export function parseUrlHostname(raw: string | undefined): string | null {
 
 export function resolveBetterAuthUrlEnv(
   vercelEnv: string,
-  publicAppUrl: string | undefined
-): 'production' | 'staging' | 'local' | 'preview' {
+  publicAppUrl: string | undefined,
+  profileHostname?: string
+): BetterAuthUrlEnvironment {
   if (vercelEnv === 'production') return 'production';
   if (vercelEnv === 'preview') {
-    // Staging alias deploys use preview on Vercel but host staging.jov.ie.
-    const publicUrl = publicAppUrl;
-    const host = parseUrlHostname(publicUrl);
-    if (host && BETTER_AUTH_URL_HOSTS.staging.has(host)) return 'staging';
+    // The staging release pins its profile hostname independently of the
+    // public app URL, which can be inlined with a production fallback.
+    const appHost = parseUrlHostname(publicAppUrl);
+    if (
+      BETTER_AUTH_URL_HOSTS.staging.has(appHost ?? '') ||
+      BETTER_AUTH_URL_HOSTS.staging.has(profileHostname?.toLowerCase() ?? '')
+    ) {
+      return 'staging';
+    }
     return 'preview';
   }
   return 'local';
@@ -31,7 +41,7 @@ export function resolveBetterAuthUrlEnv(
 
 export function isAllowedBetterAuthHost(
   hostname: string,
-  envKind: 'production' | 'staging' | 'local' | 'preview',
+  envKind: BetterAuthUrlEnvironment,
   platformHosts: readonly (string | undefined)[]
 ): boolean {
   if (envKind === 'production') {
@@ -64,6 +74,7 @@ export function checkBetterAuthUrlOriginPolicy({
   betterAuthUrl,
   publicBetterAuthUrl,
   publicAppUrl,
+  profileHostname,
   vercelEnv,
   vercelUrl,
   vercelBranchUrl,
@@ -71,11 +82,16 @@ export function checkBetterAuthUrlOriginPolicy({
   betterAuthUrl: string | undefined;
   publicBetterAuthUrl: string | undefined;
   publicAppUrl: string | undefined;
+  profileHostname?: string;
   vercelEnv: string;
   vercelUrl: string | undefined;
   vercelBranchUrl: string | undefined;
 }): { type: 'critical'; message: string } | null {
-  const envKind = resolveBetterAuthUrlEnv(vercelEnv, publicAppUrl);
+  const envKind = resolveBetterAuthUrlEnv(
+    vercelEnv,
+    publicAppUrl,
+    profileHostname
+  );
   const candidates: Array<{ label: string; value: string | undefined }> = [
     { label: 'BETTER_AUTH_URL', value: betterAuthUrl },
     {

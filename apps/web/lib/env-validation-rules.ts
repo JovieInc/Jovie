@@ -2,6 +2,7 @@ import 'server-only';
 import type { z } from 'zod';
 import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
+  type BetterAuthUrlEnvironment,
   checkBetterAuthUrlOriginPolicy,
   isAllowedBetterAuthHost as isAllowedAuthHost,
   parseUrlHostname,
@@ -82,13 +83,17 @@ const checkBetterAuthSecret: ValidationRule = ({ server, vercelEnv }) => {
  * Server base URL must match the deployed origin and never cross envs.
  * Does not log or include secret values.
  */
-function resolveBetterAuthUrlEnv(vercelEnv: string) {
-  return resolveAuthUrlEnv(vercelEnv, publicEnv.NEXT_PUBLIC_APP_URL);
+function resolveBetterAuthUrlEnv(vercelEnv: string, profileHostname?: string) {
+  return resolveAuthUrlEnv(
+    vercelEnv,
+    publicEnv.NEXT_PUBLIC_APP_URL,
+    profileHostname
+  );
 }
 
 function isAllowedBetterAuthHost(
   hostname: string,
-  envKind: 'production' | 'staging' | 'local' | 'preview'
+  envKind: BetterAuthUrlEnvironment
 ) {
   return isAllowedAuthHost(hostname, envKind, [
     process.env.VERCEL_URL,
@@ -101,6 +106,7 @@ const checkBetterAuthUrlOrigin: ValidationRule = ({ server, vercelEnv }) =>
     betterAuthUrl: server.BETTER_AUTH_URL,
     publicBetterAuthUrl: publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL,
     publicAppUrl: publicEnv.NEXT_PUBLIC_APP_URL,
+    profileHostname: server.NEXT_PUBLIC_PROFILE_HOSTNAME,
     vercelEnv,
     vercelUrl: process.env.VERCEL_URL,
     vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
