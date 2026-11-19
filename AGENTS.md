@@ -80,7 +80,7 @@ and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
 Message agents: [Linear](canon/FLEET.md#fleet-bus).
 
 Run `pnpm preflight:changed` before every push. Open PRs only with
-`pnpm pr:open open|update N` (gate-checked body), never raw `gh pr create`.
+`pnpm pr:open open|update N` (gate: pr-body-lint.mjs), never raw gh pr create.
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
