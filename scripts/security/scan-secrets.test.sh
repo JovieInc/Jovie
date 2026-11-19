@@ -346,7 +346,9 @@ export SCAN_TEST_STAGED_FILES=$'scripts/security/scan-secrets.sh\nscripts/securi
 : >"$GITLEAKS_CALLS"
 rm -f "$TRUFFLEHOG_COUNT" "$TRUFFLEHOG_PRECOMMIT_ARGS"
 status=0
-PATH="$BIN_DIR:$PATH" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
+# Pinned-first (JOV-13084): PATH no longer supplies the scanner; the explicit
+# GITLEAKS_BIN override is the only way to inject the stub.
+PATH="$BIN_DIR:$PATH" GITLEAKS_BIN="$BIN_DIR/gitleaks" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/pre-commit.output" 2>&1 \
   || status=$?
 [[ $status -eq 0 ]] || fail "pre-commit scenario returned $status"

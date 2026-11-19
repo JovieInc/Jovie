@@ -92,4 +92,17 @@ printf '# empty\n' >"$ROOT/pins.txt"
 DOCKER_PAYLOAD="$ROOT/good-bin" CURL_MODE=504 run unpinned
 [[ $RC -ne 0 ]] || fail "unpinned tool must fail closed"
 
+# 8. Pin completeness (JOV-13084): every pinned tool/version needs rows for
+# linux and darwin on both architectures, checked against the REAL
+# scanner-pins.txt (not the fixture pins above) so a platform gap that would
+# block a lane fails this test before it ships.
+PINS_FILE="$HERE/scanner-pins.txt"
+while read -r tool version; do
+  for plat in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+    awk -v t="$tool" -v v="$version" -v p="$plat" \
+      '$1 !~ /^#/ && $1 == t && $2 == v && $3 == p { found = 1; exit } END { exit found ? 0 : 1 }' \
+      "$PINS_FILE" || fail "pin-completeness: missing row $tool $version $plat"
+  done
+done < <(awk '$1 !~ /^#/ && NF >= 4 { print $1, $2 }' "$PINS_FILE" | sort -u)
+
 echo "fetch-scanner.test.sh: ok"
