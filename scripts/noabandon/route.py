@@ -7,6 +7,9 @@ budgeted client (`python3 -m apiclient gh --priority repair -- ...`). Linear del
 shared apiclient LinearClient with the SAME LINEAR_API_KEY secret linear-sync-on-merge.yml uses — the
 external-api guard keeps provider hosts inside scripts/apiclient, and no new secret is added.
 
+# api-budget: github-user-core 12/hr - per routed red event (relay wake): one comments read, one jobs read, up to three annotation reads, one files read, one comment write, at most one label write and one dispatch, all at repair priority
+# api-budget: linear-requests 6/hr - one handoff comment per linear-delivered lane change, only when the holder changes
+
 Calls per event (budget): 1 comments read, 1 jobs read, <=3 annotation reads, 1 workflow-state read,
 1 files read, 1 comment write, <=1 label write (only when a new lease is granted), <=1 dispatch.
 No polling: lease expiry of OTHER items is checked lazily by invariant.py on the same wake, bounded
