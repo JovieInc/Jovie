@@ -871,11 +871,16 @@ Needs-human, obsolete and ladder-exhausted share one PR comment marked
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
 via `lane-fix-escalating` / `lane-fix-exhausted`.
 
-Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
-fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
-it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
-`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
-issues drain first.
+Non-PR intake files one Linear issue immediately (JOV-13077, Tim 2026-11-19: Linear is the
+single source of truth): one issue per fingerprint, labeled `remediation`, `agent-ready` and
+`ws:ci` / `ws:release-deploy` / `ws:reliability`, created through the deterministic-UUID
+fence in `pr_events.ensure_linear_intake`. A recurrence with new evidence updates the same
+issue with one occurrence comment. No GitHub issue is created; when a context has no Linear
+client (the hosted relay before the workflow half exports `LANES_LINEAR_APP_ENV`) the intake
+defers visibly and the next derivation re-files it — never a GitHub fallback. Legacy GitHub
+intake issues (including ones `main-red-remediate.mjs` still files) convert once via
+`convert_intake` after the 30-minute claim window and then close. `ws:ci` is the first
+workstream rank, so those issues drain first.
 
 ### Label contract (`remediation:<fingerprint>`)
 

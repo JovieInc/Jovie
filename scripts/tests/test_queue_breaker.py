@@ -12,6 +12,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -188,28 +189,23 @@ class MainPoisonTest(unittest.TestCase):
         self.assertIn("gh down", out["main-poison"][0]["error"])
         self.assertEqual(out["tripped"], [])
 
-    def test_real_filing_path_uses_the_runner_convention_and_a_convertible_fingerprint(self):
-        """The fakes above bypass pr_events; this drives the real _file_intake -> upsert_intake. The sweep's runner
-        takes argv without `gh` (run_gh prepends it), and convert_intake only parses hex fingerprints."""
+    def test_real_filing_path_files_linear_and_never_uses_github(self):
+        """The fakes above bypass pr_events; this drives the real _file_intake -> upsert_intake.
+        JOV-13077: the intake files Linear directly — there is no `gh issue` argv to mis-route —
+        and convert-style fingerprints stay pure hex."""
         import re
-        qb, world_calls, intake_calls = load_breaker(), [], []
+        from scripts.tests.test_pr_events import FakeIntakeLinear, events as pr_events
+        qb, world_calls = load_breaker(), []
         world = poisoned_world(world_calls, [1, 2, 3])
-        def run(args, **kw):
-            args = list(args)
-            if args[:2] == ["issue", "list"] or args[:2] == ["issue", "create"]:
-                intake_calls.append(args)
-                out = "[]" if args[1] == "list" else "https://github.com/JovieInc/Jovie/issues/9001\n"
-                return SimpleNamespace(returncode=0, stdout=out, stderr="")
-            return world(args, **kw)
+        linear = FakeIntakeLinear()
         with tempfile.TemporaryDirectory() as raw:
-            out = qb.sweep(Path(raw), run, NOW)
-        self.assertEqual([c[:2] for c in intake_calls], [["issue", "list"], ["issue", "create"]])
-        self.assertTrue(all(c[0] != "gh" for c in intake_calls), "runner must not see a leading gh")
-        self.assertEqual(out["main-poison"][0]["issue"], 9001)
-        body = intake_calls[1][intake_calls[1].index("--body") + 1]
-        self.assertRegex(body, r"<!-- symphony-remediation fingerprint=([0-9a-f]+) -->")
-        fp = re.search(r"fingerprint=([0-9a-f]+) -->", body).group(1)
-        self.assertEqual(fp, out["main-poison"][0]["fingerprint"])
+            with patch.object(pr_events, "relay_linear_client", return_value=linear):
+                out = qb.sweep(Path(raw), world, NOW)
+        self.assertEqual(len(linear.creates), 1)
+        self.assertTrue(all(c[0] != "gh" for c in world_calls), "the lanes runner never sees a leading gh")
+        filed = out["main-poison"][0]
+        self.assertRegex(filed["fingerprint"], r"^[0-9a-f]+$")
+        self.assertEqual(filed["issue"], linear.destination(filed["fingerprint"]))
 
     def test_an_unfiled_signal_is_retried_next_sweep(self):
         qb, filed = load_breaker(), []

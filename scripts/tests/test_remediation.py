@@ -798,6 +798,22 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
 
+    def test_intake_occurrence_is_stable_across_identical_evidence_and_moves_with_it(self):
+        """JOV-13077: one recurrence comment per distinct occurrence; re-derived incidents
+        (a new first_seen every pass) must not comment per pass."""
+        event = {"source": "deploy", "fingerprint": "abc", "ws": "release-deploy",
+                 "subject": {"sha": "abc", "deployment": "production"},
+                 "evidence": {"url": "https://example.test/deploy/1", "excerpt": "boom"}}
+        self.assertEqual(remediation.intake_occurrence(event),
+                         remediation.intake_occurrence(deepcopy(event)))
+        moved = {**deepcopy(event), "first_seen": "2026-11-19T01:00:00Z"}
+        self.assertEqual(remediation.intake_occurrence(event), remediation.intake_occurrence(moved))
+        new_evidence = {**deepcopy(event), "evidence": {"url": "https://example.test/deploy/2", "excerpt": "boom"}}
+        self.assertNotEqual(remediation.intake_occurrence(event), remediation.intake_occurrence(new_evidence))
+        body = remediation.intake_recurrence_body(event)
+        self.assertIn("Symphony remediation intake recurred (deploy).", body)
+        self.assertIn(f"<!-- symphony-remediation-occurrence:{remediation.intake_occurrence(event)} -->", body)
+
     def test_registry_hyperagent_is_a_remote_only_regular_lane(self):
         # JOV-7706: Hyperagent is enabled, on a deliberate auto-mode agent id, but it cannot
         # continue a local worktree, so handoff and escalation never pick it.

@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.tests.test_pr_events import NOW, Shell, events, fake_lane
+from scripts.tests.test_pr_events import NOW, FakeIntakeLinear, Shell, events, fake_lane
 
 
 def iso_at(epoch):
@@ -82,11 +82,15 @@ class RedRepairTest(unittest.TestCase):
             self.assertEqual(added, [])
             self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
 
-    def test_an_infra_incident_files_one_issue_and_repairs_nothing(self):
-        added, shell = self.relay(peers=range(10, 15))  # 5 peers + this PR = 6 > INFRA_PEERS
-        self.assertEqual(added, [(900, events.remediation.INTAKE_LABEL)])
+    def test_an_infra_incident_files_one_linear_issue_and_repairs_nothing(self):
+        linear = FakeIntakeLinear()
+        with patch.object(events, "relay_linear_client", return_value=linear):
+            added, shell = self.relay(peers=range(10, 15))  # 5 peers + this PR = 6 > INFRA_PEERS
+        fingerprint = events.remediation.fingerprint(["infra-incident", "Source Validation"])
+        self.assertEqual(added, [(linear.destination(fingerprint), events.remediation.INTAKE_LABEL)])
         self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], "zero repairs")
-        self.assertEqual(len(shell.made("gh", "issue", "create")), 1)
+        self.assertEqual(shell.made("gh", "issue", "create"), [], "no GitHub issue (JOV-13077)")
+        self.assertEqual(len(linear.creates), 1)
         below, _ = self.relay(peers=range(10, 14))  # 4 peers + this PR = 5: not an incident
         self.assertEqual(below, [(5, "red")])
         red_repair = events.red_repair
@@ -108,17 +112,20 @@ class RedRepairTest(unittest.TestCase):
             page = {"data": {"repository": {"pullRequests": {
                 "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [node(n) for n in range(1, count + 1)]}}}}
             api = self.gh(**gh)
+            linear = FakeIntakeLinear()
             shell = Shell({("gh", "issue", "list"): [], ("gh", "issue", "create"): "https://github.com/x/issues/901",
                            ("gh", "api"): lambda args: page if "states:OPEN,first:50" in " ".join(args) else api(args)})
             with tempfile.TemporaryDirectory() as tmp:
-                record = events.reconcile(SimpleNamespace(state=Path(tmp)), fake_lane(shell), lambda: None, NOW, force=True)
-            return record, shell
+                record = events.reconcile(SimpleNamespace(state=Path(tmp)), fake_lane(shell), lambda: linear, NOW, force=True)
+            return record, shell, linear
 
-        record, shell = sweep(2)
+        record, shell, _ = sweep(2)
         self.assertEqual(sorted(record["labeled"]), [(1, "red"), (2, "red")], "the sweep is the hour's check-in")
-        record, shell = sweep(2, main="failure")
+        record, shell, _ = sweep(2, main="failure")
         self.assertEqual(record["labeled"], [])
         self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
-        record, shell = sweep(6)
+        record, shell, linear = sweep(6)
         self.assertEqual(record["labeled"], [], "six PRs red on one check inside 30 min is one incident")
-        self.assertEqual(len(shell.made("gh", "issue", "create")), 1)
+        # JOV-13077: the incident files one Linear intake, never a GitHub issue.
+        self.assertEqual(len(linear.creates), 1)
+        self.assertEqual(shell.made("gh", "issue", "create"), [])

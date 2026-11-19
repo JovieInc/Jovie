@@ -1078,6 +1078,28 @@ def intake_body(event: dict) -> str:
     ])
 
 
+def intake_occurrence(event: dict) -> str:
+    """Stable identity of one intake occurrence (JOV-13077): identical evidence updates the
+    fingerprint's Linear issue once; new evidence (a new URL, a new failure description)
+    records one more occurrence. first_seen is excluded on purpose — a re-derived incident
+    (the reconcile sweep re-checks a live incident every pass) must not comment per pass."""
+    evidence = event.get("evidence") or {}
+    return fingerprint([event.get("source"), str(event.get("subject")), str(evidence.get("url") or ""),
+                        str(evidence.get("excerpt") or "")])
+
+
+def intake_recurrence_body(event: dict) -> str:
+    evidence = event.get("evidence") or {}
+    return "\n".join([
+        f"Symphony remediation intake recurred ({event.get('source')}).",
+        f"Workstream: `ws:{event.get('ws')}`",
+        f"Subject: `{event.get('subject')}`",
+        f"Evidence: {evidence.get('url') or 'n/a'}",
+        str(evidence.get("excerpt") or "")[:800],
+        f"<!-- {INTAKE_LABEL}-occurrence:{intake_occurrence(event)} -->",
+    ])
+
+
 def claim_open(updated_at: float | None, now: float) -> bool:
     return updated_at is not None and now - updated_at < CLAIM_WINDOW_S
 

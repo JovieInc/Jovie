@@ -1245,37 +1245,73 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
     return cleared + added
 
 
-def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
-    """One GitHub issue per fingerprint. A hit inside 30 minutes is the claim window."""
-    now = time.time() if now is None else now
-    marker = f"fingerprint={event.get('fingerprint')}"
-    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
-                 "--limit", "50", "--json", "number,body,updatedAt"])
+_UNSET = object()  # upsert_intake(linear=...) default: construct the client from the environment
+
+
+def relay_linear_client():
+    """The lane Linear client from this process's environment, or None when this context
+    cannot file Linear (JOV-13077). The lane host keeps the app credential at the default
+    path; the hosted relay gains one only when the workflow half exports LANES_LINEAR_APP_ENV.
+    There is no GitHub-issue fallback: an unavailable client defers the intake visibly and
+    the next derivation of the same fingerprint re-files it."""
     try:
-        rows = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
-    except (ValueError, AttributeError):
-        rows = []
-    if not isinstance(rows, list):
-        rows = []
-    for row in rows:
-        if not isinstance(row, dict) or marker not in (row.get("body") or ""):
-            continue
-        return None  # one record per fingerprint; the tick converts after the claim window
-    created = sh(["gh", "issue", "create", "--repo", REPO,
-                  "--title", remediation.linear_intake_plan(event)["title"][:80],
-                  "--body", remediation.intake_body(event),
-                  "--label", remediation.INTAKE_LABEL])
-    found = re.search(r"/issues/(\d+)", created.stdout or "")
-    if not found:
+        from lane_runner import Linear  # function-level: lane_runner imports this module
+        return Linear()
+    except Exception:  # noqa: BLE001 - no credential, no state dir or no module: defer
         return None
-    # Touch nothing else inside the claim window; updatedAt on the new issue starts it.
-    if remediation.claim_open(now, now + 1):
-        return int(found.group(1))
-    return int(found.group(1))
+
+
+def upsert_intake(event: dict, sh=run, now: float | None = None, linear=_UNSET) -> str | None:
+    """File the remediation intake on Linear now (JOV-13077: Linear is the single source of
+    truth). One Linear issue per fingerprint — ensure_linear_intake fences the create with a
+    deterministic UUID — and a recurrence with new evidence updates the same issue with one
+    occurrence comment instead of filing again. No GitHub issue is created: without a Linear
+    client the intake defers visibly and never falls back to `gh issue create`. Legacy GitHub
+    intake issues still convert once (convert_intake)."""
+    del sh, now  # call compatibility: the fingerprint is the only identity; no clock to race
+    fingerprint = event.get("fingerprint")
+    if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
+        return None
+    if linear is _UNSET:
+        linear = relay_linear_client()
+    if linear is None:
+        print(f"intake deferred: fingerprint {fingerprint} has no Linear client in this context "
+              "(JOV-13077); nothing filed, no GitHub issue created", file=sys.stderr)
+        return None
+    try:
+        team = linear_intake_team(linear)
+        destination = intake_destination(team["id"], fingerprint)
+        existing = linear_intake_issue(linear, team["id"], fingerprint, destination)
+        if not existing:
+            return ensure_linear_intake(linear, event) or None
+        update_intake_recurrence(linear, existing, event)
+        return existing
+    except Exception as error:  # noqa: BLE001 - a cooled-down or erroring Linear defers visibly
+        print(f"intake deferred: fingerprint {fingerprint} could not reach Linear "
+              f"({type(error).__name__}: {error}); nothing filed, no GitHub issue created",
+              file=sys.stderr)
+        return None
+
+
+def update_intake_recurrence(linear, issue_id: str, event: dict) -> None:
+    """A repeated fingerprint updates its one Linear issue once per distinct occurrence
+    (JOV-13077): identical evidence re-upserts silently, new evidence records one comment."""
+    marker = f"<!-- {remediation.INTAKE_LABEL}-occurrence:{remediation.intake_occurrence(event)} -->"
+    try:
+        data = linear.gql('query($i:String!,$m:String!){issue(id:$i){comments(filter:{body:{contains:$m}},first:5){nodes{body}}}}',
+                          {"i": issue_id, "m": marker})
+        nodes = (((data or {}).get("issue") or {}).get("comments") or {}).get("nodes") or []
+        if any(isinstance(note, dict) and marker in (note.get("body") or "") for note in nodes):
+            return
+        linear.gql('mutation($i:String!,$b:String!){commentCreate(input:{issueId:$i,body:$b}){success}}',
+                   {"i": issue_id, "b": remediation.intake_recurrence_body(event)})
+    except Exception:  # noqa: BLE001 - the issue exists; the next occurrence re-attempts the comment
+        return
 
 
 def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
-    """After the 30-minute claim window, one Linear issue per fingerprint. No new secret."""
+    """Legacy staging only (JOV-13077): after the 30-minute claim window, one Linear issue per
+    fingerprint, linked once, then the GitHub issue closes. No new secret."""
     listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
                  "--limit", "30", "--json", "number,title,body,updatedAt"])
     try:
@@ -1333,14 +1369,28 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
         except Exception:
             continue
         if not issue_id or issue_id in linked_ids:
+            if issue_id and issue_id in linked_ids:
+                close_legacy_intake(row["number"], sh)  # converted on an earlier tick; finish the close
             continue
+        comment_ok = False
         try:
-            sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
-                f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+            posted = sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
+                         f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+            comment_ok = getattr(posted, "returncode", 1) == 0
         except (OSError, subprocess.SubprocessError):
             pass  # The canonical Linear destination remains recoverable next tick.
+        if comment_ok:
+            close_legacy_intake(row["number"], sh)
         linked.append(row["number"])
     return linked or None
+
+
+def close_legacy_intake(number: int, sh=run) -> bool:
+    """Convert-once cleanup (JOV-13077): the GitHub intake issue was only ever a staging
+    surface; Linear holds the record now."""
+    closed = sh(["gh", "issue", "close", str(number), "--repo", REPO, "--comment",
+                 "Linear issue filed; Linear is the source of truth for remediation intake (JOV-13077)."])
+    return closed.returncode == 0
 
 
 def ensure_linear_intake(linear, event: dict) -> str | None:
@@ -1348,12 +1398,8 @@ def ensure_linear_intake(linear, event: dict) -> str | None:
     fingerprint = event.get("fingerprint")
     if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
         return None
-    team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
-                      {})["teams"]["nodes"][0]
-    # Linear accepts a client-supplied UUID v4. Its unique entity ID is the
-    # cross-host fence, including a committed create whose response was lost.
-    digest = hashlib.sha256(f"symphony-remediation:{REPO}:{team['id']}:{fingerprint}".encode()).digest()
-    issue_id = str(uuid.UUID(bytes=digest[:16], version=4))
+    team = linear_intake_team(linear)
+    issue_id = intake_destination(team["id"], fingerprint)
     existing = linear_intake_issue(linear, team["id"], fingerprint, issue_id)
     if existing:
         return existing
@@ -1383,6 +1429,19 @@ def ensure_linear_intake(linear, event: dict) -> str | None:
     return linear_intake_issue(linear, team["id"], fingerprint, issue_id)
 
 
+def linear_intake_team(linear) -> dict:
+    """The JOV team node (id, states, labels) remediation intake files against."""
+    return linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                      {})["teams"]["nodes"][0]
+
+
+def intake_destination(team_id: str, fingerprint: str) -> str:
+    """Linear accepts a client-supplied UUID v4. Its unique entity ID is the
+    cross-host fence, including a committed create whose response was lost."""
+    digest = hashlib.sha256(f"symphony-remediation:{REPO}:{team_id}:{fingerprint}".encode()).digest()
+    return str(uuid.UUID(bytes=digest[:16], version=4))
+
+
 def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -> str | None:
     """Only a complete, bounded authoritative inventory can authorize creation."""
     marker = f"Fingerprint: `{fingerprint}`"
@@ -1404,7 +1463,11 @@ def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -
             if stamp is None:
                 raise ValueError("intake-inventory-unreadable")
             uuid.UUID(row["id"])
-            bound = row["description"].startswith(f"Symphony remediation intake (intake).\n{marker}\n")
+            # Intake files under its real source word (deploy, sentry, infra-incident, ...).
+            # The destination fence is the fingerprint marker plus the repository marker,
+            # not the source word.
+            bound = re.match(r"Symphony remediation intake \([^)\n]*\)\.\n" + re.escape(marker) + r"\n",
+                             row["description"]) is not None
             repository = re.search(r"<!-- symphony-remediation-repository:([^ ]+) -->", row["description"])
             bound = bound and (repository.group(1) == REPO if repository else REPO == "JovieInc/Jovie")
             if row["id"] == issue_id and not bound:
@@ -2665,8 +2728,14 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     for number, failing in red_heads.items():
         failures = merge_failures(failures, number, failing)
     incidents = red_repair.incident_checks(failures, now)
-    for check in sorted(incidents):  # one fingerprinted intake per check, zero repairs for it
-        upsert_intake(red_repair.incident_event(check, incidents[check], now), lane.sh, now)
+    if incidents:  # one Linear intake per check, fingerprint-deduped (JOV-13077); no GitHub issue
+        try:
+            incident_linear = linear_factory()
+        except Exception:
+            incident_linear = None
+        for check in sorted(incidents):
+            upsert_intake(red_repair.incident_event(check, incidents[check], now), lane.sh, now,
+                          linear=incident_linear)
     for number, failing in red_heads.items():
         if not set(failing) & set(incidents) and add_label(number, "red", lane.sh):
             labeled.append((number, "red"))
@@ -2931,6 +3000,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"#{number} enroll wake dispatched")
         elif kind == "enroll-wake-failed":
             print(f"#{number} enroll wake dispatch failed", file=sys.stderr)
+        elif isinstance(number, str):
+            print(f"linear intake {number} ({kind})")
         else:
             print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import concurrent.futures
+import io
 import threading
 import uuid
 import json
@@ -958,25 +959,41 @@ class RelayTest(unittest.TestCase):
         ]
         self.assertEqual(events.backlog_targets(prs, {"claude"}), [(1, "green"), (2, "orphan")])
 
-    def test_main_ci_failure_opens_one_intake_issue_without_a_new_secret(self):
+    def test_main_ci_failure_files_one_linear_intake_without_a_github_issue(self):
+        """JOV-13077: intake files Linear immediately; no GitHub issue is ever created."""
         run = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
                "head_sha": "abc", "pull_requests": [], "html_url": "https://example.test/run/1",
                "updated_at": "2026-10-02T00:00:00Z"}
         payload = {"workflow_run": run}
         event = events.remediation.non_pr_event("workflow_run", payload)
-        shell = Shell({("gh", "issue", "list"): [],
-                       ("gh", "issue", "create"): "https://github.com/JovieInc/Jovie/issues/4242\n"})
-        added = events.relay("workflow_run", payload, shell, set())
-        self.assertEqual(added, [(4242, "symphony-remediation")])
-        self.assertIn(event["fingerprint"], " ".join(shell.made("gh", "issue", "create")[0]))
-        again = Shell({("gh", "issue", "list"): [{
-            "number": 4242, "body": events.remediation.intake_body(event),
-            "updatedAt": "2026-10-02T00:00:00Z"}]})
-        self.assertEqual(events.relay("workflow_run", payload, again, set()), [])
-        self.assertEqual(again.made("gh", "issue", "create"), [])
-        sentry = events.remediation.event_from_sentry({"issue_id": "S1", "message": "boom", "url": "https://s"})
-        self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
-        self.assertIsNone(events.remediation.event_from_sentry({}))
+        linear = FakeIntakeLinear()
+        shell = Shell({})
+        with patch.object(events, "relay_linear_client", return_value=linear):
+            added = events.relay("workflow_run", payload, shell, set())
+        self.assertEqual(added, [(linear.destination(event["fingerprint"]), "symphony-remediation")])
+        self.assertEqual(shell.made("gh", "issue", "create"), [])
+        self.assertEqual(shell.made("gh", "issue", "list"), [])
+        self.assertEqual(len(linear.creates), 1)
+        self.assertIn(event["fingerprint"], linear.creates[0]["description"])
+        # A second failure of the same fingerprint updates the one Linear issue.
+        with patch.object(events, "relay_linear_client", return_value=linear):
+            again = events.relay("workflow_run", payload, shell, set())
+        self.assertEqual(again, [(linear.destination(event["fingerprint"]), "symphony-remediation")])
+        self.assertEqual(len(linear.creates), 1)
+        self.assertEqual(len(linear.comments), 1)
+
+    def test_relay_without_a_linear_client_defers_and_never_falls_back_to_github(self):
+        """JOV-13077: no Linear client (hosted relay before the workflow half) defers visibly."""
+        run = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+               "head_sha": "abc", "pull_requests": [], "html_url": "https://example.test/run/1",
+               "updated_at": "2026-10-02T00:00:00Z"}
+        shell = Shell({})
+        with patch.object(events, "relay_linear_client", return_value=None), \
+                patch.object(sys, "stderr", io.StringIO()) as stderr:
+            added = events.relay("workflow_run", {"workflow_run": run}, shell, set())
+        self.assertEqual(added, [])
+        self.assertEqual(shell.made("gh", "issue", "create"), [])
+        self.assertIn("intake deferred", stderr.getvalue())
 
     def test_schedule_failure_fingerprint_ignores_head_sha(self):
         """JOV-8044: a recurring scheduled red must dedupe to one intake event.
@@ -1086,6 +1103,9 @@ class IntakeConversionTest(unittest.TestCase):
                 self.assertEqual(len(linear.creates), 1)
                 expected_comments = 2 if failed else 1
                 self.assertEqual(len(shell.made('gh', 'issue', 'comment')), expected_comments)
+                # The GitHub intake issue closes once the Linear link is on record (JOV-13077).
+                expected_closes = 0 if failed else 2  # tick two re-closes while the fixture still lists it
+                self.assertEqual(len(shell.made('gh', 'issue', 'close')), expected_closes)
 
     def test_committed_unknown_create_is_recovered_without_a_second_mutation(self):
         linear, shell = self.linear(unknown=True), self.shell()
@@ -1115,6 +1135,8 @@ class IntakeConversionTest(unittest.TestCase):
         self.assertIsNone(self.convert(linear, shell))
         self.assertFalse(linear.creates)
         self.assertFalse(shell.made('gh', 'issue', 'comment'))
+        # Already converted on an earlier tick: the leftover GitHub issue still closes once.
+        self.assertEqual(len(shell.made('gh', 'issue', 'close')), 1)
 
     def test_unbound_body_or_comment_marker_cannot_suppress_a_due_intake(self):
         for hint in ('Quoted explanation of linear-issue-id: syntax',
@@ -1214,6 +1236,109 @@ class IntakeConversionTest(unittest.TestCase):
         linear = self.linear()
         self.assertIsNone(self.convert(linear, self.shell(body='unbound remediation')))
         self.assertFalse(linear.creates)
+
+
+class FakeIntakeLinear:
+    """Linear GraphQL subset the intake filing path uses: teams, issue inventory, create,
+    occurrence comments. Records every mutation for assertions."""
+
+    def __init__(self, existing=()):
+        self.rows = {row["id"]: {**row, "comments": list(row.get("comments") or [])} for row in existing}
+        self.creates, self.comments, self.reads = [], [], []
+
+    def destination(self, fingerprint: str) -> str:
+        return events.intake_destination("team", fingerprint)
+
+    def gql(self, query, variables):
+        self.reads.append(query)
+        if "teams(" in query:
+            return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
+                    "labels": {"nodes": [{"id": name, "name": name} for name in events.remediation.intake_labels("ci")]}}]}}
+        if "issueCreate(" in query:
+            data = variables["i"]
+            self.creates.append(dict(data))
+            self.rows[data["id"]] = {"id": data["id"], "description": data["description"], "comments": []}
+            return {"issueCreate": {"success": True, "issue": {"id": data["id"]}}}
+        if "issues(" in query:
+            rows = [{"id": row["id"], "description": row["description"],
+                     "createdAt": row.get("createdAt", "2026-11-01T00:00:00Z")} for row in self.rows.values()]
+            return {"issues": {"nodes": rows, "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+        if "comments(filter:" in query:
+            issue = self.rows[variables["i"]]
+            return {"issue": {"comments": {"nodes": [{"body": body} for body in issue["comments"]
+                                                     if variables["m"] in body]}}}
+        if "commentCreate(" in query:
+            issue = self.rows[variables["i"]]
+            issue["comments"].append(variables["b"])
+            self.comments.append(variables["b"])
+            return {"commentCreate": {"success": True}}
+        raise AssertionError(query)
+
+
+class IntakeLinearFilingTest(unittest.TestCase):
+    """JOV-13077: remediation intake files Linear immediately, fingerprint-deduped, and never
+    creates a GitHub issue; without a Linear client it defers visibly."""
+    fingerprint = "feedbeef0001"
+
+    def event(self, **overrides) -> dict:
+        event = {"source": "deploy", "fingerprint": self.fingerprint, "ws": "release-deploy",
+                 "subject": {"sha": "abc", "deployment": "preview"},
+                 "evidence": {"url": "https://example.test/deploy/1", "excerpt": "preview failure"},
+                 "first_seen": "2026-11-19T00:00:00Z"}
+        event.update(overrides)
+        return event
+
+    def upsert(self, event, linear, shell=None, now=None):
+        with patch.object(events, "relay_linear_client", return_value=linear):
+            return events.upsert_intake(event, shell or Shell({}), now or NOW, linear=events._UNSET)
+
+    def test_files_linear_immediately_without_a_github_issue(self):
+        linear, shell = FakeIntakeLinear(), Shell({})
+        issue_id = self.upsert(self.event(), linear, shell)
+        self.assertEqual(issue_id, linear.destination(self.fingerprint))
+        self.assertEqual(shell.made("gh", "issue", "create"), [])
+        self.assertEqual(len(linear.creates), 1)
+        self.assertIn(f"Fingerprint: `{self.fingerprint}`", linear.creates[0]["description"])
+        self.assertIn("symphony-remediation-repository:JovieInc/Jovie", linear.creates[0]["description"])
+        self.assertIn("Symphony remediation intake (deploy).", linear.creates[0]["description"])
+
+    def test_recurrence_updates_one_issue_once_per_distinct_occurrence(self):
+        linear = FakeIntakeLinear()
+        self.assertEqual(self.upsert(self.event(), linear), linear.destination(self.fingerprint))
+        # Same fingerprint, new evidence: one issue, one recurrence comment.
+        self.assertEqual(self.upsert(self.event(evidence={"url": "https://example.test/deploy/2",
+                                                          "excerpt": "preview failure again"}), linear),
+                         linear.destination(self.fingerprint))
+        self.assertEqual(len(linear.creates), 1)
+        self.assertEqual(len(linear.comments), 1)
+        # Identical evidence again: still one comment (deduped by the occurrence marker).
+        self.assertEqual(self.upsert(self.event(evidence={"url": "https://example.test/deploy/2",
+                                                          "excerpt": "preview failure again"}), linear),
+                         linear.destination(self.fingerprint))
+        self.assertEqual(len(linear.comments), 1)
+
+    def test_without_a_linear_client_defers_visibly_and_never_uses_github(self):
+        shell = Shell({})
+        with patch.object(sys, "stderr", io.StringIO()) as stderr:
+            self.assertIsNone(events.upsert_intake(self.event(), shell, NOW, linear=None))
+        self.assertEqual(shell.made("gh", "issue", "create"), [])
+        self.assertIn("intake deferred", stderr.getvalue())
+
+    def test_unreachable_linear_defers_visibly_and_never_uses_github(self):
+        class Down:
+            def gql(self, query, variables):
+                raise OSError("linear unavailable")
+        shell = Shell({})
+        with patch.object(sys, "stderr", io.StringIO()) as stderr:
+            self.assertIsNone(events.upsert_intake(self.event(), Shell({}), NOW, linear=Down()))
+        self.assertIsNone(events.upsert_intake(self.event(), shell, NOW, linear=Down()))
+        self.assertEqual(shell.made("gh", "issue", "create"), [])
+        self.assertIn("intake deferred", stderr.getvalue())
+
+    def test_sentry_events_keep_their_normalized_shape(self):
+        sentry = events.remediation.event_from_sentry({"issue_id": "S1", "message": "boom", "url": "https://s"})
+        self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
+        self.assertIsNone(events.remediation.event_from_sentry({}))
 
 
 class QuotaRelayTest(unittest.TestCase):
