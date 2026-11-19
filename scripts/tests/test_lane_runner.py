@@ -9528,8 +9528,15 @@ class UpdateTest(unittest.TestCase):
                     with patch.object(lane.worktree_pool, "enabled", return_value=True), \
                             patch.object(lane.worktree_pool, "same_volume", return_value=True), \
                             patch.object(lane.worktree_pool, "claim") as claim:
-                        fresh = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0))
-                        self.assertEqual(lane.worktree_pool.take(host.repo, Path(tmp) / "other", None,
+                        dest = Path(tmp) / "other"
+                        def fresh(argv, **kwargs):
+                            installer = dest / "scripts/hooks/configure-git-hooks.sh"
+                            installer.parent.mkdir(parents=True, exist_ok=True)
+                            installer.write_text("#!/usr/bin/env bash\nexit 0\n")
+                            installer.chmod(0o755)
+                            return subprocess.CompletedProcess(argv, 0)
+                        fresh = unittest.mock.Mock(side_effect=fresh)
+                        self.assertEqual(lane.worktree_pool.take(host.repo, dest, None,
                                                                sh=fresh), "fresh")
                         claim.assert_not_called()
                         fresh.assert_called_once()
