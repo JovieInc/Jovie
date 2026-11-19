@@ -159,6 +159,7 @@ jobs:
           sparse-checkout: |
             scripts/lanes
             scripts/apiclient
+            scripts/noabandon
             packages/api-client/providers.json
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
@@ -195,7 +196,11 @@ jobs:
       # the swarm for that PR, in the same event, without waiting for a label or a sweep. The
       # swarm's prepare gate dedupes per head (handled, in flight, sensitive, budget).
       - name: Wake the PR Remediation Swarm for the failed head
+        # With the no-abandon router on, the router below decides the lane (it dispatches the swarm
+        # only when the swarm is the next rung AND its workflow is enabled); this step stays the
+        # path when the router is off, so turning NOABANDON_ENABLED off restores today exactly.
         if: >-
+          vars.NOABANDON_ENABLED != 'true' &&
           (github.event_name == 'workflow_run' &&
           github.event.workflow_run.event == 'pull_request' &&
           contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) &&
@@ -210,6 +215,30 @@ jobs:
           PYTHONPATH=scripts python3 -m apiclient gh --priority repair -- api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
             -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
           echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"
+
+      # Tim 2026-11-19 9:35 AM PT (no-abandonment): every red, dequeue or changes-requested event on a
+      # same-repo PR gets a lease and goes to the next worker on the ladder in this same event:
+      # original worker -> $0 deterministic fix -> swarm -> Gem lanes -> Hyperagent via Symphony ->
+      # owning agent (never Tim). A lane whose receiver is disabled is skipped and reported, never
+      # counted as handled (the swarm has been disabled since 2026-11-02 while this relay kept
+      # dispatching to it). Kill switch: repo variable NOABANDON_ENABLED (unset = off).
+      - name: Lease and route the red head (no-abandon)
+        if: >-
+          vars.NOABANDON_ENABLED == 'true' &&
+          ((github.event_name == 'workflow_run' &&
+            github.event.workflow_run.event == 'pull_request' &&
+            contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) &&
+            github.event.workflow_run.head_repository.full_name == github.repository &&
+            github.event.workflow_run.pull_requests[0].number != null) ||
+           (github.event_name == 'pull_request_target' && github.event.action == 'dequeued') ||
+           (github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOABANDON_ENABLED: ${{ vars.NOABANDON_ENABLED }}
+          SWARM_ENABLED: ${{ vars.SWARM_ENABLED || 'true' }}
+          # Reuse the exact Linear secret linear-sync-on-merge.yml already reads; never mint a new one.
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: PYTHONPATH=scripts python3 scripts/noabandon/route.py
 
   # Source Validation (workflow 369845917) is the pull_request gate.
   # ci.yml has no pull_request trigger, so a name == 'CI' wake never runs.
