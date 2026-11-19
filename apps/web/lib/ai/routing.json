@@ -1,6 +1,6 @@
 {
   "schema": "jovie.ai-routing/v1",
-  "updatedAt": "2026-11-01",
+  "updatedAt": "2026-11-19",
   "description": "Single source of truth for which provider serves which model call. Read by apps/web/lib/ai/routing.ts at runtime and by scripts/ai-routing-check.mjs, which flags drift between this file and the live Gateway report, Vercel env flags and the Workers AI relay. Change routing here, never in prose.",
   "providers": {
     "gateway": {
@@ -105,7 +105,7 @@
       "repo": "JovieInc/Jovie",
       "route": "workers-ai-only",
       "fallback": null,
-      "models": ["@cf/zai-org/glm-5.3-flash"],
+      "models": ["@cf/deepseek-ai/deepseek-v4.1-flash-1017"],
       "gatewayKey": null
     },
     {
@@ -114,7 +114,10 @@
       "repo": "JovieInc/Jovie",
       "route": "workers-ai-only",
       "fallback": null,
-      "models": ["@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash"],
+      "models": [
+        "@cf/zai-org/glm-5.3",
+        "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+      ],
       "gatewayKey": "Jovie_Development_20261026",
       "gatewayUsdPerDayMax": 0.1
     },
@@ -124,9 +127,9 @@
       "repo": "JovieInc/Jovie",
       "route": "workers-ai-only",
       "fallback": null,
-      "models": ["@cf/zai-org/glm-5.3-flash"],
+      "models": ["@cf/deepseek-ai/deepseek-v4.1-flash-1017"],
       "gatewayKey": null,
-      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
+      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Vision tier (JOV-13141): Cloudflare retired @cf/zai-org/glm-5.3-flash on 2026-11-20, replaced by @cf/deepseek-ai/deepseek-v4.1-flash-1017 (1M context, vision, function calling; $0.30/M input, $1.20/M output, $0.006/M cached input); @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
     },
     {
       "id": "dev.investor-eval",
