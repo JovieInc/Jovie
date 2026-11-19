@@ -590,8 +590,10 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
-    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Slop-test ratchet (2026-11-15; landmine rules 2026-11-19): no new focused,
+    // skipped, assertion-free, tautological, mock-only, snapshot-only, real-sleep,
+    // over-mocked, mocked-subject (interfere-inc/landmines rule A) or flake-mask
+    // (rules B/C: retry budgets, raised per-test timeouts) tests.
     // Existing ones are baselined per file and may only go down.
     id: 'test-hygiene',
     command:
