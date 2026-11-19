@@ -51,12 +51,7 @@ class PoolTest(unittest.TestCase):
             hook.write_text("#!/bin/sh\nexit 0\n")
             hook.chmod(0o755)
         installer = hooks / "configure-git-hooks.sh"
-        installer.write_text(
-            "#!/usr/bin/env bash\n"
-            "set -euo pipefail\n"
-            "root=$(git rev-parse --show-toplevel)\n"
-            'git -C "$root" config core.hooksPath .husky\n'
-        )
+        installer.write_text('#!/usr/bin/env bash\nset -euo pipefail\nroot=$(git rev-parse --show-toplevel)\ngit -C "$root" config core.hooksPath .husky\n')
         installer.chmod(0o755)
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-q", "-m", "one")
@@ -478,8 +473,6 @@ print(worktree_pool.fill(Path(sys.argv[2]), size=0, base="main", warm=False, roo
             with patch.object(Path, "home", return_value=Path(home)):
                 self.assertTrue(pool_mod.node_env(self.out)["PATH"].startswith(str(bin_dir)))
         self.assertEqual(pool_mod.node_env(self.out / "missing")["PATH"], os.environ["PATH"])
-
-
 
     def test_take_arms_tracked_git_hooks(self):
         dest = self.out / "hooked"
