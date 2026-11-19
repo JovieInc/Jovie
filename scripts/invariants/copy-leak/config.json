@@ -455,7 +455,12 @@
     { "path": "apps/web/lib/release-tasks/classify-task-cluster.ts", "rules": { "markdown": ["87c28acd86b2eb0f"] }, "reason": "Private model prompt context or review rubric; bullets and bracketed record IDs are intentional model input syntax." },
     { "path": "apps/web/lib/seo/surface-ratchet.ts", "rules": { "unresolved-prompt": ["a90863a413e3ee17"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
     { "path": "apps/web/lib/submission-agent/artifacts/email-package.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional list bullets in a separately generated text/plain email body; not stray Markdown rendered as copy." },
-    { "path": "apps/web/lib/tasks/chat-work-record.ts", "rules": { "placeholder": ["602fae580f5863ab"] }, "reason": "Actual tasks.status enum value todo; leave executable task-state behavior intact." }
+    { "path": "apps/web/lib/tasks/chat-work-record.ts", "rules": { "placeholder": ["602fae580f5863ab"] }, "reason": "Actual tasks.status enum value todo; leave executable task-state behavior intact." },
+    {
+      "path": "apps/web/review-findings/banned-values.json",
+      "rules": { "unresolved-prompt": ["425ed3e1c7ec7bc2", "1657a472c0b5f173"] },
+      "reason": "Machine lint-rule registry consumed by apps/web/scripts/lint-review-findings.mjs: the flagged strings are the rule's regex source and engineering justification, never rendered copy."
+    }
   ],
   "nonCopyValues": [
     { "source": "^(?:https?://|@/|(?:GET|POST|PUT|PATCH|DELETE) /|/|apps/|app/|packages/)[^\\s]+$", "reason": "URLs, module imports, route templates and GraphQL documents are machine syntax." },

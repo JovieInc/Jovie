@@ -5,9 +5,9 @@ import SentryExamplePage from './page';
 describe('SentryExamplePage', () => {
   it('renders the client Sentry capture scaffold without an all-caps eyebrow', () => {
     render(<SentryExamplePage />);
-    expect(screen.getByText('Sentry Example')).toBeTruthy();
+    expect(screen.getByText('Sentry Example')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Throw sample error' })
-    ).toBeTruthy();
+    ).toBeInTheDocument();
   });
 });
