@@ -129,9 +129,9 @@ describe('OnboardingChat states', () => {
 
     render(<OnboardingChat {...verified} intentId={intent.id} />);
 
-    const intro = await screen.findByTestId('onboarding-empty-intro');
-    expect(intro).toHaveAttribute('data-entry-mode', 'prompt_handoff');
-
+    // The restored intent auto-sends through the real submit path. (The
+    // prompt_handoff empty intro is transient — once the starter send fires,
+    // the view swaps to the transcript — so the send itself is the proof.)
     await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
     expect(chat.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'Plan a release for my new EP' })
@@ -165,6 +165,35 @@ describe('OnboardingChat states', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeEnabled();
     expect(chat.sendMessage).not.toHaveBeenCalled();
+
+    // The full less-personalized entry includes the default walkthrough:
+    // the canonical starter pills are offered instead of a bare composer.
+    expect(screen.getAllByTestId('onboarding-starter-suggestion')).toHaveLength(
+      4
+    );
+  });
+
+  it('starts the conversation from a walkthrough pill when no intent is present', async () => {
+    // Walking the fallback: the visitor with no stored intent clicks a
+    // starter pill and the real submit path sends its canonical prompt —
+    // the /start entry never dead-ends on an empty chat.
+    const user = userEvent.setup();
+    render(
+      <OnboardingChat
+        {...verified}
+        intentId='11111111-1111-4111-8111-111111111111'
+      />
+    );
+
+    const pills = await screen.findAllByTestId('onboarding-starter-suggestion');
+    await user.click(pills[0]!);
+
+    await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    expect(chat.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "I'm an artist — help me find my Spotify profile.",
+      })
+    );
   });
 
   it('lands in the full onboarding entry when the stored intent expired', async () => {

@@ -68,37 +68,34 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
     expect(stored.expiresAt).toBeGreaterThan(Date.now());
   });
 
-  test('golden path: a real homepage intent restores and auto-sends on /start', async ({
+  test('no-intent /start renders the default walkthrough and a pill starts the chat', async ({
     page,
   }) => {
-    // The full signup-intent golden path with REAL intent — captured by the
-    // homepage UI, never seeded or injected: submit on / → /start?intent_id=
-    // → the onboarding chat restores the intent into the composer and sends
-    // the first turn with it.
-    const input = await openHomepageIntentInput(page);
+    // Fix B (signup-intent A/B fallback): a visitor whose signup carried no
+    // intent — no intent_id, nothing stored, no starter_prompt — must land
+    // in the full less-personalized onboarding: the default walkthrough
+    // pills, never an empty chat or a bare composer. No seeding, no
+    // injection: the walkthrough is the production blank-entry state.
+    await page.goto('/start');
 
-    await page.getByRole('button', { name: 'Plan A Release' }).click();
-    await input.pressSequentially('my new EP');
-    await input.press('Enter');
+    const walkthrough = page.getByTestId('onboarding-starter-walkthrough');
+    await expect(walkthrough).toBeVisible();
+    const pills = page.getByTestId('onboarding-starter-suggestion');
+    await expect(pills).toHaveCount(4);
+    await expect(pills.first()).toHaveText('Find My Spotify Artist');
 
-    await page.waitForURL(/\/start/);
+    await pills.first().click();
 
-    const htmlPrompt = 'Plan a release for my new EP';
-    const composer = page.getByLabel('Chat Message Input');
+    // The pill sends its canonical prompt through the real submit path:
+    // the chat is non-empty with the visitor's first turn.
+    const prompt = "I'm an artist — help me find my Spotify profile.";
     const userBubble = page.getByTestId('chat-user-bubble');
-    let composerHeld = false;
     await expect
       .poll(async () => {
         if ((await userBubble.count()) > 0) {
           const bubbleText = await userBubble.first().innerText();
-          if (bubbleText.includes(htmlPrompt)) return 'text';
+          if (bubbleText.includes(prompt)) return 'text';
         }
-        if ((await composer.inputValue()) === htmlPrompt) {
-          if (composerHeld) return 'text';
-          composerHeld = true;
-          return 'pending';
-        }
-        composerHeld = false;
         return 'pending';
       })
       .toBe('text');
