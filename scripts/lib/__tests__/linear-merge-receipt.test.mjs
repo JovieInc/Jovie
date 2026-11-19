@@ -264,6 +264,65 @@ describe('merge receipt writes (JOV-13075)', () => {
     }
   });
 
+  it('keeps the LYB state mapping configurable and held away from terminal states', async () => {
+    const { world, fetchImpl } = linearWorld({
+      teamKey: 'LYB',
+      identifier: 'LYB-42',
+    });
+    world.issue.team.states.nodes.push({ id: 'state-done', name: 'Done' });
+    const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-lyb-hold-'));
+    try {
+      const result = await writeLinearMergeReceipt({
+        env: {
+          LINEAR_API_KEY: 'lin_test',
+          GITHUB_EVENT_PATH: writeEvent(
+            dir,
+            eventPayload({ title: 'fix: thing (LYB-42)' })
+          ),
+          // An override cannot point a held team at a terminal state.
+          LINEAR_MERGED_STATE_NAMES: JSON.stringify({ LYB: 'Done' }),
+        },
+        fetchImpl,
+        log: () => {},
+      });
+      expect(result.action).toBe('receipt');
+      expect(result.key).toBe('LYB-42');
+      // Held: the receipt lands but the state never jumps to Done.
+      expect(world.stateUpdates).toEqual([]);
+      expect(world.issue.state.name).toBe('In Review');
+      expect(world.comments).toHaveLength(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('honors a LINEAR_MERGED_STATE_NAMES override for a non-held team', async () => {
+    const { world, fetchImpl } = linearWorld();
+    world.issue.team.states.nodes.push({
+      id: 'state-shipped',
+      name: 'Shipped',
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-override-'));
+    try {
+      const result = await writeLinearMergeReceipt({
+        env: {
+          LINEAR_API_KEY: 'lin_test',
+          GITHUB_EVENT_PATH: writeEvent(
+            dir,
+            eventPayload({ body: '<!-- linear-issue-identifier:JOV-1 -->' })
+          ),
+          LINEAR_MERGED_STATE_NAMES: JSON.stringify({ JOV: 'Shipped' }),
+        },
+        fetchImpl,
+        log: () => {},
+      });
+      expect(result.action).toBe('receipt');
+      expect(world.stateUpdates).toEqual(['Shipped']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('skips visibly without secrets (fork pull request)', async () => {
     const { world, fetchImpl } = linearWorld();
     const dir = mkdtempSync(join(tmpdir(), 'merge-receipt-fork-'));

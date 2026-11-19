@@ -28,12 +28,47 @@ export const MERGE_RECEIPT_MARKER = 'linear-merge-receipt/v1';
 /** Teams whose issues this writer receipts. */
 export const TEAM_KEYS = ['JOV', 'LYB', 'SYM'];
 /** The per-team state a merged pull request lands in. A team without a
- * state of this name gets the receipt comment without the state move. */
+ * state of this name gets the receipt comment without the state move.
+ * LYB is HELD pending Grok's Linear workflow-state audit (Tim, 2026-11-19
+ * 10:24 AM PT): its mapping stays configurable and may never resolve to a
+ * direct Done move until the audited names arrive. */
 export const TEAM_MERGED_STATE_NAME = {
   JOV: 'Merging',
   LYB: 'Merging',
   SYM: 'Merging',
 };
+/** Teams whose merged-state mapping is held pending an audit. A held team
+ * skips the state move when the resolved target would be a terminal state. */
+export const STATE_MAPPING_HELD_TEAMS = new Set(['LYB']);
+
+/**
+ * The merged-state name for a team: `LINEAR_MERGED_STATE_NAMES` (a JSON
+ * object of TEAM -> state name) overrides the default map, so a mapping
+ * stays configurable without a code edit.
+ *
+ * @param {string} teamKey
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string}
+ */
+export function mergedStateNameFor(teamKey, env = process.env) {
+  let overrides = {};
+  try {
+    overrides = JSON.parse(env.LINEAR_MERGED_STATE_NAMES ?? '{}') ?? {};
+  } catch {
+    overrides = {};
+  }
+  const fromEnv =
+    overrides && typeof overrides === 'object'
+      ? /** @type {{ JOV?: unknown, LYB?: unknown, SYM?: unknown }} */ (
+          overrides
+        )[/** @type {'JOV' | 'LYB' | 'SYM'} */ (teamKey)]
+      : undefined;
+  if (typeof fromEnv === 'string' && fromEnv) return fromEnv;
+  return (
+    TEAM_MERGED_STATE_NAME[/** @type {'JOV' | 'LYB' | 'SYM'} */ (teamKey)] ??
+    'Merging'
+  );
+}
 
 const KEY_TOKEN_RE = /^(JOV|LYB|SYM)-([1-9]\d*)$/i;
 const TITLE_KEY_RE = /\b((?:JOV|LYB|SYM)-[1-9]\d*)(?![A-Za-z0-9-])/i;
@@ -336,10 +371,13 @@ export async function writeLinearMergeReceipt(options = {}) {
     sleep
   );
   const teamKey = String(issue.team?.key ?? '').toUpperCase();
-  const stateTarget =
-    TEAM_MERGED_STATE_NAME[teamKey] ?? TEAM_MERGED_STATE_NAME.JOV;
+  const stateTarget = mergedStateNameFor(teamKey, env);
+  // Tim 2026-11-19: the LYB mapping is held pending Grok's workflow-state
+  // audit. A held team never moves to a terminal state; it keeps its receipt
+  // and stays in place until the audited names arrive.
+  const held = STATE_MAPPING_HELD_TEAMS.has(teamKey);
   const target = (issue.team?.states?.nodes ?? []).find(
-    state => state.name === stateTarget
+    state => state.name === stateTarget && !(held && state.name === 'Done')
   );
   let movedTo = '';
   if (!target?.id) {
