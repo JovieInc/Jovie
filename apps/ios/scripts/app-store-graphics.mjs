@@ -23,6 +23,8 @@ import {
   budgetRecap,
   CAPTURE_BUDGET_MS,
   guardScreenStart,
+  LAUNCH_TIMEOUT_MS,
+  SCREEN_DEADLINE_MS,
   settleDeadline,
   sleep,
   withDeadline,
@@ -417,14 +419,14 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
 /** Launch one fixture on the simulator and settle its capture. */
 async function launchAndSettle({ udid, file, spec, screen, settleMs }) {
   runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
-  run('xcrun', [
-    'simctl',
-    'launch',
-    udid,
-    BUNDLE_ID,
-    screen.launchArgument,
-    'UITest',
-  ]);
+  // simctl launch is synchronous and blocks the event loop; a cold first
+  // launch on a hosted runner has measured 158s, so it is bounded here rather
+  // than being allowed to grind into the CI step timeout invisibly.
+  run(
+    'xcrun',
+    ['simctl', 'launch', udid, BUNDLE_ID, screen.launchArgument, 'UITest'],
+    { timeout: LAUNCH_TIMEOUT_MS }
+  );
   return captureSettled({ udid, file, spec, screen, settleMs });
 }
 
@@ -511,12 +513,17 @@ async function capture({
       startedAt,
     };
     const screenMs = guardScreenStart({ budgetMs, ...recap });
+    // withDeadline takes a RELATIVE duration: grant the full screen window
+    // from when the settle timer actually starts (after the synchronous
+    // launch), clamped to the capture budget's end.
+    const screenDurationMs =
+      Math.min(screenMs, Date.now() + SCREEN_DEADLINE_MS) - Date.now();
     const file = join(rawDir, `${screen.id}.png`);
     let buffer;
     try {
       buffer = await withDeadline(
         captureScreen({ udid, file, spec, screen, settleMs }),
-        screenMs,
+        screenDurationMs,
         `${screen.id} capture`
       );
     } catch (error) {

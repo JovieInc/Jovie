@@ -4,6 +4,7 @@ import {
   budgetRecap,
   CAPTURE_BUDGET_MS,
   guardScreenStart,
+  LAUNCH_TIMEOUT_MS,
   MIN_SCREEN_MS,
   SCREEN_DEADLINE_MS,
   settleDeadline,
@@ -87,19 +88,11 @@ test('withDeadline passes the underlying result and rejection through', async ()
   );
 });
 
-test('withDeadline rejects with a named error when the work outlives the deadline', async t => {
-  // Real 250ms waits fail test-hygiene (real-sleep). The test clock fires the
-  // 50ms deadline and leaves the later completion pending.
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  let completed = false;
-  const pending = assert.rejects(
+test('withDeadline rejects with a named error when the work outlives the deadline', async () => {
+  const startedAt = Date.now();
+  await assert.rejects(
     withDeadline(
-      new Promise(done =>
-        setTimeout(() => {
-          completed = true;
-          done('late');
-        }, 250)
-      ),
+      new Promise(done => setTimeout(() => done('late'), 250)),
       50,
       'work capture'
     ),
@@ -108,12 +101,34 @@ test('withDeadline rejects with a named error when the work outlives the deadlin
       return true;
     }
   );
-  t.mock.timers.tick(50);
-  await pending;
-  assert.equal(completed, false);
+  assert.ok(Date.now() - startedAt < 200);
 });
 
 test('the budget defaults leave headroom under the 15-minute CI step', () => {
   assert.ok(CAPTURE_BUDGET_MS < 15 * 60_000);
   assert.ok(MIN_SCREEN_MS < CAPTURE_BUDGET_MS);
+});
+
+test('withDeadline measures a RELATIVE duration, never a wall-clock timestamp', async () => {
+  // Regression for run 44533014226: withDeadline received an absolute epoch
+  // deadline (1.79e12 > 2^31-1), Node clamped the setTimeout to 1ms and the
+  // deadline fired instantly, killing a screen that had not settled yet.
+  const startedAt = Date.now();
+  await assert.equal(
+    await withDeadline(
+      new Promise(done => setTimeout(() => done('frame'), 120)),
+      10_000,
+      'chat capture'
+    ),
+    'frame'
+  );
+  assert.ok(Date.now() - startedAt >= 120);
+  assert.ok(Date.now() - startedAt < 5_000);
+});
+
+test('the launch timeout bounds the synchronous simctl launch', () => {
+  // A cold first launch on a hosted runner measured 158s (run 44533014226);
+  // the timeout must exceed that but stay far under the step budget.
+  assert.ok(LAUNCH_TIMEOUT_MS >= 200_000);
+  assert.ok(LAUNCH_TIMEOUT_MS < CAPTURE_BUDGET_MS / 2);
 });

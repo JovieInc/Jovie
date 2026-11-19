@@ -19,6 +19,9 @@ export const SCREEN_DEADLINE_MS = 300_000;
 /** A screen needs at least this much remaining budget to start. */
 export const MIN_SCREEN_MS = 60_000;
 
+/** Cap for one synchronous `simctl launch` (a cold first launch can take minutes). */
+export const LAUNCH_TIMEOUT_MS = 300_000;
+
 export const sleep = ms => new Promise(done => setTimeout(done, ms));
 
 /** Waiting-budget multiple for one screen's settle loop. */
@@ -75,9 +78,12 @@ export function guardScreenStart({
 }
 
 /**
- * Reject when `promise` outlives `ms`, without losing its earlier rejection.
- * The abandoned promise's failure is swallowed (`.catch(() => {})` on the
- * detached branch only) so the deadline error is the one that surfaces.
+ * Reject when `promise` outlives `ms` — a RELATIVE duration in milliseconds,
+ * never a wall-clock timestamp. (Passing an epoch deadline overflows
+ * setTimeout's 32-bit range, Node clamps it to 1ms, and the deadline fires
+ * instantly — the run-44533014226 failure.) The abandoned promise's failure
+ * is swallowed (`.catch(() => {})` on the detached branch only) so the
+ * deadline error is the one that surfaces.
  */
 export function withDeadline(promise, ms, label) {
   let timer;
