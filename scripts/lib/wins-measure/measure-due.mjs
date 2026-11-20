@@ -22,6 +22,13 @@ import { measureJsonFile } from './json-file.mjs';
  */
 
 /**
+ * Soft adapter failures (missing creds / empty cohort). The win stays
+ * pending-measure so a later run can retry — never partial-receipt.
+ */
+const SOFT_SKIP =
+  /AI_GATEWAY_API_KEY is not set|no tag row for feature:|store not configured/i;
+
+/**
  * Split due wins into queryable vs needs-probe (no measurement yet).
  * @param {object[]} wins
  * @param {number} [nowMs]
@@ -58,8 +65,6 @@ export function dueMeasurePlan(wins, nowMs = Date.now(), hours = 24) {
  *   measureGateway?: typeof measureGatewayReport,
  *   apiKey?: string,
  *   fetchImpl?: typeof fetch,
- *   at?: string,
- *   sha?: string | null,
  * }} [deps]
  */
 async function measureOne(metric, classified, deps = {}) {
@@ -79,6 +84,10 @@ async function measureOne(metric, classified, deps = {}) {
 
 /**
  * Measure every due queryable win. Needs-probe dues are listed, not receipted.
+ * Receipts are atomic per win: only appended when every queryable metric on
+ * that win succeeds. A partial success must not drop `pending-measure`, or
+ * remaining metrics are permanently excluded from `dueMeasurements`.
+ *
  * Mutates `wins` in place when receipts are appended (caller persists).
  *
  * @param {object[]} wins
@@ -120,11 +129,19 @@ export async function measureDueWins(wins, opts = {}) {
   for (const win of wins) {
     if (!dueIds.has(win.id)) continue;
     if (isNeedsProbeWin(win)) continue;
+
+    /** @type {MeasureAction[]} */
+    const winSkips = [];
+    /** @type {Array<MeasureAction & { value: number, evidence: string }>} */
+    const winMeasured = [];
+    /** @type {MeasureAction[]} */
+    const winErrors = [];
+
     for (const metric of win.metrics ?? []) {
       if (metric.before === null) continue;
       const classified = classifyMetric(metric);
       if (classified.adapter === 'needs-probe') {
-        skipped.push({
+        winSkips.push({
           id: win.id,
           metric: metric.name,
           adapter: 'needs-probe',
@@ -134,46 +151,55 @@ export async function measureDueWins(wins, opts = {}) {
       }
       try {
         const result = await measureOne(metric, classified, opts);
-        measured.push({
+        winMeasured.push({
           id: win.id,
           metric: metric.name,
           adapter: classified.adapter,
           value: result.value,
           evidence: result.evidence,
         });
-        if (!opts.dryRun) {
-          win.receipts = win.receipts ?? [];
-          win.receipts.push({
-            metric: metric.name,
-            value: result.value,
-            at,
-            evidence: result.evidence,
-            sha,
-          });
-        }
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
-        // Missing credentials / empty gateway cohorts are skips, not job failures.
-        // Real parse/shape bugs stay in `errors` so --strict CI can fail closed.
-        if (
-          /AI_GATEWAY_API_KEY is not set|no tag row for feature:|store not configured/i.test(
-            reason
-          )
-        ) {
-          skipped.push({
-            id: win.id,
-            metric: metric.name,
-            adapter: classified.adapter,
-            reason,
-          });
-        } else {
-          errors.push({
-            id: win.id,
-            metric: metric.name,
-            adapter: classified.adapter,
-            reason,
-          });
-        }
+        const row = {
+          id: win.id,
+          metric: metric.name,
+          adapter: classified.adapter,
+          reason,
+        };
+        if (SOFT_SKIP.test(reason)) winSkips.push(row);
+        else winErrors.push(row);
+      }
+    }
+
+    skipped.push(...winSkips);
+    // Queryable metrics that soft-skipped or errored leave the win incomplete.
+    // Do not append any receipts — winStatus must stay pending-measure.
+    const queryableAttempted = winMeasured.length + winSkips.filter(
+      s => s.adapter !== 'needs-probe'
+    ).length + winErrors.length;
+    const incomplete =
+      winErrors.length > 0 ||
+      winSkips.some(s => s.adapter !== 'needs-probe') ||
+      (queryableAttempted > 0 && winMeasured.length < queryableAttempted);
+
+    if (incomplete) {
+      errors.push(...winErrors);
+      // Soft skips already in `skipped`; drop buffered successes so the report
+      // does not claim a receipt that was not persisted.
+      continue;
+    }
+
+    measured.push(...winMeasured);
+    if (!opts.dryRun && winMeasured.length) {
+      win.receipts = win.receipts ?? [];
+      for (const row of winMeasured) {
+        win.receipts.push({
+          metric: row.metric,
+          value: row.value,
+          at,
+          evidence: row.evidence,
+          sha,
+        });
       }
     }
   }

@@ -217,8 +217,91 @@ test('measure-due: missing gateway key is a skip, not a hard error', async () =>
     },
   });
   assert.equal(report.errors.length, 0);
+  assert.equal(report.measured.length, 0);
   assert.equal(report.skipped[0].adapter, 'gateway-report');
   assert.match(report.skipped[0].reason, /AI_GATEWAY_API_KEY/);
+  assert.equal(win.receipts.length, 0);
+  assert.equal(winStatus(win), 'pending-measure');
+});
+
+test('measure-due: partial queryable failure writes no receipts (stays pending-measure)', async () => {
+  const win = pending({
+    id: 'win-2026-10-20-multi',
+    metrics: [
+      {
+        name: 'requests',
+        unit: 'count',
+        better: 'lower',
+        before: 100,
+        after: 40,
+        source: 'Gateway report feature:golden-path-review',
+        query: 'node scripts/ai-gateway-report.mjs',
+      },
+      {
+        name: 'spend',
+        unit: 'usd',
+        better: 'lower',
+        before: 3,
+        after: 1,
+        source: 'Gateway report feature:golden-path-review',
+        query: 'node scripts/ai-gateway-report.mjs',
+      },
+    ],
+  });
+  let calls = 0;
+  const report = await measureDueWins([win], {
+    nowMs: dueNow,
+    measureGateway: async ({ field }) => {
+      calls += 1;
+      if (field === 'requests')
+        return { value: 40, evidence: 'gateway requests' };
+      throw new Error('gateway boom');
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(report.measured.length, 0);
+  assert.equal(report.errors.length, 1);
+  assert.match(report.errors[0].reason, /gateway boom/);
+  assert.equal(win.receipts.length, 0);
+  assert.equal(winStatus(win), 'pending-measure');
+});
+
+test('measure-due: all queryable metrics succeed atomically', async () => {
+  const win = pending({
+    id: 'win-2026-10-20-multi-ok',
+    metrics: [
+      {
+        name: 'requests',
+        unit: 'count',
+        better: 'lower',
+        before: 100,
+        after: 40,
+        source: 'Gateway report feature:golden-path-review',
+        query: 'node scripts/ai-gateway-report.mjs',
+      },
+      {
+        name: 'spend',
+        unit: 'usd',
+        better: 'lower',
+        before: 3,
+        after: 1,
+        source: 'Gateway report feature:golden-path-review',
+        query: 'node scripts/ai-gateway-report.mjs',
+      },
+    ],
+  });
+  const report = await measureDueWins([win], {
+    nowMs: dueNow,
+    at: '2026-10-21T12:00:00Z',
+    measureGateway: async ({ field }) =>
+      field === 'requests'
+        ? { value: 40, evidence: 'gateway requests' }
+        : { value: 1, evidence: 'gateway spend' },
+  });
+  assert.equal(report.measured.length, 2);
+  assert.equal(report.errors.length, 0);
+  assert.equal(win.receipts.length, 2);
+  assert.equal(winStatus(win), 'verified');
 });
 
 test('shipping-slo workflow measures due wins into the store after the snapshot', () => {
