@@ -138,7 +138,7 @@ const penSorted = [...penBlocks].sort((a, b) => a.y - b.y);
 const renderSorted = [...renderBlocks].sort((a, b) => a.y - b.y);
 if (penSorted.length === renderSorted.length)
 return penSorted.reduce((max, block, i) => Math.max(max, Math.abs(block.y - renderSorted[i].y)), 0);
-if (Math.min(penSorted.length, renderSorted.length) / Math.max(penSorted.length, renderSorted.length) < 0.5) return 1;
+if (Math.min(penSorted.length, renderSorted.length) / Math.max(penSorted.length, renderSorted.length) < 0.75) return 1;
 const nearest = (src, dst) => src.reduce((max, a) =>
 Math.max(max, dst.reduce((best, b) => Math.min(best, Math.abs(a.y - b.y)), 1)), 0);
 return Math.max(nearest(penSorted, renderSorted), nearest(renderSorted, penSorted)); }

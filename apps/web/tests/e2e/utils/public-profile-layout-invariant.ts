@@ -335,7 +335,15 @@ export async function auditPublicProfileLayout(page: Page) {
       const homeOverview = visible(
         '[data-testid="profile-desktop-home-overview"]'
       )[0];
-      if (scrollPane && homeOverview && scrollPane.scrollTop <= 1) {
+      // At standard desktop heights (--profile-desktop-min-height: 720px ->
+      // un-bannered surface >= 660px), home overview cards must fit above the
+      // scrollport fold; shorter viewports (e.g. 1920x600) scroll vertically.
+      if (
+        surfaceBox.height >= 660 &&
+        scrollPane &&
+        homeOverview &&
+        scrollPane.scrollTop <= 1
+      ) {
         const scrollBox = scrollPane.getBoundingClientRect();
         const overviewCards = visible(
           '[data-testid="profile-desktop-secondary-grid"] > section, [data-testid="profile-desktop-side-rail"] > section'

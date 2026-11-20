@@ -110,4 +110,30 @@ export function registerProfileNameAdmissionTests() {
       )
     ).toContain('artist_name_clipped');
   });
+
+  test('deliberate red detects a desktop overview card clipped at the 1280x720 fold', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/renders/profile-admission?layout=public&state=claimed', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'desktop');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    await page
+      .getByTestId('profile-desktop-secondary-grid')
+      .evaluate(column => {
+        const lastCard = column.querySelector('section:last-of-type');
+        if (!(lastCard instanceof HTMLElement)) {
+          throw new Error('desktop overview card missing');
+        }
+        lastCard.style.minHeight = '420px';
+      });
+    expect(
+      (await auditPublicProfileLayout(page)).violations.map(
+        violation => violation.code
+      )
+    ).toContain('desktop_card_clipped_at_fold');
+  });
 }
