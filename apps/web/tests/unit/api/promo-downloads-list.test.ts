@@ -23,8 +23,17 @@ vi.mock('@/lib/auth/require-auth', () => ({
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: hoisted.getSessionContextMock,
 }));
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: vi.fn(),
+}));
 vi.mock('@/lib/db', () => ({ db: { select: hoisted.selectMock } }));
-vi.mock('@/lib/db/schema/content', () => ({ discogReleases: {} }));
+vi.mock('@/lib/db/schema/content', () => ({
+  discogReleases: {},
+  discogRecordings: {},
+  discogReleaseTracks: {},
+  recordingArtists: {},
+  releaseArtists: {},
+}));
 vi.mock('@/lib/db/schema/promo-downloads', () => ({
   promoDownloads: {
     id: 'pd.id',
