@@ -67,7 +67,16 @@ vi.mock('@/lib/leads/funnel-events', () => ({
 }));
 
 vi.mock('@/lib/referrals/service', () => ({
+  activateReferral: vi.fn().mockResolvedValue(undefined),
   expireReferralOnChurn: mockExpireReferralOnChurn,
+}));
+
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  markClaimVerificationsPaid: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/waitlist/paid-admission', () => ({

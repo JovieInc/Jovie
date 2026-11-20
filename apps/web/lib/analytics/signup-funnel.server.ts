@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { realJourneyJ } from '@/lib/acquisition/synthetic-traffic';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -342,12 +343,16 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
     const [wowResult, turnsResult] = await Promise.all([
       db.execute(drizzleSql`
         WITH journeys AS (
-          SELECT acquisition_id,
-                 min(occurred_at) FILTER (WHERE stage = 'start') AS started_at,
-                 min(occurred_at) FILTER (WHERE stage = 'catalog-preview') AS wow_at
-          FROM acquisition_journey_stages
-          WHERE stage IN ('start', 'catalog-preview') AND occurred_at >= ${since}
-          GROUP BY acquisition_id
+          SELECT s.acquisition_id,
+                 min(s.occurred_at) FILTER (WHERE s.stage = 'start') AS started_at,
+                 min(s.occurred_at) FILTER (WHERE s.stage = 'catalog-preview') AS wow_at
+          FROM acquisition_journey_stages s
+          INNER JOIN acquisition_journeys j ON j.id = s.acquisition_id
+          WHERE s.stage IN ('start', 'catalog-preview')
+            AND s.occurred_at >= ${since}
+            AND j.consent_revoked_at IS NULL
+            AND ${realJourneyJ()}
+          GROUP BY s.acquisition_id
         ), timed AS (
           SELECT extract(epoch FROM wow_at - started_at) AS seconds
           FROM journeys
@@ -362,7 +367,7 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
       `),
       db.execute(drizzleSql`
         WITH sessions AS (
-          SELECT max((${serverAnalyticsEvents.properties}->>'turn_index')::int) + 1 AS turns
+          SELECT GREATEST(max((${serverAnalyticsEvents.properties}->>'turn_index')::int), 1) AS turns
           FROM ${serverAnalyticsEvents}
           WHERE ${serverAnalyticsEvents.eventName} = 'onboarding_reply'
             AND ${serverAnalyticsEvents.occurredAt} >= ${since}

@@ -90,18 +90,21 @@ export function useOnboardingClaim(
   useEffect(() => {
     if (!enabled || !isLoaded || !isSignedIn) return;
     if (claimedRef.current) return;
-    if (completedTriggersRef.current.has(claimTrigger)) return;
+    const completedTriggers = completedTriggersRef.current;
+    const inflightTriggers = inflightTriggersRef.current;
+    if (completedTriggers.has(claimTrigger)) return;
     // Prevent duplicate in-flight requests for the same trigger value.
     // This guards against React re-running the effect before the fetch
     // resolves (e.g. Clerk auth state updates: isLoaded false→true, then
     // isSignedIn false→true on the same claimTrigger value).
-    if (inflightTriggersRef.current.has(claimTrigger)) return;
-    inflightTriggersRef.current.add(claimTrigger);
+    if (inflightTriggers.has(claimTrigger)) return;
+    inflightTriggers.add(claimTrigger);
 
     let cancelled = false;
+    let retryTimerId: ReturnType<typeof setTimeout> | null = null;
     const markTriggerCompleted = () => {
-      completedTriggersRef.current.add(claimTrigger);
-      inflightTriggersRef.current.delete(claimTrigger);
+      completedTriggers.add(claimTrigger);
+      inflightTriggers.delete(claimTrigger);
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
@@ -184,7 +187,8 @@ export function useOnboardingClaim(
 
       if (body.retryAfterWebhook && attempt < MAX_RETRIES) {
         setStatus('retry-after-webhook');
-        setTimeout(() => {
+        retryTimerId = setTimeout(() => {
+          retryTimerId = null;
           if (!cancelled) void attemptClaim(attempt + 1);
         }, RETRY_DELAY_MS);
         return;
@@ -265,6 +269,13 @@ export function useOnboardingClaim(
 
     return () => {
       cancelled = true;
+      if (retryTimerId !== null) {
+        clearTimeout(retryTimerId);
+        retryTimerId = null;
+      }
+      if (!completedTriggers.has(claimTrigger)) {
+        inflightTriggers.delete(claimTrigger);
+      }
     };
     // `router` is intentionally excluded from deps. useRouter() returns a
     // stable singleton in Next.js App Router — including it would cause

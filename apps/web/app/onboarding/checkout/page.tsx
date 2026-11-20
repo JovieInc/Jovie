@@ -17,8 +17,13 @@ import {
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
+import {
+  readClaimVerification,
+  requiresClaimVerification,
+} from '@/lib/claim/claim-verification';
 import { PRICING } from '@/lib/config/pricing';
-import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
+import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
+import { resolveOnboardingCheckoutCatalog } from '@/lib/onboarding/catalog-preview.server';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   hasOnboardingUpgradeOfferState,
@@ -57,6 +62,24 @@ function resolvePriceIds(plan: PlanIntentTier): {
   }
 }
 
+function readStoredCatalogPreview(
+  settings: unknown
+): OnboardingCatalogPreview | null {
+  if (!settings || typeof settings !== 'object') return null;
+  const onboarding = (settings as Record<string, unknown>).onboarding;
+  if (!onboarding || typeof onboarding !== 'object') return null;
+  const preview = (onboarding as Record<string, unknown>).catalogPreview;
+  if (!preview || typeof preview !== 'object') return null;
+  const candidate = preview as { total?: unknown; releases?: unknown };
+  if (
+    typeof candidate.total !== 'number' ||
+    !Array.isArray(candidate.releases)
+  ) {
+    return null;
+  }
+  return preview as OnboardingCatalogPreview;
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function OnboardingCheckoutPage({
@@ -84,6 +107,7 @@ export default async function OnboardingCheckoutPage({
         avatarUrl={null}
         spotifyFollowers={1200}
         isDefaultUpsell
+        profileLive
         proofFindings={[]}
       />
     );
@@ -154,11 +178,22 @@ export default async function OnboardingCheckoutPage({
   // JOV-8068: a truthful "your profile is live" upsell requires a claimed,
   // completed, public profile — not just any row selected by the dashboard.
   let profileLive = false;
+  let storedCatalog: OnboardingCatalogPreview | null = null;
+  let heldLowReachSpotifyId: string | null = null;
 
   try {
     const dashboardData = await getDashboardData();
     const profile = dashboardData.selectedProfile;
     if (profile) {
+      const settings = (profile as Record<string, unknown>).settings;
+      storedCatalog = readStoredCatalogPreview(settings);
+      const heldVerification = readClaimVerification(settings);
+      if (
+        heldVerification &&
+        !requiresClaimVerification(heldVerification.reach.value)
+      ) {
+        heldLowReachSpotifyId = heldVerification.spotifyArtistId;
+      }
       profileData = {
         id: profile.id ?? null,
         displayName: profile.displayName || '',
@@ -181,7 +216,8 @@ export default async function OnboardingCheckoutPage({
   // Paying never publishes a page; proof does. A free-admission page that is
   // waiting for proof may still check out, and says so plainly.
   const proofPending = Boolean(
-    authResult.dbUserId && (await hasProofPendingProfile(authResult.dbUserId))
+    authResult.dbUserId &&
+      (await hasProofPendingProfile(authResult.dbUserId, profileData.id))
   );
 
   // Smart plan recommendation only for organic users with no expressed paid intent.
@@ -243,12 +279,15 @@ export default async function OnboardingCheckoutPage({
   }
 
   // JOV-7794: the paywall carries the visitor's own computed proof.
-  // JOV-9758: and their real catalog, above the price.
+  // JOV-9758: and their real catalog, above the price (including stored
+  // <50k unproven claim previews before Spotify identity attaches).
+  const catalogSpotifyId = profileData.spotifyId ?? heldLowReachSpotifyId;
   const [proofFindings, catalog] = await Promise.all([
     profileData.id ? loadClaimTimeProof(profileData.id) : Promise.resolve([]),
-    profileData.spotifyId
-      ? fetchOnboardingCatalogPreview(profileData.spotifyId)
-      : Promise.resolve(null),
+    resolveOnboardingCheckoutCatalog({
+      storedCatalog,
+      spotifyArtistId: catalogSpotifyId,
+    }),
   ]);
 
   return (
@@ -264,6 +303,7 @@ export default async function OnboardingCheckoutPage({
       avatarUrl={profileData.avatarUrl}
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
+      profileLive={profileLive}
       proofFindings={proofFindings}
       proofPending={proofPending}
       catalog={catalog}
