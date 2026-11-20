@@ -60,6 +60,32 @@ describe('you-proof fixture', () => {
     expect(plan.blockers[0]).toMatch(/owned by someone@example.com/i);
   });
 
+  it('blocks when the owner already has a different profile', () => {
+    const plan = planYouProofSeed({
+      ownerEmail: 'tim@jov.ie',
+      handleRow: {
+        profileId: 'p-you',
+        ownerEmail: 'tim@jov.ie',
+        username: 'you',
+        displayName: null,
+        bio: null,
+        isPublic: true,
+        isClaimed: true,
+      },
+      ownerProfile: {
+        profileId: 'p-other',
+        ownerEmail: 'tim@jov.ie',
+        username: 'tim',
+        displayName: 'Tim',
+        bio: null,
+        isPublic: true,
+        isClaimed: true,
+      },
+      existingSocialPlatforms: new Set(),
+    });
+    expect(plan.blockers[0]).toMatch(/different profile/i);
+  });
+
   it('plans profile + social inserts for an owned empty proof page', () => {
     const plan = planYouProofSeed({
       ownerEmail: 'tim@jov.ie',
@@ -89,8 +115,8 @@ describe('you-proof fixture', () => {
       display_name: YOU_PROOF_FIXTURE.displayName,
       bio: YOU_PROOF_FIXTURE.bio,
       is_public: true,
-      is_claimed: true,
     });
+    expect(plan.profileUpdates[0]?.set).not.toHaveProperty('is_claimed');
     expect(plan.socialLinks.every(link => link.action === 'insert')).toBe(true);
   });
 
@@ -121,6 +147,8 @@ describe('you-proof fixture', () => {
     });
     expect(plan.blockers).toEqual([]);
     expect(plan.profileUpdates).toEqual([]);
-    expect(plan.socialLinks.every(link => link.action === 'keep')).toBe(true);
+    expect(plan.socialLinks.every(link => link.action === 'unchanged')).toBe(
+      true
+    );
   });
 });

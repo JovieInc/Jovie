@@ -96,7 +96,8 @@ export interface YouProofSocialLinkPlan {
   readonly url: string;
   readonly displayText: string;
   readonly sortOrder: number;
-  readonly action: 'insert' | 'keep';
+  /** `unchanged` = platform row already present; `insert` = add fixture row. */
+  readonly action: 'insert' | 'unchanged';
 }
 
 export interface YouProofPlan {
@@ -155,18 +156,19 @@ export function planYouProofSeed(params: {
     );
   }
 
-  if (blockers.length > 0) {
+  const current = params.handleRow;
+  if (!current || blockers.length > 0) {
     return { profileUpdates: [], socialLinks: [], blockers };
   }
 
-  const current = params.handleRow!;
+  // is_claimed is set by the product claim path; ProfileUpdateData cannot
+  // write it. Seed only converges public identity fields.
   const desired: Record<string, YouProofSeedValue> = {
     username: fixture.handle,
     username_normalized: fixture.handle,
     display_name: fixture.displayName,
     bio: fixture.bio,
     is_public: true,
-    is_claimed: true,
   };
   const currentByColumn: Record<string, YouProofSeedValue> = {
     username: current.username,
@@ -174,7 +176,6 @@ export function planYouProofSeed(params: {
     display_name: current.displayName,
     bio: current.bio,
     is_public: current.isPublic,
-    is_claimed: current.isClaimed,
   };
   const changed = Object.fromEntries(
     Object.entries(desired).filter(
@@ -199,7 +200,7 @@ export function planYouProofSeed(params: {
       displayText: link.displayText,
       sortOrder: link.sortOrder,
       action: params.existingSocialPlatforms.has(link.platform)
-        ? 'keep'
+        ? 'unchanged'
         : 'insert',
     })
   );
