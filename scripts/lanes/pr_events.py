@@ -557,6 +557,10 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     # until that check's own completion.
     if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
+    # Eject holds may be labeled as github-actions[bot] after GITHUB_TOKEN failover;
+    # the status receipt still owns the episode until a new head.
+    if eject_held(pr.get("headRefOid"), sh) is not False:
+        return False
     # JOV-8492: this rollup can only supersede a red the relay itself applied (see label_episodes.py).
     # Reconcile gap-fill (jovie-bot) clears on the host sweep — see reconcile unlabel.
     if label_episode_applier(number, LANE_FIX_RED, sh) != RELAY_RED_LABELLER:
@@ -1166,9 +1170,12 @@ FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
 # main-red-eject failing-head posts this on the dequeued head (durable without comments).
 EJECT_HOLD_CONTEXT = "jovie-merge-group-eject-hold/v1"
 FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
+# App-quota failover retries eject writes with GITHUB_TOKEN → github-actions[bot] (Sentry LOW #26143).
+EJECT_HOLD_WRITERS = FAILURE_HOLD_WRITERS | {RELAY_RED_LABELLER, "github-actions"}
 
 
-def _hold_receipt_logins(sha: str | None, context: str, sh=run) -> set[str] | None:
+def _hold_receipt_logins(sha: str | None, context: str, sh=run,
+                         writers: frozenset[str] = FAILURE_HOLD_WRITERS) -> set[str] | None:
     """Creator logins for a successful commit-status hold receipt. None = unreadable."""
     if not sha:
         return set()
@@ -1179,7 +1186,7 @@ def _hold_receipt_logins(sha: str | None, context: str, sh=run) -> set[str] | No
     ])
     if listed.returncode != 0:
         return None
-    return set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS
+    return set((listed.stdout or "").split()) & writers
 
 
 def failure_held(sha: str | None, sh=run) -> bool:
@@ -1192,7 +1199,7 @@ def failure_held(sha: str | None, sh=run) -> bool:
 
 def eject_held(sha: str | None, sh=run) -> bool | None:
     """main-red-eject failing-head labeled this exact head. None = unreadable (fail closed)."""
-    writers = _hold_receipt_logins(sha, EJECT_HOLD_CONTEXT, sh)
+    writers = _hold_receipt_logins(sha, EJECT_HOLD_CONTEXT, sh, writers=EJECT_HOLD_WRITERS)
     return None if writers is None else bool(writers)
 
 
@@ -2619,12 +2626,14 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
             head_oid = (by_number.get(number) or {}).get("headRefOid")
             if (breaker_held.get(str(number)) or {}).get("head") == head_oid:
                 continue
+            # Check eject receipt before applier identity: App-quota failover can
+            # apply lane-fix-red as github-actions[bot] (RELAY_RED_LABELLER).
+            if eject_held(head_oid, lane.sh) is not False:
+                continue  # eject hold or unreadable statuses: keep
             applier = label_episode_applier(number, LANE_FIX_RED, lane.sh)
             if applier != RELAY_RED_LABELLER:
                 if applier is None or applier not in FAILURE_HOLD_WRITERS:
                     continue  # human / unreadable: fail closed
-                if eject_held(head_oid, lane.sh) is not False:
-                    continue  # eject hold or unreadable statuses: keep
                 # jovie-bot gap-fill with no merge-group evidence: clear
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:

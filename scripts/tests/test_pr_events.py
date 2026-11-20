@@ -2054,6 +2054,24 @@ class GapTest(unittest.TestCase):
             shell.calls,
         )
 
+    def test_reconcile_keeps_github_actions_eject_hold_after_token_failover(self):
+        # Sentry LOW #26143: eject App-quota failover labels as github-actions[bot].
+        # Relays clear that applier by default — eject_held must still protect the episode.
+        head = "e" * 40
+        row = {**self.node(11, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid=head),
+               "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+               "labels": {"nodes": [{"name": "lane-fix-red"}]}}
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                         "nodes": [row]}}}}
+        linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}})
+        shell = Shell({
+            ("gh", "api", "graphql"): red_episode_route(page, login="github-actions[bot]"),
+            ("gh", "api", f"repos/{events.REPO}/commits/{head}/statuses?per_page=100"): "github-actions[bot]",
+        })
+        events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
+                         "failover eject hold is not the sweep's to lift")
+
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
         claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
