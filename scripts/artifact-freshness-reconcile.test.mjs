@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  ARTIFACT_FRESHNESS_KEY,
   collectArtifactFreshness,
   desktopRelevantBetween,
+  fetchLatestProductionVerifiedSha,
+  observationFailureReceipt,
   pageSummerForFreshness,
+  resolveSummerForFreshness,
 } from './artifact-freshness-reconcile.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -20,6 +24,55 @@ test('desktopRelevantBetween is false for equal SHAs and true when git reports p
     execFileSync: () => '',
   });
   assert.equal(clean, false);
+});
+
+test('fetchLatestProductionVerifiedSha queries production-controller.yml not event=push', async () => {
+  const urls = [];
+  const result = await fetchLatestProductionVerifiedSha({
+    fetchImpl: async url => {
+      urls.push(String(url));
+      if (String(url).includes('/workflows/production-controller.yml/runs')) {
+        return {
+          ok: true,
+          json: async () => ({
+            workflow_runs: [
+              {
+                id: 11,
+                conclusion: 'success',
+                head_sha: SHA_B,
+                updated_at: '2026-11-20T00:00:00Z',
+              },
+            ],
+          }),
+        };
+      }
+      if (String(url).includes('/actions/runs/11/jobs')) {
+        return {
+          ok: true,
+          json: async () => ({
+            jobs: [
+              { name: 'Production Verified', conclusion: 'success' },
+            ],
+          }),
+        };
+      }
+      throw new Error(`unexpected url ${url}`);
+    },
+  });
+  assert.equal(result.status, 'known');
+  assert.equal(result.sourceRevision, SHA_B);
+  assert.match(urls[0], /workflows\/production-controller\.yml\/runs/);
+  assert.doesNotMatch(urls[0], /event=push/);
+});
+
+test('fetchLatestProductionVerifiedSha returns unknown on network failure', async () => {
+  const result = await fetchLatestProductionVerifiedSha({
+    fetchImpl: async () => {
+      throw new Error('boom');
+    },
+  });
+  assert.equal(result.status, 'unknown');
+  assert.match(result.reason, /boom/);
 });
 
 test('collectArtifactFreshness keeps installed/running unknown and pages on certified stall', async () => {
@@ -59,7 +112,26 @@ test('collectArtifactFreshness keeps installed/running unknown and pages on cert
   );
 });
 
-test('pageSummerForFreshness upserts once per mismatch set', async () => {
+test('collectArtifactFreshness returns red observation receipt when shipped fetch throws', async () => {
+  const receipt = await collectArtifactFreshness({
+    fetchImpl: async () => {
+      throw new Error('GitHub 503 for releases/latest');
+    },
+  });
+  assert.equal(receipt.red, true);
+  assert.match(
+    receipt.pageSummer.map(m => m.reason).join(' '),
+    /GitHub 503/
+  );
+});
+
+test('observationFailureReceipt is red and pageable', () => {
+  const receipt = observationFailureReceipt(new Error('timeout'));
+  assert.equal(receipt.red, true);
+  assert.ok(receipt.pageSummer.length > 0);
+});
+
+test('pageSummerForFreshness puts stable fingerprint in title and labelKey', async () => {
   const calls = [];
   const receipt = await collectArtifactFreshness({
     shipped: {
@@ -92,6 +164,27 @@ test('pageSummerForFreshness upserts once per mismatch set', async () => {
   });
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
-  assert.match(calls[0].title, /artifact-freshness/);
+  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
+  assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
+  assert.match(calls[0].title, new RegExp(`\\[${ARTIFACT_FRESHNESS_KEY}\\]`));
+  assert.match(calls[0].title, new RegExp(ARTIFACT_FRESHNESS_KEY));
   assert.match(calls[0].description, /feed digest mismatch/);
+});
+
+test('resolveSummerForFreshness closes by stable fingerprint on green', async () => {
+  const calls = [];
+  const result = await resolveSummerForFreshness({
+    sourceUrl: 'https://example.test/run',
+    runId: '99',
+    apiKey: 'test-key',
+    close: async args => {
+      calls.push(args);
+      return { ok: true, action: 'closed' };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
+  assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
+  assert.equal(calls[0].runId, '99');
 });

@@ -4,7 +4,8 @@
  *
  * Observes certified → published → feed for production and staging desktop
  * channels. Installed/running stay explicit unknown until a device heartbeat
- * exists. Pages Summer via Linear upsert when a stage mismatch is red.
+ * exists. Pages Summer via Linear upsert when a stage mismatch is red; closes
+ * the Summer issue when the receipt is green.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,12 @@ import {
   buildArtifactFreshnessReceipt,
   reconcileArtifactFreshness,
 } from './lib/artifact-freshness-graph.mjs';
-import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import {
+  closeLinearIssueByFingerprint,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
+
+export const ARTIFACT_FRESHNESS_KEY = 'artifact-freshness';
 
 export const DESKTOP_PRODUCTION_PATHS = Object.freeze([
   'VERSION',
@@ -36,6 +42,7 @@ export const DESKTOP_PRODUCTION_PATHS = Object.freeze([
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_REPO = 'JovieInc/Jovie';
+const PRODUCTION_CONTROLLER_WORKFLOW = 'production-controller.yml';
 
 /**
  * @param {string} publishedSha
@@ -68,6 +75,9 @@ export function desktopRelevantBetween(publishedSha, certifiedSha, deps = {}) {
 }
 
 /**
+ * Production Verified lives on production-controller.yml, which triggers on
+ * workflow_run (not push). Query that workflow's runs — never event=push.
+ *
  * @param {{
  *   readonly repo?: string;
  *   readonly token?: string | null;
@@ -84,49 +94,83 @@ export async function fetchLatestProductionVerifiedSha(input = {}) {
   const token = input.token ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const url = `${GITHUB_API}/repos/${repo}/actions/runs?branch=main&event=push&status=completed&per_page=30`;
-  const response = await fetchImpl(url, {
-    headers,
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    return {
-      status: 'unknown',
-      reason: `Production Verified lookup returned ${response.status}`,
-    };
-  }
-  const body = await response.json();
-  const runs = Array.isArray(body?.workflow_runs) ? body.workflow_runs : [];
-  for (const run of runs) {
-    if (run?.conclusion !== 'success') continue;
-    if (typeof run?.head_sha !== 'string' || !FULL_SHA.test(run.head_sha)) {
-      continue;
-    }
-    const jobsUrl = `${GITHUB_API}/repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`;
-    const jobsResponse = await fetchImpl(jobsUrl, {
+  try {
+    const url = `${GITHUB_API}/repos/${repo}/actions/workflows/${PRODUCTION_CONTROLLER_WORKFLOW}/runs?branch=main&status=completed&per_page=30`;
+    const response = await fetchImpl(url, {
       headers,
       signal: AbortSignal.timeout(30_000),
     });
-    if (!jobsResponse.ok) continue;
-    const jobsBody = await jobsResponse.json();
-    const jobs = Array.isArray(jobsBody?.jobs) ? jobsBody.jobs : [];
-    const verified = jobs.some(
-      job =>
-        job?.name === 'Production Verified' && job?.conclusion === 'success'
-    );
-    if (verified) {
+    if (!response.ok) {
       return {
-        status: 'known',
-        sourceRevision: run.head_sha,
-        at: run.updated_at ?? null,
-        verified: true,
+        status: 'unknown',
+        reason: `Production Verified lookup returned ${response.status}`,
       };
     }
+    const body = await response.json();
+    const runs = Array.isArray(body?.workflow_runs) ? body.workflow_runs : [];
+    for (const run of runs) {
+      if (run?.conclusion !== 'success') continue;
+      if (typeof run?.head_sha !== 'string' || !FULL_SHA.test(run.head_sha)) {
+        continue;
+      }
+      const jobsUrl = `${GITHUB_API}/repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`;
+      const jobsResponse = await fetchImpl(jobsUrl, {
+        headers,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!jobsResponse.ok) continue;
+      const jobsBody = await jobsResponse.json();
+      const jobs = Array.isArray(jobsBody?.jobs) ? jobsBody.jobs : [];
+      const verified = jobs.some(
+        job =>
+          job?.name === 'Production Verified' && job?.conclusion === 'success'
+      );
+      if (verified) {
+        return {
+          status: 'known',
+          sourceRevision: run.head_sha,
+          at: run.updated_at ?? null,
+          verified: true,
+        };
+      }
+    }
+    return {
+      status: 'unknown',
+      reason: 'No recent successful Production Verified job on main.',
+    };
+  } catch (error) {
+    return {
+      status: 'unknown',
+      reason: `Production Verified lookup failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
-  return {
-    status: 'unknown',
-    reason: 'No recent successful Production Verified job on main.',
-  };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {ReturnType<typeof buildArtifactFreshnessReceipt>}
+ */
+export function observationFailureReceipt(error) {
+  const reason = `artifact freshness observation failed: ${
+    error instanceof Error ? error.message : String(error)
+  }`;
+  // published known+unverified surfaces `reason` into pageSummer (publication-unverified).
+  return buildArtifactFreshnessReceipt({
+    channels: [
+      reconcileArtifactFreshness({
+        channel: 'production',
+        certified: { status: 'unknown', reason },
+        published: { status: 'known', verified: false, reason },
+        feed: { status: 'unknown', reason },
+      }),
+      reconcileArtifactFreshness({
+        channel: 'staging',
+        certified: { status: 'unknown', reason: 'staging uses rolling tag' },
+        published: { status: 'known', verified: false, reason },
+        feed: { status: 'unknown', reason },
+      }),
+    ],
+  });
 }
 
 /**
@@ -140,14 +184,22 @@ export async function fetchLatestProductionVerifiedSha(input = {}) {
  */
 export async function collectArtifactFreshness(input = {}) {
   const fetchImpl = input.fetchImpl ?? fetch;
-  const shipped =
-    input.shipped ?? (await fetchShippedDesktopVersions(fetchImpl));
-  const certified =
-    input.certified ??
-    (await fetchLatestProductionVerifiedSha({
+  let shipped = input.shipped;
+  if (!shipped) {
+    try {
+      shipped = await fetchShippedDesktopVersions(fetchImpl);
+    } catch (error) {
+      return observationFailureReceipt(error);
+    }
+  }
+
+  let certified = input.certified;
+  if (!certified) {
+    certified = await fetchLatestProductionVerifiedSha({
       fetchImpl,
       token: input.token,
-    }));
+    });
+  }
 
   const channels = [];
   for (const channel of /** @type {const} */ (['production', 'staging'])) {
@@ -213,6 +265,9 @@ export async function collectArtifactFreshness(input = {}) {
 }
 
 /**
+ * Stable Summer fingerprint. Title always contains ARTIFACT_FRESHNESS_KEY so
+ * upsertLinearIssueByTitleFingerprint can dedupe; labelKey matches close path.
+ *
  * @param {{
  *   readonly receipt: ReturnType<typeof buildArtifactFreshnessReceipt>;
  *   readonly sourceUrl?: string;
@@ -230,14 +285,10 @@ export async function pageSummerForFreshness(input) {
   const lines = pageable.map(
     m => `- \`${m.channel}\` \`${m.code}\`: ${m.reason}`
   );
-  const fingerprint = `artifact-freshness-${pageable
-    .map(m => `${m.channel}:${m.code}`)
-    .sort()
-    .join('|')
-    .slice(0, 80)}`;
+  const codes = pageable.map(m => m.code).join(', ');
   const result = await upsert({
-    fingerprint,
-    title: `[artifact-freshness] Desktop stage mismatch: ${pageable.map(m => m.code).join(', ')}`,
+    fingerprint: ARTIFACT_FRESHNESS_KEY,
+    title: `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch: ${codes}`,
     description: [
       'Automated artifact freshness graph (JOV-5368).',
       '',
@@ -251,16 +302,40 @@ export async function pageSummerForFreshness(input) {
       '## Done when',
       '- The mismatched stage closes through the existing desktop publisher or updater path.',
       '- A later reconcile receipt is green (or the exact governed blocker is named).',
+      '',
+      `Fingerprint: ${ARTIFACT_FRESHNESS_KEY}`,
     ]
       .filter(Boolean)
       .join('\n'),
     priority: 2,
     createStateName: 'Todo',
     reopenTerminal: true,
-    labelKey: 'remediation:artifact-freshness',
+    labelKey: ARTIFACT_FRESHNESS_KEY,
     apiKey,
   });
   return { ...result, count: pageable.length };
+}
+
+/**
+ * @param {{
+ *   readonly sourceUrl?: string;
+ *   readonly runId?: string;
+ *   readonly apiKey?: string | null;
+ *   readonly close?: typeof closeLinearIssueByFingerprint;
+ * }} [input]
+ */
+export async function resolveSummerForFreshness(input = {}) {
+  const close = input.close ?? closeLinearIssueByFingerprint;
+  const apiKey = input.apiKey ?? process.env.LINEAR_API_KEY;
+  return close({
+    fingerprint: ARTIFACT_FRESHNESS_KEY,
+    labelKey: ARTIFACT_FRESHNESS_KEY,
+    comment: `Artifact freshness graph is green.${
+      input.sourceUrl ? ` Source: ${input.sourceUrl}` : ''
+    }`,
+    runId: input.runId,
+    apiKey,
+  });
 }
 
 function resolveOutputPath(argv = process.argv) {
@@ -277,23 +352,39 @@ async function main() {
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : 'local';
+  const runId = process.env.GITHUB_RUN_ID ?? undefined;
 
-  const receipt = await collectArtifactFreshness();
+  let receipt;
+  try {
+    receipt = await collectArtifactFreshness();
+  } catch (error) {
+    receipt = observationFailureReceipt(error);
+  }
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(
     `[artifact-freshness] red=${receipt.red} mismatches=${receipt.pageSummer.length} → ${outputPath}`
   );
 
-  if (receipt.red && process.env.LINEAR_API_KEY) {
+  if (!process.env.LINEAR_API_KEY) {
+    if (receipt.red) {
+      console.log(
+        '[artifact-freshness] LINEAR_API_KEY absent; receipt is red but Summer was not paged.'
+      );
+    }
+    return;
+  }
+
+  if (receipt.red) {
     const paged = await pageSummerForFreshness({ receipt, sourceUrl });
     console.log(`[artifact-freshness] summer=${JSON.stringify(paged)}`);
     if (!paged.ok) process.exitCode = 1;
-  } else if (receipt.red) {
-    console.log(
-      '[artifact-freshness] LINEAR_API_KEY absent; receipt is red but Summer was not paged.'
-    );
+    return;
   }
+
+  const resolved = await resolveSummerForFreshness({ sourceUrl, runId });
+  console.log(`[artifact-freshness] summer-resolve=${JSON.stringify(resolved)}`);
+  if (!resolved.ok) process.exitCode = 1;
 }
 
 if (
