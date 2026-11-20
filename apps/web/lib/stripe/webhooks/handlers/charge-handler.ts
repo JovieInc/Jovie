@@ -12,9 +12,7 @@
  * handler is also safe to retry: billing updates are event-ordered, and
  * Stripe cancel treats already-canceled subscriptions as success.
  *
- * Immediate Stripe cancellation is required for revenue correctness. Local
- * revoke alone leaves an active Stripe subscription that
- * customer.subscription.updated or hourly reconciliation can restore.
+ * Local revoke alone leaves an active Stripe subscription that reconciliation can restore.
  */
 
 import type Stripe from 'stripe';
@@ -68,9 +66,6 @@ export class StripeWriteBlockedError extends Error {
   }
 }
 
-/**
- * Handler for subscription charge refunds and disputes.
- */
 export class ChargeHandler implements WebhookHandler {
   readonly eventTypes: readonly SupportedEventType[] = [
     'charge.refunded',
@@ -304,6 +299,9 @@ export class ChargeHandler implements WebhookHandler {
     }
 
     if (result.skipped) {
+      if (result.skipReason === 'subscription_mismatch') {
+        await this.cancelLiveSubscription(subscription);
+      }
       return {
         success: true,
         skipped: true,
