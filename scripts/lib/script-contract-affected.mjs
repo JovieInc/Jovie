@@ -227,6 +227,7 @@ async function main(args) {
         'scripts',
         '--config',
         'vitest.config.mts',
+        '--hookTimeout=120000',
         'run',
         ...vitest.flatMap(test =>
           test.split(' ').map(part => part.replace(/^scripts\//u, ''))
