@@ -155,7 +155,8 @@ export const APPLE_JOURNEYS = [
     title: 'Enter workout',
     primarySpine: true,
     valueRole: 'ttmv',
-    valueHypothesis: 'Usable workout + first meaningful action with minimal setup',
+    valueHypothesis:
+      'Usable workout + first meaningful action with minimal setup',
     evidencePaths: [],
     externalRepo: 'JovieInc/LogYourBody',
     macCommands: [
@@ -185,7 +186,8 @@ export const APPLE_JOURNEYS = [
     title: 'Interruptions / recovery (return)',
     primarySpine: true,
     valueRole: 'return',
-    valueHypothesis: 'Return for next workout; preserve progress across interrupt',
+    valueHypothesis:
+      'Return for next workout; preserve progress across interrupt',
     evidencePaths: [],
     externalRepo: 'JovieInc/LogYourBody',
     macCommands: [
@@ -221,8 +223,7 @@ export const APPLE_JOURNEYS = [
     title: 'Navigation / core work',
     primarySpine: true,
     valueRole: 'ttmv',
-    valueHypothesis:
-      'Important work done quickly, clear nav, dependable state',
+    valueHypothesis: 'Important work done quickly, clear nav, dependable state',
     evidencePaths: [
       'docs/macos/ADR-swift-native-mac.md',
       'apps/desktop/src/navigation.ts',
@@ -298,7 +299,10 @@ export function checkManifestRouteIds(
  */
 export function checkMeasurementHooks(
   typesSource = readFileSync(
-    join(REPO_ROOT, 'apps/ios/Jovie/Core/Observability/ObservabilityTypes.swift'),
+    join(
+      REPO_ROOT,
+      'apps/ios/Jovie/Core/Observability/ObservabilityTypes.swift'
+    ),
     'utf8'
   )
 ) {

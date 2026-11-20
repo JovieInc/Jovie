@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   APPLE_JOURNEYS,
-  PRIMARY_SPINE_IDS,
   checkEvidencePaths,
   checkManifestRouteIds,
   checkMeasurementHooks,
+  PRIMARY_SPINE_IDS,
   summarizeInventory,
 } from './apple-journey-inventory.mjs';
 
