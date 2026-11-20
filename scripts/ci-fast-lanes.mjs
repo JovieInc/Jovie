@@ -11,7 +11,6 @@
  * always run so one CI cycle reports every cheap failure instead of hiding
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
@@ -1153,7 +1152,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
-  'scripts/idea-radar/idea-radar.test.mjs', 'scripts/apple-change-ingest/apple-change-ingest.test.mjs',
+  'scripts/idea-radar/idea-radar.test.mjs',
+  'scripts/apple-change-ingest/apple-change-ingest.test.mjs',
   'scripts/invariants/art-direction/images.test.mjs',
   'scripts/invariants/art-direction/imagery-provenance.test.mjs',
   'scripts/invariants/art-direction/no-invented-customer.test.mjs',
