@@ -2893,7 +2893,7 @@ export async function runStructural(opts = {}) {
     'node --test .github/scripts/collect-quarantine-evidence.test.mjs',
     'node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs',
     'node --test .github/scripts/marketing-dom-workflow.test.mjs',
-    'node --test .github/scripts/update-quarantine.test.js',
+    'node --test .github/scripts/update-quarantine.test.js scripts/linear-team-drift.test.mjs scripts/lib/__tests__/flake-ledger.test.mjs scripts/lib/__tests__/guard-test-network-guard.test.mjs scripts/propose-flip-quarantine.test.mjs',
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,
     SCRIPT_CONTRACT_VITEST_COMMAND,
