@@ -875,6 +875,46 @@
         }
       ]
     },
+    "security-advisory": {
+      "entityId": "GHSA + package fingerprint (secadv-<ghsa>-<pkg>)",
+      "description": "One Dependabot advisory group from detect through Summer ownership, fix PR, and production verify. Dwell SLOs: detect→owned ≤ 300 min (event wake + 4h Gem clock backstop); finding→pr dead-man 48h (critical floor; intake --check owns severity SLAs); pr→production ≤ 24h after a linked fix PR. Dead-mans: github:jovie:security-detect-owned, github:jovie:security-finding-pr, github:jovie:security-pr-production (.claude/rules/event-driven.md).",
+      "sloSeconds": 18000,
+      "endToEnd": [["detect", "owned"], ["owned", "pr"], ["pr", "production"]],
+      "stages": [
+        {
+          "id": "detect",
+          "meaning": "Dependabot alert created/reopened until security-advisory-loop has filed or refreshed the Summer Linear issue",
+          "producer": "security-advisory-loop.yml",
+          "status": "derived",
+          "source": "security-advisory-receipts",
+          "owner": "summer"
+        },
+        {
+          "id": "owned",
+          "meaning": "Summer-owned Linear issue exists (labels security, Bug, area:security) until a fix PR is linked",
+          "producer": "security-advisory-intake.mjs",
+          "status": "spec",
+          "source": "security-advisory-receipts",
+          "owner": "summer"
+        },
+        {
+          "id": "pr",
+          "meaning": "fix PR linked on the Linear issue until it merges to main",
+          "producer": "security-advisory-intake.mjs",
+          "status": "spec",
+          "source": "security-advisory-receipts",
+          "owner": "summer"
+        },
+        {
+          "id": "production",
+          "meaning": "terminal: Production deploy after the fix; intake close-scan confirms",
+          "producer": "security-advisory-loop.yml",
+          "status": "derived",
+          "source": "security-advisory-receipts",
+          "owner": "summer"
+        }
+      ]
+    },
     "desktop-startup": {
       "entityId": "source SHA:receipt start:launch index",
       "description": "Synthetic Ubuntu local HTTP stub; not installed-native first-paint or a speedup measurement.",
@@ -999,6 +1039,13 @@
       "url": null,
       "owner": "scripts/design/design-loop-ledger.mjs (docs/metrics/design-loop-ledger.ndjson)"
     },
+    "security-advisory-receipts": {
+      "kind": "artifacts",
+      "url": null,
+      "artifact": "security-advisory-receipt-<run_id>",
+      "workflow": "security-advisory-loop.yml",
+      "owner": "scripts/security-advisory-intake.mjs"
+    },
     "desktop-startup-receipts": {
       "kind": "events",
       "url": null,
@@ -1031,7 +1078,13 @@
         "native-typecheck-qualification:qualification",
         "native-typecheck-qualification:finished"
       ],
-      "shipping-slo.yml": ["metrics:stage-timings"]
+      "shipping-slo.yml": ["metrics:stage-timings"],
+      "security-advisory-loop.yml": [
+        "security-advisory:detect",
+        "security-advisory:owned",
+        "security-advisory:pr",
+        "security-advisory:production"
+      ]
     },
     "exempt": {
       "ci-shard-contract-canary.yml": "contract self-test, not a delivery stage",

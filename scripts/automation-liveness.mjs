@@ -31,6 +31,7 @@ import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
+import { observeSecurityAdvisoryDwell } from './lib/security-advisory-dwell.mjs';
 import {
   evaluateLiveness,
   isQuotaDeferredRow,
@@ -779,6 +780,8 @@ export async function observeEntry(entry, context) {
     return observeLinearTriageDwell(receipt, context);
   if (receipt.kind === 'green-to-enqueue')
     return observeGreenToEnqueue(receipt, context);
+  if (receipt.kind === 'security-advisory-dwell')
+    return observeSecurityAdvisoryDwell(receipt, context);
   return null;
 }
 

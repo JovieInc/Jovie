@@ -66,6 +66,7 @@ export const RECEIPT_KINDS = Object.freeze([
   'merge-queue-progress',
   'linear-triage-dwell',
   'green-to-enqueue',
+  'security-advisory-dwell',
   'host-local',
   'none',
 ]);
@@ -78,6 +79,7 @@ export const HOSTED_RECEIPT_KINDS = Object.freeze([
   'merge-queue-progress',
   'linear-triage-dwell',
   'green-to-enqueue',
+  'security-advisory-dwell',
 ]);
 
 const ID_RE = /^[a-z0-9][a-z0-9:._-]*$/;
@@ -176,6 +178,14 @@ export function validateRegistry(registry) {
     ) {
       errors.push(
         `${at}: green-to-enqueue receipts need repo and requiredChecks`
+      );
+    }
+    if (
+      receipt.kind === 'security-advisory-dwell' &&
+      !['finding-pr', 'pr-production'].includes(receipt.phase)
+    ) {
+      errors.push(
+        `${at}: security-advisory-dwell receipts need phase finding-pr|pr-production`
       );
     }
     if (

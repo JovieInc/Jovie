@@ -39,6 +39,9 @@ record is a defect, even when it exits 0.
 | Linear Triage → classified (team, priority, labels, out of Triage, or Ovie card) | Linear `Issue` create / entered-triage webhook → Summer scoped triage turn | Summer [`triage-sweep` source](https://github.com/JovieInc/summer-config/blob/main/apps/summer/agent/lib/event-catch-ups.ts) | 15 min | `summer:triage-dwell` |
 | Required-green ready PR → in merge queue | `workflow_run` of required checks, `pull_request_target` `ready_for_review` (no `synchronize`: a new head has no green verdict to act on) → Merge Queue Green Enroll | push-to-main roster sweep | 10 min | `github:jovie:green-to-enqueue` |
 | Green lane draft → ready | lane gate verdict on the exact head → lanes `publish_verified` (writer proof, JOV-INV-022) | lanes tick | measured in the `green-to-enqueue` reason (`draft-green`) | lanes-owned |
+| Security advisory detect → owned | `repository_dispatch` `dependabot_alert` → Security Advisory Loop (Summer Linear labels) | Gem 4h `clock_security_advisory_loop` | 300 min | `github:jovie:security-detect-owned` |
+| Security finding owned → fix PR linked | Linear secadv issue create/update (no PR link yet) | automation-liveness + intake `--check` severity SLAs | 48 h critical-floor dead-man | `github:jovie:security-finding-pr` |
+| Security fix PR → production verify | PR merge + Production deploy → intake close-scan | automation-liveness on linked-PR open issues | 24 h | `github:jovie:security-pr-production` |
 
 Summer's `summerCatchUpJobs` owns the recovery cadence; read the linked source
 instead of copying its interval here. Verify the running generation and observed
