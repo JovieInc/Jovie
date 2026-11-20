@@ -108,11 +108,6 @@ export function ReleaseCreditsDialog({
             <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
               {content}
             </div>
-            {/* Extra safe-area beyond the surface p-5 (1.25rem). */}
-            <div
-              aria-hidden
-              className='h-[max(0px,calc(env(safe-area-inset-bottom)-1.25rem))]'
-            />
           </SheetContent>
         </Sheet>
       </>
