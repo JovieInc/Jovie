@@ -104,7 +104,7 @@ function normalizeStripeCheckoutUrl(
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
 
     const rawSessionId = request.nextUrl.searchParams.get('session_id');
