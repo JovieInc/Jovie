@@ -224,18 +224,30 @@ if (
   const refs = extractLinearReferences(pr, policy.teams).map(r => r.identifier);
   const issues = pr.fork ? null : await lookupLinearIssues(refs);
   const receipt = evaluateLinearReference({ pr, policy, issues });
+  const fix = linearReferenceFix(receipt);
   console.log(JSON.stringify(receipt));
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFileSync } = await import('node:fs');
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `- Linear reference (${receipt.mode}): **${receipt.verdict}** ${receipt.references.map(r => r.identifier).join(', ')}${receipt.fix ? ` — ${receipt.fix}` : ''}\n`
+      `- Linear reference (${receipt.mode}): **${receipt.verdict}** ${receipt.references.map(r => r.identifier).join(', ')}${fix ? ` — ${fix}` : ''}\n`
     );
   }
   if (!receipt.allowed) process.exitCode = 1;
   else if (
-    receipt.verdict === 'missing' ||
-    receipt.verdict === 'unknown-or-dead-issue'
+    (receipt.verdict === 'missing' ||
+      receipt.verdict === 'unknown-or-dead-issue') &&
+    fix
   )
-    console.log(`::warning title=Linear reference (observe)::${receipt.fix}`);
+    console.log(`::warning title=Linear reference (observe)::${fix}`);
+}
+
+/**
+ * Step summary and the observe warning read `fix` only when that variant has it.
+ * The parameter stays untyped: checkJs rejects the receipt union as `{ fix?: string }`.
+ */
+export function linearReferenceFix(receipt) {
+  if (receipt == null || typeof receipt !== 'object' || !('fix' in receipt))
+    return '';
+  return typeof receipt.fix === 'string' ? receipt.fix : '';
 }

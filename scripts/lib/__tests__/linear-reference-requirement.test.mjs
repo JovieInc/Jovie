@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   evaluateLinearReference,
   extractLinearReferences,
+  linearReferenceFix,
   lookupLinearIssues,
 } from '../linear-reference-requirement.mjs';
 
@@ -156,6 +157,13 @@ test('shell issue created after the PR is flagged but not blocked', () => {
   });
   assert.equal(r.allowed, true);
   assert.equal(r.verdict, 'linked-low-quality');
+  assert.equal(linearReferenceFix(r), '');
+  const missing = evaluateLinearReference({
+    pr: { title: 'typo', body: '', headRef: 'fix/typo', author: 'a' },
+    policy: policy('observe'),
+    issues: {},
+  });
+  assert.match(linearReferenceFix(missing), /Refs JOV-123/);
 });
 
 process.env.JOVIE_API_STATE = 'memory';

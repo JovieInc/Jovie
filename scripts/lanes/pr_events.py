@@ -1131,6 +1131,7 @@ def api_gh(args, **_):
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
                             locking_pr: int | None = None, win_section: str | None = None,
+                            previous_win_section: str | None = None,
                             premise: dict | None = None, blast_radius: dict | None = None,
                             literal_mentions: tuple[str, ...] = ()) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
@@ -1143,7 +1144,8 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section, premise=premise, blast_radius=blast_radius, literal_mentions=literal_mentions)
+                                   win_section=win_section, previous_win_section=previous_win_section, premise=premise,
+                                   blast_radius=blast_radius, literal_mentions=literal_mentions)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
