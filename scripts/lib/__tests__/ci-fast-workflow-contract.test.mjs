@@ -1421,6 +1421,18 @@ describe('ci-fast bounded parallel workflow', () => {
         ].join('\n')
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
+      // Isolate typecheck dispatch just as the pnpm stub isolates other lanes.
+      // The real spelling guard is exercised in brand-name.test.mjs.
+      writeFileSync(
+        join(binDir, 'node'),
+        [
+          '#!/bin/sh',
+          'case "$*" in *scripts/anti-slop/*) exit 0 ;; esac',
+          `exec '${process.execPath}' "$@"`,
+          '',
+        ].join('\n')
+      );
+      chmodSync(join(binDir, 'node'), 0o755);
       // The source-read guard parses the real release inventory in its merged tree.
       mkdirSync(join(repo, 'scripts/lanes'), { recursive: true });
       writeFileSync(

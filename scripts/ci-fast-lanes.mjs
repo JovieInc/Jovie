@@ -523,14 +523,11 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Anti-slop registry (docs/design-system/anti-slop-rules.json): schema,
-    // evidence and wiring of every enforced rule, and prose copies of the
-    // anti-slop list that drifted from the registry (Tim, 2026-10-26).
+    // Registry integrity, prose drift and whole-repository spelling share this
+    // existing guard; policy is docs/design-system/anti-slop-rules.json.
     id: 'anti-slop',
-    command:
-      'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
-    inputs:
-      /^(?:apps\/web\/(?:components\/shell\/|app\/.*\/settings\/)|docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
+    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs`,
+    inputs: /./u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1521,6 +1518,10 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
   'scripts/lib/__tests__/merge-queue-cancel-causes.test.mjs', // JOV-13109 MQ cancel causes.
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
+  'scripts/lib/__tests__/brand-name.test.mjs',
+  'scripts/lib/__tests__/brand-name-copy.test.mjs',
+  'scripts/lib/__tests__/brand-name-metadata.test.mjs',
+  'scripts/lib/__tests__/source-guard-pr-metadata.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
   'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',

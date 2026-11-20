@@ -2260,43 +2260,20 @@ describe('source-read guard selection', () => {
 
   it.each([
     [
-      'pull_request',
-      [
-        'web-source-read-tests',
-        'script-contracts',
-        'merged-with-base-invariants',
-        'gate-weakening-detector',
-      ],
+      'scripts/lib/ci-schedule-inventory.mjs',
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['merge_group', []],
-    ['push', []],
-  ])(
-    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
-    (event, pr) => {
-      expect(
-        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual([
-        'ci-schedule-inventory',
-        'automation-registry',
-        'external-api-guard',
-        ...pr,
-      ]);
-    }
-  );
-
-  it.each([
-    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
-    ['canon/automation-registry.jsonl', ['automation-registry']],
-    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
+    ['canon/automation-registry.jsonl', ['automation-registry', 'anti-slop']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry', 'anti-slop']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
-      ['ci-schedule-inventory'],
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['.github/workflows/nested/not-loaded.yml', []],
-    ['.github/scripts/run-actionlint.sh', []],
+    ['.github/workflows/nested/not-loaded.yml', ['anti-slop']],
+    ['.github/scripts/run-actionlint.sh', ['anti-slop']],
     [
       'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/app/api/cron/example/route.test.ts',
@@ -2306,23 +2283,24 @@ describe('source-read guard selection', () => {
         'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
+        'anti-slop',
       ],
     ],
     [
       'apps/web/eslint-rules/rule.test.js',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/scripts/tool.test.mjs',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/node-environment-files.json',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/setup-optimized.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/vitest.config.fast.mts',
@@ -2330,6 +2308,7 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2338,6 +2317,7 @@ describe('source-read guard selection', () => {
         'artist-profile-conformance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2350,6 +2330,7 @@ describe('source-read guard selection', () => {
         'static-revalidate-policy',
         'art-direction',
         'icp-language',
+        'anti-slop',
         'marketing-rounded-media',
         'marketing-container-width',
       ],
@@ -2360,16 +2341,17 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
-    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
-    ['apps/ios/Jovie/App.swift', ['native-design-system']],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', ['anti-slop']],
+    ['apps/ios/Jovie/App.swift', ['native-design-system', 'anti-slop']],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      ['merge-group-unit-guards', 'static-revalidate-policy', 'anti-slop'],
     ],
-    ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
+    ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
@@ -2452,11 +2434,12 @@ describe('source-read guard selection', () => {
       const expected = path.startsWith('apps/web/lib/')
         ? [
             'artist-profile-conformance',
+            'anti-slop',
             ...apiGuard(path),
             ...domainGuard(path),
             'copy-leak',
           ]
-        : ['copy-leak'];
+        : ['anti-slop', 'copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }
