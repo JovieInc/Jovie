@@ -113,6 +113,7 @@ export function validateWriteSwarmReceipt(receipt) {
   const system1 = obj(doc.system1);
   const mutate = obj(doc.mutate);
   const timReady = obj(doc.timReady);
+  const codeSyncPresent = doc.codeSync !== undefined && doc.codeSync !== null;
   const codeSync = obj(doc.codeSync);
 
   if (mode === 'dry') {
@@ -178,10 +179,13 @@ export function validateWriteSwarmReceipt(receipt) {
           'Writer must not System-1 self-approve (invent-and-rubber-stamp).'
         );
     }
+    // Fail closed: truthy non-objects (true/"done") must not bypass panel pass.
+    if (codeSyncPresent && !codeSync)
+      block('code_sync_type', 'codeSync must be an object when present.');
     // Landing receipts: mutate or code-sync claim require panel pass (not only Tim-ready).
     const needsPanelPass =
       mutate?.performed === true ||
-      Boolean(codeSync) ||
+      codeSyncPresent ||
       timReady?.renamed === true;
     if (needsPanelPass && t(system1?.verdict) !== 'pass') {
       block(

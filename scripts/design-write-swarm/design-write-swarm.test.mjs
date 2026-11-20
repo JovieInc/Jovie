@@ -128,6 +128,21 @@ describe('design-write-swarm', () => {
     assert.ok(
       syncOnly.blockers.some(b => b.code === 'mutate_without_system1_pass')
     );
+
+    const truthyNonObject = validateWriteSwarmReceipt({
+      ...liveBase,
+      mutate: { performed: false, writer: 'write-swarm' },
+      system1: { ...liveBase.system1, verdict: 'fail' },
+      timReady: { renamed: false },
+      codeSync: true,
+    });
+    assert.equal(truthyNonObject.ok, false);
+    assert.ok(truthyNonObject.blockers.some(b => b.code === 'code_sync_type'));
+    assert.ok(
+      truthyNonObject.blockers.some(
+        b => b.code === 'mutate_without_system1_pass'
+      )
+    );
   });
 
   it('accepts live receipt with lease + panel pass + Tim-ready', () => {
