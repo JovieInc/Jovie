@@ -1,4 +1,4 @@
-import { ACTION_BUTTON_FACE_CLASSNAME } from '@jovie/ui';
+import { ACTION_BUTTON_FACE_CLASSNAME } from '@jovie/ui/atoms/button-contract';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 

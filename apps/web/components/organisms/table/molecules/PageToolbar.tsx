@@ -1,7 +1,8 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
-import { ACTION_BUTTON_PRESET, Button, TooltipShortcut } from '@jovie/ui';
+import { Button, TooltipShortcut } from '@jovie/ui';
+import { ACTION_BUTTON_PRESET } from '@jovie/ui/atoms/button-contract';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';

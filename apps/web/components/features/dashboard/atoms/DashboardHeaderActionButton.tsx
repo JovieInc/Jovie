@@ -1,10 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   ACTION_BUTTON_FACE_CLASSNAME,
   ACTION_BUTTON_PRESET,
-  Button,
-} from '@jovie/ui';
+} from '@jovie/ui/atoms/button-contract';
 import type { ReactNode } from 'react';
 import {
   APP_CONTROL_BUTTON_CLASS,

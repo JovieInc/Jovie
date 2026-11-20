@@ -2,7 +2,7 @@ import {
   ACTION_BUTTON_FACE_CLASSNAME,
   ACTION_BUTTON_PRESET,
   ACTION_BUTTON_VISIBLE_HEIGHT_PX,
-} from '@jovie/ui';
+} from '@jovie/ui/atoms/button-contract';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from '@/components/molecules/page-toolbar-classes';

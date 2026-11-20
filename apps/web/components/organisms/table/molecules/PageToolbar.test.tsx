@@ -1,4 +1,7 @@
-import { ACTION_BUTTON_FACE_CLASSNAME, ACTION_BUTTON_PRESET } from '@jovie/ui';
+import {
+  ACTION_BUTTON_FACE_CLASSNAME,
+  ACTION_BUTTON_PRESET,
+} from '@jovie/ui/atoms/button-contract';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
