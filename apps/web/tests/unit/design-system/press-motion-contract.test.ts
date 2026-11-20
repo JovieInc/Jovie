@@ -16,12 +16,26 @@ describe('shared press-motion contract', () => {
       join(REPO_ROOT, 'packages/ui/atoms/button.tsx'),
       'utf8'
     );
+    const nativeTheme = readFileSync(
+      join(REPO_ROOT, 'apps/ios/Jovie/DesignSystem/JovieTheme.swift'),
+      'utf8'
+    );
+    const nativeManifest = JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, 'apps/ios/scripts/native-design-system.manifest.json'),
+        'utf8'
+      )
+    );
 
     expect(designSystem).toMatch(/--scale-press:\s*0\.98;/);
     expect(button).toContain('active:scale-press');
     expect(button).toContain('motion-reduce:active:scale-100');
     expect(button).not.toContain('active:scale-[0.96]');
     expect(button).toContain('pressFeedback = false');
+    expect(nativeManifest.motionBindings).toEqual([
+      ['pressScale', '--scale-press'],
+    ]);
+    expect(nativeTheme).toContain('static let pressScale: CGFloat = 0.98');
   });
 
   it('does not scale every interactive element globally', () => {

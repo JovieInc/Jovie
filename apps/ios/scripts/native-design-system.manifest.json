@@ -25,6 +25,7 @@
     ["borderStrong", "--color-border-strong"],
     ["imageForeground", "--noir-ion-text-strong"]
   ],
+  "motionBindings": [["pressScale", "--scale-press"]],
   "strictSources": ["apps/ios/Jovie/App/RootView.swift"],
   "exceptions": [
     {

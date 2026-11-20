@@ -39,7 +39,7 @@ These states apply across families and were previously undocumented.
 | Default | `--linear-btn-primary-bg`, `--linear-btn-primary-fg` | `[data-state="idle"]`, `button` base | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Hover | `--linear-btn-primary-hover`, `--color-interactive-hover` | `:hover`, `hover:bg-*` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Focus-visible | `--color-focus-ring`, `--linear-border-focus` | `:focus-visible`, `focus-visible:ring-*` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
-| Active/pressed | `--color-interactive-active` | `:active`, `active:scale-[0.96]` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
+| Active/pressed | `--color-interactive-active`, `--scale-press` | `:active`, `active:scale-press` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Disabled | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `:disabled` | `shadcn/Button/Disabled` | `packages/ui/atoms/button.tsx` |
 | Loading | `--linear-text-primary` (spinner) | `[data-state="loading"]`, `[aria-busy="true"]` | `shadcn/Button/Loading` | `packages/ui/atoms/button.tsx` |
 | Success | `--color-success`, `--color-success-subtle` | `[data-state="success"]` | `Molecules/FormStatus/Success` | `apps/web/components/molecules/FormStatus.tsx` |
