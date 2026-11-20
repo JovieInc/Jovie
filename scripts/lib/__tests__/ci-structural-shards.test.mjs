@@ -182,6 +182,13 @@ describe('lanes coverage matrix legs', () => {
     vi.unstubAllEnvs();
 
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    // Pin the lanes family too: the structural runner legitimately executes
+    // this suite with the host's CI_PRODUCT_LANES (a web-only merge-group
+    // entry carries 'web'), which drops the operations-owned lanes coverage
+    // slot and would leave the leg swap nothing to swap (JOV-10063: every
+    // web-lane merge_group entry failed here while main's own push stayed
+    // green). Same pin every sibling test in this file uses.
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
     const dispatched = [];
