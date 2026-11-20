@@ -10,7 +10,9 @@ import {
   isNeedsProbeWin,
   isQueryableWin,
   measureDueWins,
+  measureGatewayReport,
   measureJsonFile,
+  normalizeFeatureTag,
   readJsonPath,
 } from '../wins-measure/index.mjs';
 
@@ -109,6 +111,45 @@ test('json-file adapter reads a nested numeric field', () => {
   );
   assert.equal(measured.value, 0.42);
   assert.equal(measured.evidence, 'virtual.json#queueEjectionRate');
+});
+
+test('gateway-report matches production feature: prefixed tag keys', async () => {
+  // sdk.ts tags calls as `feature:<id>`; classify stores the bare name.
+  assert.equal(
+    normalizeFeatureTag('feature:golden-path-review'),
+    'golden-path-review'
+  );
+  assert.equal(normalizeFeatureTag('golden-path-review'), 'golden-path-review');
+  const fetchImpl = /** @type {any} */ (
+    async () =>
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              tag: 'feature:golden-path-review',
+              total_cost: 7,
+              request_count: 42,
+              input_tokens: 0,
+              cached_input_tokens: 0,
+            },
+            {
+              tag: 'feature:other',
+              total_cost: 1,
+              request_count: 2,
+              input_tokens: 0,
+              cached_input_tokens: 0,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+  );
+  const measured = await measureGatewayReport(
+    { feature: 'golden-path-review', field: 'requests' },
+    { apiKey: 'test-key', days: 7, fetchImpl }
+  );
+  assert.equal(measured.value, 42);
+  assert.match(measured.evidence, /feature:golden-path-review/);
 });
 
 test('measure-due: queryable fixture gets a receipt and becomes verified', async () => {
