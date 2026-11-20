@@ -18,6 +18,7 @@ vi.mock('../../merge-queue-backend.mjs', () => ({ dequeuePullRequest }));
 const { stuckHead } = await import('../../main-red-eject.mjs');
 const { marker, supersededIncidents } = await import('../main-red-eject.mjs');
 const {
+  applyFailingHeadEpisode,
   decideFailingHead,
   ejectHoldSha,
   failingHeadComment,
@@ -128,6 +129,31 @@ describe('decideFailingHead', () => {
       ejectHoldSha({ sha: MERGE_GROUP_SHA, headRefOid: PR_HEAD_SHA })
     ).toBe(PR_HEAD_SHA);
     expect(ejectHoldSha({ sha: MERGE_GROUP_SHA })).toBe(null);
+  });
+
+  it('undoes lane-fix-red when eject-hold status write fails', async () => {
+    const ghCalls = [];
+    const gh = async args => {
+      const line = args.join(' ');
+      ghCalls.push(line);
+      // Path is repos/.../statuses/<sha>, not a bare statuses/<sha> argv.
+      if (line.includes(`statuses/${PR_HEAD_SHA}`)) {
+        throw new Error(
+          'gh api -X POST: HTTP 403: Resource not accessible by integration'
+        );
+      }
+    };
+    const out = await applyFailingHeadEpisode({
+      gh,
+      repo: 'JovieInc/Jovie',
+      head: { number: 23966, sha: MERGE_GROUP_SHA, headRefOid: PR_HEAD_SHA },
+      failing: ['PR Ready'],
+    });
+    expect(out).toEqual({ labeled: false, held: false });
+    expect(ghCalls.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
+    expect(
+      ghCalls.some(c => c.includes('DELETE') && c.includes('lane-fix-red'))
+    ).toBe(true);
   });
 });
 
@@ -268,6 +294,13 @@ describe('wake fan-out wiring (2026-10-31 installation 112037986 exhaustion)', (
     expect(t.slice(gate, eject)).toContain('GH_TOKEN: ${{ github.token }}');
     expect(t).toContain("needs.gate.outputs.active == 'true'");
     expect(t).toContain('queue-read-failed'); // fails open
+  });
+
+  it('grants statuses:write so GITHUB_TOKEN failover can stamp eject holds', () => {
+    const t = wf('main-red-eject.yml');
+    const ejectPerms = t.slice(t.indexOf('  eject:'), t.indexOf('  land:'));
+    expect(ejectPerms).toContain('statuses: write');
+    expect(ejectPerms).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
   });
   it.each([
     ['dependabot-pin-sync.yml', "branches: ['dependabot/npm_and_yarn/**']"],

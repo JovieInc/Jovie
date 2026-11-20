@@ -88,27 +88,55 @@ export async function applyFailingHeadEpisode({
     console.error(`::warning::failing-head ${label} failed: ${error.message}`);
   }
   const holdSha = ejectHoldSha(head);
+  let held = false;
   if (labeled && holdSha) {
-    await gh([
-      'api',
-      '-X',
-      'POST',
-      `repos/${repo}/statuses/${holdSha}`,
-      '-f',
-      'state=success',
-      '-f',
-      `context=${EJECT_HOLD_CONTEXT}`,
-      '-f',
-      `description=failing-head eject hold on #${head.number}`,
-    ]).catch(error =>
+    try {
+      await gh([
+        'api',
+        '-X',
+        'POST',
+        `repos/${repo}/statuses/${holdSha}`,
+        '-f',
+        'state=success',
+        '-f',
+        `context=${EJECT_HOLD_CONTEXT}`,
+        '-f',
+        `description=failing-head eject hold on #${head.number}`,
+      ]);
+      held = true;
+    } catch (error) {
+      // Warn-only left an unlabeled receipt: reconcile clears lane-fix-red.
+      // Drop the label so we do not claim a hold we cannot prove (Sentry #26143).
       console.error(
         `::warning::failing-head eject-hold status failed: ${error.message}`
-      )
-    );
+      );
+      await gh([
+        'api',
+        '-X',
+        'DELETE',
+        `repos/${repo}/issues/${head.number}/labels/${label}`,
+      ]).catch(undoError =>
+        console.error(
+          `::warning::failing-head label undo after status failure failed: ${undoError.message}`
+        )
+      );
+      labeled = false;
+    }
   } else if (labeled && !holdSha) {
     console.error(
       '::warning::failing-head eject-hold skipped: missing pullRequest.headRefOid'
     );
+    await gh([
+      'api',
+      '-X',
+      'DELETE',
+      `repos/${repo}/issues/${head.number}/labels/${label}`,
+    ]).catch(undoError =>
+      console.error(
+        `::warning::failing-head label undo without headRefOid failed: ${undoError.message}`
+      )
+    );
+    labeled = false;
   }
   await gh([
     'api',
@@ -120,5 +148,5 @@ export async function applyFailingHeadEpisode({
   ]).catch(error =>
     console.error(`::warning::failing-head comment failed: ${error.message}`)
   );
-  return { labeled };
+  return { labeled, held };
 }
