@@ -313,6 +313,22 @@ describe('merge-group docs-only structural decision', () => {
     );
   });
 
+  it('runs the structural lane for docs unit/ci asserts (JOV-12618 Sentry)', () => {
+    // docs_only stays true for product-lane skip, but structural-control-paths
+    // must still select these so repo-license-hygiene / synthetic-monitoring-
+    // workflow cannot land broken content through a docs-only merge group.
+    for (const path of [
+      'README.md',
+      'CONTRIBUTING.md',
+      'docs/REPO-POLICY.md',
+      'docs/SYNTHETIC_MONITORING.md',
+    ]) {
+      expect(decide({ docsOnly: 'true', changes: [path] }), path).toBe(
+        'skip=false'
+      );
+    }
+  });
+
   it('fails closed without a verdict, a usable base or a non-empty diff', () => {
     const changes = ['apps/web/AGENTS.md'];
     expect(decide({ docsOnly: undefined, changes })).toBe('skip=false');
