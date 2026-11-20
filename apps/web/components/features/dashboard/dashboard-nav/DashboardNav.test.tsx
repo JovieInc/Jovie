@@ -74,7 +74,6 @@ describe('DashboardNav route warming', () => {
   });
 
   it('leaves home attention to the brand row and retains destinations', () => {
-    const label = 'Home';
     const destinations = () =>
       screen.getAllByRole('link').map(link => ({
         label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
@@ -84,7 +83,8 @@ describe('DashboardNav route warming', () => {
       renderFn: render,
     });
     const attention = document.querySelector('[data-inbox-attention]');
-    expect(attention).toHaveAccessibleName(label);
+    // Qualified so it does not collide with the Home nav row.
+    expect(attention).toHaveAccessibleName('Home — notifications');
     expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     const retained = destinations();
     const attentionIndex = screen
@@ -103,7 +103,9 @@ describe('DashboardNav route warming', () => {
     expect(destinations()).toEqual(
       retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
     );
-    expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Home', exact: true })
+    ).not.toBeInTheDocument();
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
@@ -143,11 +145,14 @@ describe('DashboardNav route warming', () => {
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
-    expect(homeLinks).toHaveLength(2);
+    // Exact "Home" is the nav row only; the rail bell uses a qualified name.
+    const homeLinks = screen.getAllByRole('link', { name: 'Home', exact: true });
+    expect(homeLinks).toHaveLength(1);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
     }
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention).toHaveAttribute('data-prefetch', 'false');
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
         screen.queryByRole('link', { name: label })
@@ -272,7 +277,9 @@ describe('DashboardNav route warming', () => {
     const pendingLink = pending.container.querySelector(
       '[data-navigation-item-id="home"]'
     );
-    expect(pendingLink).toHaveAccessibleName('Home');
+    expect(pendingLink).toHaveAccessibleName(
+      'Home — 3 Items Need Attention'
+    );
     expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -297,19 +304,19 @@ describe('DashboardNav route warming', () => {
     const link = updateOnly.container.querySelector(
       '[data-navigation-item-id="home"]'
     );
-    expect(link).toHaveAccessibleName('Home');
+    expect(link).toHaveAccessibleName('Home — all caught up');
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link?.querySelector('[data-inbox-runtime-update]')).toBeNull();
     runtimeUpdateState.available = false;
   });
 
-  it('labels the header bell Home without a rollout override', () => {
+  it('labels the rail Home bell with a qualified accessible name', () => {
     const view = renderDashboardNav({
       renderFn: render,
     });
     expect(
       view.container.querySelector('[data-navigation-item-id="home"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Home — notifications');
   });
 
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
