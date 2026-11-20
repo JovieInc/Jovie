@@ -285,6 +285,31 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
     "export const listAllChangedFiles = () => ['feature.txt'];\n" +
       "export const selectSourceGuards = () => [{id:'exact-dependency-probe',command:'node scripts/dependency-probe.mjs'}];\n"
   );
+  // Source Validation loads runSourceGuards from the trusted archive. The
+  // fixture only ships the probe guard; a serial stub keeps the same
+  // run-all / first-failure contract without the real pool's ci-fast-lanes
+  // closure.
+  write(
+    'scripts/lib/ci-source-guard-pool.mjs',
+    `import { spawnSync } from 'node:child_process';
+export async function runSourceGuards(guards = []) {
+  let code = 0;
+  for (const guard of guards) {
+    const result = spawnSync(guard.command, {
+      shell: true,
+      cwd: process.cwd(),
+      stdio: 'inherit',
+    });
+    const status = result.status ?? 1;
+    console.log(
+      \`[source-guards] \${guard.id}: exit \${status}; duration_ms=0\`
+    );
+    if (status !== 0 && code === 0) code = status;
+  }
+  return { code, output: '' };
+}
+`
+  );
   git('add', '.');
   git('commit', '-qm', 'shared dependency fork');
   git('switch', '-qc', 'source-head');
