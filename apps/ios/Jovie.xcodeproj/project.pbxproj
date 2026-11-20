@@ -13,6 +13,7 @@
 		A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000001 /* TeleprompterProposal.swift */; };
 		A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000003 /* TeleprompterCaptureController.swift */; };
 		A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */; };
+		A0F507500000000000000012 /* TeleprompterCaptureFileIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */; };
 		A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000005 /* TeleprompterViewModel.swift */; };
 		A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000007 /* TeleprompterOverlayView.swift */; };
 		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
@@ -94,6 +95,7 @@
 		A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000007 /* MobileChatModels.swift */; };
 		A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH13008000000000000001 /* VoiceCaptureService.swift */; };
 		A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */; };
+		A0F507500000000000000014 /* TeleprompterCaptureFileIOTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */; };
 		A0J0V2549000000000000000A /* MobileChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000009 /* MobileChatView.swift */; };
 		687D02CF59BD4E45B18E1015 /* MobileChatMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */; };
 		A0J0V36390000000000000002 /* ComposerWorkflowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */; };
@@ -174,6 +176,7 @@
 		A0F507500000000000000001 /* TeleprompterProposal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterProposal.swift; sourceTree = "<group>"; };
 		A0F507500000000000000003 /* TeleprompterCaptureController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureController.swift; sourceTree = "<group>"; };
 		A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureOrientation.swift; sourceTree = "<group>"; };
+		A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureFileIO.swift; sourceTree = "<group>"; };
 		A0F507500000000000000005 /* TeleprompterViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterViewModel.swift; sourceTree = "<group>"; };
 		A0F507500000000000000007 /* TeleprompterOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
@@ -274,6 +277,7 @@
 		A0J0V25490000000000000007 /* MobileChatModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatModels.swift; sourceTree = "<group>"; };
 		A0GH13008000000000000001 /* VoiceCaptureService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureService.swift; sourceTree = "<group>"; };
 		A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureServiceTests.swift; sourceTree = "<group>"; };
+		A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureFileIOTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000009 /* MobileChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatView.swift; sourceTree = "<group>"; };
 		1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMessageViews.swift; sourceTree = "<group>"; };
 		A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ComposerWorkflowSheet.swift; sourceTree = "<group>"; };
@@ -461,6 +465,7 @@
 				A0B10F00000000000000000C /* ObservabilityTests.swift */,
 				A0B10F000000000000000036 /* SentryHangTrackingPolicyTests.swift */,
 				A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */,
+				A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */,
 				448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */,
 				178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */,
 				A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */,
@@ -549,6 +554,7 @@
 			children = (
 				A0F507500000000000000001 /* TeleprompterProposal.swift */,
 				A0F507500000000000000003 /* TeleprompterCaptureController.swift */,
+				A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */,
 				A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */,
 				A0F507500000000000000005 /* TeleprompterViewModel.swift */,
 				A0F507500000000000000007 /* TeleprompterOverlayView.swift */,
@@ -881,6 +887,7 @@
 				A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */,
 				A0B10F000000000000000037 /* SentryHangTrackingPolicyTests.swift in Sources */,
 				A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */,
+				A0F507500000000000000014 /* TeleprompterCaptureFileIOTests.swift in Sources */,
 				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
 				A0J0V26350000000000000004 /* MobileAuthFinalizationTests.swift in Sources */,
@@ -970,6 +977,7 @@
 				A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */,
 				A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */,
 				A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */,
+				A0F507500000000000000012 /* TeleprompterCaptureFileIO.swift in Sources */,
 				A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */,
 				A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */,
 				A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */,

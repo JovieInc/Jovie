@@ -270,7 +270,7 @@ final class TeleprompterCaptureController: TeleprompterCaptureControlling {
     isPreviewing = false
     await stopSessionAndRemoveAudioCapture()
 
-    guard FileManager.default.fileExists(atPath: videoURL.path) else {
+    guard await TeleprompterCaptureFileIO.videoExists(at: videoURL) else {
       Observability.captureMessage(
         .teleprompterRecordingFailed,
         level: .error,

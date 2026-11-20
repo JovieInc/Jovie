@@ -42,9 +42,6 @@
       "apps/ios/Jovie/App/MobileAuthReturn.swift": 2,
       "apps/ios/Packages/JovieKit/Sources/JovieKit/AppReviewPolicy.swift": 2
     },
-    "main-actor-sync-io": {
-      "apps/ios/Jovie/Features/Teleprompter/TeleprompterCaptureController.swift": 1
-    },
     "observable-object-type": {
       "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift": 1,
       "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift": 1,

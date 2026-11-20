@@ -125,8 +125,15 @@ export function keyMatches(key, file) {
     return candidates.some(candidate => pattern.test(candidate));
   }
   return candidates.some(candidate => {
-    if (!key.includes('/'))
+    if (!key.includes('/')) {
+      // Bare filenames and route groups match apps/web paths and repo-root
+      // files (package.json, turbo.json). They must not match every nested
+      // basename outside apps/web (e.g. scripts/*/baseline.json), or
+      // swift-arch ratchets falsely select web disk-read tests (JOV-10443).
+      const isRepoRootFile = !file.includes('/');
+      if (!file.startsWith(WEB) && !isRepoRootFile) return false;
       return basename(candidate) === key || candidate.split('/').includes(key);
+    }
     const padded = `/${candidate}`;
     const at = padded.indexOf(`/${key}`);
     if (at === -1) return false;
