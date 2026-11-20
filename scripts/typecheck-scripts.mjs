@@ -1,15 +1,7 @@
 #!/usr/bin/env node
 /**
  * Typecheck coverage for the scripts/ tree with a shrink-only error baseline
- * (JOV-4327).
- *
- * Motivation: the .mjs scripts run on plain Node and the .ts scripts (hermes
- * jobs) run via tsx in prod hermes monitors, but no CI lane type-checked them. A
- * nonexistent `chdirSync` import from `node:fs` survived review and
- * crash-looped two hermes monitors (ci-failure-monitor, pr-stuck-monitor) —
- * fixed in #14527. This lane catches that class (TS2305 bad named import,
- * TS2307 missing module, TS2304 unknown name, TS2339 unknown property, …)
- * before it ships.
+ * (JOV-4327). Catches TS2305, TS2307, TS2304, and TS2339 before they ship.
  *
  * Ratchet semantics (mirrors the repo's ratchet philosophy):
  * - `tsc -p scripts/tsconfig.json` runs over the whole scripts/ tree.
@@ -134,10 +126,6 @@ function unknownPropertySources(diagnosticLines, read) {
 }
 
 /**
- * TS2339 on unknown from `response.json()` or js-yaml `load()`. Name
- * `loadWorkflowYaml` when the cited file imports js-yaml, and a JSDoc type
- * for json(). The json() type is also the request-mock return, so
- * `{ branches: unknown[] }` is TS2322. Never raise the baseline.
  * @param {readonly string[]} diagnosticLines
  * @param {(path: string) => string} [read]
  * @returns {string | null}
@@ -158,6 +146,20 @@ export function unknownJsonPropertyRepair(diagnosticLines, read) {
       'envelope, not unknown[]. Do not grow apps/web/typecheck-tests-baseline.json ' +
       'or scripts/typecheck-baseline.json to absorb it.'
     );
+  }
+  return null;
+}
+
+/** @param {readonly string[]} diagnosticLines */
+export function defaultOptionsPropertyRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property '.+' does not exist on type '\{ [^']*\?: [^']+ \}'\./.test(
+        line
+      )
+    )
+  ) {
+    return 'TS2339 on an inferred optional-property object: check defaulted options parameters and declare all supported properties with JSDoc. Do not grow the baseline to absorb the error.';
   }
   return null;
 }
@@ -469,7 +471,11 @@ export function evaluateTypecheckBaseline({
     for (const { file, code } of newErrors) {
       diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+    for (const diagnose of [
+      unknownJsonPropertyRepair,
+      defaultOptionsPropertyRepair,
+      tupleInferenceRepair,
+    ]) {
       const repair = diagnose(diagnosticLines);
       if (repair) console.error(repair);
     }

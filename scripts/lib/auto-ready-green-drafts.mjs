@@ -20,6 +20,7 @@ import {
 import {
   classifyAutoReadyPromotion,
   hasControlledProofMarker,
+  UNDRAFT_HOLD_LABELS,
 } from './auto-ready-provenance.mjs';
 import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
@@ -36,6 +37,8 @@ const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,
+    // JOV-13139: outside-review / do-not-ready pins.
+    ...UNDRAFT_HOLD_LABELS,
     ...ADMISSION_BLOCKING_LABELS.filter(label => !MACHINE_BLOCKS.has(label)),
   ]),
 ]);
@@ -100,6 +103,14 @@ export function classifyGreenSourceDraft(input = {}) {
   }
   if (hasGreenSourceHold(input.labels)) {
     return { eligible: false, reason: 'held' };
+  }
+  // JOV-13139: an unresolved must-fix review is a deterministic hold. GitHub's
+  // reviewDecision is structured state, not judgment; a later approving
+  // review (or an opened review resolving the request) clears it.
+  if (
+    String(input.reviewDecision ?? '').toUpperCase() === 'CHANGES_REQUESTED'
+  ) {
+    return { eligible: false, reason: 'review:changes-requested' };
   }
 
   const state = String(input.state ?? 'OPEN').toUpperCase();

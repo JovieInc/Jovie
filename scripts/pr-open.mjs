@@ -6,22 +6,18 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
-import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
+import { scrubPrText } from './lib/pr-prose.mjs';
 import {
   runGithub as gh,
   publicationPriority,
   recordPublication,
 } from './lib/pr-publication.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
-import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
+import { isRepairPr } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
-import {
-  evaluateFleetRules,
-  isLockedArea,
-  section,
-} from './pr-fleet-rules.mjs';
+import { gate, PR_URL_PLACEHOLDER } from './pr-body-lint.mjs';
+import { isLockedArea, section } from './pr-fleet-rules.mjs';
 
-const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
@@ -251,25 +247,8 @@ export function missingEvidence(input) {
   return needs;
 }
 
-export function gate({ title, body, labels = [], files, extra = [] }) {
-  const lint = lintPrBody({ body, title, labels, files, evaluateFleetRules });
-  const errors = [
-    ...lint.errors.map(e => e.message),
-    ...extra,
-    ...[...proseOnly(body).matchAll(/<[^<>\n]{3,}>/g)]
-      .map(m => m[0])
-      .filter(
-        t =>
-          t !== PR_URL_PLACEHOLDER &&
-          !/^<(?:!--|\/?(?:details|summary|br|hr|p|a|img|code|pre|kbd|sub|sup|b|i|em|strong|ul|ol|li|table|thead|tbody|tr|td|th|div|span)(?:\s[^>]*)?\/?>)/.test(
-            t
-          ) &&
-          !/^<https?:/.test(t)
-      )
-      .map(t => `placeholder: replace ${t} with real content`),
-  ];
-  return { errors, warnings: lint.warnings.map(w => w.message) };
-}
+/** The PR body gate lives in scripts/pr-body-lint.mjs (also `pnpm pr:body-lint`), so the local command and pr-open can never disagree. Re-exported for existing importers/tests. */
+export { gate };
 
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
@@ -380,6 +359,8 @@ function parse(argv) {
     else if (f === '--failing-log') a.failingLogPath = v();
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
+    else if (f === '--ready') a.ready = true;
+    else if (f === '--auto-merge') a.autoMerge = true;
     else if (f === '--draft') a.draft = true;
     else if (f === '--park') a.park = true;
     else if (f === '--on-green') a.onGreen = true;
@@ -598,7 +579,7 @@ export async function main(
     execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
     log(
-      'usage: pr-open <draft|check|open|update N> [flags]; --failing-log PATH reads Vitest red evidence'
+      'usage: pr-open <draft|check|open|update N> [flags] (--ready, --auto-merge arm shipping after green gates); --failing-log PATH reads Vitest red evidence'
     );
     return 2;
   }
@@ -775,7 +756,7 @@ export async function main(
           'target: PR changed during preparation; run update again'
         );
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
-      return 0;
+      return armShipping(github, a, String(a.number), log);
     }
     const { automaticPriority, priority: capacityPriority } =
       publicationPriority({
@@ -884,6 +865,7 @@ export async function main(
         ]);
         if (edited.status !== 0) return edited.status ?? 1;
       }
+      if (made.status === 0 && armShipping(github, a, url, log)) return 1;
       return made.status ?? 1;
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -892,6 +874,24 @@ export async function main(
     log(`FAIL  ${error.message}`);
     return 1;
   }
+}
+
+/** `--ready` marks the draft ready, `--auto-merge` arms squash auto-merge; both run only after every gate passes. */
+function armShipping(github, a, target, log) {
+  const steps = [];
+  if (a.ready) steps.push(['pr', 'ready', target]);
+  if (a.autoMerge) steps.push(['pr', 'merge', target, '--auto', '--squash']);
+  for (const step of steps) {
+    const r = github(a.repo, [...step, '--repo', REPOSITORY]);
+    if (r.status !== 0) {
+      log(
+        `FAIL  ${step[1]}: ${(r.stderr || r.stdout || 'request failed').toString().trim()}`
+      );
+      return 1;
+    }
+    log(`armed ${step[1]} for ${target}`);
+  }
+  return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
