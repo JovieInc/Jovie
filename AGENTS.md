@@ -57,6 +57,7 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Tests/coverage | [testing](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [flow](docs/PR_FLOW.md), [queue](.github/MERGE_QUEUE.md), [protection](.github/BRANCH_PROTECTION.md), [release](.claude/rules/release.md) |
 | iOS/macOS | [ios](.claude/rules/ios.md) / [macos](.claude/rules/macos.md) |
+| Native / web / Electron boundary | [ENGINEERING](canon/ENGINEERING.md#native--web--electron-boundary), [decisions](docs/architecture/native-web-electron-decisions.md) |
 | Pen canvas/registry | [pen](.claude/rules/pen.md) |
 | Skills | [gstack](.claude/rules/gstack.md) |
 | New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |

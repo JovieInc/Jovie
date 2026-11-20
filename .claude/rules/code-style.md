@@ -456,7 +456,12 @@ Before merging any PR that introduces background/scheduled work, verify:
 ## Build Before You Build (Prior-Art Gate)
 
 Use the single [capability sourcing and IA policy](../../canon/ENGINEERING.md#capability-sourcing-and-ia-integration)
-before new or expanded commodity mechanisms or visible UI. Record/reuse the
+before new or expanded commodity mechanisms or visible UI. For installed-client
+vs hosted-web vs Electron choices, also apply
+[native / web / Electron boundary](../../canon/ENGINEERING.md#native--web--electron-boundary)
+and extend
+[`docs/architecture/native-web-electron-decisions.md`](../../docs/architecture/native-web-electron-decisions.md)
+when the boundary changes. Record/reuse the
 scoped decision in the existing issue plan/workpad and PR; renew invalidated
 assumptions. Missing research access creates a bounded research task. Apply the
 same policy to sub-capabilities and provider-owned lifecycles. New diagnostics

@@ -44,9 +44,12 @@ description for every user-facing behavior change:
    status and the next recovery action for each failure state.
 4. **Input matrix:** the pointer/touch path, keyboard path where the platform
    has a hardware keyboard, and screen-reader/text-scaling/reduced-motion
-   behavior. iOS uses native input and accessibility conventions; web and Mac
-   may add power-user shortcuts. Semantic and behavioral parity matter, not
-   identical pixels or bindings.
+  behavior. iOS uses native input and accessibility conventions; web and Mac
+  may add power-user shortcuts. Semantic and behavioral parity matter, not
+  identical pixels or bindings. Choosing native vs web vs Electron for a
+  surface follows
+  [ENGINEERING.md](../../canon/ENGINEERING.md#native--web--electron-boundary),
+  not pixel parity alone.
 
 Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
 second surface when a direct visible control fits. Touch and pointer controls
