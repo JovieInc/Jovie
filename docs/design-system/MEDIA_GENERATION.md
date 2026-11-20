@@ -67,8 +67,8 @@ Runtime motion/shaders (not pixel gen) stay in
 
 Prefer Cloudflare R2 for Project-owned object storage (Project preference).
 Album-art candidates today use `@vercel/blob`
-(`apps/web/lib/services/album-art/storage.ts`) — migrate in a follow-up;
-do not add new Vercel Blob stores for design-system media.
+(`apps/web/lib/services/album-art/storage.ts`) — candidate follow-up
+JOV-13875; do not add new Vercel Blob stores for design-system media.
 
 ## How to add a path
 
