@@ -399,9 +399,9 @@ export const agentCreatorLookupLimiter = createRateLimiter(
 /**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
- * across serverless instances; callers treat a degraded backend as advisory
- * (see allowIfRateLimitBackendDegraded) so a Redis outage never blocks a
- * legitimate creator following their claim link.
+ * across serverless instances. Callers MUST fail closed on unavailable /
+ * degraded backends (429/503) — do not wrap with
+ * `allowIfRateLimitBackendDegraded`.
  */
 export const claimTokenAccessLimiter = createRateLimiter(
   RATE_LIMITERS.claimTokenAccess,
