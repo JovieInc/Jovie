@@ -21,10 +21,10 @@ export const VELOCITY_WINDOW_MS = 100;
 export const VELOCITY_STALE_MS = 60;
 /** Slower than this (items/ms) counts as a plain release. */
 export const MIN_FLING_VELOCITY = 0.0003;
-/** Cap on a throw, items/ms (about 6700 px/s at a 56px row). */
+/** Cap on a throw, items/ms (about 6200 px/s at a 52px row). */
 export const MAX_FLING_VELOCITY = 0.12;
 /** Spring stiffness (1/ms) for a release with no useful velocity. */
-export const SNAP_STIFFNESS = 0.012;
+export const SNAP_STIFFNESS = 0.015;
 /** Bounds for the stiffness of a throw, so tails stay short but smooth. */
 export const MIN_FLING_STIFFNESS = 0.0035;
 export const MAX_FLING_STIFFNESS = 0.03;

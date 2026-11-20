@@ -69,10 +69,10 @@ export function SmartLinkProviderButton({
             <path d={iconPath} />
           </svg>
         ) : null)}
-      <span
+        <span
         className={cn(
           primary
-            ? 'text-btn-primary-foreground flex-none'
+            ? 'text-btn-primary-foreground flex-none tracking-tight'
             : 'text-foreground flex-1',
           'text-base font-semibold'
         )}

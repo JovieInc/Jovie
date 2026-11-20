@@ -199,7 +199,7 @@ describe('ActionDial touch', () => {
     touch(dial, 'pointerdown', 200, 0);
     touch(dial, 'pointermove', 170, 100);
     touch(dial, 'pointermove', 140, 200);
-    expect(Number(dial.getAttribute('data-position'))).toBeCloseTo(60 / 56, 2);
+    expect(Number(dial.getAttribute('data-position'))).toBeCloseTo(60 / 52, 2);
     touch(dial, 'pointermove', 138, 500);
     touch(dial, 'pointerup', 138, 600);
     expect(onSelect).toHaveBeenCalledWith('apple');
@@ -390,6 +390,68 @@ function cleanupAnimate() {
   // @ts-expect-error jsdom has no Element.animate; restore that.
   delete HTMLElement.prototype.animate;
 }
+
+describe('ActionDial preferred state', () => {
+  it('labels the centered service and marks a remembered preference', async () => {
+    mockMotion(true);
+    render(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='apple'
+        preferredId='apple'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='Choose a streaming service'
+      />
+    );
+    expect(screen.getByTestId('action-dial')).toHaveAttribute(
+      'data-preferred',
+      'true'
+    );
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Apple Music · Remembered'
+    );
+    expect(status()).toBe('Apple Music selected, remembered');
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
+    await waitFor(() =>
+      expect(screen.getByTestId('action-dial')).toHaveAttribute(
+        'data-preferred',
+        'false'
+      )
+    );
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Deezer'
+    );
+    expect(screen.getByTestId('action-dial-selection')).not.toHaveTextContent(
+      'Remembered'
+    );
+    await waitFor(() => expect(status()).toBe('Deezer selected'));
+  });
+
+  it('keeps preferred row metadata while another option is centered', () => {
+    mockMotion(true);
+    render(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='spotify'
+        preferredId='deezer'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    expect(screen.getByTestId('action-dial')).toHaveAttribute(
+      'data-preferred',
+      'false'
+    );
+    expect(
+      screen.getByRole('option', { name: 'Deezer' })
+    ).toHaveAttribute('data-preferred', 'true');
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Spotify'
+    );
+  });
+});
 
 describe('ActionDial edge cases', () => {
   it('renders nothing without options so the host owns the fallback', () => {

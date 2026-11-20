@@ -49,11 +49,11 @@ describe('rowLayout', () => {
 describe('rowIsTappable', () => {
   it('excludes the docked row and the compressed outer rows', () => {
     expect(rowIsTappable(0)).toBe(false);
-    expect(rowIsTappable(0.59)).toBe(false);
-    expect(rowIsTappable(0.6)).toBe(true);
+    expect(rowIsTappable(0.54)).toBe(false);
+    expect(rowIsTappable(0.55)).toBe(true);
     expect(rowIsTappable(-1)).toBe(true);
-    expect(rowIsTappable(1.5)).toBe(true);
-    expect(rowIsTappable(1.51)).toBe(false);
+    expect(rowIsTappable(1.55)).toBe(true);
+    expect(rowIsTappable(1.56)).toBe(false);
     expect(rowIsTappable(-2)).toBe(false);
   });
 });

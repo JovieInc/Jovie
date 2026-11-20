@@ -30,6 +30,7 @@ const SERVICES = [
 export function SmartLinksDemo() {
   const [releaseIndex, setReleaseIndex] = useState(0);
   const [selectedId, setSelectedId] = useState('spotify');
+  const [preferredId, setPreferredId] = useState<string | null>(null);
   const release = RELEASES[releaseIndex]!;
   const options = useMemo<ActionDialOption[]>(
     () =>
@@ -79,7 +80,11 @@ export function SmartLinksDemo() {
         <ActionDial
           options={options}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          preferredId={preferredId}
+          onSelect={id => {
+            setSelectedId(id);
+            setPreferredId(id);
+          }}
           actionLabel='Open live Smart Link'
           groupLabel='Try the streaming service dial'
           hint='Pick a service. Your choice carries to the next release.'

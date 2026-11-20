@@ -56,10 +56,12 @@ export function MusicServiceDial({
   const [selectedKey, setSelectedKey] = useState<ProviderKey | null>(
     fallbackKey
   );
+  const [preferredKey, setPreferredKey] = useState<ProviderKey | null>(null);
 
   useLayoutEffect(() => {
     const preferred = readPreferredProvider();
     const available = providers.find(provider => provider.key === preferred);
+    setPreferredKey(available?.key ?? null);
     setSelectedKey(available?.key ?? fallbackKey);
   }, [providers, fallbackKey]);
 
@@ -92,6 +94,7 @@ export function MusicServiceDial({
       const provider = providers.find(candidate => candidate.key === key);
       if (!provider) return;
       setSelectedKey(provider.key);
+      setPreferredKey(provider.key);
       rememberProvider(provider.key);
     },
     [providers]
@@ -101,6 +104,7 @@ export function MusicServiceDial({
     (key: string) => {
       const provider = providers.find(candidate => candidate.key === key);
       if (!provider) return;
+      setPreferredKey(provider.key);
       rememberProvider(provider.key);
       onStream(provider.key);
     },
@@ -113,6 +117,7 @@ export function MusicServiceDial({
     <ActionDial
       options={options}
       selectedId={selectedKey}
+      preferredId={preferredKey}
       onSelect={handleSelect}
       onActivate={handleStream}
       actionLabel='Stream Now'

@@ -40,6 +40,12 @@ interface ActionDialProps {
   readonly actionLabel: string;
   readonly groupLabel: string;
   readonly onActivate?: (id: string) => void;
+  /**
+   * Remembered destination id (cookie / prior choice). When it matches the
+   * centered option the dial surfaces a quiet "Remembered" state — clearer
+   * preferred-DSP feedback without a second control.
+   */
+  readonly preferredId?: string | null;
   readonly hint?: string | null;
   readonly className?: string;
   readonly disabled?: boolean;
@@ -104,6 +110,7 @@ export function ActionDial({
   actionLabel,
   groupLabel,
   onActivate,
+  preferredId = null,
   hint = 'Swipe to switch. Your choice is remembered.',
   className,
   disabled = false,
@@ -196,8 +203,10 @@ export function ActionDial({
     }
     for (const [index, icon] of iconRefs.current) {
       const distance = index - position;
+      const abs = Math.abs(distance);
       icon.style.transform = `translate3d(0, ${distance * 100}%, 0)`;
-      icon.style.opacity = Math.abs(distance) < 1 ? '1' : '0';
+      // Fractional crossfade keeps the CTA icon settling coupled to the reel.
+      icon.style.opacity = String(Math.max(0, 1 - abs));
     }
   }, []);
 
@@ -214,10 +223,10 @@ export function ActionDial({
     lastPulseRef.current = now;
     action.animate(
       [
-        { transform: 'scale(0.972)', opacity: 0.86 },
+        { transform: 'scale(0.968)', opacity: 0.88 },
         { transform: 'scale(1)', opacity: 1 },
       ],
-      { duration: 140, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
+      { duration: 120, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
     );
   }, []);
 
@@ -422,6 +431,10 @@ export function ActionDial({
   if (!active) return null;
 
   const position = activeIndex;
+  const settled = options[restIndex] ?? active;
+  // Caption follows the centered option (what Stream Now opens); status waits for rest.
+  const isPreferred = Boolean(preferredId && active.id === preferredId);
+  const settledPreferred = Boolean(preferredId && settled.id === preferredId);
   const actionIcon =
     count < 2 || !active.icon ? (
       active.icon
@@ -442,7 +455,7 @@ export function ActionDial({
               className='absolute inset-0 will-change-transform'
               style={{
                 transform: `translate3d(0, ${(index - position) * 100}%, 0)`,
-                opacity: Math.abs(index - position) < 1 ? 1 : 0,
+                opacity: Math.max(0, 1 - Math.abs(index - position)),
               }}
               data-testid={`action-dial-icon-${option.id}`}
             >
@@ -472,12 +485,14 @@ export function ActionDial({
       data-testid='action-dial'
       data-position={selectedIndex}
       data-state='idle'
+      data-preferred={isPreferred ? 'true' : 'false'}
     >
       <legend className='sr-only'>{groupLabel}</legend>
       <div
         className={cn(
           'relative overflow-hidden',
-          count === 1 ? 'h-19 min-h-19' : 'h-53 min-h-53'
+          // Tighter vertical stack with 52px row steps; keep one composition.
+          count === 1 ? 'h-19 min-h-19' : 'h-50 min-h-50'
         )}
       >
         {count > 1 ? (
@@ -495,6 +510,9 @@ export function ActionDial({
           >
             {windowed.map(([index, option]) => {
               const layout = rowLayout(index - position);
+              const preferredRow = Boolean(
+                preferredId && option.id === preferredId
+              );
               return (
                 <div
                   key={option.id}
@@ -509,7 +527,8 @@ export function ActionDial({
                   aria-posinset={index + 1}
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
-                  className='absolute inset-x-3 top-21 flex h-11 items-center justify-center gap-2 rounded-full text-sm text-foreground will-change-transform'
+                  data-preferred={preferredRow ? 'true' : undefined}
+                  className='absolute inset-x-3 top-19 flex h-12 min-h-12 items-center justify-center gap-2 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
                   style={{
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
@@ -543,7 +562,7 @@ export function ActionDial({
           ref={actionRef}
           className={cn(
             'absolute inset-x-3 z-10',
-            count === 1 ? 'top-3' : 'top-20'
+            count === 1 ? 'top-3' : 'top-19'
           )}
         >
           <SmartLinkProviderButton
@@ -554,7 +573,7 @@ export function ActionDial({
             primary
             disabled={disabled}
             ariaLabel={`${actionLabel} with ${active.label}`}
-            className='w-full'
+            className='w-full tracking-tight'
             onClick={event => {
               if (suppressClickRef.current) {
                 event.preventDefault();
@@ -576,42 +595,71 @@ export function ActionDial({
         </p>
       ) : null}
       {count > 1 ? (
-        <div
-          className='mt-1 flex h-5 items-center justify-center'
-          aria-hidden='true'
-          data-testid='action-dial-hint'
-          data-visible={showHint}
-        >
-          <span
-            ref={hintGlyphRef}
+        <div className='mt-1 flex min-h-6 flex-col items-center justify-center gap-0.5'>
+          <p
+            data-testid='action-dial-selection'
             className={cn(
-              'text-tertiary-token transition-opacity duration-normal motion-reduce:transition-none',
-              showHint ? 'opacity-100' : 'opacity-0'
+              'text-center text-xs font-medium tracking-tight',
+              isPreferred ? 'text-primary-token' : 'text-secondary-token'
             )}
+            aria-hidden='true'
           >
-            <svg
-              viewBox='0 0 24 24'
-              fill='none'
-              stroke='currentColor'
-              strokeWidth='1.75'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              className='h-4 w-4'
-              aria-hidden='true'
+            {active.label}
+            {isPreferred ? (
+              <span className='text-tertiary-token'> · Remembered</span>
+            ) : null}
+          </p>
+          <div
+            className='flex h-4 items-center justify-center'
+            aria-hidden='true'
+            data-testid='action-dial-hint'
+            data-visible={showHint}
+          >
+            <span
+              ref={hintGlyphRef}
+              className={cn(
+                'text-tertiary-token transition-opacity duration-normal motion-reduce:transition-none',
+                showHint ? 'opacity-100' : 'opacity-0'
+              )}
             >
-              {/* Lucide chevrons-up-down geometry; inlined so the dial has no icon-package dependency. */}
-              <path d='m7 15 5 5 5-5' />
-              <path d='m7 9 5-5 5 5' />
-            </svg>
-          </span>
+              <svg
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='1.75'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                className='h-3.5 w-3.5'
+                aria-hidden='true'
+              >
+                {/* Lucide chevrons-up-down geometry; inlined so the dial has no icon-package dependency. */}
+                <path d='m7 15 5 5 5-5' />
+                <path d='m7 9 5-5 5 5' />
+              </svg>
+            </span>
+          </div>
         </div>
       ) : hint ? (
         <p id={hintId} className='mt-1 text-center text-xs text-primary-token'>
           {hint}
         </p>
-      ) : null}
+      ) : (
+        <p
+          data-testid='action-dial-selection'
+          className={cn(
+            'mt-1 text-center text-xs font-medium tracking-tight',
+            isPreferred ? 'text-primary-token' : 'text-secondary-token'
+          )}
+        >
+          {active.label}
+          {isPreferred ? (
+            <span className='text-tertiary-token'> · Remembered</span>
+          ) : null}
+        </p>
+      )}
       <p className='sr-only' role='status' aria-live='polite'>
-        {(options[restIndex] ?? active).label} selected
+        {settled.label} selected
+        {settledPreferred ? ', remembered' : ''}
       </p>
     </fieldset>
   );

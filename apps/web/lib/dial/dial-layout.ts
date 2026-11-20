@@ -5,11 +5,13 @@
  */
 
 /** Pixels between adjacent row centers near the center. */
-export const ROW_STEP_PX = 56;
+export const ROW_STEP_PX = 52;
 /** Pixels between row centers further out, where rows are compressed. */
-export const OUTER_STEP_PX = 34;
+export const OUTER_STEP_PX = 30;
 /** Rows further than this from the center are not rendered. */
 export const WINDOW_RADIUS = 5;
+/** Minimum comfortable row hit height (Apple HIG floor is 44). */
+export const ROW_HIT_PX = 48;
 
 export interface RowLayout {
   readonly y: number;
@@ -38,5 +40,6 @@ export function rowLayout(distance: number): RowLayout {
 /** Whether a row at this distance should take taps (not under the button). */
 export function rowIsTappable(distance: number): boolean {
   const abs = Math.abs(distance);
-  return abs >= 0.6 && abs <= 1.5;
+  // Slightly wider than the visual dock so adjacent rows stay easy to hit.
+  return abs >= 0.55 && abs <= 1.55;
 }
