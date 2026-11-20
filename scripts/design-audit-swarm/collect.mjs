@@ -1,18 +1,11 @@
 /**
- * Read-only design-audit collectors. No pen writer / fixer / emit imports.
+ * Read-only design-audit collectors. Spawn check CLIs — no pen writer/fixer
+ * imports and no heavy import-graph coupling into script-contracts.
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { runValidate } from '../anti-slop/run.mjs';
-import {
-  checkChromeRepository,
-  checkRepository,
-} from '../component-ownership-check.mjs';
-import { loadBindings, validateBindings } from '../design/pen-bindings-lib.mjs';
-import { runDesignGovernanceAudit } from '../design-governance-audit.mjs';
-import { evaluateSharedUiVisualArbitraryAudit } from '../shared-ui-visual-arbitrary-audit.mjs';
 
 /** @typedef {'design-governance'|'anti-slop'|'fragmentation'|'pen-parity'|'media-gen-inventory'} DesignAuditRecipeId */
 
@@ -91,104 +84,108 @@ function finding(partial) {
   };
 }
 
-function collectGovernance(repoRoot) {
-  const { failed, warned } = runDesignGovernanceAudit(repoRoot, {
-    includeAuthorityMap: true,
+/** @param {string} repoRoot @param {string[]} args */
+function runNode(repoRoot, args) {
+  return spawnSync(process.execPath, args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 8 * 1024 * 1024,
   });
-  return [
-    ...failed.map(check =>
-      finding({
-        id: `gov-${check.id}`,
-        recipeId: 'design-governance',
-        title: `Governance FAIL: ${check.id}`,
-        summary: check.detail,
-        priority: 'P0',
-        kind: 'governance',
-        evidencePaths: ['scripts/design-governance-audit.mjs', check.id],
-        surface: check.id,
-      })
-    ),
-    ...warned.map(check =>
-      finding({
-        id: `gov-warn-${check.id}`,
-        recipeId: 'design-governance',
-        title: `Governance WARN: ${check.id}`,
-        summary: check.detail,
-        priority: 'P2',
-        kind: 'governance',
-        evidencePaths: ['scripts/design-governance-audit.mjs', check.id],
-        surface: check.id,
-      })
-    ),
-  ];
 }
 
-function collectAntiSlop(repoRoot) {
-  return runValidate(repoRoot).errors.map((message, index) =>
-    finding({
-      id: `anti-slop-${index + 1}`,
-      recipeId: 'anti-slop',
-      title: 'Anti-slop registry drift',
-      summary: message,
-      priority: 'P1',
-      kind: 'anti-slop',
-      evidencePaths: ['docs/design-system/anti-slop-rules.json'],
-    })
-  );
-}
-
-function collectFragmentation() {
-  const ownership = [...checkRepository(), ...checkChromeRepository()].slice(
-    0,
-    25
-  );
-  const ownershipFindings = ownership.map((violation, index) =>
-    finding({
-      id: `frag-ownership-${index + 1}`,
-      recipeId: 'fragmentation',
-      title: 'Component ownership violation',
-      summary: `${violation.filePath}: ${violation.reason ?? violation.internal ?? 'ownership drift'}`,
-      priority: 'P1',
-      kind: 'fragmentation',
-      evidencePaths: [
-        violation.filePath,
-        'docs/design-system/component-ownership.json',
-      ],
-      surface: violation.filePath,
-    })
-  );
-
-  const visual = evaluateSharedUiVisualArbitraryAudit();
-  if (visual.ok !== false) return ownershipFindings;
+function collectGovernance(repoRoot) {
+  const result = runNode(repoRoot, ['scripts/design-governance-audit.mjs']);
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  if (result.status === 0) return [];
   return [
-    ...ownershipFindings,
     finding({
-      id: 'frag-shared-ui-visual',
-      recipeId: 'fragmentation',
-      title: 'Shared-UI visual arbitrary debt grew',
+      id: 'gov-audit-failed',
+      recipeId: 'design-governance',
+      title: 'Design governance audit failed',
       summary:
-        (visual.issues ?? []).slice(0, 5).join('; ') ||
-        `shared-ui visual-arbitrary ${visual.status}`,
-      priority: 'P1',
-      kind: 'fragmentation',
-      evidencePaths: ['scripts/shared-ui-visual-arbitrary-audit.mjs'],
+        output.trim().slice(0, 2000) ||
+        'design-governance-audit exited non-zero',
+      priority: 'P0',
+      kind: 'governance',
+      evidencePaths: ['scripts/design-governance-audit.mjs'],
     }),
   ];
 }
 
-function collectPenParity(repoRoot) {
-  const errors = validateBindings(loadBindings(repoRoot), { root: repoRoot });
-  return errors.map((message, index) =>
+function collectAntiSlop(repoRoot) {
+  const result = runNode(repoRoot, ['scripts/anti-slop/run.mjs', 'validate']);
+  if (result.status === 0) return [];
+  const detail = (result.stderr || result.stdout || '').trim().slice(0, 2000);
+  return [
     finding({
-      id: `pen-parity-${index + 1}`,
+      id: 'anti-slop-validate',
+      recipeId: 'anti-slop',
+      title: 'Anti-slop registry drift',
+      summary: detail || 'anti-slop validate exited non-zero',
+      priority: 'P1',
+      kind: 'anti-slop',
+      evidencePaths: ['docs/design-system/anti-slop-rules.json'],
+    }),
+  ];
+}
+
+function collectFragmentation(repoRoot) {
+  /** @type {ReturnType<typeof finding>[]} */
+  const findings = [];
+  const ownership = runNode(repoRoot, [
+    'scripts/component-ownership-check.mjs',
+  ]);
+  if (ownership.status !== 0) {
+    findings.push(
+      finding({
+        id: 'frag-ownership',
+        recipeId: 'fragmentation',
+        title: 'Component ownership violation',
+        summary: (ownership.stderr || ownership.stdout || '')
+          .trim()
+          .slice(0, 2000),
+        priority: 'P1',
+        kind: 'fragmentation',
+        evidencePaths: ['docs/design-system/component-ownership.json'],
+      })
+    );
+  }
+  const visual = runNode(repoRoot, [
+    'scripts/shared-ui-visual-arbitrary-audit.mjs',
+  ]);
+  if (visual.status !== 0) {
+    findings.push(
+      finding({
+        id: 'frag-shared-ui-visual',
+        recipeId: 'fragmentation',
+        title: 'Shared-UI visual arbitrary debt grew',
+        summary: (visual.stderr || visual.stdout || '').trim().slice(0, 2000),
+        priority: 'P1',
+        kind: 'fragmentation',
+        evidencePaths: ['scripts/shared-ui-visual-arbitrary-audit.mjs'],
+      })
+    );
+  }
+  return findings;
+}
+
+function collectPenParity(repoRoot) {
+  const result = runNode(repoRoot, [
+    'scripts/design/pen-bindings.mjs',
+    'validate',
+  ]);
+  if (result.status === 0) return [];
+  return [
+    finding({
+      id: 'pen-parity-validate',
       recipeId: 'pen-parity',
       title: 'Pen binding parity error',
-      summary: message,
+      summary: (result.stderr || result.stdout || '').trim().slice(0, 2000),
       priority: 'P1',
       kind: 'pen-parity',
-      evidencePaths: ['scripts/design/pen-bindings-lib.mjs'],
-    })
-  );
+      evidencePaths: ['scripts/design/pen-bindings.mjs'],
+    }),
+  ];
 }
 
 function collectMediaGen(repoRoot) {
