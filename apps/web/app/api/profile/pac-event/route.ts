@@ -10,6 +10,7 @@ import {
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -22,7 +23,6 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const MAX_BODY_BYTES = 4096;
-const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 
 /**
  * First-party sink for PAC (Primary Action Card) instrumentation events —
@@ -100,7 +100,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Never trust the beacon's positive consent claim for identity joining.
     // The httpOnly granular cookie and server-resolved region policy are
     // authoritative. Client-reported opt-outs remain an extra fail-closed
-    // signal, while GPC/DNT and the legacy rejection cookie are also honored.
+    // signal. GPC/DNT override; legacy rejection is the fallback when granular
+    // consent is unusable, since privacy choices also uses it for advertising.
     const requiresCookieConsent =
       cookieStore.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
       isCookieBannerRequired(
@@ -119,7 +120,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       request.headers.get('dnt') === '1' ||
       request.headers.get('dnt') === 'yes';
     const legacyOptedOut =
-      cookieStore.get(LEGACY_TRACKING_CONSENT_COOKIE)?.value === 'rejected';
+      canonicalConsent === null &&
+      cookieStore.get(TRACKING_CONSENT_COOKIE_NAME)?.value === 'rejected';
     const clientOptedOut = PAC_IDENTITY_BLOCKED_CONSENTS.includes(
       event.consent
     );

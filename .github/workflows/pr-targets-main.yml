@@ -27,7 +27,7 @@ concurrency:
 jobs:
   pr-targets-main:
     name: PR targets main
-    runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 2
     steps:
       - name: Refuse any base other than main

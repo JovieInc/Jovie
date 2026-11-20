@@ -1,0 +1,33 @@
+{
+  "schema": "jovie-pr-wip-policy/v1",
+  "about": "Historical producer WIP targets for census and repair ordering, plus disabled idle expiry. These November 1 throughput estimates are diagnostic, never admission ceilings. Canonical pr_wip.py admission uses the matched caller's shared quota ledger and fresh runner backlog; actual API calls reserve at the shared client. Unknown evidence preserves existing bounded seats and prevents autoscale growth. Producer names, draft counts and historical quota-deferred heads do not attest current capacity.",
+  "admission": "observed-capacity",
+  "measuredAt": "2026-11-01T00:40:00Z",
+  "targetLeadTimeDays": 1,
+  "minCap": 4,
+  "defaultCap": 6,
+  "caps": {
+    "opus": 30,
+    "glm": 20,
+    "fix": 15,
+    "feat": 10,
+    "codex": 8,
+    "compounding": 8,
+    "bot": 6,
+    "hyperagent": 5,
+    "ci": 4,
+    "claude": 4,
+    "sonnet": 4,
+    "devin": 4,
+    "grok": 4
+  },
+  "exemptProducers": ["tim", "dependabot", "revert", "gh-readonly-queue"],
+  "liveWindowHours": 48,
+  "expire": {
+    "enabled": false,
+    "about": "Off until JOV-INV-011 (automaticCloseRequiresExplicitDuplicateLabel) is amended by the founder; until then `python3 scripts/lanes/pr_wip.py expire` lists candidates and `--apply` is an explicit, authorized run.",
+    "ownerlessIdleDays": 7,
+    "anyIdleDays": 21,
+    "maxClosesPerTick": 10
+  }
+}

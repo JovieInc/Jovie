@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   StackableBadgeGroup,
@@ -122,7 +123,7 @@ describe('StackableBadgeGroup', () => {
     );
 
     expect(screen.getByTitle('Selected')).toHaveClass('ring-1');
-    expect(screen.getByTitle('Disabled')).toHaveClass('opacity-50');
+    expect(screen.getByTitle('Disabled')).toHaveClass('text-tertiary-token');
     expect(screen.getByTitle('Selected')).toHaveAttribute(
       'data-selected',
       'true'
@@ -178,5 +179,91 @@ describe('StackableBadgeGroup', () => {
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('list', { name: 'All badges' })).toBeNull();
+  });
+});
+
+describe('StackableBadgeGroup state stories', () => {
+  it('uses error tone tokens for failed items', () => {
+    render(
+      <StackableBadgeGroup
+        items={[
+          { id: 'sync', label: 'Sync failed', tone: 'error' },
+          { id: 'spotify', label: 'Spotify' },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('group', { name: 'Sync failed, Spotify' })).toBe(
+      screen.getByRole('group')
+    );
+    expect(screen.getByTitle('Sync failed').className).toMatch(/error/);
+  });
+
+  it('falls back to dot marks for items without icons', () => {
+    render(
+      <StackableBadgeGroup
+        items={[
+          { id: 'spotify', label: 'Spotify' },
+          { id: 'tidal', label: 'Tidal' },
+        ]}
+      />
+    );
+
+    const stacked = screen.getByTitle('Tidal');
+    expect(stacked.querySelector('.rounded-full.bg-current')).not.toBeNull();
+  });
+
+  it('overlaps stacked items at the logical start edge for RTL', () => {
+    render(
+      <div dir='rtl'>
+        <StackableBadgeGroup
+          items={[
+            { id: 'anghami', label: 'أنغامي', tone: 'success' },
+            { id: 'spotify', label: 'سبوتيفاي' },
+          ]}
+        />
+      </div>
+    );
+
+    expect(screen.getByTitle('سبوتيفاي')).toHaveClass('-ms-1.5');
+    expect(screen.getByText('أنغامي')).toHaveClass('truncate');
+  });
+});
+
+describe('StackableBadgeGroup accessibility', () => {
+  it('has no axe violations for default, overflow, error and RTL stacks', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <div>
+        <StackableBadgeGroup items={ITEMS} maxVisible={2} />
+        <StackableBadgeGroup
+          items={[
+            { id: 'sync', label: 'Sync failed', tone: 'error' },
+            { id: 'tidal', label: 'Tidal' },
+          ]}
+        />
+        <div dir='rtl' lang='ar'>
+          <StackableBadgeGroup
+            items={[
+              { id: 'anghami', label: 'أنغامي', tone: 'success' },
+              { id: 'spotify', label: 'سبوتيفاي' },
+            ]}
+          />
+        </div>
+      </div>
+    );
+
+    await expectNoA11yViolations(container);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Show 2 more badges' })
+    );
+    const disclosure = await screen.findByRole('dialog', {
+      name: 'All badges',
+    });
+    expect(
+      within(disclosure).getByRole('list', { name: 'All badges' })
+    ).toBeVisible();
+    await expectNoA11yViolations(disclosure);
   });
 });

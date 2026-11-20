@@ -3,6 +3,8 @@ import {
   type CommissionLaunchInput,
   decideLaunchAction,
   InMemoryLaunchRegistry,
+  type LaunchOutcome,
+  type LaunchStatus,
   launchIdForSource,
 } from './index';
 
@@ -158,6 +160,158 @@ describe('InMemoryLaunchRegistry', () => {
     });
     expect(replay.receipts).toHaveLength(1);
     expect(withReceipt.status).toBe('delivered');
+  });
+
+  it.each<{ kind: LaunchOutcome['kind']; status: LaunchStatus }>([
+    { kind: 'visited', status: 'visited' },
+    { kind: 'confirmed_subscription', status: 'subscribed' },
+    { kind: 'activated', status: 'activated' },
+    { kind: 'retained', status: 'retained' },
+    { kind: 'converted', status: 'activated' },
+  ])(
+    'records zero $kind without advancing, but advances on positive counts',
+    async ({ kind, status }) => {
+      const registry = new InMemoryLaunchRegistry();
+      const launch = await registry.commission(commissionInput());
+      const zero: LaunchOutcome = {
+        kind,
+        count: 0,
+        observationWindow: '2026-10-01/2026-10-08',
+        observedAt: '2026-10-08T00:00:00Z',
+      };
+      const observedZero = await registry.recordOutcome(launch.launchId, zero);
+      expect(observedZero).toMatchObject({
+        status: 'prepared',
+        outcomes: [zero],
+        receipts: [],
+      });
+
+      const positive = { ...zero, count: 1 };
+      const observedPositive = await registry.recordOutcome(
+        launch.launchId,
+        positive
+      );
+      expect(observedPositive.status).toBe(status);
+      expect(observedPositive.outcomes).toEqual([zero, positive]);
+
+      const retainedZero: LaunchOutcome = { ...zero, kind: 'retained' };
+      const laterZero = await registry.recordOutcome(
+        launch.launchId,
+        retainedZero
+      );
+      expect(laterZero.status).toBe(status);
+      expect(laterZero.outcomes).toEqual([zero, positive, retainedZero]);
+      const laterVisit = await registry.recordOutcome(launch.launchId, {
+        ...positive,
+        kind: 'visited',
+      });
+      expect(laterVisit.status).toBe(status);
+    }
+  );
+
+  it.each([
+    { publiclyAvailable: false },
+    { userAccessVerified: false },
+    { material: false },
+  ])(
+    'keeps zero observations separate from availability and no-action decisions: %j',
+    async overrides => {
+      const registry = new InMemoryLaunchRegistry();
+      const access = availability(overrides);
+      const launch = await registry.commission(
+        commissionInput({
+          availability: access,
+          decision: decideLaunchAction(
+            decisionInput({ ...overrides, availability: access })
+          ),
+        })
+      );
+      const zero: LaunchOutcome = {
+        kind: 'retained',
+        count: 0,
+        observationWindow: '2026-10-01/2026-10-08',
+        observedAt: '2026-10-08T00:00:00Z',
+      };
+      const recorded = await registry.recordOutcome(launch.launchId, zero);
+      expect(recorded).toMatchObject({
+        status: 'prepared',
+        availability: launch.availability,
+        decision: launch.decision,
+        outcomes: [zero],
+        receipts: [],
+      });
+      expect(await registry.get(launch.launchId)).toBe(recorded);
+    }
+  );
+
+  it('keeps a delivered launch delivered after observing zero retention', async () => {
+    const registry = new InMemoryLaunchRegistry();
+    const launch = await registry.commission(commissionInput());
+    const receipt = {
+      externalId: 'ig-media-123',
+      channel: 'instagram',
+      status: 'delivered' as const,
+      observedAt: '2026-10-01T01:00:00Z',
+    };
+    await registry.recordReceipt(launch.launchId, receipt);
+    const zero: LaunchOutcome = {
+      kind: 'retained',
+      count: 0,
+      observationWindow: '2026-10-01/2026-10-08',
+      observedAt: '2026-10-08T00:00:00Z',
+    };
+    const recorded = await registry.recordOutcome(launch.launchId, zero);
+    expect(recorded).toMatchObject({
+      status: 'delivered',
+      receipts: [receipt],
+      outcomes: [zero],
+    });
+  });
+
+  it.each(['withdrawn', 'retracted'] as const)(
+    'retains zero and positive observations without reopening a %s launch',
+    async status => {
+      const registry = new InMemoryLaunchRegistry();
+      const launch = await registry.commission(commissionInput());
+      const note = 'availability or claim withdrawn';
+      await registry.annotate(launch.launchId, status, note);
+      for (const count of [0, 1]) {
+        const recorded = await registry.recordOutcome(launch.launchId, {
+          kind: 'retained',
+          count,
+          observationWindow: '2026-10-01/2026-10-08',
+          observedAt: '2026-10-08T00:00:00Z',
+        });
+        expect(recorded.status).toBe(status);
+        expect(recorded.statusNote).toBe(note);
+      }
+      expect(
+        (await registry.get(launch.launchId))?.outcomes.map(
+          outcome => outcome.count
+        )
+      ).toEqual([0, 1]);
+    }
+  );
+
+  it.each([
+    -1,
+    0.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])('rejects invalid count %s without changing the launch', async count => {
+    const registry = new InMemoryLaunchRegistry();
+    const launch = await registry.commission(commissionInput());
+    await expect(
+      registry.recordOutcome(launch.launchId, {
+        kind: 'retained',
+        count,
+        observationWindow: '2026-10-01/2026-10-08',
+        observedAt: '2026-10-08T00:00:00Z',
+      })
+    ).rejects.toThrow('non-negative safe integer');
+    expect(await registry.get(launch.launchId)).toBe(launch);
   });
 
   it('advances lifecycle status monotonically and annotates withdrawals', async () => {

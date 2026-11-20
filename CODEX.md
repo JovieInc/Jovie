@@ -4,7 +4,7 @@ Read `canon/OPERATING_SYSTEM.md` and `AGENTS.md` first. Codex uses the same
 canonical local bootstrap as humans and Claude: `bash scripts/codex-setup.sh`
 delegates to `scripts/setup.sh`. The wrapper selects the source-pinned Node
 runtime from nvm when already installed, including in non-interactive desktop
-hook shells. Current pins are Node 24.22.1 and pnpm 9.15.9.
+hook shells. Current pins are Node 24.22.3 and pnpm 9.15.9.
 
 ## Desktop worktrees and hooks
 
@@ -22,6 +22,13 @@ Codex requires review and trust of each new or changed hook definition through
 `/hooks`. A checked-in hook file or feature flag is not proof that it ran.
 Do not fabricate trust hashes or bypass hook review. Manual setup remains
 available before trust.
+
+`scripts/setup.sh` and `scripts/agent/worktree-new` (the worktree pool) both
+run `pnpm install` (husky / `prepare`) and `scripts/hooks/configure-git-hooks.sh`,
+which then runs `scripts/hooks/verify-git-hooks.sh`. The verifier fails if
+`core.hooksPath` is not `.husky` or if `.husky/pre-commit` or `.husky/pre-push`
+is missing or not executable, so a fresh agent worktree cannot silently
+commit or push around the hooks.
 
 The normal setup path also attempts bounded GBrain health/index maintenance.
 That is best effort and does not retrieve prior decisions or prove durable
@@ -44,10 +51,9 @@ version failure propagates; setup never labels it as success.
 
 Setup shell exports do not persist into later cloud command shells. Retain
 the toolchain on disk and activate its PATH in the cloud Start skill. Refresh
-frozen dependencies after a checkout or lockfile change. Until the checkout
-contains the secret-free wrapper, use the environment's dependency-only
-install script and disable repository hooks for nested CLI invocations with
-`-c features.hooks=false`.
+frozen dependencies after a checkout or lockfile change. Use only the
+per-agent Codex cloud environments, never a legacy one; see the guardrail in
+[canon/FLEET.md](canon/FLEET.md).
 
 Authenticated web tests/builds, browser E2E, database/migration checks, native
 builds, and release acceptance require their own environments and receipts.

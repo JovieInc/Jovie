@@ -9,47 +9,48 @@
       {
         "id": "entry",
         "kind": "entry",
-        "surface": "web",
-        "oracle": "TODO: what a first-time visitor must understand on the first screen"
+        "surface": "ios",
+        "oracle": "A first-time visitor sees the native Jovie sign-in screen and can start browser authentication; unavailable and cancelled states offer recovery."
       },
       {
         "id": "signup",
         "kind": "signup",
-        "surface": "web",
-        "oracle": "TODO: a canary account is created and signed in as itself"
+        "surface": "ios",
+        "oracle": "The canary completes browser PKCE authentication and the native token exchange returns the same signed-in user, never another account or fixture identity."
       },
       {
         "id": "onboarding",
         "kind": "onboarding",
-        "surface": "web",
-        "oracle": "TODO: onboarding completes with the canary's own inputs reflected back"
+        "surface": "ios",
+        "oracle": "The canary completes required profile setup natively and its own handle and artist data appear in the app; a web-only detour or generic placeholder fails."
       },
       {
         "id": "first-value",
         "kind": "first-value",
-        "surface": "web",
-        "oracle": "TODO: the canary sees the product's core value with its own data"
+        "surface": "ios",
+        "oracle": "The native profile and library show the canary's own artist and releases; opening a release preserves identity and gives a working next action without errors or quota walls."
       },
       {
         "id": "paid-conversion",
         "kind": "paid-conversion",
-        "surface": "web",
-        "oracle": "TODO: the paywall shows the live price and a test purchase unlocks the paid plan"
+        "surface": "ios",
+        "oracle": "The canary's Settings billing handoff shows the canonical Artist Presence price, test-mode checkout completes, and the same account's paid entitlement is reflected after returning to the native app."
       }
     ],
-    "flows": { "web": "canon/certification/flows/jovie-ios.mjs" },
+    "flows": { "ios": "canon/certification/flows/jovie-ios.mjs" },
     "accounts": {
       "policy": "canary-only",
-      "source": "TODO: doppler:<project>/<config> keys for canary accounts (never in git)"
+      "source": "apps/web/lib/synthetic/prodcert-identities.ts; existing canary identities on the shared Jovie backend, with native browser PKCE and token exchange; fixture launches do not prove authentication"
     }
   },
   "paidOutcome": {
-    "plan": "TODO",
-    "price": 0,
+    "plan": "Artist Presence",
+    "price": 12,
     "currency": "USD",
     "interval": "month",
-    "priceSource": "TODO: path of the file holding the live price",
-    "freeAlternative": "TODO: what the buyer does instead of paying"
+    "priceSource": "apps/web/lib/config/plan-prices.ts",
+    "pricePattern": "monthlyUsd:\\s*([0-9.]+)",
+    "freeAlternative": "Jovie Free (profile, smart links, release pages and fan capture) or a free link-in-bio"
   },
   "buyer": {
     "personas": "canon/certification/jovie-ios-personas.json",
@@ -59,8 +60,12 @@
   "privacy": {
     "profile": "standard",
     "registry": "canon/certification/jovie-ios-tracker-registry.json",
-    "crawl": [{ "url": "TODO: https://<prod>/", "input": false }],
-    "policyUrl": "TODO: https://<prod>/privacy",
+    "crawl": [
+      { "url": "https://jov.ie/signin", "input": true },
+      { "url": "https://jov.ie/support", "input": true },
+      { "url": "https://jov.ie/legal/privacy", "input": false }
+    ],
+    "policyUrl": "https://jov.ie/legal/privacy",
     "counselSignoff": null
   },
   "customerVoice": {
@@ -68,12 +73,13 @@
       {
         "id": "support-email",
         "kind": "email",
-        "route": "TODO: handler that captures inbound support email"
+        "route": "apps/ios/Jovie/Features/Settings/SettingsView.swift SettingsExternalURL.support -> https://jov.ie/support -> apps/web/app/api/webhooks/resend-inbound -> lib/customer-voice -> Summer",
+        "status": "pending"
       }
     ],
     "approval": "tim",
-    "sink": "SUMMER_CUSTOMER_VOICE_URL"
+    "sink": "SUMMER_BASE_URL"
   },
-  "waste": { "appId": "TODO: id in the waste registry" },
-  "capacity": { "appId": "TODO: id in the capacity collector" }
+  "waste": { "appId": "jovie" },
+  "capacity": { "appId": "jovie" }
 }

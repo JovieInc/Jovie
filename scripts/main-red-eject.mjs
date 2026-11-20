@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// api-budget: github-app-core 600/hr - estimate: 60 relevant wakes/hr x 10 REST reads/writes; manual apply is exceptional.
+// api-budget: github-app-graphql 300/hr - estimate: 60 relevant wakes/hr x 5 queue reads and actor-verified dequeue calls.
+// api-budget: github-actions-token 900/hr - estimate: 60 relevant wakes/hr x 15 substituted calls, never an additional polling loop.
 // Main-red ejection driver. A failing check must never stop the queue:
 // attribute the culprit, revert it through the compounding jump path, re-land it
 // as a repair PR, and free a conflicted queue head. See scripts/lib/main-red-eject.mjs.
@@ -34,6 +37,7 @@ import {
   INCIDENT_SCHEMA,
   MAX_LOOKBACK_COMMITS,
   marker,
+  openIncidents,
   parsePrNumber,
   planJump,
   REOPEN_LABEL,
@@ -43,6 +47,10 @@ import {
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
+import {
+  remediateUnrevertable,
+  unattributedPlan,
+} from './main-red-remediate.mjs';
 
 const REPO = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const CI_WORKFLOW = 'ci.yml';
@@ -188,12 +196,7 @@ export async function plan({
   const trigger = detectConsecutiveGroupFailure(
     recent.map(r => ({ ...r, signature: r.signature }))
   );
-  if (!trigger.triggered)
-    return {
-      ...result,
-      action: 'none',
-      reason: 'failures-do-not-share-a-signature',
-    };
+  if (!trigger.triggered) return unattributedPlan(result, recent, mode);
   const check = checkKey(trigger.signature);
 
   const commits = await mainCommits();
@@ -231,18 +234,7 @@ export async function plan({
   const open = await api(`repos/${REPO}/pulls?state=open&per_page=100`, 'poll');
   const openReverts = open
     .filter(p => p.labels.some(l => l.name === REVERT_LABEL))
-    .map(p => ({ number: p.number, check: readMarker(p.body)?.check }));
-  const repairs = open
-    .filter(
-      p =>
-        p.labels.some(l => l.name === COMPOUNDING_LABEL) &&
-        /main (is )?red|recert|renew|census/i.test(p.title)
-    )
-    .map(p => ({
-      number: p.number,
-      createdAt: p.created_at,
-      queued: Boolean(p.auto_merge),
-    }));
+    .map(p => ({ number: p.number, ...readMarker(p.body) }));
   const prior = culprit?.pr
     ? await api(`repos/${REPO}/issues/${culprit.pr}`, 'poll').catch(() => null)
     : null;
@@ -251,9 +243,7 @@ export async function plan({
     culprit,
     check,
     openReverts,
-    repairs,
     priorAttempts,
-    now,
     mode,
     ambiguous: attribution.status === 'ambiguous',
     culpritLabels: (prior?.labels ?? []).map(l => l.name),
@@ -323,9 +313,91 @@ async function queueEntries() {
   }));
 }
 
+const QUOTA_DEFERRED_CODE = 'dequeue_quota_deferred';
+
+/** A MergeQueueBackendError that is the installation bucket's rate-limit exhaustion. */
+function isInstallationQuotaExhaustion(error) {
+  return (
+    error?.name === 'MergeQueueBackendError' &&
+    error?.code === 'gh_command_failed' &&
+    /rate limit (already )?exceeded for installation ID \d+/i.test(
+      error.details?.stderr ?? ''
+    ) &&
+    shouldFailOver(
+      { code: 1, stderr: error.details?.stderr ?? '' },
+      process.env.GH_FALLBACK_TOKEN
+    )
+  );
+}
+
+/** Same contract as runGh's exit-75 defer: visible, retryable, not a verdict. */
+function quotaDeferredError(cause) {
+  const reason =
+    cause?.code === 'native_mutation_actor_unauthorized'
+      ? `fallback identity ${cause.details?.observedActor ?? 'unknown'} is not a trusted native queue mutation actor (mutation-actor check held)`
+      : `fallback token also exhausted: ${String(cause?.details?.stderr ?? cause?.message ?? '').slice(0, 160)}`;
+  return Object.assign(new Error(`Queue mutation deferred: ${reason}`), {
+    name: 'MergeQueueDeferError',
+    code: QUOTA_DEFERRED_CODE,
+    details: { cause: cause?.code ?? 'unknown_error' },
+  });
+}
+
 async function dequeue(number) {
+  // Only dequeuePullRequest is imported on the happy path: contract tests mock
+  // this module partially (main-red-eject-failing-head.test.mjs provides just
+  // dequeuePullRequest), and vitest fails closed on any other export access.
+  // createGhRunner is imported lazily inside the failover branch only.
   const { dequeuePullRequest } = await import('./merge-queue-backend.mjs');
-  return dequeuePullRequest({ backend: 'native', repository: REPO, number });
+  const attempt = runners =>
+    dequeuePullRequest({
+      backend: 'native',
+      repository: REPO,
+      number,
+      ...runners,
+    });
+  try {
+    return await attempt({});
+  } catch (error) {
+    // The gh()-wrapper failover above covers this script's own calls only;
+    // the backend spawns its own `gh` runners. When actor verification hits
+    // the exhausted installation bucket, retry on the fallback credential.
+    // Actor verification is the first backend call. Only retry there: a
+    // later failed read can follow a successful mutation, whose outcome must
+    // not be reported as an untouched, deferred dequeue.
+    if (
+      !isInstallationQuotaExhaustion(error) ||
+      !error.message.startsWith(
+        'verifying the native queue mutation actor failed'
+      )
+    )
+      throw error;
+    const fallback = process.env.GH_FALLBACK_TOKEN;
+    if (!fallback || fallback === process.env.GH_TOKEN) throw error;
+    console.error(
+      '::warning::github-app-quota-failover: Jovie Bot installation exhausted for the queue mutation; retrying actor verification with GITHUB_TOKEN.'
+    );
+    const { createGhRunner } = await import('./merge-queue-backend.mjs');
+    const runner = createGhRunner({
+      env: { ...process.env, GH_TOKEN: fallback },
+    });
+    try {
+      return await attempt({ runner, mutationRunner: runner });
+    } catch (fallbackError) {
+      // A refusal here is the mutation-actor safety check working, not a bug:
+      // GITHUB_TOKEN authenticates as github-actions[bot], which is not a
+      // trusted queue writer. Defer visibly instead of crashing.
+      if (
+        fallbackError?.code === 'native_mutation_actor_unauthorized' ||
+        (isInstallationQuotaExhaustion(fallbackError) &&
+          fallbackError.message.startsWith(
+            'verifying the native queue mutation actor failed'
+          ))
+      )
+        throw quotaDeferredError(fallbackError);
+      throw fallbackError;
+    }
+  }
 }
 
 /** Green Enroll is the only queue writer: dequeue first if already queued, then dispatch it. */
@@ -358,10 +430,7 @@ async function enqueueWithJump(number) {
 // ---- incident --------------------------------------------------------------
 
 async function incident(key, title, body) {
-  const found = await api(
-    `repos/${REPO}/issues?state=open&labels=${INCIDENT_LABEL}&per_page=50`,
-    'repair'
-  );
+  const found = await openIncidents({ api, gh, repo: REPO, key });
   const existing = found.find(i => readMarker(i.body)?.key === key);
   const text = `${marker({ key })}\n${body}`;
   if (existing) {
@@ -396,6 +465,7 @@ async function incident(key, title, body) {
 
 const git = (...args) =>
   execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
@@ -406,18 +476,9 @@ export async function apply(p) {
   if (!p.decision) return { ...p, applied: false };
   const { culprit, check, decision } = p;
   if (decision.action !== 'revert') {
-    if (
-      decision.action === 'alert' ||
-      decision.action === 'skip' ||
-      decision.action === 'dry-revert'
-    )
-      if (decision.action === 'alert')
-        await incident(
-          `alert:${check}`,
-          `main-red: ${check} (manual: ${decision.reason})`,
-          `Main is red on \`${check}\`. Automatic revert not taken: ${decision.reason}. Culprit candidate: ${culprit ? `#${culprit.pr} ${culprit.sha}` : 'unknown'}.`
-        );
-    return { ...p, applied: false };
+    // Alerts page; a red main with nothing to revert also files a fix intake.
+    const io = { api, gh, incident, repo: REPO };
+    return { ...p, applied: false, ...(await remediateUnrevertable(p, io)) };
   }
   const t = p.titles;
   const branch = `compounding/revert-${culprit.pr}-${culprit.sha.slice(0, 7)}`;
@@ -458,6 +519,8 @@ export async function apply(p) {
       culprit.pr +
       ' is re-landed as a repair PR with this failure attached.',
     '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+    // `compounding` PRs owe a Win section (Fleet Rules, scripts/lib/wins-ledger.mjs requiresWin).
+    `## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | merge-group CI runs | first failed merge group to this PR's created_at\n- Verify: https://github.com/${REPO}/actions/runs/${p.trigger.groups[0]}\n- Pending: yes`,
   ].join('\n\n');
   const pr = JSON.parse(
     await gh(
@@ -650,7 +713,36 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     return { ...verdict, recorded: true };
   }
   if (!verdict.stuck || !doApply) return verdict;
-  await dequeue(head.number);
+  let deferReason = null;
+  try {
+    await dequeue(head.number);
+  } catch (error) {
+    if (error?.code !== QUOTA_DEFERRED_CODE) throw error;
+    deferReason = error.message;
+  }
+  if (deferReason !== null) {
+    // Visible, honest deferred status (run 41227299023 crashed here): the
+    // mutation-actor check refused the fallback credential or both credential
+    // buckets are exhausted before a dequeue. The next ejector wake
+    // retries once quota heals (the first-sighting marker is already on the PR).
+    const note = `Queue head #${head.number} is UNMERGEABLE since ${verdict.since} but the dequeue is deferred — ${deferReason}. No dequeue or queue follow-up actions were performed (no labels, no conflict pass, no re-enqueue); incident reporting is attempted separately. The next ejector wake retries.`;
+    console.error(`::warning::queue-mutation-deferred: ${note}`);
+    await incident(
+      `unmergeable:${head.number}`,
+      `queue head #${head.number} UNMERGEABLE ${verdict.dwellMin} min (dequeue deferred)`,
+      note
+    ).catch(error =>
+      console.error(
+        `::warning::deferred dequeue incident failed: ${error.message}`
+      )
+    );
+    return {
+      ...verdict,
+      dequeued: false,
+      deferred: true,
+      reason: deferReason,
+    };
+  }
   await gh([
     'api',
     '-X',
@@ -659,27 +751,26 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     '-f',
     `labels[]=${CONFLICT_LABEL}`,
   ]);
-  await gh(
-    [
-      'workflow',
-      'run',
-      'pr-remediation-swarm.yml',
-      '-f',
-      // The swarm's workflow_dispatch input is `prs` (comma-separated); an
-      // undeclared input makes the dispatch fail with HTTP 422 (run 41122896980).
-      `prs=${head.number}`,
-    ],
+  // A workflow-disabled dispatch target is an owner-controlled state (run
+  // 42623483651: HTTP 422 on the disabled remediation swarm), not an ejector
+  // error: report it visibly and fall through to the remaining stuck-head
+  // actions; the next wake re-dispatches once the workflow is re-enabled.
+  // (An undeclared dispatch input is also HTTP 422 — run 41122896980 — hence
+  // the swarm's `prs` input name.)
+  const dispatchWorkflow = (file, input, priority) =>
+    gh(['workflow', 'run', file, '-f', input], priority).catch(error => {
+      if (!/disabled workflow/i.test(String(error.message))) throw error;
+      console.error(`::warning::workflow-disabled: ${error.message.trim()}`);
+    });
+  await dispatchWorkflow(
+    'pr-remediation-swarm.yml',
+    `prs=${head.number}`,
     'repair'
   );
   // Green Enroll re-admits the head once the conflict pass pushes and checks are green.
-  await gh(
-    [
-      'workflow',
-      'run',
-      'merge-queue-green-enroll.yml',
-      '-f',
-      `pr_number=${head.number}`,
-    ],
+  await dispatchWorkflow(
+    'merge-queue-green-enroll.yml',
+    `pr_number=${head.number}`,
     'merge'
   );
   const dequeuedAt = new Date(now).toISOString();

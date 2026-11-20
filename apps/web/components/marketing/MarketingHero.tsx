@@ -2,7 +2,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
@@ -359,7 +359,7 @@ function MarketingHeroLanding({
   titleTestId = 'hero-heading',
   sectionTestId = 'marketing-hero-section',
   primaryCtaLabel = 'Get started',
-  primaryCtaHref = APP_ROUTES.SIGNUP,
+  primaryCtaHref = PUBLIC_ENTRY_HREF,
   ctaEventName = 'landing_cta_get_started',
   primaryCtaTestId,
   secondaryCtaLabel,

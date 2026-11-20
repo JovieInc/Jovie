@@ -24,7 +24,12 @@ export type PublicProfileIdentityExclusionReason =
   | 'capture_profile_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
-  claim_flow_fixture: ['e2eclaimartist'],
+  // The claim-walk canary's reserved handle (JOV-9826): excluded from every
+  // general create/rename/ingestion path like the other fixtures, but — as
+  // the one claim_flow_fixture exception allows — claimable by its owner
+  // through the verified token-backed takeover the cert walk uses. Stays
+  // noindex in every state via the identity-exclusion indexing rule.
+  claim_flow_fixture: ['e2eclaimartist', 'jovie-prodcert-claim'],
   fabricated_identity_fixture: [
     'dualipa',
     'taylorswift',

@@ -19,7 +19,11 @@ const retentionScript = resolve('scripts/local-runtime-retention.mjs');
 const oldDate = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
 function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  }).trim();
 }
 
 function createRepo() {

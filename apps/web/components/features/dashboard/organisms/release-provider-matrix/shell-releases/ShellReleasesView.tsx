@@ -40,6 +40,7 @@ import {
 } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { buildReleaseAlbumArtChatPrompt } from '@/lib/chat/release-chat-prompts';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDspMatchesQuery, usePlanGate } from '@/lib/queries';
@@ -79,6 +80,7 @@ import {
   ShellReleaseRow,
   type ShellReleaseSyncStatus,
 } from './ShellReleaseRow';
+import { useInitialListPaintGate } from './useInitialListPaintGate';
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -390,7 +392,6 @@ export function ShellReleasesView({
     initialArtistName ?? null
   );
   const [isImporting, setIsImporting] = useState(initialImporting);
-  const [isInitialListPaint, setIsInitialListPaint] = useState(true);
   const [spotifySearchOpen, setSpotifySearchOpen] = useState(
     shouldOpenSpotifyConnect
   );
@@ -592,13 +593,10 @@ export function ShellReleasesView({
   const handleGenerateAlbumArt = useCallback(
     (release: ReleaseViewModel) => {
       openChatWithPrompt(
-        `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
-          {
-            releaseId: release.id,
-            releaseTitle: release.title,
-            instruction: 'Show three options.',
-          }
-        )}`,
+        buildReleaseAlbumArtChatPrompt({
+          releaseId: release.id,
+          releaseTitle: release.title,
+        }),
         router
       );
     },
@@ -978,23 +976,19 @@ export function ShellReleasesView({
     isConnected && rows.length === 0 && !isImporting;
   const shouldResolveAppleMusicEligibility =
     isConnected && rows.length > 0 && !isAmConnected && !isImporting;
-  const { data: appleMusicMatches, isLoading: isAppleMusicEligibilityLoading } =
-    useDspMatchesQuery({
-      profileId: rows[0]?.profileId ?? '',
-      enabled: experienceMode !== 'demo' && shouldResolveAppleMusicEligibility,
-    });
-  const shouldGateListPaint =
-    isInitialListPaint &&
-    shouldResolveAppleMusicEligibility &&
-    isAppleMusicEligibilityLoading;
-
-  // Eligibility may start loading after Spotify import completes. Once the
-  // list is visible, keep its menus, selection and focus mounted through it.
-  useEffect(() => {
-    if (isInitialListPaint && !shouldGateListPaint) {
-      setIsInitialListPaint(false);
-    }
-  }, [isInitialListPaint, shouldGateListPaint]);
+  const {
+    data: appleMusicMatches,
+    isLoading: isAppleMusicEligibilityLoading,
+    failureCount: appleMusicEligibilityFailures,
+  } = useDspMatchesQuery({
+    profileId: rows[0]?.profileId ?? '',
+    enabled: experienceMode !== 'demo' && shouldResolveAppleMusicEligibility,
+  });
+  const shouldGateListPaint = useInitialListPaintGate({
+    shouldResolve: shouldResolveAppleMusicEligibility,
+    isLoading: isAppleMusicEligibilityLoading,
+    failureCount: appleMusicEligibilityFailures,
+  });
 
   return (
     <>

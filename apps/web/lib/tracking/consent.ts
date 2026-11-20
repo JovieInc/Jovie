@@ -1,5 +1,8 @@
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
-import { parseConsentCookieValue } from '@/lib/cookies/consent-state';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
+import {
+  parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
+} from '@/lib/cookies/consent-state';
 
 /**
  * Tracking Consent Utilities
@@ -14,7 +17,6 @@ export type ConsentState =
   | 'rejected'
   | 'gpc-opted-out';
 
-const CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 const CONSENT_STORAGE_KEY = 'jovie_tracking_consent';
 export const ACQUISITION_COOKIE_NAME = 'jv_acquisition_id';
 const ACQUISITION_STORAGE_KEY = 'jovie_acquisition_id';
@@ -42,13 +44,9 @@ function readCookie(name: string): string {
 
 function isConsentRequiredForCurrentVisitor(): boolean {
   try {
-    return globalThis.document.cookie
-      .split(';')
-      .some(cookie =>
-        cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=1`)
-      );
+    return isCookieBannerRequiredFromCookieString(globalThis.document.cookie);
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -96,7 +94,7 @@ export function getConsentState(): ConsentState {
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
-    if (name === CONSENT_COOKIE_NAME) {
+    if (name === TRACKING_CONSENT_COOKIE_NAME) {
       if (value === 'accepted' || value === 'rejected') {
         return value;
       }
@@ -125,7 +123,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
   expires.setFullYear(expires.getFullYear() + 1);
   // Add Secure flag for HTTPS environments
   const isSecure = globalThis.location.protocol === 'https:';
-  document.cookie = `${CONSENT_COOKIE_NAME}=${state}; path=/; expires=${expires.toUTCString()}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+  document.cookie = `${TRACKING_CONSENT_COOKIE_NAME}=${state}; path=/; expires=${expires.toUTCString()}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
 }
 
 /**
@@ -133,7 +131,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
  */
 export function isTrackingAllowed(): boolean {
   const state = getConsentState();
-  return state === 'accepted';
+  return state === 'accepted' && isMarketingAllowed();
 }
 
 /**
@@ -182,18 +180,27 @@ export function isAnalyticsAllowed(): boolean {
   if (isGPCEnabled() || isDNTEnabled()) return false;
 
   const legacyState = getConsentState();
-  if (legacyState === 'rejected') return false;
 
   try {
     const raw = globalThis.localStorage?.getItem('jv_cc');
+    // Privacy choices uses legacy rejection to persist advertising withdrawal.
+    // A valid granular analytics choice remains independent of that opt-out.
+    const consent = parseConsentCookieValue(raw ?? undefined);
+    if (consent) return consent.analytics;
+    if (legacyState === 'rejected') return false;
     if (!raw) {
       return !isConsentRequiredForCurrentVisitor();
+    }
+
+    if (isConsentRequiredForCurrentVisitor()) {
+      // Consent-required regions need an affirmative, well-formed choice.
+      return parseConsentCookieValue(raw)?.analytics === true;
     }
 
     const parsed = JSON.parse(raw);
     return parsed?.analytics !== false;
   } catch {
-    return true;
+    return legacyState !== 'rejected' && !isConsentRequiredForCurrentVisitor();
   }
 }
 
@@ -297,6 +304,6 @@ export function clearConsentState(): void {
   } catch {
     // localStorage may be unavailable
   }
-  document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  document.cookie = `${TRACKING_CONSENT_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
   clearAcquisitionId();
 }

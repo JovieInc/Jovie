@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
@@ -251,7 +252,13 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(container.querySelector('[aria-expanded]')).toBeNull();
+    expect(
+      container.querySelector('[data-nav-section="primary"] [aria-expanded]')
+    ).toBeNull();
+    expect(getByRole('button', { name: 'Chat History' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
@@ -385,6 +392,7 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
+    fireEvent.click(getByRole('button', { name: 'Chat History' }));
     expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
       'text-primary-token'
     );

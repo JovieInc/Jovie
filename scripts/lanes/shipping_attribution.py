@@ -8,18 +8,19 @@ are never origin evidence.
 from __future__ import annotations
 
 import argparse
+import io
 from collections import Counter
 from datetime import datetime, timezone
-import fcntl
 import json
 import math
-import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import time
 from urllib.parse import quote
+
+from atomic_state import append_json_object
 
 ATTRIBUTION_SCHEMA = "jovie-company-shipping-attribution/v1"
 ORIGIN_RECEIPT_SCHEMA = "jovie-shipping-origin/v1"
@@ -281,7 +282,7 @@ def attribute_pr(pr: dict, receipts: list[dict], repository: str) -> dict:
 
 
 def project_report(project: dict, evidence: dict, ledger: dict, generated_at: float) -> dict:
-    # Origin emitters use a sparse two-file checkout; only reporting needs the reader.
+    # Origin emitters use a minimal receipt checkout; only reporting needs the reader.
     import merge_evidence
 
     repository, instrumented = project["repository"], project["instrumented"]
@@ -348,6 +349,29 @@ def company_report(evidence_by_repository: dict, ledger: dict, generated_at: flo
             "complete": complete, "mergeCount": total, "projects": projects}
 
 
+_TRANSPORT = (RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError)
+
+
+def _gh_api(endpoint):
+    """Read one GitHub REST path. A failed call keeps gh's stderr on the error."""
+    try:
+        result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
+                                timeout=20, check=False)
+    except subprocess.TimeoutExpired as error:
+        raw = error.stderr or error.stdout or "timed out"
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", "replace")
+        raise RuntimeError(
+            f"origin-read-failed: {endpoint}: timeout: {' '.join(str(raw).split())[:300]}") from error
+    if result.returncode != 0:
+        detail = " ".join((result.stderr or result.stdout or "").split())[:300]
+        raise RuntimeError(f"origin-read-failed: {endpoint}: exit {result.returncode}: {detail}")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"origin-read-failed: {endpoint}: invalid json") from error
+
+
 def validate_origin_receipt(receipt: dict) -> None:
     if (not isinstance(receipt, dict) or type(receipt.get("pr")) is not int or receipt["pr"] < 1
             or not isinstance(receipt.get("repository"), str)
@@ -366,16 +390,26 @@ def resolve_origin_head(repository: str, number: int, expected_head: str, *, fet
     A just-pushed SHA can be missing from the pull and the git ref for a short
     window. Poll until both equal ``expected_head``. Repository, pull number,
     and base repo mismatches are rejected on the first read. A head that is
-    still different after the bounded wait is still a mismatch.
+    still different after the bounded wait is still a mismatch. A failed
+    repository read is transport and is retried; a disallowed repository is not.
     """
-    def remote(endpoint):
-        result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
-                                timeout=20, check=True)
-        return json.loads(result.stdout)
-    read = fetch or remote
+    read = fetch or _gh_api
     pause = sleep or time.sleep
     tries = ORIGIN_HEAD_READ_ATTEMPTS if attempts is None else attempts
-    canonical = read(f"repos/{repository}")["full_name"]
+    budget = max(tries, 1)
+    canonical = None
+    for attempt in range(budget):
+        try:
+            canonical = read(f"repos/{repository}")["full_name"]
+            break
+        except ValueError:
+            raise
+        except _TRANSPORT as error:
+            if attempt + 1 >= budget:
+                raise
+            print(f"origin repository read failed for {repository} "
+                  f"(attempt {attempt + 1}/{budget}): {error}", file=sys.stderr)
+            pause(ORIGIN_HEAD_RETRY_DELAYS[min(attempt, len(ORIGIN_HEAD_RETRY_DELAYS) - 1)])
     if canonical not in {project["repository"] for project in PROJECTS}:
         raise ValueError("origin-repository-not-allowed")
     for attempt in range(max(tries, 0)):
@@ -401,29 +435,32 @@ def resolve_origin_head(repository: str, number: int, expected_head: str, *, fet
 def append_origin_receipt(path: Path, receipt: dict) -> None:
     """Append a manual/external origin receipt without changing execution authority."""
     validate_origin_receipt(receipt)
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with Path(path).open("a+") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        handle.seek(0)
-        for raw in handle:
-            if not raw.strip():
-                continue
-            try:
-                row = json.loads(raw)
-            except ValueError:
-                raise OSError("origin-ledger-corrupt") from None
-            if not isinstance(row, dict):
-                raise OSError("origin-ledger-corrupt")
-            if (row.get("schema") == ORIGIN_RECEIPT_SCHEMA and
-                    (row.get("repository"), row.get("pr"), row.get("headSha")) ==
-                    (receipt["repository"], receipt["pr"], receipt["headSha"])):
-                fields = ("method", "initiator", "provider", "model", "linearIssue")
-                if any(row.get(key) != receipt.get(key) for key in fields):
-                    raise ValueError("conflicting-origin-receipt")
-                raise ValueError("duplicate-origin-receipt")
-        handle.write(json.dumps(receipt, separators=(",", ":")) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
+
+    def check_existing(handle, candidate):
+        # Preserve the original UTF-8/universal-newline/Unicode-blank reader.
+        reader = io.TextIOWrapper(handle, encoding="utf-8")
+        try:
+            for raw in reader:
+                if not raw.strip():
+                    continue
+                try:
+                    row = json.loads(raw)
+                except ValueError:
+                    raise OSError("origin-ledger-corrupt") from None
+                if not isinstance(row, dict):
+                    raise OSError("origin-ledger-corrupt")
+                if (row.get("schema") == ORIGIN_RECEIPT_SCHEMA and
+                        (row.get("repository"), row.get("pr"), row.get("headSha")) ==
+                        (candidate["repository"], candidate["pr"], candidate["headSha"])):
+                    fields = ("method", "initiator", "provider", "model", "linearIssue")
+                    if any(row.get(key) != candidate.get(key) for key in fields):
+                        raise ValueError("conflicting-origin-receipt")
+                    raise ValueError("duplicate-origin-receipt")
+        except UnicodeError:
+            raise OSError("origin-ledger-corrupt") from None
+        finally:
+            reader.detach()  # the helper owns the still-locked binary descriptor
+    append_json_object(path, receipt, before_append=check_existing)
 
 
 def main(argv=None) -> int:

@@ -1,0 +1,14 @@
+# Intentional leak-shaped strings for gitleaks default-rules coverage (JOV-8895).
+# This file is allowlisted in .gitleaks.toml and .trufflehog-exclude.txt —
+# the verify script copies it to a temp path so every rule must fire there.
+# All values are synthetic and invented; none is a real credential.
+AWS_ACCESS_KEY_ID=AKIAZ9QW7XRV5N3KL2MB # trufflehog:ignore
+GITHUB_TOKEN=ghp_Zz9Xw8Vv7Qq3Jj5Kk2Mm6Nn4Pp8Rr1Ss2Tt6 # trufflehog:ignore
+STRIPE_SECRET_KEY=sk_test_FAKEGITLEAKSFIXTURE0Z9XW8 # trufflehog:ignore
+SLACK_BOT_TOKEN=xoxb-849235176308-592734168253-Zr9Kk2Mm6Nn4 # trufflehog:ignore
+# OPENAI key shape is assembled at runtime by verify-gitleaks-coverage.sh:
+# the contiguous sk-<20>T3BlbkFJ<20> marker is rejected by push-side secret
+# scanning even for synthetic values (JOV-8895, verified 2026-10-25).
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAZq9Xw8Vv7Qr3Jj5Kk2Mm6Nn4Pp8Rr1Ss2Tt6Uu9Zz9Xw8Vv
+-----END RSA PRIVATE KEY-----

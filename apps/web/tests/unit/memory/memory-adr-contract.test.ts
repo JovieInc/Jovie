@@ -10,23 +10,6 @@ const MEMORY_CORE_ARCH_PATH = join(
 );
 const WEB_ROOT = join(REPO_ROOT, 'apps/web');
 
-const REQUIRED_ADR_SECTIONS = [
-  '## Decision',
-  '## Scope',
-  '## Context',
-  '## Current file map',
-  '## Forbidden couplings',
-] as const;
-
-const REQUIRED_MEMORY_CORE_SECTIONS = [
-  '## Decision',
-  '## Why WDK stays in AgentOS',
-  '## Product workflow boundaries',
-  '## v0 shipped target',
-  '## Technology decision table',
-  '## Linear triage',
-] as const;
-
 const PRODUCT_MEMORY_PATHS = [
   'lib/memory',
   'lib/workflows/memory',
@@ -95,43 +78,30 @@ function findForbiddenImports(
 }
 
 describe('MEMORY ADR contract (JOV-2705)', () => {
-  it('keeps docs/MEMORY_ADR.md present with required decision sections', () => {
+  it('keeps docs/MEMORY_ADR.md as a retired pointer', () => {
     expect(existsSync(MEMORY_ADR_PATH)).toBe(true);
 
     const adr = readFileSync(MEMORY_ADR_PATH, 'utf8');
     expect(adr).toContain('Issue: JOV-2705');
     expect(adr).toContain('Internal AgentOS');
-    expect(adr).toContain('Product memory workflows');
-    expect(adr).toContain('WorkflowRunner');
-    // Current cognition-harness decision (#12498): eve supersedes the OpenAI
-    // Agents SDK target. Pin it so a future edit can't silently revert it.
+    expect(adr).toContain('Retirement notice (2026-09-02)');
     expect(adr).toContain('`eve`');
     expect(adr).toContain('#12498');
-
-    for (const section of REQUIRED_ADR_SECTIONS) {
-      expect(adr, `missing ${section}`).toContain(section);
-    }
+    expect(adr).not.toContain('WorkflowRunner');
+    expect(adr).not.toContain('launchctl');
   });
 
-  it('keeps docs/MEMORY_CORE_ARCHITECTURE.md present with required sections', () => {
+  it('keeps docs/MEMORY_CORE_ARCHITECTURE.md as a retired pointer', () => {
     expect(existsSync(MEMORY_CORE_ARCH_PATH)).toBe(true);
 
     const arch = readFileSync(MEMORY_CORE_ARCH_PATH, 'utf8');
     expect(arch).toContain('Issue: JOV-2705');
-    expect(arch).toContain('Trigger.dev');
     expect(arch).toContain('Retirement notice (2026-09-02)');
-    // OpenAI Agents SDK kept as the superseded/lineage target...
-    expect(arch).toContain('OpenAI Agents SDK');
-    // ...with eve as the current selected harness (#12498).
     expect(arch).toContain('`eve`');
     expect(arch).toContain('#12498');
     expect(arch).toContain('studio-session-loop.ts');
-    expect(arch).toContain('Graphiti');
-    expect(arch).toContain('Honcho');
-
-    for (const section of REQUIRED_MEMORY_CORE_SECTIONS) {
-      expect(arch, `missing ${section}`).toContain(section);
-    }
+    expect(arch).not.toContain('Why WDK stays');
+    expect(arch).not.toContain('Graphiti');
   });
 
   it('links AgentOS architecture without collapsing the runtime split', () => {
@@ -142,9 +112,10 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     expect(agentOsAdr).toContain('MEMORY_CORE_ARCHITECTURE.md');
     expect(agentOsAdr).toContain('MEMORY_ADR.md');
     expect(agentOsAdr).toContain('JOV-2705');
+    expect(agentOsAdr).toContain('github.scope-judge` is retired');
   });
 
-  it('documents the product-memory split in AUTOMATION_AUDIT.md', () => {
+  it('keeps AUTOMATION_AUDIT.md as a retired pointer', () => {
     const automationAuditPath = join(REPO_ROOT, 'docs/AUTOMATION_AUDIT.md');
     expect(existsSync(automationAuditPath)).toBe(true);
 
@@ -153,6 +124,7 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     expect(audit).toContain('MEMORY_CORE_ARCHITECTURE.md');
     expect(audit).toContain('Trigger.dev');
     expect(audit).toContain('Retirement notice (2026-09-02)');
+    expect(audit).not.toContain('install Trigger');
   });
 
   it('blocks product memory modules from importing AgentOS WDK workflow code', () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { nextState, probe, run } from './index.ts';
+import worker, { nextState, probe, run } from './index.ts';
 
 const res = (status, headers = {}) => new Response('', { status, headers });
 test('probe classifies a paused deployment, quota, http failure and network error', async () => {
@@ -130,4 +130,77 @@ test('emails once per incident (down and recovery, not re-pages) and pages Summe
     ).incident,
     '1000'
   );
+});
+
+test('a failed page writes the state key once and does not arm the quiet window', async () => {
+  const puts = [];
+  const store = new Map();
+  const STATE = {
+    get: async k => store.get(k) ?? null,
+    put: async (k, v) => {
+      puts.push(k);
+      store.set(k, v);
+    },
+  };
+  const failing = async (_url, init) =>
+    init?.method === 'POST' ? res(500) : res(503);
+  const first = await run(
+    {
+      STATE,
+      TARGETS: 'https://jov.ie/',
+      FAILURES_TO_PAGE: '1',
+      PAGE_URLS: 'https://a.example/h',
+    },
+    1000,
+    failing
+  );
+  assert.equal(first.delivered, 0);
+  assert.equal(puts.filter(key => key === 'state').length, 1);
+  assert.equal(JSON.parse(store.get('state')).pagedAt, null);
+});
+
+test('a page that reaches no channel does not start the re-page quiet window', async () => {
+  const store = new Map();
+  const STATE = {
+    get: async k => store.get(k) ?? null,
+    put: async (k, v) => {
+      store.set(k, v);
+    },
+  };
+  const failing = async (u, init) =>
+    init?.method === 'POST' ? res(500) : res(503);
+  const env = {
+    STATE,
+    TARGETS: 'https://jov.ie/',
+    FAILURES_TO_PAGE: '1',
+    PAGE_URLS: 'https://a.example/h',
+  };
+  const first = await run(env, 1000, failing);
+  assert.equal(first.page, 'down');
+  assert.equal(first.delivered, 0);
+  const second = await run(env, 61_000, failing);
+  assert.equal(second.page, 'down', 'the next minute tries to page again');
+  const ok = async (u, init) => (init?.method === 'POST' ? res(200) : res(503));
+  const third = await run(env, 121_000, ok);
+  assert.equal(third.page, 'down');
+  assert.equal(third.delivered, 1);
+  const fourth = await run(env, 181_000, ok);
+  assert.equal(fourth.page, null, 'a delivered page starts the quiet window');
+});
+
+test('cron-hub dispatch: unauthenticated or secretless calls are rejected, authenticated runs the probe', async () => {
+  const env = { TARGETS: '' };
+  const post = headers =>
+    new Request('https://x/__cron', { method: 'POST', headers });
+  assert.equal((await worker.fetch(post({}), env)).status, 401);
+  assert.equal(
+    (await worker.fetch(post({ authorization: 'Bearer s' }), env)).status,
+    401,
+    'no secret configured'
+  );
+  const ok = await worker.fetch(post({ authorization: 'Bearer s' }), {
+    ...env,
+    CRON_HUB_SECRET: 's',
+  });
+  assert.equal(ok.status, 200);
 });

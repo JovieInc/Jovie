@@ -3,11 +3,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DSP_LOGO_CONFIG, DspLogo } from './DspLogo';
 
 describe('DspLogo', () => {
-  it('renders a muted System B platform logo with tokenized brand color', () => {
-    render(<DspLogo provider='spotify' />);
+  it('renders a muted System B platform logo with tokenized brand color', async () => {
+    const { container } = render(<DspLogo provider='spotify' />);
 
     const logo = screen.getByText('Spotify').closest('.system-b-dsp-logo');
 
@@ -18,6 +19,7 @@ describe('DspLogo', () => {
     });
     expect(logo?.querySelector('svg')).toHaveClass('system-b-dsp-logo-icon');
     expect(screen.getByText('Spotify')).toHaveClass('system-b-dsp-logo-label');
+    await expectNoA11yViolations(container);
   });
 
   it('keeps exported DSP colors on design tokens, not raw brand hex values', () => {

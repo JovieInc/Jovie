@@ -26,6 +26,26 @@ describe('AskJovieMark', () => {
     expect(trigger.querySelector('.ask-jovie-mark-icon')).not.toBeNull();
   });
 
+  it('rests on the mark alone and reveals a clipped wordmark on hover or focus', () => {
+    render(<AskJovieMark />);
+    const trigger = screen.getByTestId('ask-jovie-trigger');
+    const wordmark = trigger.querySelector('.ask-jovie-wordmark');
+    expect(wordmark).toHaveClass('overflow-hidden');
+    expect(wordmark).toHaveTextContent('Jovie');
+    // No flex gap: a 0-width wordmark must not pad the resting ring.
+    expect(trigger.className).not.toMatch(/(?:^|\s)gap-/);
+    expect(trigger).toHaveClass('focus-ring-themed');
+    expect(trigger.className).not.toContain('ring-white');
+  });
+
+  it('puts the mark on the sidebar icon column with no side padding', () => {
+    render(<AskJovieMark />);
+    const trigger = screen.getByTestId('ask-jovie-trigger');
+    // Side padding pushed the mark 4px past the 12px column every nav icon
+    // uses; a negative margin would off-centre it in the collapsed rail.
+    expect(trigger.className).not.toMatch(/(?:^|\s)-?(?:px|pl|ml)-/);
+  });
+
   it('opens the panel with suggested prompts on click', () => {
     render(<AskJovieMark />);
     fireEvent.click(screen.getByTestId('ask-jovie-trigger'));

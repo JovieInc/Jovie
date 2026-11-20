@@ -1,5 +1,8 @@
 {
   "name": "jovie-workers-ai",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings --experimental-test-coverage --test-coverage-include='src/index.ts' --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=100 --test src/index.test.mjs"
+  }
 }

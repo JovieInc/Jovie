@@ -164,6 +164,9 @@ describe('InstantlyPixel', () => {
 describe('isMarketingAllowed', () => {
   beforeEach(() => {
     localStorage.clear();
+    // These cases model a known non-consent region (proxy sets the flag to 0).
+    // An absent flag fails closed; see consent-fail-closed.test.ts.
+    document.cookie = 'jv_cc_required=0; path=/';
   });
 
   it('returns true when jv_cc has marketing: true', async () => {

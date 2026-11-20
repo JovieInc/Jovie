@@ -1,3 +1,5 @@
+import { DISCOVERABILITY_FLAGS } from './discoverability-defaults';
+
 export const LEGACY_STATSIG_GATE_KEYS = {
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
   SMARTLINK_PRE_SAVE: 'smartlink_pre_save_campaigns',
@@ -29,8 +31,7 @@ export interface StatsigFeatureFlagsBootstrap {
 }
 
 export const APP_FLAG_DEFAULTS = {
-  YOUTUBE_WORKSPACE_NAV: false,
-  JOVIE_WORK_NAV: false,
+  ...DISCOVERABILITY_FLAGS,
   BILLING_UPGRADE_DIRECT: true,
   SMARTLINK_PRE_SAVE: true,
   IOS_APPLE_MUSIC_PRIORITY: true,
@@ -78,6 +79,10 @@ export const APP_FLAG_DEFAULTS = {
    */
   CREATOR_FINANCE: false,
   VISIBILITY_AUDIT_OFFER: false,
+  /** JOV-12380: draft visibility only; no outbound send authority. */
+  OUTBOUND_DOGFOOD_GATE: false,
+  /** JOV-12382: certified email draft composition only, never send authority. */
+  OUTBOUND_COLD_DRAFTS: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -109,6 +114,8 @@ export const APP_FLAG_KEYS = {
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
   VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
+  OUTBOUND_DOGFOOD_GATE: 'outbound_dogfood_gate',
+  OUTBOUND_COLD_DRAFTS: 'outbound_cold_drafts',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -135,6 +142,8 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
   VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
+  OUTBOUND_DOGFOOD_GATE: 'code:OUTBOUND_DOGFOOD_GATE',
+  OUTBOUND_COLD_DRAFTS: 'code:OUTBOUND_COLD_DRAFTS',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -187,6 +196,10 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
   CREATOR_FINANCE:
     'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
+  OUTBOUND_COLD_DRAFTS:
+    'Compose certified, compliant cold email drafts after dogfood approval. Default off, including admins (JOV-12382).',
+  OUTBOUND_DOGFOOD_GATE:
+    'Require verified onboarding and profile judge evidence before exposing outbound drafts (JOV-12380). Default on only in tests.',
   VISIBILITY_AUDIT_OFFER:
     'Hidden unless the flag and a Stripe Payment Link are both set.',
 } as const satisfies Record<AppFlagName, string>;
@@ -239,6 +252,10 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain while the anonymous public write path needs an abuse stop control.',
   CREATOR_FINANCE:
     'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
+  OUTBOUND_COLD_DRAFTS:
+    'Remove after claim-link draft certification and approved rollout (JOV-12379).',
+  OUTBOUND_DOGFOOD_GATE:
+    'Remove after the claim-link loop is certified and draft gating is permanently enabled (JOV-12379).',
   VISIBILITY_AUDIT_OFFER: 'Remove when the audit checkout is retired.',
 } as const satisfies Record<AppFlagName, string>;
 
@@ -306,5 +323,7 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
+  'OUTBOUND_COLD_DRAFTS', // JOV-12382: draft-only rollout; local default off, no remote gate
+  'OUTBOUND_DOGFOOD_GATE', // JOV-12380: local default off; audited override, no remote gate
   'VISIBILITY_AUDIT_OFFER', // default off; no Statsig gate
 ]);

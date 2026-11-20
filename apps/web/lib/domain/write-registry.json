@@ -47,6 +47,13 @@
       "tables": ["discogReleases"]
     },
     {
+      "id": "release.create",
+      "entity": "release",
+      "module": "apps/web/lib/domain/releases.ts",
+      "exports": ["createReleaseForProfile", "renameReleaseSlug"],
+      "tables": ["discogReleases"]
+    },
+    {
       "id": "profile.fields",
       "entity": "profile",
       "module": "apps/web/lib/services/profile/mutations.ts",
@@ -56,6 +63,13 @@
         "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.edit",
+      "entity": "profile",
+      "module": "apps/web/lib/domain/profile.ts",
+      "exports": ["applyProfileUpdate"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -103,10 +117,31 @@
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
+      "id": "waitlist.role-intake",
+      "entity": "waitlist/role-intake",
+      "module": "apps/web/lib/waitlist/role-entry.ts",
+      "exports": ["joinWaitlistWithRole"],
+      "tables": ["waitlistEntries"]
+    },
+    {
+      "id": "waitlist.invite-funnel",
+      "entity": "waitlist/invite-funnel",
+      "module": "apps/web/lib/waitlist/invite-funnel.ts",
+      "exports": ["recordInviteOpened", "recordInviteRedeemed"],
+      "tables": ["waitlistEntries"]
+    },
+    {
       "id": "synthetic.admitted-canary",
       "entity": "admitted production canary fixture",
       "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
       "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "synthetic.canary-reset",
+      "entity": "claim-walk canary reset (JOV-9826)",
+      "module": "apps/web/lib/synthetic/canary-reset.server.ts",
+      "exports": ["executeCanaryReset"],
       "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
@@ -132,6 +167,20 @@
       "module": "apps/web/lib/stripe/customer-sync/update-status.ts",
       "exports": ["updateUserBillingStatus"],
       "tables": ["users"]
+    },
+    {
+      "id": "account.founder-welcome-marker",
+      "entity": "account",
+      "module": "apps/web/lib/founder-welcome/marker.server.ts",
+      "exports": ["markFounderWelcomeSent"],
+      "tables": ["users"]
+    },
+    {
+      "id": "account.dogfood-tmp-cleanup",
+      "entity": "account",
+      "module": "apps/web/lib/accounts/dogfood-tmp-cleanup.ts",
+      "exports": ["runDogfoodTmpCleanup"],
+      "tables": ["users", "creatorProfiles"]
     },
     {
       "id": "merch.cards",
@@ -207,6 +256,13 @@
       "kind": "domain",
       "domain": "feedback.submit"
     },
+    "chat:useSkill": {
+      "kind": "read"
+    },
+    "chat:requestCapability": {
+      "kind": "domain",
+      "domain": "feedback.submit"
+    },
     "chat:showAccountStatus": {
       "kind": "read"
     },
@@ -220,8 +276,8 @@
       "kind": "read"
     },
     "chat:proposeProfileEdit": {
-      "kind": "debt",
-      "reason": "commit is /api/chat/confirm-edit (name and bio only); Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "profile.edit"
     },
     "chat:importBioFromUrl": {
       "kind": "read"
@@ -232,22 +288,13 @@
     "chat:checkCanvasStatus": {
       "kind": "read"
     },
-    "chat:suggestRelatedArtists": {
-      "kind": "read"
-    },
     "chat:writeWorldClassBio": {
-      "kind": "generate"
-    },
-    "chat:generateCanvasPlan": {
       "kind": "generate"
     },
     "chat:generateAlbumArt": {
       "kind": "generate"
     },
     "chat:retouchImage": {
-      "kind": "generate"
-    },
-    "chat:createPromoStrategy": {
       "kind": "generate"
     },
     "chat:voicePromo": {
@@ -261,8 +308,8 @@
       "domain": "release.metadata"
     },
     "chat:createRelease": {
-      "kind": "debt",
-      "reason": "calls upsertRelease directly with its own slug rule and no status, reveal date, genres or explicit flag; Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "release.create"
     },
     "chat:generateReleasePitch": {
       "kind": "domain",
@@ -379,6 +426,30 @@
       "kind": "read"
     },
     "mcp:chatgpt:subscribe_to_updates": {
+      "kind": "read"
+    },
+    "mcp:draft:claim_handle": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:answer_onboarding_question": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:get_qualification": {
+      "kind": "read"
+    },
+    "mcp:draft:build_profile": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:publish_profile": {
+      "kind": "read"
+    },
+    "mcp:draft:share_profile": {
+      "kind": "read"
+    },
+    "mcp:draft:start_upgrade": {
       "kind": "read"
     }
   }

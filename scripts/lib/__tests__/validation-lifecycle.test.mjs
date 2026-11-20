@@ -12,6 +12,7 @@ import {
   outcomeAcceptanceReasons,
   parseValidationReceipts,
   RECORDED_RECEIPT_KINDS,
+  secretsInfraClosureSignals,
   selectBindingPull,
 } from '../validation-lifecycle.mjs';
 
@@ -144,6 +145,102 @@ describe('validation manifest', () => {
   ])('requires an outcome receipt for %s', (_name, extra, issue) => {
     const manifest = manifestFor(issue, extra);
     expect(manifest.required.map(entry => entry.kind)).toContain('outcome');
+  });
+
+  it('requires an outcome receipt when a secrets issue lists steps the PR does not claim (JOV-9959)', () => {
+    const manifest = manifestFor({
+      title: 'Staging DATABASE_URL points at the production database',
+      description: [
+        'The staging Doppler config’s database connection string points at the **shared production database**.',
+        '',
+        '**Next steps:**',
+        '',
+        '1. Confirm which secrets and configs are affected.',
+        '2. Give staging its own database (a Neon branch or a separate DB).',
+        '3. Rotate any credential that was shared.',
+        '4. Add a guard that fails CI or boot if the staging and prod DB hosts match.',
+      ].join('\n'),
+    });
+    // The guard PR (#23776) covers only step 4; the swap and rotation stay
+    // open, so the manifest must demand a non-deployment receipt and the
+    // issue must stay Validating with a visible reason.
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'outcome',
+    ]);
+    expect(
+      manifest.required.find(entry => entry.kind === 'outcome')?.reason
+    ).toMatch(/secrets\/infra issue/);
+    const outcome = decideValidationTransition({
+      state: STARTED,
+      manifest,
+      holds: [],
+      deployment: VERIFIED,
+      receipts: [],
+    });
+    expect(outcome.target).toBe('Validating');
+    expect(outcome.explanation.join('\n')).toMatch(
+      /a merge and deploy cannot swap the secret or rotate the credential/
+    );
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [receipt({ kind: 'outcome' })],
+      }).target
+    ).toBe('Done');
+  });
+
+  it('forces the outcome receipt from the title or an explicit human-only step', () => {
+    expect(
+      secretsInfraClosureSignals({
+        title: 'Rotate the staging credential',
+        description: '',
+      })
+    ).toContain('secrets/credentials in scope');
+    // Word cues are case-insensitive; the env-var cue stays uppercase-only.
+    expect(
+      secretsInfraClosureSignals({
+        title: 'Rotate Shared Staging Credentials',
+        description: '',
+      })
+    ).toContain('secrets/credentials in scope');
+    expect(
+      secretsInfraClosureSignals({
+        title: 'Finish the launch rollout',
+        description:
+          'The final switch is human-only; agents cannot reach the console.',
+      })
+    ).toContain('human-only step in scope');
+    const manifest = manifestFor({
+      title: 'Finish the launch rollout',
+      description:
+        'The final switch is human-only; agents cannot reach the console.',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'outcome',
+    ]);
+  });
+
+  it('does not hold ordinary wording on the secrets cues', () => {
+    for (const issue of [
+      { title: 'Fix connection pool exhaustion on the dashboard query' },
+      { title: 'Support image rotation in the asset editor' },
+      { title: 'Webhook URL validation rejects malformed payloads' },
+      { title: 'Add reset_url expiry to password reset links' },
+      {
+        title: 'Add a database index to the releases table',
+        description: 'The profile query scans the whole database.',
+      },
+    ]) {
+      expect(secretsInfraClosureSignals(issue)).toEqual([]);
+      expect(manifestFor(issue).required.map(entry => entry.kind)).toEqual([
+        'deployment',
+      ]);
+    }
   });
 
   it('needs an outcome for an open acceptance or completion section (JOV-7510 false Done)', () => {

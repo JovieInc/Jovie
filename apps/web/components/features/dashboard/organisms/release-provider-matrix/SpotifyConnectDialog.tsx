@@ -59,7 +59,7 @@ function SearchDropdownState({
       <p
         className={cn(
           'min-w-0 flex-1 text-xs',
-          tone === 'error' ? 'text-error' : 'text-secondary-token'
+          tone === 'error' ? 'text-error-text' : 'text-secondary-token'
         )}
         role={tone === 'error' ? 'alert' : undefined}
       >
@@ -487,7 +487,7 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-lg font-semibold text-primary-token'>
+      <DialogTitle className='text-base font-semibold text-primary-token'>
         Connect Spotify
       </DialogTitle>
       <DialogDescription className='text-app text-secondary-token'>

@@ -15,61 +15,20 @@ import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import {
+  type ActionStep,
+  actionStep,
+  actionSteps,
+  coldHosted,
+  evaluateCondition,
+  setupAction,
+  stepIndex,
+} from './runner-setup-fixture';
+import { registerPreparedWorkspaceTests } from './runner-setup-prepared-workspace';
+
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 
-// JOV-7707: the setup action is checked from its parsed YAML. Step `if:`
-// expressions are evaluated for each event, and the prune shell runs against
-// a fixture .pnpm tree.
-type ActionStep = {
-  id?: string;
-  name?: string;
-  if?: string;
-  uses?: string;
-  run?: string;
-  env?: Record<string, string>;
-  with?: Record<string, unknown>;
-};
-const setupAction = parseYaml(
-  readFileSync(
-    resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
-    'utf8'
-  )
-) as {
-  inputs: Record<string, { default?: string }>;
-  runs: { steps: ActionStep[] };
-};
-const actionSteps = setupAction.runs.steps;
-const actionStep = (name: string) => {
-  const found = actionSteps.find(step => step.name === name);
-  expect(found, name).toBeDefined();
-  return found as ActionStep;
-};
-const stepIndex = (name: string) =>
-  actionSteps.findIndex(step => step.name === name);
-
-// Minimal GitHub Actions expression evaluator: literals, context paths,
-// ==, !=, !, &&, || and parentheses (all the setup action uses).
-function evaluateCondition(
-  expression: string | undefined,
-  context: Record<string, string>
-): boolean {
-  if (!expression) return true;
-  const tokens =
-    expression
-      .replace(/^\$\{\{|\}\}$/g, '')
-      .match(/'[^']*'|==|!=|&&|\|\||!|\(|\)|[A-Za-z_][\w.-]*/g) ?? [];
-  const source = tokens
-    .map(token => {
-      if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1));
-      if (token === '==') return '===';
-      if (token === '!=') return '!==';
-      if (['&&', '||', '!', '(', ')'].includes(token)) return token;
-      if (token === 'true' || token === 'false') return `'${token}'`;
-      return `(ctx[${JSON.stringify(token)}] ?? '')`;
-    })
-    .join(' ');
-  return Boolean(new Function('ctx', `return (${source});`)(context));
-}
+registerPreparedWorkspaceTests();
 
 describe('self-hosted runner setup action', () => {
   const pruneRoots: string[] = [];
@@ -77,20 +36,6 @@ describe('self-hosted runner setup action', () => {
     for (const root of pruneRoots.splice(0))
       rmSync(root, { recursive: true, force: true });
   });
-  const coldHosted = {
-    'steps.runner-prereqs.outputs.dependencies_warm': 'false',
-    'runner.environment': 'github-hosted',
-    'runner.os': 'Linux',
-    'inputs.package_cache': 'true',
-    'inputs.reuse_merge_group_workspace': 'false',
-    'inputs.save_merge_group_workspace': 'false',
-    'steps.node-modules-cache.outcome': 'success',
-    'steps.node-modules-cache.outputs.cache-hit': 'false',
-    'steps.node-modules-cache.outputs.cache-matched-key': '',
-    'github.event_name': 'push',
-    'github.repository': 'JovieInc/Jovie',
-    'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
-  };
 
   it('uses the warning-free pinned installer without saving pnpm stores', () => {
     expect(
@@ -716,7 +661,7 @@ describe('baked runner prerequisite contract', () => {
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(24);
-    expect(requirements.nodeMinimum).toBe('24.22.1');
+    expect(requirements.nodeMinimum).toBe('24.22.3');
     expect(requirements.nodeMinimum).toBe(
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
@@ -738,7 +683,7 @@ describe('baked runner prerequisite contract', () => {
       'sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c08f391a11258de5e'
     );
     expect(runnerDockerfile).toContain(
-      '6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6'
+      '4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb'
     );
     expect(runnerDockerfile).toContain('sha256sum --check --strict');
     expect(runnerDockerfile).not.toMatch(/curl[\s\S]*?\|\s*tar/);
@@ -748,7 +693,7 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerDockerfile).toContain('COREPACK_HOME=/opt/corepack');
     expect(runnerDockerfile).toContain('su -s /bin/bash runner -c');
     expect(runnerDockerfile).toContain(
-      '/opt/hostedtoolcache/node/24.22.1/x64/bin/pnpm --version'
+      '/opt/hostedtoolcache/node/24.22.3/x64/bin/pnpm --version'
     );
     expect(
       runnerDockerfile.indexOf('FROM runner-base\n\n# Corepack')
@@ -1427,9 +1372,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
-    // Version resolve, cache restore and browser download all skip on a warm image.
+    // Version resolve, cache restore/save, download and save notice skip on warm.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      3
+      5
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });

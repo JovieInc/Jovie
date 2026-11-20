@@ -12,6 +12,10 @@ import {
 } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
+import {
+  isClaimAccessControlled,
+  linkClaimReplaysBestEffort,
+} from '@/lib/onboarding/claim-side-effects';
 import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
 import {
@@ -32,7 +36,6 @@ import {
   decideGoldenPathAdmissionForArtist,
   requiresProofBeforePublic,
 } from '@/lib/waitlist/golden-path-admission.server';
-import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -141,14 +144,13 @@ async function createWaitlistReceipt(params: {
     reach: state.artist?.followers ?? null,
   });
 
-  // Best leads first: the score and every input are stored on the entry. The
-  // catalog is not measurable before the identity is linked, so it is null.
+  // Best leads first: the score and every input are stored on the entry.
   const admissionScore = scoreAdmissionCandidate({
     identityResolved: Boolean(state.artist?.id),
     followers: state.artist?.followers ?? null,
     popularity: state.artist?.popularity ?? null,
-    catalogReleases: null,
-    latestReleaseAt: null,
+    catalogReleases: state.catalogPreview?.total ?? null,
+    latestReleaseAt: state.catalogPreview?.releases[0]?.releaseDate ?? null,
     releaseStage:
       state.interviewSignals.findLast(signal => signal.releaseStage)
         ?.releaseStage ?? null,
@@ -211,6 +213,7 @@ interface ClaimHandoff {
   readonly waitlistIntakeRequired: boolean;
   /** Admitted by the golden path, page private until ownership is proven. */
   readonly proofPending?: boolean;
+  readonly handleReservationFailed?: boolean;
 }
 
 const EMPTY_CLAIM_HANDOFF: ClaimHandoff = {
@@ -296,11 +299,14 @@ async function resolveClaimHandoff(params: {
       await captureError(
         'Onboarding waitlist handle reservation failed',
         error,
-        {
-          route: '/api/onboarding/claim',
-          method: 'POST',
-        }
+        { route: '/api/onboarding/claim', method: 'POST' }
       );
+      return {
+        profile: null,
+        waitlist,
+        waitlistIntakeRequired: false,
+        handleReservationFailed: true,
+      };
     }
     return { profile, waitlist, waitlistIntakeRequired: false };
   }
@@ -395,15 +401,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ claimed: 0 });
     }
 
-    const accessControlled = await isWaitlistGateEnabled().catch(
-      async error => {
-        await captureError('Onboarding claim gate lookup failed', error, {
-          route: '/api/onboarding/claim',
-          method: 'POST',
-        });
-        return true;
-      }
-    );
+    await linkClaimReplaysBestEffort(sessionId, userId);
+
+    const accessControlled = await isClaimAccessControlled();
     const currentDbUser = await getDbUser(userId);
     const alreadyApproved = isWaitlistApprovedUserStatus(
       currentDbUser?.userStatus
@@ -470,7 +470,11 @@ export async function POST(req: Request) {
               userAgent,
             })
           : EMPTY_CLAIM_HANDOFF;
-        if (terminalKind && !handoff.profileError)
+        if (
+          terminalKind &&
+          !handoff.profileError &&
+          !handoff.handleReservationFailed
+        )
           await clearOnboardingSessionCookie();
         return NextResponse.json(
           {
@@ -497,9 +501,7 @@ export async function POST(req: Request) {
       const mustWaitlist =
         !alreadyApproved && (accessControlled || terminalKind === 'waitlist');
 
-      // Do not consume the anonymous transcript until a public artist
-      // identity exists. The same /start conversation retries after the next
-      // natural-language turn (JOV-5001).
+      // Do not consume the anonymous transcript until a public artist identity exists (JOV-5001).
       if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
         return NextResponse.json({
           claimed: 0,
@@ -507,14 +509,7 @@ export async function POST(req: Request) {
         });
       }
 
-      // Compare-and-swap ownership before writing user-scoped waitlist data.
-      // The WHERE clause only
-      // matches a row that is still unclaimed (userId IS NULL) and still has
-      // this sessionId. .returning() lets us detect a concurrent claim from
-      // another request — if zero rows update, somebody else won the race.
-      // We don't use db.transaction() per .claude/rules/db.md, so this CAS is
-      // the ownership linearization point. A failed downstream waitlist write
-      // remains retryable through the same-user recovery branch above.
+      // CAS ownership linearization point (`userId IS NULL`); same-user retries recover above.
       const claimedPrimary = await db
         .update(chatConversations)
         .set({ userId, updatedAt: new Date() })
@@ -640,7 +635,11 @@ export async function POST(req: Request) {
           );
       }
 
-      if (terminalKind && !handoff.profileError)
+      if (
+        terminalKind &&
+        !handoff.profileError &&
+        !handoff.handleReservationFailed
+      )
         await clearOnboardingSessionCookie();
 
       return NextResponse.json(
@@ -652,8 +651,6 @@ export async function POST(req: Request) {
         { status: handoff.profileError ? 409 : 200 }
       );
     } catch (error) {
-      // Ownership gate: unauthenticated / non-owner / missing conversation.
-      // Fail closed — never surface reserved / locked-in success without verify.
       if (isOnboardingOwnershipError(error)) {
         logger.warn('[onboarding/claim] ownership gate rejected claim', {
           errorCode: error.errorCode,
@@ -665,12 +662,12 @@ export async function POST(req: Request) {
         );
       }
 
-      // Unique-constraint violation on the partial index = this sessionId was
-      // already claimed onto a different user. Surface a friendly 409.
       const message = error instanceof Error ? error.message.toLowerCase() : '';
       if (
         message.includes('idx_chat_conversations_session_id_claimed_unique') ||
-        message.includes('unique')
+        (message.includes('unique') &&
+          !message.includes('creator_profiles') &&
+          !message.includes('waitlist'))
       ) {
         logger.warn(
           '[onboarding/claim] session already claimed onto a different user',

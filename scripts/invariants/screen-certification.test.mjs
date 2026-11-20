@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -14,6 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
+import { spawnSync } from '../lib/child-process.mjs';
 import {
   readProductReferenceOwner,
   screenNeedsProductReferences,
@@ -2129,7 +2129,7 @@ if (p.endsWith('/zip')) {
       assert.equal(wrongName.receipt.certified, false);
       assert.match(
         wrongName.receipt.issues.join('\n'),
-        /artifact run, workflow, or exact producer attempt is not trusted/
+        /exact producer attempt is not trusted; failed checks artifact name/
       );
     } finally {
       process.env.PATH = priorPath;
@@ -4219,15 +4219,15 @@ if (p.endsWith('/zip')) {
 
   it('registers the profile-mode render route for changed-surface certification', () => {
     const source = 'apps/web/app/[username]/profile-mode-render/';
+    const missSource = 'apps/web/app/[username]/profile-miss/page.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.profile-mode-render'
     );
-
     assert.deepEqual(screen, {
       id: 'web.profile-mode-render',
       platform: 'web',
       owner: 'profile-mode-render',
-      sources: [source],
+      sources: [source, missSource],
       viewports: ['desktop', 'mobile'],
     });
 

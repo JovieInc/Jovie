@@ -1,0 +1,66 @@
+{
+  "note": "Internal pages that answer 404 to strangers in production on purpose. The ready gate expects a 404 here, and reports the route as a finding if it ever opens. Add a route only in a reviewed PR, with the reason.",
+  "routes": [
+    {
+      "prefix": "/demo",
+      "exact": true,
+      "reason": "internal demo index, noindex; /demo/video stays public"
+    },
+    {
+      "prefix": "/demo/audience",
+      "reason": "internal demo page, noindex"
+    },
+    {
+      "prefix": "/demo/dropdowns",
+      "reason": "internal demo page, noindex"
+    },
+    {
+      "prefix": "/demo/founder-video",
+      "reason": "internal demo page, noindex"
+    },
+    {
+      "prefix": "/demo/onboarding",
+      "reason": "internal demo page, noindex"
+    },
+    {
+      "prefix": "/demo/showcase",
+      "reason": "screenshot fixtures; production 404s them except for the screenshot workflow (lib/security/production-blocked-routes.ts)"
+    },
+    {
+      "prefix": "/ui",
+      "reason": "component gallery for development"
+    },
+    {
+      "prefix": "/exp",
+      "reason": "experiments; exp/layout.tsx calls notFound() outside development"
+    },
+    {
+      "prefix": "/dev",
+      "reason": "development probes"
+    },
+    {
+      "prefix": "/sandbox",
+      "reason": "development sandbox"
+    },
+    {
+      "prefix": "/renders",
+      "reason": "render fixtures; denied in production (lib/render-fixture-policy.ts)"
+    },
+    {
+      "prefix": "/investor-portal",
+      "reason": "token-gated; strangers get a neutral 404 (lib/auth/investor-portal.ts)"
+    },
+    {
+      "prefix": "/engineering/preview",
+      "reason": "preview layout calls notFound() outside a local dev server"
+    },
+    {
+      "prefix": "/sentry-example-page",
+      "reason": "Sentry setup sample, reserved system route"
+    },
+    {
+      "prefix": "/spinner-test",
+      "reason": "development spinner test"
+    }
+  ]
+}

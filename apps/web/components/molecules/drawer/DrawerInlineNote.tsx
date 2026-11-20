@@ -7,6 +7,8 @@ export interface DrawerInlineNoteProps {
   readonly message: string;
   readonly tone?: 'default' | 'error';
   readonly className?: string;
+  /** `flush` drops the horizontal inset and shortens the note for dense lists. */
+  readonly inset?: 'default' | 'flush';
   readonly testId?: string;
 }
 
@@ -19,22 +21,26 @@ export function DrawerInlineNote({
   message,
   tone = 'default',
   className,
+  inset = 'default',
   testId,
 }: DrawerInlineNoteProps) {
   return (
-    <DrawerSurfaceCard
-      variant='flat'
-      testId={testId}
-      className={cn('flex min-h-22 items-center px-3 py-3', className)}
-    >
-      <p
+    <DrawerSurfaceCard variant='flat' testId={testId} className={className}>
+      <div
         className={cn(
-          'text-xs leading-[18px] tracking-wide',
-          tone === 'error' ? 'text-error' : 'text-secondary-token'
+          'flex items-center py-3',
+          inset === 'flush' ? 'min-h-12 px-0' : 'min-h-22 px-3'
         )}
       >
-        {message}
-      </p>
+        <p
+          className={cn(
+            'text-xs leading-[18px] tracking-wide',
+            tone === 'error' ? 'text-error' : 'text-secondary-token'
+          )}
+        >
+          {message}
+        </p>
+      </div>
     </DrawerSurfaceCard>
   );
 }

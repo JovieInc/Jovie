@@ -168,7 +168,10 @@ export async function readLoginMatrixEvidence({
     run.run_attempt === Number(attempt) &&
     run.head_sha === sha &&
     run.path === '.github/workflows/e2e-full-matrix.yml' &&
-    run.event === 'push' &&
+    // Daily matrix evidence is dispatched by the Gem lanes clock; the workflow's
+    // remediation job only runs on repository_dispatch after the every-push trigger
+    // was retired (JOV-10683 / PR #23724).
+    run.event === 'repository_dispatch' &&
     run.head_branch === 'main' &&
     isRecord(run.repository) &&
     run.repository.full_name === repository;

@@ -22,11 +22,33 @@ describe('Footer', () => {
   it('gives every profile legal link a 44pt hit box', () => {
     render(<Footer variant='profile' artistHandle='tim' />);
 
-    for (const label of ['Privacy', 'Terms', 'Report']) {
+    for (const label of [
+      'Privacy',
+      'Terms',
+      'Report',
+      'Your Privacy Choices',
+    ]) {
       for (const link of screen.getAllByRole('link', { name: label })) {
         expect(link).toHaveClass('min-h-11', 'min-w-11');
       }
     }
+  });
+
+  it('reserves the mobile band under the profile branding so hit boxes never overlap', () => {
+    const { container } = render(
+      <Footer variant='profile' artistHandle='tim' />
+    );
+
+    const brandingRow = screen
+      .getByRole('link', { name: 'Powered by Jovie Home' })
+      .closest('div')?.parentElement;
+    // The wrapper is the branding group div's parent (FooterBranding renders
+    // its own inner group div); the mobile reservation lifts the branding
+    // link's 44pt hit box clear of the absolute legal links (bottom-2
+    // right-4, 44pt boxes), while desktop keeps the tight band because its
+    // legal links are viewport-pinned.
+    expect(brandingRow).toHaveClass('pb-16', 'md:pb-2');
+    expect(container.querySelector('footer')?.className).toContain('relative');
   });
 
   it('keeps regular footer destinations on the shared route registry', () => {
@@ -38,6 +60,7 @@ describe('Footer', () => {
       Support: APP_ROUTES.SUPPORT,
       Blog: APP_ROUTES.BLOG,
       Changelog: APP_ROUTES.CHANGELOG,
+      'Get Started': APP_ROUTES.START,
     } as const;
 
     for (const [label, href] of Object.entries(expectedLinks)) {
@@ -73,5 +96,15 @@ describe('Footer', () => {
 
     rerender(<Footer variant='profile' />);
     expect(screen.queryByRole('link', { name: 'Report' })).toBeNull();
+  });
+});
+
+describe('Footer legal link contrast (JOV-8873)', () => {
+  it('renders profile legal links at 80% resting opacity', () => {
+    render(<Footer variant='profile' />);
+    for (const link of screen.getAllByRole('link', { name: 'Privacy' })) {
+      expect(link).toHaveClass('opacity-80');
+      expect(link).not.toHaveClass('opacity-60');
+    }
   });
 });

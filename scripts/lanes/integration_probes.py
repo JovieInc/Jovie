@@ -1,9 +1,9 @@
 """Synthetic probes for the live integrations fleet work on Gem depends on (silent-breakage gap, 2026-11-02).
 
-Overnight 2026-11-01/02 three components broke with no incident: the jovie-research MCP was down all
-night (its health timer only ran `jovie-research --version`, which never starts the MCP server), the
-Hyperagent board bridge crash-looped on TLS EOF, and the lanes stay-up watchdog timer had been dark for
-a week. Each probe below exercises the real path a consumer uses, not a version string:
+Overnight 2026-11-01/02 three components broke with no incident: the jovie-research MCP was down all night
+(its health timer only ran `--version`, never starting the MCP server), the Hyperagent board bridge crash-looped
+on TLS EOF, and the lanes watchdog timer was dark for a week. Each probe exercises the real consumer path
+(gem:host-git, JOV-11391, is the Git floor: host_git.py):
 
   gem:lanes-tick:timer      jovie-lanes.timer armed (busy slots can mask a dead timer)
   gem:lanes-watchdog:timer  jovie-lanes-watchdog.timer armed (the watchdog went dark when it stopped)
@@ -20,9 +20,7 @@ existing doctor -> Linear -> Summer detector -> board path. The condition clears
 the issue with its cleared comment) only when the probe passes again. A red probe with a `heal` spec gets
 a bounded `systemctl --user` restart/start (HEAL_MAX per HEAL_WINDOW_S, HEAL_GAP_S apart), recorded in
 the probe state; the condition stays open until a later probe proves the heal worked.
-
-Every passing probe touches `<state>/probes/<id>.ok`, the host-local liveness receipt its row in
-canon/automation-registry.jsonl watches, so a probe pass that stops running is itself silence.
+Every passing probe touches `<state>/probes/<id>.ok`, the host-local liveness receipt its row in canon/automation-registry.jsonl watches, so a probe pass that stops running is itself silence.
 Kill switches: LANES_INTEGRATION_PROBES=0 (no probes), LANES_INTEGRATION_HEAL=0 (probe, never restart).
 """
 from __future__ import annotations
@@ -38,6 +36,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
+import host_git
 
 SCHEMA = "jovie.integration-probes/v1"
 STATE_FILE = "integration-probes.json"
@@ -335,6 +334,7 @@ PROBES = {
                           "owner": "mesh hub (workers/mesh-hub)"},
     "gem:codex-auth": {"run": lambda ctx: probe_codex(**ctx), "registry": "gem:codex-auth", "heal": None,
                        "owner": "gem-lanes (scripts/lanes/codex_lane.py)"},
+    "gem:host-git": {"run": lambda ctx: host_git.probe(**ctx), "registry": "gem:host-git", "heal": None, "owner": "gem-lanes (scripts/hostops/install-lane-host-git.sh)"},
 }
 
 

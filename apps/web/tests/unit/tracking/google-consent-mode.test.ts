@@ -135,7 +135,7 @@ describe('google-consent-mode', () => {
       "gtag('consent', 'default'"
     );
     expect(buildGoogleConsentInitScript(measurementId)).toContain(
-      'jv_cc_required=1'
+      'jv_cc_required=0'
     );
     expect(buildGoogleAnalyticsConfigScript(measurementId)).toContain(
       "gtag('config', 'G-TMY7Z8HK47')"

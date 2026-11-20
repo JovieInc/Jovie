@@ -126,6 +126,20 @@ describe('SidebarNavItem active chrome', () => {
     expect(row.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('keeps collapsed navigation named and active', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'Releases', active: true }}
+        collapsed
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Releases' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('does not mark an inactive row pressed', () => {
     const TestIcon = (props: { className?: string }) => <svg {...props} />;
 
@@ -139,5 +153,21 @@ describe('SidebarNavItem active chrome', () => {
     expect(
       screen.getByRole('button', { name: 'Releases' })
     ).not.toHaveAttribute('aria-pressed');
+  });
+});
+
+describe('SidebarNavItem design-system button', () => {
+  it('renders the row through PlainButton with its own focus ring', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+    render(
+      <SidebarNavItem
+        collapsed={false}
+        item={{ label: 'Inbox', icon: TestIcon }}
+      />
+    );
+    const row = screen.getByRole('button', { name: 'Inbox' });
+    expect(row).toHaveAttribute('data-slot', 'plain-button');
+    expect(row).toHaveClass('focus-visible:ring-ring/55');
+    expect(row).not.toHaveClass('focus-visible:ring-focus');
   });
 });

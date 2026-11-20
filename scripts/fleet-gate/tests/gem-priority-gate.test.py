@@ -3706,9 +3706,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
-        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
-        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"])
         self.assertTrue(receipt["closureAdmission"]["remediationContinues"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
@@ -5871,7 +5869,7 @@ class ClosureObservationContractTests(unittest.TestCase):
                 self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
                 self.assertEqual(products["jovie"]["status"], "red")
                 self.assertEqual(products["jovie"]["reasons"], closure["reasons"])
-                for peer in ("logyourbody", "ovie"):
+                for peer in ("logyourbody",):
                     self.assertTrue(products[peer]["newIssueIntakeAllowed"])
             self.assertTrue(receipt["remediationAdmission"]["allowed"])
 

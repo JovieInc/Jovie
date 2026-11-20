@@ -12,6 +12,8 @@ export interface VideoRecordingProposalPayload {
   readonly title: string;
   readonly script: string;
   readonly showcaseVariant: TeleprompterShowcaseVariant;
+  /** Between-take questions Jovie wrote from the script. Optional. */
+  readonly questions?: readonly string[];
 }
 
 export function isVideoRecordingProposalPayload(
@@ -26,7 +28,10 @@ export function isVideoRecordingProposalPayload(
     typeof candidate.title === 'string' &&
     typeof candidate.script === 'string' &&
     (candidate.showcaseVariant === 'interstitial' ||
-      candidate.showcaseVariant === 'direct')
+      candidate.showcaseVariant === 'direct') &&
+    (candidate.questions === undefined ||
+      (Array.isArray(candidate.questions) &&
+        candidate.questions.every(question => typeof question === 'string')))
   );
 }
 
@@ -37,4 +42,5 @@ export interface TeleprompterRecordingContext {
   readonly script: string;
   readonly showcaseVariant: TeleprompterShowcaseVariant;
   readonly source: 'chat_proposal';
+  readonly questions?: readonly string[];
 }

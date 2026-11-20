@@ -38,6 +38,8 @@ describe('waitlist column renderers', () => {
     ['new', 'Waitlisted', 'text-(--linear-text-tertiary)'],
     ['chat_started', 'Chat started', 'text-(--linear-text-tertiary)'],
     ['qualified', 'Qualified', 'text-(--linear-text-tertiary)'],
+    ['queued', 'Queued (held)', 'bg-(--color-warning-subtle)'],
+    ['disqualified', 'Not a fit', 'bg-(--color-error-subtle)'],
     ['waitlisted', 'Waitlisted', 'text-(--linear-text-tertiary)'],
     ['invited', 'Invited', 'text-(--linear-text-primary)'],
     ['approved', 'Approved', 'text-(--linear-text-primary)'],

@@ -59,30 +59,24 @@ export function directDependencies(file, root) {
   return found;
 }
 
-const dependencyCache = new Map();
-
 /**
  * The test file plus everything it imports (transitively, through JS) or reads.
- * Cached per (root, test) for the process: runStructural is called many times
- * by its own contract suite, and rescanning ~100 tests per call timed that
- * suite out at 30 s in a loaded merge group (#21471, 2026-10-13).
+ * The file graph belongs to this invocation: callers can edit a checkout
+ * between selections, so a process-wide result must not outlive its inputs.
  */
 export function testDependencies(testFile, root) {
-  const key = `${root}\0${testFile}`;
-  const cached = dependencyCache.get(key);
-  if (cached) return cached;
-  const result = scanTestDependencies(testFile, root);
-  dependencyCache.set(key, result);
-  return result;
+  return scanTestDependencies(testFile, root, new Map());
 }
 
-function scanTestDependencies(testFile, root) {
+function scanTestDependencies(testFile, root, directCache) {
   const seen = new Set([testFile]);
   const pending = [testFile];
   while (pending.length > 0) {
     const file = pending.pop();
     if (!MODULE.test(file) || !existsSync(join(root, file))) continue;
-    for (const dependency of directDependencies(file, root)) {
+    if (!directCache.has(file))
+      directCache.set(file, directDependencies(file, root));
+    for (const dependency of directCache.get(file)) {
       if (dependency.includes('node_modules/') || seen.has(dependency))
         continue;
       seen.add(dependency);
@@ -96,7 +90,19 @@ function scanTestDependencies(testFile, root) {
 export function testsAffectedBy(tests, changed, root) {
   const changes = new Set(changed);
   if (changes.size === 0) return [];
+  // A shared hub can be reached by hundreds of tests. Parse its direct
+  // imports/reads once for this immutable selection, retaining every test's
+  // complete transitive closure and the catalog's original order/grouping.
+  const directCache = new Map();
+  const testCache = new Map();
+  const dependencies = test => {
+    if (!testCache.has(test))
+      testCache.set(test, scanTestDependencies(test, root, directCache));
+    return testCache.get(test);
+  };
   return tests.filter(test =>
-    [...testDependencies(test, root)].some(file => changes.has(file))
+    test
+      .split(' ')
+      .some(part => [...dependencies(part)].some(file => changes.has(file)))
   );
 }

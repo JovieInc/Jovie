@@ -61,6 +61,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            scripts/lanes/atomic_state.py
             scripts/lanes/shipping_attribution.py
             scripts/shipping_origin.py
             scripts/dependabot-update-policy.mjs

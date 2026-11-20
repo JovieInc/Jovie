@@ -120,19 +120,13 @@ export function getCanonicalForCategory(
 
 // ─── Homepage composition ───────────────────────────────────────────────────
 
-/** Feature flags that affect homepage section composition. */
+/** Switches that affect homepage section composition. */
 export interface HomepageCompositionFlags {
-  /** `SHOW_HOMEPAGE_GO_LIVE_SECTION` */
   readonly showGoLive: boolean;
-  /** `SHOW_HOMEPAGE_FRIDAY_RHYTHM` */
   readonly showFridayRhythm: boolean;
-  /** `SHOW_HOME_REFRESH_2026` */
   readonly showHomeRefresh2026: boolean;
-  /** `SHOW_HOMEPAGE_V2_PRICING` */
   readonly showV2Pricing: boolean;
-  /** `SHOW_HOMEPAGE_FAQ` */
   readonly showFaq: boolean;
-  /** `SHOW_HOMEPAGE_V2_FINAL_CTA` */
   readonly showV2FinalCta: boolean;
 }
 

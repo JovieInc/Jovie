@@ -40,5 +40,13 @@
       "gold": "orange",
       "flare": "red"
     }
+  },
+  "marks": {
+    "count": 2,
+    "roles": ["verified", "on-media"],
+    "locked": "2026-11-08",
+    "note": "Brand marks, not accents: verified is the verified-profile badge blue (it clears 3:1 on white where ion does not); on-media is the white that stays white on brand fills, photos and fixed-dark media.",
+    "light": { "verified": "#0084D1", "on-media": "#FFFFFF" },
+    "dark": { "verified": "#00BCFF", "on-media": "#FFFFFF" }
   }
 }

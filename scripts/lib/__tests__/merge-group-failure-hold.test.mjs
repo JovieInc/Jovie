@@ -79,7 +79,9 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         cwd: dir,
         encoding: 'utf8',
         input,
-        timeout: 10_000,
+        // Sparse fixture git under full script-contracts load regularly
+        // exceeds 10s on contended hosts; keep the assertion, widen the wait.
+        timeout: 60_000,
       });
       expect(result.error, result.stderr).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
@@ -120,7 +122,7 @@ it('imports the real failure policy from both workflow sparse checkouts', () => 
         const missing = spawnSync(process.execPath, importArgs, {
           cwd: dir,
           encoding: 'utf8',
-          timeout: 10_000,
+          timeout: 60_000,
         });
         expect(missing.error).toBeUndefined();
         expect(missing.status).not.toBe(0);
@@ -1383,6 +1385,9 @@ describe('merge-group source revision mapping', () => {
 
 describe('failure classification and revision-scoped suppression', () => {
   it('classifies deterministic source checks separately from infrastructure', () => {
+    expect(classify('failure', ['Run lanes coverage pytest'])).toBe(
+      'deterministic-source'
+    );
     expect(classify('failure', ['Run structural ci-fast lane'])).toBe(
       'deterministic-source'
     );

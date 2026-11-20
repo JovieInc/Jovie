@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { PRODUCT_COPY } from '@/data/productCopy';
+import { HomepageHeroCanvas } from './HomepageHeroCanvas';
 import { HomepageHeroLight } from './HomepageHeroLight';
 import { startHeroLight } from './hero-light-gl';
 
@@ -141,29 +141,41 @@ describe('HomepageHeroLight', () => {
   });
 });
 
-describe('HomepageArtistHero', () => {
+describe('HomepageHeroCanvas as mounted by /product', () => {
   afterEach(() => {
     cleanup();
   });
 
   it('ships the cinematic hero and the CSS poster', () => {
-    render(<HomepageArtistHero />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      HOMEPAGE_COPY.hero.headline
+    const { hero, claimCard } = PRODUCT_COPY;
+    render(
+      <HomepageHeroCanvas
+        headingId='product-hero-heading'
+        headline={hero.headline}
+        subhead={hero.support}
+        claim={{
+          domain: claimCard.domain,
+          placeholder: claimCard.handle,
+          action: claimCard.cta,
+        }}
+        supportNote={claimCard.proof}
+        profile={hero.profile}
+        sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+        claimTestId='product-claim-card'
+        claimTestIdPrefix='product'
+      />
     );
-    // PublicPageShell owns navigation; the hero keeps one claim form.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      hero.headline
+    );
+    // MarketingPageShell owns navigation; the hero keeps one claim form.
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Jovie' })).toBeNull();
-    expect(screen.getAllByTestId('homepage-claim-form')).toHaveLength(1);
-    expect(screen.getByTestId('homepage-claim-form')).toHaveAttribute(
-      'action',
-      '/start'
-    );
+    expect(screen.getAllByTestId('product-claim-card')).toHaveLength(1);
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
-    // No real person's face on the homepage (Tim, 2026-10-26).
+    // No real person's face in the hero capture (Tim, 2026-10-26).
     expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
   });
 });

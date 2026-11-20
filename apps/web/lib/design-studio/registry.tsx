@@ -155,7 +155,7 @@ function PublicProfileIphonePreview() {
               <p className='truncate text-xs font-semibold text-white/62'>
                 {state.label}
               </p>
-              <span className='rounded-md bg-white/[0.06] px-2 py-1 text-3xs text-white/45'>
+              <span className='rounded-md bg-white/[0.06] px-2 py-1 text-3xs text-white/62'>
                 iPhone
               </span>
             </div>
@@ -184,7 +184,7 @@ function PublicProfileMerchFixturePreview() {
               <div className='h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.38),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_52%,#050608_100%)]' />
             </div>
             <div className='min-w-0 py-1'>
-              <p className='text-xs font-semibold text-white/45'>Merch Drop</p>
+              <p className='text-xs font-semibold text-white/62'>Merch Drop</p>
               <p className='mt-1 text-base font-[650] leading-5 tracking-[-0.03em] text-white dark:text-white [overflow-wrap:anywhere]'>
                 Tour Tee
               </p>
@@ -209,7 +209,7 @@ function MusicAiCommandPreview() {
           </div>
           <div className='min-w-0'>
             <p className='truncate text-xs font-semibold'>Jovie</p>
-            <p className='truncate text-3xs text-white/45'>Music first AI</p>
+            <p className='truncate text-3xs text-white/62'>Music first AI</p>
           </div>
         </div>
         <nav className='space-y-1 text-xs'>
@@ -270,7 +270,7 @@ function MusicAiCommandPreview() {
                     <p className='truncate text-xs font-medium text-white dark:text-white'>
                       {row.title}
                     </p>
-                    <p className='truncate text-xs text-white/45'>{row.meta}</p>
+                    <p className='truncate text-xs text-white/62'>{row.meta}</p>
                   </div>
                 </div>
               );
@@ -324,7 +324,7 @@ function LibraryViewPreview() {
             <div className={cn('h-32 bg-gradient-to-br', asset.tone)} />
             <div className='space-y-2 p-3'>
               <p className='truncate text-xs font-medium'>{asset.title}</p>
-              <div className='flex items-center justify-between gap-2 text-xs text-white/45'>
+              <div className='flex items-center justify-between gap-2 text-xs text-white/62'>
                 <span>{asset.type}</span>
                 <span>{asset.status}</span>
               </div>
@@ -341,7 +341,7 @@ function TrackViewPreview() {
     <StudioFrame className='grid grid-cols-[1fr_360px]'>
       <div className='flex flex-col justify-between p-4'>
         <div>
-          <div className='mb-4 flex items-center gap-2 text-xs text-white/45'>
+          <div className='mb-4 flex items-center gap-2 text-xs text-white/62'>
             <AudioLines className='h-3.5 w-3.5' />
             <span>Track View</span>
           </div>
@@ -358,11 +358,11 @@ function TrackViewPreview() {
                   <MockArtwork className='h-10 w-10' />
                   <div className='min-w-0'>
                     <p className='truncate text-xs font-medium'>{title}</p>
-                    <p className='truncate text-xs text-white/45'>
+                    <p className='truncate text-xs text-white/62'>
                       Sora Vale · 3:{index === 0 ? '42' : '18'}
                     </p>
                   </div>
-                  <span className='text-xs text-white/40'>
+                  <span className='text-xs text-white/62'>
                     {index === 0 ? 'Playing' : 'Ready'}
                   </span>
                 </div>
@@ -412,7 +412,7 @@ function TrackViewPreview() {
             ['Pitch Notes', 'Dark pop, late-night driving'],
           ].map(([label, value]) => (
             <div key={label}>
-              <p className='text-white/45'>{label}</p>
+              <p className='text-white/62'>{label}</p>
               <p className='mt-1 text-white/80'>{value}</p>
             </div>
           ))}
@@ -428,11 +428,11 @@ function ThreadMediaPreview() {
       <div className='mb-4 flex items-center justify-between'>
         <div>
           <p className='text-base font-semibold'>Thread Media Cards</p>
-          <p className='mt-1 text-xs text-white/45'>
+          <p className='mt-1 text-xs text-white/62'>
             Release context with audio, image, and video attachments.
           </p>
         </div>
-        <MessageSquare className='h-4 w-4 text-white/40' />
+        <MessageSquare className='h-4 w-4 text-white/62' />
       </div>
       <div className='grid gap-3 lg:grid-cols-3'>
         <ThreadAudioCard

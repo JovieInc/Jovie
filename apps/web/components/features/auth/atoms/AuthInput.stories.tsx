@@ -35,3 +35,24 @@ export const ErrorState: Story = {
     error: true,
   },
 };
+
+/** A long email address scrolls inside the pill instead of widening the column. */
+export const LongContentEmail: Story = {
+  args: {
+    defaultValue: 'booking.and.management.team@example-records-group.com',
+  },
+};
+
+/** The email field inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    defaultValue: 'artist@example.com',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

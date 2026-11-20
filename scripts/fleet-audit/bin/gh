@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Fleet audit shim for gh (scripts/fleet-audit/audit.py). Installed into a PATH dir whose name
+# contains "jovie-audit-bin" so the real binary is found by skipping that dir. If the audit core is
+# missing or python is unavailable, fall through to the real binary (fail open).
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+core="${JOVIE_AUDIT_CORE:-$here/../audit.py}"
+if command -v python3 >/dev/null 2>&1 && [ -f "$core" ]; then
+  exec python3 -I "$core" wrap gh "$@"
+fi
+real=$(PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -v jovie-audit-bin | paste -sd: -) command -v gh)
+exec "$real" "$@"

@@ -25,7 +25,7 @@ describe('public profile tap targets (44pt floor)', () => {
   it('gives the Jovie Home logo link a 44pt box', () => {
     render(<FooterBranding artistHandle='tim' variant='linear' size='sm' />);
 
-    const home = screen.getByRole('link', { name: 'Jovie Home' });
+    const home = screen.getByRole('link', { name: 'Powered by Jovie Home' });
     expect(home).toHaveClass('min-h-11', 'min-w-11');
   });
 

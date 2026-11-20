@@ -52,6 +52,16 @@ class Selection(unittest.TestCase):
         self.assertEqual([r["identifier"] for r in got], ["JOV-3", "JOV-1", "JOV-4"])  # the label is not required
         self.assertEqual(skipped, {})
 
+    def test_marketing_admitted_after_ranked_and_urgent_without_waiving_readiness(self):
+        rows = [row(1, labels=("priority:marketing",)), row(2, priority=1), row(3),
+                row(4, labels=("priority:marketing", "needs-tim"))]
+        got, skipped = pa.admit_candidates(rows, {"JOV-3": 1}, now=NOW)
+        self.assertEqual([r["identifier"] for r in got], ["JOV-3", "JOV-2", "JOV-1"])
+        self.assertIn("JOV-4", skipped)
+        self.assertTrue(pa.protected(rows[0], {}))
+        rows[0]["labels"] = []
+        self.assertFalse(pa.protected(rows[0], {}))
+
     def test_hold_label_blocks_urgent(self):
         got, _ = pa.admit_candidates([row(1, priority=1, labels=("agent-ready", "needs-tim"))], {}, now=NOW)
         self.assertEqual(got, [])
@@ -154,6 +164,23 @@ class RunTests(unittest.TestCase):
             with ls._mutating(ls._claims_path(Path(d)), ls.CLAIMS) as data:
                 data["claims"] = claims
             self.assertEqual(pa.measure(d, NOW + 100)["admittedToClaimedMinP50"], 1.5)
+
+    def test_marketing_receipt_names_the_label_and_records_claim_latency(self):
+        with tempfile.TemporaryDirectory() as d:
+            host = self.seed(d, [row(1, labels=("priority:marketing",))])
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW)
+            self.assertEqual(receipt["admitted"], ["JOV-1"])
+            entries = ls._read(ls._outbox_path(Path(d)), ls.OUTBOX)["entries"]
+            comment = next(e["body"] for e in entries if e["op"] == "comment")
+            self.assertIn("priority:marketing", comment)
+            self.assertNotIn("Urgent (P1)", comment)
+            ls.claim(Path(d), "id-1", "JOV-1", "codex")
+            with ls._mutating(ls._claims_path(Path(d)), ls.CLAIMS) as data:
+                data["claims"]["id-1"]["claimedAt"] = NOW + 90
+            self.assertEqual(pa.measure(d, NOW + 100)["admittedToClaimedMinP50"], 1.5)
+            latency = json.loads((Path(d) / "priority-latency.jsonl").read_text())
+            self.assertTrue(latency["marketing"])
+            self.assertFalse(latency["urgent"])
 
     def test_unlabelled_ranked_issue_is_admitted_and_counted(self):
         with tempfile.TemporaryDirectory() as d:

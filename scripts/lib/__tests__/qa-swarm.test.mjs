@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -124,8 +125,13 @@ it('resolves the fixture root itself when a parent temp dir holds a foreign git 
   process.env.TMPDIR = contaminatedParent;
   const { repoRoot, restore } = makeTempRepo();
   try {
-    expect(getRepoRoot()).toBe(repoRoot);
-    expect(getQaSwarmPaths().repoRoot).toBe(repoRoot);
+    // process.cwd() on macOS is the real path (/private/var), while mkdtemp
+    // returns the /var symlink path. Same directory; the contaminated parent
+    // must still not win.
+    expect(realpathSync(getRepoRoot())).toBe(realpathSync(repoRoot));
+    expect(realpathSync(getQaSwarmPaths().repoRoot)).toBe(
+      realpathSync(repoRoot)
+    );
   } finally {
     restore();
     if (originalTmpdir === undefined) {

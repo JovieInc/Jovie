@@ -24,6 +24,7 @@ import type {
 
 interface EntityCardProps {
   readonly model: EntityCardModel;
+  readonly media?: 'auto' | 'none';
   /** Feature Hero / Compact / Detailed — auto-selected by the carousel. */
   readonly treatment?: EntityTreatment;
   /** App shell surface, or the frosted public-profile pearl. */
@@ -120,7 +121,7 @@ function EntityCtaControl({
   }
 
   const className = cn(
-    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-2xs font-semibold leading-none text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
     // Landscape profile actions keep the native 44px touch-target floor.
     // Portrait unified cards retain their compact 36px action row.
     unified
@@ -231,6 +232,7 @@ function CardShell({
 
 export function EntityCard({
   model,
+  media = 'auto',
   treatment = 'compact',
   surface = 'app',
   shape,
@@ -270,11 +272,6 @@ export function EntityCard({
               treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
             )
           : size.artClass;
-  const titleClampClassName = isUnified
-    ? 'line-clamp-1'
-    : shape && treatment !== 'big'
-      ? 'line-clamp-1'
-      : 'line-clamp-2';
   const preset = KIND_PRESETS[model.kind];
   const accent = model.accent ?? preset.accent;
   const Icon = preset.icon;
@@ -326,7 +323,7 @@ export function EntityCard({
         className
       )}
     >
-      {isLandscapeNonMedia ? null : (
+      {isLandscapeNonMedia || media === 'none' ? null : (
         <div
           className={cn(
             'relative flex w-full items-center justify-center overflow-hidden',
@@ -448,8 +445,10 @@ export function EntityCard({
 
           <h3
             className={cn(
-              'min-w-0 font-[590] leading-tight tracking-tighter text-primary-token',
-              titleClampClassName,
+              'min-w-0 font-semibold leading-tight tracking-tighter text-primary-token',
+              isUnified || (shape && treatment !== 'big')
+                ? 'line-clamp-1'
+                : 'line-clamp-2',
               // Unified: match the featured card's title size — one design.
               isUnified ? 'text-sm' : size.titleClass
             )}
@@ -539,7 +538,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-3 text-2xs font-semibold leading-none text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
                     isProfileLandscape ? 'h-11 w-fit' : 'h-9 w-full'
                   )}
                 >
@@ -551,7 +550,7 @@ export function EntityCard({
             <>
               {model.price ? (
                 <div className='min-w-0'>
-                  <span className='text-sm font-[680] text-primary-token'>
+                  <span className='text-sm font-bold text-primary-token'>
                     {model.price.original ? (
                       <>
                         {model.price.display}

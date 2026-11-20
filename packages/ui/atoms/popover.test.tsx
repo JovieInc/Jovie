@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Popover,
@@ -210,12 +211,6 @@ describe('Popover', () => {
       externalButton.focus();
       expect(externalButton).toHaveFocus();
       // The key assertion is that external focus works - popover doesn't trap
-    });
-
-    it.skip('returns focus to trigger when closed with escape', () => {
-      // Skipped: Radix Popover focus behavior varies across environments
-      // This behavior is covered functionally by other tests
-      expect(true).toBe(true);
     });
 
     it('supports keyboard navigation', () => {
@@ -450,5 +445,26 @@ describe('Popover', () => {
         screen.getByRole('button', { name: 'Remove row' })
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('Popover accessibility', () => {
+  it('has no axe violations when open', async () => {
+    render(
+      <TestPopover open aria-label='Release details' showArrow>
+        <p>Released June 12.</p>
+      </TestPopover>
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations with long right-to-left copy', async () => {
+    render(
+      <TestPopover open aria-label='إعدادات الحساب' dir='rtl'>
+        <p>حدّث تفضيلات حسابك واختر الإشعارات التي تصلك عند نشر إصدار جديد.</p>
+      </TestPopover>
+    );
+    await expectNoA11yViolations(document.body);
   });
 });

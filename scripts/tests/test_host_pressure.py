@@ -70,6 +70,40 @@ class HostPressureTest(unittest.TestCase):
             self.assertIsNone(hp.forecast_days([[0, 100 * G]], total))
             self.assertEqual(hp.forecast_days([[0, 60 * G], [3600, 55 * G], [8 * 3600, 40 * G]], total), 0.0)
 
+    def test_load_storm_alarms_only_when_sustained_and_clears(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            census = lambda: {"processes": 3000, "defunct": 1293, "top": [{"comm": "node", "count": 194}]}
+            lines = lambda: [json.loads(x) for x in (state / "host-alarms.jsonl").read_text().splitlines()] if (state / "host-alarms.jsonl").exists() else []
+            hp.publish_load(state, 60.0, 16, 1000, census=census)       # 4x16=64: under the line
+            hp.publish_load(state, 457.0, 16, 1060, census=census)      # over, just started
+            self.assertEqual(lines(), [])
+            hp.publish_load(state, 900.0, 16, 1120, census=census)      # 60 s over: not yet
+            self.assertEqual(lines(), [])
+            hp.publish_load(state, 1661.0, 16, 1180, census=census)     # 120 s over: alarm
+            hp.publish_load(state, 1661.0, 16, 1240, census=census)     # still over: no duplicate
+            self.assertEqual(len(lines()), 1)
+            event = lines()[0]
+            self.assertEqual((event["kind"], event["alarm"], event["threshold"]), ("host-load-storm", True, 64.0))
+            self.assertEqual(event["census"]["defunct"], 1293)
+            hp.publish_load(state, 5.0, 16, 1300, census=census)
+            self.assertEqual([e["alarm"] for e in lines()], [True, False])
+
+    def test_load_blip_resets_the_clock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            hp.publish_load(state, 500.0, 16, 1000, census=dict)
+            hp.publish_load(state, 10.0, 16, 1060, census=dict)
+            hp.publish_load(state, 500.0, 16, 1120, census=dict)
+            row = hp.publish_load(state, 500.0, 16, 1180, census=dict)
+            self.assertFalse(row["alarm"])
+
+    def test_load_config_env_override_and_census(self):
+        self.assertEqual(hp.load_config({"JOVIE_LOAD_ALARM_MULT": "0.5", "JOVIE_LOAD_ALARM_SECS": "1"}), (0.5, 1.0))
+        self.assertEqual(hp.load_config({"JOVIE_LOAD_ALARM_MULT": "x"}), (4.0, 120.0))
+        if Path("/proc").exists():
+            self.assertGreater(hp.process_census()["processes"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

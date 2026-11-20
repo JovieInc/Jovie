@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { BASE_URL } from '@/constants/app';
+import { CONTENT_SIGNAL } from '@/lib/agent-ready/discovery';
 import { env } from '@/lib/env-server';
 
 // Single domain robots.txt configuration
@@ -77,6 +78,7 @@ export default function robots(): MetadataRoute.Robots {
           userAgent: '*',
           allow: '/',
           disallow: DISALLOW_PATHS,
+          other: { 'Content-Signal': CONTENT_SIGNAL },
         },
         // Apply the declared AI crawler policy by purpose
         // But block investor and internal utility routes from ALL crawlers
@@ -84,6 +86,7 @@ export default function robots(): MetadataRoute.Robots {
           userAgent: crawler,
           allow: ['/', '/llms.txt'],
           disallow: DISALLOW_PATHS,
+          other: { 'Content-Signal': CONTENT_SIGNAL },
         })),
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,
@@ -97,6 +100,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         disallow: '/',
+        other: { 'Content-Signal': CONTENT_SIGNAL },
       },
     ],
   };

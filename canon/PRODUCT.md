@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-10-15
+Last updated: 2026-11-09
 
 Product exists to increase customer value delivered per week.
 
@@ -215,6 +215,23 @@ possible in terms of DS and IA."
   One-click answers execute immediately with a five-second undo. Ovie Home is
   dashboard-dense on a MacBook Pro.
 
+### One Ovie: web, shared shell, no native Ovie (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: "The native Ovie Mac app shouldn't exist. That
+was a failure of agents creating multiple versions of Ovie. Just as Jovie runs
+my closed-loop creator career, Ovie should run my closed-loop company, with
+Jovie also run from Ovie, with as much parity as possible."
+
+- Exactly one Ovie exists: the web Ovie in the Jovie monorepo at `/app/ov`, on
+  the shared Jovie/Ovie shell. Packaged doors (Electron) and the office wall
+  (a Chrome kiosk window) only load that URL.
+- No native Ovie: no Swift, SwiftUI, AppKit or separate-repo Ovie. The
+  `JovieInc/ovie` repository is archived and removed from the Symphony and
+  gem registries. Unique capabilities move into web Ovie via issues, never a
+  second implementation.
+- Guard: `canon/product-surfaces.json` and `pnpm run surfaces:check` (see
+  `canon/ENGINEERING.md`, "One surface per product").
+
 ### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
 
 **EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
@@ -261,6 +278,38 @@ ultrawide."
 Canon boundaries still hold: Ovie is presentation, not an agent; Summer and
 Jovie remain the two agents. JOV-5959 owns the Ovie Home implementation.
 
+### Public signup closes behind the waitlist (founder decision, 2026-11-02)
+
+Tim White approved the plan on 2026-11-02: close public signup and admit
+people by invite from a role-qualifying waitlist.
+
+- **Ship now:** the `PUBLIC_SIGNUP_CLOSED` code flag
+  (`apps/web/lib/flags/code-flags.ts`, closed by default). With the flag on,
+  `/signup` and anonymous `/start` go to the `/waitlist` role form (role and
+  email, Turnstile-gated, no account). Sign-in and waitlist invite links still
+  create accounts and enter the golden path. A missing env override keeps signup closed;
+  `FEATURE_PUBLIC_SIGNUP_CLOSED=false` is the explicit reopen override.
+- **Re-evaluate when:** the golden path is certified and the first paying
+  artists are live. Admin People → Waitlist shows submissions by role and
+  invite conversion (sent, opened, account created, golden path entered).
+- **Then:** reopen signup with `FEATURE_PUBLIC_SIGNUP_CLOSED=false`, and delete the flag
+  once the reopened funnel is stable.
+
+### Public signup reopens (founder decision, 2026-11-09 11:01 PM PT)
+
+Tim White directed on 2026-11-09 11:01 PM PT: open public signup immediately,
+with a one-switch kill path. This supersedes the 2026-11-02 closure above;
+that section's history is kept.
+
+- **Ship now:** `PUBLIC_SIGNUP_CLOSED` defaults to `false`
+  (`apps/web/lib/flags/code-flags.ts`). `/signup` and anonymous `/start`
+  render the sign-up surfaces directly; the homepage waitlist role form keeps
+  saving entries via `/api/waitlist/join` in both modes.
+- **Kill switch:** set `FEATURE_PUBLIC_SIGNUP_CLOSED=true` in Vercel
+  production env and redeploy (or revert the reopen PR). `/signup` and
+  anonymous `/start` then send visitors back to the `/waitlist` role form.
+- **Then:** once the reopened funnel is stable, delete the flag.
+
 ---
 
 ## Anti-Goals
@@ -288,6 +337,7 @@ Do not optimize for:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-11-09 | Public signup reopens; FEATURE_PUBLIC_SIGNUP_CLOSED=true is the kill switch. | Tim White |
 | 2026-10-21 | Ovie is one no-scroll Home plus a collapsed Tools group. | Tim White |
 | 2026-10-20 | Jovie and Ovie mirror one shell and IA; Ovie Home is a living canvas. | Tim White |
 | 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |

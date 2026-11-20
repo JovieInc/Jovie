@@ -25,12 +25,17 @@ import {
 } from './components';
 import { AudioPreviewStrip } from './components/AudioPreviewStrip';
 import { ChatFileChips } from './components/ChatFileChips';
+import {
+  ChatFollowUps,
+  useProfileChatFollowUps,
+} from './components/ChatFollowUps';
 import type { ChatInputProps } from './components/ChatInput';
 import { ChatUploadManifest } from './components/ChatUploadManifest';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
+import { useSourceFactsByMessage } from './source-evidence-context';
 import type { ChatError, MessagePart } from './types';
 import { isWeeklyPlanLimitError } from './utils';
 
@@ -248,6 +253,8 @@ interface ChatThreadMessagesProps {
   /** Earlier unanswered turns hidden behind one control (Summer only). */
   readonly collapsedFailureCount?: number;
   readonly onShowCollapsedFailures?: () => void;
+  /** Sends a tapped next move; enables follow-ups under a profile chat's first reply. */
+  readonly onFollowUp?: (prompt: string) => void;
 }
 
 export function ChatThreadMessages({
@@ -270,6 +277,7 @@ export function ChatThreadMessages({
   conversationId,
   collapsedFailureCount = 0,
   onShowCollapsedFailures,
+  onFollowUp,
 }: ChatThreadMessagesProps) {
   // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
   'use no memo';
@@ -286,6 +294,13 @@ export function ChatThreadMessages({
     messages.length > 0 &&
     virtualizedMinHeight > 0;
   const renderVirtualWindow = shouldVirtualizeMessages && !virtualizerStuck;
+  const sourceFacts = useSourceFactsByMessage(messages);
+  const followUps = useProfileChatFollowUps(
+    messages,
+    profileId,
+    isStreaming,
+    onFollowUp
+  );
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
@@ -299,6 +314,7 @@ export function ChatThreadMessages({
           id={message.id}
           role={message.role}
           parts={message.parts}
+          sourceFacts={sourceFacts.get(message.id)}
           isStreaming={isStreaming && index === lastAssistantIndex}
           isThinking={isThinking}
           avatarUrl={message.role === 'user' ? avatarUrl : undefined}
@@ -309,6 +325,12 @@ export function ChatThreadMessages({
           conversationId={conversationId ?? undefined}
           enableFeedback
         />
+        {followUps && followUps.afterMessageId === message.id ? (
+          <ChatFollowUps
+            items={followUps.items}
+            onSelect={followUps.onSelect}
+          />
+        ) : null}
       </div>
     );
   };

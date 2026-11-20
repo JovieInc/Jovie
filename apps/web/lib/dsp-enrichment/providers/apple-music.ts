@@ -16,6 +16,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { safeParseIsrc } from '@/lib/ids/branded';
 import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import {
@@ -36,6 +37,7 @@ import {
   getAppleMusicAuthHeaders,
   isAppleMusicConfigured,
 } from './apple-music-auth';
+import { MAX_ALBUM_PAGES, nextAlbumsPath } from './apple-music-paging';
 
 // ============================================================================
 // Configuration
@@ -373,12 +375,11 @@ export async function bulkLookupByIsrc(
 
   if (result.data) {
     for (const track of result.data) {
-      const trackIsrc = track.attributes?.isrc;
+      // Provider-payload boundary: normalize + validate ISRCs; malformed values skipped.
+      const trackIsrc = safeParseIsrc(track.attributes?.isrc);
       if (trackIsrc) {
-        const normalizedIsrc = trackIsrc.toUpperCase();
-        trackMap.set(normalizedIsrc, track);
-        // Cache the result for future lookups
-        setCachedIsrcTrack(normalizedIsrc, track);
+        trackMap.set(trackIsrc, track);
+        setCachedIsrcTrack(trackIsrc, track); // Cache for future lookups
       }
     }
   }
@@ -505,12 +506,8 @@ export async function getAlbum(
 }
 
 /**
- * Get artist's albums.
- *
- * @param artistId - Apple Music artist ID
- * @param options - Provider options
- * @param limit - Maximum results (default 50)
- * @returns Array of albums
+ * Get all of an artist's albums. MusicKit pages at most `limit` (max 100) per
+ * request, so follow its `next` cursor, up to MAX_ALBUM_PAGES requests.
  */
 export async function getArtistAlbums(
   artistId: string,
@@ -518,16 +515,19 @@ export async function getArtistAlbums(
   limit = DEFAULT_ALBUMS_LIMIT
 ): Promise<AppleMusicAlbum[]> {
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
-
-  const result = await executeWithCircuitBreaker(async () => {
-    const response = await musicKitRequest<AppleMusicAlbum>(
-      `/catalog/${storefront}/artists/${artistId}/albums?limit=${limit}`,
-      options
+  const albums: AppleMusicAlbum[] = [];
+  let path: string | null =
+    `/catalog/${storefront}/artists/${artistId}/albums?limit=${limit}`;
+  for (let page = 0; path && page < MAX_ALBUM_PAGES; page++) {
+    const endpoint: string = path;
+    const result = await executeWithCircuitBreaker(
+      () => musicKitRequest<AppleMusicAlbum>(endpoint, options),
+      options.signal
     );
-    return response;
-  }, options.signal);
-
-  return result.data ?? [];
+    albums.push(...(result.data ?? []));
+    path = nextAlbumsPath(result.next, limit);
+  }
+  return albums;
 }
 
 // ============================================================================

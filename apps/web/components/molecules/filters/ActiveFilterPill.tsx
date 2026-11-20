@@ -32,7 +32,10 @@ export function ActiveFilterPill({
         )}
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
-        <span className='font-caption text-(--linear-accent)'>
+        {/* The AA accent-purple text token keeps the violet family while
+            clearing WCAG AA on the content surface (the previous
+            linear-accent violet measured ~3.4:1; axe color-contrast). */}
+        <span className='font-caption text-(--color-accent-purple-text)'>
           {displayValue}
         </span>
       </div>

@@ -43,3 +43,14 @@ describe('ThreadVideoCard', () => {
     expect(onFullscreen).toHaveBeenCalledOnce();
   });
 });
+
+describe('ThreadVideoCard accessible name (JOV-8873)', () => {
+  it('includes the visible duration in the play button name', () => {
+    render(
+      <ThreadVideoCard title='clip' durationSec={94} onPlay={() => undefined} />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Play clip — 1:34' })
+    ).toBeInTheDocument();
+  });
+});

@@ -16,6 +16,10 @@ const meta: Meta<typeof Avatar> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Valid data URL, deliberately undecodable image bytes: native onError without
+// an unrelated network/TLS failure or a missing-resource console error.
+const FAILED_PORTRAIT_SRC = 'data:image/png;base64,bm90LWFuLWltYWdl';
+
 export const Default: Story = {
   render: () => (
     <Avatar size='lg'>
@@ -27,10 +31,7 @@ export const Default: Story = {
 export const WithImage: Story = {
   render: () => (
     <Avatar size='lg' ring>
-      <AvatarImage
-        src='https://cdn.jov.ie/static/placeholder-avatar.png'
-        alt='Artist'
-      />
+      <AvatarImage src='/images/avatars/tim-white.jpg' alt='Tim White' />
       <AvatarStatusDot status='online' size='lg' />
     </Avatar>
   ),
@@ -42,7 +43,7 @@ export const ArtworkComposition: Story = {
       <div className='grid justify-items-center gap-2'>
         <Avatar size='2xl' shape='artwork'>
           <AvatarImage
-            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            src='/images/mock-profile/tim-white-dont-look-down-card.jpg'
             alt='Full release artwork using inherited props'
           />
         </Avatar>
@@ -51,7 +52,7 @@ export const ArtworkComposition: Story = {
       <div className='grid justify-items-center gap-2'>
         <Avatar size='2xl' shape='artwork'>
           <AvatarImage
-            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            src='/images/mock-profile/tim-white-dont-look-down-card.jpg'
             alt='Full release artwork using explicit props'
             size='2xl'
             shape='artwork'
@@ -80,7 +81,7 @@ export const ImageFailure: Story = {
   render: ({ size, ring }) => (
     <UserAvatar
       name='Tim White'
-      src='/avatar-audit-portrait.png'
+      src={FAILED_PORTRAIT_SRC}
       size={size}
       ring={ring}
       status='away'
@@ -119,4 +120,83 @@ export const PresenceStates: Story = {
       ))}
     </div>
   ),
+};
+
+export const Empty: Story = {
+  render: () => <UserAvatar size='lg' />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'With no name and no image the circular frame keeps its size and shows a neutral “?” labelled “Avatar”.',
+      },
+    },
+  },
+};
+
+export const ErrorState: Story = {
+  render: () => (
+    <UserAvatar name='Alex Chen' src={FAILED_PORTRAIT_SRC} size='lg' ring />
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Undecodable portrait data triggers the image error handler and falls back to the named initials in the same circular frame.',
+      },
+    },
+  },
+};
+
+export const Partial: Story = {
+  render: () => <UserAvatar name='Maya Okafor' size='lg' status='online' />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A name without an image renders initials, keeping presence and the circular person crop.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-48 items-center gap-2'>
+      <UserAvatar
+        name='Maximiliana Alejandra Konstantinopoulou-Vanderbilt Featuring The Orchestra'
+        size='md'
+      />
+      <span className='min-w-0 truncate text-sm text-primary-token'>
+        Maximiliana Alejandra Konstantinopoulou-Vanderbilt Featuring The
+        Orchestra
+      </span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A very long name still yields two initials in a fixed frame; the full name stays the accessible label.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='flex items-center gap-3'>
+      <UserAvatar name='ليلى حداد' size='lg' status='away' />
+      <UserAvatar name='ליאור כהן' size='lg' />
+      <span className='text-sm text-primary-token'>ليلى حداد</span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic and Hebrew names derive grapheme-safe initials in a right-to-left row; the presence dot keeps its bottom-right corner.',
+      },
+    },
+  },
 };

@@ -6,6 +6,7 @@ import {
   CANONICAL_PUBLIC_SHELL_CONTEXT,
   CANONICAL_PUBLIC_SHELL_EVENTS,
 } from '@/data/canonicalPublicShellOptimization';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
@@ -27,21 +28,6 @@ vi.mock('@/lib/analytics', async importOriginal => {
   };
 });
 
-// Product default: SHOW_MARKETING_CENTER_NAV is false (clean homepage baseline).
-// Enable it here so header content assertions exercise center nav in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_CENTER_NAV: true,
-      SHOW_HOMEPAGE_CENTER_NAV: true,
-    },
-  };
-});
-
 describe('MarketingHeader', () => {
   beforeEach(() => {
     mockTrack.mockClear();
@@ -51,6 +37,56 @@ describe('MarketingHeader', () => {
       value: 0,
     });
   });
+
+  it.each([
+    '/',
+    '/product',
+    '/pricing',
+    '/about',
+    '/instant-merch',
+    '/cli',
+    '/blog',
+    '/download',
+    '/artist-profiles',
+  ])('renders the canonical 28px marketing mark on %s', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
+    render(<MarketingHeader />);
+
+    const logoLink = screen.getByTestId('site-logo-link');
+    expect(logoLink).toHaveAttribute('href', '/');
+    expect(logoLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(logoLink.querySelector('svg')).toHaveAttribute('width', '28');
+    expect(logoLink.querySelector('svg')).toHaveAttribute('height', '28');
+  });
+
+  it('keeps the ordinary header mark at its existing 20px size', () => {
+    render(<HeaderNav logoVariant='icon' authMode='public-static' />);
+
+    const logoLink = screen.getByTestId('site-logo-link');
+    expect(logoLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+    expect(logoLink.querySelector('svg')).toHaveAttribute('width', '20');
+    expect(logoLink.querySelector('svg')).toHaveAttribute('height', '20');
+  });
+
+  it.each(['homepage', 'minimal'] as const)(
+    'keeps the 28px mark in the %s marketing presentation',
+    variant => {
+      render(<MarketingHeader variant={variant} logoVariant='icon' />);
+
+      const mark = screen
+        .getByTestId('site-logo-link')
+        .querySelector('[data-brand-mark-size]');
+      expect(mark).toHaveAttribute('data-brand-mark-size', '28');
+      expect(mark?.querySelector('svg')).toHaveAttribute('width', '28');
+      expect(mark?.querySelector('svg')).toHaveAttribute('height', '28');
+    }
+  );
 
   it('reserves only enlarged row growth and releases its observer on unmount', () => {
     const observations: {
@@ -149,10 +185,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-on front-door contract on /signup.
+    // The shared public CTA follows the open front-door contract into /start.
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it('orders Customers, Product, and Pricing after the wordmark', () => {
@@ -203,16 +239,21 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one claim CTA on the homepage header (JOV-5085)', () => {
+  it('uses the one claim CTA on the homepage header', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Claim your profile' });
+    const ctas = screen.getAllByRole('link', {
+      name: HOME_MARKETING_HEADER_CTA.label,
+    });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/start');
+      expect(cta).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
     }
-    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
+    expect(HOME_MARKETING_HEADER_CTA.label).toBe('Claim your profile');
+    expect(
+      screen.queryByRole('link', { name: 'Request an Invite' })
+    ).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -228,8 +269,8 @@ describe('MarketingHeader', () => {
       'marketing-glass'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
@@ -260,8 +301,8 @@ describe('MarketingHeader', () => {
       '/product'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/start');
+      screen.getByRole('link', { name: HOME_MARKETING_HEADER_CTA.label })
+    ).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

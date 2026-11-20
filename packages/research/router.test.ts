@@ -300,6 +300,8 @@ describe('router', () => {
   });
 
   it('coalesces concurrent identical queries into one execution', async () => {
+    const now = Date.parse(sampleResult().createdAt);
+    state = new ResearchState(dir, () => now);
     let release!: () => void;
     const gate = new Promise<void>(r => {
       release = r;
@@ -333,9 +335,10 @@ describe('router', () => {
   });
 
   it('reuses a persisted gbrain result and warms the local cache', async () => {
-    const loadPersisted = vi.fn(async () =>
-      sampleResult({ key: 'from-gbrain' })
-    );
+    const persisted = sampleResult({ key: 'from-gbrain' });
+    let now = Date.parse(persisted.createdAt);
+    state = new ResearchState(dir, () => now);
+    const loadPersisted = vi.fn(async () => persisted);
     const sources = { gbrain: source([]), repo: source([]) };
     const router = createRouter({ state, sources, judges: [], loadPersisted });
     const result = await router.research({
@@ -345,6 +348,9 @@ describe('router', () => {
     expect(result.cache).toBe('gbrain');
     expect(await state.getCached('from-gbrain')).not.toBeNull();
     expect(sources.gbrain.run).not.toHaveBeenCalled();
+
+    now = Date.parse(persisted.expiresAt);
+    expect(await state.getCached('from-gbrain')).toBeNull();
   });
 });
 

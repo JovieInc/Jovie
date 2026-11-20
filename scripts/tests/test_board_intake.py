@@ -1,10 +1,12 @@
 """Board intake: the lanes claim codex board work, hand it to lanes intake, close on verified outcomes."""
 import json
+import multiprocessing
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import board_intake as bi  # noqa: E402
@@ -47,16 +49,25 @@ class FakeLinear:
     def __init__(self, states=None):
         self.states = states or {}
         self.moved, self.created, self.filed = [], [], {}
+        self.descriptions, self.updated, self.comments, self.completed = {}, [], [], set()
 
     def gql(self, query, variables):
-        if "issues(first:1" in query:
-            hit = [{"identifier": i} for marker, i in self.filed.items() if marker in variables["q"]]
-            return {"issues": {"nodes": hit}}
+        if "issues(" in query:
+            nodes = [{"id": "uuid-" + ident, "identifier": ident, "title": f"{marker} t",
+                      "description": self.descriptions.get(ident, "")}
+                     for marker, ident in self.filed.items()
+                     if variables["q"] in marker and ident not in self.completed]
+            return {"issues": {"nodes": nodes}}
         if "issueCreate" in query:
             self.created.append(variables["i"])
             ident = f"JOV-{9000 + len(self.filed)}"
             self.filed[variables["i"]["title"].split(" ")[0]] = ident
+            self.descriptions[ident] = variables["i"]["description"]
             return {"issueCreate": {"issue": {"id": "new", "identifier": ident}}}
+        if "issueUpdate" in query:
+            self.updated.append((variables["id"], variables["d"]))
+            self.descriptions[variables["id"].replace("uuid-", "")] = variables["d"]
+            return {"issueUpdate": {"success": True}}
         if "teams(" in query:
             return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
                                          "labels": {"nodes": [{"id": "l1", "name": "symphony"}]}}]}}
@@ -65,6 +76,9 @@ class FakeLinear:
 
     def move(self, issue_id, state):
         self.moved.append((issue_id, state))
+
+    def comment(self, issue_id, body):
+        self.comments.append((issue_id, body))
 
 
 def gh_with(states, calls=None):
@@ -111,6 +125,52 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(bi.goal_key(task("goal-mq-merge-rate-2026110203")), "goal-mq-merge-rate")
         self.assertEqual(bi.goal_key(task("prod-stale-staged-alias-gate-20261101")), "prod-stale-staged-alias-gate")
 
+    def test_goal_key_strips_summer_date_and_slot_suffix(self):
+        self.assertEqual(bi.goal_key(task("goal-rev-cert-onboarding-auth-claim-20261118-3")),
+                         "goal-rev-cert-onboarding-auth-claim")
+        self.assertEqual(bi.goal_key(task("goal-rev-start-chat-20261119-0")), "goal-rev-start-chat")
+        self.assertEqual(bi.goal_key(task("goal-rev-cert-homepage-entry-20261119-12")),
+                         "goal-rev-cert-homepage-entry")
+
+    def test_reposted_goal_refreshes_its_open_issue_instead_of_filing_a_duplicate(self):
+        linear = FakeLinear()
+        first = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0", body="evidence A"))
+        again = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1", body="evidence B"))
+        self.assertEqual(first, again)
+        self.assertEqual(len(linear.created), 1)
+        self.assertEqual(len(linear.updated), 1)
+        self.assertEqual(len(linear.comments), 1)
+        self.assertIn("instead of filing a duplicate", linear.comments[0][1])
+
+    def test_repost_with_unchanged_evidence_leaves_the_issue_alone(self):
+        linear = FakeLinear()
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        self.assertEqual(bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1")), ident)
+        self.assertEqual(linear.updated, [])
+        self.assertEqual(linear.comments, [])
+
+    def test_dated_marker_issue_from_before_the_stable_key_is_reused(self):
+        linear = FakeLinear()
+        linear.filed["[board:goal-rev-start-chat-20261119-2]"] = "JOV-13027"
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-3"))
+        self.assertEqual(ident, "JOV-13027")
+        self.assertEqual(len(linear.created), 0)
+
+    def test_a_marker_for_a_different_goal_is_never_matched(self):
+        linear = FakeLinear()
+        linear.filed["[board:goal-rev-start-chat-v2]"] = "JOV-13101"
+        ident = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        self.assertEqual(len(linear.created), 1)
+        self.assertNotEqual(ident, "JOV-13101")
+
+    def test_completed_goal_issue_lets_a_repost_file_a_fresh_one(self):
+        linear = FakeLinear()
+        first = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-0"))
+        linear.completed.add(first)
+        second = bi.create_goal_issue(linear, task("goal-rev-start-chat-20261119-1"))
+        self.assertNotEqual(second, first)
+        self.assertEqual(len(linear.created), 2)
+
     def test_metrics_report_pickup_work_success_and_rate(self):
         rows = [{"event": "claimed", "postedEpoch": NOW - 100, "claimedEpoch": NOW - 40},
                 {"event": "done", "claimedEpoch": NOW - 40, "closedEpoch": NOW},
@@ -144,6 +204,78 @@ class TickTest(unittest.TestCase):
         rows = [json.loads(l) for l in (self.state / "runs/board-intake.jsonl").read_text().splitlines()]
         self.assertTrue(all(r["claimedEpoch"] - r["postedEpoch"] == 600 for r in rows))
 
+    def test_repair_backlog_does_not_consume_new_work_claim_budget(self):
+        repairs = [task(f"stall-jovie-{n}-aaaaaaa-a1") for n in range(1, 21)]
+        goals = [task(f"goal-{n}") for n in range(7)]
+        hub = FakeHub([*goals, *repairs])
+        linear = FakeLinear()
+        with patch.object(bi, "MAX_CLAIMS_PER_TICK", 5):
+            receipt = self.run_tick(hub, linear)
+        self.assertEqual(len(receipt["claimed"]), 25)
+        self.assertTrue(all(t["id"] in receipt["claimed"] for t in repairs))
+        self.assertEqual(len(linear.created), 5)
+        self.assertEqual(receipt["repairClaimed"], 20)
+        self.assertEqual(receipt["newWorkClaimed"], 5)
+
+    def test_repair_claims_continue_when_new_work_budget_is_zero(self):
+        hub = FakeHub([task("goal-x"), task("stall-jovie-1-aaaaaaa-a1")])
+        with patch.object(bi, "MAX_CLAIMS_PER_TICK", 0):
+            receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"], ["stall-jovie-1-aaaaaaa-a1"])
+
+    def test_one_claim_per_repo_pr_across_repeated_fingerprints(self):
+        hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-1-bbbbbbb-a2"),
+                       task("stall-logyourbody-1-ccccccc-a1")])
+        receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"], ["stall-jovie-1-aaaaaaa-a1", "stall-logyourbody-1-ccccccc-a1"])
+        self.assertEqual([t["id"] for t in hub.ops("claim")], receipt["claimed"])
+        rows = [json.loads(line) for line in (self.state / "runs/board-intake.jsonl").read_text().splitlines()]
+        self.assertEqual({(r["repo"], r["number"]) for r in rows},
+                         {("JovieInc/Jovie", 1), ("JovieInc/LogYourBody", 1)})
+
+    def test_existing_pr_claim_fences_new_repair_task_until_verified_outcome(self):
+        hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1")])
+        self.run_tick(hub, FakeLinear())
+        hub.tasks["stall-jovie-1-bbbbbbb-a2"] = task("stall-jovie-1-bbbbbbb-a2")
+        receipt = self.run_tick(hub, FakeLinear(), gh=gh_with({1: "OPEN"}), now=NOW + 60)
+        self.assertEqual(receipt["claimed"], [])
+        self.assertEqual(len(hub.ops("claim")), 1)
+
+    def test_overlapping_process_yields_before_reading_or_claiming_board_tasks(self):
+        ctx = multiprocessing.get_context("fork")
+        entered, release = ctx.Event(), ctx.Event()
+        receiver, sender = ctx.Pipe(duplex=False)
+        tasks = [task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-1-bbbbbbb-a2")]
+
+        def first_tick():
+            hub = FakeHub(tasks)
+
+            def paused(method, path, body=None):
+                if path.startswith("/v1/board?"):
+                    entered.set()
+                    if not release.wait(10):
+                        raise RuntimeError("test release missing")
+                return hub(method, path, body)
+            sender.send(bi.tick(self.state, FakeLinear(), now=NOW, call=paused, gh=gh_with({})))
+
+        first = ctx.Process(target=first_tick)
+        first.start()
+        try:
+            self.assertTrue(entered.wait(10))
+            hub = FakeHub(tasks)
+            second = self.run_tick(hub, FakeLinear())
+            self.assertEqual(second["deferred"], "active-intake")
+            self.assertEqual(second["claimed"], [])
+            self.assertEqual(hub.calls, [])
+        finally:
+            release.set()
+            first.join(10)
+        self.assertEqual(first.exitcode, 0)
+        self.assertTrue(receiver.poll(1))
+        self.assertEqual(receiver.recv()["claimed"], ["stall-jovie-1-aaaaaaa-a1"])
+        held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
+        self.assertEqual(list(held), ["stall-jovie-1-aaaaaaa-a1"])
+
     def test_hourly_reposts_of_one_goal_share_one_issue(self):
         hub = FakeHub([task("goal-mq-merge-rate-2026110201"), task("goal-mq-merge-rate-2026110202")])
         linear = FakeLinear()
@@ -151,6 +283,18 @@ class TickTest(unittest.TestCase):
         self.assertEqual(len(linear.created), 1)
         held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
         self.assertEqual(len({row["issue"] for row in held.values()}), 1)
+
+    def test_slot_reposts_of_one_goal_share_one_issue_across_ticks(self):
+        hub = FakeHub([task("goal-rev-start-chat-20261119-0")])
+        linear = FakeLinear()
+        self.run_tick(hub, linear)
+        hub.tasks["goal-rev-start-chat-20261119-1"] = task("goal-rev-start-chat-20261119-1")
+        self.run_tick(hub, linear, now=NOW + 60)
+        self.assertEqual(len(linear.created), 1)
+        self.assertEqual(len(linear.comments), 0)
+        held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
+        self.assertEqual({row["issue"] for row in held.values()},
+                         {linear.filed["[board:goal-rev-start-chat]"]})
 
     def test_merged_pr_closes_done_with_sha_and_closed_pr_fails(self):
         hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-2-bbbbbbb-a1")])
@@ -184,7 +328,8 @@ class TickTest(unittest.TestCase):
                       + [task("stall-jovie-9-aaaaaaa-a1"), task("stall-jovie-8-bbbbbbb-a2")])
         receipt = self.run_tick(hub, FakeLinear())
         self.assertEqual(receipt["claimed"][:2], ["stall-jovie-9-aaaaaaa-a1", "stall-jovie-8-bbbbbbb-a2"])
-        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK)
+        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK + 2)
+        self.assertEqual(receipt["newWorkClaimed"], bi.MAX_CLAIMS_PER_TICK)
         self.assertNotIn("goal-y", receipt["claimed"])
 
     def test_a_held_stuck_pr_gets_its_lanes_repair_label_once(self):

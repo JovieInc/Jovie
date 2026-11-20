@@ -1,5 +1,9 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import {
+  HOMEPAGE_EDITORIAL_COPY as COPY,
+  HOMEPAGE_INVITE_ANCHOR,
+} from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -42,7 +46,7 @@ test.describe('/new landing page', () => {
 
     await expect(hero).toBeVisible();
     await expect(
-      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
+      hero.getByRole('heading', { level: 1, name: COPY.hero.headline })
     ).toBeVisible();
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
@@ -53,16 +57,14 @@ test.describe('/new landing page', () => {
     await expect(page.locator('body')).not.toContainText('Page not found');
   });
 
-  test('uses the claim form as the primary action', async ({ page }) => {
+  test('uses the claim action as the primary action', async ({ page }) => {
     await gotoLegacyNewLanding(page);
 
+    const claim = getClaimProfileIntent();
     const cta = page.getByTestId('homepage-primary-cta');
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
-    await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
-      'action',
-      '/start'
-    );
+    await expect(cta).toHaveText(claim.label);
+    await expect(cta).toHaveAttribute('href', claim.href);
   });
 
   test('mounts the homepage sections after the redirect', async ({ page }) => {
@@ -71,20 +73,22 @@ test.describe('/new landing page', () => {
     const headings = await page
       .locator('main h1:visible, main h2:visible')
       .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
-    expect(headings.filter(Boolean)[0]).toBe(HOMEPAGE_COPY.hero.headline);
-    await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
-      HOMEPAGE_COPY.hero.claim.action
-    );
+    expect(headings.filter(Boolean)[0]).toBe(COPY.hero.headline);
+    await expect(
+      page
+        .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
+        .getByTestId('homepage-close-cta')
+    ).toBeAttached();
   });
 
-  test('keeps the artist-profile hero on the redirected homepage', async ({
+  test('keeps the editorial hero on the redirected homepage', async ({
     page,
   }) => {
     await gotoLegacyNewLanding(page);
 
     const hero = page.getByTestId('marketing-section-hero');
     await expect(
-      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
+      hero.getByRole('heading', { level: 1, name: COPY.hero.headline })
     ).toBeVisible();
     await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
@@ -92,7 +96,9 @@ test.describe('/new landing page', () => {
     await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });
 
-  test('keeps the hero and claim visible on mobile', async ({ page }) => {
+  test('keeps the hero and claim action visible on mobile', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await gotoLegacyNewLanding(page);
 

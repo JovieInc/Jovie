@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/AddPlatformDialog.test.tsx
+
 import { Button } from '@jovie/ui';
 import { useId, useState, useTransition } from 'react';
 import { addManualDspMatch } from '@/app/app/(shell)/dashboard/presence/actions';
@@ -19,6 +21,9 @@ import {
   DSP_PROVIDER_PLACEHOLDERS,
 } from '@/lib/dsp-provider-metadata';
 import { cn } from '@/lib/utils';
+
+const ADD_FAILED_MESSAGE =
+  "This profile couldn't be added. Check the link and try again.";
 
 const ALL_PROVIDERS: readonly DspProviderId[] = [...DSP_PROVIDER_IDS];
 
@@ -97,10 +102,10 @@ export function AddPlatformDialog({
           resetForm();
           onClose();
         } else {
-          setError(result.error ?? 'Something went wrong');
+          setError(result.error ?? ADD_FAILED_MESSAGE);
         }
       } catch {
-        setError('Something went wrong. Please try again.');
+        setError(ADD_FAILED_MESSAGE);
       }
     });
   }

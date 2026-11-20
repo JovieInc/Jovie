@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import React, { useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -89,7 +89,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
     >
       {/* Stretched tap target — absolutely positioned behind the content so
           the Message button (which has z-10) intercepts clicks for itself. */}
-      <button
+      <PlainButton
         type='button'
         onClick={handleCardClick}
         aria-label={`View details for ${displayName}`}

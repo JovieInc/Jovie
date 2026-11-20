@@ -1,5 +1,7 @@
 'use client';
 
+import { useSourceFactsByMessage } from '@/components/jovie/source-evidence-context';
+
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
 import { useChat } from '@ai-sdk/react';
@@ -7,6 +9,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -56,8 +59,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
-import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -85,39 +87,38 @@ import {
   isHandleCheckOutput,
   isNextStepPayload,
   isSocialLinkOutput,
+  rollbackFailedUserTurn,
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+import {
+  preloadOnboardingConversationChunks,
+  scheduleOnboardingConversationPreload,
+} from './onboardingConversationWarm';
+import type { OnboardingProfileBuilderState } from './onboardingProfileRailState';
 
 /**
  * /start LCP (JOV-9611): the empty state paints only the intro heading and the
  * composer. Everything that renders a conversation (markdown/streamdown message
  * bodies, tool UI, proposal cards) is split out of the entry bundle so the
- * first paint is not starved behind its evaluation on slow mobile CPUs.
- * `preloadOnboardingConversationChunks` warms them once the page is idle, so
- * the first assistant reply never waits on a network fetch.
+ * first paint is not starved behind its evaluation on slow mobile CPUs. The
+ * chunks warm on user intent, never on idle (JOV-12023) — see
+ * onboardingConversationWarm.
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
-const loadChatMessage = () =>
-  import('@/components/jovie/components').then(mod => mod.ChatMessage);
-const loadToolPartsRenderer = () =>
-  import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
-const loadChatProposeCheckoutCard = () =>
-  import('./ChatProposeCheckoutCard').then(mod => mod.ChatProposeCheckoutCard);
-const loadChatProposeNextStepCard = () =>
-  import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
 // Inline import() inside dynamic() keeps Next's loadable preload metadata; the
-// loaders above resolve to the same chunks for idle preloading. Each `loading`
-// placeholder reserves the slot locally so a not-yet-fetched chunk never
-// suspends up to the route-level fallback.
+// loaders above resolve to the same chunks for idle preloading. Message rows
+// reveal together inside OnboardingMessageList; tool cards reserve their slots
+// locally so a pending chunk never suspends up to the route-level fallback.
 function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
   return <div aria-hidden='true' className={`w-full ${minHeightClass}`} />;
 }
 
-const ChatMessage = dynamic(
-  () => import('@/components/jovie/components').then(mod => mod.ChatMessage),
-  { loading: () => <ReservedChatSlot minHeightClass='min-h-10' /> }
+const ChatMessage = dynamic(() =>
+  import('@/components/jovie/components/ChatMessage').then(
+    mod => mod.ChatMessage
+  )
 );
 const ToolPartsRenderer = dynamic(
   () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
@@ -137,30 +138,6 @@ const ChatProposeNextStepCard = dynamic(
     ),
   { loading: () => <ReservedChatSlot minHeightClass='min-h-24' /> }
 );
-
-function preloadOnboardingConversationChunks() {
-  void Promise.all([
-    loadChatMessage(),
-    loadToolPartsRenderer(),
-    loadChatProposeCheckoutCard(),
-    loadChatProposeNextStepCard(),
-  ]).catch(() => undefined);
-}
-
-function scheduleOnboardingConversationPreload(): () => void {
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    const handle = globalThis.requestIdleCallback(
-      preloadOnboardingConversationChunks,
-      { timeout: 4000 }
-    );
-    return () => globalThis.cancelIdleCallback?.(handle);
-  }
-  const handle = globalThis.setTimeout(
-    preloadOnboardingConversationChunks,
-    1500
-  );
-  return () => globalThis.clearTimeout(handle);
-}
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
 
@@ -558,6 +535,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const sourceFacts = useSourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
@@ -579,60 +557,66 @@ function OnboardingMessageList({
     selectedArtist: null,
   }).handle;
 
+  // A generic per-message placeholder cannot match both a wrapped user
+  // bubble and the thinking dots. Reveal the first transcript as one unit,
+  // including its speaker rows, while the surrounding composer stays mounted.
   return (
-    <div className='flex flex-col pb-4'>
-      {displayMessages.map((message, index) => {
-        const text = getMessageText(message);
-        const toolParts = getToolParts(message);
-        const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-        const shouldRenderMessage =
-          isThinking || Boolean(text) || toolParts.length === 0;
-        // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
-        // assistant messages is one turn and keeps a single row.
-        const startsAgentTurn =
-          message.role === 'assistant' &&
-          displayMessages[index - 1]?.role !== 'assistant';
+    <Suspense fallback={null}>
+      <div className='flex flex-col pb-4'>
+        {displayMessages.map((message, index) => {
+          const text = getMessageText(message);
+          const toolParts = getToolParts(message);
+          const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+          const shouldRenderMessage =
+            isThinking || Boolean(text) || toolParts.length === 0;
+          // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
+          // assistant messages is one turn and keeps a single row.
+          const startsAgentTurn =
+            message.role === 'assistant' &&
+            displayMessages[index - 1]?.role !== 'assistant';
 
-        return (
-          <div
-            key={message.id}
-            className='pb-5 transition-opacity duration-fast'
-          >
-            {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
-            {shouldRenderMessage ? (
-              <ChatMessage
-                id={message.id}
-                role={message.role}
-                parts={(message.parts ?? []) as MessagePart[]}
-                isThinking={isThinking}
-                isStreaming={
-                  isStreaming && message.id === lastAssistantMessageId
-                }
-                renderTools={false}
-                showAssistantActions={false}
-              />
-            ) : null}
-            {!isThinking
-              ? renderOnboardingTools({
-                  messageId: message.id,
-                  toolParts,
-                  hasMessageText: Boolean(text),
-                  isBusy,
-                  onHandleCandidateChange,
-                  onConfirmHandle,
-                  onAttachAccount,
-                  onNoneOfTheseArtists,
-                  onSelectArtist,
-                  selectedArtistId,
-                  handleStepDone,
-                  socialStepDone,
-                  claimHandle,
-                })
-              : null}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <div
+              key={message.id}
+              className='pb-5 transition-opacity duration-fast'
+            >
+              {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
+              {shouldRenderMessage ? (
+                <ChatMessage
+                  id={message.id}
+                  role={message.role}
+                  parts={(message.parts ?? []) as MessagePart[]}
+                  sourceFacts={sourceFacts.get(message.id)}
+                  isThinking={isThinking}
+                  isStreaming={
+                    isStreaming && message.id === lastAssistantMessageId
+                  }
+                  renderTools={false}
+                  showAssistantActions={false}
+                />
+              ) : null}
+              {!isThinking
+                ? renderOnboardingTools({
+                    messageId: message.id,
+                    toolParts,
+                    hasMessageText: Boolean(text),
+                    isBusy,
+                    onHandleCandidateChange,
+                    onConfirmHandle,
+                    onAttachAccount,
+                    onNoneOfTheseArtists,
+                    onSelectArtist,
+                    selectedArtistId,
+                    handleStepDone,
+                    socialStepDone,
+                    claimHandle,
+                  })
+                : null}
+            </div>
+          );
+        })}
+      </div>
+    </Suspense>
   );
 }
 
@@ -642,25 +626,6 @@ function isTurnstileTokenUsable(
 ): boolean {
   if (!token) return false;
   return !BLOCKED_TURNSTILE_TOKEN_STATUSES.has(status);
-}
-
-function rollbackFailedUserTurn(
-  messages: readonly UIMessage[],
-  failedText: string | null | undefined
-): readonly UIMessage[] {
-  const trimmedFailed = failedText?.trim();
-  if (!trimmedFailed) return messages;
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role !== 'user') continue;
-    if (getMessageText(message).trim() === trimmedFailed) {
-      return messages.slice(0, index);
-    }
-    break;
-  }
-
-  return messages;
 }
 
 function getDisplayMessages(
@@ -746,6 +711,8 @@ interface OnboardingMessageRegionProps {
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
+  /** Sends the selected default-walkthrough prompt through the real submit path. */
+  readonly onSuggestionSelect: (prompt: string) => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -768,6 +735,7 @@ function OnboardingMessageRegion({
   profileBuilderState,
   shouldDockComposer,
   pinThreadToTop,
+  onSuggestionSelect,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -804,6 +772,7 @@ function OnboardingMessageRegion({
               mode={entryMode}
               entryProfile={entryProfile}
               onTryAnotherName={onTryAnotherName}
+              onSuggestionSelect={onSuggestionSelect}
             />
           </div>
         }
@@ -893,7 +862,11 @@ export function OnboardingChat({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
 
-  useEffect(() => scheduleOnboardingConversationPreload(), []);
+  const chatSectionRef = useRef<HTMLElement | null>(null);
+  useEffect(
+    () => scheduleOnboardingConversationPreload(chatSectionRef.current),
+    []
+  );
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -1050,6 +1023,8 @@ export function OnboardingChat({
         hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
+      // JOV-12023: the starter auto-send has no gesture, so submit warms too.
+      preloadOnboardingConversationChunks();
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
@@ -1163,8 +1138,15 @@ export function OnboardingChat({
   useEffect(() => {
     if (hasInjectedStarterPromptRef.current) return;
     let nextPrompt: string | null = null;
+    let nextMode: OnboardingEntryMode = 'prompt_handoff';
 
-    if (intentId) {
+    if (!takenHandleEntry && starterHandoff?.prompt) {
+      nextPrompt = starterHandoff.prompt;
+      nextMode =
+        starterHandoff.kind === 'spotify_artist'
+          ? 'spotify_handoff'
+          : 'prompt_handoff';
+    } else if (intentId) {
       const intent = readHomepageIntent(intentId);
       if (intent) {
         nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
@@ -1176,11 +1158,17 @@ export function OnboardingChat({
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
-      setEntryMode('prompt_handoff');
+      setEntryMode(nextMode);
     } else {
       setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [entryProfile, intentId, setComposerInput]);
+  }, [
+    entryProfile,
+    intentId,
+    setComposerInput,
+    starterHandoff,
+    takenHandleEntry,
+  ]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -1418,20 +1406,26 @@ export function OnboardingChat({
         {...onboardingChatInputProps}
         pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
       />
+      <span hidden aria-hidden='true' data-onboarding-composer-complete />
     </div>
   );
 
   return (
     <section
+      ref={chatSectionRef}
       className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
+      data-starter-handoff={hasInitialStarterPrompt ? 'true' : undefined}
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
-      <div
+      <section
         ref={scrollContainerRef}
         onScroll={onScroll}
+        aria-label='Onboarding Conversation'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable transcript (axe scrollable-region-focusable)
+        tabIndex={0}
         className={cn(
           'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
@@ -1471,9 +1465,10 @@ export function OnboardingChat({
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
             pinThreadToTop={hasInitialStarterPrompt}
+            onSuggestionSelect={submitText}
           />
         </div>
-      </div>
+      </section>
 
       {shouldDockComposer ? (
         <div

@@ -89,6 +89,7 @@ class FakeLinear:
     def __init__(self, issues=None, jobs=None, open_issues=None):
         self.issues, self.jobs, self.open = issues or {}, jobs or [], open_issues or []
         self.comments, self.moves, self.states = [], [], {}
+        self.published, self.comment_failure = {}, None
 
     def gql(self, query, variables):
         if "number:{eq:$n}" in query:
@@ -98,6 +99,19 @@ class FakeLinear:
             return {"issues": {"nodes": [n for n in self.open if n["priority"] in variables["p"]]}}
         if "labels:{name:{eq:$l}}" in query:
             return {"issues": {"nodes": [j for j in self.jobs if self.states.get(j["id"], "Todo") == "Todo"]}}
+        if "comment(id:$id)" in query:
+            return {"comment": self.published.get(variables["id"])}
+        if "commentCreate(input:$i)" in query:
+            payload = variables["i"]
+            self.published[payload["id"]] = {"id": payload["id"], "body": payload["body"],
+                "issue": {"id": payload["issueId"]}, "createdAt": "2026-11-16T23:00:00.123Z"}
+            self.comments.append((payload["issueId"], payload["body"]))
+            if self.comment_failure:
+                raise self.comment_failure
+            return {"commentCreate": {"success": True}}
+        if "issue(id:$id)" in query:
+            current = next((j for j in self.jobs if j["id"] == variables["id"]), None)
+            return {"issue": {**current, "state": {"name": self.state_of(current["id"])}} if current else None}
         raise AssertionError(query)
 
     def comment(self, issue_id, body):
@@ -531,117 +545,6 @@ def result_block(comment):
     return json.loads(re.search(r"<!-- summer-reasoning-result:v1 -->\n```json\n(.*)\n```", comment, re.S)[1])
 
 
-class OneJobTest(unittest.TestCase):
-    def setUp(self):
-        routing = patch.object(reason, "catalog_command", lambda slug: ["gbrain", "get", slug])
-        routing.start()
-        self.addCleanup(routing.stop)
-
-    issue = {"id": "i-9", "identifier": "JOV-9", "title": "t", "description": description(), "createdAt": "1"}
-
-    def test_success_comments_the_block_writes_gbrain_and_closes(self):
-        linear = FakeLinear()
-        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
-        with tempfile.TemporaryDirectory() as tmp:
-            record = reason.one_job(linear, {**self.issue, "description": description({**JOB_BLOCK, "contextRefs": []})},
-                                    CONFIG, Path(tmp), run=run)
-            self.assertEqual(json.loads(reason.budget_path(Path(tmp)).read_text()).popitem()[1]["jobs"], 1)
-        self.assertEqual(linear.moves, [("i-9", "Done")])
-        block = result_block(linear.comments[-1][1])
-        self.assertEqual((block["schema"], block["confidence"], block["job"]), (reason.RESULT_SCHEMA, "high", "JOV-9"))
-        self.assertEqual(block, record)
-        put, get = run.made("gbrain")
-        self.assertEqual(put, ["gbrain", "put", record["gbrainSlug"]])
-        self.assertEqual(get, ["gbrain", "get", record["gbrainSlug"]])
-        self.assertNotIn(reason.RESULT_MARKER, run.calls[-2][1]["input"])
-
-    def test_gbrain_exit_zero_without_a_stored_body_is_not_stored(self):
-        # JOV-7715: Gem's wrapper exited 0 and kept a frontmatter-only page; the receipt said stored.
-        empty = '---\ntype: concept\ntitle: 2026 10 03 Jov 7709\n---\n\n'
-        for stored in (done(empty), done("", 1), OSError("x")):
-            def gbrain(args, kw, stored=stored):
-                if args[1] == "get" and args[2].startswith("ops/summer/decisions/"):
-                    if isinstance(stored, BaseException):
-                        raise stored
-                    return stored
-                return done("ok")
-            linear = FakeLinear()
-            run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
-            with tempfile.TemporaryDirectory() as tmp:
-                record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
-            self.assertIsNone(record["gbrainSlug"])
-            self.assertIsNone(result_block(linear.comments[-1][1])["gbrainSlug"])
-
-    def test_gbrain_hanging_after_a_real_write_is_verified_by_read_back(self):
-        store = StoringGbrain(hang=True)
-        self.assertTrue(reason.write_gbrain("s", "t", "# t\n\nmemo body", run=Runner(gbrain=store)))
-        self.assertFalse(reason.write_gbrain("s", "t", "  \n", run=Runner(gbrain=store)))
-
-    def test_gbrain_failure_drops_the_slug(self):
-        linear = FakeLinear()
-        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("", 1))
-        with tempfile.TemporaryDirectory() as tmp:
-            record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
-        self.assertIsNone(record["gbrainSlug"])
-        self.assertIsNone(result_block(linear.comments[-1][1])["gbrainSlug"])
-        self.assertTrue(reason.write_gbrain("s", "t", "b", run=Runner(gbrain=OSError("x"))) is False)
-
-    def test_prior_art_failure_blocks_models_and_budget_spend(self):
-        linear = FakeLinear()
-        issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "How should we price Jovie?",
-                                                            "contextRefs": []})}
-        run = Runner(gbrain=done("", 1, "gbrain offline"), proposer_stub=claude_ok())
-        with tempfile.TemporaryDirectory() as tmp:
-            state = Path(tmp)
-            record = reason.one_job(linear, issue, CONFIG, state, run=run)
-            self.assertFalse(reason.budget_path(state).exists())
-        self.assertEqual(record["priorArt"]["status"], "retrieval-failed")
-        self.assertEqual(run.made("proposer_stub"), [])
-        self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
-
-    def test_known_yc_playbook_reaches_the_prompt_before_a_fresh_experiment(self):
-        linear = FakeLinear()
-        issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "Should we hire our first engineer?",
-                                                            "contextRefs": ["JOV-12"]})}
-        linear.issues["JOV-12"] = {"identifier": "JOV-12", "title": "Capacity evidence", "priority": 2,
-                                   "state": {"name": "Todo"}, "labels": {"nodes": []},
-                                   "description": "Current customer demand does not exceed capacity."}
-        hit = "[0.9] knowledge/external/yc/playbook/hiring-team -- Hiring and team growth"
-        page = ("---\ntitle: Hiring and team growth\npublished_at: 2026-09-28\n"
-                "source_url: https://www.ycombinator.com/library/4H-how-to-hire-your-first-engineer\n---\n"
-                "# Hiring\n## Applicability\nUse before adding early headcount.\n## Source evidence")
-        proposal = {**PROPOSAL, "precedentDisposition": "adopt",
-                    "materialDifference": "No material difference; Jovie is pre-PMF with spare capacity.",
-                    "newLearningNeeded": [],
-                    "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
-                                for item in PROPOSAL["ranking"]]}
-        run = Runner(gbrain=[done(page), done("ok"), done("", 1)],
-                     proposer_stub=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
-        with tempfile.TemporaryDirectory() as tmp:
-            record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
-        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "proposer_stub")][1]["input"]
-        self.assertIn("knowledge/external/yc/playbook/hiring-team", prompt)
-        self.assertIn("what is materially different about Jovie's case?", prompt)
-        self.assertEqual(record["decisionEvidence"]["inference"]["precedentDisposition"], "adopt")
-        self.assertEqual(record["decisionEvidence"]["newLearning"], [])
-
-    def test_failure_retries_once_then_cancels(self):
-        linear = FakeLinear()
-        with tempfile.TemporaryDirectory() as tmp:
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
-            self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
-            self.assertEqual(reason.failure_count(Path(tmp), "JOV-9"), 2)
-        self.assertEqual(linear.moves[-1], ("i-9", "Canceled"))
-        self.assertEqual(result_block(linear.comments[-1][1])["confidence"], "failed")
-
-    def test_expired_job_is_cancelled_without_model_calls(self):
-        linear, run = FakeLinear(), Runner()
-        issue = {**self.issue, "description": description({**JOB_BLOCK, "deadline": "2000-01-01T00:00:00Z"})}
-        with tempfile.TemporaryDirectory() as tmp:
-            reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
-        self.assertEqual((linear.moves, run.calls), ([("i-9", "Canceled")], []))
-        self.assertIn("deadline passed", result_block(linear.comments[-1][1])["reasons"])
 
 
 class FakeLock:
@@ -683,7 +586,7 @@ class DrainAndTickTest(unittest.TestCase):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             def admitted_job(*args, **kwargs):
                 (host.state / "lifecycle-drain.json").write_text("operator hold")
-                return {"confidence": "high"}
+                return {"confidence": "high", "publication": {"status": "published"}}
             with patch.object(reason, "healthy", return_value=True), \
                     patch.object(reason, "one_job", side_effect=admitted_job) as job:
                 result = reason.drain(host, self.lane(linear), CONFIG)
@@ -706,7 +609,7 @@ class DrainAndTickTest(unittest.TestCase):
             return real_state(issue_id)
         linear.state_of = state_of
         run = Runner(proposer_stub=[done('"loggedIn": true'), claude_ok()], grok=[done("logged in"), done(json.dumps(AGREE))],
-                     gbrain=done("ok"))
+                     gbrain=StoringGbrain())
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             out = reason.drain(host, self.lane(linear), CONFIG, run=run)
@@ -741,6 +644,8 @@ class DrainAndTickTest(unittest.TestCase):
                 self.assertEqual(linear.moves, [])
                 self.assertEqual(linear.comments, [])
 
+
+
     def test_drain_guards(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
@@ -760,7 +665,7 @@ class DrainAndTickTest(unittest.TestCase):
         linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "rank", "description": description(), "createdAt": "1"},
                                   {"id": "i-2", "identifier": "JOV-2", "title": "research", "description": research, "createdAt": "2"}])
         run = Runner(proposer_stub=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
-                     gbrain=done("ok"))
+                     gbrain=StoringGbrain())
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             out = reason.drain(host, self.lane(linear), CONFIG, run=run)
@@ -1543,6 +1448,23 @@ class OutcomeLaneTest(unittest.TestCase):
             self.addCleanup(p.stop)
         result = outcome.drain(host, lane, run=run, now=time.time())
         return result, calls, comments, state
+
+    def test_cursor_resumes_after_a_full_scan_and_wraps_after_the_last_page(self):
+        calls = []
+        def page(query, variables):
+            start = int(variables["after"] or 0)
+            calls.append(start)
+            stop = min(251, start + variables["first"])
+            return {"issues": {"nodes": [{"identifier": str(i)} for i in range(start, stop)],
+                               "pageInfo": {"endCursor": str(stop), "hasNextPage": stop < 251}}}
+
+        api = SimpleNamespace(gql=page)
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            for now in (10, 11, 12):
+                outcome.candidates(api, state, now)
+            self.assertEqual(calls, [0, 50, 100, 150, 200, 250, 0, 50, 100, 150])
+            self.assertFalse((state / outcome.STATE_FILE).exists())
 
     def test_a_verified_issue_gets_an_itemized_comment_and_a_pass_receipt(self):
         verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [

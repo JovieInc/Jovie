@@ -137,6 +137,7 @@ describe('useJovieAuth', () => {
     expect(result.current.user.isSignedIn).toBe(true);
     expect(result.current.user.user).toEqual({
       id: 'ba_user_tim',
+      emailVerified: true,
       emailAddresses: [
         { id: 'ba_email_ba_user_tim', emailAddress: 'tim@jov.ie' },
       ],

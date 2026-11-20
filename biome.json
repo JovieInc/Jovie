@@ -1,6 +1,6 @@
 {
   "root": true,
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -27,6 +27,7 @@
       "!apps/web/typecheck-tests-baseline.json",
       "!apps/web/typecheck-stories-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
+      "!scripts/ci-trigger-registry.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!scripts/public-benchmark/receipts",
       "!docs/design-system/drift-ledger.json",
@@ -61,7 +62,10 @@
         "noDistractingElements": "error",
         "noHeaderScope": "error",
         "noInteractiveElementToNoninteractiveRole": "error",
-        "noLabelWithoutControl": "error",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": { "inputComponents": ["HostDrawnInput"] }
+        },
         "noNoninteractiveElementInteractions": "error",
         "noNoninteractiveElementToInteractiveRole": "error",
         "noNoninteractiveTabindex": "error",
@@ -236,6 +240,16 @@
   "css": {
     "parser": {
       "tailwindDirectives": true
+    }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
     }
   },
   "assist": {

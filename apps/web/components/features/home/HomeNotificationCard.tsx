@@ -14,12 +14,12 @@ export function HomeNotificationCard() {
             fill='none'
             aria-hidden='true'
           >
-            <rect width='16' height='16' rx='4' fill='rgba(255,255,255,0.9)' />
+            <rect width='16' height='16' rx='4' className='fill-on-media/90' />
             <text
               x='8'
               y='12'
               textAnchor='middle'
-              fill='#0a0b0e'
+              className='fill-ink-on-media'
               fontSize='10'
               fontWeight='700'
               fontFamily='ui-sans-serif, system-ui, sans-serif'

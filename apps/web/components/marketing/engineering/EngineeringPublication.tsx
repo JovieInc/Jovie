@@ -3,11 +3,22 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
-import { MarketingEditorialHeroPhoto } from '@/components/marketing/MarketingEditorialHeroPhoto';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENGINEERING_COPY } from '@/data/engineeringCopy';
-import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
+import type {
+  EngineeringStoryRecord,
+  EngineeringStorySource,
+} from '@/lib/engineering-publication';
+
+type EvidenceKind = EngineeringStorySource['evidence'][number]['kind'];
+
+const EVIDENCE_KIND_LABELS: Record<EvidenceKind, string> = {
+  'public-url': 'Public URL',
+  changelog: 'Changelog',
+  test: 'Test',
+  'pull-request': 'Pull request',
+};
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -68,20 +79,19 @@ function PageFrame({
   title,
   description,
   children,
-  /** Only the /engineering index carries the editorial hero photo (route
-   * table: hero image 37). Article and founder-preview pages stay text-only. */
-  showHeroPhoto = false,
+  /** Preserve the public index header offset; article and preview spacing stays unchanged. */
+  dockedHero = false,
 }: {
   readonly kicker: ReactNode;
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
-  readonly showHeroPhoto?: boolean;
+  readonly dockedHero?: boolean;
 }) {
   const hero = (
     <MarketingHero
       variant='left'
-      className={showHeroPhoto ? 'relative z-10' : undefined}
+      className={dockedHero ? 'relative z-10' : undefined}
     >
       <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
       <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
@@ -95,13 +105,8 @@ function PageFrame({
 
   return (
     <section className='min-h-screen bg-page text-primary-token'>
-      {showHeroPhoto ? (
+      {dockedHero ? (
         <div className='marketing-hero-dock relative overflow-hidden'>
-          <MarketingEditorialHeroPhoto
-            src='/images/hero/engineering-index.webp'
-            opacity={0.4}
-            testId='engineering-hero-photo'
-          />
           {hero}
         </div>
       ) : (
@@ -134,7 +139,7 @@ export function EngineeringIndex({
           ? 'Draft and provenance status for founder review. This gallery stays out of public indexes.'
           : 'Proof-led notes on what Jovie has shipped and made public.'
       }
-      showHeroPhoto={!preview}
+      dockedHero={!preview}
     >
       <div data-testid='engineering-index'>
         {stories.length === 0 ? (
@@ -218,8 +223,8 @@ export function EngineeringArticle({
             <ul className='space-y-2'>
               {record.source.evidence.map(item => (
                 <li key={item.id} className='text-sm text-secondary-token'>
-                  <span className='mr-2 text-xs uppercase text-tertiary-token'>
-                    {item.kind}
+                  <span className='mr-2 text-xs text-tertiary-token'>
+                    {EVIDENCE_KIND_LABELS[item.kind]}
                   </span>
                   <a
                     href={item.href}

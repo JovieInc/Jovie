@@ -33,6 +33,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     className,
+    decoding,
     fetchPriority,
     priority,
     sizes,
@@ -40,6 +41,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   }: {
     readonly alt: string;
     readonly className?: string;
+    readonly decoding?: 'sync' | 'async' | 'auto';
     readonly fetchPriority?: 'high' | 'low' | 'auto';
     readonly priority?: boolean;
     readonly sizes?: string;
@@ -48,6 +50,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     React.createElement('img', {
       alt,
       className,
+      decoding,
       fetchPriority,
       'data-priority': priority ? 'true' : 'false',
       'data-sizes': sizes,
@@ -115,16 +118,15 @@ describe('EntityCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
     expect(screen.getByText('Shop')).toBeInTheDocument();
-  });
-
-  it('keeps editorial helper lines outside paragraph anatomy', () => {
-    render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Premium tee').tagName).toBe('SPAN');
     expect(screen.getByText('Profit $11.87').tagName).toBe('SPAN');
   });
 
   it('hides the status pill in the compact treatment (progressive disclosure)', () => {
-    render(<EntityCard model={merchModel} treatment='compact' />);
+    const view = render(
+      <EntityCard model={merchModel} treatment='compact' media='none' />
+    );
+    expect(view.container.querySelector('img, .aspect-square')).toBeNull();
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
     render(<EntityCard model={merchModel} treatment='detailed' />);
     expect(screen.getByText('Live')).toBeInTheDocument();
@@ -383,6 +385,7 @@ describe('EntityCard', () => {
 describe('EntityCard source contract', () => {
   it('uses inline helper anatomy for meta and profit details', () => {
     const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
+    expect(source).not.toMatch(/font-\[(?:590|680)\]/);
 
     expect(source).toContain(
       "'block min-w-0 truncate text-xs text-tertiary-token'"
@@ -777,21 +780,18 @@ describe('ProfilePacCard landscape states', () => {
       );
 
       const art = screen.getByTestId('profile-pac-featured-art');
-      expect(art.querySelector('img')).toHaveAttribute(
+      const img = art.querySelector('img');
+      expect(img).toHaveAttribute(
         'data-sizes',
         '(min-width: 1024px) 400px, 104px'
       );
-      expect(art.querySelector('img')).toHaveAttribute(
-        'data-priority',
-        'false'
-      );
+      expect(img).toHaveAttribute('data-priority', 'false');
       if (renderMode === 'interactive') {
-        expect(art.querySelector('img')).toHaveAttribute(
-          'fetchpriority',
-          'high'
-        );
+        expect(img).toHaveAttribute('fetchpriority', 'high');
+        expect(img).toHaveAttribute('decoding', 'sync');
       } else {
-        expect(art.querySelector('img')).not.toHaveAttribute('fetchpriority');
+        expect(img).not.toHaveAttribute('fetchpriority');
+        expect(img).not.toHaveAttribute('decoding');
       }
     }
   );

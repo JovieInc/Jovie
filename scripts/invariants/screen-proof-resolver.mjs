@@ -1,9 +1,14 @@
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pause, runTransport } from './screen-proof-transport.mjs';
+
+export { setTransportRetryDelaysForTests } from './screen-proof-transport.mjs';
+
 import { validPlaywrightPng } from '../lib/playwright-png.mjs';
+import { producerAttemptChecks } from './screen-proof-attempt-checks.mjs';
+import { finalPathMatches } from './screen-proof-final-paths.mjs';
 
 export const PRODUCER = Object.freeze({
   repository: 'JovieInc/Jovie',
@@ -23,32 +28,24 @@ export const REQUIRED_MARKETING_QUALITY_CHECKS = Object.freeze([
 ]);
 const SKEW = 5 * 60_000;
 const MAX_AGE = 24 * 60 * 60_000;
-// The marketing artifact currently contains 240 files (60 routes x two
-// viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
+// The marketing artifact currently holds 240 files (60 routes x two
+// viewports x PNG/receipt); headroom while rejecting zip bombs.
 const MAX_ARCHIVE_MEMBERS = 256;
 const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
-// JOV-INV-018 incident (2026-09-28): `spawnSync`'s default-scoped 32MB
-// stdout cap silently killed `gh api .../zip` once the marketing bundle
-// (60 routes x two viewports of full-page PNGs) grew past ~33MB — observed
-// at 163MB. The kill sets `status: null`, so `run()` threw the generic
-// 'controlled transport unavailable', which every caller reported as
-// "controlled GitHub artifact resolver is unavailable" for every screen
-// routed through that artifact, masking real per-screen findings (or a
-// real pass) behind a misleading transport error. The download transport
-// must never be the tightest ceiling in this pipeline: extraction already
-// owns the authoritative zip-bomb limit via MAX_EXTRACTED_ARTIFACT_BYTES,
-// so give the raw (already PNG-compressed, so barely smaller) download the
-// same ceiling plus headroom rather than an arbitrary lower one.
+// JOV-INV-018 (2026-09-28): spawnSync's 32MB stdout cap silently killed
+// `gh api .../zip` once the marketing bundle grew past ~33MB (observed at
+// 163MB); status null → 'controlled transport unavailable', masking real
+// per-screen findings behind a misleading transport error. The download
+// transport must never be the tightest ceiling here: extraction already
+// owns the authoritative zip-bomb limit — give the raw (barely smaller)
+// download the same ceiling plus headroom, not an arbitrary lower one.
 const MAX_ARTIFACT_DOWNLOAD_BYTES =
   MAX_EXTRACTED_ARTIFACT_BYTES + 128 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
-// Read-after-write on the jobs API. Runs 39786806070, 39791190562, and
-// 39795196640 rejected every screen with the trust failure while Generate
-// Screenshots had already concluded success; a later read of the same
-// attempt accepted the screens that were checked after the row appeared.
-// The sleeps below total 150s, which covers the ~117s lag before that row
-// was visible. This does not accept any other conclusion, repository,
-// workflow, head, or digest.
+// Read-after-write on the jobs API: runs 39786806070/39791190562/39795196640
+// rejected every screen while Generate Screenshots had already concluded
+// success, and a later read accepted them. The sleeps total 150s (~117s
+// observed lag); no other conclusion, repository, workflow, head or digest.
 export const PRODUCER_LAG_DELAYS_MS = Object.freeze([
   10_000, 20_000, 30_000, 30_000, 30_000, 30_000,
 ]);
@@ -94,6 +91,18 @@ const equal = (left, right) =>
 // (every other screen) still requires an exactly empty search string —
 // this only widens what an exact, caller-declared query can additionally
 // match, never what an empty one does.
+// Bare-path receipt finalPaths (JOV-7973 seam: /waitlist -> /start).
+const receiptFinalPathMatches = (finalPath, route) => {
+  if (typeof finalPath !== 'string' || typeof route !== 'string') return false;
+  const url = new URL(finalPath, 'http://localhost');
+  const expected = new URL(route, 'http://localhost');
+  return (
+    url.protocol === 'http:' &&
+    ['localhost', '127.0.0.1'].includes(url.hostname) &&
+    finalPathMatches(url, expected) &&
+    url.hash === ''
+  );
+};
 const validLocalFinalUrl = (value, expectedRoute) => {
   if (typeof value !== 'string' || typeof expectedRoute !== 'string')
     return false;
@@ -103,8 +112,7 @@ const validLocalFinalUrl = (value, expectedRoute) => {
     return (
       url.protocol === 'http:' &&
       ['localhost', '127.0.0.1'].includes(url.hostname) &&
-      url.pathname === expected.pathname &&
-      url.search === expected.search &&
+      finalPathMatches(url, expected) &&
       url.hash === ''
     );
   } catch {
@@ -146,21 +154,16 @@ export function screenProofArtifactName(screenId) {
   if (!/^[a-z0-9-]+$/.test(suffix)) return null;
   return `${PRODUCER.artifact}-${suffix}`;
 }
-function run(command, args, binary = false) {
-  const result = spawnSync(command, args, {
-    encoding: binary ? undefined : 'utf8',
-    maxBuffer: binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024,
-  });
-  if (result.status !== 0) throw new Error('controlled transport unavailable');
-  return result.stdout;
+export function run(command, args, binary = false) {
+  return runTransport(
+    command,
+    args,
+    binary,
+    binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024
+  );
 }
 function api(path, binary = false) {
   return run('gh', ['api', `repos/${PRODUCER.repository}/${path}`], binary);
-}
-function pause(ms) {
-  if (!ms) return;
-  const result = spawnSync('sleep', [String(ms / 1000)]);
-  if (result.status !== 0) throw new Error('controlled transport unavailable');
 }
 function producerLagDelays(lagDelays) {
   const source = Array.isArray(lagDelays) ? lagDelays : PRODUCER_LAG_DELAYS_MS;
@@ -188,7 +191,7 @@ function producerJobs(jobs, runId, attempt, headSha) {
   );
 }
 /**
- * @returns {'accept' | 'wait' | 'reject'}
+ * @returns {{ decision: 'accept' | 'wait' | 'reject', failed: string[] }}
  */
 function classifyProducerAttempt({
   artifact,
@@ -210,27 +213,14 @@ function classifyProducerAttempt({
     workflowRun.status === 'in_progress' &&
     workflowRun.conclusion == null;
   const job = producerJobs(jobs, runId, attempt, context.headSha);
-  const identityTrusted =
-    validId(runId) &&
-    validId(attempt) &&
-    artifact.id === artifactId &&
-    trustedName &&
-    !artifact.expired &&
-    workflowRun.repository?.full_name === PRODUCER.repository &&
-    workflowRun.head_branch === 'main' &&
-    workflowRun.head_sha?.toLowerCase() === context.headSha.toLowerCase() &&
-    workflowRun.path === PRODUCER.workflow &&
-    ['push', 'workflow_dispatch'].includes(workflowRun.event);
-  if (
-    identityTrusted &&
-    digestReady &&
-    (completedRun || downstreamCertificationRun) &&
-    job.length === 1 &&
-    validId(job[0].id) &&
-    job[0].conclusion === 'success'
-  ) {
-    return 'accept';
-  }
+  const { identityTrusted, failed } = producerAttemptChecks({
+    ...{ artifact, workflowRun, runId, attempt, artifactId, trustedName, job },
+    ...{ digestReady, completedRun, downstreamCertificationRun, validId },
+    sameRun: runId === currentRunId && attempt === currentAttempt,
+    headSha: context.headSha,
+    producer: PRODUCER,
+  });
+  if (failed.length === 0) return { decision: 'accept', failed };
   const named = (jobs?.jobs || []).filter(
     item => item?.name === PRODUCER.job && item.run_id === runId
   );
@@ -245,9 +235,9 @@ function classifyProducerAttempt({
     !terminalProducer &&
     (!digestReady || job.length !== 1 || job[0].conclusion !== 'success')
   ) {
-    return 'wait';
+    return { decision: 'wait', failed };
   }
-  return 'reject';
+  return { decision: 'reject', failed };
 }
 function bundleDigest(files) {
   const hash = createHash('sha256');
@@ -349,7 +339,7 @@ function decodeMarketingProof(bytes, context, meta) {
     if (
       receipt.route !== context.marketingRoute ||
       receipt.fixturePath !== context.marketingRoute ||
-      receipt.finalPath !== context.marketingRoute
+      !receiptFinalPathMatches(receipt.finalPath, context.marketingRoute)
     )
       return fail(
         'marketing receipt does not match the registered screen route'
@@ -503,7 +493,7 @@ export function resolveTrustedScreenProof({
       const trustedName =
         artifact.name === marketingName ||
         artifact.name === screenProofArtifactName(context.screenId);
-      const decision = classifyProducerAttempt({
+      const { decision, failed } = classifyProducerAttempt({
         artifact,
         workflowRun: loaded.workflowRun,
         jobs: loaded.jobs,
@@ -519,7 +509,7 @@ export function resolveTrustedScreenProof({
       }
       if (decision === 'reject' || index === delays.length - 1) {
         return fail(
-          'artifact run, workflow, or exact producer attempt is not trusted'
+          `artifact run, workflow, or exact producer attempt is not trusted; failed checks ${failed.join(', ')}`
         );
       }
     }

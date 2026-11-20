@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Marketing heroes sit on the matte page background (Tim, 2026-10-29). The
- * saturated per-route hero photographs (`MarketingHeroPhoto`,
- * `/images/marketing-hero/*`) are gone and must not come back.
+ * per-route and editorial hero photographs are retired. Shared article-card
+ * artwork remains valid; it must not become full-bleed hero wallpaper.
  */
 const WEB_ROOT = join(__dirname, '../../..');
 const ROOTS = ['app', 'components', 'features', 'data', 'content', 'lib'];
@@ -13,7 +13,7 @@ const SKIP_DIRS = new Set(['node_modules', '.next']);
 const SOURCE = /\.(?:ts|tsx|js|jsx|css)$/;
 const TEST_FILE = /\.(?:test|spec)\.[jt]sx?$/;
 const HERO_PHOTO =
-  /MarketingHeroPhoto|\/images\/marketing-hero\/|marketing-hero-photo/;
+  /Marketing(?:Editorial)?HeroPhoto|\/images\/marketing-hero\/|marketing-(?:editorial-)?hero-photo/;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
@@ -43,5 +43,20 @@ describe('matte marketing hero backgrounds', () => {
     expect(existsSync(join(WEB_ROOT, 'public/images/marketing-hero'))).toBe(
       false
     );
+    expect(
+      existsSync(
+        join(WEB_ROOT, 'components/marketing/MarketingEditorialHeroPhoto.tsx')
+      )
+    ).toBe(false);
+    for (const asset of [
+      'blog-index.webp',
+      'changelog-index.webp',
+      'engineering-index.webp',
+    ]) {
+      expect(
+        existsSync(join(WEB_ROOT, 'public/images/hero', asset)),
+        asset
+      ).toBe(false);
+    }
   });
 });

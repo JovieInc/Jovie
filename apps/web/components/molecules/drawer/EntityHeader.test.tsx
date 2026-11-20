@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CheckCircle2 } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   EntityHeader,
   EntityHeaderStatusGlyph,
@@ -22,8 +23,8 @@ vi.mock('next/image', () => ({
 }));
 
 describe('EntityHeader', () => {
-  it('renders one dominant title and a quiet details line', () => {
-    render(
+  it('renders one dominant title and a quiet details line', async () => {
+    const { container } = render(
       <EntityHeader
         thumbnail={<EntityHeaderThumbnail variant='person' name='Tim White' />}
         title='Tim White'
@@ -39,6 +40,7 @@ describe('EntityHeader', () => {
     expect(details).toHaveTextContent('Brand partnerships · Worldwide');
     expect(details).toHaveClass('text-secondary-token');
     expect(details.className).not.toContain('font-semibold');
+    await expectNoA11yViolations(container);
   });
 
   it('omits the details row entirely when no subtitle or status glyph exist', () => {
@@ -96,6 +98,33 @@ describe('EntityHeader', () => {
     ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
   });
 
+  it('keeps a stable one-line grid title tight while preserving inline actions', () => {
+    const { rerender } = render(
+      <EntityHeader
+        layout='grid'
+        title='Name'
+        stableLayout
+        titleLineClamp={1}
+      />
+    );
+    expect(screen.getByTestId('entity-header-title')).not.toHaveClass(
+      'min-h-6'
+    );
+    rerender(
+      <EntityHeader
+        layout='inline'
+        title='Name'
+        stableLayout
+        titleLineClamp={1}
+        actions={<button type='button'>More</button>}
+      />
+    );
+    expect(screen.getByTestId('entity-header-title')).toHaveClass('min-h-6');
+    expect(
+      screen.getByRole('button', { name: 'More' }).parentElement
+    ).toHaveClass('absolute', 'right-0', 'top-0');
+  });
+
   it('assigns media, identity, metadata, and actions to explicit grid cells', () => {
     render(
       <EntityHeader
@@ -110,19 +139,30 @@ describe('EntityHeader', () => {
 
     const header = screen.getByTestId('entity-header');
     expect(header).toHaveAttribute('data-layout', 'grid');
-    expect(header).toHaveClass('grid', 'grid-cols-[auto_minmax(0,1fr)_auto]');
-    expect(header.querySelector('[data-entity-header-image]')).toHaveClass(
-      'row-span-2'
+    expect(header).toHaveClass(
+      'grid',
+      'grid-cols-[auto_minmax(0,1fr)_auto]',
+      'items-center',
+      'gap-x-3',
+      'gap-y-2'
     );
+    const image = header.querySelector('[data-entity-header-image]');
+    expect(image).toHaveClass('row-start-1');
+    expect(image).not.toHaveClass('row-span-2');
     expect(header.querySelector('[data-entity-header-identity]')).toHaveClass(
-      'col-start-2'
+      'col-start-2',
+      'col-span-2',
+      'space-y-0.5'
     );
     expect(header.querySelector('[data-entity-header-metadata]')).toHaveClass(
       'row-start-2'
     );
-    expect(header.querySelector('[data-entity-header-actions]')).toHaveClass(
-      'col-start-3'
+    const actions = header.querySelector('[data-entity-header-actions]');
+    expect(actions).toHaveClass('h-0', 'items-center');
+    expect(actions?.parentElement).toBe(
+      screen.getByTestId('entity-header-title').parentElement
     );
+    expect(actions?.parentElement).toHaveClass('items-center');
   });
 });
 

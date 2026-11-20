@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { FleetResult, FleetState } from './dispatcher';
 import {
   compactFleetState,
+  FLEET_HOT_ROW_BUDGET_BYTES,
   fleetArchiveKey,
   fleetHistoryPrefix,
   readArchiveValue,
@@ -260,5 +261,66 @@ describe('fleet compaction primitives', () => {
     });
     expect(compactFleetState('profile', s, now)).toEqual([]);
     expect(s.historySequences.helper).toBe(2);
+  });
+
+  it('archives terminal invocations when the hot state exceeds the row budget, below the count threshold, without touching pinned work', () => {
+    const s = state();
+    const result = invocation();
+    for (let index = 0; index < 1200; index++) {
+      s.invocations[`invocation-${index}`] = {
+        hash: 'a'.repeat(64),
+        result,
+      };
+    }
+    s.invocations.pinned = { hash: 'pinned', result };
+    s.pendingDefects.fingerprint = {
+      attemptId: randomUUID(),
+      fingerprint: 'fingerprint',
+      issueId: randomUUID(),
+      input: {},
+      leaseId: randomUUID(),
+      workerId: 'helper',
+      startedAt: iso(),
+      invocationId: 'pinned',
+      hash: 'pinned',
+      receipt: result.receipt,
+    };
+    expect(Object.keys(s.invocations)).toHaveLength(1201);
+    expect(Buffer.byteLength(JSON.stringify(s))).toBeGreaterThan(
+      FLEET_HOT_ROW_BUDGET_BYTES
+    );
+    const firstRows = compactFleetState('profile', s, now);
+    expect(firstRows).toHaveLength(100);
+    expect(firstRows[0].key).toBe(
+      fleetArchiveKey('profile', 'invocations', 'invocation-0')
+    );
+    let passes = 1;
+    while (
+      Buffer.byteLength(JSON.stringify(s)) > FLEET_HOT_ROW_BUDGET_BYTES &&
+      passes < 30
+    ) {
+      if (!compactFleetState('profile', s, now).length) break;
+      passes += 1;
+    }
+    expect(Buffer.byteLength(JSON.stringify(s))).toBeLessThanOrEqual(
+      FLEET_HOT_ROW_BUDGET_BYTES
+    );
+    expect(s.invocations.pinned).toBeDefined();
+    expect(Object.keys(s.receiptHistoryRecorded)).toHaveLength(0);
+  });
+
+  it('drops publish-once receipt markers whose receipts are no longer hot', () => {
+    const s = state();
+    const { receipt } = work(s);
+    s.receiptHistoryRecorded.gone = true;
+    const rows = compactFleetState('profile', s, now);
+    expect(Object.keys(s.receiptHistoryRecorded)).toEqual([receipt.receiptId]);
+    expect(s.receipts[receipt.receiptId]).toBeDefined();
+    expect(
+      rows.find(
+        row =>
+          row.key === fleetArchiveKey('profile', 'receipts', receipt.leaseId)
+      )?.value
+    ).toMatchObject({ value: receipt });
   });
 });

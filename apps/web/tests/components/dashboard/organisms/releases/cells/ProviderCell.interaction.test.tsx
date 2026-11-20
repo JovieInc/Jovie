@@ -66,6 +66,8 @@ describe('ProviderCell actions', () => {
     );
 
     const [openButton, copyButton] = screen.getAllByRole('button');
+    expect(openButton).toHaveAttribute('aria-label', 'Open');
+    expect(copyButton).toHaveAttribute('aria-label', 'Copy');
     fireEvent.click(openButton);
     fireEvent.click(copyButton);
 
@@ -108,7 +110,7 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("isCopied ? 'text-success' : undefined");
+    ).toContain("isCopied ? 'text-success-text' : undefined");
     expect(
       readFileSync(
         resolve(
@@ -117,7 +119,7 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("isCopied ? 'text-success' : undefined");
+    ).toContain("isCopied ? 'text-success-text' : undefined");
   });
 });
 
@@ -149,7 +151,9 @@ describe('Ion-token feedback on availability surfaces', () => {
       </TooltipProvider>
     );
     await user.click(
-      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+      screen.getByRole('button', {
+        name: /^Show provider availability details:/i,
+      })
     );
     await user.click(screen.getByRole('button', { name: '+ Add link' }));
     const input = screen.getByPlaceholderText('Paste URL...');
@@ -207,9 +211,10 @@ describe('Ion-token feedback on availability surfaces', () => {
     const button = screen.getByRole('button', { name: 'Copied!' });
     expect(button).toHaveAttribute('data-variant', 'secondary');
     expect(button).toHaveAttribute('data-size', 'sm');
-    expect(screen.getByText('Copied!')).toHaveClass('text-success');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success-text');
+    expect(screen.getByText('Copied!')).not.toHaveClass('text-success');
     expect(button.querySelector('svg')?.parentElement).toHaveClass(
-      'text-success'
+      'text-success-text'
     );
     expect(button.className).not.toMatch(/emerald|amber/);
   });
@@ -275,7 +280,9 @@ describe('Ion-token feedback on availability surfaces', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+      screen.getByRole('button', {
+        name: /^Show provider availability details:/i,
+      })
     );
 
     const statusDot = document.querySelector('span.ring-2');
@@ -307,8 +314,9 @@ describe('Ion-token feedback on availability surfaces', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('data-variant', 'secondary');
     expect(button).toHaveAttribute('data-size', 'sm');
-    expect(screen.getByText('Copied!')).toHaveClass('text-success');
-    expect(button.querySelector('svg')).toHaveClass('text-success');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success-text');
+    expect(screen.getByText('Copied!')).not.toHaveClass('text-success');
+    expect(button.querySelector('svg')).toHaveClass('text-success-text');
     expect(button.className).not.toMatch(/emerald|amber/);
   });
 });

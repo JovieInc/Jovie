@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   ProofClaimCtaLink,
   proofClaimFooterClassName,
@@ -8,6 +7,7 @@ import {
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { ClaimAttributionLink } from './ClaimAttributionLink';
 
 export interface ProfileClaimFooterProps {
   readonly href: string;
@@ -39,10 +39,8 @@ export function ProfileClaimFooter({
 
   const content = (
     <>
-      <span className='text-white/70' aria-hidden='true'>
-        Jovie
-      </span>
-      <span className='text-white/30' aria-hidden='true'>
+      <span className='text-on-media/55'>Jovie</span>
+      <span className='text-on-media/30' aria-hidden='true'>
         ·
       </span>
       <span>{label}</span>
@@ -58,13 +56,14 @@ export function ProfileClaimFooter({
         <ProofClaimCtaLink
           href={href}
           label={label}
+          ariaLabel={`Jovie · ${label}`}
           className={proofClaimFooterClassName()}
           testId='profile-claim-footer-cta'
         >
           {content}
         </ProofClaimCtaLink>
       ) : (
-        <Link
+        <ClaimAttributionLink
           href={href}
           className={proofClaimFooterClassName()}
           data-testid='profile-claim-footer-cta'
@@ -75,7 +74,7 @@ export function ProfileClaimFooter({
           }}
         >
           {content}
-        </Link>
+        </ClaimAttributionLink>
       )}
     </div>
   );

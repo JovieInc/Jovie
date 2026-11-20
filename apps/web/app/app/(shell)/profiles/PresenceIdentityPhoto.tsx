@@ -1,5 +1,7 @@
 'use client';
 
+import { BookOpen, Globe2 } from 'lucide-react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   getPlatformIconMetadata,
   SocialIcon,
@@ -44,6 +46,33 @@ function ProviderBadge({
   );
 }
 
+/**
+ * The compact row's platform glyph, resolved like the Profiles brand icon:
+ * Jovie, source and website rows have no social glyph, so they get their own
+ * mark instead of SocialIcon's generic link fallback.
+ */
+function CompactPlatformGlyph({
+  subject,
+}: Readonly<{ subject: PresenceIdentitySubject }>) {
+  if (subject.kind === 'jovie')
+    return (
+      <BrandLogo
+        size='chrome'
+        tone='color'
+        rounded={false}
+        aria-hidden
+        className='h-3 w-3 [&_svg]:h-full [&_svg]:w-full'
+      />
+    );
+  if (subject.kind === 'authority')
+    return <BookOpen className='h-3 w-3' aria-hidden />;
+  if (subject.kind === 'website')
+    return <Globe2 className='h-3 w-3' aria-hidden />;
+  return (
+    <SocialIcon platform={subject.platform} className='h-3 w-3' aria-hidden />
+  );
+}
+
 export function PresenceIdentityPhoto({
   subject,
   artistName,
@@ -62,6 +91,10 @@ export function PresenceIdentityPhoto({
       : photo
   );
   const showVerified = photo.verified && photo.kind === 'profile';
+  // A compact row with no portrait shows where the profile lives, not the
+  // artist's initials: every row of one artist would otherwise read as the
+  // same "TW" monogram (Pen OMrP0: each row carries its platform mark).
+  const compactPlatformMark = size === 'sm' && photo.kind !== 'profile';
 
   return (
     <span
@@ -74,15 +107,27 @@ export function PresenceIdentityPhoto({
       data-photo-verified={showVerified ? 'true' : 'false'}
       data-photo-freshness={photo.freshness}
     >
-      <Avatar
-        key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
-        src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
-        alt='' // The source-aware outer frame owns the accessible identity.
-        name={entityName}
-        size={size}
-        shape={size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'}
-        verified={false}
-      />
+      {compactPlatformMark ? (
+        <span
+          aria-hidden
+          data-testid='presence-identity-platform-mark'
+          className='inline-flex h-5 w-5 items-center justify-center text-secondary-token'
+        >
+          <CompactPlatformGlyph subject={subject} />
+        </span>
+      ) : (
+        <Avatar
+          key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
+          src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
+          alt='' // The source-aware outer frame owns the accessible identity.
+          name={entityName}
+          size={size}
+          shape={
+            size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'
+          }
+          verified={false}
+        />
+      )}
       {size !== 'sm' ? (
         <ProviderBadge platform={subject.platform} label={platformLabel} />
       ) : null}

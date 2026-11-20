@@ -103,6 +103,7 @@ export function DemoPublicProfileSurface() {
           presentation='compact-preview'
           mode='profile'
           artist={DEMO_PUBLIC_ARTIST}
+          releases={INTERNAL_DJ_DEMO_PERSONA.releases}
           socialLinks={[...DEMO_PUBLIC_SOCIAL_LINKS]}
           contacts={[]}
           subtitle='Festival headliner, producer, and catalog powerhouse'

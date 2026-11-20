@@ -16,7 +16,7 @@ const read = (path: string, root = WEB_ROOT) =>
   readFileSync(join(root, path), 'utf8');
 
 /** Tools whose commit path still bypasses a domain function. Lower, never raise. */
-const DEBT_CEILING = 5;
+const DEBT_CEILING = 3;
 
 type Tool = { kind: string; domain?: string; reason?: string };
 const tools = registry.agentTools as Record<string, Tool>;
@@ -87,6 +87,36 @@ describe('domain write registry', () => {
       if (t.kind === 'domain') expect(ids.has(t.domain ?? ''), tool).toBe(true);
       expect(['domain', 'read', 'generate', 'debt']).toContain(t.kind);
     }
+  });
+
+  it('release create and profile edit are ONE function for the form and the chat tool', () => {
+    // Folded in from the Ovie agent-first worker (#23342): both entry points of
+    // each pair must call the registered function, so the same request saves
+    // the same state. Same-rows tests: tests/unit/domain/*-paths.test.ts.
+    const pairs = [
+      {
+        fn: 'createReleaseForProfile',
+        entries: [
+          'app/app/(shell)/dashboard/releases/actions.ts',
+          'lib/ai/tools/create-release.ts',
+        ],
+      },
+      {
+        fn: 'applyProfileUpdate',
+        entries: [
+          'app/api/dashboard/profile/route.ts',
+          'app/api/chat/confirm-edit/route.ts',
+        ],
+      },
+    ];
+    for (const { fn, entries } of pairs) {
+      const domain = registry.domains.find(d => d.exports.includes(fn));
+      expect(domain, `${fn} must be registered`).toBeDefined();
+      for (const entry of entries)
+        expect(read(entry), `${entry} must call ${fn}`).toContain(fn);
+    }
+    expect(tools['chat:createRelease']).toMatchObject({ kind: 'domain' });
+    expect(tools['chat:proposeProfileEdit']).toMatchObject({ kind: 'domain' });
   });
 
   it('keeps tool debt named and shrinking', () => {

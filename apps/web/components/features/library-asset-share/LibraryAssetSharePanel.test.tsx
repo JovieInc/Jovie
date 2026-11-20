@@ -30,6 +30,30 @@ describe('LibraryAssetSharePanel', () => {
     vi.clearAllMocks();
   });
 
+  it('dims the disabled row to opacity-75 so AA secondary text survives', () => {
+    const { container } = render(
+      <LibraryAssetSharePanel
+        asset={asset}
+        profileId='profile-1'
+        artistHandle='tim'
+        disabled
+        onShareChange={vi.fn()}
+        initialShare={{
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        }}
+      />
+    );
+
+    const dimmed = container.querySelector('.opacity-75');
+    expect(dimmed).not.toBeNull();
+    expect(dimmed?.className).not.toContain('opacity-60');
+  });
+
   it('keeps Share Link to URL, Copy, and overflow verbs', async () => {
     const user = userEvent.setup();
 
@@ -73,7 +97,9 @@ describe('LibraryAssetSharePanel', () => {
     expect(
       screen.getByRole('menuitem', { name: 'Make public' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
+    // The header already opens the page; the link row carries no second Open.
+    expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open link' })).toBeNull();
     expect(
       screen.getByRole('menuitem', { name: 'Revoke private link' })
     ).toBeInTheDocument();

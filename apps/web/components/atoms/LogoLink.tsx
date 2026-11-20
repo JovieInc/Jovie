@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo, type LogoVariant } from '@/components/atoms/Logo';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 import './LogoLink.css';
 
@@ -8,6 +9,7 @@ interface LogoLinkProps
     readonly href?: string;
     readonly className?: string;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly logoMarkSize?: BrandMarkSize;
     readonly prefetch?: boolean;
     readonly variant?: LogoVariant;
     /**
@@ -24,13 +26,19 @@ export function LogoLink({
   href = '/',
   className,
   logoSize = 'sm',
+  logoMarkSize,
   prefetch,
   variant = 'word',
   reveal = false,
   'data-testid': dataTestId = 'site-logo',
 }: LogoLinkProps) {
   const logo = (
-    <Logo size={logoSize} variant={variant} data-testid={dataTestId} />
+    <Logo
+      size={logoSize}
+      markSize={logoMarkSize}
+      variant={variant}
+      data-testid={dataTestId}
+    />
   );
 
   return (

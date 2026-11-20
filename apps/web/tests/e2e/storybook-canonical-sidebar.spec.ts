@@ -53,11 +53,15 @@ for (const theme of ['dark', 'light']) {
       page.viewportSize()!.height,
       0
     );
-    // The Inbox row (canonical `home` destination), not the slot's Inbox bell.
-    const home = nav
-      .getByRole('link', { name: 'Inbox', exact: true })
-      .and(page.locator('[data-navigation-item-id="home"]'));
-    const row = await home.boundingBox();
+    // The header bell owns `/app`, so the rail has no Inbox row; measure a
+    // canonical destination row instead.
+    await expect(nav.locator('[data-navigation-item-id="home"]')).toHaveCount(
+      0
+    );
+    const work = nav
+      .getByRole('link', { name: 'Work', exact: true })
+      .and(page.locator('[data-navigation-item-id="library"]'));
+    const row = await work.boundingBox();
     expect(row!.height).toBe(28);
     const create = nav.getByRole('link', { name: 'New Chat' });
     await expect(create).toHaveCount(1);
@@ -65,18 +69,12 @@ for (const theme of ['dark', 'light']) {
     await expect(nav.locator('[data-sidebar-history-header]')).toContainText(
       'Today'
     );
-    await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-    ).toHaveCount(1);
-    await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-    ).toHaveCount(1);
+    // Header owns bell and search: New Chat is a 28px row, no lone "+".
+    await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
     await expect(
       nav.getByRole('button', { name: 'Filter Unread Chats' })
     ).toHaveCount(0);
-    const box = await create.boundingBox();
-    expect(box!.width).toBe(24);
-    expect(box!.height).toBe(24);
+    expect((await create.boundingBox())!.height).toBe(28);
     await create.focus();
     await expect(create).toBeFocused();
     expect(await footer.boundingBox()).toEqual(before);
@@ -413,11 +411,12 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       });
       const expanded = await readSidebarAnchors(page);
       const headingAction = nav.locator(
-        '[data-sidebar-search-slot] [aria-label="New Chat"]'
+        '[data-nav-section="create"] [data-navigation-item-id="chat"]'
       );
       await expect(headingAction).toHaveCount(1);
       await expect(create).toHaveCount(1);
-      await expect(nav.getByText('New Chat', { exact: true })).toHaveCount(0);
+      await expect(create).toContainText('New Chat');
+      await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
       await expect(
         nav.getByRole('button', { name: 'Filter Unread Chats' })
       ).toHaveCount(0);
@@ -425,8 +424,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         history === 'composed-history' ? 1 : 0
       );
       const box = await create.boundingBox();
-      expect(box!.width).toBe(24);
-      expect(box!.height).toBe(24);
+      expect(box!.height).toBe(28);
       await page.screenshot({
         path: testInfo.outputPath(`${history}-${theme}-expanded.png`),
       });
@@ -437,7 +435,8 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         element.addEventListener(
           'click',
           event => {
-            if ((event.target as Element).closest('[aria-label="New Chat"]')) {
+            const target = event.target as Element;
+            if (target.closest('[data-navigation-item-id="chat"]')) {
               event.preventDefault();
               element.dataset.creationCount = String(
                 Number(element.dataset.creationCount) + 1
@@ -457,9 +456,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
           .getByRole('button', { name: 'Collapse sidebar', exact: true })
           .click();
         await expect(create).toHaveCount(1);
-        await expect(
-          nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-        ).toHaveCount(1);
+        await expect(headingAction).toHaveCount(1);
         expectStableSidebar(expanded, await readSidebarAnchors(page));
         if (cycle === 0)
           await page.screenshot({
@@ -508,9 +505,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       await expect(
         page.getByRole('button', { name: 'Expand sidebar', exact: true })
       ).toBeVisible();
-      await expect(
-        nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-      ).toHaveCount(1);
+      await expect(headingAction).toHaveCount(1);
       await expect(draft).toHaveValue('Preserve this campaign draft');
     });
   }
@@ -529,7 +524,7 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   await expect(create).toHaveCount(1);
   await expect(create).toHaveAttribute('href', '/app/chat');
   await expect(
-    nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+    nav.locator('[data-nav-section="create"] [data-navigation-item-id="chat"]')
   ).toHaveCount(1);
   await create.focus();
   await expect(create).toBeFocused();

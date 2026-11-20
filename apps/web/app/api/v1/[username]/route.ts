@@ -30,6 +30,7 @@ import {
 } from '@/lib/rate-limit';
 import { getProfileWithUser } from '@/lib/services/profile';
 import { getActiveLinksForProfile } from '@/lib/services/social-links/queries';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
 export const dynamic = 'force-dynamic';
@@ -252,7 +253,12 @@ export async function GET(
           displayText: link.displayText,
         })),
         platformIds: {
-          spotify: profile.spotifyId ?? null,
+          // Legacy profiles keep only spotify_url; derive the exact ID.
+          spotify:
+            profile.spotifyId ??
+            (profile.spotifyUrl
+              ? extractSpotifyArtistId(profile.spotifyUrl)
+              : null),
           appleMusic: profile.appleMusicId ?? null,
           youtube: youtubeChannelId,
           deezer: profile.deezerId ?? null,

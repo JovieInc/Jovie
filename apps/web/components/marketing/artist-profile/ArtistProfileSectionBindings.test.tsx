@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
@@ -87,7 +88,7 @@ describe('Artist profile section delegation', () => {
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      '/start'
+      getClaimProfileIntent().href
     );
   });
 });

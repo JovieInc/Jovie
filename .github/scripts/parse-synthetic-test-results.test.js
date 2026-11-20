@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   classifySyntheticTests,
+  formatGithubOutput,
   parseSyntheticTestResults,
   resolveSyntheticTestStatus,
 } = require('./parse-synthetic-test-results');
@@ -16,7 +17,14 @@ function buildPlaywrightReport(specs) {
           tests: [
             {
               status: spec.status,
-              results: spec.results ?? [{ status: spec.status }],
+              ...(spec.annotation
+                ? {
+                    annotations: [
+                      { type: 'skip', description: spec.annotation },
+                    ],
+                    results: [],
+                  }
+                : { results: spec.results ?? [{ status: spec.status }] }),
             },
           ],
         })),
@@ -36,17 +44,83 @@ function createMemoryFileSystem(files) {
   };
 }
 
-test('resolveSyntheticTestStatus treats optional skips without unexpected failures as passed', () => {
-  const tests = [{}, {}];
-  const passed = [{}];
-  const skipped = [{}];
+const OTP_SKIP_ANNOTATION =
+  'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
+const OTP_RESOLVER_REASON =
+  'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).';
+const OTP_DOPPLER_REASON =
+  'synthetic-otp-unavailable: could not read E2E_PROD_OTP_CHECK_TOKEN from Doppler jovie-web/prd after 3 attempts (exit-7) — Doppler resolution failure, not a verified missing secret. Re-run the workflow.';
+const ROBOT_SKIP_REASON =
+  'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.';
+const WAITLIST_RESULT_FILES = [
+  {
+    name: 'synthetic-production-waitlist',
+    path: 'waitlist.json',
+    required: true,
+  },
+];
 
+// Waitlist canary report: a passing preflight leg plus one more leg.
+function waitlistReport(extraLegs) {
+  return {
+    fileSystem: createMemoryFileSystem({
+      'waitlist.json': JSON.stringify(
+        buildPlaywrightReport([
+          {
+            title: 'reads the production waitlist preflight receipt',
+            status: 'expected',
+          },
+          ...extraLegs,
+        ])
+      ),
+    }),
+  };
+}
+
+const OTP_SKIPPED_LEG = {
+  title: 'retains identity and proves waitlist suppression',
+  status: 'skipped',
+  annotation: OTP_SKIP_ANNOTATION,
+};
+
+const ROBOT_SKIPPED_TITLE =
+  'creates a profile, verifies dashboard/public profile, and cleans up';
+
+function passingSyntheticFiles() {
+  const report = JSON.stringify(
+    buildPlaywrightReport([{ title: 'shows SSO buttons', status: 'expected' }])
+  );
+  return {
+    'apps/web/test-results/synthetic-auth-ui-results.json': report,
+    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
+      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
+    ),
+    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
+      buildPlaywrightReport([
+        { title: 'renders public profile', status: 'expected' },
+      ])
+    ),
+  };
+}
+
+const REQUIRED_SYNTHETIC_FILES = [
+  'synthetic-auth-ui',
+  'synthetic-golden-path',
+  'onboarding-robot-full',
+  'public-profile-smoke',
+].map(name => ({
+  name,
+  path: `apps/web/test-results/${name}-results.json`,
+  required: true,
+}));
+
+test('resolveSyntheticTestStatus treats optional skips without unexpected failures as passed', () => {
   assert.equal(
     resolveSyntheticTestStatus({
-      tests,
+      tests: [{}, {}],
       missingResults: [],
-      passed,
-      skipped,
+      passed: [{}],
+      skipped: [{}],
       requiredSkipped: [],
       failed: [],
     }),
@@ -55,26 +129,21 @@ test('resolveSyntheticTestStatus treats optional skips without unexpected failur
 });
 
 test('resolveSyntheticTestStatus fails only on unexpected failures', () => {
-  const tests = [{}, {}, {}];
-  const passed = [{}];
-  const skipped = [{}];
-  const failed = [{}];
-
   assert.equal(
     resolveSyntheticTestStatus({
-      tests,
+      tests: [{}, {}, {}],
       missingResults: [],
-      passed,
-      skipped,
+      passed: [{}],
+      skipped: [{}],
       requiredSkipped: [],
-      failed,
+      failed: [{}],
     }),
     'failed'
   );
 });
 
 test('classifySyntheticTests distinguishes skipped results from unexpected failures', () => {
-  const tests = [
+  const classification = classifySyntheticTests([
     {
       source: 'onboarding-robot-full',
       spec: { title: 'creates a profile' },
@@ -90,9 +159,7 @@ test('classifySyntheticTests distinguishes skipped results from unexpected failu
       spec: { title: 'shows SSO buttons' },
       testCase: { status: 'unexpected', results: [{ status: 'failed' }] },
     },
-  ];
-
-  const classification = classifySyntheticTests(tests);
+  ]);
 
   assert.equal(classification.skipped.length, 1);
   assert.equal(classification.failed.length, 1);
@@ -100,60 +167,19 @@ test('classifySyntheticTests distinguishes skipped results from unexpected failu
 });
 
 test('parseSyntheticTestResults fails closed when a required suite is skipped', () => {
-  const fileSystem = createMemoryFileSystem({
-    'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'shows SSO buttons', status: 'expected' },
-      ])
-    ),
-    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
-    ),
-    'apps/web/test-results/onboarding-robot-full-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        {
-          title:
-            'creates a profile, verifies dashboard/public profile, and cleans up',
-          status: 'skipped',
-        },
-      ])
-    ),
-    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'renders public profile', status: 'expected' },
-      ])
-    ),
-  });
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/synthetic-golden-path-results.json'] =
+    files['apps/web/test-results/synthetic-auth-ui-results.json'];
+  files['apps/web/test-results/onboarding-robot-full-results.json'] =
+    JSON.stringify(
+      buildPlaywrightReport([{ title: ROBOT_SKIPPED_TITLE, status: 'skipped' }])
+    );
+  files['apps/web/test-results/public-profile-smoke-results.json'] =
+    files['apps/web/test-results/synthetic-auth-ui-results.json'];
 
   const result = parseSyntheticTestResults({
-    resultFiles: [
-      {
-        name: 'synthetic-auth-ui',
-        path: 'apps/web/test-results/synthetic-auth-ui-results.json',
-        required: true,
-      },
-      {
-        name: 'synthetic-golden-path',
-        path: 'apps/web/test-results/synthetic-golden-path-results.json',
-        required: true,
-      },
-      {
-        name: 'onboarding-robot-full',
-        path: 'apps/web/test-results/onboarding-robot-full-results.json',
-        required: true,
-      },
-      {
-        name: 'public-profile-smoke',
-        path: 'apps/web/test-results/public-profile-smoke-results.json',
-        required: true,
-      },
-      {
-        name: 'synthetic-legacy-otp',
-        path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
-        required: false,
-      },
-    ],
-    fileSystem,
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(files),
   });
 
   assert.equal(result.testStatus, 'failed');
@@ -162,20 +188,18 @@ test('parseSyntheticTestResults fails closed when a required suite is skipped', 
   assert.equal(result.skippedTests, 1);
   assert.deepEqual(result.failedTests, [
     'Skipped tests:',
-    'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up',
+    `onboarding-robot-full: ${ROBOT_SKIPPED_TITLE}`,
   ]);
 });
 
 test('parseSyntheticTestResults allows an optional suite to be skipped', () => {
-  const fileSystem = createMemoryFileSystem({
-    'optional.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'legacy probe', status: 'skipped' }])
-    ),
-  });
-
   const result = parseSyntheticTestResults({
     resultFiles: [{ name: 'optional', path: 'optional.json', required: false }],
-    fileSystem,
+    fileSystem: createMemoryFileSystem({
+      'optional.json': JSON.stringify(
+        buildPlaywrightReport([{ title: 'legacy probe', status: 'skipped' }])
+      ),
+    }),
   });
 
   assert.equal(result.testStatus, 'passed');
@@ -183,23 +207,17 @@ test('parseSyntheticTestResults allows an optional suite to be skipped', () => {
 });
 
 test('parseSyntheticTestResults fails when one required report contains zero tests', () => {
-  const fileSystem = createMemoryFileSystem({
-    'passing.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'healthy probe', status: 'expected' }])
-    ),
-    'empty-required.json': JSON.stringify({ suites: [] }),
-  });
-
   const result = parseSyntheticTestResults({
     resultFiles: [
       { name: 'passing', path: 'passing.json', required: true },
-      {
-        name: 'empty-required',
-        path: 'empty-required.json',
-        required: true,
-      },
+      { name: 'empty-required', path: 'empty-required.json', required: true },
     ],
-    fileSystem,
+    fileSystem: createMemoryFileSystem({
+      'passing.json': JSON.stringify(
+        buildPlaywrightReport([{ title: 'healthy probe', status: 'expected' }])
+      ),
+      'empty-required.json': JSON.stringify({ suites: [] }),
+    }),
   });
 
   assert.equal(result.testStatus, 'error');
@@ -209,169 +227,60 @@ test('parseSyntheticTestResults fails when one required report contains zero tes
 });
 
 test('parseSyntheticTestResults fails when any suite reports unexpected failures', () => {
-  const fileSystem = createMemoryFileSystem({
-    'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/synthetic-auth-ui-results.json'] =
+    JSON.stringify(
       buildPlaywrightReport([
         { title: 'shows SSO buttons', status: 'unexpected' },
       ])
-    ),
-    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
-    ),
-    'apps/web/test-results/onboarding-robot-full-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        {
-          title:
-            'creates a profile, verifies dashboard/public profile, and cleans up',
-          status: 'skipped',
-        },
-      ])
-    ),
-    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'renders public profile', status: 'expected' },
-      ])
-    ),
-  });
+    );
+  files['apps/web/test-results/onboarding-robot-full-results.json'] =
+    JSON.stringify(
+      buildPlaywrightReport([{ title: ROBOT_SKIPPED_TITLE, status: 'skipped' }])
+    );
+  files['apps/web/test-results/public-profile-smoke-results.json'] = files[
+    'apps/web/test-results/synthetic-auth-ui-results.json'
+  ].replace('unexpected', 'expected');
 
   const result = parseSyntheticTestResults({
-    resultFiles: [
-      {
-        name: 'synthetic-auth-ui',
-        path: 'apps/web/test-results/synthetic-auth-ui-results.json',
-        required: true,
-      },
-      {
-        name: 'synthetic-golden-path',
-        path: 'apps/web/test-results/synthetic-golden-path-results.json',
-        required: true,
-      },
-      {
-        name: 'onboarding-robot-full',
-        path: 'apps/web/test-results/onboarding-robot-full-results.json',
-        required: true,
-      },
-      {
-        name: 'public-profile-smoke',
-        path: 'apps/web/test-results/public-profile-smoke-results.json',
-        required: true,
-      },
-    ],
-    fileSystem,
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(files),
   });
 
   assert.equal(result.testStatus, 'failed');
   assert.deepEqual(result.failedTests, [
     'synthetic-auth-ui: shows SSO buttons',
     'Skipped tests:',
-    'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up',
+    `onboarding-robot-full: ${ROBOT_SKIPPED_TITLE}`,
   ]);
 });
 
 test('parseSyntheticTestResults ignores optional legacy OTP results when absent', () => {
-  const fileSystem = createMemoryFileSystem({
-    'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/onboarding-robot-full-results.json'] =
+    JSON.stringify(
       buildPlaywrightReport([
-        { title: 'shows SSO buttons', status: 'expected' },
+        { title: ROBOT_SKIPPED_TITLE, status: 'expected' },
       ])
-    ),
-    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
-    ),
-    'apps/web/test-results/onboarding-robot-full-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        {
-          title:
-            'creates a profile, verifies dashboard/public profile, and cleans up',
-          status: 'expected',
-        },
-      ])
-    ),
-    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'renders public profile', status: 'expected' },
-      ])
-    ),
-  });
+    );
+  files['apps/web/test-results/public-profile-smoke-results.json'] =
+    files['apps/web/test-results/synthetic-auth-ui-results.json'];
 
   const result = parseSyntheticTestResults({
     resultFiles: [
-      {
-        name: 'synthetic-auth-ui',
-        path: 'apps/web/test-results/synthetic-auth-ui-results.json',
-        required: true,
-      },
-      {
-        name: 'synthetic-golden-path',
-        path: 'apps/web/test-results/synthetic-golden-path-results.json',
-        required: true,
-      },
-      {
-        name: 'onboarding-robot-full',
-        path: 'apps/web/test-results/onboarding-robot-full-results.json',
-        required: true,
-      },
-      {
-        name: 'public-profile-smoke',
-        path: 'apps/web/test-results/public-profile-smoke-results.json',
-        required: true,
-      },
+      ...REQUIRED_SYNTHETIC_FILES,
       {
         name: 'synthetic-legacy-otp',
         path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
         required: false,
       },
     ],
-    fileSystem,
+    fileSystem: createMemoryFileSystem(files),
   });
 
   assert.equal(result.testStatus, 'passed');
   assert.equal(result.totalTests, 4);
 });
-
-const ROBOT_SKIP_REASON =
-  'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.';
-
-function passingSyntheticFiles() {
-  return {
-    'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'shows SSO buttons', status: 'expected' },
-      ])
-    ),
-    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
-      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
-    ),
-    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
-      buildPlaywrightReport([
-        { title: 'renders public profile', status: 'expected' },
-      ])
-    ),
-  };
-}
-
-const REQUIRED_SYNTHETIC_FILES = [
-  {
-    name: 'synthetic-auth-ui',
-    path: 'apps/web/test-results/synthetic-auth-ui-results.json',
-    required: true,
-  },
-  {
-    name: 'synthetic-golden-path',
-    path: 'apps/web/test-results/synthetic-golden-path-results.json',
-    required: true,
-  },
-  {
-    name: 'onboarding-robot-full',
-    path: 'apps/web/test-results/onboarding-robot-full-results.json',
-    required: true,
-  },
-  {
-    name: 'public-profile-smoke',
-    path: 'apps/web/test-results/public-profile-smoke-results.json',
-    required: true,
-  },
-];
 
 test('parseSyntheticTestResults records a missing production robot as a warning', () => {
   const result = parseSyntheticTestResults({
@@ -419,14 +328,10 @@ test('parseSyntheticTestResults keeps an unmarked robot skip as a failure', () =
   const files = passingSyntheticFiles();
   files['apps/web/test-results/onboarding-robot-full-results.json'] =
     JSON.stringify(
-      buildPlaywrightReport([
-        {
-          title:
-            'creates a profile, verifies dashboard/public profile, and cleans up',
-          status: 'skipped',
-        },
-      ])
+      buildPlaywrightReport([{ title: ROBOT_SKIPPED_TITLE, status: 'skipped' }])
     );
+  files['apps/web/test-results/public-profile-smoke-results.json'] =
+    files['apps/web/test-results/synthetic-auth-ui-results.json'];
 
   const result = parseSyntheticTestResults({
     resultFiles: REQUIRED_SYNTHETIC_FILES,
@@ -437,7 +342,7 @@ test('parseSyntheticTestResults keeps an unmarked robot skip as a failure', () =
   assert.equal(result.testStatus, 'failed');
   assert.equal(
     result.failedTests.includes(
-      'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up'
+      `onboarding-robot-full: ${ROBOT_SKIPPED_TITLE}`
     ),
     true
   );
@@ -446,27 +351,17 @@ test('parseSyntheticTestResults keeps an unmarked robot skip as a failure', () =
 test('parseSyntheticTestResults records a marked robot skip annotation as a warning', () => {
   const files = passingSyntheticFiles();
   files['apps/web/test-results/onboarding-robot-full-results.json'] =
-    JSON.stringify({
-      suites: [
+    JSON.stringify(
+      buildPlaywrightReport([
         {
-          specs: [
-            {
-              title:
-                'creates a profile, verifies dashboard/public profile, and cleans up',
-              tests: [
-                {
-                  status: 'skipped',
-                  annotations: [
-                    { type: 'skip', description: ROBOT_SKIP_REASON },
-                  ],
-                  results: [],
-                },
-              ],
-            },
-          ],
+          title: ROBOT_SKIPPED_TITLE,
+          status: 'skipped',
+          annotation: ROBOT_SKIP_REASON,
         },
-      ],
-    });
+      ])
+    );
+  files['apps/web/test-results/public-profile-smoke-results.json'] =
+    files['apps/web/test-results/synthetic-auth-ui-results.json'];
 
   const result = parseSyntheticTestResults({
     resultFiles: REQUIRED_SYNTHETIC_FILES,
@@ -520,56 +415,19 @@ test('parseSyntheticTestResults rejects the old not-implemented robot reason', (
 });
 
 test('parseSyntheticTestResults keeps a logged OTP skip from failing a required suite', () => {
-  const reason =
-    'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
-  const fileSystem = createMemoryFileSystem({
-    'waitlist.json': JSON.stringify({
-      suites: [
-        {
-          specs: [
-            {
-              title: 'reads the production waitlist preflight receipt',
-              tests: [
-                {
-                  status: 'expected',
-                  results: [{ status: 'passed' }],
-                },
-              ],
-            },
-            {
-              title: 'retains identity and proves waitlist suppression',
-              tests: [
-                {
-                  status: 'skipped',
-                  annotations: [{ type: 'skip', description: reason }],
-                  results: [],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
   const result = parseSyntheticTestResults({
     resultFiles: [
-      {
-        name: 'synthetic-golden-path',
-        path: 'waitlist.json',
-        required: true,
-      },
+      { name: 'synthetic-golden-path', path: 'waitlist.json', required: true },
     ],
-    fileSystem,
-    otpSkipReason:
-      'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',
+    ...waitlistReport([OTP_SKIPPED_LEG]),
+    otpSkipReason: OTP_RESOLVER_REASON,
   });
 
   assert.equal(result.testStatus, 'passed');
   assert.equal(result.passedTests, 1);
   assert.equal(result.skippedTests, 1);
   assert.equal(
-    result.testWarnings.some(warning => warning.includes(reason)),
+    result.testWarnings.some(warning => warning.includes(OTP_SKIP_ANNOTATION)),
     true
   );
   assert.equal(
@@ -580,58 +438,34 @@ test('parseSyntheticTestResults keeps a logged OTP skip from failing a required 
   );
 });
 
-test('parseSyntheticTestResults fails the waitlist canary when its signup leg is skipped', () => {
-  const reason =
-    'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
-  const fileSystem = createMemoryFileSystem({
-    'waitlist.json': JSON.stringify({
-      suites: [
-        {
-          specs: [
-            {
-              title: 'reads the production waitlist preflight receipt',
-              tests: [
-                {
-                  status: 'expected',
-                  results: [{ status: 'passed' }],
-                },
-              ],
-            },
-            {
-              title: 'retains identity and proves waitlist suppression',
-              tests: [
-                {
-                  status: 'skipped',
-                  annotations: [{ type: 'skip', description: reason }],
-                  results: [],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
+test('parseSyntheticTestResults treats a resolver-verified missing-OTP waitlist skip as missing-config, not a failure (JOV-7656)', () => {
   const result = parseSyntheticTestResults({
-    resultFiles: [
-      {
-        name: 'synthetic-production-waitlist',
-        path: 'waitlist.json',
-        required: true,
-      },
-    ],
-    fileSystem,
-    otpSkipReason:
-      'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',
+    resultFiles: WAITLIST_RESULT_FILES,
+    ...waitlistReport([OTP_SKIPPED_LEG]),
+    otpSkipReason: OTP_RESOLVER_REASON,
   });
 
-  // A skip here means the waitlist path was never exercised: loud, not green.
-  assert.equal(result.testStatus, 'failed');
+  // Same class as the robot skip: Tim-only secrets verified absent is a named
+  // missing-config state, reported visibly, not a red run.
+  assert.equal(result.testStatus, 'passed');
   assert.equal(result.passedTests, 1);
   assert.equal(result.skippedTests, 1);
+  assert.deepEqual(result.failedTests, [
+    'Skipped tests:',
+    `synthetic-production-waitlist: retains identity and proves waitlist suppression (skip reason: ${OTP_SKIP_ANNOTATION})`,
+  ]);
   assert.equal(
-    result.testWarnings.some(warning => warning.includes(reason)),
+    result.testWarnings.some(warning =>
+      warning.includes(
+        'synthetic-production-waitlist: retains identity and proves waitlist suppression'
+      )
+    ),
+    true
+  );
+  assert.equal(
+    result.testWarnings.some(warning =>
+      warning.includes('synthetic-otp-unavailable')
+    ),
     true
   );
   assert.equal(
@@ -640,11 +474,138 @@ test('parseSyntheticTestResults fails the waitlist canary when its signup leg is
     ),
     true
   );
+});
+
+test('parseSyntheticTestResults keeps a waitlist OTP-marked skip red without resolver corroboration (JOV-7656)', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: WAITLIST_RESULT_FILES,
+    ...waitlistReport([OTP_SKIPPED_LEG]),
+    otpSkipReason: '',
+  });
+
+  // The marker alone is not a pass: the resolver must verify the secrets are
+  // absent. With no corroboration the skip stays loud.
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.includes(
+      `synthetic-production-waitlist: retains identity and proves waitlist suppression (skip reason: ${OTP_SKIP_ANNOTATION})`
+    ),
+    `failedTests should carry the skip reason inline, got: ${JSON.stringify(result.failedTests)}`
+  );
+});
+
+test('parseSyntheticTestResults keeps a real waitlist failure red even when another leg skips for missing OTP config (JOV-7656)', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: WAITLIST_RESULT_FILES,
+    ...waitlistReport([
+      {
+        title: 'reads the production waitlist preflight receipt',
+        status: 'unexpected',
+      },
+      OTP_SKIPPED_LEG,
+    ]),
+    otpSkipReason: OTP_RESOLVER_REASON,
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.deepEqual(result.failedTests, [
+    'synthetic-production-waitlist: reads the production waitlist preflight receipt',
+    'Skipped tests:',
+    `synthetic-production-waitlist: retains identity and proves waitlist suppression (skip reason: ${OTP_SKIP_ANNOTATION})`,
+  ]);
+});
+
+test('a Doppler read failure is reported as the skip cause, not as missing secrets (JOV-6813)', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: WAITLIST_RESULT_FILES,
+    ...waitlistReport([OTP_SKIPPED_LEG]),
+    otpSkipReason: OTP_DOPPLER_REASON,
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.some(line =>
+      line.startsWith(
+        'Skip cause: synthetic-otp-unavailable: could not read E2E_PROD_OTP_CHECK_TOKEN'
+      )
+    ),
+    'the resolution-failure cause must reach failed_tests'
+  );
+  assert.ok(
+    result.failedTests.every(
+      line =>
+        !line.startsWith(
+          'Skip cause: Skipping OTP-dependent synthetic steps: missing'
+        )
+    ),
+    'the misleading "missing secrets" wording must not be the reported cause'
+  );
+  // JOV-6813: a failing skip still names its cause inline.
+  assert.ok(
+    result.failedTests.includes(
+      `synthetic-production-waitlist: retains identity and proves waitlist suppression (skip reason: ${OTP_SKIP_ANNOTATION})`
+    ),
+    `failedTests should carry the skip reason inline, got: ${JSON.stringify(result.failedTests)}`
+  );
+});
+
+test('an unrelated required skip is not attributed to OTP configuration', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: WAITLIST_RESULT_FILES,
+    fileSystem: createMemoryFileSystem({
+      'waitlist.json': JSON.stringify(
+        buildPlaywrightReport([
+          { title: 'other prerequisite', status: 'skipped' },
+        ])
+      ),
+    }),
+    otpSkipReason: 'synthetic-otp-unavailable: unrelated OTP read failure',
+  });
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.includes(
+      'synthetic-production-waitlist: other prerequisite'
+    )
+  );
+  assert.equal(
+    result.failedTests.some(line => line.startsWith('Skip cause:')),
+    false
+  );
+});
+
+test('OTP cause is retained when an OTP marker follows another annotation', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: WAITLIST_RESULT_FILES,
+    fileSystem: createMemoryFileSystem({
+      'waitlist.json': JSON.stringify({
+        suites: [
+          {
+            specs: [
+              {
+                title: 'mixed reasons',
+                tests: [
+                  {
+                    status: 'skipped',
+                    annotations: [
+                      { description: 'synthetic-robot-auth-unavailable' },
+                      { description: 'synthetic-otp-unavailable' },
+                    ],
+                    results: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    }),
+    otpSkipReason: 'authoritative OTP cause',
+  });
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(result.failedTests.includes('Skip cause: authoritative OTP cause'));
 });
 
 test('formatGithubOutput emits a JSON-safe failed_tests_slack line', () => {
-  const { formatGithubOutput } = require('./parse-synthetic-test-results');
-
   const output = formatGithubOutput({
     totalTests: 2,
     passedTests: 0,

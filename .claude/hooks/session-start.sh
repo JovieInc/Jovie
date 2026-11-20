@@ -13,7 +13,16 @@ echo "  Jovie Development Environment Setup"
 echo "=============================================="
 echo ""
 
-# 0. CRITICAL: Verify Node.js version FIRST
+# 0. Put the repo's pinned Node first on PATH, fetching it when the session
+# started on another one, so no check runs on the wrong Node.
+if [ -f "$PROJECT_DIR/scripts/lib/setup-worktree-health.sh" ]; then
+  . "$PROJECT_DIR/scripts/lib/setup-worktree-health.sh"
+  if ! jovie_setup_ensure_pinned_node "$PROJECT_DIR"; then
+    echo "ERROR: could not fetch Node $(cat "$PROJECT_DIR/.nvmrc") from nodejs.org."
+  fi
+fi
+
+# 0.1. Verify Node.js version
 REQUIRED_NODE_MAJOR=$(cat "$PROJECT_DIR/.nvmrc" 2>/dev/null | cut -d. -f1)
 REQUIRED_NODE_MAJOR="${REQUIRED_NODE_MAJOR:-24}"
 CURRENT_NODE_VERSION=$(node --version 2>/dev/null || echo "not found")
@@ -29,7 +38,7 @@ if [ "$CURRENT_NODE_VERSION" = "not found" ]; then
 fi
 
 if [ "$CURRENT_NODE_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
-  echo "WARNING: Wrong Node.js version detected!"
+  echo "ERROR: Wrong Node.js version detected! Checks run on it will not match CI."
   echo ""
   echo "  Current:  $CURRENT_NODE_VERSION"
   echo "  Required: v${REQUIRED_NODE_MAJOR}.x"
@@ -51,7 +60,12 @@ if [ -x "$PROJECT_DIR/scripts/setup.sh" ]; then
   # fingerprint matches and Node/pnpm pins are ok). Cold/stale worktrees
   # still run the full bootstrap.
   echo "Running ./scripts/setup.sh to normalize this worktree..."
-  "$PROJECT_DIR/scripts/setup.sh"
+  # A cloud session cannot install every laptop tool (Doppler, for one), and
+  # setup.sh exits 1 on any missing one. Keep going, so dependencies and the
+  # Playwright browser below still get set up.
+  if ! "$PROJECT_DIR/scripts/setup.sh"; then
+    echo "WARNING: scripts/setup.sh reported missing tools (listed above); continuing."
+  fi
 fi
 
 # 0.5. Verify GitHub CLI availability
@@ -64,22 +78,22 @@ else
   echo "GitHub CLI already installed."
 fi
 
-# 1. Install dependencies if node_modules is missing or empty
+# 1. Install dependencies if node_modules is still missing or empty (setup.sh
+# above normally installs them). Same frozen install as setup.sh and the Codex
+# Cloud lane (JOV-12623): the pnpm version comes from package.json's
+# packageManager pin, and pnpm-lock.yaml is never rewritten.
 if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   echo "Installing dependencies (this may take a moment on first run)..."
-
-  # Check if pnpm is available
-  if ! command -v pnpm &> /dev/null; then
-    echo "Installing pnpm..."
-    corepack enable 2>/dev/null
-    corepack prepare pnpm@9.15.9 --activate
-  fi
-
-  # Install with frozen lockfile for reproducibility
-  pnpm install --frozen-lockfile
+  node "$PROJECT_DIR/scripts/codex-cloud-setup.mjs" install
   echo "Dependencies installed."
 else
   echo "Dependencies already installed."
+fi
+
+# 1.5. Playwright Chromium (cloud sessions): ready it for screenshots and e2e,
+# or say why it cannot be, before work that needs it starts.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && command -v jovie_setup_playwright_chromium >/dev/null 2>&1; then
+  jovie_setup_playwright_chromium "$PROJECT_DIR"
 fi
 
 # 2. Make hook scripts executable
@@ -108,24 +122,28 @@ PNPM_VER=$(pnpm --version 2>/dev/null || echo 'not found')
 # Check if versions match requirements
 NODE_OK="[OK]"
 PNPM_OK="[OK]"
+REQUIRED_PNPM="not pinned"
+if command -v jovie_setup_required_pnpm >/dev/null 2>&1; then
+  REQUIRED_PNPM="$(jovie_setup_required_pnpm "$PROJECT_DIR" || echo 'not pinned')"
+fi
 if [ "$(echo "$NODE_VER" | sed 's/v\([0-9]*\).*/\1/')" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
   NODE_OK="[WRONG - need v${REQUIRED_NODE_MAJOR}+]"
 fi
-if [ "$PNPM_VER" != "9.15.9" ] && [ "$PNPM_VER" != "not found" ]; then
-  PNPM_OK="[WRONG - need 9.15.9]"
+if [ "$PNPM_VER" != "$REQUIRED_PNPM" ] && [ "$PNPM_VER" != "not found" ]; then
+  PNPM_OK="[WRONG - need $REQUIRED_PNPM (package.json packageManager)]"
 fi
 
 echo "  Node.js: $NODE_VER $NODE_OK"
 echo "  pnpm:    $PNPM_VER $PNPM_OK"
 echo "  jq:      $(jq --version 2>/dev/null || echo 'not installed (hooks will use fallbacks)')"
 echo "  gh CLI:  $(gh --version 2>/dev/null | head -1 || echo 'not installed')"
-echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install first')"
+echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install --offline --frozen-lockfile first')"
 
 # 4. Check for node_modules/.bin in PATH
 if [ -d "node_modules/.bin" ]; then
   echo "  Binaries: available"
 else
-  echo "  Binaries: not found (run pnpm install)"
+  echo "  Binaries: not found (run pnpm install --offline --frozen-lockfile)"
 fi
 
 echo ""

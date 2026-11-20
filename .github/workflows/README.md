@@ -142,7 +142,7 @@ in-flight/legacy daily run (bounded to 11 reads per pass).
 ## Neon Database
 
 - **Ephemeral branches** - Created only by manual dispatch or scheduled evidence lanes (never automatically per PR) as explicit, expiring exceptions carrying the `jovie-preview-env-admission/v1` contract (JOV-5941; registry: `.github/preview-env-registry.json`)
-- **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt; the daily `neon-scheduled-cleanup.yml` heartbeat reconciles missed cleanup events
+- **Cleanup** - every created branch carries a Neon-enforced TTL (`expires_in_hours`), branch creation runs `.github/actions/neon-branch-cleanup` when the project nears its branch limit, and the manual `neon-scheduled-cleanup.yml` reconciliation pass emits a `jovie-preview-env-cleanup/v1` receipt
 - **Protected branch** - `main` is the production database branch
 
 ## Hosted Previews
@@ -187,7 +187,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Visual Snapshot Compare (homepage)` (merge-group), `Visual Snapshot Compare (marketing DOM)` (merge-group), `Visual Snapshot Compare (marketing routes)` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
@@ -210,6 +210,9 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
 | `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (homepage)` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (marketing DOM)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=1 --retries=0 -g 'deliberate-red|certifies every marketing route'` |
+| `Visual Snapshot Compare (marketing routes)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=4 --retries=0` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |
@@ -242,21 +245,3 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
-
-## Internal PR Review (advisory)
-
-`internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
-CodeRabbit. On each non-draft PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
-hazards and violations of the scoped `.claude/rules` conventions for the
-changed paths (with capped base-branch call sites of changed exports, enclosing
-functions, scripts and flags), via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
-`AI_GATEWAY_API_KEY` secret — no new vendors). Drafts, Dependabot, `bot/*`
-report branches and docs-only diffs are skipped; `gh workflow run
-internal-review.yml -f pr_number=<n>` reviews one PR on demand.
-
-Non-blocking by construction: it is not a required check, never requests
-changes, and the script always exits 0 — a missing key, rate limit, or
-oversized diff degrades to an annotated comment, never merge delay. Merge
-correctness remains owned by the required gates above. It runs on
-`pull_request_target` against the trusted base ref; the PR diff is read through
-the GitHub API as data only, so no PR-controlled code executes.

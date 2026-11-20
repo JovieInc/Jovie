@@ -19,6 +19,20 @@ export function executorKinds(raw: string | undefined): Set<string> {
   );
 }
 
+/** Presence and a stand-in never certify the addressed agent's runtime. */
+export function runtimeStatus(
+  kind: string,
+  env: { AI?: unknown; EXECUTOR_KINDS?: string }
+) {
+  return {
+    canHandle: false,
+    runtimeVerification: 'unverified' as const,
+    executorAvailable: Boolean(
+      env.AI && executorKinds(env.EXECUTOR_KINDS).has(kind)
+    ),
+  };
+}
+
 /** Executor only takes real peer tasks: never replies, hub wrappers, probes or itself. */
 export function isExecutable(message: {
   from: string;

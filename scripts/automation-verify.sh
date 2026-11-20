@@ -10,7 +10,12 @@ if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
   exit 1
 fi
 if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  # Same as pre-push-gate.sh: pin node without replacing pnpm on PATH.
+  NODE_ONLY="$(mktemp -d "${TMPDIR:-/tmp}/jovie-node.XXXXXX")"
+  ln -s "$RESOLVED_NODE_BIN/node" "$NODE_ONLY/node"
+  trap 'rm -rf "$NODE_ONLY"' EXIT
   echo "[automation-verify] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  RESOLVED_NODE_BIN="$NODE_ONLY"
   export PATH="$RESOLVED_NODE_BIN:$PATH"
 fi
 
@@ -18,10 +23,23 @@ case "$SCOPE" in
   affected)
     echo "[automation-verify] Running affected verify bundle"
     BASE_REF="${AUTOMATION_VERIFY_BASE:-origin/main}"
-    if ! git rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
-      echo "[automation-verify] Cannot resolve affected-test base: ${BASE_REF}" >&2
+    # Resolve at the consumer boundary: pool-local main may be stale. Keep
+    # qualified refs intact and pin the commit for every downstream diff.
+    if ! BASE_REF="$(node --input-type=module - "$BASE_REF" <<'NODE'
+import { execFileSync } from 'node:child_process';
+import { baseRefCandidates, resolveBaseRef } from './scripts/lib/git-base-ref.mjs';
+const requested = process.argv[2];
+const base = resolveBaseRef(process.cwd(), requested);
+if (!base) {
+  console.error(`[automation-verify] Cannot resolve affected-test base: ${requested} (tried ${baseRefCandidates(requested).join(', ')})`);
+  process.exit(1);
+}
+console.log(execFileSync('git', ['rev-parse', '--verify', `${base}^{commit}`], { encoding: 'utf8' }).trim());
+NODE
+)"; then
       exit 1
     fi
+    export TURBO_SCM_BASE="$BASE_REF"
     node scripts/turbo-local.mjs typecheck --affected
     # Turbo packages do not cover the scripts/ tree; Source Validation checks it
     # separately. Run the same ratchet here when scripts/ changed so a new type

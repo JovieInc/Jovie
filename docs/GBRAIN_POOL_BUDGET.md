@@ -83,4 +83,4 @@ Steady-state connections should stay well under tier cap; no long-lived
 - GitHub issue: [JovieInc/Jovie#10815](https://github.com/JovieInc/Jovie/issues/10815)
 - Linear: [JOV-3123](https://linear.app/jovie/issue/JOV-3123)
 - gbrain upstream env docs: `GBRAIN_POOL_SIZE` in garrytan/gbrain `src/core/db.ts`
-- Hermes-Air (PGLite): [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
+- Mac lane: the Air does not run a gbrain server. Contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md).

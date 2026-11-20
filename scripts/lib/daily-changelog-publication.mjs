@@ -11,6 +11,7 @@ import {
   processedDailySourceIds,
   renderDailyDigest,
 } from './daily-changelog.mjs';
+import { hasRequiredAuthSmoke } from './daily-changelog-evidence.mjs';
 
 export const NOTE_SCHEMA = 'customer-changelog/v1';
 const NOTE_RE = /<!--\s*customer-changelog\/v1\s+([\s\S]*?)\s*-->/g;
@@ -20,7 +21,6 @@ const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Removed']);
 let permalinkMigrations;
-
 function readPermalinkMigrations() {
   permalinkMigrations ??= JSON.parse(
     readFileSync(
@@ -343,7 +343,7 @@ export function assertPublicationBinding(marker, buildInfo, controller) {
   if (
     !SHA_RE.test(marker?.sha ?? '') ||
     !['promoted', 'skipped_superseded'].includes(marker?.terminalReason) ||
-    marker?.authSmoke !== 'passed' ||
+    !hasRequiredAuthSmoke(marker) ||
     !marker?.deploymentId ||
     buildInfo?.environment !== 'production' ||
     controller?.verified !== true ||

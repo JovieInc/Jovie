@@ -37,10 +37,11 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context           | Source PR                                                                                                                | Native `merge_group`                                                                                                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, ten affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
+| `PR Ready`        | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, 14 web unit shards + `packages/ui`, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock; emits `Merge Suite Scope / full_web_units` so main may skip duplicate lanes (JOV-10687). An `ordinary_admission` scope must not authorize that skip. |
 | `Migration Guard` | Path-gated migration policy                                                                                              | Re-emitted and evaluated on the combined head                                                                                                                                        |
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
+| `Company guards`  | Shared company guard suite (size baselines, canon guards)                                                                | Runs on merge_group, so queue entries report it directly                                                                                                                             |
 
 ### GITHUB_TOKEN budget per group
 
@@ -76,6 +77,46 @@ post-merge/nightly;
 the fast diff secret scan gates source and combined heads.
 The full iOS simulator UI and screenshot regression runs only for an authorized
 iOS TestFlight generation and must pass before upload.
+
+## Queue parity: the queue is a re-check, not a first check
+
+The queue exists to catch one thing: two green PRs that break each other. So:
+
+1. Every job the queue requires (the job behind each required context on
+   `merge_group`, plus its transitive `needs` that can run there) has a job
+   required on `pull_request` that runs the same command, or a dated exemption.
+2. A job whose inputs are only the PR (diff size, body, labels, author,
+   approvals) does not run on `merge_group`. It stays required on the PR head.
+   Moving a check from the queue to the PR is fine only if it stays required on
+   the PR.
+
+`.github/merge-queue-parity.json` holds the classification:
+
+- `parity`: queue job to its required PR twin and the command both run. A job
+  required on both events (Company guards) needs no entry.
+- `exemptions`: queue jobs with no PR twin. `kind` is `combined-head` (only the
+  combined head can answer: admission, the combined dependency workspace, the
+  queue aggregate) or `gap` (a PR job should run it, today it does not). Each has
+  a reason, `createdOn` and `expiresOn`, at most 90 days apart.
+- `prOnlyInputs` and `prOnlyExemptions`: jobs that read only the PR, the PR job
+  that must stay required, and why one still runs in the queue.
+
+`scripts/ci-workflow-topology.test.mjs` (via `scripts/lib/queue-parity.mjs`)
+fails a PR that adds a queue-required job without a twin or an exemption, puts
+a PR-only job on the queue, leaves a stale entry, or names a shared command a
+job does not run. Expiry reads the newest `createdOn` in the file, not the wall
+clock, so a verdict depends only on the commit: adding an exemption fails on any
+older one that has lapsed. `CALENDAR_DEADLINE_SCAN=1` reads the real clock.
+
+To close a gap, make the PR run the command, move the entry to `parity`, and
+delete the exemption. Seeded 2026-11-11 with 7 combined-head jobs, 21 gaps
+(including the 14 web unit shards, Lighthouse and the visual snapshot compare)
+and 3 PR-only jobs in the queue. PR Fleet Rules left the queue first: it
+was never required, and its policy returned no verdict on a synthetic head.
+PR Size Guard stays for now: 41 of its 42 queue failures from 2026-11-04 to
+2026-11-11 were the combined-tree byte budget, which only the combined head can
+answer, and it also reads hold labels at admission. Only its per-member size cap
+is PR-only.
 
 ## Canonical native configuration
 
@@ -419,3 +460,39 @@ person or agent arming auto-merge by hand). When a parent merges,
 the parent's squash-merged commits, then dispatches green enroll's per-PR path
 for it, so admission (green head, holds, draft) stays in the single queue
 writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, PR Fleet Rules (fork PRs stay hosted) and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+- `RUNNER_SOURCE_VALIDATION`: the six Source Validation jobs except `PR Ready`. Fork PRs always stay on their hosted label. Gem has 5 slots (one job each) against Source Validation's ~26 average concurrent hosted jobs, so only flip this for a measured subset; compare per-job time before and after.
+
+Auto-Ready Drafts fleet controllers stay hosted to preserve their verified `gh` CLI contract.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
+
+### Marketing priority
+
+Apply `priority:marketing` to a marketing-page PR and its ready Linear issue.
+Green Enroll considers labeled PRs first in reconciliation and uses the existing
+bounded jump and relabel-jump path. Marketing and `compounding` entries share
+`MAX_JUMPED`, `JUMP_MAX_BUILD_S` and `JUMP_BATCH_S`; an active build or cap can
+defer a jump. The label never clears a hold or substitutes for current-head checks.
+
+Symphony admits ready labeled Backlog issues through the existing bounded
+priority replacement and protects them from low-priority displacement. Signed
+Summer portfolio ranks and explicit Linear Urgent remain ahead; marketing
+precedes other eligible work. Removing the label restores ordinary ordering.
+The mesh board still orders stuck-PR repairs before detector issues and goals;
+it does not interpret arbitrary task text as a priority grant. Existing admission
+timestamps and Green Enroll decision receipts measure the effect.
+
+Ship now: reuse the existing priority paths. Re-evaluate when marketing is
+cleared or jump-reset receipts show lost throughput. Then remove the label or
+adjust the existing bounded policy with measured evidence, retaining every gate.

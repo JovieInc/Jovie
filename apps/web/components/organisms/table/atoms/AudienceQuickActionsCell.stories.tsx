@@ -28,10 +28,10 @@ export const Default: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Export contact' })
+      canvas.getByRole('button', { name: 'Export Contact' })
     );
     await expect(args.onExport).toHaveBeenCalled();
-    await userEvent.click(canvas.getByRole('button', { name: 'Block member' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Block Member' }));
     await expect(args.onBlock).toHaveBeenCalled();
   },
 };

@@ -61,12 +61,9 @@ Production OV chat uses the same OIDC-protected Summer shadow channel:
 - Conversation turns expose no callable tools. Commercial shadow turns retain
   the read-only capability manifest, their existing limits and governance keys.
 
-These routes document source behavior, not commissioning proof. Summer remains
-unavailable until the exact deployment and conversation receipts in
-[`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](../../docs/operations/SUMMER_RUNTIME_RETIREMENT.md)
-pass.
-Hermes is retired and is not a rollback. Missing Eve proof leaves Summer
-unavailable.
+These routes document source behavior of this pilot. They are not the live
+Summer deployment. Live Summer is `JovieInc/summer-config` `apps/summer`.
+Hermes is retired and is not a rollback.
 
 ## Local verification
 

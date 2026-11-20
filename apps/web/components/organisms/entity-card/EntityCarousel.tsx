@@ -381,7 +381,7 @@ export function EntityCarousel({
             aria-label='Previous Card'
             disabled={currentIndex === 0}
             onClick={() => scrollToIndex(currentIndex - 1)}
-            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
+            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronLeft className='h-4 w-4' aria-hidden='true' />
           </button>
@@ -399,7 +399,7 @@ export function EntityCarousel({
                   aria-label={`Go to card ${index + 1}`}
                   aria-current={isCurrent ? 'true' : undefined}
                   onClick={() => scrollToIndex(index)}
-                  className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span
                     aria-hidden='true'
@@ -417,7 +417,7 @@ export function EntityCarousel({
             aria-label='Next Card'
             disabled={currentIndex === slotCount - 1}
             onClick={() => scrollToIndex(currentIndex + 1)}
-            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
+            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
           </button>

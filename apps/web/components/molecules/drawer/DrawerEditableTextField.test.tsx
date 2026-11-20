@@ -35,6 +35,9 @@ describe('DrawerEditableTextField', () => {
     // label-content-name-mismatch on the /product/isrc marketing capture.
     expect(trigger).not.toHaveAttribute('aria-label');
     expect(trigger).toHaveTextContent('QMT671400005');
+    // The sr-only prefix comes first so the accessible name still contains
+    // the visible value (WCAG 2.5.3 label-in-name).
+    expect(trigger).toHaveAccessibleName(/^Edit ISRC:/);
     fireEvent.click(trigger);
 
     const input = screen.getByLabelText('Edit ISRC');
@@ -125,5 +128,13 @@ describe('DrawerEditableTextField', () => {
     expect(actionSlot?.children).toHaveLength(2);
     expect(screen.queryByLabelText('Copy Spotify URL')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Open Spotify URL')).not.toBeInTheDocument();
+  });
+
+  it('renders the edit trigger through the design-system plain button', () => {
+    render(<DrawerEditableTextField label='Title' value='Nova' editable />);
+    expect(screen.getByRole('button', { name: /Nova/ })).toHaveAttribute(
+      'data-slot',
+      'plain-button'
+    );
   });
 });

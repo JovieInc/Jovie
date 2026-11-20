@@ -141,7 +141,9 @@ describe('ConnectorsClient', () => {
     renderClient();
     const activate = () =>
       act(() => {
-        screen.getByRole('button', { name: 'Connect Gmail' }).click();
+        screen
+          .getByRole('button', { name: /^Connect(?:ing…)? Gmail$/ })
+          .click();
       });
 
     activate();
@@ -196,7 +198,7 @@ describe('ConnectorsClient', () => {
       '/api/connectors/youtube/authorize?returnTo=%2Fapp%2Fov%2Fintegrations&creatorProfileId=22222222-2222-4222-8222-222222222222'
     );
     expect(
-      youtubeRow().getByRole('button', { name: 'Connect YouTube' })
+      youtubeRow().getByRole('button', { name: 'Connecting… YouTube' })
     ).toBeDisabled();
     expect(youtubeRow().getByText('Connecting…')).toBeInTheDocument();
   });
@@ -295,7 +297,9 @@ describe('ConnectorsClient', () => {
     );
 
     for (const provider of ['Gmail', 'Google Calendar', 'Spotify', 'YouTube']) {
-      expect(screen.getByText(provider)).toBeInTheDocument();
+      expect(
+        screen.getByText(provider, { ignore: '.sr-only' })
+      ).toBeInTheDocument();
     }
     expect(youtubeRow().getByText('Artist Channel')).toBeInTheDocument();
     await userEvent.click(youtubeRow().getByText('Details'));

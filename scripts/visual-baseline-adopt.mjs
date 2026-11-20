@@ -21,10 +21,10 @@ import {
   statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, join, relative, resolve } from 'node:path';
+import { refuseProtected } from './invariants/pen-diff-lib.mjs';
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = resolve(import.meta.dirname, '..');
 export const SNAPSHOT_ROOT = join(
   REPO_ROOT,
   'apps/web/tests/e2e/__snapshots__'
@@ -46,7 +46,7 @@ function walk(dir) {
  * Map each `<name>-actual.png` to the one committed baseline named
  * `<name>.png`. Ambiguous or unknown names are reported, never guessed.
  */
-export function planAdoption(actualPaths, baselinePaths) {
+export function planAdoption(actualPaths, baselinePaths, guard) {
   const byName = new Map();
   for (const path of baselinePaths) {
     const name = basename(path);
@@ -70,7 +70,7 @@ export function planAdoption(actualPaths, baselinePaths) {
           : `ambiguous baseline ${name}: ${matches.length} matches`
       );
   }
-  return { copies, problems };
+  return refuseProtected({ copies, problems }, guard);
 }
 
 function downloadArtifact(runId, artifactName) {
@@ -134,4 +134,4 @@ function main() {
   );
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] === import.meta.filename) main();

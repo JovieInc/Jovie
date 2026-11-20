@@ -32,3 +32,20 @@ export const Disabled: Story = {
     disabled: true,
   },
 };
+
+/**
+ * The consent banner in a right-to-left document: the three actions follow
+ * the reading direction, so Reject all sits at the inline start (right).
+ */
+export const Rtl: Story = {
+  args: {
+    compact: true,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-80'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -1,55 +1,26 @@
 #!/usr/bin/env node
-// api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
-// api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 import { spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
-import { requiresWin } from './lib/wins-ledger.mjs';
+import { shipIntent } from './lib/auto-ready-provenance.mjs';
+import { scrubPrText } from './lib/pr-prose.mjs';
 import {
-  evaluateFleetRules,
-  isLockedArea,
-  section,
-} from './pr-fleet-rules.mjs';
+  runGithub as gh,
+  publicationPriority,
+  recordPublication,
+} from './lib/pr-publication.mjs';
+import { wipGate } from './lib/pr-wip-gate.mjs';
+import { isRepairPr } from './lib/preflight-changed.mjs';
+import { requiresWin } from './lib/wins-ledger.mjs';
+import { gate, PR_URL_PLACEHOLDER } from './pr-body-lint.mjs';
+import { isLockedArea, section } from './pr-fleet-rules.mjs';
 
-const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
-
-export function proseOnly(body) {
-  let fence = '';
-  return body
-    .split('\n')
-    .map(line => {
-      const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence) {
-        if (
-          marker &&
-          marker[1][0] === fence[0] &&
-          marker[1].length >= fence.length
-        )
-          fence = '';
-        return '';
-      }
-      if (marker) {
-        fence = marker[1];
-        return '';
-      }
-      return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, '');
-    })
-    .join('\n');
-}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -110,6 +81,11 @@ export function evidenceFromBody(body = '') {
   const red = section(body, 'Red-before-green');
   return {
     metric,
+    metricAfter:
+      metric && parts[4] !== '' && Number.isFinite(Number(parts[4]))
+        ? parts[4]
+        : undefined,
+    verifyLink: value(win, 'Verify'),
     claim: value(win, 'Claim'),
     area: value(win, 'Area'),
     theme: value(win, 'Theme'),
@@ -175,7 +151,7 @@ function blastRadius(paths) {
 
 /** @param {{
  *   title: string, files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
- *   labels?: string[], summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
+ *   labels?: string[], summary?: string, metric?: string, metricAfter?: string, verifyLink?: string, claim?: string, area?: string, theme?: string,
  *   perMerge?: boolean, failingCommand?: string, failingRun?: string, customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
  * }} input */
 export function draftBody({
@@ -184,6 +160,8 @@ export function draftBody({
   labels = [],
   summary,
   metric,
+  metricAfter,
+  verifyLink,
   claim,
   area,
   theme,
@@ -209,7 +187,7 @@ export function draftBody({
     const parts = (metric ?? '').split('|').map(s => s.trim());
     const [name, unit, better, before, source, ...query] = parts;
     const line = metric
-      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ? | ${source} | ${query.join('|')}`
+      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ${metricAfter ?? '?'} | ${source} | ${query.join('|')}`
       : '';
     out.push(
       [
@@ -225,9 +203,9 @@ export function draftBody({
             .toLowerCase()
         }`,
         line,
-        `- Verify: ${prUrl}`,
+        `- Verify: ${verifyLink || prUrl}`,
         ...(perMerge ? ['- Per-merge: yes'] : []),
-        '- Pending: yes',
+        ...(metricAfter === undefined ? ['- Pending: yes'] : []),
       ].join('\n')
     );
   } else out.push('## Win\n\nn/a');
@@ -269,43 +247,12 @@ export function missingEvidence(input) {
   return needs;
 }
 
-export function gate({ title, body, labels = [], files, extra = [] }) {
-  const lint = lintPrBody({ body, title, labels, files, evaluateFleetRules });
-  const errors = [
-    ...lint.errors.map(e => e.message),
-    ...extra,
-    ...[...proseOnly(body).matchAll(/<[^<>\n]{3,}>/g)]
-      .map(m => m[0])
-      .filter(
-        t =>
-          t !== PR_URL_PLACEHOLDER &&
-          !/^<(?:!--|\/?(?:details|summary|br|hr|p|a|img|code|pre|kbd|sub|sup|b|i|em|strong|ul|ol|li|table|thead|tbody|tr|td|th|div|span)(?:\s[^>]*)?\/?>)/.test(
-            t
-          ) &&
-          !/^<https?:/.test(t)
-      )
-      .map(t => `placeholder: replace ${t} with real content`),
-  ];
-  return { errors, warnings: lint.warnings.map(w => w.message) };
-}
+/** The PR body gate lives in scripts/pr-body-lint.mjs (also `pnpm pr:body-lint`), so the local command and pr-open can never disagree. Re-exported for existing importers/tests. */
+export { gate };
 
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
 
-/** @type {Command} */
-const gh = (cwd, args, opts = {}) =>
-  spawnSync(
-    'node',
-    [
-      path.join(cwd, 'packages/api-client/cli.ts'),
-      'gh',
-      '--priority',
-      'default',
-      '--',
-      ...args,
-    ],
-    { cwd, encoding: 'utf8', ...opts }
-  );
 /** @type {Command} */
 const run = (cmd, args, opts = {}) =>
   spawnSync(cmd, args, { encoding: 'utf8', ...opts });
@@ -401,6 +348,8 @@ function parse(argv) {
     else if (f === '--summary') a.summary = v();
     else if (f === '--label') a.labels.push(v());
     else if (f === '--metric') a.metric = v();
+    else if (f === '--metric-after') a.metricAfter = v();
+    else if (f === '--verify-link') a.verifyLink = v();
     else if (f === '--claim') a.claim = v();
     else if (f === '--area') a.area = v();
     else if (f === '--theme') a.theme = v();
@@ -410,25 +359,20 @@ function parse(argv) {
     else if (f === '--failing-log') a.failingLogPath = v();
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
+    else if (f === '--ready') a.ready = true;
+    else if (f === '--auto-merge') a.autoMerge = true;
     else if (f === '--draft') a.draft = true;
+    else if (f === '--park') a.park = true;
+    else if (f === '--on-green') a.onGreen = true;
+    else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
+    else if (f === '--no-repair-reserve') a.noRepairReserve = true;
+    else if (f.startsWith('--no-repair-reserve='))
+      a.priorityError = '--no-repair-reserve takes no value';
     else if (!f.startsWith('--')) a.number = f;
   }
   return a;
-}
-
-function record(row) {
-  try {
-    const dir = path.join(homedir(), '.local/state/jovie-lanes');
-    mkdirSync(dir, { recursive: true });
-    appendFileSync(
-      path.join(dir, 'pr-open.jsonl'),
-      `${JSON.stringify({ at: new Date().toISOString(), ...row })}\n`
-    );
-  } catch {
-    /* metric write is best effort */
-  }
 }
 
 const PR_FIELDS =
@@ -579,11 +523,17 @@ export async function refreshBodyChecks(
       );
   };
   try {
-    // The second event carries the exact final body; no commits, pushes or reruns.
-    edit(
-      `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
-    );
-    edit(body);
+    // A changed body/title emits its own edited event, so one PATCH is one fresh
+    // flight. A byte-identical update emits none, so only it gets the marker
+    // round-trip (JOV-10354: an unconditional double PATCH doubled flights).
+    if (body === pr.body && title === pr.title) {
+      edit(
+        `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
+      );
+      edit(body);
+    } else {
+      edit(body);
+    }
     for (let attempt = 0; attempt < 5; attempt++) {
       const fresh = runs().filter(
         r =>
@@ -617,14 +567,19 @@ export async function main(
     execute = run,
     diagnose = console.error,
     pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+    record = recordPublication,
   } = {}
 ) {
   const a = parse(argv);
+  if (a.priorityError) {
+    log(`FAIL  priority: ${a.priorityError}`);
+    return 2;
+  }
   const git = (args, options = {}) =>
     execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
     log(
-      'usage: pr-open <draft|check|open|update N> [flags]; --failing-log PATH reads Vitest red evidence'
+      'usage: pr-open <draft|check|open|update N> [flags] (--ready, --auto-merge arm shipping after green gates); --failing-log PATH reads Vitest red evidence'
     );
     return 2;
   }
@@ -690,7 +645,7 @@ export async function main(
       }
     } else {
       const { changedFiles } = await import('./preflight-changed.mjs');
-      files = changedFiles(a.repo, a.base).files;
+      files = changedFiles(a.repo, baseRef).files;
       subjects = git(['log', '--format=%s', `origin/${a.base}..HEAD`])
         .stdout.trim()
         .split('\n')
@@ -704,7 +659,7 @@ export async function main(
             f.filename,
           ]).stdout;
     }
-    const title = a.title || pr?.title || subjects[0] || '';
+    const title = scrubPrText(a.title || pr?.title || subjects[0] || '');
     const labels = [
       ...new Set([
         ...(pr?.labels ?? []).map(l => (typeof l === 'string' ? l : l.name)),
@@ -721,6 +676,11 @@ export async function main(
           ? {}
           : evidenceFromBody(pr.body);
       }
+    }
+    // A replacement baseline needs its own after-value and verification source.
+    if (a.metric !== undefined) {
+      derived.metricAfter = undefined;
+      derived.verifyLink = undefined;
     }
     const input = {
       ...derived,
@@ -741,9 +701,10 @@ export async function main(
           ? `${title}\n\nChanges: ${commonDirectories(files.map(f => f.filename)).join(', ')}.`
           : subjects.join('; ') || undefined),
     };
-    const body = a.bodyFile
+    const raw = a.bodyFile
       ? readFileSync(a.bodyFile, 'utf8')
       : draftBody(input);
+    const body = scrubPrText(shipIntent(raw, a, pr?.body));
     const identity = a.number ? targetErrors(body, a.number, true) : [];
     const needs = a.bodyFile ? [] : missingEvidence(input);
     if (needs.length)
@@ -795,32 +756,100 @@ export async function main(
           'target: PR changed during preparation; run update again'
         );
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
-      return 0;
+      return armShipping(github, a, String(a.number), log);
     }
+    const { automaticPriority, priority: capacityPriority } =
+      publicationPriority({
+        title,
+        body,
+        labels,
+        files,
+        evidence: evidenceFromBody(body),
+        noRepairReserve: a.noRepairReserve,
+      });
+    record({
+      cmd: 'publication-priority',
+      automaticPriority,
+      priority: capacityPriority,
+      noRepairReserve: a.noRepairReserve === true,
+    });
+    const wip = wipGate(
+      { ...a, capacityPriority },
+      git(['branch', '--show-current']).stdout.trim(),
+      {
+        execute,
+        log,
+        record,
+      }
+    );
+    if (wip.refused) return wip.deferred ? 75 : 3;
+    if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');
       writeFileSync(bodyFile, body);
+      const branchResult = git(['branch', '--show-current']);
+      const branch = branchResult.stdout.trim();
+      const local = git(['rev-parse', 'HEAD']);
+      const expectedHead = local.stdout.trim();
+      if (
+        branchResult.status !== 0 ||
+        !branch ||
+        local.status !== 0 ||
+        !/^[0-9a-f]{40}$/.test(expectedHead)
+      )
+        throw new Error(
+          'publication-head: cannot resolve the intended branch and commit'
+        );
       if (!a.noPush) {
         const push = git(['push', '-u', 'origin', 'HEAD'], {
           stdio: 'inherit',
         });
         if (push.status !== 0) return push.status ?? 1;
       }
-      const made = github(a.repo, [
-        'pr',
-        'create',
-        '--repo',
-        REPOSITORY,
-        '--base',
-        a.base,
-        '--title',
-        title,
-        '--body-file',
-        bodyFile,
-        ...(a.draft ? ['--draft'] : []),
-        ...labels.flatMap(l => ['--label', l]),
-      ]);
+      // A narrow origin.fetch may not map this branch to @{upstream}: prove the
+      // remote head and name it; never re-push or bypass publication gates.
+      const remoteRef = `refs/heads/${branch}`;
+      const published = git(
+        ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
+        { timeout: 30_000 }
+      );
+      if (published.status !== 0)
+        throw new Error(
+          `publication-head: remote head unavailable for ${branch}`
+        );
+      const refs = published.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim().split(/\s+/));
+      if (
+        refs.length !== 1 ||
+        refs[0][0] !== expectedHead ||
+        refs[0][1] !== remoteRef
+      )
+        throw new Error(
+          `publication-head: remote head does not match the intended commit for ${branch}`
+        );
+      const made = github(
+        a.repo,
+        [
+          'pr',
+          'create',
+          '--head',
+          branch,
+          '--repo',
+          REPOSITORY,
+          '--base',
+          a.base,
+          '--title',
+          title,
+          '--body-file',
+          bodyFile,
+          ...(a.draft ? ['--draft'] : []),
+          ...labels.flatMap(l => ['--label', l]),
+        ],
+        { once: true, priority: capacityPriority }
+      );
       log((made.stdout || made.stderr).trim());
       const url = made.stdout.trim().split('\n').pop();
       if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
@@ -836,6 +865,7 @@ export async function main(
         ]);
         if (edited.status !== 0) return edited.status ?? 1;
       }
+      if (made.status === 0 && armShipping(github, a, url, log)) return 1;
       return made.status ?? 1;
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -844,6 +874,24 @@ export async function main(
     log(`FAIL  ${error.message}`);
     return 1;
   }
+}
+
+/** `--ready` marks the draft ready, `--auto-merge` arms squash auto-merge; both run only after every gate passes. */
+function armShipping(github, a, target, log) {
+  const steps = [];
+  if (a.ready) steps.push(['pr', 'ready', target]);
+  if (a.autoMerge) steps.push(['pr', 'merge', target, '--auto', '--squash']);
+  for (const step of steps) {
+    const r = github(a.repo, [...step, '--repo', REPOSITORY]);
+    if (r.status !== 0) {
+      log(
+        `FAIL  ${step[1]}: ${(r.stderr || r.stdout || 'request failed').toString().trim()}`
+      );
+      return 1;
+    }
+    log(`armed ${step[1]} for ${target}`);
+  }
+  return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

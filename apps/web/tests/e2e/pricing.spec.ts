@@ -249,8 +249,13 @@ test.describe('Pricing Page', () => {
           ).toHaveText('Included');
           await assertReadableCells();
           await selector.press('Tab');
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          const closingAction = page
+            .getByTestId('marketing-section-cta')
+            .getByRole('link', { name: 'Start Artist Presence, $12/mo' });
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
           await page.keyboard.press('Shift+Tab');
           await expect(selector).toBeFocused();
@@ -276,8 +281,10 @@ test.describe('Pricing Page', () => {
           ).toHaveText('Not included');
           await assertReadableCells();
           await selector.press('Tab');
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
           await page.keyboard.press('Shift+Tab');
           await expect(selector).toBeFocused();
@@ -303,8 +310,10 @@ test.describe('Pricing Page', () => {
           ).toHaveText('Included');
           await selector.press('Tab');
           await expect(selector).not.toBeFocused();
-          await expect(page.locator(':focus')).toHaveText(
-            'Claim my free profile'
+          await expect(closingAction).toBeFocused();
+          await expect(closingAction).toHaveAttribute(
+            'href',
+            '/claim?plan=pro'
           );
         } else {
           await expect(chart.getByRole('combobox')).toHaveCount(0);

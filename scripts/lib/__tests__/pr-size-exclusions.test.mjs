@@ -1,13 +1,17 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { draftBody, gate, redOutput } from '../../pr-open.mjs';
 import { countSizeGuardFiles } from '../merge-group-member-policy.mjs';
+import { admissionPriority } from '../pr-publication.mjs';
 import {
   filterCountedRows,
   isSizeExcluded,
   TEST_SIZE_EXCLUSION,
 } from '../pr-size-exclusions.mjs';
+import { wipAdmission, wipGate } from '../pr-wip-gate.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const MODULE = resolve(ROOT, 'scripts/lib/pr-size-exclusions.mjs');
@@ -119,4 +123,178 @@ describe('PR size exclusions', () => {
     ).toContain("from './pr-size-exclusions.mjs'");
     expect(TEST_SIZE_EXCLUSION.source.length).toBeGreaterThan(0);
   });
+});
+
+describe('pr-open capacity admission', () => {
+  const python =
+    (status, stdout, stderr = '') =>
+    () => ({
+      status,
+      stdout,
+      stderr,
+    });
+  const over = python(
+    3,
+    '{"allowed":false,"reason":"wip-cap","producer":"hyperagent","used":36,"cap":5}'
+  );
+
+  it('defers actual capacity refusals and exposes unknown evidence as provisional', () => {
+    const refused = wipAdmission('hyperagent/x', over, '.');
+    expect(refused.allowed).toBe(false);
+    expect(refused.message).toMatch(/wip-cap: `hyperagent\/` already owns 36/);
+    const unknown = wipAdmission('codex/x', python(1, '', 'gh down'), '.');
+    expect(unknown.allowed).toBe(true);
+    expect(unknown.reason).toBe('capacity-unknown');
+    expect(unknown.message).toMatch(/bounded API request gate/);
+    const within = wipAdmission(
+      'codex/x',
+      python(0, '{"allowed":true,"producer":"codex","used":2,"cap":8}'),
+      '.'
+    );
+    expect(within).toMatchObject({ allowed: true, message: null });
+  });
+
+  it('never applies a PR-count override to real quota or CI saturation', () => {
+    for (const reason of [
+      'github-quota:core',
+      'github-quota:graphql',
+      'ci-runner-backlog',
+    ]) {
+      const rows = [];
+      const result = wipGate(
+        {
+          repo: '.',
+          wipOverride: 'Tim authorized one internal PR-count bypass',
+        },
+        'codex/fix',
+        {
+          execute: python(
+            75,
+            JSON.stringify({ allowed: false, reason, retryAt: 1800003600 })
+          ),
+          log: () => {},
+          record: row => rows.push(row),
+        }
+      );
+      expect(result).toEqual({
+        refused: true,
+        override: false,
+        deferred: true,
+      });
+      expect(rows.at(-1).reason).toBe(reason);
+      expect(rows.at(-1)).not.toHaveProperty('override');
+    }
+  });
+
+  it('allows twelve PRs against the historical eight when capacity is healthy', () => {
+    const result = wipAdmission(
+      'codex/fix',
+      python(
+        0,
+        JSON.stringify({
+          allowed: true,
+          known: true,
+          reason: 'within-capacity',
+          producer: 'codex',
+          used: 12,
+          cap: 8,
+        })
+      ),
+      '.'
+    );
+    expect(result).toEqual({
+      allowed: true,
+      reason: 'within-capacity',
+      message: null,
+    });
+  });
+
+  it('wipGate refuses over the cap, and a recorded override labels instead', () => {
+    const rows = [];
+    const out = [];
+    const env = execute => ({
+      execute,
+      log: x => out.push(x),
+      record: row => rows.push(row),
+    });
+    expect(wipGate({ repo: '.' }, 'hyperagent/x', env(over))).toEqual({
+      refused: true,
+      override: false,
+    });
+    expect(out.join('\n')).toMatch(/FAIL {2}wip-cap/);
+    const short = { repo: '.', wipOverride: 'too short' };
+    expect(wipGate(short, 'hyperagent/x', env(over)).refused).toBe(true);
+    const reason = 'this PR installs the cap itself';
+    const given = { repo: '.', wipOverride: reason };
+    expect(wipGate(given, 'hyperagent/x', env(over))).toEqual({
+      refused: false,
+      override: true,
+    });
+    expect(rows.at(-1).override).toBe(reason);
+    const ok = python(
+      0,
+      '{"allowed":true,"producer":"codex","used":1,"cap":8}'
+    );
+    expect(wipGate({ repo: '.' }, 'codex/x', env(ok))).toEqual({
+      refused: false,
+      override: false,
+    });
+  });
+});
+
+it('only evidence-qualified correctness repairs use the existing repair reserve', () => {
+  const repair = {
+    title: 'fix(merch): prevent an invalid payment',
+    labels: [],
+    evidence: {
+      failingCommand: 'node --test payment.test.mjs',
+      failingRun: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    },
+    body: '## Red-before-green\n\n- Failing command: `node --test payment.test.mjs`\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/1\n',
+    files: [{ filename: 'apps/web/lib/merch/order.ts' }],
+  };
+  assert.equal(admissionPriority(repair), 'repair');
+  for (const filename of [
+    'apps/web/lib/auth/session.ts',
+    'apps/web/lib/agent-os/admission.ts',
+    '.github/workflows/ci.yml',
+  ])
+    assert.equal(
+      admissionPriority({ ...repair, files: [{ filename }] }),
+      'repair'
+    );
+  assert.equal(
+    admissionPriority({ ...repair, title: 'feat(merch): add a payment' }),
+    'default'
+  );
+  assert.equal(admissionPriority({ ...repair, evidence: {} }), 'default');
+  assert.equal(
+    admissionPriority({ ...repair, files: [{ filename: 'docs/payments.md' }] }),
+    'default'
+  );
+  assert.equal(
+    admissionPriority({
+      ...repair,
+      files: [{ filename: 'apps/web/components/ui/button.tsx' }],
+    }),
+    'default'
+  );
+});
+
+it('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
+  const log =
+    '\x1b[31m ❯ scripts/thing.test.ts (3 tests | 1 failed)\x1b[0m\nAssertionError: expected 0 to be 1\n Test Files  1 failed (1)';
+  const files = [{ filename: 'scripts/x.test.mjs', status: 'added' }];
+  const body = draftBody({
+    title: 'fix(web): regression',
+    files,
+    failingCommand: 'pnpm exec vitest run',
+    failingLog: log,
+  });
+  assert.match(body, /```text\nFAIL ❯ scripts\/thing.test.ts/);
+  assert.deepEqual(
+    gate({ title: 'fix(web): regression', body, files }).errors,
+    []
+  );
+  assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });

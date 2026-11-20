@@ -39,8 +39,20 @@ const KEY_SALT = 'jovie-synthetic-passage';
 export const PASSAGE_TOKEN_SCOPES = [
   'onboarding_chat',
   'smartlink_click',
+  // JOV-9826: canary claim-walk unblocks. `canary_reset` authorizes the
+  // internal reset endpoint that returns the claim-walk canary to its
+  // pre-claim state; `canary_checkout` authorizes the Stripe test-mode
+  // canary checkout walk. Both are consumed by internal routes that ALSO
+  // require the CRON_SECRET bearer, so holding one implies production
+  // cron authority and neither grants any customer-facing surface.
+  'canary_reset',
+  'canary_checkout',
 ] as const;
 export type PassageTokenScope = (typeof PASSAGE_TOKEN_SCOPES)[number];
+
+/** JOV-9826: the single scope the canary-reset endpoint accepts. */
+export const PASSAGE_TOKEN_SCOPE_CANARY_RESET: PassageTokenScope =
+  'canary_reset';
 
 export interface PassageTokenClaims {
   /** Canary email the run acts as. */

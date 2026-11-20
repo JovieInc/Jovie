@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
+  successfulPrWake,
+  workflowConcurrency,
+} from './lib/__tests__/helpers/green-enroll-concurrency.mjs';
+import {
   ADMISSION_STEP,
   applyMergeGroupFailure,
 } from './merge-group-failure-hold.mjs';
@@ -22,6 +26,28 @@ const run = new AsyncFunction(
   'require',
   script
 );
+/**
+ * Deterministic stand-ins for wall-clock time (JOV-10086). Tests must never
+ * assert on how long a run took: a loaded runner turns that into a flake.
+ * `recordTimers` captures every delay the script under test asks for, so a
+ * "must not sleep" check asserts on the requested delay, not elapsed time.
+ * Date-only mock timers advance the sweep budget without delaying the event loop.
+ */
+async function recordTimers(fn) {
+  const realSetTimeout = globalThis.setTimeout;
+  const delays = [];
+  globalThis.setTimeout = new Proxy(realSetTimeout, {
+    apply(target, thisArg, args) {
+      delays.push(Number(args[1]) || 0);
+      return Reflect.apply(target, thisArg, args);
+    },
+  });
+  try {
+    return { value: await fn(), delays };
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+}
 const sha = 'a'.repeat(40);
 const mainSha = 'c'.repeat(40);
 test('all native queue mutation clients request repository contents write', () => {
@@ -669,15 +695,20 @@ test('a required-green BLOCKED recheck stops at four follow-ups and ignores draf
   );
   assert.deepEqual(held.result.reads, [1]);
   assert.deepEqual(held.calls, []);
-  const started = Date.now();
-  const sweep = await withFetch(() =>
-    fixture({
-      eventName: 'push',
-      env: { MERGE_STATE_RETRY_MS: '5000', RECHECK_TOKEN: 'ghs_test' },
-      overrides: blockedGreen(),
-    })
+  const { value: sweep, delays } = await recordTimers(() =>
+    withFetch(() =>
+      fixture({
+        eventName: 'push',
+        env: { MERGE_STATE_RETRY_MS: '5000', RECHECK_TOKEN: 'ghs_test' },
+        overrides: blockedGreen(),
+      })
+    )
   );
-  assert.ok(Date.now() - started < 1000, 'a sweep must not sleep on BLOCKED');
+  assert.deepEqual(
+    delays.filter(ms => ms >= 1000),
+    [],
+    'a sweep must not sleep on BLOCKED'
+  );
   assert.deepEqual(sweep.result.reads, [1]);
   assert.deepEqual(sweep.result.mutations, []);
   assert.deepEqual(sweep.calls, []);
@@ -731,34 +762,35 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
   }));
   let inFlight = 0;
   let peak = 0;
-  const started = Date.now();
-  const result = await fixture({
-    roster,
-    eventName: 'push',
-    // A sleep would block the test far past its own timeout.
-    env: { MERGE_STATE_RETRY_MS: '600000' },
-    readCurrentSnapshot: async (number, readCount) => {
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
-      await new Promise(resolve => setTimeout(resolve, 20));
-      inFlight -= 1;
-      // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
-      // a third settle CLEAN on the second read, a third stay UNKNOWN.
-      const firstRead = readCount <= 70;
-      const state =
-        number % 3 === 0
-          ? 'BLOCKED'
-          : firstRead || number % 3 === 2
-            ? 'UNKNOWN'
-            : 'CLEAN';
-      return { ...current(number), mergeStateStatus: state };
-    },
-  });
-  // Overlap is proven by peak concurrency, not wall clock (a loaded runner
-  // blew a 1.4 s bound). The time bound only catches the 600 s retry sleep.
-  assert.ok(
-    Date.now() - started < 60_000,
-    'sweep slept on UNKNOWN instead of reading once more'
+  const { value: result, delays: sweepDelays } = await recordTimers(() =>
+    fixture({
+      roster,
+      eventName: 'push',
+      // A sleep would request a 600 s timer; asserted below via the delays.
+      env: { MERGE_STATE_RETRY_MS: '600000' },
+      readCurrentSnapshot: async (number, readCount) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        // Yield to the event loop so reads can overlap, without a timer.
+        await new Promise(resolve => setImmediate(resolve));
+        inFlight -= 1;
+        // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
+        // a third settle CLEAN on the second read, a third stay UNKNOWN.
+        const firstRead = readCount <= 70;
+        const state =
+          number % 3 === 0
+            ? 'BLOCKED'
+            : firstRead || number % 3 === 2
+              ? 'UNKNOWN'
+              : 'CLEAN';
+        return { ...current(number), mergeStateStatus: state };
+      },
+    })
+  );
+  assert.deepEqual(
+    sweepDelays.filter(ms => ms >= 1000),
+    [],
+    'a sweep must never sleep on UNKNOWN or BLOCKED'
   );
   assert.ok(
     peak > 1 && peak <= 6,
@@ -773,7 +805,7 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
   );
 });
 
-test('a sweep goes longest-waiting first and stops at its budget', async () => {
+test('a sweep goes longest-waiting first and stops at its budget', async context => {
   const roster = [
     { ...candidate(3), updated_at: '2026-10-12T12:00:00Z' },
     { ...candidate(1), updated_at: '2026-10-12T10:00:00Z' },
@@ -784,12 +816,18 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
     ordered.mutations.map(m => m.id),
     ['PR_1', 'PR_2', 'PR_3']
   );
+  // Each read "takes" 600 ms of fake time, so the budget is spent
+  // deterministically regardless of runner load.
+  context.mock.timers.enable({
+    apis: ['Date'],
+    now: Date.parse('2026-10-12T12:00:00Z'),
+  });
   const spent = await fixture({
     roster,
     eventName: 'push',
     env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
     readCurrentSnapshot: async number => {
-      await new Promise(resolve => setTimeout(resolve, 600));
+      context.mock.timers.tick(600);
       return current(number);
     },
   });
@@ -1665,65 +1703,53 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
 // GitHub keeps only one pending run per concurrency group. Evaluate the
 // actual YAML expression so a repository-wide group cannot silently replace
 // another PR's final wake.
-function formatExpression(template, ...args) {
-  return template.replace(/\{(\d+)\}/g, (_whole, index) =>
-    String(args[Number(index)] ?? '')
-  );
-}
-
-function evalWorkflowExpr(expression, github) {
-  const js = expression
-    .replaceAll(
-      'github.event.pull_request.number',
-      'github.event.pull_request?.number'
-    )
-    .replaceAll(
-      'github.event.workflow_run.pull_requests[0].number',
-      'github.event.workflow_run?.pull_requests?.[0]?.number'
-    )
-    .replaceAll(
-      'github.event.workflow_run.head_sha',
-      'github.event.workflow_run?.head_sha'
-    )
-    .replaceAll(
-      'github.event.workflow_run.name',
-      'github.event.workflow_run?.name'
-    )
-    .replaceAll('github.event.workflow_run.id', 'github.event.workflow_run?.id')
-    .replaceAll(
-      'github.event.workflow_run.conclusion',
-      'github.event.workflow_run?.conclusion'
-    )
-    .replaceAll(
-      'github.event.workflow_run.event',
-      'github.event.workflow_run?.event'
-    );
-  return new Function('github', 'inputs', 'format', `return (${js});`)(
-    github,
-    github.inputs ?? {},
-    formatExpression
-  );
-}
-
-function concurrencyGroup(github) {
-  const group = workflow.concurrency.group;
-  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) =>
-    evalWorkflowExpr(expression, github)
-  );
-}
-
-function cancelInProgress(github) {
-  const value = workflow.concurrency['cancel-in-progress'];
-  if (typeof value !== 'string') return value;
-  const match = value.match(/^\$\{\{([\s\S]*)\}\}$/);
-  if (!match) return value;
-  return evalWorkflowExpr(match[1].trim(), github);
-}
+const { concurrencyGroup, cancelInProgress } = workflowConcurrency(workflow);
 
 const wake = (number, id) => ({
   event_name: 'workflow_run',
   event: { workflow_run: { id, pull_requests: number ? [{ number }] : [] } },
   run_id: id + 1000,
+});
+
+for (const slot of ['running', 'pending']) {
+  test(`a late old-head success cannot replace the current ${slot} admission wake`, async () => {
+    const currentWake = successfulPrWake(sha, 101);
+    const staleWake = successfulPrWake('b'.repeat(40), 102, 7, 'PR Size Guard');
+    const survivors = new Map([[concurrencyGroup(currentWake), currentWake]]);
+    // The pending slot always replaces its predecessor. Running slots replace
+    // only when the incoming event has cancel-in-progress enabled.
+    if (slot === 'running' && cancelInProgress(staleWake))
+      survivors.delete(concurrencyGroup(staleWake));
+    survivors.set(concurrencyGroup(staleWake), staleWake);
+
+    const mutations = [];
+    for (const event of survivors.values()) {
+      const result = await fixture({
+        eventName: event.event_name,
+        payload: event.event,
+      });
+      mutations.push(...result.mutations);
+    }
+    assert.deepEqual(mutations, [{ id: 'PR_7', oid: sha }]);
+  });
+}
+
+test('success wake identity coalesces only the same PR and exact source head', () => {
+  const current = successfulPrWake(sha, 101);
+  assert.equal(
+    concurrencyGroup(current),
+    concurrencyGroup(successfulPrWake(sha, 102, 7, 'PR Size Guard'))
+  );
+  for (const independent of [
+    successfulPrWake('b'.repeat(40), 103),
+    successfulPrWake(sha, 104, 8),
+    successfulPrWake('', 105),
+  ])
+    assert.notEqual(concurrencyGroup(current), concurrencyGroup(independent));
+  assert.notEqual(
+    concurrencyGroup(successfulPrWake('', 105)),
+    concurrencyGroup(successfulPrWake('', 106))
+  );
 });
 
 test('independent PR wakes survive replacement of GitHub pending runs', async () => {
@@ -2461,8 +2487,8 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
-    "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
-    "receipt(pr, 'relabel-jump',",
+    "receipt(pr, 'enqueued',",
+    "receipt(pr, 'skip', 'already-enqueued:position-preserved')",
     "receipt(pr, 'error',",
   ])
     assert.ok(script.includes(decision), decision);
@@ -2474,147 +2500,188 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
   assert.ok(!script.includes('${{'));
 });
 
-test('compounding PRs jump the queue under the reset-safe policy and every decision leaves a receipt', async () => {
-  const compounding = {
-    labels: {
-      pageInfo: { hasNextPage: false },
-      nodes: [{ name: 'compounding' }],
-    },
-  };
-  const iso = secondsAgo =>
-    new Date(Date.now() - secondsAgo * 1000).toISOString();
-  const entry = (number, state = 'QUEUED', secondsAgo = 3600) => ({
-    state,
-    enqueuedAt: iso(secondsAgo),
-    pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
-  });
-  const plain = (number, state, secondsAgo) => ({
-    state,
-    enqueuedAt: iso(secondsAgo),
-    pullRequest: { number, labels: { nodes: [] } },
-  });
-  const jumped = { id: 'PR_1', oid: sha, jump: true };
-  const unjumped = { id: 'PR_1', oid: sha };
-  const byLabel = await fixture({ overrides: { 1: compounding } });
-  assert.deepEqual(byLabel.mutations, [jumped]);
-  const byPaths = await fixture({
-    files: [
-      { filename: 'scripts/lanes/autoscale.py' },
-      { filename: '.github/workflows/lane-fix-relay.yml' },
-    ],
-  });
-  assert.deepEqual(byPaths.mutations, [jumped]);
-  const mixed = await fixture({
-    files: [
-      { filename: 'scripts/lanes/autoscale.py' },
-      { filename: 'apps/web/page.tsx' },
-    ],
-  });
-  assert.deepEqual(mixed.mutations, [unjumped]);
-  const capped = await fixture({
-    overrides: { 1: compounding },
-    queueEntries: [entry(8), entry(9)],
-  });
-  assert.deepEqual(capped.mutations, [unjumped]);
-  const room = await fixture({
-    overrides: { 1: compounding },
-    queueEntries: [entry(8)],
-  });
-  assert.deepEqual(room.mutations, [jumped]);
-  // A building group that has run more than five minutes is never reset by a jump.
-  const building = await fixture({
-    overrides: { 1: compounding },
-    queueEntries: [plain(30, 'AWAITING_CHECKS', 900)],
-  });
-  assert.deepEqual(building.mutations, [unjumped]);
-  // A young building group may be reset, and the reset is logged.
-  const young = await fixture({
-    overrides: { 1: compounding },
-    queueEntries: [plain(31, 'AWAITING_CHECKS', 60)],
-  });
-  assert.deepEqual(young.mutations, [jumped]);
-  assert.ok(young.warnings.some(w => /JUMP RESET by #1.*#31/.test(w)));
-  // Jumps are batched: a compounding entry enqueued under 30 minutes ago defers the next.
-  const batched = await fixture({
-    overrides: { 1: compounding },
-    queueEntries: [entry(8, 'QUEUED', 300)],
-  });
-  assert.deepEqual(batched.mutations, [unjumped]);
+const stableQueueEntry = (
+  number,
+  position,
+  state = 'AWAITING_CHECKS',
+  secondsAgo = 60,
+  labels = []
+) => ({
+  state,
+  position,
+  enqueuedAt: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+  pullRequest: { number, labels: { nodes: labels.map(name => ({ name })) } },
 });
 
-test('a queued PR labeled compounding is re-routed with jump under the same caps and leaves a relabel-jump receipt', async () => {
-  const queuedCompounding = {
-    isInMergeQueue: true,
-    labels: {
-      pageInfo: { hasNextPage: false },
-      nodes: [{ name: 'compounding' }],
-    },
+for (const priorityLabel of ['compounding', 'priority:marketing']) {
+  const labels = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: priorityLabel }],
   };
-  const iso = secondsAgo =>
-    new Date(Date.now() - secondsAgo * 1000).toISOString();
-  const entry = (number, position, over = {}) => ({
-    state: 'QUEUED',
-    position,
-    enqueuedAt: iso(3600),
-    pullRequest: { number, labels: { nodes: [] } },
-    ...over,
+  test(`stable queue: fresh ${priorityLabel} admission never resets young or older building groups`, async () => {
+    for (const age of [0, 60, 299, 300, 900]) {
+      const result = await fixture({
+        overrides: { 1: { labels } },
+        queueEntries: [stableQueueEntry(31, 1, 'AWAITING_CHECKS', age)],
+      });
+      assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+      assert.ok(!result.warnings.some(w => /JUMP RESET/.test(w)));
+    }
   });
-  const self = position => entry(1, position);
-  const compoundingEntry = (number, position, secondsAgo = 3600) =>
-    entry(number, position, {
-      enqueuedAt: iso(secondsAgo),
-      pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
-    });
-  const dequeued = { id: 'PR_1', dequeue: true };
-  const jumped = { id: 'PR_1', oid: sha, jump: true };
-  const reroute = queueEntries =>
-    fixture({ overrides: { 1: queuedCompounding }, queueEntries });
 
-  // Behind a plain entry: dequeue then enqueue with jump, never the manual-removal block.
-  const rerouted = await reroute([entry(8, 1), self(2)]);
-  assert.deepEqual(rerouted.mutations, [dequeued, jumped]);
-  // Already first, or only compounding entries ahead: untouched.
-  assert.deepEqual((await reroute([self(1), entry(8, 2)])).mutations, []);
+  test(`stable queue: relabeling queued or building ${priorityLabel} preserves every existing entry`, async () => {
+    for (const state of ['QUEUED', 'AWAITING_CHECKS', 'MERGEABLE']) {
+      for (const eventName of ['workflow_dispatch', 'pull_request_target']) {
+        for (const queueEntries of [
+          [stableQueueEntry(8, 1), stableQueueEntry(1, 2, state)],
+          [stableQueueEntry(8, 1, 'QUEUED'), stableQueueEntry(1, 2, state)],
+          [stableQueueEntry(1, 1, state)],
+        ]) {
+          const result = await fixture({
+            overrides: { 1: { labels, isInMergeQueue: true } },
+            queueEntries,
+            eventName,
+            payload:
+              eventName === 'pull_request_target'
+                ? {
+                    action: 'labeled',
+                    number: 1,
+                    pull_request: candidate(1),
+                    label: { name: priorityLabel },
+                  }
+                : {},
+          });
+          assert.deepEqual(result.mutations, []);
+        }
+      }
+    }
+  });
+
+  test(`stable queue: ${priorityLabel} admits normally in empty or nonbuilding queues`, async () => {
+    for (const queueEntries of [
+      [],
+      [stableQueueEntry(8, 1, 'QUEUED')],
+      [stableQueueEntry(8, 1, 'MERGEABLE')],
+    ]) {
+      const result = await fixture({
+        overrides: { 1: { labels } },
+        queueEntries,
+      });
+      assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+      assert.deepEqual(
+        (
+          await fixture({
+            overrides: { 1: { labels } },
+            queueEntries,
+            dry: true,
+          })
+        ).mutations,
+        []
+      );
+    }
+  });
+
+  test(`stable queue: repeated ${priorityLabel} events do not replay accepted admission`, async () => {
+    const queueEntries = [stableQueueEntry(8, 1), stableQueueEntry(1, 2)];
+    for (let event = 0; event < 3; event++) {
+      const result = await fixture({
+        overrides: { 1: { labels, isInMergeQueue: true } },
+        queueEntries,
+      });
+      assert.deepEqual(result.mutations, []);
+    }
+  });
+}
+
+test('stable queue: mixed priorities and infrastructure paths make independent progress without jumps', async () => {
+  const marketing = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'priority:marketing' }],
+  };
+  const compounding = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'compounding' }],
+  };
+  const result = await fixture({
+    roster: [
+      candidate(1),
+      { ...candidate(2), labels: compounding.nodes },
+      { ...candidate(3), labels: marketing.nodes },
+    ],
+    overrides: { 2: { labels: compounding }, 3: { labels: marketing } },
+    queueEntries: [stableQueueEntry(31, 1)],
+    files: [{ filename: 'scripts/lanes/autoscale.py' }],
+  });
   assert.deepEqual(
-    (await reroute([compoundingEntry(8, 1), self(2)])).mutations,
-    []
+    result.mutations,
+    [3, 1, 2].map(number => ({ id: `PR_${number}`, oid: sha }))
   );
-  // Caps apply unchanged: MAX_JUMPED, JUMP_MAX_BUILD_S and JUMP_BATCH_S defer the re-route.
-  const capped = await reroute([
-    compoundingEntry(8, 1),
-    compoundingEntry(9, 2),
-    entry(7, 3),
-    self(4),
-  ]);
-  assert.deepEqual(capped.mutations, []);
-  const stale = await reroute([
-    entry(30, 1, { state: 'AWAITING_CHECKS', enqueuedAt: iso(900) }),
-    self(2),
-  ]);
-  assert.deepEqual(stale.mutations, []);
-  const batched = await reroute([
-    compoundingEntry(8, 1, 300),
-    entry(7, 2),
-    self(3),
-  ]);
-  assert.deepEqual(batched.mutations, []);
-  // A young building group may be reset; the reset is logged.
-  const young = await reroute([
-    entry(31, 1, { state: 'AWAITING_CHECKS', enqueuedAt: iso(60) }),
-    self(2),
-  ]);
-  assert.deepEqual(young.mutations, [dequeued, jumped]);
-  assert.ok(young.warnings.some(w => /JUMP RESET by #1.*#31/.test(w)));
-  // A queued PR without the label, or a dry run, is never touched.
-  const unlabeled = await fixture({
-    overrides: { 1: { isInMergeQueue: true } },
-    queueEntries: [entry(8, 1), self(2)],
+});
+
+test('stable queue: priority cannot admit stale heads or exact-head failure holds', async () => {
+  const labels = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'compounding' }],
+  };
+  const held = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: 'class=deterministic-source;n=1;run=456;try=1',
+    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+  };
+  for (const options of [
+    { overrides: { 1: { labels, headRefOid: 'b'.repeat(40) } } },
+    { overrides: { 1: { labels } }, statuses: [held] },
+  ]) {
+    assert.deepEqual(
+      (await fixture({ ...options, queueEntries: [stableQueueEntry(31, 1)] }))
+        .mutations,
+      []
+    );
+  }
+});
+
+test('marketing priority never bypasses draft, stale head, failure state or hold labels', async () => {
+  const marketing = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'priority:marketing' }],
+  };
+  for (const override of [
+    { isDraft: true },
+    { headRefOid: 'b'.repeat(40) },
+    { mergeStateStatus: 'DIRTY' },
+    { labels: { ...marketing, nodes: [...marketing.nodes, { name: 'hold' }] } },
+    { labels: { ...marketing, pageInfo: { hasNextPage: true } } },
+  ]) {
+    const result = await fixture({
+      overrides: { 1: { labels: marketing, ...override } },
+    });
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('marketing retains intake order while existing entries keep their positions', async () => {
+  const marketing = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'priority:marketing' }],
+  };
+  const entry = (number, name) => ({
+    state: 'QUEUED',
+    enqueuedAt: new Date(Date.now() - 3600000).toISOString(),
+    pullRequest: { number, labels: { nodes: [{ name }] } },
   });
-  assert.deepEqual(unlabeled.mutations, []);
-  const dry = await fixture({
-    overrides: { 1: queuedCompounding },
-    queueEntries: [entry(8, 1), self(2)],
-    dry: true,
+  const capped = await fixture({
+    overrides: { 1: { labels: marketing } },
+    queueEntries: [entry(8, 'compounding'), entry(9, 'priority:marketing')],
   });
-  assert.deepEqual(dry.mutations, []);
+  assert.deepEqual(capped.mutations, [{ id: 'PR_1', oid: sha }]);
+  const sweep = await fixture({
+    roster: [candidate(1), { ...candidate(2), labels: marketing.nodes }],
+    overrides: { 2: { labels: marketing } },
+  });
+  assert.deepEqual(
+    sweep.mutations.map(m => m.id),
+    ['PR_2', 'PR_1']
+  );
 });

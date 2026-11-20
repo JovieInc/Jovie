@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import './MarketingSnapRail.css';
 
@@ -51,14 +50,13 @@ export function MarketingSnapRail({
   overlayControlsOnDesktop = false,
   showMobileControls = false,
   showDesktopControls = true,
-  previousLabel = 'Scroll Left',
-  nextLabel = 'Scroll Right',
+  previousLabel = 'Previous',
+  nextLabel = 'Next',
 }: Readonly<MarketingSnapRailProps>) {
   const generatedId = useId();
   const railId = `marketing-snap-rail-${generatedId}`;
   const describedBy = instructionsId ?? `${railId}-instructions`;
   const scrollerRef = useRef<HTMLElement | null>(null);
-  const reducedMotion = useReducedMotion();
   const [scrollState, setScrollState] = useState({
     ready: false,
     canScrollPrevious: false,
@@ -72,13 +70,17 @@ export function MarketingSnapRail({
     }
 
     const maximumScrollLeft = Math.max(rail.scrollWidth - rail.clientWidth, 0);
+    // Native RTL rails start at zero and advance with negative scrollLeft.
+    const direction =
+      globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
+    const scrollOffset = rail.scrollLeft * direction;
     const boundaryTolerance = 2;
     const nextScrollState = {
       ready: true,
-      canScrollPrevious: rail.scrollLeft > boundaryTolerance,
+      canScrollPrevious: scrollOffset > boundaryTolerance,
       canScrollNext:
         maximumScrollLeft > boundaryTolerance &&
-        rail.scrollLeft < maximumScrollLeft - boundaryTolerance,
+        scrollOffset < maximumScrollLeft - boundaryTolerance,
     };
     setScrollState(previousScrollState =>
       previousScrollState.ready === nextScrollState.ready &&
@@ -109,21 +111,23 @@ export function MarketingSnapRail({
     };
   }, [measureScrollState]);
 
-  const scrollByDirection = useCallback(
-    (direction: 'prev' | 'next') => {
-      const rail = scrollerRef.current;
-      if (!rail) {
-        return;
-      }
+  const scrollByDirection = useCallback((direction: 'prev' | 'next') => {
+    const rail = scrollerRef.current;
+    if (!rail) {
+      return;
+    }
 
-      const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
-      rail.scrollBy({
-        left: direction === 'next' ? scrollStep : -scrollStep,
-        behavior: reducedMotion ? 'auto' : 'smooth',
-      });
-    },
-    [reducedMotion]
-  );
+    const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
+    const directionSign =
+      globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
+    const reducedMotion = globalThis.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
+    rail.scrollBy({
+      left: (direction === 'next' ? scrollStep : -scrollStep) * directionSign,
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }, []);
 
   const navButtons = (
     <>
@@ -137,7 +141,7 @@ export function MarketingSnapRail({
         }}
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
-        <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+        <ChevronLeft className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
       </button>
       <button
         type='button'
@@ -149,7 +153,7 @@ export function MarketingSnapRail({
         }}
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
-        <ChevronRight className='h-4 w-4' aria-hidden='true' />
+        <ChevronRight className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
       </button>
     </>
   );
@@ -246,7 +250,7 @@ export function MarketingSnapRail({
           data-testid={scrollerTestId ?? `${testId}-scroller`}
           className={cn(
             'marketing-snap-rail__scroller relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            !reducedMotion && 'sm:scroll-smooth',
+            'motion-safe:sm:scroll-smooth',
             railClassName
           )}
         >

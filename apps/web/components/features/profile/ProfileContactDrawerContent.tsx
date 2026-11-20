@@ -37,29 +37,32 @@ function TerritoryPills({
         <PopoverTrigger asChild>
           <button
             type='button'
-            className='inline-flex h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-2xs font-semibold text-white/58 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-            aria-label={`Show all territories for ${contact.roleLabel}`}
+            className='inline-flex h-6 items-center rounded-full border border-on-media/[0.08] bg-on-media/[0.04] px-2 text-2xs font-semibold text-on-media/58 transition-colors duration-subtle hover:bg-on-media/[0.08] hover:text-on-media/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+            aria-label={`+${territories.length - 1} more territories for ${contact.roleLabel}`}
           >
             +{territories.length - 1}
           </button>
         </PopoverTrigger>
         <PopoverContent
+          size='bare'
           side='top'
           align='start'
-          className='w-auto min-w-45 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white dark:text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
+          className='w-auto min-w-45'
         >
-          <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
-            Territories
-          </p>
-          <div className='mt-2 flex flex-wrap gap-1.5'>
-            {territories.map(territory => (
-              <span
-                key={territory}
-                className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-2xs font-caption text-white/72'
-              >
-                {territory}
-              </span>
-            ))}
+          <div className='rounded-2xl border border-on-media/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-on-media shadow-[0_20px_48px_rgba(0,0,0,0.4)]'>
+            <p className='text-2xs font-semibold tracking-[0.08em] text-on-media/42'>
+              Territories
+            </p>
+            <div className='mt-2 flex flex-wrap gap-1.5'>
+              {territories.map(territory => (
+                <span
+                  key={territory}
+                  className='inline-flex rounded-full border border-on-media/[0.08] bg-on-media/[0.04] px-2 py-1 text-2xs font-caption text-on-media/72'
+                >
+                  {territory}
+                </span>
+              ))}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
@@ -94,13 +97,13 @@ export function ProfileContactDrawerContent({
           >
             <div className='flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left'>
               <div className='flex flex-wrap items-center gap-2'>
-                <span className='text-sm font-medium text-white/90'>
+                <span className='text-sm font-medium text-on-media/90'>
                   {contact.roleLabel}
                 </span>
                 <TerritoryPills contact={contact} />
               </div>
               {metadata ? (
-                <span className='truncate text-2xs font-book leading-[1.2] text-white/50'>
+                <span className='truncate text-2xs font-book leading-[1.2] text-on-media/50'>
                   {metadata}
                 </span>
               ) : null}
@@ -114,7 +117,7 @@ export function ProfileContactDrawerContent({
                   return (
                     <span
                       key={`${contact.id}-${channel.type}`}
-                      className='flex h-9 w-9 items-center justify-center rounded-full text-white/50'
+                      className='flex h-9 w-9 items-center justify-center rounded-full text-on-media/50'
                     >
                       <ChannelIcon type={channel.type} />
                     </span>
@@ -125,7 +128,7 @@ export function ProfileContactDrawerContent({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-9 w-9 items-center justify-center rounded-full text-white/50 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                    className='flex h-9 w-9 items-center justify-center rounded-full text-on-media/50 transition-colors duration-subtle hover:bg-on-media/[0.08] hover:text-on-media/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
                     aria-label={formatPublicContactChannelAriaLabel(
                       channel.type,
                       contact

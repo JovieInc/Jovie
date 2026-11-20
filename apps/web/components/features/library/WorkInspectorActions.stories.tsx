@@ -56,6 +56,7 @@ const meta = {
     launches: [],
     canPublish: true,
     disabled: false,
+    onAskJovie: () => undefined,
     onSharePrivately: () => undefined,
   },
 } satisfies Meta<typeof WorkInspectorActions>;

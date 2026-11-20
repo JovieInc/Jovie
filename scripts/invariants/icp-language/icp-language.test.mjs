@@ -32,7 +32,12 @@ function baselineFixture(t) {
   mkdirSync(dirname(path), { recursive: true });
   const ids = ['artist:old.ts:abc', 'music:old.ts:def'];
   writeFileSync(path, `${JSON.stringify({ count: ids.length, ids })}\n`);
-  const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  const git = args =>
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      stdio: 'pipe',
+    });
   git(['init', '--quiet']);
   git(['add', '.']);
   git([
@@ -156,6 +161,46 @@ test('audience routes are exempt and general routes are scanned', () => {
       files.some(file => file.includes(part)),
       false,
       part
+    );
+  }
+});
+
+test('the music line is permitted on `/` only (Tim, 2026-11-03)', () => {
+  // Positive: the homepage's own sections and copy may use music language.
+  const homepage = [
+    'apps/web/components/homepage/HomepageEditorial.tsx',
+    'apps/web/data/homepageEditorialCopy.ts',
+  ];
+  for (const file of homepage) {
+    assert.equal(isExemptPath(file, config), true, file);
+    assert.deepEqual(
+      violationsInSource(
+        "export const line = 'Jovie helps you move your music forward.';",
+        file,
+        config
+      ).ids,
+      []
+    );
+  }
+  // Negative: every other general route and the shared marketing layers are
+  // still scanned and still reject the same line.
+  for (const file of [
+    'apps/web/app/(home)/page.tsx',
+    'apps/web/app/(marketing)/pricing/page.tsx',
+    'apps/web/app/(marketing)/about/page.tsx',
+    'apps/web/components/marketing/MarketingHero.tsx',
+    'apps/web/components/homepage/HomepageSpecSections.tsx',
+    'apps/web/data/companyIdentity.ts',
+  ]) {
+    assert.equal(isExemptPath(file, config), false, file);
+    assert.deepEqual(
+      violationsInSource(
+        "export const line = 'Jovie helps you move your music forward.';",
+        file,
+        config
+      ).ids.map(id => id.split(':')[0]),
+      ['music'],
+      file
     );
   }
 });

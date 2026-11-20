@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { CODE_FLAGS, isCodeFlagEnabled } from './code-flags';
+import { CODE_FLAGS, type CodeFlagName, isCodeFlagEnabled } from './code-flags';
 
 describe('code flags', () => {
   afterEach(() => {
-    delete process.env.FEATURE_CANVAS_GRAIN;
+    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
     delete process.env.FEATURE_MUSICFETCH_FALLBACK;
   });
 
@@ -14,12 +14,17 @@ describe('code flags', () => {
   });
 
   it('defaults to the registry value when no env override is set', () => {
-    expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(CODE_FLAGS.CANVAS_GRAIN);
+    for (const name of Object.keys(CODE_FLAGS) as CodeFlagName[]) {
+      delete process.env[`FEATURE_${name}`];
+      expect(isCodeFlagEnabled(name)).toBe(CODE_FLAGS[name]);
+    }
   });
 
   it('honors FEATURE_<FLAG_NAME> env overrides', () => {
-    process.env.FEATURE_CANVAS_GRAIN = 'false';
-    expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(false);
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
+    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
+    process.env.FEATURE_MUSICFETCH_FALLBACK = 'true';
+    expect(isCodeFlagEnabled('MUSICFETCH_FALLBACK')).toBe(true);
   });
 
   it('defaults the final MusicFetch fallback switch off with an env rollback', () => {
@@ -57,13 +62,5 @@ describe('code flags', () => {
     process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL = 'false';
     expect(isCodeFlagEnabled('ONBOARDING_VALUE_BEFORE_PAYWALL')).toBe(false);
     delete process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL;
-  });
-
-  it('keeps the auth offer summary off unless the env override is true', () => {
-    expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
-    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);
-    process.env.FEATURE_AUTH_OFFER_SUMMARY = 'true';
-    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(true);
-    delete process.env.FEATURE_AUTH_OFFER_SUMMARY;
   });
 });

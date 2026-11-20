@@ -4,6 +4,7 @@ import {
   isHostWithOptionalPort,
   sessionSecretSchema,
 } from './env-configuration-policy';
+import { commerceServerEnvSchema } from './env-server-schema-commerce';
 import {
   ovieSummerEveDeploymentOriginSchema,
   ovieSummerEveExpectedDeploymentIdSchema,
@@ -200,38 +201,7 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET_MERCH: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
 
-  // Printful fulfillment backend
-  PRINTFUL_API_KEY: z.string().optional(),
-  PRINTFUL_API_BASE_URL: z.string().url().optional(),
-  PRINTFUL_STORE_ID: z.string().optional(),
-  PRINTFUL_WEBHOOK_SECRET: z.string().optional(),
-
-  // Retired founding tier — webhook lookup only (founding -> pro entitlements)
-  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
-
-  // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
-  STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: z
-    .string()
-    .startsWith('price_')
-    .optional(),
-  STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
-  STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
-  STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
-
-  // Product-specific founder offer. Maps to Pro base entitlements while the
-  // exact price ID remains the YouTube thumbnail entitlement source of truth.
-  STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY: z
-    .string()
-    .startsWith('price_')
-    .optional(),
-
-  // Stripe price IDs for Growth tier (legacy, kept for backward compat)
-  STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
-  STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
-
-  // Stripe price IDs for Max tier (amounts in lib/config/plan-prices.ts)
-  STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
-  STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
+  ...commerceServerEnvSchema.shape,
   VISIBILITY_AUDIT_PAYMENT_LINK_URL: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
@@ -244,6 +214,8 @@ export const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+  // HMAC-SHA256 key the dogfood judge signs admission records with.
+  DOGFOOD_JUDGE_SIGNING_KEY: z.string().optional(),
   // Optional allowlist of additional hosts (comma-separated) whose
   // `x-forwarded-host` should be treated as trusted for cron routes.
   // Used for Jovie-owned preview aliases. Never trusts `*.vercel.app`.
@@ -348,14 +320,11 @@ export const ServerEnvSchema = z.object({
   RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
-  // Kill switch for Linear remediation intake. Unset files. 'true' skips.
-  REMEDIATION_TRIGGERS_DISABLED: z.string().optional(),
-  SUMMER_SENTRY_INTAKE_LIVE: z.string().optional(),
   // JOV-7331: internal fleet canary, disabled until deployment approval.
   JOVIE_FLEET_ENABLED: z.enum(['0', '1']).optional(),
   JOVIE_FLEET_LINEAR_TEAM_ID: z.string().uuid().optional(),
 
-  // GitHub dispatch (Sentry autofix pipeline)
+  // GitHub dispatch (Sentry webhook → Lane Fix Relay)
   GH_DISPATCH_TOKEN: z.string().optional(),
   // Vercel-injected Git metadata (used to target the dispatch repo)
   VERCEL_GIT_REPO_OWNER: z.string().optional(),
@@ -646,6 +615,7 @@ export const ENV_KEYS = [
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'DOGFOOD_JUDGE_SIGNING_KEY',
   'CRON_TRUSTED_HOSTS',
   'METADATA_HASH_KEY',
   'PII_ENCRYPTION_KEY',
@@ -709,8 +679,6 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
-  'REMEDIATION_TRIGGERS_DISABLED',
-  'SUMMER_SENTRY_INTAKE_LIVE',
   'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'JOVIE_FLEET_ENABLED',
   'JOVIE_FLEET_LINEAR_TEAM_ID',

@@ -23,6 +23,7 @@ export interface ClaimableProfileSnapshot {
   readonly id: string;
   readonly username: string;
   readonly isClaimed: boolean | null | undefined;
+  readonly userId?: string | null;
   readonly userClerkId?: string | null;
   readonly spotifyId?: string | null;
 }

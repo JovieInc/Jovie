@@ -1,0 +1,74 @@
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, within } from 'storybook/test';
+import type { AdminUsagePoint } from '@/lib/admin/types';
+import { MetricsChart } from './MetricsChart';
+
+const usagePoints: AdminUsagePoint[] = [
+  { label: 'Aug 18', value: 834 },
+  { label: 'Aug 19', value: 902 },
+];
+
+const longUsagePoints: AdminUsagePoint[] = Array.from(
+  { length: 90 },
+  (_, index) => ({
+    label: `Day ${index + 1}`,
+    value: 1_000_000 + index * 12_345,
+  })
+);
+
+/** State coverage for the admin daily-active-users chart; Populated lives in MetricsChart.stories.tsx. */
+const meta = {
+  title: 'Features/Admin/MetricsChart States',
+  component: MetricsChart,
+  parameters: { layout: 'centered' },
+  decorators: [
+    Story => (
+      <div className='w-full max-w-4xl rounded-xl border border-subtle bg-surface-1 p-4'>
+        <Story />
+      </div>
+    ),
+  ],
+  args: { points: usagePoints },
+} satisfies Meta<typeof MetricsChart>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** Empty: no usage observations yet, so the chart says so instead of plotting zero. */
+export const EmptyNoUsage: Story = {
+  args: { points: [] },
+  play: async ({ canvasElement }) => {
+    await expect(
+      await within(canvasElement).findByText('No usage data available yet.')
+    ).toBeVisible();
+  },
+};
+
+/** Long content: ninety days of seven-figure counts. */
+export const LongContentNinetyDays: Story = {
+  args: { points: longUsagePoints },
+  play: async ({ canvasElement }) => {
+    // Current DAU and Peak Day carry the same value for a strictly
+    // increasing series, so the stat text intentionally matches twice.
+    const [stat] = await within(canvasElement).findAllByText(
+      (2_098_705).toLocaleString()
+    );
+    await expect(stat).toBeVisible();
+  },
+};
+
+/** Right-to-left: the chart and its stats inside an RTL document. */
+export const RtlDocument: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await expect(
+      await within(canvasElement).findByText('Daily Active Users')
+    ).toBeVisible();
+  },
+};

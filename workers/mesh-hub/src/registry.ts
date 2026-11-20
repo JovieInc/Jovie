@@ -10,12 +10,13 @@ import {
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
-import { executorKinds } from './executor.ts';
+import { runtimeStatus } from './executor.ts';
 import type { Liveness } from './mailbox.ts';
 import {
   type AgentState,
   evaluatePresence,
   evaluateProbe,
+  lastConsumerAlive,
   PROBE,
 } from './presence.ts';
 
@@ -37,11 +38,14 @@ const ALERTING = new Set([
   'agent.silent',
   'agent.unreachable',
   'message.dead',
+  'webhook.rejected',
   'hub.suspect',
   'mail.stale',
   'executor.failed',
 ]);
 const TOUCH_DEBOUNCE_MS = 15_000;
+const numberOrNull = (value: unknown): number | null =>
+  value === null ? null : Number(value);
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS agents (
@@ -270,20 +274,17 @@ export class Registry extends DurableObject<Env> {
         // Mailbox unreachable: do not guess; skip this agent this round.
         continue;
       }
-      const heartbeatSec =
-        agent.heartbeat_sec === null ? null : Number(agent.heartbeat_sec);
+      const heartbeatSec = numberOrNull(agent.heartbeat_sec);
       if (heartbeatSec) heartbeatAgents++;
       const presence = evaluatePresence({
         now,
         heartbeatSec,
         state: String(agent.state) as AgentState,
-        lastSeenAt:
-          agent.last_seen_at === null ? null : Number(agent.last_seen_at),
+        lastSeenAt: numberOrNull(agent.last_seen_at),
         connected: live.connected,
         lastPingAt: live.lastPingAt,
         lastActivityAt: live.lastActivityAt,
-        registeredAt:
-          agent.updated_at === null ? null : Number(agent.updated_at),
+        registeredAt: numberOrNull(agent.updated_at),
       });
       if (presence.state !== agent.state)
         this.sql.exec(
@@ -295,10 +296,7 @@ export class Registry extends DurableObject<Env> {
       if (presence.event) {
         const previous = {
           state: String(agent.state),
-          changedAt:
-            agent.state_changed_at === null
-              ? null
-              : Number(agent.state_changed_at),
+          changedAt: numberOrNull(agent.state_changed_at),
         };
         pending.push({
           type: presence.event,
@@ -384,6 +382,7 @@ export class Registry extends DurableObject<Env> {
   ) {
     const result = evaluateProbe({
       now,
+      lastAliveAt: lastConsumerAlive(live),
       lastProbeAt: live.lastProbe?.acceptedAt ?? null,
       lastProbeAckAt: live.lastProbe?.receivedAt ?? null,
       misses,
@@ -438,8 +437,7 @@ export class Registry extends DurableObject<Env> {
         owner: row.owner === null ? null : String(row.owner),
         status: String(row.status),
         fallback: row.fallback === null ? null : String(row.fallback),
-        heartbeatSec:
-          row.heartbeat_sec === null ? null : Number(row.heartbeat_sec),
+        heartbeatSec: numberOrNull(row.heartbeat_sec),
         probe: Boolean(row.probe),
         lastSeenAt:
           row.last_seen_at === null
@@ -451,7 +449,7 @@ export class Registry extends DurableObject<Env> {
             ? null
             : new Date(Number(row.state_changed_at)).toISOString(),
         probeMisses: Number(row.probe_misses),
-        probeRttMs: row.probe_rtt_ms === null ? null : Number(row.probe_rtt_ms),
+        probeRttMs: numberOrNull(row.probe_rtt_ms),
       }));
   }
 
@@ -463,11 +461,7 @@ export class Registry extends DurableObject<Env> {
           const live = await this.mailbox(agent.kind).liveness();
           return {
             ...agent,
-            // "ok" means can handle mail: a hub executor exists. A relay alone only stores it.
-            canHandle: Boolean(
-              this.env.AI &&
-                executorKinds(this.env.EXECUTOR_KINDS).has(agent.kind)
-            ),
+            ...runtimeStatus(agent.kind, this.env),
             connected: live.connected,
             lastPingAt: live.lastPingAt
               ? new Date(live.lastPingAt).toISOString()
@@ -478,6 +472,7 @@ export class Registry extends DurableObject<Env> {
         } catch {
           return {
             ...agent,
+            ...runtimeStatus(agent.kind, this.env),
             connected: null,
             lastPingAt: null,
             unhandled: null,

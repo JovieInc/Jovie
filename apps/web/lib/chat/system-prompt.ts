@@ -1,27 +1,27 @@
 import { getProfileUrl } from '@/constants/domains';
+import {
+  buildArtistRulesPromptSection,
+  type EnforcedArtistRule,
+} from '@/lib/artist-rules/gate';
+import {
+  buildDiscographySection,
+  discographyTotalLine,
+  formatPromptDate,
+} from '@/lib/chat/discography-prompt';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSkillsPromptSection } from '@/lib/chat/skills/registry';
+import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
+import type { ReleaseCatalogMeta } from '@/lib/chat/types';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
 
-interface ArtistContextSpotify {
-  readonly spotifyUrl?: string | null;
-  readonly spotifyFollowers: number | null;
-  readonly spotifyPopularity: number | null;
-}
-
-/** Connection state is its own fact: a null follower count is not "Not connected". */
-function spotifyConnectionLine(context: ArtistContextSpotify): string {
-  const connected =
-    Boolean(context.spotifyUrl) ||
-    context.spotifyFollowers !== null ||
-    context.spotifyPopularity !== null;
-  return connected
-    ? `Connected${context.spotifyUrl ? ` (${context.spotifyUrl})` : ''}`
-    : 'Not connected';
-}
+export {
+  describeReleaseTiming,
+  formatPromptDate,
+} from '@/lib/chat/discography-prompt';
 
 interface ArtistContext {
   readonly displayName: string;
@@ -39,6 +39,7 @@ interface ArtistContext {
     readonly totalReceivedCents: number;
     readonly monthReceivedCents: number;
   };
+  readonly artistRules?: readonly EnforcedArtistRule[];
 }
 
 interface ReleasePromptContext {
@@ -78,68 +79,6 @@ interface AccountPromptContext {
     readonly hasStripeCustomer: boolean;
     readonly hasStripeSubscription: boolean;
   };
-}
-
-const DAY_MS = 86_400_000;
-
-function utcDay(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
-function weekday(date: Date): string {
-  return date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-}
-
-/** "2026-10-30 (Friday)" */
-export function formatPromptDate(date: Date): string {
-  return `${date.toISOString().slice(0, 10)} (${weekday(date)})`;
-}
-
-/**
- * Upcoming vs released, relative to today. Without this the model treats a
- * single due Friday as already out (helpfulness eval, 2026-10-28).
- */
-export function describeReleaseTiming(
-  releaseDate: string | null,
-  now: Date
-): string {
-  if (!releaseDate) return 'date not set';
-  const date = new Date(releaseDate);
-  if (Number.isNaN(date.getTime())) return 'date not set';
-  const days = Math.round((utcDay(date) - utcDay(now)) / DAY_MS);
-  if (days > 0) {
-    return `UPCOMING, out ${weekday(date)} ${releaseDate.slice(0, 10)}, in ${days} day${days === 1 ? '' : 's'}`;
-  }
-  if (days === 0) return `OUT TODAY, ${releaseDate.slice(0, 10)}`;
-  const ago = -days;
-  return `released ${releaseDate.slice(0, 10)}, ${ago} day${ago === 1 ? '' : 's'} ago`;
-}
-
-function formatReleaseLine(release: ReleasePromptContext, now: Date): string {
-  const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
-  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`;
-}
-
-function buildDiscographySection(
-  releases: ReleasePromptContext[],
-  now: Date
-): string {
-  if (releases.length === 0) {
-    return '- No releases found in the connected discography yet.';
-  }
-
-  const releaseLines = releases
-    .slice(0, 25)
-    .map(release => formatReleaseLine(release, now))
-    .join('\n');
-  const overflowCount = releases.length - 25;
-  const releasePlural = overflowCount === 1 ? '' : 's';
-  const overflowLine =
-    overflowCount > 0
-      ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
-      : '';
-
-  return `${releaseLines}${overflowLine}`;
 }
 
 /**
@@ -190,6 +129,13 @@ export function buildSystemPromptParts(
      * releases and music links already in this context.
      */
     segment?: ResolvedSegment;
+    /** Catalog read health + total; omitted = loaded slice is the whole catalog. */
+    releaseCatalog?: ReleaseCatalogMeta;
+    /**
+     * Releases the artist named this turn that are outside the shown rows.
+     * Rendered inside Discography Context; omitted when the catalog is unread.
+     */
+    namedReleases?: readonly ReleasePromptContext[];
     /** Clock for release timing. Defaults to now; tests and evals pin it. */
     now?: Date;
   }
@@ -203,7 +149,7 @@ export function buildSystemPromptParts(
       platforms: context.hasMusicLinks ? ['spotify'] : [],
     }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-${buildPromptSecuritySection()}
+${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}${buildSkillsPromptSection()}
 ## About This Artist
 - **Today:** ${formatPromptDate(now)}
 - **Name:** ${context.displayName} (@${context.username})
@@ -224,8 +170,8 @@ Everything you say about this artist's own accounts, connections, releases, song
 - **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes (the public profile shows streaming links)' : 'No'}
 
 ## Discography Context
-- **Total Releases:** ${releases.length}
-${buildDiscographySection(releases, now)}
+- **Total Releases:** ${discographyTotalLine(releases, options?.releaseCatalog)}
+${buildDiscographySection(releases, now, options?.releaseCatalog, options?.namedReleases)}
 
 ${buildSegmentPromptSection(segment)}
 
@@ -238,7 +184,7 @@ ${buildSegmentPromptSection(segment)}
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
 - \`@release:<id>[<title>]\`: reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
-- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks.
+- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks. \`@profile:<id>[<name>]\` is the user's own Jovie profile, attached when they start a chat from it; treat it as a request for help with that profile.
 - \`/skill:<toolId>\`: the user picked this skill explicitly. Call the matching tool immediately **only if that tool is available to this artist on their current plan** (anything not in the tools list you were given is gated). If the tool is gated, do not attempt to call it or describe its output; say briefly that the skill is a Pro-plan feature. If the tool is available but required entity slots aren't filled (no matching @entity token), ask for the missing entity before calling.
 Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
 
@@ -315,7 +261,7 @@ ${PITCH_GRILL_PROCEDURE}
 Use the voicePromo tool when the artist says "clone my voice", "voice promo", "radio drop", "DJ liner", "promo audio from my voice", or "generate a drop with my cloned voice". It generates short playable promo audio (radio station liner) from a cloned ElevenLabs voiceId + text/script. Always confirm voiceId (user provides or from prior clone flow). This is a premium tool. Keep scripts short (<280 chars ideal for radio). Pass style or targetStation when provided for personalization. The output is base64 audio ready for playback/download.
 
 ## In-App Video Recording
-Use proposeVideoRecording when you have written a short talking-head script for a promo, thank-you, or behind-the-scenes video and the artist should record it in Jovie. Pass the script you wrote, a concise title, and the kind. The card offers Upload video and Record in app; do not start recording yourself.
+Use proposeVideoRecording when you have written a short talking-head script for a promo, thank-you, or behind-the-scenes video and the artist should record it in Jovie. Pass the script you wrote, a concise title, and the kind. Also pass two or three short questions an interviewer would ask about the script, so the artist can answer on camera between takes. The card offers Upload video and Record in app; do not start recording yourself.
 
 ## Merch Creation
 Use merch tools immediately when the artist asks to make, preview, publish, pause, kill, bring back, rank, optimize, or inspect merch. For a new merch idea, call findMerchSources before createMerch or previewMerchOptions. Start with a confirmed catalog title or an explicitly user-provided phrase, never with generated art alone.
@@ -327,6 +273,8 @@ Merch grounding contract:
 - An uploaded Work logo, vector, or PNG is an artist-owned source asset, not inspiration. Never recreate it from a textual description. Explain that Jovie needs the asset-preserving render path before it can make constrained variations from that selected asset.
 - If no confirmed source exists, say that plainly and ask for one title or one phrase they own. Do not generate a generic artist render as a substitute.
 
+Act on the first clear intent. When the artist asks to make merch, do not ask "want me to run it?" or any other go-ahead question: after findMerchSources, call createMerch in the same turn with the recommended candidate, and say which title you used. One confirmation at most, and only for publishing.
+Never describe designs as queued, loading, generating or on the way. Say only what the tool result shows: if createMerch returns designs, present them; if it returns none, say generation did not produce designs and offer to retry. Never end a reply by asking the artist to pick from options that did not render.
 createMerch and previewMerchOptions always produce exactly three options only after a verified source is selected. After showing options, ask the artist to pick 1, 2, or 3, or describe a change.
 If the artist already named an item type, pass it through. If they did not, do not ask a product-type question while starting generation: call the tool with no itemType, let it transparently start as a premium tee, and say they can switch the product after choosing a design. Ask for product type before calling the tool only when the artist explicitly wants to decide that before any generation starts.
 Use createMerchAlternativeItem when the artist asks for the same saved design on another product. Do not regenerate the design unless they ask for a different concept.
@@ -342,7 +290,7 @@ Merch quality standard:
 - The MVP uses Jovie checkout and a manual artist payout ledger. Never say artist payouts are automatic.
 
 ## Feedback
-When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
+When the artist wants to share feedback or report a bug, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission. A request for something Jovie can't do yet goes to requestCapability instead.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
 
   // Per-turn context (retrieved knowledge, live usage counters, referenced
   // entities, pinned card) goes last so the stable prefix stays byte-identical

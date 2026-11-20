@@ -9,7 +9,12 @@ import {
   type FleetResult,
   type FleetState,
 } from './dispatcher';
-import { fleetArchiveKey, fleetHistoryPrefix } from './retention';
+import {
+  type ArchivedInvocation,
+  fleetArchiveKey,
+  fleetHistoryPrefix,
+  readArchiveValue,
+} from './retention';
 
 class ArchiveStore implements FleetBackend {
   records = new Map<string, unknown>();
@@ -395,12 +400,16 @@ describe('fleet archival preserves authority and durable outcomes beyond lifetim
       }
     });
     const ids = new Set<string>();
+    const pageKeys: string[] = [];
     let after = 0;
     for (;;) {
+      const pageKey = randomUUID();
+      pageKeys.push(pageKey);
       const result = await f.invoke(
         'fleet.status',
         { historyAfter: after, historyLimit: 100 },
-        f.token
+        f.token,
+        pageKey
       );
       expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(
         1024 * 1024
@@ -420,9 +429,22 @@ describe('fleet archival preserves authority and durable outcomes beyond lifetim
         .filter(r => r.refresh)
         .every(r => !r.result)
     ).toBe(true);
-    expect(
-      Object.values(f.state().invocations).filter(r => r.refresh).length
-    ).toBeGreaterThan(1);
+    expect(pageKeys.length).toBeGreaterThan(1);
+    const archivedBindings = [...f.store.records]
+      .filter(([key]) => key.startsWith(`${f.key}:archive:invocations:`))
+      .map(([key, value]) =>
+        readArchiveValue<ArchivedInvocation>(
+          value,
+          'invocations',
+          key.slice(`${f.key}:archive:invocations:`.length)
+        )
+      );
+    const refreshBindings = [
+      ...Object.values(f.state().invocations),
+      ...archivedBindings,
+    ].filter(binding => binding?.refresh);
+    expect(refreshBindings).toHaveLength(pageKeys.length);
+    expect(refreshBindings.every(binding => !binding?.result)).toBe(true);
   });
 
   it('admits a defect after reporting while the original lease remains valid, without orphaning its provider reservation', async () => {

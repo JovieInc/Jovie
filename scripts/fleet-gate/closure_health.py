@@ -142,7 +142,7 @@ GIT_OID = re.compile(r"^[0-9a-f]{40}$")
 # be classified as promotable; drift fails closed instead of silently dropping
 # a newly required check.
 EXPECTED_REQUIRED_CHECKS = frozenset(
-    {"Fork PR Gate", "Migration Guard", "PR Ready", "PR Size Guard"}
+    {"Fork PR Gate", "Migration Guard", "PR Ready", "PR Size Guard", "Company guards"}
 )
 CHECKABLE_MERGE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
 ACCEPTED_CHECK_RUN_CONCLUSIONS = frozenset({"NEUTRAL", "SKIPPED", "SUCCESS"})
@@ -2243,7 +2243,6 @@ def product_id_for_repository(repository: str | None) -> str | None:
     fallback = {
         "jovieinc/jovie": JOVIE_PRODUCT_ID,
         "jovieinc/logyourbody": "logyourbody",
-        "jovieinc/ovie": "ovie",
     }
     return fallback.get(repository.casefold())
 
@@ -2318,7 +2317,6 @@ def _issue_intake_product_rows() -> list[tuple[str, str]]:
         return [
             (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
             ("logyourbody", "JovieInc/LogYourBody"),
-            ("ovie", "JovieInc/ovie"),
         ]
     try:
         return [(repo.id, repo.github) for repo in issue_intake_repos()]
@@ -2326,7 +2324,6 @@ def _issue_intake_product_rows() -> list[tuple[str, str]]:
         return [
             (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
             ("logyourbody", "JovieInc/LogYourBody"),
-            ("ovie", "JovieInc/ovie"),
         ]
 
 
@@ -2381,7 +2378,7 @@ def product_intake_allowed(
 ) -> bool:
     """Return newIssueIntakeAllowed for one registry product.
 
-    Jovie MQ empty/UNMERGEABLE never freezes LYB/Ovie. Systems-down shared
+    Jovie MQ empty/UNMERGEABLE never freezes LYB. Systems-down shared
     evidence still fails closed for every product.
     """
     needle = str(product_id or "").strip() or JOVIE_PRODUCT_ID

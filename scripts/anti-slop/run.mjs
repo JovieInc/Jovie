@@ -8,10 +8,12 @@
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readScanFile, scanFiles } from './brand-name.mjs';
 import {
   checkDrift,
+  checkTitleCaseHeadings,
   findUnregisteredCopies,
   LEGACY_PATH,
   loadRegistry,
@@ -25,7 +27,7 @@ export function runValidate(root = REPO_ROOT) {
   const { errors } = validateRegistry(reg, root);
   const drift = checkDrift(reg, root);
   return {
-    errors: [...errors, ...drift.errors],
+    errors: [...errors, ...drift.errors, ...checkTitleCaseHeadings(root)],
     summary: summarize(reg),
     copies: drift.current.length,
   };
@@ -40,8 +42,11 @@ export function runMatchers(reg, files, root = REPO_ROOT) {
       const fileRe = matcher.files ? new RegExp(matcher.files, 'u') : null;
       for (const file of files) {
         if (fileRe && !fileRe.test(file)) continue;
-        const lines = readFileSync(resolve(root, file), 'utf8').split('\n');
+        const input = readScanFile(file, root, { brand: false });
+        if (!input) continue;
+        const lines = input.text.split('\n');
         lines.forEach((line, index) => {
+          re.lastIndex = 0;
           if (re.test(line))
             findings.push({
               id: rule.id,
@@ -87,14 +92,26 @@ function main(argv) {
       process.stderr.write('usage: check --files <file...>\n');
       return 2;
     }
+    const safeFiles = files.filter(
+      file => readScanFile(file, REPO_ROOT, { brand: false }) !== null
+    );
+    if (!safeFiles.length) return 0;
     const reg = loadRegistry();
-    const findings = runMatchers(reg, files);
+    const findings = runMatchers(reg, safeFiles);
+    for (const hit of scanFiles(safeFiles))
+      findings.push({
+        id: 'ASR-036',
+        severity: 'block',
+        file: hit.file,
+        line: hit.line,
+        text: `${hit.kind} ${hit.text}`,
+      });
     const fs = spawnSync(
       process.execPath,
       [
         join(REPO_ROOT, 'scripts/design-frontend-skill-check.mjs'),
         '--files',
-        ...files,
+        ...safeFiles,
       ],
       { stdio: 'inherit' }
     );

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import stage_timings  # noqa: E402
+import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import pr_wip; import stage_timings  # noqa: E402
 # Tim 2026-10-12: no arbitrary timers. Seats follow proven demand every tick; only measured limits
 # (host load/memory/PSI/disk, provider credits and leases, GitHub quota, current failure rate on
 # this release) hold or shrink them. HOST_SETTLE_S is the measurement lag of the signal itself:
@@ -20,11 +20,10 @@ MERGE_QUEUE_WAIT_BRAKE_MIN = 30
 YIELD_WINDOW_S, YIELD_MIN_ATTEMPTS, YIELD_FLOOR = 7200, 6, 0.12
 _CONVERTED = frozenset({"pushed", "fix-pushed", "pr-opened", "landing", "decomposed"})
 _ATTEMPTED = _CONVERTED | frozenset({"failed", "fix-no-change", "provider-error", "not-shippable"})
-# WIP cap (2026-10-28): finish before starting. Above this many open PRs, new-issue intake stops; fix-red,
-# conflict and other remediation seats keep running, so inventory converges instead of piling up.
-WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = 80, 1800
+# Historical WIP target is diagnostic; it is never an admission ceiling.
+WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = pr_wip.total_cap(), 1800
 # Hosted-runner backlog (throughput_sentinel release-flow.json): push admission pauses, remediation does not.
-CI_QUEUED_RUNS_BRAKE, CI_QUEUED_OLDEST_BRAKE_MIN, CI_SIGNAL_STALE_S = 400, 15, 900
+CI_QUEUED_RUNS_BRAKE, CI_QUEUED_OLDEST_BRAKE_MIN, CI_SIGNAL_STALE_S = pr_wip.CI_QUEUED_RUNS_BRAKE, pr_wip.CI_QUEUED_OLDEST_BRAKE_MIN, pr_wip.CI_SIGNAL_STALE_S
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
 # A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
@@ -257,7 +256,7 @@ def flow_metrics(observed: dict, yields: dict, swarm: int, wip_max: int, now: fl
             "cycleMinutesP50": _pctl(cycle, .5), "cycleMinutesP95": _pctl(cycle, .95), "openPrWip": _count(observed.get("openPRCount")),
             "wipMax": wip_max, "backlog": backlog, "swarmClaims": swarm,
             "burnDownEtaDays": round(backlog / merged_day, 1) if backlog is not None and merged_day else None,
-            "targets": {"mergedPerDay": 100, "mergedPerAttempt": 0.6, "openPrWip": 80, "burnDownEtaDays": 14}}
+            "targets": {"mergedPerDay": 100, "mergedPerAttempt": 0.6, "openPrWip": wip_max, "burnDownEtaDays": 14}}
 def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFAULT) -> dict:
     """Local files only: no GitHub or Linear calls."""
     root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed = _obj(doctor.get("observed"))
@@ -297,6 +296,7 @@ def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFA
     ci_fresh = flow_at is not None and 0 <= now - flow_at <= CI_SIGNAL_STALE_S
     quota = observed.get("quotaDeferredHeads"); quota = quota.get("value") if isinstance(quota, dict) else quota
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
+            "admissionCapacity": pr_wip.capacity_snapshot(state_dir=root, now=now),
             "yieldByProvider": yields, "swarmClaims": swarm, "openPRCount": _count(observed.get("openPRCount")),
             "quotaDeferredHeads": _count(quota), "wipMax": wip_max,
             "ciQueue": {"queuedRuns": _count(flow.get("queuedRuns")), "oldestMin": _num(flow.get("queuedOldestMin")), "fresh": ci_fresh},
@@ -359,6 +359,8 @@ def _demand(name: str, obs: dict, now: float | None = None) -> int | None:
     # Positive observed demand is useful even when the other pool is unknown.
     return eligible if eligible else maint if maint else None
 def _budget_unknown(obs: dict) -> str | None:
+    if "admissionCapacity" in obs:
+        return "capacity-unknown" if _obj(obs["admissionCapacity"]).get("known") is not True else None
     if _int(obs.get("githubRemaining")) is None:
         return "github-unknown"
     return None
@@ -370,7 +372,9 @@ def _multi_reason(name: str, obs: dict, sample: dict, now: float, changed: float
     if events and (changed is None or max(events) > changed):
         return "rate-limited"
     github = _int(obs.get("githubRemaining"))
-    if github is not None and github < GITHUB_DECREASE_BELOW:
+    capacity = _obj(obs.get("admissionCapacity"))
+    quota_blocked = any(str(reason).startswith("github-") for reason in capacity.get("blockers", []))
+    if quota_blocked or ("admissionCapacity" not in obs and github is not None and github < GITHUB_DECREASE_BELOW):
         return "github-budget-low"
     disk, free, mem, psi = _obj(obs.get("disk")), _num(_obj(obs.get("disk")).get("freePct")), _num(sample.get("memAvailableBytes")), sample.get("psi")
     severe = _psi_known(psi) and (psi["cpuSomeAvg10"] >= PSI_CPU_SEVERE or psi["memoryFullAvg10"] >= PSI_MEM_SEVERE or psi["ioFullAvg10"] >= PSI_IO_SEVERE)
@@ -402,20 +406,8 @@ def _throughput_brake(previous: dict, obs: dict, now: float) -> dict:
             "heldForS": max(0, now - since) if since is not None else 0,
             "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
                        "openedPerHour": opened, "ejectionRate": ejections}}
-def _intake_gates(obs: dict, brake: dict) -> list[str]:
-    """Push admission, not remediation fan-out: new issues become new PRs that spend CI, merge-queue and
-    GitHub quota, so they stop on WIP, CI queue wait or quota deferral. Fix-red seats are untouched."""
-    gates, wip, wip_max = [], _count(obs.get("openPRCount")), _count(obs.get("wipMax"))
-    if wip is not None and wip_max and wip > wip_max:
-        gates.append("wip-cap")
-    if "queue-wait" in (brake.get("reasons") or []):
-        gates.append("ci-queue-wait")
-    ci = _obj(obs.get("ciQueue"))
-    if ci.get("fresh") and ((_count(ci.get("queuedRuns")) or 0) >= CI_QUEUED_RUNS_BRAKE or (_num(ci.get("oldestMin")) or 0) >= CI_QUEUED_OLDEST_BRAKE_MIN):
-        gates.append("ci-runner-backlog")
-    if (_count(obs.get("quotaDeferredHeads")) or 0) > 0:
-        gates.append("github-quota-deferred")
-    return gates
+def _intake_gates(obs: dict, brake: dict, name: str = "") -> list[str]:
+    return pr_wip.intake_blockers(obs, name)
 def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     """Only measured limits and unknown measurements. No streaks, budgets or trailing averages."""
     reason = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason")
@@ -438,7 +430,9 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
         (mem is None or _num(mem) is None or mem < MEM_HEADROOM_BYTES, "low-mem"),
         (psi is not None and (not _psi_known(psi) or any(psi[key] > limit for key, limit in zip(_PSI, (PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK)))), "psi-high"),
         (disk.get("admitted") is not True or free is None or free <= DISK_INCREASE_MIN, "disk-low"),
-        (github is None or github < GITHUB_INCREASE_MIN, "github-unknown" if github is None else "github-budget"),
+        (_budget_unknown(obs) is not None or (_obj(obs.get("admissionCapacity")).get("allowed") is False)
+         if "admissionCapacity" in obs else github is None or github < GITHUB_INCREASE_MIN,
+         _budget_unknown(obs) or _obj(obs.get("admissionCapacity")).get("reason") or "github-budget"),
     )
     return [token for cond, token in pairs if cond]
 _CEILING_HOLDS = ("hold:lane-ceiling", "hold:host-ceiling")
@@ -579,9 +573,12 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 used += 0 if chosen in remote_lanes else grow
     for name, row in rows.items():
         base = row["base"]
-        if base > 0 and row["effective"] > base and unknown:
+        capacity = pr_wip.capacity_from_observation(obs, name)
+        capacity_unknown = "capacity-unknown" if capacity and capacity.get("known") is not True else None
+        limit_unknown = unknown or capacity_unknown
+        if base > 0 and row["effective"] > base and limit_unknown:
             # API-budget uncertainty stays fail-safe; queue metrics are only diagnostic.
-            row.update(effective=base, target=min(base, row.get("target", base)), lastReason="hold:" + unknown, blockers=[unknown])
+            row.update(effective=base, target=min(base, row.get("target", base)), lastReason="hold:" + limit_unknown, blockers=[limit_unknown])
         intake_blockers = []
         if base <= 0 or _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason") == "provider-disabled":
             intake_blockers.append("disabled")
@@ -589,7 +586,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             intake_blockers.append("unhealthy")
         if name in set(obs.get("cooling") or []):
             intake_blockers.append("cooling")
-        intake_blockers += _intake_gates(obs, brake)
+        intake_blockers += _intake_gates(obs, brake, name)
         row.update(intakeEffective=0 if intake_blockers else row["effective"], intakeBlockers=intake_blockers)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:

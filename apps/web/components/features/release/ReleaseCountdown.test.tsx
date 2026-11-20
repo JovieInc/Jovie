@@ -1,5 +1,6 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ReleaseCountdown } from './ReleaseCountdown';
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -57,11 +58,11 @@ describe('ReleaseCountdown', () => {
 
     expect(screen.getByText('Release starts in')).toBeVisible();
     expect(screen.getByText('2')).toBeVisible();
-    expect(screen.getByText('days')).toBeVisible();
+    expect(screen.getByText('Days')).toBeVisible();
     expect(screen.getByText('3')).toBeVisible();
-    expect(screen.getByText('hrs')).toBeVisible();
+    expect(screen.getByText('Hrs')).toBeVisible();
     expect(screen.getByText('4')).toBeVisible();
-    expect(screen.getByText('min')).toBeVisible();
+    expect(screen.getByText('Min')).toBeVisible();
   });
 
   it('updates the countdown and refreshes once when the release arrives', () => {
@@ -128,10 +129,59 @@ describe('ReleaseCountdown', () => {
     );
 
     expect(screen.getByText('Drops in')).toHaveClass('text-secondary-token');
-    for (const unit of ['days', 'hrs', 'min']) {
+    for (const unit of ['Days', 'Hrs', 'Min']) {
       const label = screen.getByText(unit);
       expect(label).toHaveClass('text-secondary-token');
       expect(label.className).not.toMatch(/text-white\/\d+/u);
     }
+  });
+});
+
+describe('ReleaseCountdown states (axe)', () => {
+  const inMs = (ms: number) => new Date(Date.now() + ms + 30_000);
+  afterEach(cleanup);
+
+  it('renders nothing once the release has arrived (empty)', async () => {
+    const { container } = render(
+      <ReleaseCountdown releaseDate={new Date(Date.now() - 60_000)} />
+    );
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('drops the days column under a day (partial)', async () => {
+    const { container } = render(
+      <ReleaseCountdown releaseDate={inMs((3 * 60 + 5) * 60_000)} />
+    );
+    expect(screen.queryByText(/^days?$/i)).toBeNull();
+    expect(screen.getByText('3')).toBeVisible();
+    expect(screen.getByText('Hrs')).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders a long custom label and the compact row without axe violations', async () => {
+    const label = 'Premieres worldwide on every streaming service in';
+    const { container } = render(
+      <>
+        <ReleaseCountdown releaseDate={inMs(12 * 86_400_000)} label={label} />
+        <ReleaseCountdown releaseDate={inMs(12 * 86_400_000)} compact />
+      </>
+    );
+    expect(screen.getByText(label)).toBeVisible();
+    expect(screen.getByText('D')).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders in a right-to-left page without axe violations', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ReleaseCountdown
+          releaseDate={inMs(2 * 86_400_000)}
+          label='يصدر خلال'
+        />
+      </div>
+    );
+    expect(screen.getByText('يصدر خلال')).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

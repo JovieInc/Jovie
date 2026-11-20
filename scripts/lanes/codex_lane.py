@@ -25,16 +25,27 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from scripts.lanes.codex_terminal import (
+        AUTH, LIMIT, RESET_AT, RESET_IN, parse_reset, parse_announcement,
+        pending_terminal_observation, classify as classify_terminal,
+        terminal_context, terminal_observation,
+    )
+except ModuleNotFoundError:  # Direct executor entry from outside the repository root.
+    from codex_terminal import (
+        AUTH, LIMIT, RESET_AT, RESET_IN, parse_reset, parse_announcement,
+        pending_terminal_observation, classify as classify_terminal,
+        terminal_context, terminal_observation,
+    )
 
 ACCOUNTS_ROOT = Path(os.environ.get("CODEX_ACCOUNTS_ROOT", Path.home() / ".codex-accounts"))
 STATE = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "codex-accounts.json"
 DEFAULT_COOLDOWN_S = int(os.environ.get("CODEX_DEFAULT_COOLDOWN_S", 5 * 3600))
-LIMIT = re.compile(r"usage limit|rate limit|too many requests|\b429\b|quota", re.I)
 # A short burst limit (429 / "rate limit") backs off briefly and rotates; only a spent
 # plan (usage limit / quota) banks the account until its reset.
-USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
 RATE_BACKOFF_S = int(os.environ.get("CODEX_RATE_BACKOFF_S", 120))
 ROTATE_PAUSE_S = float(os.environ.get("CODEX_ROTATE_PAUSE_S", 20))
 # An account leased by another run is busy, not spent. On Gem (one current-login lease) three
@@ -50,15 +61,7 @@ LEDGER_CADENCE_S = 3600
 SUBSCRIPTION_REFRESH_LEAD_S = 900
 SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
-AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
-RESET_AT = re.compile(r"(?:try again|resets?|available)\s+(?:at|on)\s+([0-9T:\-\. ]+(?:AM|PM|Z)?)", re.I)
-RESET_IN = re.compile(r"try again in\s+((?:\d+\s*(?:days?|hours?|hrs?|minutes?|mins?|seconds?|secs?|[dhms])\s*)+)", re.I)
-IMMEDIATE_RESET = re.compile(r"(?:\b(?:rate|usage) limits?\b.{0,30}\b(?:reset|restored)\b|\b(?:reset|restored)\b.{0,30}\b(?:rate|usage) limits?\b)", re.I)
-BANKED_GRANT = re.compile(r"\b(?:banked resets?|reset credits?|credits?\s+(?:for|to)\s+reset)\b", re.I)
-UNASSERTED = re.compile(r"\b(?:if|would|could|might|may|hypothetical|proposal|considering)\b", re.I)
-HISTORICAL = re.compile(r"\b(?:yesterday|last (?:week|month|year)|previously|historically)\b", re.I)
-NEGATED = re.compile(r"\b(?:no|not|never|won't|will not|didn't|did not)\b", re.I)
 NO_ACCOUNT_EXIT = 75  # EX_TEMPFAIL: the lane treats it as provider-error and cools down
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
 ACCOUNT_CLASS = "chatgpt-oauth"
@@ -196,7 +199,7 @@ def verify_subscription_identity(name: str, snapshot: dict, profile: dict) -> No
 
 
 def current_login_mode() -> bool:
-    """Opt-in to the existing CLI login; never discover or rotate other profiles."""
+    """Use subscription-only CLI transport for the single login or explicit pool."""
     return os.environ.get("CODEX_LANE_AUTH_MODE") in (CURRENT_LOGIN, SUBSCRIPTION_POOL)
 
 
@@ -437,53 +440,6 @@ def available(name: str, state: dict, now: float) -> bool:
     return float(state.get(name, {}).get("exhaustedUntil") or 0) <= now
 
 
-def parse_reset(text: str, now: float) -> float | None:
-    """The reset instant codex printed, if any; None means 'unknown, use the default'."""
-    match = RESET_IN.search(text)
-    if match:
-        seconds = 0
-        for amount, unit in re.findall(r"(\d+)\s*([a-z]+)", match.group(1), re.I):
-            seconds += int(amount) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[unit[0].lower()]
-        return now + seconds if seconds else None
-    match = RESET_AT.search(text)
-    if not match:
-        return None
-    raw = match.group(1).strip()
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc).timestamp()
-        except ValueError:
-            continue
-    for fmt in ("%I:%M %p", "%I %p", "%H:%M"):
-        try:
-            clock = datetime.strptime(raw.upper(), fmt)
-        except ValueError:
-            continue
-        local = datetime.fromtimestamp(now).replace(hour=clock.hour, minute=clock.minute, second=0)
-        if local.timestamp() <= now:
-            local += timedelta(days=1)
-        return local.timestamp()
-    return None
-
-
-def parse_announcement(message: dict) -> dict | None:
-    if not isinstance(message, dict) or not isinstance(message.get("messageId"), str):
-        return None
-    body = message.get("messageBody")
-    if not isinstance(body, str) or not body.strip():
-        return None
-    flags = {"immediateReset": False, "bankedCreditGrant": False}
-    if UNASSERTED.search(body) or HISTORICAL.search(body):
-        return {"messageId": message["messageId"], "createdAt": message.get("createdAt"), **flags, "digest": hashlib.sha256(body.encode()).hexdigest()}
-    for clause in re.split(r"(?:[.;\n]|\b(?:and|but)\b)", body):
-        if NEGATED.search(clause) or UNASSERTED.search(clause) or HISTORICAL.search(clause):
-            continue
-        banked = bool(BANKED_GRANT.search(clause))
-        flags["bankedCreditGrant"] |= banked
-        flags["immediateReset"] |= bool(IMMEDIATE_RESET.search(clause)) and not banked
-    return {"messageId": message["messageId"], "createdAt": message.get("createdAt"), **flags,
-            "digest": hashlib.sha256(body.encode()).hexdigest()}
-
 def announcement_evidence(messages: list, seen: dict | None = None) -> tuple[list[dict], dict]:
     seen = dict(seen or {})
     fresh = []
@@ -630,20 +586,28 @@ def app_server_calls(name: str, calls: list[tuple[str, dict | None]], timeout: f
                                  {**os.environ, "CODEX_HOME": str(ACCOUNTS_ROOT / name)}),
                             **({"pass_fds": (lease_handle.fileno(),)} if current else {}))
     deadline = time.monotonic() + timeout
+    pending = b""
 
     def request(request_id: int, method: str, params=None) -> dict:
+        nonlocal pending
         payload = {"id": request_id, "method": method}
         if params is not None:
             payload["params"] = params
         proc.stdin.write(json.dumps(payload) + "\n")
         proc.stdin.flush()
         while time.monotonic() < deadline:
-            ready, _, _ = select.select([proc.stdout], [], [], max(0, deadline - time.monotonic()))
-            if not ready:
-                break
-            line = proc.stdout.readline()
-            if not line:
-                break
+            # Own stdout bytes here: readline can prefetch a response after a
+            # notification, leaving select's OS pipe empty despite buffered data.
+            if b"\n" not in pending:
+                ready, _, _ = select.select([proc.stdout], [], [], max(0, deadline - time.monotonic()))
+                if not ready:
+                    break
+                chunk = os.read(proc.stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                pending += chunk
+                continue
+            line, _, pending = pending.partition(b"\n")
             message = json.loads(line)
             if message.get("id") == request_id:
                 if message.get("error"):
@@ -746,14 +710,27 @@ METADATA_HOLD = "public-subscription-capacity-exhausted"
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
     """Observe one existing login; never redeem credits, rotate or clear banks.
 
-    Use the execution account's lock, and the maintained hourly cadence. Failure
-    leaves the previous observation to become stale; it cannot certify capacity.
+    Use the execution account's lock. A new terminal quota event bypasses the
+    cadence once. A failed observation never certifies capacity or clears banks.
     """
-    def due():
-        state = read_state()
+    observation_id = None
+    claim_id = uuid.uuid4().hex
+    wake_id = None
+    def due(state=None):
+        nonlocal wake_id
+        state = read_state() if state is None else state
         ledger = ((state.get(name) or {}).get("subscriptionLedger") if subscription_pool_mode()
                   else state.get("_ledger")) or {}
         last = ledger.get("reconciledAt")
+        if subscription_pool_mode():
+            pending = pending_terminal_observation(state.get(name) or {}, ledger, now)
+            if pending:
+                wake_id = pending
+                return True
+            if wake_id and ledger.get("observationId") == wake_id:
+                # A newer observer may have stamped after this call captured now.
+                # Its durable event claim wins even when our clock precedes it.
+                return False
         if subscription_pool_mode() and type(last) in (int, float):
             capacity = ((state.get(name) or {}).get("capacityLease") or {}).get("usableCapacityRemaining") or {}
             # Once per expired window: a failed refresh stamps the attempt after
@@ -774,8 +751,12 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     and type(last) in (int, float) and 0 <= now - last < if_due)
     def ledger_update(state, errors):
         ledger = {"schema": LEDGER_SCHEMA, "authMode": os.environ.get("CODEX_LANE_AUTH_MODE"),
-                  "reconciledAt": now, "errors": errors}
+                  "reconciledAt": now, "errors": errors, "attemptId": claim_id}
         if subscription_pool_mode():
+            previous = (state.get(name) or {}).get("subscriptionLedger") or {}
+            consumed = observation_id or previous.get("observationId")
+            if consumed:
+                ledger["observationId"] = consumed
             state.setdefault(name, {})["subscriptionLedger"] = ledger
         else:
             state["_ledger"] = ledger
@@ -797,7 +778,21 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
         # Persist the attempt before provider access. If storage is unavailable,
         # make no request; a failed observation or event write must not hot-loop.
         try:
-            update_state(lambda state: ledger_update(state, {name: "observation-in-progress"}))
+            stamped = False
+            def stamp_attempt(state):
+                nonlocal observation_id, stamped
+                # Multi-slot observers can both pass due() before either stamps.
+                # Recheck and consume under the same durable state lock.
+                if not due(state):
+                    return
+                entry = state.get(name) or {}
+                if subscription_pool_mode():
+                    observation_id = pending_terminal_observation(entry, entry.get("subscriptionLedger") or {}, now)
+                ledger_update(state, {name: "observation-in-progress"})
+                stamped = True
+            update_state(stamp_attempt)
+            if not stamped:
+                return {"reconciled": False, "reason": "cadence"}
         except Exception as error:
             return {"reconciled": False, "accounts": [],
                     "errors": {"_reconcile": type(error).__name__ + ": observation storage unavailable"}}
@@ -832,7 +827,13 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
         except Exception as error:
             errors[name] = type(error).__name__ + ": public subscription metadata unavailable"
 
+        applied = False
         def apply(state):
+            nonlocal applied
+            ledger = ((state.get(name) or {}).get("subscriptionLedger") if subscription_pool_mode()
+                      else state.get("_ledger")) or {}
+            if ledger.get("attemptId") != claim_id:
+                return  # A newer observer owns the durable stamp and its readback.
             if value is not None:
                 # Merge only observation fields into the current locked row.
                 # Quota/auth banks and run/attempt ownership remain untouched.
@@ -870,11 +871,14 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                                                  "leaseId": value["leaseId"], "previousDigest": _lease_digest(previous) if previous else None,
                                                  "currentDigest": _lease_digest(value), "lease": value}) + "\n")
             ledger_update(state, errors)
+            applied = True
         try:
             update_state(apply)
         except Exception as error:
             errors["_reconcile"] = type(error).__name__ + ": observation storage unavailable"
             return {"reconciled": False, "accounts": [], "errors": errors}
+        if not applied:
+            return {"reconciled": False, "reason": "observation-superseded"}
         return {"reconciled": value is not None, "accounts": [name] if value else [], "errors": errors}
     finally:
         handle.close()
@@ -1018,22 +1022,7 @@ def maybe_redeem(name: str, handle, now: float) -> bool:
 
 
 def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
-    """(kind, exhausted_until): kind is ok | rate | limit | auth | error."""
-    tail = output[-20000:]
-    # Only a failed run can be an exhausted account. A successful run's transcript often
-    # mentions "429", "quota" or "rate limit" (Jovie has a rate limiter), and matching that
-    # banked all 5 healthy accounts for 5h on 2026-09-27. Read only codex's closing lines.
-    closing = "\n".join(tail.splitlines()[-30:])
-    if code != 0 and LIMIT.search(closing):
-        if not USAGE.search(closing):
-            return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
-        return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
-    # Same rule as limits: only codex's closing lines can say the login failed. An agent
-    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
-    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
-    if code != 0 and AUTH.search(closing):
-        return "auth", now + 24 * 3600
-    return ("ok" if code == 0 else "error"), None
+    return classify_terminal(output, code, now, rate_backoff=RATE_BACKOFF_S, usage_cooldown=DEFAULT_COOLDOWN_S)
 
 
 def login_slots(name: str) -> int:
@@ -1229,7 +1218,7 @@ def run(args) -> int:
             print(f"codex-lane: account {name} at or below the {floor_percent():g}% floor until {iso(until)}; "
                   "failing over", file=sys.stderr)
             continue
-        if current_login_mode():
+        if current_login_mode() and not subscription_pool_mode():
             # Preserve the worktree for the harness's existing retry/handoff policy;
             # never rotate accounts or consume reset credits after an exhausted run.
             return NO_ACCOUNT_EXIT if kind in ("rate", "limit", "auth") else code
@@ -1239,7 +1228,12 @@ def run(args) -> int:
         if kind not in ("rate", "limit", "auth"):
             return code
         print(f"codex-lane: account {name} {kind}; unavailable until {iso(until)}; rotating", file=sys.stderr)
-        time.sleep(ROTATE_PAUSE_S)
+        if subscription_pool_mode():
+            # Consume the failed attempt's bank event now; configured peers are
+            # revalidated through the same lease/identity observer before selection.
+            reconcile()
+        else:
+            time.sleep(ROTATE_PAUSE_S)
 
 
 def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
@@ -1308,7 +1302,8 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                 return
             entry.update(lastKind=kind, lastExit=code, lastRunAt=completed_at)
             if until:
-                entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
+                observation = terminal_observation(output, kind, code, completed_at, until)
+                entry.update(exhaustedUntil=until, lastError=observation["condition"], lastObservation=observation)
             else:
                 entry.pop("exhaustedUntil", None)
             if kind == "ok":
@@ -1520,6 +1515,7 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "exhaustedUntil": iso(until) if until > now else None,
             "resetsInS": max(0, int(until - now)) if until > now else 0,
             "lastKind": entry.get("lastKind"), "lastError": entry.get("lastError"),
+            "lastObservation": entry.get("lastObservation"),
             "runs": entry.get("runs", 0),
             "lastUsed": iso(entry.get("lastUsed")),
             "remainingPercent": primary.get("remainingPercent"),

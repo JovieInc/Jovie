@@ -9,6 +9,10 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
+import {
+  changelogSubscribeLimiter,
+  waitlistJoinLimiter,
+} from './public-submission-limiters';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
 import type { PlanAwareRateLimiter, RateLimitResult } from './types';
 import {
@@ -495,16 +499,10 @@ export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
   requireRedis: true,
 });
 
-/**
- * Changelog subscribe limiter
- * Limit: 1 request per 10 seconds per IP
- */
-export const changelogSubscribeLimiter = createRateLimiter(
-  RATE_LIMITERS.changelogSubscribe,
-  {
-    requireRedis: true,
-  }
-);
+export {
+  changelogSubscribeLimiter,
+  waitlistJoinLimiter,
+} from './public-submission-limiters';
 
 // ============================================================================
 // Convenience Functions
@@ -1365,6 +1363,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     health: healthLimiter,
     general: generalLimiter,
     changelogSubscribe: changelogSubscribeLimiter,
+    waitlistJoin: waitlistJoinLimiter,
     spotifySearch: spotifySearchLimiter,
     spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,
