@@ -67,7 +67,15 @@ jobs:
         run: |
           set -euo pipefail
           IDLE="${{ github.event.inputs.idle_hours || '6' }}"
+          # Inventory exits 0 even when deadlocks>0 (counts live in JSON). Tolerate
+          # legacy exit 75 so Apply still runs if an older tip is checked out.
+          set +e
           node scripts/summer/pr-no-stall.mjs --json --idle-hours="$IDLE" | tee "$RUNNER_TEMP/no-stall.json"
+          inventory_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$inventory_status" -ne 0 ] && [ "$inventory_status" -ne 75 ]; then
+            exit "$inventory_status"
+          fi
           deadlocks="$(jq '[.actionable[] | select(.class=="admission-deadlock")] | length' "$RUNNER_TEMP/no-stall.json")"
           echo "deadlocks=$deadlocks" >> "$GITHUB_OUTPUT"
           echo "::notice title=Summer no-stall::open=$(jq -r .openCount "$RUNNER_TEMP/no-stall.json") actionable=$(jq -r '.actionable|length' "$RUNNER_TEMP/no-stall.json") deadlocks=$deadlocks"

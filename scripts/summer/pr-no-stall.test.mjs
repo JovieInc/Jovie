@@ -161,6 +161,70 @@ describe('pr-no-stall classifier', () => {
     assert.equal(requiredChecksSettledGreen({ statusCheckRollup: [] }), false);
   });
 
+  it('treats StatusContext.state FAILURE/ERROR/PENDING as not green', () => {
+    assert.equal(
+      requiredChecksSettledGreen({
+        statusCheckRollup: [
+          ...GREEN_ROLLUP,
+          {
+            __typename: 'StatusContext',
+            context: 'Fork PR Gate',
+            state: 'SUCCESS',
+          },
+        ],
+      }),
+      true
+    );
+    assert.equal(
+      requiredChecksSettledGreen({
+        statusCheckRollup: [
+          {
+            __typename: 'StatusContext',
+            context: 'ci/travis',
+            state: 'FAILURE',
+          },
+        ],
+      }),
+      false
+    );
+    assert.equal(
+      requiredChecksSettledGreen({
+        statusCheckRollup: [
+          { __typename: 'StatusContext', context: 'ci', state: 'PENDING' },
+        ],
+      }),
+      false
+    );
+    assert.equal(
+      requiredChecksSettledGreen({
+        statusCheckRollup: [
+          { __typename: 'StatusContext', context: 'ci', state: 'ERROR' },
+        ],
+      }),
+      false
+    );
+  });
+
+  it('inventory-only main exits 0 when deadlocks are present', async () => {
+    const { main } = await import('./pr-no-stall.mjs');
+    const code = main(['--json'], {
+      listPrs: () => [
+        {
+          number: 1,
+          isDraft: false,
+          mergeable: 'MERGEABLE',
+          mergeStateStatus: 'BLOCKED',
+          headRefName: 'cursor/deadlock',
+          updatedAt: '2026-11-11T20:00:00Z',
+          labels: ['lane-fix-red'],
+          statusCheckRollup: GREEN_ROLLUP,
+        },
+      ],
+      nowMs: NOW,
+    });
+    assert.equal(code, 0);
+  });
+
   it('emptyHeadBump uses git argv arrays and refuses shell-meta branches', () => {
     const calls = [];
     const run = (cmd, args) => {

@@ -84,6 +84,7 @@ export function isSafeBranchName(branch) {
 
 /**
  * Fail closed: missing rollup is not proof of green.
+ * CheckRun uses status/conclusion; StatusContext uses state (no status/conclusion).
  * @param {{ statusCheckRollup?: unknown }} pr
  */
 export function requiredChecksSettledGreen(pr) {
@@ -91,14 +92,29 @@ export function requiredChecksSettledGreen(pr) {
   if (!Array.isArray(rollup) || rollup.length === 0) return false;
   for (const check of rollup) {
     if (!check || typeof check !== 'object') return false;
-    const status = String(
-      /** @type {{ status?: string }} */ (check).status ?? ''
-    ).toUpperCase();
-    const conclusion = String(
-      /** @type {{ conclusion?: string }} */ (check).conclusion ?? ''
-    ).toUpperCase();
+    const typed = /** @type {{
+      __typename?: string,
+      status?: string,
+      conclusion?: string,
+      state?: string,
+    }} */ (check);
+    const typename = String(typed.__typename ?? '');
+    const state = String(typed.state ?? '').toUpperCase();
+    const status = String(typed.status ?? '').toUpperCase();
+    const conclusion = String(typed.conclusion ?? '').toUpperCase();
+
+    // Commit status contexts (StatusContext) only expose `state`.
+    if (typename === 'StatusContext' || (state && !status && !conclusion)) {
+      if (!['SUCCESS', 'EXPECTED'].includes(state)) return false;
+      continue;
+    }
+
     if (status && status !== 'COMPLETED') return false;
     if (conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
+      return false;
+    }
+    // Mixed payloads: if `state` is present on a CheckRun-shaped node, honor it.
+    if (state && !['SUCCESS', 'EXPECTED', 'NEUTRAL'].includes(state)) {
       return false;
     }
   }
@@ -454,10 +470,9 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       );
     }
   }
-  return report.actionable.some(row => row.class === 'admission-deadlock') &&
-    !args.apply
-    ? 75
-    : 0;
+  // Inventory must exit 0 so CI can read deadlocks=N and run Apply. Deadlocks
+  // are surfaced in JSON / stdout counts, not via a failing exit code.
+  return 0;
 }
 
 const isDirectRun =
