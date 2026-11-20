@@ -23,4 +23,20 @@ extension ChatRepository {
       failureReason: failureReason
     )
   }
+
+  /// Emit first-send outcome after a non-throwing stream completion.
+  func notePostIdentityFirstSendAfterStream(
+    wasInFlight: Bool,
+    status: MobileChatTimelineStatus?
+  ) {
+    let decision = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: wasInFlight,
+      isFailed: status == .failed,
+      isCanceled: status == .canceled
+    )
+    if decision.clearLastError {
+      lastErrorMessage = nil
+    }
+    notePostIdentityFirstSendOutcome(decision.outcome, failureReason: decision.failureReason)
+  }
 }

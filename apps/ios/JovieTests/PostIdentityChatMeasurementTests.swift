@@ -34,6 +34,106 @@ struct PostIdentityChatMeasurementTests {
     )
   }
 
+  @Test func streamTerminalMapsFailCancelAndSuccessWithoutThrowing() {
+    let missing = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: true,
+      isFailed: false,
+      isCanceled: false
+    )
+    #expect(missing.outcome == .failed)
+    #expect(missing.failureReason == "missing_terminal_state")
+    #expect(missing.clearLastError == false)
+
+    let streamFailed = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: false,
+      isFailed: true,
+      isCanceled: false
+    )
+    #expect(streamFailed.outcome == .failed)
+    #expect(streamFailed.failureReason == "stream_failed")
+    #expect(streamFailed.clearLastError == false)
+
+    let streamCanceled = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: false,
+      isFailed: false,
+      isCanceled: true
+    )
+    #expect(streamCanceled.outcome == .cancelled)
+    #expect(streamCanceled.failureReason == nil)
+    #expect(streamCanceled.clearLastError == false)
+
+    let succeeded = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: false,
+      isFailed: false,
+      isCanceled: false
+    )
+    #expect(succeeded.outcome == .succeeded)
+    #expect(succeeded.failureReason == nil)
+    #expect(succeeded.clearLastError)
+  }
+
+  @Test func streamReportedFailAndCancelEmitDistinctOutcomes() {
+    let suiteName = "jovie.postIdentity.streamTerminal.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let previousFirstValue = FirstValueLandingPolicy.replaceDefaultsForTesting(defaults)
+    let previousMeasurement = PostIdentityChatMeasurement.replaceDefaultsForTesting(defaults)
+    let failProvider = RecordingObservabilityProvider()
+    Observability.useProviderForTesting(failProvider)
+    defer {
+      Observability.resetForTesting()
+      _ = FirstValueLandingPolicy.replaceDefaultsForTesting(previousFirstValue)
+      _ = PostIdentityChatMeasurement.replaceDefaultsForTesting(previousMeasurement)
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let failUser = "user_stream_fail"
+    FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: failUser, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: failUser, launchMode: .live)
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendStarted(userID: failUser, launchMode: .live)
+    )
+    let failDecision = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: false,
+      isFailed: true,
+      isCanceled: false
+    )
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendOutcome(
+        userID: failUser,
+        launchMode: .live,
+        outcome: failDecision.outcome,
+        failureReason: failDecision.failureReason
+      )
+    )
+    #expect(failProvider.breadcrumbs.map(\.event).contains(.chatFirstSendFailed))
+    #expect(failProvider.breadcrumbs.map(\.event).contains(.chatFirstSendCancelled) == false)
+
+    let cancelProvider = RecordingObservabilityProvider()
+    Observability.useProviderForTesting(cancelProvider)
+    let cancelUser = "user_stream_cancel"
+    FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: cancelUser, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: cancelUser, launchMode: .live)
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendStarted(userID: cancelUser, launchMode: .live)
+    )
+    let cancelDecision = PostIdentityChatMeasurement.decideStreamTerminal(
+      missingTerminalState: false,
+      isFailed: false,
+      isCanceled: true
+    )
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendOutcome(
+        userID: cancelUser,
+        launchMode: .live,
+        outcome: cancelDecision.outcome,
+        failureReason: cancelDecision.failureReason
+      )
+    )
+    #expect(cancelProvider.breadcrumbs.map(\.event).contains(.chatFirstSendCancelled))
+    #expect(cancelProvider.breadcrumbs.map(\.event).contains(.chatFirstSendFailed) == false)
+  }
+
   @Test func upgradeWithIdentityBitAloneIsNotEligibleWithoutArming() {
     let suiteName = "jovie.postIdentity.eligibility.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

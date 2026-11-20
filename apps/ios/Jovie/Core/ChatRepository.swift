@@ -385,20 +385,19 @@ final class ChatRepository {
       }
       coalescer.flush()
       context.acceptingEvents = false
-      if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
+      // Stream NDJSON can set .failed/.canceled without throwing — still emit outcome.
+      let wasInFlight = assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true
+      if wasInFlight {
         markAssistantFailed(
           clientTurnId: clientTurnId,
           message: "Summer did not confirm a terminal state for this turn."
         )
-        notePostIdentityFirstSendOutcome(.failed, failureReason: "missing_terminal_state")
       }
+      notePostIdentityFirstSendAfterStream(
+        wasInFlight: wasInFlight,
+        status: assistantStatus(clientTurnId: clientTurnId)
+      )
       isOffline = false
-      if assistantStatus(clientTurnId: clientTurnId) != .failed,
-         assistantStatus(clientTurnId: clientTurnId) != .canceled
-      {
-        lastErrorMessage = nil
-        notePostIdentityFirstSendOutcome(.succeeded)
-      }
       await persistCache(generation: generation, selection: selection)
     } catch {
       // Stop the timer sink before any awaited expiry delivery or cleanup.

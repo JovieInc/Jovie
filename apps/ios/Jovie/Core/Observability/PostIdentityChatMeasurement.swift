@@ -20,9 +20,51 @@ enum PostIdentityChatMeasurement {
     case failed
   }
 
+  /// Decision for a stream that finished without throwing (NDJSON terminal state).
+  struct StreamTerminalDecision: Equatable {
+    let outcome: FirstSendOutcome
+    let failureReason: String?
+    let clearLastError: Bool
+  }
+
   static let storageKeyPrefix = "jovie.postIdentity.chat."
   /// Empty-home dwell window before emitting a one-shot stall breadcrumb.
   static let emptyHomeDwellSeconds: Duration = .seconds(30)
+
+  /// Map post-stream assistant state to a first-send outcome.
+  /// Stream `.failed` / `.canceled` do not throw — callers must still emit here.
+  static func decideStreamTerminal(
+    missingTerminalState: Bool,
+    isFailed: Bool,
+    isCanceled: Bool
+  ) -> StreamTerminalDecision {
+    if missingTerminalState {
+      return StreamTerminalDecision(
+        outcome: .failed,
+        failureReason: "missing_terminal_state",
+        clearLastError: false
+      )
+    }
+    if isFailed {
+      return StreamTerminalDecision(
+        outcome: .failed,
+        failureReason: "stream_failed",
+        clearLastError: false
+      )
+    }
+    if isCanceled {
+      return StreamTerminalDecision(
+        outcome: .cancelled,
+        failureReason: nil,
+        clearLastError: false
+      )
+    }
+    return StreamTerminalDecision(
+      outcome: .succeeded,
+      failureReason: nil,
+      clearLastError: true
+    )
+  }
 
   private static var defaultsOverride: UserDefaults?
 
