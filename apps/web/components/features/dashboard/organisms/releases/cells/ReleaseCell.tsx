@@ -1,11 +1,11 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 // @coverage-via apps/web/tests/components/releases/ReleaseCell.test.tsx
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   formatCompactReleaseArtistLine,
@@ -94,28 +94,27 @@ export const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
-      {/* Play/status indicator — 16px column */}
-      <div className='flex w-4 shrink-0 items-center justify-center'>
+      {/* Play column matches IconButton xs (h-6/w-6); do not restyle with h-*. */}
+      <div className='flex w-6 shrink-0 items-center justify-center'>
         {hasPreview && (
-          <DrawerInlineIconButton
+          <IconButton
+            size='xs'
+            variant='inline'
+            // Playing: fully opaque (no fade). Idle: reveal on row hover via
+            // fade=parent (replaces the retired DrawerInlineIconButton className).
+            fade={isPlaying ? undefined : 'parent'}
             onClick={handleTogglePlayback}
-            className={cn(
-              'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
-              isPlaying
-                ? 'text-(--color-accent-purple-text) opacity-100'
-                : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
-            )}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-2.5 w-2.5' />
+              <Pause className='h-2.5 w-2.5 text-(--color-accent-purple-text)' />
             ) : (
-              <Play className='h-2.5 w-2.5' />
+              <Play className='h-2.5 w-2.5 text-quaternary-token' />
             )}
-          </DrawerInlineIconButton>
+          </IconButton>
         )}
         {!hasPreview && showType && typeStyle && (
           <span

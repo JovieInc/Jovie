@@ -103,10 +103,10 @@ describe('admin investor shell normalization', () => {
     // Drift T2.1: row chrome lives in InvestorLinkRowActions (IconButton + menu).
     expect(managerSource).toContain('InvestorLinkRowActions');
     expect(rowActionsSource).toContain('TableActionMenu');
-    expect(rowActionsSource).not.toContain('absolute right-0 top-full');
-    expect(rowActionsSource).not.toContain('document.addEventListener');
     expect(managerSource).not.toContain('absolute right-0 top-full');
     expect(managerSource).not.toContain('document.addEventListener');
+    expect(rowActionsSource).not.toContain('absolute right-0 top-full');
+    expect(rowActionsSource).not.toContain('document.addEventListener');
   });
 
   it('does not style investor table headers with all-caps tracking chrome', () => {

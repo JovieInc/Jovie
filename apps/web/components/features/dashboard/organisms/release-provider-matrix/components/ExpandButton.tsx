@@ -1,8 +1,8 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 
 interface ExpandButtonProps {
   /** Whether the row is currently expanded */
@@ -35,10 +35,11 @@ export const ExpandButton = memo(function ExpandButton({
   }
 
   return (
-    <DrawerInlineIconButton
+    <IconButton
+      size='xs'
+      variant='inline'
       onClick={onClick}
       disabled={isLoading}
-      className='h-4 w-4 rounded p-0 text-tertiary-token disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
@@ -55,6 +56,6 @@ export const ExpandButton = memo(function ExpandButton({
           aria-hidden='true'
         />
       )}
-    </DrawerInlineIconButton>
+    </IconButton>
   );
 });
