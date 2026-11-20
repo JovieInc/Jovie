@@ -1,32 +1,59 @@
 [
   {
     "file": ".claude/rules/anti-slop.md",
-    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "paths": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs"
+    ],
     "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
   },
   {
     "file": ".claude/rules/auth.md",
-    "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
+    "paths": [
+      "apps/web/**/auth/**",
+      "apps/web/proxy.ts",
+      "apps/web/tests/**"
+    ],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
   },
   {
     "file": ".claude/rules/ci-branching.md",
-    "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
+    "paths": [
+      ".github/**",
+      "scripts/ci-*",
+      "scripts/lib/ci-*"
+    ],
     "bodySha256": "1446014ed54249c991905ac56b9551be78a2f9fa86b2d569f1db048c5bda50e7"
   },
   {
     "file": ".claude/rules/code-style.md",
-    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "a8260d3292af576dbc5e17b74b4ecae43c177d82c56a575650180016d1fbdec2"
+    "paths": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs"
+    ],
+    "bodySha256": "ddc6fa20c94cee33cee2dc0715b93c74b3e4402e3dfaba5ac75937090b901ffd"
   },
   {
     "file": ".claude/rules/db.md",
-    "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
+    "paths": [
+      "**/db/**",
+      "**/drizzle/**",
+      "**/migrations/**",
+      "**/queries/**"
+    ],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
     "file": ".claude/rules/domain-writes.md",
-    "paths": ["apps/web/**"],
+    "paths": [
+      "apps/web/**"
+    ],
     "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
   },
   {
@@ -76,7 +103,9 @@
   },
   {
     "file": ".claude/rules/hermes-air.md",
-    "paths": ["docs/HERMES_AIR.md"],
+    "paths": [
+      "docs/HERMES_AIR.md"
+    ],
     "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
@@ -115,8 +144,11 @@
   },
   {
     "file": ".claude/rules/ios.md",
-    "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
+    "paths": [
+      "apps/ios/**",
+      "**/*.swift"
+    ],
+    "bodySha256": "09001090cb26977b865a25038927fe528831da035a91db3d101ada4b95df8a5e"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -137,7 +169,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
+    "bodySha256": "9bd27ae5162d6df5852d8dce19c30d2d5ae7baa0ca663089f25b87c377cc8c83"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -152,12 +184,20 @@
   },
   {
     "file": ".claude/rules/pen.md",
-    "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
+    "paths": [
+      "**/*.pen",
+      "scripts/agent/pen*",
+      "docs/design-system/**"
+    ],
     "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
-    "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
+    "paths": [
+      ".github/**",
+      "scripts/*pr*",
+      "docs/PR_FLOW.md"
+    ],
     "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
   },
   {
@@ -240,6 +280,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
+    "bodySha256": "7530c197b771375b9f529e2076f88f643574588be352df94cfe95b4e655c1636"
   }
 ]
