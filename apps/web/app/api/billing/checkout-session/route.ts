@@ -60,12 +60,16 @@ function getLineItemPriceId(
  * or create one instead of into the app.
  */
 async function buyerProfileState(userId: string): Promise<{
+  clerkId: string | null;
+  activeProfileId: string | null;
   needsProfile: boolean;
   isPublic: boolean;
   username: string | null;
 }> {
   const [row] = await db
     .select({
+      clerkId: users.clerkId,
+      activeProfileId: users.activeProfileId,
       isClaimed: creatorProfiles.isClaimed,
       isPublic: creatorProfiles.isPublic,
       username: creatorProfiles.username,
@@ -75,10 +79,18 @@ async function buyerProfileState(userId: string): Promise<{
     .where(eq(users.id, userId))
     .limit(1);
   return {
+    clerkId: row?.clerkId ?? null,
+    activeProfileId: row?.activeProfileId ?? null,
     needsProfile: row?.isClaimed !== true,
     isPublic: row?.isPublic === true,
     username: row?.username ?? null,
   };
+}
+
+function isSettledCheckoutPaymentStatus(
+  paymentStatus: Stripe.Checkout.Session.PaymentStatus | null | undefined
+): boolean {
+  return paymentStatus === 'paid' || paymentStatus === 'no_payment_required';
 }
 
 export async function GET(request: NextRequest) {
@@ -94,17 +106,29 @@ export async function GET(request: NextRequest) {
     }
     const { session_id: sessionId } = parsedQuery.data;
 
-    const session = await withStripeRetry('retrieveCheckoutSession', () =>
-      stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['line_items.data.price'],
-      })
-    );
+    const [session, profileState] = await Promise.all([
+      withStripeRetry('retrieveCheckoutSession', () =>
+        stripe.checkout.sessions.retrieve(sessionId, {
+          expand: ['line_items.data.price'],
+        })
+      ),
+      buyerProfileState(userId),
+    ]);
 
-    if (session.metadata?.clerk_user_id !== userId) {
+    const sessionOwner =
+      session.metadata?.clerk_user_id ?? session.metadata?.user_id ?? null;
+    const isOwner =
+      sessionOwner === userId ||
+      (Boolean(profileState.clerkId) && sessionOwner === profileState.clerkId);
+    if (!isOwner) {
       return jsonError('Checkout session not found', 404);
     }
 
-    if (session.mode !== 'subscription' || session.status !== 'complete') {
+    if (
+      session.mode !== 'subscription' ||
+      session.status !== 'complete' ||
+      !isSettledCheckoutPaymentStatus(session.payment_status)
+    ) {
       return NextResponse.json(
         { plan: null, priceId: null },
         { headers: NO_STORE_HEADERS }
@@ -117,11 +141,10 @@ export async function GET(request: NextRequest) {
       (lineItemPriceId
         ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
         : null);
-    const profileState = plan
-      ? await buyerProfileState(userId)
-      : { needsProfile: false, isPublic: false, username: null };
-    const needsProfile = profileState.needsProfile;
-    const proofPending = plan ? await hasProofPendingProfile(userId) : false;
+    const needsProfile = plan ? profileState.needsProfile : false;
+    const proofPending = plan
+      ? await hasProofPendingProfile(userId, profileState.activeProfileId)
+      : false;
     // Paying never publishes a page. The stage is "profile live", so a private
     // page waiting for proof must not record it.
     if (plan && !needsProfile && profileState.isPublic && !proofPending) {

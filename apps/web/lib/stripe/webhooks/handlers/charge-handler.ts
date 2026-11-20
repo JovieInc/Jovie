@@ -273,6 +273,7 @@ export class ChargeHandler implements WebhookHandler {
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      expectedSubscriptionId: subscription.id,
       stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,
@@ -355,7 +356,6 @@ export class ChargeHandler implements WebhookHandler {
         });
       }
     } catch {
-      // An optional notification must never prevent financial corrections.
       logger.warn('Charge reversal Slack alert failed', {
         stripeEventId: details.stripeEventId,
       });

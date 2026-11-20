@@ -5,15 +5,24 @@ const mocks = vi.hoisted(() => ({
   userId: 'app-user-1' as string | null,
   session: {} as Record<string, unknown>,
   profileRows: [] as Array<{
+    clerkId?: string | null;
+    activeProfileId?: string | null;
     isClaimed: boolean | null;
     isPublic?: boolean | null;
     username?: string | null;
   }>,
   proofPending: false,
+  proofPendingArgs: [] as Array<[string, string | null | undefined]>,
   recordedStages: [] as string[],
 }));
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
-  hasProofPendingProfile: async () => mocks.proofPending,
+  hasProofPendingProfile: async (
+    appUserId: string,
+    profileId?: string | null
+  ) => {
+    mocks.proofPendingArgs.push([appUserId, profileId]);
+    return mocks.proofPending;
+  },
 }));
 vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
   recordArtistOfferStage: async (_id: unknown, stage: string) => {
@@ -58,11 +67,15 @@ describe('GET /api/billing/checkout-session', () => {
     mocks.session = {
       mode: 'subscription',
       status: 'complete',
+      payment_status: 'paid',
       metadata: { clerk_user_id: 'app-user-1', plan: 'pro' },
       line_items: { data: [{ price: { id: 'price_pro' } }] },
     };
-    mocks.profileRows = [{ isClaimed: true, isPublic: true }];
+    mocks.profileRows = [
+      { activeProfileId: 'profile-1', isClaimed: true, isPublic: true },
+    ];
     mocks.proofPending = false;
+    mocks.proofPendingArgs = [];
     mocks.recordedStages = [];
   });
 
@@ -151,5 +164,41 @@ describe('GET /api/billing/checkout-session', () => {
     const { GET } = await import('@/app/api/billing/checkout-session/route');
     await GET(request());
     expect(mocks.recordedStages).toContain('profile-live');
+    expect(mocks.proofPendingArgs).toEqual([['app-user-1', 'profile-1']]);
+  });
+
+  it('rejects unsettled async payment_status even when checkout status is complete', async () => {
+    mocks.session = {
+      ...mocks.session,
+      status: 'complete',
+      payment_status: 'unpaid',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body).toEqual({ plan: null, priceId: null });
+    expect(mocks.recordedStages).toEqual([]);
+  });
+
+  it('matches legacy clerkId session metadata for migrated Better Auth users', async () => {
+    mocks.userId = 'ba-uuid-1';
+    mocks.profileRows = [
+      {
+        clerkId: 'user_legacy_clerk_1',
+        activeProfileId: 'profile-ba',
+        isClaimed: true,
+        isPublic: true,
+        username: 'migratedartist',
+      },
+    ];
+    mocks.session = {
+      ...mocks.session,
+      metadata: { clerk_user_id: 'user_legacy_clerk_1', plan: 'pro' },
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.plan).toBe('pro');
+    expect(body.profileShareUrl).toMatch(/\/migratedartist$/);
   });
 });

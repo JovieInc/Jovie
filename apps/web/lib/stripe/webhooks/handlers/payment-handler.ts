@@ -263,33 +263,31 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         throw new Error('Billing update omitted canonical app user ID');
       }
 
-      // Durable revenue event emitted from the verified webhook, not the
-      // buyer's return page. `stripe:${stripeEventId}` deduplicates Stripe
-      // retries; a failed write throws so the webhook stays unprocessed and
-      // Stripe redelivers instead of leaving a paid transition unmeasured.
-      const paymentDelivery = await trackServerEvent(
-        invoice.billing_reason === 'subscription_cycle'
-          ? 'subscription_renewed'
-          : 'payment_succeeded',
-        {
-          stripeEventId,
-          billingReason: invoice.billing_reason ?? undefined,
-        },
-        undefined,
-        {
-          eventIdentity: `stripe:${stripeEventId}`,
-          occurredAt: stripeEventTimestamp,
-        }
-      );
-      if (!paymentDelivery.ok) {
-        throw new Error(
-          `Payment analytics delivery failed: ${paymentDelivery.error}`
-        );
-      }
-
       await invalidateBillingCache(result.appUserId);
-      await this.tryRecordReferralCommission(result.appUserId, invoice);
-      this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+      if (!result.skipped) {
+        const paymentDelivery = await trackServerEvent(
+          invoice.billing_reason === 'subscription_cycle'
+            ? 'subscription_renewed'
+            : 'payment_succeeded',
+          {
+            stripeEventId,
+            billingReason: invoice.billing_reason ?? undefined,
+          },
+          undefined,
+          {
+            eventIdentity: `stripe:${stripeEventId}`,
+            occurredAt: stripeEventTimestamp,
+          }
+        );
+        if (!paymentDelivery.ok) {
+          throw new Error(
+            `Payment analytics delivery failed: ${paymentDelivery.error}`
+          );
+        }
+
+        await this.tryRecordReferralCommission(result.appUserId, invoice);
+        this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+      }
 
       return result;
     } catch (error) {
@@ -385,13 +383,14 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       };
     }
 
-    // Subscription is in failure status - downgrade the user
     const customerId = getCustomerId(subscription.customer);
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      expectedSubscriptionId: subscription.id,
+      stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,
       eventType: 'payment_failed',
@@ -423,8 +422,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
     await invalidateBillingCache(result.appUserId);
 
-    // Send dunning email (fire-and-forget, don't block webhook response)
-    if (shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
+    if (!result.skipped && shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
       const priceId = subscription.items.data[0]?.price?.id;
       sendPaymentFailedEmail({
         userId: result.appUserId,
