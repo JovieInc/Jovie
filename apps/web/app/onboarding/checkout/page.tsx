@@ -190,7 +190,7 @@ export default async function OnboardingCheckoutPage({
       const heldVerification = readClaimVerification(settings);
       if (
         heldVerification &&
-        !requiresClaimVerification(heldVerification.reach)
+        !requiresClaimVerification(heldVerification.reach.value)
       ) {
         heldLowReachSpotifyId = heldVerification.spotifyArtistId;
       }

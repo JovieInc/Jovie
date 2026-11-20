@@ -7,8 +7,26 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { activateReferral } from '@/lib/referrals/service';
 import type { CheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
+import type { BillingSkipReason } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import { admitPaidUser } from '@/lib/waitlist/paid-admission';
+
+/**
+ * Allow idempotent post-activation DB effects to finish when an unprocessed
+ * Stripe event retries after `applyBillingUpdateWithAudit` already committed
+ * (`skipReason === 'duplicate_event'`), while blocking stale or mismatched
+ * subscription deliveries (`stale_event` / `subscription_mismatch`).
+ */
+export function canCompleteIdempotentPostEffects(result: {
+  readonly success: boolean;
+  readonly skipped?: boolean;
+  readonly skipReason?: BillingSkipReason;
+}): boolean {
+  return (
+    result.success &&
+    (!result.skipped || result.skipReason === 'duplicate_event')
+  );
+}
 
 async function tryActivateReferral(appUserId: string): Promise<void> {
   try {
@@ -28,6 +46,7 @@ export async function runActiveSubscriptionPostEffects(params: {
   readonly correlation?: CheckoutCorrelation;
   readonly acquisitionId?: string | null;
   readonly stripeEventTimestamp: Date;
+  readonly skipWelcomeEmail?: boolean;
   readonly eventName:
     | 'checkout.session.completed'
     | 'customer.subscription.created'
@@ -40,6 +59,7 @@ export async function runActiveSubscriptionPostEffects(params: {
     plan,
     correlation,
     stripeEventTimestamp,
+    skipWelcomeEmail = false,
     eventName,
   } = params;
   const acquisitionId =
@@ -52,12 +72,14 @@ export async function runActiveSubscriptionPostEffects(params: {
 
   await tryActivateReferral(appUserId);
 
-  enqueuePaidWelcomeAfterEntitlement({
-    appUserId,
-    clerkUserId: userId,
-    subscription,
-    plan,
-  });
+  if (!skipWelcomeEmail) {
+    enqueuePaidWelcomeAfterEntitlement({
+      appUserId,
+      clerkUserId: userId,
+      subscription,
+      plan,
+    });
+  }
 
   try {
     await attributeLeadPaidConversionByAppUserId(

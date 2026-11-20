@@ -85,6 +85,54 @@ describe('post-activation side effects & subscription replacement guard', () => 
     });
   });
 
+  it('completes idempotent DB post-effects without re-sending welcome email when skipWelcomeEmail is true', async () => {
+    const {
+      canCompleteIdempotentPostEffects,
+      runActiveSubscriptionPostEffects,
+    } = await import('@/lib/stripe/webhooks/post-activation');
+    const ts = new Date('2026-11-20T05:00:00Z');
+
+    expect(
+      canCompleteIdempotentPostEffects({
+        success: true,
+        skipped: true,
+        skipReason: 'duplicate_event',
+      })
+    ).toBe(true);
+    expect(
+      canCompleteIdempotentPostEffects({
+        success: true,
+        skipped: true,
+        skipReason: 'stale_event',
+      })
+    ).toBe(false);
+    expect(
+      canCompleteIdempotentPostEffects({
+        success: true,
+        skipped: true,
+        skipReason: 'subscription_mismatch',
+      })
+    ).toBe(false);
+
+    await runActiveSubscriptionPostEffects({
+      appUserId: 'ba-user-uuid-retry',
+      userId: 'ba-user-uuid-retry',
+      subscription: { id: 'sub_retry' } as Stripe.Subscription,
+      plan: 'pro',
+      acquisitionId: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      stripeEventTimestamp: ts,
+      skipWelcomeEmail: true,
+      eventName: 'checkout.session.completed',
+    });
+
+    expect(mocks.admitPaidUser).toHaveBeenCalledOnce();
+    expect(mocks.activateReferral).toHaveBeenCalledWith('ba-user-uuid-retry');
+    expect(mocks.enqueuePaidWelcome).not.toHaveBeenCalled();
+    expect(mocks.attributeLeadPaid).toHaveBeenCalledOnce();
+    expect(mocks.recordOfferStage).toHaveBeenCalledOnce();
+    expect(mocks.markClaimPaid).toHaveBeenCalledOnce();
+  });
+
   it('skips downgrade when expectedSubscriptionId does not match active replacement subscription', async () => {
     mocks.fetchByIdentity.mockResolvedValue({
       success: true,
@@ -118,6 +166,7 @@ describe('post-activation side effects & subscription replacement guard', () => 
       success: true,
       appUserId: 'ba-user-uuid-3',
       skipped: true,
+      skipReason: 'subscription_mismatch',
       reason: 'Active subscription replaced before downgrade',
     });
     expect(mocks.applyBillingUpdate).not.toHaveBeenCalled();

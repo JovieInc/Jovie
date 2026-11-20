@@ -134,6 +134,7 @@ export async function updateUserBillingStatus(
         success: true,
         appUserId: currentUser.id,
         skipped: true,
+        skipReason: 'subscription_mismatch',
         reason: 'Active subscription replaced before downgrade',
       };
     }
@@ -144,6 +145,7 @@ export async function updateUserBillingStatus(
         success: true,
         appUserId: currentUser.id,
         skipped: true,
+        skipReason: 'stale_event',
         reason: 'Event is older than last processed event',
       };
     }
@@ -197,6 +199,7 @@ export async function updateUserBillingStatus(
       success: true,
       appUserId: result.appUserId,
       skipped: result.deduplicated,
+      skipReason: result.deduplicated ? 'duplicate_event' : undefined,
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {
@@ -298,6 +301,7 @@ async function retryUpdateWithFreshData(
         success: true,
         appUserId: freshUser.id,
         skipped: true,
+        skipReason: 'subscription_mismatch',
         reason: 'Active subscription replaced before downgrade',
       };
     }
@@ -308,6 +312,7 @@ async function retryUpdateWithFreshData(
         success: true,
         appUserId: freshUser.id,
         skipped: true,
+        skipReason: 'stale_event',
         reason: 'Event is older than last processed event (on retry)',
       };
     }
@@ -381,6 +386,7 @@ async function retryUpdateWithFreshData(
       success: true,
       appUserId: result.appUserId,
       skipped: result.deduplicated,
+      skipReason: result.deduplicated ? 'duplicate_event' : undefined,
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {

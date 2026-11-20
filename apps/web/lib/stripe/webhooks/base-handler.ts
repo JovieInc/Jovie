@@ -22,6 +22,7 @@ import {
 } from '@/lib/stripe/checkout-correlation';
 import {
   type BillingAuditEventType,
+  type BillingSkipReason,
   updateUserBillingStatus,
 } from '@/lib/stripe/customer-sync';
 import {
@@ -50,6 +51,9 @@ export interface ProcessSubscriptionResult extends HandlerResult {
 
   /** Whether the subscription is currently active */
   isActive?: boolean;
+
+  /** Structured reason when updateUserBillingStatus skipped mutating users. */
+  skipReason?: BillingSkipReason;
 
   /** Durable checkout correlation recovered from session/subscription metadata. */
   correlation?: CheckoutCorrelation;
@@ -251,6 +255,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       appUserId: result.appUserId,
       isActive: false,
       skipped: result.skipped,
+      skipReason: result.skipReason,
       reason: result.reason,
       ...(correlation ? { correlation } : {}),
     };
@@ -348,6 +353,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       isActive: true,
       plan,
       skipped: result.skipped,
+      skipReason: result.skipReason,
       reason: result.reason,
       ...(correlation ? { correlation } : {}),
     };

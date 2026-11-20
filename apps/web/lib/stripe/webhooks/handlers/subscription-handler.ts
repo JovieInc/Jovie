@@ -31,7 +31,10 @@ import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
-import { runActiveSubscriptionPostEffects } from '../post-activation';
+import {
+  canCompleteIdempotentPostEffects,
+  runActiveSubscriptionPostEffects,
+} from '../post-activation';
 import type {
   HandlerResult,
   SupportedEventType,
@@ -178,7 +181,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && !result.skipped && result.isActive) {
+    if (canCompleteIdempotentPostEffects(result) && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
@@ -189,6 +192,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         plan: result.plan,
         correlation: result.correlation,
         stripeEventTimestamp,
+        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'customer.subscription.created',
       });
     }
@@ -291,7 +295,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && !result.skipped && result.isActive) {
+    if (canCompleteIdempotentPostEffects(result) && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
@@ -302,6 +306,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         plan: result.plan,
         correlation: result.correlation,
         stripeEventTimestamp,
+        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'customer.subscription.updated',
       });
     }

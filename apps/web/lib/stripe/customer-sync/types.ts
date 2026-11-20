@@ -221,6 +221,11 @@ export type UpdateBillingStatusOptions = UpdateBillingStatusBase &
     | { isPro: false; plan?: 'free' } // defaults to 'free'
   );
 
+export type BillingSkipReason =
+  | 'duplicate_event'
+  | 'stale_event'
+  | 'subscription_mismatch';
+
 /**
  * Result of a billing status update
  */
@@ -230,6 +235,7 @@ export interface UpdateBillingStatusResult {
   appUserId?: string;
   error?: string;
   skipped?: boolean;
+  skipReason?: BillingSkipReason;
   reason?: string;
 }
 
