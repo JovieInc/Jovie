@@ -71,6 +71,7 @@ test('actual audit gates profile regressions independently of /r and /s coverage
     'lib/coverage-surface-files.mjs',
     'lib/coverage-surface-tokens.mjs',
     'lib/mutation-heatmap-scores.mjs',
+    'lib/mutation-score-math.mjs',
   ]) {
     write(`scripts/${file}`);
   }
@@ -79,6 +80,7 @@ test('actual audit gates profile regressions independently of /r and /s coverage
     'lib/coverage-surface-files.mjs',
     'lib/coverage-surface-tokens.mjs',
     'lib/mutation-heatmap-scores.mjs',
+    'lib/mutation-score-math.mjs',
   ]) {
     copyFileSync(new URL(file, import.meta.url), join(root, 'scripts', file));
   }

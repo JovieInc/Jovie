@@ -4,12 +4,17 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { scoreMutants } from './mutation-score-math.mjs';
 
 export const WEB_ROOT = 'apps/web';
 export const DEFAULT_STRYKER_REL = 'apps/web/reports/stryker-incremental.json';
 export const DEFAULT_BASELINE_REL = 'scripts/mutation-score-baseline.json';
 
 /**
+ * Live Stryker scores use the same contract as mutation floors: exclude
+ * CompileError from the denominator, and skip a file when unknown statuses
+ * (Timeout / Ignored / Pending / …) make the score incomplete so baseline
+ * floors can fill the gap instead of understating Mut.
  * @param {string} filePath
  * @returns {Record<string, number> | null}
  */
@@ -23,10 +28,9 @@ export function scoresFromStrykerReport(filePath) {
     for (const [file, payload] of Object.entries(raw.files)) {
       const mutants = payload?.mutants ?? [];
       if (!Array.isArray(mutants) || mutants.length === 0) continue;
-      const killed = mutants.filter(m => m.status === 'Killed').length;
-      scores[normalizeRepoWebPath(file)] = Math.round(
-        (killed / mutants.length) * 100
-      );
+      const scored = scoreMutants(mutants);
+      if (scored.score == null) continue;
+      scores[normalizeRepoWebPath(file)] = scored.score;
     }
     return Object.keys(scores).length > 0 ? scores : null;
   } catch {

@@ -66,7 +66,7 @@ describe('mutation-heatmap-scores', () => {
     });
   });
 
-  it('scoresFromStrykerReport derives kill ratio per file', () => {
+  it('scoresFromStrykerReport uses canonical scoreMutants kill ratio', () => {
     const { root, write, cleanup } = fixture();
     cleanups.push(cleanup);
     write('stryker.json', {
@@ -81,7 +81,50 @@ describe('mutation-heatmap-scores', () => {
       },
     });
     expect(scoresFromStrykerReport(join(root, 'stryker.json'))).toEqual({
-      'apps/web/proxy.ts': 67,
+      'apps/web/proxy.ts': 66.7,
+    });
+  });
+
+  it('scoresFromStrykerReport excludes CompileError from the denominator', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('stryker.json', {
+      files: {
+        'apps/web/proxy.ts': {
+          mutants: [{ status: 'Killed' }, { status: 'CompileError' }],
+        },
+      },
+    });
+    expect(scoresFromStrykerReport(join(root, 'stryker.json'))).toEqual({
+      'apps/web/proxy.ts': 100,
+    });
+  });
+
+  it('scoresFromStrykerReport withholds incomplete statuses so baseline can fill', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('baseline.json', {
+      files: { 'proxy.ts': { measured: 56.7 } },
+    });
+    write('stryker.json', {
+      files: {
+        'apps/web/proxy.ts': {
+          mutants: [{ status: 'Killed' }, { status: 'Timeout' }],
+        },
+        'apps/web/lib/stripe/dunning.ts': {
+          mutants: [{ status: 'Killed' }, { status: 'Survived' }],
+        },
+      },
+    });
+    expect(
+      readMutationHeatmapScores({
+        repoRoot: root,
+        baselinePath: join(root, 'baseline.json'),
+        strykerPath: join(root, 'stryker.json'),
+      })
+    ).toEqual({
+      'apps/web/proxy.ts': 57,
+      'apps/web/lib/stripe/dunning.ts': 50,
     });
   });
 
