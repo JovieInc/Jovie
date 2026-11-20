@@ -4,6 +4,7 @@ import { FakeClock } from './fake-provider.ts';
 import {
   type GhRunner,
   ghShape,
+  ghStdoutBytes,
   ghWantsFileStdout,
   runGh,
   splitIncluded,
@@ -282,11 +283,12 @@ describe('gh through the ledger', () => {
   it('skips --include and GH_FORCE_TTY for artifact zip downloads', async () => {
     const seen: { args: readonly string[]; env: NodeJS.ProcessEnv }[] = [];
     const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff]);
-    const run: GhRunner = async (args, env) => {
-      seen.push({ args: [...args], env: { ...env } });
-      return { code: 0, stdout: zip, stderr: '' };
+    const args = ['api', 'repos/o/r/actions/artifacts/9/zip'] as const;
+    const run: GhRunner = async (argv, env) => {
+      seen.push({ args: [...argv], env: { ...env } });
+      return { code: 0, stdout: zip.toString('latin1'), stderr: '' };
     };
-    const result = await runGh(['api', 'repos/o/r/actions/artifacts/9/zip'], {
+    const result = await runGh([...args], {
       store: new MemoryLedgerStore(),
       credential: 'zip',
       run,
@@ -294,10 +296,9 @@ describe('gh through the ledger', () => {
       env: { GH_FORCE_TTY: '0', GH_TOKEN: 't' },
     });
     expect(result.code).toBe(0);
-    expect(Buffer.isBuffer(result.stdout)).toBe(true);
-    expect(result.stdout).toEqual(zip);
+    expect(ghStdoutBytes(result.stdout, args)).toEqual(zip);
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.args).toEqual(['api', 'repos/o/r/actions/artifacts/9/zip']);
+    expect(seen[0]?.args).toEqual([...args]);
     expect(seen[0]?.env.GH_FORCE_TTY).toBeUndefined();
   });
 

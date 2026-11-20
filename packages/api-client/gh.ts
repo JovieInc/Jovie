@@ -33,8 +33,12 @@ import { defaultStore, hashCredential, type LedgerStore } from './store.ts';
 
 export interface GhResult {
   readonly code: number;
-  /** Buffer for artifact `/zip` bodies; UTF-8 string for JSON/text. */
-  readonly stdout: string | Buffer;
+  /**
+   * UTF-8 text for JSON responses. Artifact `/zip` bodies are captured as a
+   * latin1 string (lossless byte↔string) so callers that write with
+   * `Buffer.from(stdout, 'latin1')` keep a valid archive.
+   */
+  readonly stdout: string;
   readonly stderr: string;
 }
 
@@ -48,6 +52,11 @@ export function ghWantsFileStdout(args: readonly string[]): boolean {
   return args.some(
     arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0] ?? '')
   );
+}
+
+/** Decode stdout to bytes — latin1 for `/zip`, UTF-8 otherwise. */
+export function ghStdoutBytes(stdout: string, args: readonly string[]): Buffer {
+  return Buffer.from(stdout, ghWantsFileStdout(args) ? 'latin1' : 'utf8');
 }
 export interface RunGhOptions {
   readonly priority?: PriorityName;
@@ -204,7 +213,7 @@ function captureToFile(
     try {
       fd = openSync(file, 'w');
     } catch (error) {
-      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(error) });
+      resolve({ code: 127, stdout: '', stderr: String(error) });
       return;
     }
     let child;
@@ -220,7 +229,7 @@ function captureToFile(
       } catch {
         // best-effort cleanup
       }
-      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(error) });
+      resolve({ code: 127, stdout: '', stderr: String(error) });
       return;
     }
     closeSync(fd);
@@ -234,7 +243,7 @@ function captureToFile(
       }
       resolve({
         code: 127,
-        stdout: Buffer.alloc(0),
+        stdout: '',
         stderr: 'gh stderr pipe missing',
       });
       return;
@@ -244,18 +253,19 @@ function captureToFile(
     const finish = (code: number, message: string) => {
       if (settled) return;
       settled = true;
-      let stdout: Buffer = Buffer.alloc(0);
+      let bytes = Buffer.alloc(0);
       try {
-        stdout = readFileSync(file);
+        bytes = readFileSync(file);
       } catch {
-        stdout = Buffer.alloc(0);
+        bytes = Buffer.alloc(0);
       }
       try {
         unlinkSync(file);
       } catch {
         // The body was already read, or the file was never created.
       }
-      resolve({ code, stdout, stderr: message });
+      // latin1 is a 1:1 byte map; UTF-8 would corrupt zip local headers.
+      resolve({ code, stdout: bytes.toString('latin1'), stderr: message });
     };
     stderr.on('data', c => err.push(c));
     child.on('error', e => finish(127, String(e)));
@@ -392,14 +402,10 @@ export async function runGh(
     }
     attempt += 1;
     const result = await (options.run ?? defaultRun)(argv, env);
-    const stdoutText =
-      typeof result.stdout === 'string'
-        ? result.stdout
-        : result.stdout.toString('utf8');
-    const included = include ? splitIncluded(stdoutText) : null;
+    const included = include ? splitIncluded(result.stdout) : null;
     const headers: HeaderBag = included?.headers ?? null;
     const status = included
-      ? Number(/^HTTP\/[\d.]+ (\d{3})/.exec(stdoutText)?.[1])
+      ? Number(/^HTTP\/[\d.]+ (\d{3})/.exec(result.stdout)?.[1])
       : result.code === 0
         ? 200
         : null;
@@ -411,9 +417,8 @@ export async function runGh(
         : classifyFailure(spec, {
             status,
             headers,
-            text: `${result.stderr}\n${
-              typeof body === 'string' ? body : body.toString('utf8')
-            }`,
+            // Zip failures are rare; latin1 error text is still readable enough.
+            text: `${result.stderr}\n${body}`,
             nowMs: at,
           });
     // Without HTTP evidence, only gh's known transport wording is transient.
@@ -434,9 +439,8 @@ export async function runGh(
     const observations = parseBudget(spec, headers, at, shape.resource);
     if (result.code === 0 && shape.cost === 0) {
       const headerResources = new Set(observations.map(row => row.resource));
-      const quotaBody = typeof body === 'string' ? body : body.toString('utf8');
       observations.push(
-        ...quotaObservations(quotaBody).filter(
+        ...quotaObservations(body).filter(
           row => !headerResources.has(row.resource)
         )
       );
