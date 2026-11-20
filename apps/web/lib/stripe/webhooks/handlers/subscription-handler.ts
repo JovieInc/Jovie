@@ -108,7 +108,8 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         return this.handleUpdated(
           subscription,
           stripeEventId,
-          stripeEventTimestamp
+          stripeEventTimestamp,
+          event
         );
 
       case 'customer.subscription.deleted':
@@ -266,8 +267,15 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
   private async handleUpdated(
     subscription: Stripe.Subscription,
     stripeEventId: string,
-    stripeEventTimestamp: Date
+    stripeEventTimestamp: Date,
+    event: Stripe.Event
   ): Promise<HandlerResult> {
+    const priorSubscriptionStatus =
+      event.data.previous_attributes &&
+      typeof event.data.previous_attributes === 'object' &&
+      'status' in event.data.previous_attributes
+        ? String(event.data.previous_attributes.status)
+        : undefined;
     const userId = await this.extractUserId(
       subscription,
       'customer.subscription.updated'
@@ -306,6 +314,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         correlation: result.correlation,
         stripeEventTimestamp,
         eventName: 'customer.subscription.updated',
+        priorSubscriptionStatus,
       });
     }
 

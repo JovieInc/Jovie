@@ -37,6 +37,36 @@ vi.mock('@/lib/db/billing-status', () => ({
   applyBillingUpdateWithAudit: mocks.applyBillingUpdate,
 }));
 
+describe('shouldMarkClaimVerificationsPaid', () => {
+  it('allows checkout/created and 3DS incomplete transitions only', async () => {
+    const { shouldMarkClaimVerificationsPaid } = await import(
+      '@/lib/stripe/webhooks/post-activation'
+    );
+    expect(
+      shouldMarkClaimVerificationsPaid({
+        eventName: 'checkout.session.completed',
+      })
+    ).toBe(true);
+    expect(
+      shouldMarkClaimVerificationsPaid({
+        eventName: 'customer.subscription.created',
+      })
+    ).toBe(true);
+    expect(
+      shouldMarkClaimVerificationsPaid({
+        eventName: 'customer.subscription.updated',
+        priorSubscriptionStatus: 'incomplete',
+      })
+    ).toBe(true);
+    expect(
+      shouldMarkClaimVerificationsPaid({
+        eventName: 'customer.subscription.updated',
+        priorSubscriptionStatus: 'active',
+      })
+    ).toBe(false);
+  });
+});
+
 describe('post-activation side effects & subscription replacement guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,7 +77,42 @@ describe('post-activation side effects & subscription replacement guard', () => 
     mocks.markClaimPaid.mockResolvedValue(undefined);
   });
 
-  it('executes paid admission, referral, welcome email, lead attribution, offer stage, and claim-paid', async () => {
+  it('runs renewal post-effects without marking claim verifications paid', async () => {
+    const { runActiveSubscriptionPostEffects } = await import(
+      '@/lib/stripe/webhooks/post-activation'
+    );
+    const ts = new Date('2026-11-20T05:00:00Z');
+    await runActiveSubscriptionPostEffects({
+      appUserId: 'ba-user-uuid-2',
+      userId: 'ba-user-uuid-2',
+      subscription: { id: 'sub_renewal' } as Stripe.Subscription,
+      plan: 'pro',
+      acquisitionId: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      stripeEventTimestamp: ts,
+      eventName: 'customer.subscription.updated',
+      priorSubscriptionStatus: 'active',
+    });
+
+    expect(mocks.admitPaidUser).toHaveBeenCalledWith({
+      appUserId: 'ba-user-uuid-2',
+      cacheKeys: ['ba-user-uuid-2'],
+    });
+    expect(mocks.activateReferral).toHaveBeenCalledWith('ba-user-uuid-2');
+    expect(mocks.enqueuePaidWelcome).toHaveBeenCalledOnce();
+    expect(mocks.attributeLeadPaid).toHaveBeenCalledWith(
+      'ba-user-uuid-2',
+      'sub_renewal',
+      undefined
+    );
+    expect(mocks.recordOfferStage).toHaveBeenCalledWith(
+      '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      'paid',
+      ts
+    );
+    expect(mocks.markClaimPaid).not.toHaveBeenCalled();
+  });
+
+  it('marks claim verifications paid on 3DS subscription.updated incomplete→active', async () => {
     const { runActiveSubscriptionPostEffects } = await import(
       '@/lib/stripe/webhooks/post-activation'
     );
@@ -60,24 +125,9 @@ describe('post-activation side effects & subscription replacement guard', () => 
       acquisitionId: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
       stripeEventTimestamp: ts,
       eventName: 'customer.subscription.updated',
+      priorSubscriptionStatus: 'incomplete',
     });
 
-    expect(mocks.admitPaidUser).toHaveBeenCalledWith({
-      appUserId: 'ba-user-uuid-2',
-      cacheKeys: ['ba-user-uuid-2'],
-    });
-    expect(mocks.activateReferral).toHaveBeenCalledWith('ba-user-uuid-2');
-    expect(mocks.enqueuePaidWelcome).toHaveBeenCalledOnce();
-    expect(mocks.attributeLeadPaid).toHaveBeenCalledWith(
-      'ba-user-uuid-2',
-      'sub_3ds',
-      undefined
-    );
-    expect(mocks.recordOfferStage).toHaveBeenCalledWith(
-      '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
-      'paid',
-      ts
-    );
     expect(mocks.markClaimPaid).toHaveBeenCalledWith({
       appUserId: 'ba-user-uuid-2',
       paidAt: ts,

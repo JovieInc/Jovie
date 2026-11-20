@@ -227,6 +227,7 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
             },
             items: { data: [{ price: { id: 'price_pro_monthly' } }] },
           },
+          previous_attributes: { status: 'incomplete' },
         },
       } as unknown as Stripe.Event,
       stripeEventId: 'evt_3ds_active',
@@ -242,6 +243,46 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
         }),
         stripeEventTimestamp: ts,
         eventName: 'customer.subscription.updated',
+        priorSubscriptionStatus: 'incomplete',
+      })
+    );
+  });
+
+  it('does not mark claims paid on unrelated active subscription updates', async () => {
+    mocks.dbSelectRows = [{ id: 'ba-user-uuid-renew', clerkId: null }];
+    mocks.updateBilling.mockResolvedValue({
+      success: true,
+      appUserId: 'ba-user-uuid-renew',
+      isActive: true,
+      skipped: false,
+    });
+
+    const { SubscriptionHandler } = await import(
+      '@/lib/stripe/webhooks/handlers/subscription-handler'
+    );
+    const handler = new SubscriptionHandler();
+    await handler.handle({
+      event: {
+        id: 'evt_renewal',
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_renew',
+            status: 'active',
+            customer: { id: 'cus_renew', object: 'customer' },
+            metadata: { clerk_user_id: 'ba-user-uuid-renew' },
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          },
+          previous_attributes: { cancel_at_period_end: false },
+        },
+      } as unknown as Stripe.Event,
+      stripeEventId: 'evt_renewal',
+      stripeEventTimestamp: new Date('2026-11-20T05:00:00Z'),
+    });
+
+    expect(mocks.runPostEffects).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priorSubscriptionStatus: undefined,
       })
     );
   });

@@ -35,6 +35,25 @@ export function canCompleteIdempotentPostEffects(result: {
  * commission row. Do not broaden canCompleteIdempotentPostEffects for stale
  * events — analytics and non-idempotent notifications stay gated there.
  */
+/** Claim checkout transitions only on paid checkout or first activation (incl. 3DS). */
+export function shouldMarkClaimVerificationsPaid(params: {
+  readonly eventName:
+    | 'checkout.session.completed'
+    | 'customer.subscription.created'
+    | 'customer.subscription.updated';
+  readonly priorSubscriptionStatus?: string | null;
+}): boolean {
+  if (params.eventName === 'checkout.session.completed') return true;
+  if (params.eventName === 'customer.subscription.created') return true;
+  if (params.eventName === 'customer.subscription.updated') {
+    return (
+      params.priorSubscriptionStatus === 'incomplete' ||
+      params.priorSubscriptionStatus === 'incomplete_expired'
+    );
+  }
+  return false;
+}
+
 export function canRecordInvoiceKeyedCommission(result: {
   readonly success: boolean;
   readonly skipped?: boolean;
@@ -69,6 +88,7 @@ export async function runActiveSubscriptionPostEffects(params: {
     | 'checkout.session.completed'
     | 'customer.subscription.created'
     | 'customer.subscription.updated';
+  readonly priorSubscriptionStatus?: string | null;
 }): Promise<void> {
   const {
     appUserId,
@@ -79,6 +99,7 @@ export async function runActiveSubscriptionPostEffects(params: {
     stripeEventTimestamp,
     skipWelcomeEmail = false,
     eventName,
+    priorSubscriptionStatus,
   } = params;
   const acquisitionId =
     params.acquisitionId ?? correlation?.acquisitionId ?? null;
@@ -121,23 +142,27 @@ export async function runActiveSubscriptionPostEffects(params: {
 
   await recordArtistOfferStage(acquisitionId, 'paid', stripeEventTimestamp);
 
-  try {
-    await markClaimVerificationsPaid({
-      appUserId,
-      paidAt: stripeEventTimestamp,
-      acquisitionId,
-    });
-  } catch (error) {
-    await captureCriticalError(
-      'Claim verification payment transition failed',
-      error,
-      {
-        route: '/api/stripe/webhooks',
-        event: eventName,
-        subscriptionId: subscription.id,
-        userId,
-      }
-    );
-    throw error;
+  if (
+    shouldMarkClaimVerificationsPaid({ eventName, priorSubscriptionStatus })
+  ) {
+    try {
+      await markClaimVerificationsPaid({
+        appUserId,
+        paidAt: stripeEventTimestamp,
+        acquisitionId,
+      });
+    } catch (error) {
+      await captureCriticalError(
+        'Claim verification payment transition failed',
+        error,
+        {
+          route: '/api/stripe/webhooks',
+          event: eventName,
+          subscriptionId: subscription.id,
+          userId,
+        }
+      );
+      throw error;
+    }
   }
 }
