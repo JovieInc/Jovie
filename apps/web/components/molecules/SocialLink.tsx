@@ -1,7 +1,7 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { memo } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
@@ -77,13 +77,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   };
 
   return (
-    <CircleIconButton
-      asChild
-      size='md'
-      variant='pearl'
-      ariaLabel={accessibleName}
-      className='text-primary-token/72 shadow-none hover:text-primary-token'
-    >
+    <IconButton asChild size='lg' variant='pearl' ariaLabel={accessibleName}>
       <a
         href={href}
         target='_blank'
@@ -93,7 +87,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
       >
         <SocialIcon platform={link.platform} className='h-4 w-4' />
       </a>
-    </CircleIconButton>
+    </IconButton>
   );
 }
 
