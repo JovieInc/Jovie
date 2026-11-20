@@ -202,12 +202,11 @@ export async function GET(request: NextRequest) {
 
     // Only a live, claimed page is shareable: a private page waiting for
     // proof must not be handed out as a link.
+    const profileLive = Boolean(
+      plan && !needsProfile && profileState.isPublic && !proofPending
+    );
     const profileShareUrl =
-      plan &&
-      !needsProfile &&
-      profileState.isPublic &&
-      !proofPending &&
-      profileState.username
+      profileLive && profileState.username
         ? getProfileUrl(profileState.username)
         : null;
 
@@ -217,6 +216,7 @@ export async function GET(request: NextRequest) {
         priceId: lineItemPriceId,
         needsProfile,
         proofPending,
+        profileLive,
         profileShareUrl,
       },
       { headers: NO_STORE_HEADERS }

@@ -89,6 +89,7 @@ describe('GET /api/billing/checkout-session', () => {
       priceId: 'price_pro',
       needsProfile: true,
       proofPending: false,
+      profileLive: false,
       profileShareUrl: null,
     });
   });
@@ -98,6 +99,19 @@ describe('GET /api/billing/checkout-session', () => {
 
     const body = await (await GET(request())).json();
     expect(body.needsProfile).toBe(false);
+    expect(body.profileLive).toBe(true);
+  });
+
+  it('returns profileLive false for a private claimed page when validating session_id', async () => {
+    mocks.profileRows = [
+      { isClaimed: true, isPublic: false, username: 'privateartist' },
+    ];
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+
+    const body = await (await GET(request())).json();
+    expect(body.profileLive).toBe(false);
+    expect(body.profileShareUrl).toBeNull();
+    expect(body.plan).toBe('pro');
   });
 
   it('hands out a share link only for a live, claimed page', async () => {
