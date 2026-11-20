@@ -86,9 +86,13 @@ export function parseFeed(xml, ctx) {
     const description = stripHtml(
       tagText(chunk, 'content:encoded') || tagText(chunk, 'description')
     );
-    const publishedAt = pubDateRaw ? new Date(pubDateRaw).toISOString() : null;
-    if (publishedAt && Number.isNaN(Date.parse(publishedAt)))
-      throw new Error(`invalid_pubDate:${ctx.sourceId}:${guid}`);
+    let publishedAt = null;
+    if (pubDateRaw) {
+      const ms = Date.parse(pubDateRaw);
+      if (Number.isNaN(ms))
+        throw new Error(`invalid_pubDate:${ctx.sourceId}:${guid}`);
+      publishedAt = new Date(ms).toISOString();
+    }
     const hashInput = [guid, title, description].join('\n');
     return {
       sourceId: ctx.sourceId,

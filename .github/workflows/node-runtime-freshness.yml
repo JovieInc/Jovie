@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: node-runtime-freshness
   cancel-in-progress: true
@@ -26,11 +27,31 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
+      # github-token-budget: 2 calls/run - list + download the prior apple-change-receipt for revision detection
+      - name: Restore previous Apple change receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apple-prior"
+          id="$(node packages/api-client/cli.ts gh --priority poll -- api \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=apple-change-receipt&per_page=100" \
+            --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+          if [ -n "${id}" ]; then
+            node packages/api-client/cli.ts gh --priority poll -- api \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" \
+              > "$RUNNER_TEMP/apple-prior/prior.zip" || true
+            unzip -p "$RUNNER_TEMP/apple-prior/prior.zip" apple-change-receipt.json \
+              > "$RUNNER_TEMP/apple-prior/apple-change-receipt.json" 2>/dev/null || true
+          fi
       - name: Ingest and classify
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/apple-change-receipt.json"
-          node scripts/apple-change-ingest/apple-change-ingest.mjs --out "$out" \
+          args=(--out "$out")
+          prior="$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+          if [ -f "$prior" ]; then args+=(--prior "$prior"); fi
+          node scripts/apple-change-ingest/apple-change-ingest.mjs "${args[@]}" \
             | tee "$RUNNER_TEMP/apple-change-summary.json"
           {
             echo "## Apple change ingest"
@@ -41,10 +62,11 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: apple-change-receipt-${{ github.run_id }}
+          name: apple-change-receipt
           path: |
             ${{ runner.temp }}/apple-change-receipt.json
             ${{ runner.temp }}/apple-change-summary.json
+          if-no-files-found: ignore
           retention-days: 90
   policy:
     name: Enforce official Node lifecycle and patch SLA

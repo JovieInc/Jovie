@@ -98,6 +98,29 @@ test('parseFeed records canonical url, guid, pubDate, and content hash', () => {
   );
 });
 
+test('parseFeed rejects invalid pubDate with invalid_pubDate, not RangeError', () => {
+  const bad = `<?xml version="1.0"?><rss version="2.0"><channel>
+<item>
+  <title>Xcode 27.2 (27B52)</title>
+  <link>https://developer.apple.com/news/releases/?id=bad-date</link>
+  <guid>https://developer.apple.com/news/releases/?id=bad-date</guid>
+  <pubDate>not-a-real-date</pubDate>
+  <description>View release notes</description>
+</item>
+</channel></rss>`;
+  assert.throws(
+    () =>
+      parseFeed(bad, {
+        sourceId: 'apple-developer-releases',
+        observedAt: '2026-11-20T18:00:00.000Z',
+      }),
+    err =>
+      err instanceof Error &&
+      /invalid_pubDate:apple-developer-releases:/.test(err.message) &&
+      !(err instanceof RangeError)
+  );
+});
+
 test('classifier maps platforms, isolates betas, and drops tvOS-only', () => {
   const beta = classifyItem({
     title: 'Xcode 27.3 beta 2 (27C5035i)',
