@@ -304,7 +304,10 @@ describe('Source Validation disk-read guards', () => {
   it('call the bounded pool instead of a serial spawnSync loop', () => {
     const workflow = readFileSync(
       fileURLToPath(
-        new URL('../../../.github/workflows/source-validation.yml', import.meta.url)
+        new URL(
+          '../../../.github/workflows/source-validation.yml',
+          import.meta.url
+        )
       ),
       'utf8'
     );
