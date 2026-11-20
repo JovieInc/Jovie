@@ -313,15 +313,23 @@ describe('merge-group docs-only structural decision', () => {
     );
   });
 
-  it('runs the structural lane for docs unit/ci asserts (JOV-12618 Sentry)', () => {
+  it('runs the structural lane for docs structural suites assert (JOV-12618)', () => {
     // docs_only stays true for product-lane skip, but structural-control-paths
-    // must still select these so repo-license-hygiene / synthetic-monitoring-
-    // workflow cannot land broken content through a docs-only merge group.
+    // must still select these so unit/ci + structural pytest/lanes content
+    // asserts cannot land broken docs through a docs-only merge group.
     for (const path of [
       'README.md',
       'CONTRIBUTING.md',
       'docs/REPO-POLICY.md',
       'docs/SYNTHETIC_MONITORING.md',
+      'docs/COST_MONITORING.md',
+      'docs/AUTOMATION_AUDIT.md',
+      'docs/design/design-brief-template.md',
+      'docs/CHANGELOG_PUBLICATION.md',
+      'docs/TEST_COVERAGE_HEATMAP.md',
+      'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
+      'docs/ordinary-reference.md',
+      'docs/launch/LAUNCH_GATES.md',
     ]) {
       expect(decide({ docsOnly: 'true', changes: [path] }), path).toBe(
         'skip=false'

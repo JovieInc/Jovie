@@ -3347,15 +3347,20 @@ it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
     '.github/actions/setup-playwright/action.yml',
     'scripts/lib/playwright-png.mjs',
     'apps/web/playwright.config.ts',
-    // unit/ci asserts these docs; docs_only must not skip structural (JOV-12618).
+    // Structural suites assert these docs; docs_only must not skip (JOV-12618).
     'README.md',
     'CONTRIBUTING.md',
     'docs/REPO-POLICY.md',
     'docs/SYNTHETIC_MONITORING.md',
+    'docs/COST_MONITORING.md',
+    'docs/AUTOMATION_AUDIT.md',
+    'docs/design/design-brief-template.md',
   ]) {
     expect(selects(path), path).toBe(true);
   }
   expect(selects('docs/REVIEW_BAR.md')).toBe(false);
+  // Orphan pytest (not wired into structural CI) — keep out of the selector.
+  expect(selects('docs/ops/openai-symphony-burrito.md')).toBe(false);
 });
 
 describe('invariant-scanned PR structural selection', () => {
@@ -3756,5 +3761,9 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
   expect(selected).toContain('.github/workflows/ci.yml');
   expect(selected).toContain('README.md');
   expect(selected).toContain('docs/SYNTHETIC_MONITORING.md');
+  expect(selected).toContain('docs/COST_MONITORING.md');
+  expect(selected).toContain('docs/AUTOMATION_AUDIT.md');
+  expect(selected).toContain('docs/design/design-brief-template.md');
   expect(selected).not.toContain('docs/REVIEW_BAR.md');
+  expect(selected).not.toContain('docs/ops/openai-symphony-burrito.md');
 });

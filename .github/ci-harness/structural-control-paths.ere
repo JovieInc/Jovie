@@ -56,11 +56,14 @@
 ^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$
 ^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$
 
-# Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
-# skip PRs, so these contracts run here (#18718). README / CONTRIBUTING /
-# SYNTHETIC_MONITORING stay docs_only for product lanes but must still select
-# structural so repo-license-hygiene and synthetic-monitoring-workflow assert.
-^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/(REPO-POLICY|SYNTHETIC_MONITORING)\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$|README\.md$|CONTRIBUTING\.md$)
+# Inputs apps/web/tests/unit/ci and structural pytest/lanes read beyond
+# .github/: web Unit Tests skip PRs, so these contracts run here (#18718).
+# Named docs stay docs_only for product lanes but must still select structural
+# so content assertions cannot skip on a docs-only merge group. Add new
+# structural-asserted docs here (do not rely on DOC_PATH alone).
+# (docs/ops/openai-symphony-burrito.md is NOT listed: its pytest file is not
+# wired into structural CI today.)
+^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/((REPO-POLICY|SYNTHETIC_MONITORING|COST_MONITORING|AUTOMATION_AUDIT|CHANGELOG_PUBLICATION|TEST_COVERAGE_HEATMAP|NIGHTLY_TESTING_AGENT_REPORT|ordinary-reference)\.md|launch/LAUNCH_GATES\.md|design/design-brief-template\.md)|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$|README\.md$|CONTRIBUTING\.md$)
 ^scripts/(lib/)?publish-coverage-report(\.test)?\.mjs$
 
 # Codecov and Chromatic config must match the workflows that produce them.
