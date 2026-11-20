@@ -17,13 +17,15 @@ const catalogFixture: OnboardingCatalogPreview = {
       releaseDate: '2026-09-14',
       releaseType: 'single',
       artworkUrl: null,
+      spotifyUrl: 'https://open.spotify.com/album/rel-1',
     },
     {
       id: 'rel-2',
       title: 'Static Bloom',
       releaseDate: '2025-11-02',
-      releaseType: 'ep',
+      releaseType: 'album',
       artworkUrl: null,
+      spotifyUrl: 'https://open.spotify.com/album/rel-2',
     },
   ],
 };

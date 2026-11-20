@@ -363,7 +363,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    if (!result.skipped) {
+    if (canCompleteIdempotentPostEffects(result)) {
       const churnDelivery = await trackServerEvent(
         'subscription_churned',
         { stripeEventId },
@@ -388,7 +388,9 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
+    }
 
+    if (!result.skipped) {
       this.sendCancellationNotification(result.appUserId).catch(err => {
         logger.warn(
           '[subscription-handler] Slack cancellation notification failed',
