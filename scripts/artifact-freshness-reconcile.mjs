@@ -44,19 +44,19 @@ export function observationFailureReceipt(error) {
   const reason = `artifact freshness observation failed: ${
     error instanceof Error ? error.message : String(error)
   }`;
-  // published known+unverified surfaces `reason` into pageSummer (publication-unverified).
+  // Incomplete observation — never page as publication-unverified.
   return buildArtifactFreshnessReceipt({
     channels: [
       reconcileArtifactFreshness({
         channel: 'production',
         certified: { status: 'unknown', reason },
-        published: { status: 'known', verified: false, reason },
+        published: { status: 'unknown', reason },
         feed: { status: 'unknown', reason },
       }),
       reconcileArtifactFreshness({
         channel: 'staging',
         certified: { status: 'unknown', reason: 'staging uses rolling tag' },
-        published: { status: 'known', verified: false, reason },
+        published: { status: 'unknown', reason },
         feed: { status: 'unknown', reason },
       }),
     ],

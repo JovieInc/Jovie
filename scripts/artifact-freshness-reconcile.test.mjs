@@ -112,20 +112,42 @@ test('collectArtifactFreshness keeps installed/running unknown and pages on cert
   );
 });
 
-test('collectArtifactFreshness returns red observation receipt when shipped fetch throws', async () => {
+test('transient releases/latest failure is incomplete observation without paging', async () => {
   const receipt = await collectArtifactFreshness({
     fetchImpl: async () => {
       throw new Error('GitHub 503 for releases/latest');
     },
   });
-  assert.equal(receipt.red, true);
-  assert.match(receipt.pageSummer.map(m => m.reason).join(' '), /GitHub 503/);
+  assert.equal(receipt.red, false);
+  assert.equal(receipt.pageSummer.length, 0);
+  assert.equal(
+    receipt.pageSummer.some(m => m.code === 'publication-unverified'),
+    false
+  );
+  assert.equal(
+    receipt.channels.every(c => c.stages.published.status === 'unknown'),
+    true
+  );
+  assert.equal(
+    receipt.channels.every(c => c.stages.feed.status === 'unknown'),
+    true
+  );
+  assert.match(
+    receipt.channels.map(c => c.stages.published.reason ?? '').join(' '),
+    /GitHub 503/
+  );
+  assert.equal(canResolveSummerForFreshness(receipt), false);
 });
 
-test('observationFailureReceipt is red and pageable', () => {
+test('observationFailureReceipt records unknown published/feed without paging', () => {
   const receipt = observationFailureReceipt(new Error('timeout'));
-  assert.equal(receipt.red, true);
-  assert.ok(receipt.pageSummer.length > 0);
+  assert.equal(receipt.red, false);
+  assert.equal(receipt.pageSummer.length, 0);
+  assert.equal(
+    receipt.channels.every(c => c.stages.published.status === 'unknown'),
+    true
+  );
+  assert.equal(canResolveSummerForFreshness(receipt), false);
 });
 
 test('pageSummerForFreshness puts stable fingerprint in title and labelKey', async () => {
