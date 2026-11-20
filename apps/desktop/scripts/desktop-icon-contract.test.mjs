@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -167,6 +168,15 @@ test('legacy icon-source.png remains for reference but is no longer the producti
 });
 
 test('packaged production and staging icons use the rounded desktop profile', async () => {
+  // Staging PNG is gitignored and produced by gen-staging-icon.mjs (copy of
+  // production). Generate before asserting so CI does not rely on a force-add.
+  const gen = spawnSync(
+    process.execPath,
+    [join(desktopRoot, 'scripts', 'gen-staging-icon.mjs')],
+    { encoding: 'utf8' }
+  );
+  assert.equal(gen.status, 0, gen.stderr || gen.stdout);
+
   await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
   await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
   await assertMacSafeArea(productionPngPath, ICON_SIZE);
