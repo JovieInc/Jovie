@@ -25,10 +25,7 @@ test('docs and unrelated native changes allocate no typecheck parity work', () =
 });
 
 test('TypeScript and typecheck graph inputs select the typecheck twin', () => {
-  assert.equal(
-    selectMqParityScope(['apps/web/lib/foo.ts']).typecheck,
-    true
-  );
+  assert.equal(selectMqParityScope(['apps/web/lib/foo.ts']).typecheck, true);
   assert.equal(selectMqParityScope(['tsconfig.json']).typecheck, true);
   assert.equal(selectMqParityScope(['pnpm-lock.yaml']).typecheck, true);
   assert.equal(
@@ -47,10 +44,7 @@ test('source-validation wires the typecheck twin onto Affected Unit Tests', () =
   assert.ok(twin, 'typecheck lane parity step missing');
   assert.equal(twin.run, 'node scripts/ci-fast-lanes.mjs');
   assert.equal(twin.env.CI_FAST_LANE_GROUP, 'typecheck');
-  assert.match(
-    String(twin.if),
-    /mq-parity\.outputs\.typecheck == 'true'/
-  );
+  assert.match(String(twin.if), /mq-parity\.outputs\.typecheck == 'true'/);
 });
 
 test('older PR heads load new parity tools from trusted base without dirtying the source checkout', () => {
