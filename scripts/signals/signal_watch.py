@@ -73,8 +73,7 @@ MAX_PENDING = 200
 MAX_STORE_PER_RUN = 40
 DEFAULT_BUDGET_USD = 0.25
 DEFAULT_CARDS_PER_DAY = 3
-# Calibrated on the first real run (2026-10-20): Jev's worth probability topped out at 0.38 over
-# 80 items (71 ignore). Override with SIGNALS_CARD_MIN_SCORE.
+# First real run (2026-10-20): Jev worth topped out at 0.38; override SIGNALS_CARD_MIN_SCORE.
 CARD_MIN_SCORE = 0.3
 CARD_MIN_ACTION_P = 0.5
 OUTBOX_MAX_AGE_S = 3 * 24 * 3600
@@ -121,26 +120,21 @@ QUESTIONS = {
 def now_iso(now: float | None = None) -> str:
     return yc_corpus.now_iso(now)
 
-
 def epoch(value: str) -> float | None:
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
 
-
 def sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
 
 def compact(text: str, limit: int = SUMMARY_CHARS) -> str:
     text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", text or "")).split())
     return text if len(text) <= limit else text[:limit - 1].rsplit(" ", 1)[0] + "…"
 
-
 def one_line(text: str, limit: int) -> str:
     return compact(text, limit).replace("\n", " ") or "(untitled)"
-
 
 def slug_part(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "item"
@@ -499,11 +493,7 @@ def x_post_item(post: dict) -> dict:
 
 
 def poll_x(state: dict, config: dict, env, now: float, search=None) -> tuple[list[dict], dict]:
-    """New posts from tracked accounts: one Grok call per REFRESH_INTERVAL_S, capped per day.
-
-    Failed runs shorten nextAttemptAt to 1h so feeds can recover, but X must not burn a
-    Grok seat call on those feed-only retries (DEFAULT_GROK_CALLS_PER_DAY assumes 6h slots).
-    """
+    """Tracked X via Grok: ≤1 call/REFRESH_INTERVAL_S so hourly feed retries cannot burn quota."""
     x = state.setdefault("x", {})
     day = now_iso(now)[:10]
     if x.get("day") != day:
@@ -515,8 +505,7 @@ def poll_x(state: dict, config: dict, env, now: float, search=None) -> tuple[lis
         return [], {"status": "capped", "calls": x["calls"]}
     last_polled = epoch(x.get("lastPolledAt") or "")
     if last_polled is not None and now - last_polled < REFRESH_INTERVAL_S:
-        return [], {"status": "deferred", "callsToday": x["calls"],
-                    "nextEligibleAt": now_iso(last_polled + REFRESH_INTERVAL_S)}
+        return [], {"status": "deferred", "callsToday": x["calls"]}
     since = (x.get("lastCreatedAt") or now_iso(now - 2 * 86400))[:10]
     search = search or x_grok.search_posts
     x["calls"] += 1

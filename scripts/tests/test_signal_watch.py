@@ -208,7 +208,7 @@ class XPostTests(unittest.TestCase):
             return {"status": status, "posts": posts, "costUsd": 0.08}
         return fake, calls
 
-    def test_poll_x_dedupes_caps_and_tracks_since(self):
+    def test_poll_x_dedupes_caps_defers_and_tracks_since(self):
         state, config = {}, {"enabled": True, "accounts": ["AnthropicAI"], "queries": []}
         fake, calls = self.search([X_POST])
         t0 = NOW + 86400
@@ -216,39 +216,17 @@ class XPostTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in items], ["x-post:2112579251555721573"])
         self.assertEqual((items[0]["kind"], items[0]["sourceName"]), ("x-post", "X @AnthropicAI"))
         self.assertEqual(W.brain_slug(items[0]), "signals/x-posts/2112579251555721573")
-        self.assertEqual(calls[0][2], "2026-10-19")
-        self.assertEqual((summary["new"], summary["callsToday"]), (1, 1))
-        deferred, deferred_summary = W.poll_x(state, config, {}, t0 + 60, fake)
-        self.assertEqual(deferred, [])
-        self.assertEqual(deferred_summary["status"], "deferred")
-        self.assertEqual(len(calls), 1)
-        again, _ = W.poll_x(state, config, {}, t0 + W.REFRESH_INTERVAL_S, fake)
-        self.assertEqual(again, [])
-        self.assertEqual(calls[1][2], "2026-10-20")
+        self.assertEqual((calls[0][2], summary["new"], summary["callsToday"]), ("2026-10-19", 1, 1))
+        for hour in (1, 2, 3, 4):  # hourly feed retries must not burn Grok quota
+            hop_items, hop = W.poll_x(state, config, {}, t0 + hour * 3600, fake)
+            self.assertEqual((hop_items, hop["status"], hop["callsToday"], len(calls)),
+                             ([], "deferred", 1, 1))
+        again, again_summary = W.poll_x(state, config, {}, t0 + W.REFRESH_INTERVAL_S, fake)
+        self.assertEqual((again, calls[1][2], again_summary["callsToday"]), ([], "2026-10-20", 2))
         _, capped = W.poll_x(
             state, config, {"SIGNALS_GROK_DAILY_CALLS": "2"}, t0 + 2 * W.REFRESH_INTERVAL_S, fake)
         self.assertEqual(capped["status"], "capped")
-        _, off = W.poll_x({}, config, {"SIGNALS_X_DISABLED": "1"}, NOW, fake)
-        self.assertEqual(off["status"], "disabled")
-
-    def test_poll_x_defers_within_refresh_interval_without_burning_quota(self):
-        """Hourly feed-failure retries must not spend the four daily Grok slots."""
-        state, config = {}, {"enabled": True, "accounts": ["AnthropicAI"], "queries": []}
-        fake, calls = self.search([X_POST])
-        t0 = NOW + 86400
-        first, summary = W.poll_x(state, config, {}, t0, fake)
-        self.assertEqual(len(first), 1)
-        self.assertEqual(summary["callsToday"], 1)
-        for hour in range(1, 5):
-            items, hop = W.poll_x(state, config, {}, t0 + hour * 3600, fake)
-            self.assertEqual(items, [])
-            self.assertEqual(hop["status"], "deferred")
-            self.assertEqual(hop["callsToday"], 1)
-        self.assertEqual(len(calls), 1)
-        later, later_summary = W.poll_x(state, config, {}, t0 + W.REFRESH_INTERVAL_S, fake)
-        self.assertEqual(later, [])
-        self.assertEqual(later_summary["callsToday"], 2)
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(W.poll_x({}, config, {"SIGNALS_X_DISABLED": "1"}, NOW, fake)[1]["status"], "disabled")
 
     @patch.object(W.capacity_limit, "summer_config", side_effect=AssertionError("host Summer config must not be read"))
     def test_x_posts_card_as_changelog_origin_and_record_dwell(self, _summer_config):
