@@ -9,32 +9,59 @@
  * Filename includes `proxy` so the risk-register surface inventory can count it.
  */
 import { expect, test } from '@playwright/test';
+import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const NAV_TIMEOUT = 30_000;
+const publicSignupClosed = process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true';
 
 test.describe('proxy auth gate (anonymous)', () => {
-  test('GET /onboarding redirects to /start and keeps resume', async ({
+  test('GET /onboarding first-hop redirects to /start and keeps resume', async ({
+    request,
+  }) => {
+    // Proxy contract only: /onboarding → /start before the /start page gate.
+    const response = await request.get('/onboarding?resume=spotify', {
+      maxRedirects: 0,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    expect(response.status()).toBeGreaterThanOrEqual(300);
+    expect(response.status()).toBeLessThan(400);
+    const location = response.headers().location ?? '';
+    const target = new URL(location, 'http://localhost');
+    expect(target.pathname).toBe('/start');
+    expect(target.searchParams.get('resume')).toBe('spotify');
+  });
+
+  test('GET /onboarding followed nav lands on the public front door', async ({
     page,
   }) => {
     await page.goto('/onboarding?resume=spotify', {
       waitUntil: 'domcontentloaded',
-      timeout: NAV_TIMEOUT,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
 
-    await expect(page).toHaveURL(/\/start(?:\?|$)/, { timeout: NAV_TIMEOUT });
-    const url = new URL(page.url());
-    expect(url.pathname).toBe('/start');
-    expect(url.searchParams.get('resume')).toBe('spotify');
+    // FEATURE_PUBLIC_SIGNUP_CLOSED (JOV-7973): anonymous /start hands off to
+    // /waitlist. Mirror canary-auth-signup-onboarding.spec.ts.
+    if (publicSignupClosed) {
+      await expect(page).toHaveURL(/\/waitlist(?:\?|$)/, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      await expect(page.getByTestId('waitlist-role-form')).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+    } else {
+      await expect(page).toHaveURL(/\/start(?:\?|$)/, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      const url = new URL(page.url());
+      expect(url.pathname).toBe('/start');
+      expect(url.searchParams.get('resume')).toBe('spotify');
+      await expect(page).not.toHaveURL(/\/waitlist/);
+    }
 
-    // Resulting state: public front door, not the authenticated app shell.
     await expect(page).not.toHaveURL(/\/app(?:\/|$)/);
     const body = (await page.locator('body').textContent()) ?? '';
     expect(body.trim()).not.toMatch(/^\{["\s]/);
-    await expect(page.locator('h1, h2, [data-testid]').first()).toBeVisible({
-      timeout: NAV_TIMEOUT,
-    });
   });
 
   test('GET /app sends anonymous users to sign-in (followed navigation)', async ({
@@ -42,11 +69,11 @@ test.describe('proxy auth gate (anonymous)', () => {
   }) => {
     await page.goto('/app', {
       waitUntil: 'domcontentloaded',
-      timeout: NAV_TIMEOUT,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
 
     await expect(page).toHaveURL(/\/signin(?:\?|$)/i, {
-      timeout: NAV_TIMEOUT,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     await expect(page).not.toHaveURL(/\/app(?:\/|$)/);
     // First-hop Location + redirect_url are asserted in
