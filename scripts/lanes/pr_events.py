@@ -540,6 +540,36 @@ def merge_failures(peers: dict | None, number: int, failing: dict | None) -> dic
     return merged
 
 
+# main-red-eject failing-head comments carry this marker (scripts/lib/main-red-eject.mjs).
+FAILING_HEAD_EJECT_RE = re.compile(r"<!-- main-red-eject (\{.*?\}) -->")
+
+
+def failing_head_eject_holds(number: int, head_oid: str | None, sh=run) -> bool | None:
+    """Whether main-red-eject hold-labeled this exact head. None = unreadable (fail closed)."""
+    if not head_oid:
+        return False
+    read = sh(["gh", "api", f"repos/{REPO}/issues/{number}/comments?per_page=100"])
+    if getattr(read, "returncode", 1):
+        return None
+    try:
+        comments = json.loads(read.stdout or "[]")
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(comments, list):
+        return None
+    for comment in comments:
+        match = FAILING_HEAD_EJECT_RE.search(str((comment or {}).get("body") or ""))
+        if not match:
+            continue
+        try:
+            fields = json.loads(match.group(1))
+        except (ValueError, TypeError):
+            continue
+        if fields.get("failingHeadDequeued") == head_oid:
+            return True
+    return False
+
+
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -2591,15 +2621,22 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if not set(failing) & set(incidents) and add_label(number, "red", lane.sh):
             labeled.append((number, "red"))
     for number, kind in plan["unlabel"]:
-        # JOV-8492: merge-group holds (queue breaker + main-red-eject failing-head) are
-        # jovie-bot episodes. The required-green rollup cannot see those reds; clearing the
-        # label re-arms silent same-head dead-ends. Protect by breaker state OR provenance.
+        # JOV-8492: merge-group holds are jovie-bot episodes the PR-head rollup cannot
+        # supersede. Protect breaker-held heads and main-red-eject failing-head markers.
+        # Reconcile gap-fill also applies lane-fix-red as jovie-bot — those MUST clear on
+        # CLEAN or enroll stalls (Sentry on #26143). Relay (github-actions) reds always clear.
         if kind == "red":
-            held_head = (breaker_held.get(str(number)) or {}).get("head")
-            if held_head == (by_number.get(number) or {}).get("headRefOid"):
+            head_oid = (by_number.get(number) or {}).get("headRefOid")
+            if (breaker_held.get(str(number)) or {}).get("head") == head_oid:
                 continue
-            if label_episode_applier(number, LANE_FIX_RED, lane.sh) != RELAY_RED_LABELLER:
-                continue
+            applier = label_episode_applier(number, LANE_FIX_RED, lane.sh)
+            if applier != RELAY_RED_LABELLER:
+                if applier is None or applier not in FAILURE_HOLD_WRITERS:
+                    continue  # human / unreadable: fail closed
+                eject = failing_head_eject_holds(number, head_oid, lane.sh)
+                if eject is not False:
+                    continue  # eject hold or unreadable comments: keep
+                # jovie-bot gap-fill with no merge-group evidence: clear
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}

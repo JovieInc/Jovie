@@ -2018,17 +2018,42 @@ class GapTest(unittest.TestCase):
 
     def test_reconcile_does_not_unlabel_jovie_bot_merge_group_red(self):
         # main-red-eject failing-head applies lane-fix-red as jovie-bot without a
-        # queue-breaker.json row; provenance alone must protect the episode.
-        row = {**self.node(9, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid="c" * 40),
+        # queue-breaker.json row; the eject comment marker protects the episode.
+        head = "c" * 40
+        row = {**self.node(9, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid=head),
+               "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+               "labels": {"nodes": [{"name": "lane-fix-red"}]}}
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                         "nodes": [row]}}}}
+        eject_comment = [{"body": f'<!-- main-red-eject {{"failingHeadDequeued": "{head}"}} -->\ndequeued'}]
+        linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}})
+        shell = Shell({
+            ("gh", "api", "graphql"): red_episode_route(page, login="jovie-bot[bot]"),
+            ("gh", "api", f"repos/{events.REPO}/issues/9/comments?per_page=100"): eject_comment,
+        })
+        events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
+                         "jovie-bot merge-group hold is not the sweep's to lift")
+
+    def test_reconcile_clears_jovie_bot_gap_fill_red_without_merge_group_hold(self):
+        # Sentry #26143: reconcile applies lane-fix-red as jovie-bot for missed relay
+        # events. Those must clear on CLEAN or enroll stalls. No breaker, no eject marker.
+        head = "d" * 40
+        row = {**self.node(10, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid=head),
                "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
                "labels": {"nodes": [{"name": "lane-fix-red"}]}}
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                          "nodes": [row]}}}}
         linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}})
-        shell = Shell({("gh", "api", "graphql"): red_episode_route(page, login="jovie-bot[bot]")})
+        shell = Shell({
+            ("gh", "api", "graphql"): red_episode_route(page, login="jovie-bot[bot]"),
+            ("gh", "api", f"repos/{events.REPO}/issues/10/comments?per_page=100"): [],
+        })
         events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
-        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
-                         "jovie-bot merge-group hold is not the sweep's to lift")
+        self.assertIn(
+            ["gh", "api", "-X", "DELETE", f"repos/{events.REPO}/issues/10/labels/lane-fix-red"],
+            shell.calls,
+        )
 
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
