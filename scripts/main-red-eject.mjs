@@ -668,7 +668,9 @@ async function failingHead(head, doApply) {
     '-f',
     `labels[]=${FIX_RED_LABEL}`,
   ]).catch(error =>
-    console.error(`::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`)
+    console.error(
+      `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
+    )
   );
   // The dequeue is the fix; a failed comment must not undo or retry it.
   await gh([
