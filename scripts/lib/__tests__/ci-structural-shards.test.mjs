@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LANES_COVERAGE_COMMAND,
@@ -13,9 +15,9 @@ import {
 describe('structural core matrix shards', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  const startedFor = async shard => {
+  const startedFor = async (shard, products) => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
-    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_PRODUCT_LANES', products);
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
     vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
@@ -34,17 +36,34 @@ describe('structural core matrix shards', () => {
     return started;
   };
 
-  it('partitions the structural pool across the matrix legs without dropping or duplicating a command', async () => {
-    const whole = await startedFor(undefined);
-    const first = await startedFor('1/2');
-    const second = await startedFor('2/2');
-    expect(whole.length).toBeGreaterThan(0);
-    expect([...first, ...second].sort()).toEqual([...whole].sort());
-    expect(new Set([...first, ...second]).size).toBe(whole.length);
-    // Round-robin keeps each shard's list order and spreads the pool evenly.
-    expect(first).toEqual(whole.filter((_, index) => index % 2 === 0));
-    expect(second).toEqual(whole.filter((_, index) => index % 2 === 1));
-  });
+  const workflow = /** @type {{ jobs: Record<string, any> }} */ (
+    load(
+      readFileSync(
+        new URL('../../../.github/workflows/ci.yml', import.meta.url),
+        'utf8'
+      )
+    )
+  );
+  it.each(['operations', 'web', 'mac', 'operations,web,mac', 'none'])(
+    'partitions the actual remaining matrix exactly once for %s',
+    async products => {
+      const job = workflow.jobs['ci-fast-remaining-shards'];
+      expect(job.env.CI_FAST_STRUCTURAL_SHARD).toBe('${{ matrix.shard }}/3');
+      expect(job.strategy.matrix.shard).toEqual([1, 2, 3]);
+      const whole = await startedFor(undefined, products);
+      if (products.includes('operations'))
+        expect(whole.length).toBeGreaterThan(0);
+      const legs = [];
+      for (const shard of job.strategy.matrix.shard)
+        legs.push(await startedFor(`${shard}/3`, products));
+      expect(legs.flat().sort()).toEqual([...whole].sort());
+      expect(new Set(legs.flat()).size).toBe(whole.length);
+      for (let i = 0; i < legs.length; i++)
+        expect(legs[i]).toEqual(
+          whole.filter((_, index) => index % legs.length === i)
+        );
+    }
+  );
 
   it('partitions a known list deterministically and rejects bad specs', () => {
     const pool = ['a', 'b', 'c', 'd', 'e'];
@@ -73,7 +92,19 @@ describe('lanes coverage matrix legs', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it('runs exactly one leg command for only:<group>', async () => {
-    for (const group of Object.keys(LANES_COVERAGE_GROUP_COMMANDS)) {
+    const job = /** @type {{ jobs: Record<string, any> }} */ (
+      load(
+        readFileSync(
+          new URL('../../../.github/workflows/ci.yml', import.meta.url),
+          'utf8'
+        )
+      )
+    ).jobs['ci-fast-structural-lanes-shards'];
+    expect(job.env.CI_FAST_STRUCTURAL_LANES).toBe('only:${{ matrix.group }}');
+    expect([...job.strategy.matrix.group].sort()).toEqual(
+      Object.keys(LANES_COVERAGE_GROUP_COMMANDS).sort()
+    );
+    for (const group of job.strategy.matrix.group) {
       vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
       vi.stubEnv('CI_PRODUCT_LANES', 'operations');
       vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');

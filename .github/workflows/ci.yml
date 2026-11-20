@@ -2378,6 +2378,34 @@ jobs:
 
   ci-fast-remaining:
     name: ci-fast (remaining)
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-fast-remaining-shards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    if: &ci-fast-fanin-gate >-
+      always() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-workspace.result == 'success' &&
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      )
+    steps:
+      - name: Require every remaining shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.ci-fast-remaining-shards.result }}
+        run: &ci-fast-shards-result |
+          set -euo pipefail
+          if [[ "$SHARDS_RESULT" != 'success' ]]; then
+            echo "::error::ci-fast shards failed closed: $SHARDS_RESULT"
+            exit 1
+          fi
+
+  ci-fast-remaining-shards:
+    name: ci-fast (remaining shard ${{ matrix.shard }}/3)
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
     # JOV-5454: live Storybook certification needs Chromium plus bounded
@@ -2400,7 +2428,12 @@ jobs:
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
       )
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
+      CI_FAST_STRUCTURAL_SHARD: ${{ matrix.shard }}/3
       CI_FAST_STRUCTURAL_PYTEST: skip
       CI_FAST_STRUCTURAL_WEB: skip
       CI_FAST_STRUCTURAL_LANES: skip
@@ -2464,6 +2497,7 @@ jobs:
       # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
       # against its sha256 pin before use, so an older key is safe to restore.
       - name: Restore pinned actionlint downloads
+        if: ${{ success() && matrix.shard == 1 }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/jovie-pinned-downloads
@@ -2481,11 +2515,13 @@ jobs:
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
       - name: Set up Go for source-pinned actionlint
+        if: ${{ success() && matrix.shard == 1 }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
+        if: ${{ success() && matrix.shard == 1 }}
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
@@ -2543,6 +2579,7 @@ jobs:
             echo "Pinned origin/${BASE_BRANCH} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
           fi
       - name: Validate CI/release incident prevention contract
+        if: ${{ success() && matrix.shard == 1 }}
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
@@ -2551,7 +2588,7 @@ jobs:
         # JOV-6689: a PR closing an `incident` issue must ship or link a
         # post-mortem. The label lookup is the only non-deterministic piece,
         # so it stays in this step; the check below is pure file/text.
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.shard == 1
         shell: bash
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -2580,6 +2617,7 @@ jobs:
           echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
           echo "Incident-labeled references: ${incident:-none}"
       - name: Post-mortem linkage and frontmatter check
+        if: ${{ success() && matrix.shard == 1 }}
         # Same always-on placement as the incident contract above: every
         # source PR and merge-group head, dependency-free (JOV-6689).
         env:
@@ -2587,6 +2625,7 @@ jobs:
           POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
         run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
+        if: ${{ success() && matrix.shard == 1 }}
         shell: bash
         run: |
           if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
@@ -2638,6 +2677,7 @@ jobs:
       # dependency/Chromium setup below. The merge-group matrix still runs the
       # complete Storybook surface set on the combined head.
       - name: Select Storybook browser proof
+        if: ${{ success() && matrix.shard == 1 }}
         id: storybook-browser
         shell: bash
         run: |
@@ -2738,6 +2778,7 @@ jobs:
       # installs and the structural lane runs; "Await ci-fast lanes" fails
       # closed on their status after the structural lane.
       - name: Start ci-fast lanes
+        if: ${{ success() && matrix.shard == 1 }}
         id: lanes-start
         shell: bash
         env:
@@ -2894,7 +2935,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ci-fast-lanes-remaining-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/ci-fast-lanes.json
             ${{ runner.temp }}/ci-fast-lanes-structural.json
@@ -3282,9 +3323,82 @@ jobs:
 
   ci-fast-structural-lanes:
     name: ci-fast (structural lanes)
-    # The lanes coverage pytest (four shards + per-module coverage floors) set
-    # remaining's whole structural wall (478s of 478s, merge group
-    # 41250311104) while contending for 4 vCPU; it runs alone here.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-fast-structural-lanes-shards]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 5
+    if: *ci-fast-fanin-gate
+    steps:
+      - name: Require every lanes coverage shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.ci-fast-structural-lanes-shards.result }}
+        run: *ci-fast-shards-result
+      - *shallow-checkout
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Download lanes coverage ab
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-ab-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/ab
+      - name: Download lanes coverage cd
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-cd-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/cd
+      - name: Require complete lanes coverage evidence
+        id: coverage
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          import { LANES_COVERAGE_GROUP_SHARDS, lanesReceiptRanSuite } from './scripts/lib/ci-structural-shards.mjs';
+          const ran = Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => {
+            const dir = `${process.env.RUNNER_TEMP}/lanes-coverage/${group}`;
+            const executed = lanesReceiptRanSuite(JSON.parse(readFileSync(`${dir}/receipt.json`, 'utf8')));
+            if (executed && !existsSync(`${dir}/jovie-lanes-${group}.coverage`)) {
+              throw new Error(`Missing lanes coverage data: ${group}`);
+            }
+            return executed;
+          });
+          if (ran.some(value => value !== ran[0])) throw new Error('Inconsistent lanes coverage receipts');
+          appendFileSync(process.env.GITHUB_OUTPUT, `ran=${ran[0]}\n`);
+          NODE
+      - name: Set up Python for combined lanes coverage
+        if: steps.coverage.outputs.ran == 'true'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
+      - name: Install combined lanes coverage reporter
+        if: steps.coverage.outputs.ran == 'true'
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Combine lanes coverage and enforce all module floors
+        if: steps.coverage.outputs.ran == 'true'
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { LANES_COVERAGE_FLOORS, LANES_COVERAGE_GROUP_SHARDS } from './scripts/lib/ci-structural-shards.mjs';
+          const root = process.env.RUNNER_TEMP;
+          const env = { ...process.env, COVERAGE_FILE: `${root}/jovie-lanes.coverage` };
+          const run = args => {
+            const result = spawnSync('python3', ['-m', 'coverage', ...args], { env, stdio: 'inherit' });
+            if (result.status !== 0) process.exit(result.status ?? 1);
+          };
+          run(['combine', ...Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => `${root}/lanes-coverage/${group}/jovie-lanes-${group}.coverage`)]);
+          for (const { include, floor } of LANES_COVERAGE_FLOORS) {
+            run(['report', `--include=${include}`, `--fail-under=${floor}`]);
+          }
+          NODE
+
+  ci-fast-structural-lanes-shards:
+    name: ci-fast (structural lanes shard ${{ matrix.group }})
+    # Each group runs its existing pytest pair; the required fan-in combines
+    # both maps before enforcing every whole-suite coverage floor.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3292,8 +3406,12 @@ jobs:
       contents: read
     timeout-minutes: 20
     if: *ci-fast-gate
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [ab, cd]
     env:
-      CI_FAST_STRUCTURAL_LANES: only
+      CI_FAST_STRUCTURAL_LANES: only:${{ matrix.group }}
     steps:
       - *shallow-checkout
       - name: Start base-branch history fetch
@@ -3320,6 +3438,35 @@ jobs:
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: *structural-run-env
         run: node scripts/ci-fast-lanes.mjs
+      - name: Collect lanes coverage evidence
+        env:
+          GROUP: ${{ matrix.group }}
+          DECISION_SKIP: ${{ steps.structural.outputs.skip }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/lanes-coverage-$GROUP"
+          mkdir -p "$evidence"
+          if [[ "$DECISION_SKIP" == 'true' ]]; then
+            printf '%s\n' '{"lanes":[{"id":"structural","status":"skipped"}]}' > "$evidence/receipt.json"
+          else
+            cp "$RUNNER_TEMP/ci-fast-lanes-structural.json" "$evidence/receipt.json"
+          fi
+          node --input-type=module <<'NODE'
+          import { readFileSync, copyFileSync } from 'node:fs';
+          import { lanesReceiptRanSuite } from './scripts/lib/ci-structural-shards.mjs';
+          const { RUNNER_TEMP: root, GROUP: group } = process.env;
+          const dir = `${root}/lanes-coverage-${group}`;
+          if (lanesReceiptRanSuite(JSON.parse(readFileSync(`${dir}/receipt.json`, 'utf8')))) {
+            copyFileSync(`${root}/jovie-lanes-${group}.coverage`, `${dir}/jovie-lanes-${group}.coverage`);
+          }
+          NODE
+      - name: Upload lanes coverage evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lanes-coverage-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage-${{ matrix.group }}/
+          retention-days: 7
+          if-no-files-found: error
 
   ci-knip:
     name: Knip (dead code)
@@ -4115,17 +4262,16 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across runners; the aggregates read the matrix result. Three shards since
-    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
-    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
-    # waiting on the lanes pytest.
+    # across runners; the aggregates read the matrix result. Six browser shards
+    # retain the identical spec list and two workers per runner. The separate
+    # certification member still runs exactly once on merge groups.
     strategy:
       fail-fast: true
       matrix:
         # JOV-12094: the unchanged component gate used to run three times,
         # serially before each browser shard (up to 300s each). Keep it in
         # this required matrix, once and alongside the full browser suite.
-        shard: ${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, "certification"]' || '[1, 2, 3]') }}
+        shard: ${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, 4, 5, 6, "certification"]' || '[1, 2, 3, 4, 5, 6]') }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4216,7 +4362,7 @@ jobs:
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
-                  --workers=2 --shard="$STORYBOOK_SHARD/3"
+                  --workers=2 --shard="$STORYBOOK_SHARD/6"
               exit 0
             fi
             sleep 2
