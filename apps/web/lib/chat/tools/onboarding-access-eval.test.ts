@@ -185,6 +185,45 @@ describe('evaluateAccessSignal', () => {
     });
     expect(result.kind).toBe('needs_more_info');
   });
+
+  it('admits <1k follower Spotify artists with verified catalog depth even with no_active_release', () => {
+    const result = evaluateAccessSignal({
+      signal: {
+        audienceBand: 'under_500',
+        releaseStage: 'no_active_release',
+      },
+      spotifyArtistId: '1ZlSI1juLMMN1HU8X7RViN',
+      spotifyFollowers: 340,
+      catalogReleases: 4,
+      turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+    });
+    expect(result).toMatchObject({
+      kind: 'instant_access',
+      rationale: 'spotify_catalog_releases_4',
+      proofRequired: true,
+    });
+  });
+
+  it('does not admit <1k artists from catalog depth when Spotify identity is unconfirmed or 0 releases', () => {
+    expect(
+      evaluateAccessSignal({
+        signal: { releaseStage: 'no_active_release' },
+        spotifyArtistId: null,
+        spotifyFollowers: 400,
+        catalogReleases: 5,
+        turnCount: 1,
+      }).kind
+    ).toBe('needs_more_info');
+    expect(
+      evaluateAccessSignal({
+        signal: { releaseStage: 'no_active_release' },
+        spotifyArtistId: '1ZlSI1juLMMN1HU8X7RViN',
+        spotifyFollowers: 400,
+        catalogReleases: 0,
+        turnCount: 1,
+      }).kind
+    ).toBe('needs_more_info');
+  });
 });
 
 describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
@@ -223,6 +262,15 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
 
   it('evaluates verified Spotify data when the gate is off', () => {
     expect(decideOnboardingAccess(base).kind).toBe('instant_access');
+    expect(
+      decideOnboardingAccess({
+        ...base,
+        spotifyFollowers: 250,
+        catalogReleases: 3,
+        signals: [{ releaseStage: 'no_active_release' }],
+        turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+      }).kind
+    ).toBe('instant_access');
   });
 });
 

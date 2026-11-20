@@ -379,8 +379,7 @@ function decideAccess(
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
 ): AccessDecision {
-  // Incomplete acks must not force waitlist via turn cap — freeze turnCount
-  // under the force threshold unless we have real signal this turn.
+  // Freeze turnCount under the force threshold on incomplete acks.
   const turnCount =
     options?.forceTurnCap === false
       ? Math.min(state.turnCount, 2)
@@ -393,6 +392,7 @@ function decideAccess(
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,
+    catalogReleases: state.catalogPreview?.total ?? null,
     metrics: state.artistMetrics,
     signals: state.signals,
     turnCount,
