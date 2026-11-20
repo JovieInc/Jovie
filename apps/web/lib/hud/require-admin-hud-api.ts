@@ -1,6 +1,11 @@
 import 'server-only';
 import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
-/** Read-only Ovie observation uses baseline role + optional privacy, not a mandatory MFA curtain. */
+
+/**
+ * HUD API gate. Read-only observation stays role + privacy (no MFA curtain).
+ * Mutations and secret material must pass `privileged: true` so
+ * `hasRecentAdminMfaReverification` matches `requireAdmin()` / entitlements.
+ */
 export async function requireAdminHudApiAccess(options?: {
   session?: 'cookie' | 'fresh';
   privileged?: boolean;

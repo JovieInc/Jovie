@@ -44,6 +44,9 @@ vi.mock('@/lib/db', async importOriginal => ({
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   assertOviePrivacyUnlocked: async () => {},
 }));
+vi.mock('@/lib/admin/mfa', () => ({
+  hasRecentAdminMfaReverification: async () => true,
+}));
 vi.mock('@/lib/sentry/set-user-context', () => ({
   attachSentryContext: async () => {},
 }));

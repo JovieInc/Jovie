@@ -6,13 +6,15 @@ import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import { captureWarning } from '@/lib/error-tracking';
 import { privacyErrorResponse } from '@/lib/ovie/privacy-lock/access';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
+import { hasRecentAdminMfaReverification } from './mfa';
 import { isAdmin } from './roles';
 
 /**
  * Admin route protection middleware
  *
- * Verifies that the current user has admin privileges before allowing access.
- * Returns 403 Forbidden if user is not an admin.
+ * Verifies admin role plus a live passkey step-up receipt
+ * (`hasRecentAdminMfaReverification`, fail closed). Aligns privileged
+ * admin APIs with entitlements/`operatorAccess` MFA gating.
  *
  * Usage in API routes:
  * ```typescript
@@ -26,7 +28,7 @@ import { isAdmin } from './roles';
  * }
  * ```
  *
- * @returns NextResponse with 403 status if not admin, null if authorized
+ * @returns NextResponse with 401/403 if denied, null if authorized
  */
 export async function requireAdmin(options?: {
   session?: 'cookie' | 'fresh';
@@ -67,6 +69,22 @@ export async function requireAdmin(options?: {
 
     return NextResponse.json(
       { error: 'Forbidden. Admin privileges required.' },
+      { status: 403 }
+    );
+  }
+
+  // Privileged admin mutations (impersonate, set-plan, flags, investors)
+  // require the same passkey step-up as entitlements `isAdmin`. Fail closed
+  // when the receipt is missing, expired, or unreadable.
+  if (!(await hasRecentAdminMfaReverification(auth))) {
+    captureWarning(
+      `[admin/middleware] Admin MFA step-up required for user: ${maskedUserId}`
+    );
+    return NextResponse.json(
+      {
+        error: 'Verify your passkey for this privileged action.',
+        code: 'PASSKEY_STEP_UP_REQUIRED',
+      },
       { status: 403 }
     );
   }
