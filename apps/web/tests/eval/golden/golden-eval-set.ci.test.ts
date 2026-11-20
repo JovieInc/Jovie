@@ -182,7 +182,7 @@ describe('Golden eval-set CI gate: referenced-entity hydration', () => {
     expect(systemPrompt.toLowerCase()).toContain('never another artist');
   });
 
-  it('calls generateText with the hydrated owned-release prompt and rejects mis-attribution', async () => {
+  it('produces a reply that treats the owned release as the user own work', async () => {
     const systemPrompt = buildPromptWithReferencedEntities();
 
     const reply =
