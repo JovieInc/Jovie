@@ -1215,7 +1215,6 @@ test('PR Ready executes the exact-head evidence gate and denies missing, failed,
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
 test('fleet policy regressions run before workspace dependencies are installed', () => {
   const dir = mkdtempSync(join(tmpdir(), 'fleet-bootstrap-'));
   try {
@@ -1224,6 +1223,7 @@ test('fleet policy regressions run before workspace dependencies are installed',
       'scripts/pr-fleet-rules.mjs',
       'scripts/lib/workflow-token-budget.mjs',
       'scripts/lib/wins-ledger.mjs',
+      'scripts/lib/wins-measure/classify.mjs',
       'packages/api-client',
       '.github/workflows/source-validation.yml',
       '.github/workflows/fleet-rules-evidence.yml',

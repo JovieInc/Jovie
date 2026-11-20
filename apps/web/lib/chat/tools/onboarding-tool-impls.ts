@@ -619,8 +619,6 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeNextStep.description,
       inputSchema: TOOL_SCHEMAS.proposeNextStep.inputSchema,
       execute: async () => {
-        // JOV-7144: the single access gate shared with the scripted fallback.
-        // The DB-backed controlled-access gate stays authoritative inside it.
         const decision = decideOnboardingAccess({
           activeRole: state.profileDraft?.activeRole,
           accessControlled: state.accessControlled,
@@ -629,6 +627,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
           spotifyArtistId: state.spotifyArtistId,
           publicProfileUrl: state.publicProfileUrl,
           spotifyFollowers: state.spotifyFollowers,
+          catalogReleases: state.catalogPreview?.total ?? null,
           metrics: state.artistMetrics,
           signals: state.signals,
           turnCount: state.turnCount,
@@ -664,6 +663,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
           spotifyArtistId: state.spotifyArtistId,
           publicProfileUrl: state.publicProfileUrl,
           spotifyFollowers: state.spotifyFollowers,
+          catalogReleases: state.catalogPreview?.total ?? null,
           metrics: state.artistMetrics,
           signals: state.signals,
           turnCount: state.turnCount,

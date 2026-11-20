@@ -4,7 +4,9 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  enrichStampPr,
   findOpenDesktopStampPr,
+  needsMergeableEnrichment,
   stampOwnershipDecision,
 } from './desktop-stamp-ownership.mjs';
 
@@ -93,6 +95,52 @@ test('findOpenDesktopStampPr reads slurped pull pages', () => {
   );
   assert.equal(matches.length, 1);
   assert.equal(matches[0].number, 9);
+});
+
+test('list-endpoint rows without mergeable_state need enrichment (JOV-13856)', () => {
+  assert.equal(needsMergeableEnrichment({ number: 25802, labels: [] }), true);
+  assert.equal(
+    needsMergeableEnrichment({ number: 1, mergeable_state: 'dirty' }),
+    false
+  );
+  assert.equal(needsMergeableEnrichment(null), false);
+});
+
+test('enrichStampPr fills mergeable_state from a detail GET', async () => {
+  const listRow = {
+    number: 25802,
+    html_url: 'https://github.com/JovieInc/Jovie/pull/25802',
+    labels: [],
+    head: { ref: 'cursor/stable-desktop-publish-abc' },
+  };
+  const calls = [];
+  const enriched = await enrichStampPr(listRow, {
+    repository: 'JovieInc/Jovie',
+    fetchPr: async (repository, number) => {
+      calls.push({ repository, number });
+      return { mergeable_state: 'dirty', draft: false };
+    },
+  });
+  assert.deepEqual(calls, [{ repository: 'JovieInc/Jovie', number: 25802 }]);
+  assert.equal(stampOwnershipDecision(enriched).action, 'supersede');
+  assert.equal(
+    stampOwnershipDecision(enriched).reason,
+    'mergeable_state=dirty'
+  );
+});
+
+test('enrichStampPr skips the detail GET when mergeable_state is present', async () => {
+  let fetched = 0;
+  const pr = { number: 1, mergeable_state: 'clean', labels: [] };
+  const out = await enrichStampPr(pr, {
+    repository: 'JovieInc/Jovie',
+    fetchPr: async () => {
+      fetched += 1;
+      return { mergeable_state: 'dirty' };
+    },
+  });
+  assert.equal(fetched, 0);
+  assert.equal(out, pr);
 });
 
 test('desktop-release stamp job wires ownership decide + supersede', () => {

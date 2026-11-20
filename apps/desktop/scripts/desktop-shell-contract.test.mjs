@@ -726,6 +726,10 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
     join(desktopRoot, 'electron-builder.local.yml'),
     'utf8'
   );
+  const stagingBuilder = await readFile(
+    join(desktopRoot, 'electron-builder.staging.yml'),
+    'utf8'
+  );
   const productionBuilder = await readFile(
     join(desktopRoot, 'electron-builder.yml'),
     'utf8'
@@ -736,7 +740,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   );
 
   assert.match(webWordmark, /<svg/);
-  for (const config of [localBuilder, productionBuilder]) {
+  for (const config of [localBuilder, stagingBuilder, productionBuilder]) {
     assert.match(
       config,
       /from: \.\.\/web\/public\/brand\/Jovie-Wordmark-Cream\.svg/
@@ -928,6 +932,7 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
     'entitlements.mac.production.plist',
+    'entitlements.mac.staging.plist',
   ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
@@ -946,9 +951,12 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
 });
 
 // A keychain-access-groups entitlement the embedded profile does not
-// authorize stops the app from launching, so production pairs its own.
-test('production Touch ID entitlements pair with a matching Developer ID profile (JOV-6727)', async () => {
-  for (const [config, bundleId] of [['electron-builder.yml', 'app.jov.ie']]) {
+// authorize stops the app from launching, so each channel pairs its own.
+test('signed channels pair Touch ID entitlements with a matching Developer ID profile (JOV-6727)', async () => {
+  for (const [config, bundleId] of [
+    ['electron-builder.yml', 'app.jov.ie'],
+    ['electron-builder.staging.yml', 'app.jov.ie.staging'],
+  ]) {
     const builder = await readFile(join(desktopRoot, config), 'utf8');
     assert.match(
       builder,
@@ -1065,11 +1073,13 @@ test('desktop profile navigation never loads the protected main shell', async ()
   assert.match(mainSource, /showPublicProfilePreview\(directProfileUrl\)/);
 });
 test('desktop production bundle declares the jovie auth protocol', async () => {
-  const [builderConfig, mainSource, localConfig] = await Promise.all([
-    readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
-    readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
-    readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
-  ]);
+  const [builderConfig, mainSource, stagingConfig, localConfig] =
+    await Promise.all([
+      readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
+    ]);
 
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
@@ -1093,10 +1103,18 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
     mainSource,
     /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
   );
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(stagingConfig, /publish:\s*\n\s*provider: generic/);
+  assert.match(
+    stagingConfig,
+    /url: https:\/\/github\.com\/JovieInc\/Jovie\/releases\/download\/desktop-staging/
+  );
   assert.match(localConfig, /CFBundleURLTypes:/);
   assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
   assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
-  for (const config of [builderConfig, localConfig]) {
+  for (const config of [builderConfig, stagingConfig, localConfig]) {
     assert.match(config, /extraResources:/);
     assert.match(config, /from: build\/build-identity\.json/);
     assert.match(config, /to: build-identity\.json/);

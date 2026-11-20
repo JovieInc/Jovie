@@ -7,7 +7,12 @@
  * is DIRTY/behind or lane-fix-exhausted, keeping it forever starves Tim's Mac
  * dogfood (observed: #25802 open 2026-11-16..20 with no new publish). Supersede
  * closes that PR so a fresh stamp can open from the current verified generation.
+ *
+ * JOV-13856: `GET /repos/{repo}/pulls` list payloads omit `mergeable_state`.
+ * The CLI enriches via `GET /repos/{repo}/pulls/{number}` before deciding.
  */
+
+import { spawnSync } from 'node:child_process';
 
 export const STAMP_BRANCH_PREFIX = 'cursor/stable-desktop-publish-';
 
@@ -67,6 +72,31 @@ export function stampOwnershipDecision(pr) {
   };
 }
 
+/** List-endpoint rows omit mergeable_state; those need a detail GET. */
+export function needsMergeableEnrichment(pr) {
+  if (!pr || pr.number == null) return false;
+  return String(pr.mergeable_state ?? '').trim() === '';
+}
+
+/**
+ * Merge detail fields the list endpoint omits (JOV-13856).
+ * @param {object | null | undefined} pr
+ * @param {{ repository: string, fetchPr: (repository: string, number: number) => Promise<object | null> }} deps
+ */
+export async function enrichStampPr(pr, { repository, fetchPr }) {
+  if (!pr || !needsMergeableEnrichment(pr)) return pr;
+  const detail = await fetchPr(repository, pr.number);
+  if (!detail) return pr;
+  return {
+    ...pr,
+    mergeable_state: detail.mergeable_state ?? pr.mergeable_state,
+    draft: detail.draft ?? pr.draft,
+    html_url: detail.html_url ?? pr.html_url,
+    head: detail.head ?? pr.head,
+    labels: detail.labels ?? pr.labels,
+  };
+}
+
 /**
  * Pick the open stamp PR from a pulls list payload (possibly paginated slurp).
  * @param {unknown} pullsPayload
@@ -101,6 +131,30 @@ function readStdin() {
   });
 }
 
+/** Detail GET through the shared hold script (same as desktop-release.yml). */
+export function fetchStampPrDetail(repository, number) {
+  const result = spawnSync(
+    'bash',
+    [
+      '.github/scripts/gh-api-hold.sh',
+      'api',
+      `repos/${repository}/pulls/${number}`,
+    ],
+    { encoding: 'utf8' }
+  );
+  if (result.status !== 0) {
+    console.error(
+      `::warning::stamp detail GET #${number} failed: ${result.stderr || result.stdout}`
+    );
+    return null;
+  }
+  try {
+    return JSON.parse(result.stdout || 'null');
+  } catch {
+    return null;
+  }
+}
+
 async function main(argv = process.argv.slice(2)) {
   if (argv[0] !== 'decide') {
     console.error(
@@ -127,7 +181,11 @@ async function main(argv = process.argv.slice(2)) {
     );
     process.exit(0);
   }
-  console.log(JSON.stringify(stampOwnershipDecision(matches[0] ?? null)));
+  const enriched = await enrichStampPr(matches[0] ?? null, {
+    repository,
+    fetchPr: fetchStampPrDetail,
+  });
+  console.log(JSON.stringify(stampOwnershipDecision(enriched)));
 }
 
 const isCli =
