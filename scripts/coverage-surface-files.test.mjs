@@ -66,10 +66,19 @@ test('ordinary wildcards, single-file line ranges, and missing paths retain beha
 
 test('actual audit gates profile regressions independently of /r and /s coverage', t => {
   const { root, write } = fixture(t);
-  write('scripts/lib/coverage-surface-files.mjs');
+  // audit-test-coverage imports listing, token matching, and Mut scores.
+  for (const file of [
+    'lib/coverage-surface-files.mjs',
+    'lib/coverage-surface-tokens.mjs',
+    'lib/mutation-heatmap-scores.mjs',
+  ]) {
+    write(`scripts/${file}`);
+  }
   for (const file of [
     'audit-test-coverage.ts',
     'lib/coverage-surface-files.mjs',
+    'lib/coverage-surface-tokens.mjs',
+    'lib/mutation-heatmap-scores.mjs',
   ]) {
     copyFileSync(new URL(file, import.meta.url), join(root, 'scripts', file));
   }
