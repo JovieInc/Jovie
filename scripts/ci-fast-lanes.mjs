@@ -1022,7 +1022,6 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   LANES_COVERAGE_COMMAND,
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
-
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
