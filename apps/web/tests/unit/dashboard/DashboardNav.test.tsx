@@ -105,7 +105,8 @@ describe('DashboardNav', () => {
     const inbox = document.querySelector('[data-navigation-item-id="home"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Home');
+    // Rail bell is first home id; name is qualified so it ≠ nav row "Home".
+    expect(inbox).toHaveAccessibleName('Home — notifications');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -148,7 +149,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="home"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Home — all caught up');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
@@ -176,7 +177,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="home"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Home — notifications');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {

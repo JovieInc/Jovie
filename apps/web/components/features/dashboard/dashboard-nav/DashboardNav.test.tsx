@@ -103,9 +103,7 @@ describe('DashboardNav route warming', () => {
     expect(destinations()).toEqual(
       retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
     );
-    expect(
-      screen.queryByRole('link', { name: 'Home', exact: true })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Home$/ })).not.toBeInTheDocument();
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
@@ -146,7 +144,7 @@ describe('DashboardNav route warming', () => {
       );
     }
     // Exact "Home" is the nav row only; the rail bell uses a qualified name.
-    const homeLinks = screen.getAllByRole('link', { name: 'Home', exact: true });
+    const homeLinks = screen.getAllByRole('link', { name: /^Home$/ });
     expect(homeLinks).toHaveLength(1);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
