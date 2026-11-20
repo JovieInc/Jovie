@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — fade prop coverage.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -418,5 +419,25 @@ describe('IconButton accessible name', () => {
     expect(
       screen.getByRole('button', { name: 'Close panel' })
     ).toBeInTheDocument();
+  });
+
+  it('applies contract fade modifiers via the fade prop', () => {
+    const { rerender } = render(
+      <IconButton ariaLabel='Fade parent' fade='parent'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Fade parent' }).className
+    ).toContain('opacity-0');
+
+    rerender(
+      <IconButton ariaLabel='Fade visible' fade='visible'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Fade visible' }).className
+    ).toContain('opacity-60');
   });
 });
