@@ -1,5 +1,6 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { ShellReleaseRow } from './ShellReleaseRow';
@@ -38,9 +39,12 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-full max-w-4xl bg-surface-0 p-3 text-primary-token'>
+      <ul
+        aria-label='Releases'
+        className='w-full max-w-4xl bg-surface-0 p-3 text-primary-token'
+      >
         <Story />
-      </div>
+      </ul>
     ),
   ],
   args: {
@@ -55,6 +59,105 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const DspDetails: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: { onSelect: fn() },
+  // The meta decorator already supplies the semantic <ul> parent; a second
+  // nested <ul> here tripped axe's list rule (ul > ul is not allowed).
+  render: args => <ShellReleaseRow {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const document = canvasElement.ownerDocument;
+    const trigger = canvas.getByRole('button', {
+      name: /^View DSP Distribution Details/i,
+    });
+    const row = canvas.getByRole('listitem', { name: release.title });
+    const rowHeight = row.getBoundingClientRect().height;
+    const rootFontSize = Number.parseFloat(
+      getComputedStyle(document.documentElement).fontSize
+    );
+
+    await expect(rowHeight).toBe(rootFontSize * 2);
+
+    for (const activation of ['pointer', 'Enter', 'Space']) {
+      if (activation === 'pointer') await userEvent.click(trigger);
+      else {
+        trigger.focus();
+        await userEvent.keyboard(activation === 'Enter' ? '{Enter}' : ' ');
+      }
+      await expect(
+        within(document.body).getByRole('dialog', {
+          name: 'DSP Distribution Details',
+        })
+      ).toHaveFocus();
+      await expect(args.onSelect).not.toHaveBeenCalled();
+
+      await waitFor(() => {
+        const dialog = within(document.body).getByRole('dialog', {
+          name: 'DSP Distribution Details',
+        });
+        expect(dialog).toBeVisible();
+
+        for (const name of ['Spotify', 'TIDAL']) {
+          const label = within(dialog).getByText(name, { exact: true });
+          const bounds = label.getBoundingClientRect();
+          expect(bounds.width).toBeGreaterThan(0);
+          expect(bounds.height).toBeGreaterThan(0);
+          expect(bounds.top).toBeGreaterThanOrEqual(0);
+          expect(bounds.bottom).toBeLessThanOrEqual(
+            document.documentElement.clientHeight
+          );
+          const hit = document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2
+          );
+          expect(label.contains(hit)).toBe(true);
+        }
+        expect(row.getBoundingClientRect().height).toBe(rowHeight);
+      });
+
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(
+          within(document.body).queryByRole('dialog')
+        ).not.toBeInTheDocument()
+      );
+      await expect(trigger).toHaveFocus();
+    }
+  },
+};
+
+export const DspScrollableDetails: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: {
+    onSelect: fn(),
+    release: {
+      ...release,
+      providers: (
+        [
+          'soundcloud',
+          'deezer',
+          'amazon_music',
+          'bandcamp',
+          'pandora',
+          'qobuz',
+        ] as const
+      ).map(key => ({
+        key,
+        label: key,
+        path: key,
+        isPrimary: false,
+        url: `https://example.com/releases/${key}`,
+        source: 'manual',
+        updatedAt: '2026-10-27',
+      })),
+    },
+  },
+  // The meta decorator already supplies the semantic <ul> parent; a second
+  // nested <ul> here tripped axe's list rule (ul > ul is not allowed).
+  render: args => <ShellReleaseRow {...args} />,
+};
 
 export const Selected: Story = {
   args: {

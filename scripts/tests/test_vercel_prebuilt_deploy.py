@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.tests.staging_controller_contract import assert_staging_controller_contract
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -30,17 +32,7 @@ ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
 
 def test_staging_controller_is_independent_and_exact_sha() -> None:
-    staging = (REPO_ROOT / ".github/workflows/staging-controller.yml").read_text()
-    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
-    assert "workflows: [CI]" in staging
-    assert "group: staging-mutation" in staging
-    assert "outcome=not_applicable" in staging
-    assert "product-lane-release-${candidate_sha}-${candidate_attempt}" in staging
-    assert "release_mode: staging" in staging
-    assert "fleet-promotion" not in staging
-    assert "release_mode: production" in production
-    assert 'staging_receipt_sha="$web_evidence_sha"' in production
-    assert "https://staging.jov.ie/api/health/build-info" in production
+    assert_staging_controller_contract(REPO_ROOT)
 
 
 def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
@@ -669,13 +661,12 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
-def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
+def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
+    """Clerk is retired from the build env (2026-10-29, #23527): turbo hashes NEXT_PUBLIC_*
+    into the build task, so per-job Clerk values split the cache key, and nothing in the app
+    reads them any more (no-clerk-build-env guard). Staging build secrets resolve through the
+    staging-scoped Doppler config, never production, and the prebuilt deploy stays fail-closed."""
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
-    expected_publishable = (
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "
-        "${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}"
-    )
-    expected_secret = "CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}"
 
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
@@ -684,13 +675,24 @@ def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
     ]
     build_step = _staging_build_step(workflow)
 
-    # The in-job staging build must sign Clerk tokens with staging keys.
-    assert expected_publishable in build_step
-    assert expected_secret in build_step
-    # The prebuilt deploy step also receives them so CLI-side env resolution
-    # cannot fall back to production keys.
-    assert staging.count(expected_publishable) >= 2
-    assert staging.count(expected_secret) >= 2
+    # Clerk is retired: neither the in-job build nor prebuilt deployment
+    # should receive old credentials or aliases, including staging variants.
+    assert not re.search(
+        r"\b(?:NEXT_PUBLIC_CLERK_[A-Z_]+|CLERK_SECRET_KEY(?:_STAGING)?|"
+        r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
+        staging,
+    )
+    # The in-job staging build takes its secrets from the staging Doppler config
+    # with no fallback, so CLI-side env resolution cannot fall back to production.
+    assert "--project jovie-web --config stg" in build_step
+    assert "--no-fallback" in build_step
+
+    deploy_step = staging[
+        staging.index("- name: Deploy (staging preview, prebuilt)") :
+    ]
+    # Fail-closed: a source fallback would silently discard the in-job
+    # artifact and repeat the slow server build.
+    assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:

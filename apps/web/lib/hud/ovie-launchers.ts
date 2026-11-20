@@ -1,5 +1,8 @@
+import { APP_ROUTES } from '@/constants/routes';
+
 export type OvieLauncherGroup = 'internal' | 'external';
-export type OvieLauncherKind = 'web' | 'ssh';
+/** `route` opens a page inside Ovie itself and is reachable from every surface. */
+export type OvieLauncherKind = 'web' | 'ssh' | 'route';
 export type OvieLauncherOwner = 'human' | 'agent';
 // biome-ignore format: compact unions
 export type OvieLauncherLoop =
@@ -10,7 +13,7 @@ export type OvieLauncherStatus =
 
 // biome-ignore format: compact required-id list
 export const OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS = [
-  'gbrain', 'hermes', 'symphony', 'mercury', 'gmail', 'github-prs', 'vercel',
+  'gbrain', 'hermes', 'fleet', 'mercury', 'gmail', 'github-prs', 'vercel',
 ] as const;
 
 // biome-ignore format: compact origins
@@ -22,7 +25,6 @@ export const OVIE_CONFIGURED_PUBLIC_ORIGINS = {
 
 export const HERMES_GATEWAY_TEMPLATE_ORIGIN = 'http://127.0.0.1:7800';
 export const GBRAIN_HTTP_TEMPLATE_ORIGIN = 'http://127.0.0.1:7801';
-export const SYMPHONY_SSH_TEMPLATE_HOST = 'gem';
 
 // biome-ignore format: compact definition
 export interface OvieLauncherDefinition {
@@ -48,7 +50,7 @@ function parseCatalogRow(line: string): OvieLauncherDefinition {
 export const OVIE_LAUNCHER_CATALOG: readonly OvieLauncherDefinition[] = `
 gbrain|GBrain|internal|web|observe|human|1|0|gbrain memory wiki|GBrain web from GBRAIN_API_URL
 hermes|Hermes|internal|web|observe|human|1|0|hermes gateway air|Hermes web from Air gateway template
-symphony|Symphony|internal|ssh|recover|human|1|0|symphony gem tui elixir|Official Elixir Symphony TUI on Gem via SSH
+fleet|Fleet|internal|route|recover|human|1|0|fleet lanes agents health symphony|Ovie Fleet page: lane health, alerts and agents
 mercury|Mercury|external|web|observe|human|1|0|mercury bank cash runway|Official Mercury app
 gmail|Gmail|external|web|communicate|human|1|0|gmail mail email|Official Gmail web app
 github-prs|GitHub PRs|external|web|review|human|1|0|github pull pr review|Configured GitHub repo pull request list
@@ -187,7 +189,7 @@ export function resolveLauncherDestination(
   // biome-ignore format: compact config
   config: {
     readonly gbrainApiUrl?: string; readonly hermesWebUrl?: string;
-    readonly symphonySshHost?: string; readonly githubOwner?: string;
+    readonly githubOwner?: string;
     readonly githubRepo?: string; readonly productionOrigin?: string;
   }
 ): OvieLauncherResolvedDestination {
@@ -208,12 +210,14 @@ export function resolveLauncherDestination(
         'HERMES_WEB_URL',
         'Hermes Air gateway template'
       );
-    case 'symphony':
+    case 'fleet':
+      // The Elixir Symphony TUI is retired (lanes replaced it); Fleet is the
+      // in-app answer to "is the fleet healthy".
       return {
-        sshHost: SYMPHONY_SSH_TEMPLATE_HOST,
-        display: `ssh ${SYMPHONY_SSH_TEMPLATE_HOST}`,
+        href: APP_ROUTES.ADMIN_OPERATIONS,
+        display: 'Fleet',
         configured: true,
-        source: 'documented Gem SSH alias',
+        source: 'Ovie Fleet page',
       };
     case 'github-prs':
       return optionalWeb(
@@ -382,6 +386,37 @@ export function rankLaunchers(input: {
   };
   assertPrimaryRailInvariants(inventory);
   return inventory;
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/**
+ * A launcher the current surface may not reach: SSH aliases and loopback web
+ * destinations only exist on the operator's Mac. Server preflight cannot see
+ * them either (it runs on the host, not the Mac), so the web door never
+ * renders them rather than showing a permanent "Unavailable".
+ */
+export function isLocalOnlyLauncher(
+  control: Pick<OvieLauncherControl, 'kind' | 'href' | 'sshHost'>
+): boolean {
+  if (control.kind === 'route') return false;
+  if (control.kind === 'ssh' || control.sshHost) return true;
+  if (!control.href) return false;
+  try {
+    return LOOPBACK_HOSTS.has(new URL(control.href).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Controls the current surface can reach: local-only ones need the Mac app. */
+export function reachableLaunchers(
+  controls: readonly OvieLauncherControl[],
+  inMacApp: boolean
+): readonly OvieLauncherControl[] {
+  return inMacApp
+    ? controls
+    : controls.filter(control => !isLocalOnlyLauncher(control));
 }
 
 export function filterLaunchers(

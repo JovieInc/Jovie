@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
+const mockCaptureCritical = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: (id: string) =>
+    ({ price_pro: 'pro', price_max: 'max' })[id] ?? null,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCritical,
+}));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mockUpdateUserBillingStatus,
@@ -16,16 +26,20 @@ describe('status-mismatch-fixer', () => {
     isPro: true,
   };
 
+  const priceFor = (plan: 'pro' | 'max') => `price_${plan}`;
+
   const makeSubscription = (
     id: string,
     status: Stripe.Subscription.Status,
-    customer: string
+    customer: string,
+    priceIds: string[] = [priceFor('pro')]
   ) =>
     ({
       id,
       status,
       customer,
-    }) as Stripe.Subscription;
+      items: { data: priceIds.map(priceId => ({ price: { id: priceId } })) },
+    }) as unknown as Stripe.Subscription;
 
   it('should fix mismatch by downgrading user when expected is false', async () => {
     mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
@@ -60,8 +74,47 @@ describe('status-mismatch-fixer', () => {
         isPro: true,
         stripeSubscriptionId: 'sub_2',
         stripeCustomerId: 'cus_2',
+        plan: 'pro',
       })
     );
+  });
+
+  it('grants the plan the price maps to, so a Max subscriber is not downgraded to Pro', async () => {
+    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    const maxPrice = priceFor('max');
+    // An add-on item may come first; the plan price is found on any item.
+    const subscription = makeSubscription('sub_max', 'active', 'cus_m', [
+      'price_unmapped_addon',
+      maxPrice,
+    ]);
+
+    await fixStatusMismatch({ ...mockUser, isPro: false }, subscription, true);
+
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isPro: true,
+        plan: 'max',
+        stripePriceId: maxPrice,
+      })
+    );
+  });
+
+  it('does not grant Pro for a price it cannot map', async () => {
+    mockUpdateUserBillingStatus.mockClear();
+    const subscription = makeSubscription('sub_x', 'active', 'cus_x', [
+      'price_unmapped',
+    ]);
+
+    const result = await fixStatusMismatch(
+      { ...mockUser, isPro: false },
+      subscription,
+      true
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('unknown_price_id');
+    expect(mockCaptureCritical).toHaveBeenCalled();
+    expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
   });
 
   it('should return error when updateUserBillingStatus fails', async () => {
@@ -102,6 +155,7 @@ describe('status-mismatch-fixer', () => {
       id: 'sub_5',
       status: 'active',
       customer: { id: 'cus_expanded' },
+      items: { data: [{ price: { id: priceFor('pro') } }] },
     } as unknown as Stripe.Subscription;
 
     const user = { ...mockUser, isPro: false };

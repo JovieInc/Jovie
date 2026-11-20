@@ -84,7 +84,6 @@
     "skills",
     "skills-lock.json",
     "sonar-project.properties",
-    "STRATEGY.md",
     "test-performance-config.json",
     "tests",
     "tools",
@@ -95,6 +94,7 @@
     "VERSION",
     "version.json",
     "vitest.config.mts",
+    "warden.toml",
     "workers",
     "WORKFLOW.md"
   ]

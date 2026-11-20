@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { logger } from '@/lib/utils/logger';
 
@@ -45,7 +46,14 @@ export async function GET(
 
     const profile = await getCreatorProfileWithLinks(username);
 
-    if (!profile?.isPublic) {
+    if (
+      !profile?.isPublic ||
+      shouldHideTestProfileFromDirectUrl({
+        handle: username,
+        ownerEmail: profile.userEmail,
+        settings: profile.settings,
+      })
+    ) {
       return NextResponse.json(
         { error: 'Creator not found' },
         { status: 404, headers: NO_STORE_HEADERS }

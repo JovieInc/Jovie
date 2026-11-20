@@ -98,7 +98,7 @@ describe('ChatEmptyStateComposerRegion', () => {
     ).toBe(CHAT_EMPTY_ROTATE_SAMPLES[0].reply);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
+      screen.getByRole('button', { name: /^Ask Plan my next release / })
     );
     expect(onSelectSample).toHaveBeenCalledExactlyOnceWith(
       CHAT_EMPTY_ROTATE_SAMPLES[0].prompt

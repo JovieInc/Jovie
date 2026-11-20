@@ -40,6 +40,7 @@ export function HudBottlenecksCard({
             {bottlenecks.map((bottleneck, index) => (
               <ShellListRowFrame
                 key={bottleneck.id}
+                role='listitem'
                 className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2'
               >
                 <span className='shrink-0 text-xs font-semibold tabular-nums text-tertiary-token'>

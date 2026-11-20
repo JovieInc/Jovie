@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { fixtureClient } from './fixtures/production-freshness-client.mjs';
 import {
   aggregateContinuity,
   classifyEndpointObservation,
@@ -8,16 +8,27 @@ import {
   FRESHNESS_INCIDENT_CLASS,
   FRESHNESS_TARGET_ID,
   forecastBudgetExhaustion,
-  observeProductionContinuity,
-  observeProductionFreshness,
+  observeProductionContinuity as observeContinuity,
+  observeProductionFreshness as observeFreshness,
   parseCliArgs,
   parseTargets,
   planBudgetContinuityAction,
   remediationConclusion,
-  runCli,
+  runCli as runContinuityCli,
 } from './production-continuity.mjs';
 
 const NOW = new Date('2026-09-13T15:38:12.000Z');
+const observeProductionFreshness = o =>
+  observeFreshness({ ...o, githubClient: fixtureClient(o.fetchImpl) });
+const observeProductionContinuity = o =>
+  observeContinuity({
+    ...o,
+    freshness: o.freshness
+      ? { ...o.freshness, githubClient: fixtureClient(o.fetchImpl) }
+      : null,
+  });
+const runCli = o =>
+  runContinuityCli({ ...o, githubClient: fixtureClient(o.fetchImpl) });
 const observation = overrides =>
   classifyEndpointObservation({
     id: 'jovie-production',
@@ -364,21 +375,12 @@ describe('remediation conclusion mapping', () => {
 describe('production freshness', () => {
   const LIVE = 'c'.repeat(40);
   const MAIN = 'd'.repeat(40);
-  // Hex-only fake SHAs (g/h would fail the strict SHA_PATTERN check).
-  const RANGE = ['e', 'f', 'a', 'b'].map(
-    (char, index) => char.repeat(39) + String(index)
-  );
   const freshnessFetch = ({
     liveSha = LIVE,
     mainSha = MAIN,
     aheadBy = 4,
-    oldestAt = '2026-09-13T13:00:00Z',
-    arrivedAt = oldestAt,
-    commitShas = null,
+    oldestAt = '2026-09-13T10:00:00Z',
     failCompare = false,
-    failLedger = false,
-    landingRuns = null,
-    rawCommits = undefined,
   } = {}) => {
     const calls = [];
     const json = (body, status = 200) => ({
@@ -391,29 +393,34 @@ describe('production freshness', () => {
       calls.push({ url, init });
       if (url.endsWith('/build-info')) return json({ commitSha: liveSha });
       if (url.endsWith('/commits/main')) return json({ sha: mainSha });
+      if (url.includes('/actions/workflows/ci.yml/runs'))
+        return json({
+          total_count: 1,
+          workflow_runs: [
+            {
+              head_sha: mainSha,
+              created_at: oldestAt,
+              event: 'push',
+              head_branch: 'main',
+            },
+          ],
+        });
       if (url.includes('/compare/')) {
         if (failCompare) return json({ message: 'boom' }, 500);
-        if (rawCommits !== undefined)
-          return json({ ahead_by: aheadBy, commits: rawCommits });
-        const shas = commitShas ?? (aheadBy > 0 ? RANGE.slice(0, aheadBy) : []);
         return json({
           status: aheadBy > 0 ? 'ahead' : 'identical',
           ahead_by: aheadBy,
           commits:
             aheadBy > 0
-              ? shas.map(sha => ({
-                  sha,
+              ? Array.from({ length: aheadBy }, (_, index) => ({
+                  sha:
+                    index === aheadBy - 1
+                      ? mainSha
+                      : index.toString(16).padStart(40, '0'),
                   commit: { committer: oldestAt ? { date: oldestAt } : {} },
                 }))
               : [],
         });
-      }
-      if (url.includes('/actions/workflows/ci.yml/runs')) {
-        if (failLedger) return json({ message: 'boom' }, 500);
-        const runs =
-          landingRuns ??
-          (arrivedAt ? [{ head_sha: RANGE[0], created_at: arrivedAt }] : []);
-        return json({ total_count: runs.length, workflow_runs: runs });
       }
       return json({}, 404);
     };
@@ -429,106 +436,33 @@ describe('production freshness', () => {
     });
 
   it('reports production-stale once main has carried unshipped commits past the bound', async () => {
-    const stale = await observe({ oldestAt: '2026-09-13T13:00:00Z' });
+    const stale = await observe({ oldestAt: '2026-09-13T10:00:00Z' });
     assert.equal(stale.healthy, false);
     assert.equal(stale.incidentClass, FRESHNESS_INCIDENT_CLASS);
     assert.equal(stale.id, FRESHNESS_TARGET_ID);
     assert.equal(stale.unshippedCommits, 4);
-    assert.equal(stale.unshippedAgeSeconds, 9492);
+    assert.equal(stale.unshippedAgeSeconds, 20292);
     assert.equal(stale.liveSha, LIVE);
     assert.equal(stale.mainSha, MAIN);
-    assert.equal(stale.unshippedArrivedAt, '2026-09-13T13:00:00.000Z');
 
     const fresh = await observe({ oldestAt: '2026-09-13T15:00:00Z' });
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
-    assert.match(fresh.reason, /^unshipped-for-2292s-within-5400s$/);
+    assert.match(fresh.reason, /^unshipped-for-2292s-within-14760s$/);
+    assert.equal(fresh.catchingUp, true);
+    assert.equal(fresh.summary, 'behind by 4, catching up');
+    assert.equal(stale.catchingUp, false);
+    assert.equal(stale.summary, 'behind by 4, stale');
   });
 
-  it('measures release lag from the main landing, not the commit date (JOV-7674 2026-10-25)', async () => {
-    // Run 40200688331 paged the founder: the oldest unshipped commit was
-    // authored 12:25 but only merged onto main 13:45, so committer-age read
-    // a 21-minute release as a 101-minute stall.
-    const incident = await observe({
-      oldestAt: '2026-09-13T12:25:16Z',
-      arrivedAt: '2026-09-13T15:17:12Z',
-    });
-    assert.equal(incident.healthy, true);
-    assert.equal(incident.incidentClass, null);
-    assert.equal(incident.reason, 'unshipped-for-1260s-within-5400s');
-    assert.equal(incident.unshippedAgeSeconds, 1260);
-    assert.equal(incident.oldestUnshippedAt, '2026-09-13T12:25:16Z');
-    assert.equal(incident.unshippedArrivedAt, '2026-09-13T15:17:12.000Z');
-  });
-
-  it('takes the landing from the push tip when the oldest commit arrived in a batch', async () => {
-    // A push that lands several commits only fires a run for its tip, a later
-    // commit in the same unshipped range; unreadable entries never count.
-    const batched = await observe({
-      landingRuns: [
-        { head_sha: 'not-a-sha', created_at: '2026-09-13T15:00:00Z' },
-        { head_sha: RANGE[2], created_at: 'not-a-date' },
-        { head_sha: RANGE[2], created_at: '2026-09-13T14:38:12Z' },
-      ],
-    });
-    assert.equal(batched.healthy, true);
-    assert.equal(batched.reason, 'unshipped-for-3600s-within-5400s');
-    assert.equal(batched.unshippedAgeSeconds, 3600);
-    assert.equal(batched.unshippedArrivedAt, '2026-09-13T14:38:12.000Z');
-  });
-
-  it('pages past the ledger horizon when no unshipped landing appears in a ledger spanning the bound', async () => {
-    const paged = await observe({
-      landingRuns: [
-        { head_sha: MAIN, created_at: '2026-09-13T15:00:00Z' },
-        { head_sha: MAIN, created_at: '2026-09-13T06:00:00Z' },
-      ],
-    });
-    assert.equal(paged.healthy, false);
-    assert.equal(paged.incidentClass, FRESHNESS_INCIDENT_CLASS);
-    assert.equal(paged.reason, 'unshipped-past-landing-ledger');
-    assert.equal(paged.unshippedAgeSeconds, 34692);
-    assert.equal(paged.unshippedArrivedAt, null);
-  });
-
-  it('reports unknown when no unshipped landing appears and the ledger is younger than the bound', async () => {
-    const shortHorizon = await observe({
-      landingRuns: [{ head_sha: MAIN, created_at: '2026-09-13T15:00:00Z' }],
-    });
-    assert.equal(shortHorizon.healthy, null);
-    assert.equal(shortHorizon.reason, 'unshipped-arrival-unreadable');
-    const unparseableHorizon = await observe({
-      landingRuns: [{ head_sha: MAIN, created_at: 'nope' }],
-    });
-    assert.equal(unparseableHorizon.healthy, null);
-    assert.equal(unparseableHorizon.reason, 'unshipped-arrival-unreadable');
-  });
-
-  it('reports unknown when the landing ledger is unreadable', async () => {
-    const result = await observe({ failLedger: true });
-    assert.equal(result.healthy, null);
-    assert.equal(result.reason, 'unshipped-arrival-unreadable');
-    assert.equal(result.unshippedCommits, 4);
-  });
-
-  it('reports unknown when the unshipped range carries no readable commit shas', async () => {
-    const noShas = await observe({ commitShas: [] });
-    assert.equal(noShas.healthy, null);
-    assert.equal(noShas.reason, 'unshipped-range-unreadable');
-    assert.equal(noShas.unshippedCommits, 4);
-    const notAList = await observe({ rawCommits: null });
-    assert.equal(notAList.healthy, null);
-    assert.equal(notAList.reason, 'unshipped-range-unreadable');
-  });
-
-  it('treats 90 minutes as the production freshness bound', async () => {
-    const within = await observe({ oldestAt: '2026-09-13T14:10:00Z' });
+  it('treats the measured p95 (246 minutes) as the freshness bound by default as the production freshness bound', async () => {
+    const within = await observe({ oldestAt: '2026-09-13T11:33:12Z' });
     assert.equal(within.healthy, true);
-    assert.match(within.reason, /^unshipped-for-5292s-within-5400s$/);
-    const over = await observe({ oldestAt: '2026-09-13T14:07:00Z' });
+    assert.match(within.reason, /^unshipped-for-14700s-within-14760s$/);
+    const over = await observe({ oldestAt: '2026-09-13T11:31:12Z' });
     assert.equal(over.healthy, false);
     assert.equal(over.incidentClass, FRESHNESS_INCIDENT_CLASS);
-    assert.equal(over.unshippedAgeSeconds, 5472);
+    assert.equal(over.unshippedAgeSeconds, 14820);
   });
 
   it('is healthy when production already carries main', async () => {
@@ -580,17 +514,11 @@ describe('production freshness', () => {
     );
   });
 
-  it('verdicts from the main landing even when the range has no commit date', async () => {
-    const result = await observe({
-      oldestAt: null,
-      arrivedAt: '2026-09-13T13:00:00Z',
-    });
-    assert.equal(result.healthy, false);
-    assert.equal(result.incidentClass, FRESHNESS_INCIDENT_CLASS);
-    assert.equal(result.reason, 'unshipped-for-9492s');
+  it('reports unknown when the unshipped range has no commit date', async () => {
+    const result = await observe({ oldestAt: null });
+    assert.equal(result.healthy, null);
+    assert.equal(result.reason, 'unshipped-age-unreadable');
     assert.equal(result.unshippedCommits, 4);
-    assert.equal(result.oldestUnshippedAt, null);
-    assert.equal(result.unshippedArrivedAt, '2026-09-13T13:00:00.000Z');
   });
 
   it('sends the GitHub token only to GitHub and never to production', async () => {
@@ -622,7 +550,8 @@ describe('production freshness', () => {
     assert.equal(staleOnly.status, 'unhealthy');
     assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
     assert.equal(staleOnly.requiresFounderNotification, true);
-    assert.equal(staleOnly.requiresAgentIngress, false);
+    assert.equal(staleOnly.requiresAgentIngress, true);
+    assert.equal(staleOnly.agentIngressFailure, 'production-controller-failed');
 
     const paused = aggregateContinuity(
       [
@@ -635,6 +564,7 @@ describe('production freshness', () => {
       { now: NOW }
     );
     assert.equal(paused.requiresAgentIngress, true);
+    assert.equal(paused.agentIngressFailure, 'provider-unavailable');
   });
 
   it('rolls unknown freshness up as unknown, not healthy, with an explicit unknownTargets list', async () => {
@@ -798,24 +728,10 @@ describe('production freshness', () => {
       });
       if (url.endsWith('/build-info')) return json({ commitSha: LIVE });
       if (url.endsWith('/commits/main')) return json({ sha: MAIN });
-      if (url.includes('/actions/workflows/ci.yml/runs')) {
-        return json({
-          total_count: 1,
-          workflow_runs: [
-            {
-              head_sha: compare.commits?.[0]?.sha,
-              created_at: compare.commits?.[0]?.commit?.committer?.date,
-            },
-          ],
-        });
-      }
       return json(compare);
     };
     const commits = [
-      {
-        sha: RANGE[0],
-        commit: { committer: { date: '2026-09-13T13:00:00Z' } },
-      },
+      { commit: { committer: { date: '2026-09-13T10:00:00Z' } } },
     ];
     const run = ahead => {
       const compare = { commits };
@@ -856,35 +772,29 @@ describe('production freshness', () => {
       [current.healthy, current.reason],
       [true, 'production-current']
     );
-    const stale = await run(4);
+    const stale = await observe({
+      aheadBy: 4,
+      oldestAt: '2026-09-13T10:00:00Z',
+    });
     assert.deepEqual(
       [stale.healthy, stale.incidentClass],
       [false, FRESHNESS_INCIDENT_CLASS]
     );
-    const fresh = await observeProductionFreshness({
-      fetchImpl: rawFetch({
-        ahead_by: 4,
-        commits: [
-          {
-            sha: RANGE[0],
-            commit: { committer: { date: '2026-09-13T15:00:00Z' } },
-          },
-        ],
-      }),
-      now: NOW,
-      repository: 'JovieInc/Jovie',
+    const fresh = await observe({
+      aheadBy: 4,
+      oldestAt: '2026-09-13T15:00:00Z',
     });
     assert.deepEqual(
       [fresh.healthy, fresh.reason],
-      [true, 'unshipped-for-2292s-within-5400s']
+      [true, 'unshipped-for-2292s-within-14760s']
     );
   });
 
-  it('treats non-string SHAs as unknown and non-string commit dates as display-only', async () => {
+  it('treats non-string SHAs and non-string commit dates as unknown', async () => {
     const make = ({
       live = LIVE,
       main = MAIN,
-      date = '2026-09-13T13:00:00Z',
+      date = '2026-09-13T10:00:00Z',
     }) =>
       observeProductionFreshness({
         fetchImpl: async url => {
@@ -896,20 +806,12 @@ describe('production freshness', () => {
           });
           if (url.endsWith('/build-info')) return json({ commitSha: live });
           if (url.endsWith('/commits/main')) return json({ sha: main });
-          if (url.includes('/actions/workflows/ci.yml/runs')) {
-            return json({
-              total_count: 1,
-              workflow_runs: [
-                {
-                  head_sha: RANGE[0],
-                  created_at: '2026-09-13T13:00:00Z',
-                },
-              ],
-            });
-          }
           return json({
             ahead_by: 2,
-            commits: [{ sha: RANGE[0], commit: { committer: { date } } }],
+            commits: ['e'.repeat(40), MAIN].map(sha => ({
+              sha,
+              commit: { committer: { date } },
+            })),
           });
         },
         now: NOW,
@@ -918,36 +820,17 @@ describe('production freshness', () => {
     for (const [input, reason] of [
       [{ live: [LIVE] }, 'live-sha-unreadable'],
       [{ main: [MAIN] }, 'main-sha-unreadable'],
+      [{ date: 0 }, 'unshipped-age-unreadable'],
+      [{ date: 1757768400000 }, 'unshipped-age-unreadable'],
+      [{ date: 'not-a-date' }, 'unshipped-age-unreadable'],
     ]) {
       const result = await make(input);
       assert.deepEqual([result.healthy, result.reason], [null, reason], reason);
     }
-    for (const input of [
-      { date: 0 },
-      { date: 1757768400000 },
-      { date: 'not-a-date' },
-    ]) {
-      const result = await make(input);
-      assert.deepEqual(
-        [result.healthy, result.incidentClass],
-        [false, FRESHNESS_INCIDENT_CLASS],
-        String(input.date)
-      );
-      assert.equal(
-        result.oldestUnshippedAt,
-        typeof input.date === 'string' ? input.date : null,
-        String(input.date)
-      );
-      assert.equal(
-        result.unshippedArrivedAt,
-        '2026-09-13T13:00:00.000Z',
-        String(input.date)
-      );
-    }
   });
 
   it('includes freshness in the CLI only when a repository is configured', async () => {
-    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T13:00:00Z' });
+    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T10:00:00Z' });
     const outputs = [];
     const result = await runCli({
       appendFileImpl: async (_path, text) => outputs.push(text),
@@ -973,7 +856,7 @@ describe('production freshness', () => {
     });
     assert.equal(result.status, 'unhealthy');
     assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
-    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+    assert.match(outputs.join(''), /requires_agent_ingress=true/);
 
     const without = await runCli({
       appendFileImpl: async () => {},

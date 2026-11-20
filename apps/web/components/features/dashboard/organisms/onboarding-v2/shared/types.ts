@@ -23,12 +23,12 @@ export const ONBOARDING_STEPS = [
   {
     id: 'handle',
     title: 'Choose your handle',
-    prompt: 'This is how fans will find and remember you.',
+    prompt: 'This is how people will find and remember you.',
   },
   {
     id: 'dsp',
     title: 'Connect your music',
-    prompt: 'Import your releases from Spotify so fans can find your music.',
+    prompt: 'Import your releases from Spotify so listeners can find you.',
   },
   {
     id: 'profile-review',

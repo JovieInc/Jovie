@@ -3,10 +3,12 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  getArtistOfferFunnelReport: vi.fn(),
   getCanonicalContactMetrics: vi.fn(),
   getFounderFunnelData: vi.fn(),
   getFounderFunnelStageRows: vi.fn(),
   getLeadFunnelCounts: vi.fn(),
+  getPmfMetrics: vi.fn(),
   requireAccess: vi.fn(),
 }));
 
@@ -48,6 +50,14 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
     <section>{children}</section>
   ),
 }));
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  getArtistOfferFunnelReport: mocks.getArtistOfferFunnelReport,
+}));
+vi.mock('@/components/features/admin/leads/GoldenPathFunnelPanel', () => ({
+  GoldenPathFunnelPanel: ({ report }: { report: unknown }) => (
+    <div>{report ? 'Golden path ready' : 'Golden path unavailable'}</div>
+  ),
+}));
 vi.mock('@/lib/admin/contacts', () => ({
   getCanonicalContactMetrics: mocks.getCanonicalContactMetrics,
 }));
@@ -62,6 +72,14 @@ vi.mock('@/lib/admin/founder-funnel', () => ({
       'paid',
     ].includes(value as string),
 }));
+vi.mock('@/lib/admin/pmf-metrics', () => ({
+  getPmfMetrics: mocks.getPmfMetrics,
+}));
+vi.mock('@/components/features/admin/leads/PmfMetricsPanel', () => ({
+  PmfMetricsPanel: ({ metrics }: { metrics: unknown }) => (
+    <div>{metrics ? 'PMF metric ready' : 'PMF metric unavailable'}</div>
+  ),
+}));
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.requireAccess,
 }));
@@ -75,6 +93,34 @@ describe('AdminGrowthPage', () => {
       count: range === '7d' ? 7 : 30,
     }));
     mocks.getCanonicalContactMetrics.mockResolvedValue({});
+    mocks.getArtistOfferFunnelReport.mockResolvedValue({ goldenPath: {} });
+    mocks.getPmfMetrics.mockResolvedValue({ surveyResponses: 0 });
+  });
+
+  it('shows the PMF metric, and an honest error when it cannot be read', async () => {
+    const { default: AdminGrowthPage } = await import('./page');
+    const ok = render(
+      await AdminGrowthPage({ searchParams: Promise.resolve({}) })
+    );
+    expect(screen.getByText('PMF metric ready')).toBeInTheDocument();
+    ok.unmount();
+
+    mocks.getPmfMetrics.mockResolvedValue(null);
+    render(await AdminGrowthPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText('PMF metric unavailable')).toBeInTheDocument();
+  });
+
+  it('shows the golden path funnel, and an honest error when it cannot be read', async () => {
+    const { default: AdminGrowthPage } = await import('./page');
+    const ok = render(
+      await AdminGrowthPage({ searchParams: Promise.resolve({}) })
+    );
+    expect(screen.getByText('Golden path ready')).toBeInTheDocument();
+    ok.unmount();
+
+    mocks.getArtistOfferFunnelReport.mockRejectedValue(new Error('db down'));
+    render(await AdminGrowthPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText('Golden path unavailable')).toBeInTheDocument();
   });
 
   it('discloses lifecycle stages that do not have authoritative cohort data', async () => {

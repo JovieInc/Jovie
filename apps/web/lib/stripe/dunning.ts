@@ -30,7 +30,7 @@ import {
 } from '@/lib/email/templates/payment-recovered';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { logger } from '@/lib/utils/logger';
 import { createBillingPortalSession } from './client';
 import { getPriceMappingDetails } from './config';
@@ -38,10 +38,10 @@ import { getPriceMappingDetails } from './config';
 /**
  * Shared email provider instance (singleton).
  */
-let emailProviderInstance: ResendEmailProvider | null = null;
+let emailProviderInstance: GatewayEmailProvider | null = null;
 
-function getEmailProvider(): ResendEmailProvider {
-  emailProviderInstance ??= new ResendEmailProvider();
+function getEmailProvider(): GatewayEmailProvider {
+  emailProviderInstance ??= new GatewayEmailProvider();
   return emailProviderInstance;
 }
 
@@ -173,6 +173,9 @@ export async function sendPaymentFailedEmail(
 
     const provider = getEmailProvider();
     const result = await provider.sendEmail({
+      stream: 'transactional',
+      purpose: 'dunning-payment-failed',
+      consent: 'account-transaction',
       to: email,
       subject: getPaymentFailedSubject(templateData),
       text: getPaymentFailedText(templateData),
@@ -237,6 +240,9 @@ export async function sendPaymentRecoveredEmail(
 
     const provider = getEmailProvider();
     const result = await provider.sendEmail({
+      stream: 'transactional',
+      purpose: 'dunning-payment-recovered',
+      consent: 'account-transaction',
       to: email,
       subject: getPaymentRecoveredSubject(),
       text: getPaymentRecoveredText(templateData),

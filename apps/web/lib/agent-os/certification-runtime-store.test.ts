@@ -4,8 +4,11 @@ import { MARKETING_COMPONENT_REGISTRY } from '@/data/marketing/componentRegistry
 const mocks = vi.hoisted(() => {
   const backend = { kind: 'postgres' };
   const store = {
-    ingestPacket: vi.fn(async () => 'ingested'),
-    inspectLedger: vi.fn(async () => ({ entryOutcomes: ['ledger-entry'] })),
+    ingestPacketWithOutcomes: vi.fn(async () => ({
+      entryOutcomes: ['ledger-entry'],
+      row: 'ingested',
+    })),
+    inspectLedger: vi.fn(async () => ({ entryOutcomes: ['stale'] })),
     projectReviewReady: vi.fn(async () => 'projected'),
     recordFounderDecision: vi.fn(async () => 'recorded'),
   };
@@ -47,13 +50,12 @@ it('constructs one Postgres registry store and forwards runtime operations', asy
   await expect(
     ingestMarketingCertificationPacket(packet, '2026-09-05T07:59:00.000Z')
   ).resolves.toEqual({ entries: ['ledger-entry'], row: 'ingested' });
-  expect(mocks.store.ingestPacket).toHaveBeenCalledWith(
+  expect(mocks.store.ingestPacketWithOutcomes).toHaveBeenCalledWith(
     packet,
     '2026-09-05T07:59:00.000Z'
   );
-  expect(mocks.store.inspectLedger).toHaveBeenCalledWith(
-    '2026-09-05T07:59:00.000Z'
-  );
+  // The ledger is MBs: ingest must not re-read it after writing.
+  expect(mocks.store.inspectLedger).not.toHaveBeenCalled();
 
   const projection = { assuranceProfiles: [], existingEntryId: 'badge' };
   await expect(projectMarketingReviewReady(projection)).resolves.toBe(

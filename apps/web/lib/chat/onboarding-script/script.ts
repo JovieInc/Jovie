@@ -15,13 +15,15 @@
  * Copy contract (audit):
  * - 1–2 sentences + action per turn
  * - Before ownership verified: "this artist", never "you"
- * - Followers: "Spotify followers (source: enrichment)" — no Jovie audience claims
+ * - Followers: "Spotify followers" — no Jovie audience claims, no pipeline words
  */
 
 import {
   ONBOARDING_OPENER_PRIMARY,
   ONBOARDING_WAITLIST_RECEIPT,
 } from '@/lib/chat/prompts/onboarding';
+import type { SegmentScope } from '@/lib/creator/segment-registry';
+import { MUSIC_SEGMENTS } from '@/lib/creator/segments';
 
 export type ScriptStepId =
   | 'greet'
@@ -29,22 +31,47 @@ export type ScriptStepId =
   | 'confirm_artist'
   | 'confirm_artist_no_data'
   | 'handle'
+  | 'attach_social'
   | 'ask_audience'
   | 'instant_access'
+  | 'golden_path_admitted'
   | 'waitlist'
   | 'done'
   | 'stream_error'
-  | 'ownership_conflict';
+  | 'ownership_conflict'
+  | 'clarify'
+  | 'faq_what'
+  | 'faq_price'
+  | 'faq_time'
+  | 'faq_ownership'
+  | 'faq_spotify';
 
 export interface ScriptLine {
   readonly key: `${ScriptStepId}:${string}`;
   readonly stepId: ScriptStepId;
   readonly variant: string;
   readonly text: string;
+  /**
+   * Segment scope (JOV-9679). Omitted means untagged legacy copy: shown until
+   * a non-matching segment is resolved, then dropped. Use 'neutral' for lines
+   * safe for every creator.
+   */
+  readonly segments?: SegmentScope;
 }
 
-function line(stepId: ScriptStepId, variant: string, text: string): ScriptLine {
-  return { key: `${stepId}:${variant}`, stepId, variant, text };
+function line(
+  stepId: ScriptStepId,
+  variant: string,
+  text: string,
+  segments?: SegmentScope
+): ScriptLine {
+  return {
+    key: `${stepId}:${variant}`,
+    stepId,
+    variant,
+    text,
+    ...(segments ? { segments } : {}),
+  };
 }
 
 export const SCRIPT_LINES: readonly ScriptLine[] = [
@@ -62,32 +89,43 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   ),
   line(
     'get_artist',
-    'v4',
-    'Search Spotify for the act, then pick a row so enrichment can attach.'
+    'v5',
+    'Search Spotify for the act, then pick the matching row.'
   ),
 
-  // Before ownership verified: "this artist", not "you". Followers cite enrichment source.
+  // Before ownership verified: "this artist", not "you". The handle card
+  // ships in the same turn, so the line points at it. No pipeline words
+  // ("enrichment", "(source: …)"): the rail already shows the Spotify source.
   line(
     'confirm_artist',
-    'v3',
-    'Pulled up this artist. {followers} Spotify followers (source: enrichment). Next: lock a handle for this profile.'
+    'v5',
+    'Found {name} on Spotify: {followers} followers. Confirm the handle for this page below.'
   ),
   line(
     'confirm_artist',
-    'v4',
-    '{name} is the match. Enrichment shows {followers} Spotify followers. Claim a handle next.'
+    'v6',
+    '{name} is the match, with {followers} Spotify followers. Lock in the handle below.'
   ),
 
   line(
     'confirm_artist_no_data',
-    'v3',
-    'Locked the match. Spotify enrichment is slow. We can keep moving without the counts. Next: lock a handle.'
+    'v4',
+    'Locked the match. Spotify is slow to send the counts, so we keep moving without them. Confirm the handle below.'
   ),
 
   line(
     'handle',
     'v3',
     'Checking @{handle} now. This is the public link for the profile.'
+  ),
+
+  // Shown with the social-link card right after the handle is confirmed:
+  // one ask per turn, and it matches the card (2026-10-31 walk: the audience
+  // question rode on top of an "attach an account" card).
+  line(
+    'attach_social',
+    'v1',
+    'Handle locked. Paste the link to one public profile you post on, like Instagram or TikTok.'
   ),
 
   line(
@@ -102,7 +140,13 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'You clear the bar. Checkout takes about a minute. The free tier is available if you want to start there.'
   ),
 
-  line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
+  line(
+    'golden_path_admitted',
+    'v1',
+    'You clear the bar. Your page goes live once we confirm it is you, and it stays private and yours to edit until then. Checkout takes about a minute and paying does not change that. The free tier is available if you want to start there.'
+  ),
+
+  line('waitlist', 'v4', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
     'done',
@@ -114,6 +158,53 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'ownership_conflict',
     'v1',
     'This artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow.'
+  ),
+
+  // System-1 answer sets (JOV-9627). Fixed copy for the questions visitors
+  // actually ask; the classifier picks the key, no model writes a word.
+  line(
+    'clarify',
+    'v1',
+    'Give me the artist name, or paste the Spotify link. I will take it from there.',
+    MUSIC_SEGMENTS
+  ),
+  line(
+    'clarify',
+    'v2',
+    'Tell me your name, or paste a link to your work. I will take it from there.',
+    'neutral'
+  ),
+  line(
+    'faq_what',
+    'v1',
+    'Jovie builds an artist profile from your Spotify data and keeps it current. Pick the artist, claim a handle, and the page takes shape.',
+    MUSIC_SEGMENTS
+  ),
+  line(
+    'faq_what',
+    'v2',
+    'Jovie builds your profile from the accounts you connect and keeps it current. Claim a handle, and the page takes shape.',
+    'neutral'
+  ),
+  line(
+    'faq_price',
+    'v1',
+    'Starting is free. Paid plans come after the profile exists, and nothing in this chat charges a card.'
+  ),
+  line(
+    'faq_time',
+    'v1',
+    'Four short steps: pick the artist, lock a handle, attach one account, then see the result.'
+  ),
+  line(
+    'faq_ownership',
+    'v1',
+    'Nothing goes live until we confirm it is you. Until then the page stays private.'
+  ),
+  line(
+    'faq_spotify',
+    'v1',
+    'Spotify gives us the real catalog and counts, so we start there. Pick the closest match.'
   ),
 
   line(
@@ -160,12 +251,20 @@ export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
   'confirm_artist',
   'confirm_artist_no_data',
   'handle',
+  'attach_social',
   'ask_audience',
   'instant_access',
+  'golden_path_admitted',
   'waitlist',
   'done',
   'stream_error',
   'ownership_conflict',
+  'clarify',
+  'faq_what',
+  'faq_price',
+  'faq_time',
+  'faq_ownership',
+  'faq_spotify',
 ];
 
 export function isScriptStepId(value: string): value is ScriptStepId {

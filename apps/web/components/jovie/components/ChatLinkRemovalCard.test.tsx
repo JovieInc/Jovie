@@ -66,3 +66,20 @@ describe('ChatLinkRemovalCard', () => {
     expect(screen.queryByRole('button', { name: /^Remove$/i })).toBeNull();
   });
 });
+
+describe('ChatLinkRemovalCard destructive contrast (JOV-8873)', () => {
+  it('uses the destructive button tokens for the remove action', () => {
+    render(
+      <ChatLinkRemovalCard
+        profileId='profile-1'
+        linkId='link-1'
+        platform='Spotify'
+        url='https://open.spotify.com/artist/example'
+      />
+    );
+    const remove = screen.getByRole('button', { name: /^Remove$/i });
+    expect(remove.className).toContain('bg-(--color-btn-destructive-bg)');
+    expect(remove.className).toContain('text-(--color-btn-destructive-fg)');
+    expect(remove.className).not.toContain('bg-error ');
+  });
+});

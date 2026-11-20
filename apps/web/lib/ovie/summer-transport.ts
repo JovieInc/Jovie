@@ -72,7 +72,49 @@ export type SummerSpeakInput = {
   readonly signal?: AbortSignal;
 };
 
+/**
+ * Truthful progress reported by the fast chat endpoint. Every field is copied
+ * from an endpoint event; nothing here is ever inferred or synthesized.
+ */
+export type SummerProgress =
+  | {
+      readonly kind: 'meta';
+      readonly requestId: string;
+      readonly route: string;
+      readonly model: string;
+    }
+  | {
+      readonly kind: 'tool';
+      readonly name: string;
+      readonly phase: 'start' | 'done' | 'error';
+      readonly ms: number | null;
+    }
+  | {
+      readonly kind: 'status';
+      readonly phase: string;
+      readonly model: string | null;
+      readonly text: string | null;
+    }
+  | {
+      readonly kind: 'plan';
+      readonly planId: string;
+      readonly path: string | null;
+      readonly model: string;
+      readonly summary: string;
+    };
+
+/** The endpoint's own terminal acknowledgement (its `done` event). */
+export type SummerAck = {
+  readonly requestId: string;
+  readonly route: string;
+  readonly model: string;
+  readonly ttftMs: number | null;
+  readonly totalMs: number | null;
+};
+
 export type SummerSpeakEvent =
+  | { readonly type: 'progress'; readonly progress: SummerProgress }
+  | { readonly type: 'ack'; readonly ack: SummerAck }
   | { readonly type: 'receipt'; readonly receipt: SummerEveReceipt }
   | { readonly type: 'checkpoint'; readonly checkpoint: SummerEveCheckpoint }
   | { readonly type: 'notice'; readonly text: string; readonly code: string }
@@ -104,6 +146,8 @@ export type SummerTurnBinding = {
 };
 
 export type SummerTurnEvent =
+  | { readonly type: 'progress'; readonly progress: SummerProgress }
+  | { readonly type: 'ack'; readonly ack: SummerAck }
   | { readonly type: 'binding'; readonly binding: SummerTurnBinding }
   | {
       readonly type: 'state';
@@ -349,6 +393,11 @@ export async function* runOvieSummerTurn(input: {
       if (input.signal?.aborted) {
         terminal = 'canceled';
         break;
+      }
+      if (event.type === 'progress' || event.type === 'ack') {
+        // Passed through untouched: never persisted, never turned into an answer.
+        yield event;
+        continue;
       }
       if (event.type === 'receipt') {
         eveReceipt = event.receipt;

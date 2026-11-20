@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { UTM_LINKS_COPY, UTM_LINKS_RESULT_URL } from '@/data/utmLinksCopy';
@@ -60,5 +62,31 @@ describe('UtmLinksLanding', () => {
         link.href
       );
     }
+  });
+
+  it('reserves the builder geometry so the panel never pushes the hero copy', () => {
+    render(<UtmLinksLanding />);
+
+    // CI saw utm-links-panel grow 424px -> 775px at ~370ms and drag the
+    // centered copy down (CLS 0.0686). Columns top-align on md+, so panel
+    // height can never move the copy, and the builder reserves its final
+    // block size before the client island paints.
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero).toHaveClass('md:items-start');
+
+    const reserve = screen
+      .getByTestId('utm-links-panel')
+      .querySelector('.utm-links-builder');
+    expect(reserve).not.toBeNull();
+    expect(reserve).toContainElement(screen.getByTestId('utm-builder'));
+
+    const css = readFileSync(
+      resolve(import.meta.dirname, 'UtmLinksBuilder.css'),
+      'utf8'
+    );
+    expect(css).toMatch(/\.utm-links-builder\s*\{[^}]*min-block-size:/);
+    expect(css).toMatch(
+      /@media[^{]*40rem[^{]*\{\s*\.utm-links-builder\s*\{[^}]*min-block-size:/
+    );
   });
 });

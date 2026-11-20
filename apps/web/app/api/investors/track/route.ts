@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { investorLinks, investorViews } from '@/lib/db/schema/investors';
 import { captureError } from '@/lib/error-tracking';
@@ -7,8 +8,16 @@ import {
   isInvestorClaimTokenShape,
   isInvestorClaimUnexpired,
 } from '@/lib/investors/claim-token';
+import { apiLimiter } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
+
+/** Schema for the duration-heartbeat tracking body. */
+const trackInvestorViewSchema = z.object({
+  token: z.string().min(1),
+  pagePath: z.string().min(1),
+  durationHintMs: z.number().int().positive(),
+});
 
 /**
  * POST /api/investors/track
@@ -20,15 +29,29 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { token, pagePath, durationHintMs } = body;
-
-    if (!token || !pagePath || !durationHintMs) {
+    const parsed = trackInvestorViewSchema.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
+    const { token, pagePath, durationHintMs } = parsed.data;
 
     if (!isInvestorClaimTokenShape(token)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    // Per-IP abuse cap (JOV-8888): unauthenticated endpoint doing DB
+    // lookups must not be enumerable at scale. Same pattern as the events
+    // route: shape-check first, then the limiter, then the database.
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      'unknown';
+    const rateLimit = await apiLimiter.limit(
+      `investor-portal:track:${clientIp}`
+    );
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     // Find the active link

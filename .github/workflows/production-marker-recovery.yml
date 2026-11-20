@@ -48,7 +48,7 @@ concurrency:
 jobs:
   recover-marker:
     name: Recover exact verified-generation marker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read

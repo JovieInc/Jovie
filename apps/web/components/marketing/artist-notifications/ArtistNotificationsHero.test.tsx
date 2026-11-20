@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -23,11 +25,11 @@ describe('ArtistNotificationsHero', () => {
     const hero = ARTIST_NOTIFICATIONS_COPY.hero;
     const view = render(<ArtistNotificationsHero hero={hero} />);
     const trial = screen.getByRole('link', { name: hero.primaryCtaLabel });
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
     fireEvent.focus(trial);
     fireEvent.mouseEnter(trial);
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
 
     view.rerender(
@@ -45,13 +47,22 @@ describe('ArtistNotificationsHero', () => {
     expect(publicAction).toHaveAttribute('data-test-prefetch', 'undefined');
   });
 
+  it('insets the hero dock so the section reads as a contained surface', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+    const dock = container.querySelector('.marketing-hero-dock');
+    expect(dock).not.toBeNull();
+    expect(dock).toHaveClass('marketing-hero-dock--inset');
+  });
+
   it('renders the canonical notification hero with bounded headline and CTA', () => {
     render(<ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />);
 
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
+        name: segmentedAccessibleName('Reach listeners.', 'On autopilot.'),
       })
     ).not.toHaveClass('line-clamp-2');
     expect(
@@ -89,5 +100,35 @@ describe('ArtistNotificationsHero', () => {
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {
     expect(storyMeta.component).toBe(ArtistNotificationsHero);
     expect(Hero.args?.hero).toBe(ARTIST_NOTIFICATIONS_COPY.hero);
+  });
+
+  it('stacks the notification cards straight and aligned, never tilted or floating', () => {
+    render(<ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />);
+
+    const stage = screen.getByTestId('artist-notifications-card-stage');
+    const positions = [...stage.children];
+    expect(positions).toHaveLength(
+      ARTIST_NOTIFICATIONS_COPY.hero.floatingCards.length
+    );
+    // One shared class: no per-card offsets.
+    for (const position of positions) {
+      expect(position.className).toBe(
+        'system-b-artist-notifications-card-position'
+      );
+    }
+
+    const css = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../artist-profile/ArtistProfileLandingPage.css'
+      ),
+      'utf8'
+    );
+    const cardRules = css
+      .split('}')
+      .filter(rule => rule.includes('system-b-artist-notifications-card'));
+    for (const rule of cardRules) {
+      expect(rule).not.toMatch(/rotate\(|position:\s*absolute/);
+    }
   });
 });

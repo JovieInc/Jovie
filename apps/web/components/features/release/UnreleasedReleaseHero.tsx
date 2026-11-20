@@ -8,12 +8,14 @@
  * menu button top-right, content area below with notification signup.
  */
 
+import { PlainButton } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import {
+  SMART_LINK_HERO_ARTIST_CLASS,
   SMART_LINK_HERO_TITLE_CLASS,
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
@@ -79,12 +81,12 @@ export function UnreleasedReleaseHero({
         onMenuOpen={() => setMenuOpen(true)}
         returnHref={`/${artist.handle}`}
         returnLabel={`Back to ${artist.name}`}
-        heroOverlay={
-          <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
+        heroMeta={
+          <div>
             <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
             <Link
               href={`/${artist.handle}`}
-              className='mt-1 block text-sm font-book text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+              className={SMART_LINK_HERO_ARTIST_CLASS}
             >
               {artist.name}
             </Link>
@@ -119,7 +121,7 @@ export function UnreleasedReleaseHero({
         title='Menu'
       >
         <div className='flex flex-col gap-0.5'>
-          <button
+          <PlainButton
             type='button'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
@@ -129,7 +131,7 @@ export function UnreleasedReleaseHero({
           >
             <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
-          </button>
+          </PlainButton>
         </div>
       </ProfileDrawerShell>
       <ProfileDrawerShell

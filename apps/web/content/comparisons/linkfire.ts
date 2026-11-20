@@ -41,7 +41,7 @@ export const linkfireComparison: ComparisonData = {
       claimIds: ['jovie.contact-collection', 'linkfire.email-collection'],
     },
     {
-      name: 'Fan notifications',
+      name: 'Audience notifications',
       jovie: true,
       competitor: true,
       note: 'Jovie notifications require enrollment; Linkfire documents automated pre-save subscription emails for supported services',

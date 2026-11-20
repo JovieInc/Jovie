@@ -17,6 +17,7 @@ vi.mock('./context', () => ({
 
 import {
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSubButton,
@@ -32,6 +33,20 @@ describe('sidebar menu', () => {
       </SidebarMenu>
     );
     expect(screen.getByText('Overview')).toBeTruthy();
+  });
+
+  it('keeps menu badge counts on the AA sidebar-muted token', () => {
+    render(
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton>Overview</SidebarMenuButton>
+          <SidebarMenuBadge>12</SidebarMenuBadge>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+    const badge = screen.getByText('12');
+    expect(badge).toHaveClass('text-sidebar-muted');
+    expect(badge).not.toHaveClass('text-sidebar-item-icon');
   });
 
   it('marks the active button and keeps tokenized motion classes', () => {

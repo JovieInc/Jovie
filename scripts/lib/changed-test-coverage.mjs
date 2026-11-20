@@ -142,6 +142,7 @@ function assertExactShas({ base, head, repoRoot }) {
     );
   }
   execFileSync('git', ['cat-file', '-e', `${base}^{commit}`], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     stdio: 'ignore',
   });
@@ -263,7 +264,24 @@ export function formatChangedLineCoverage(result) {
   if (result.percentage === null) {
     return 'Changed web source contains no coverable statement lines.';
   }
-  return `Changed-line coverage: ${result.coveredLines}/${result.coverableLines} (${result.percentage}%; required ${result.minimum}%).`;
+  const summary = `Changed-line coverage: ${result.coveredLines}/${result.coverableLines} (${result.percentage}%; required ${result.minimum}%).`;
+  if (result.ok) return summary;
+  const uncovered = result.files
+    .filter(file => file.coveredLines < file.coverableLines)
+    .sort(
+      (a, b) =>
+        b.coverableLines -
+          b.coveredLines -
+          (a.coverableLines - a.coveredLines) || a.path.localeCompare(b.path)
+    )
+    .slice(0, 10)
+    .map(
+      file =>
+        `${file.path} (${file.coverableLines - file.coveredLines}/${file.coverableLines})`
+    );
+  return uncovered.length
+    ? `${summary}\nUncovered changed lines: ${uncovered.join(', ')}`
+    : summary;
 }
 
 function coverageIncludeFromFiles(files) {

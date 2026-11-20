@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Kbd } from '@jovie/ui';
+import { Button, Kbd, PlainButton } from '@jovie/ui';
 import React from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
@@ -61,7 +61,7 @@ export const SidebarRail = React.forwardRef<
   const { toggleSidebar, state } = useSidebar();
 
   return (
-    <button
+    <PlainButton
       ref={ref}
       data-sidebar='rail'
       aria-label='Toggle Sidebar'

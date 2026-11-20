@@ -5,3 +5,8 @@ export function isProfileSearchable(settings: unknown): boolean {
   if (!Object.hasOwn(settings, 'searchable')) return true;
   return (settings as Record<string, unknown>).searchable === true;
 }
+
+/** Canonical booleans plus known legacy Neon true encodings; never arbitrary truthiness. */
+export function isPublicProfilePublished(value: unknown): boolean {
+  return value === true || value === 1 || value === 't';
+}

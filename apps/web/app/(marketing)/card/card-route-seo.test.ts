@@ -16,8 +16,9 @@ import { metadata } from './page';
 describe('/card marketing route', () => {
   it('publishes one canonical feature-page route', () => {
     expect(APP_ROUTES.CARD).toBe('/card');
-    expect(getExactPublishedMarketingPaths()).toContain('/card');
-    expect(getPublishedCommercialHubPaths()).toContain('/card');
+    // Withheld until Jovie Card ships (data/marketing/withheldRoutes.ts).
+    expect(getExactPublishedMarketingPaths()).not.toContain('/card');
+    expect(getPublishedCommercialHubPaths()).not.toContain('/card');
 
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card');
     expect(route).toMatchObject({
@@ -57,6 +58,6 @@ describe('/card marketing route', () => {
       card: 'summary_large_image',
       description: metadata.description,
     });
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 });

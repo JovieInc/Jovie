@@ -10,6 +10,7 @@ import {
 } from '@/data/marketingPricingPlans';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { cn } from '@/lib/utils';
+import { LockedPlanPrice } from './LockedPlanPrice';
 
 type MarketingPricingMode = 'compact' | 'expanded';
 
@@ -57,14 +58,19 @@ function MarketingPricingPlanCard({
         aria-hidden='true'
       />
       <div className='marketing-pricing-plan-card__header'>
-        <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
         <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
         <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
       </div>
 
       <p className='marketing-pricing-plan-card__price'>
-        {plan.price}
-        {plan.cadence ? <span>{plan.cadence}</span> : null}
+        {plan.id === RECOMMENDED_PLAN_ID ? (
+          <LockedPlanPrice price={plan.price} cadence={plan.cadence} />
+        ) : (
+          <>
+            {plan.price}
+            {plan.cadence ? <span>{plan.cadence}</span> : null}
+          </>
+        )}
       </p>
 
       <Button

@@ -1,0 +1,67 @@
+{
+  "schema": "jovie.pen-codegen-rules/v1",
+  "grid": {
+    "viewport": 1440,
+    "margin": 96,
+    "columns": 12,
+    "gutter": 24,
+    "spanTolerancePx": 12,
+    "offGridWarnPx": 2
+  },
+  "colorUtilities": {
+    "surface.canvas": { "bg": "surface-page" },
+    "surface.bgPage": { "bg": "surface-page" },
+    "surface.shell": { "bg": "surface-0" },
+    "surface.panel": { "bg": "surface-1" },
+    "surface.elevated": { "bg": "surface-2" },
+    "surface.floating": { "bg": "surface-3" },
+    "text.primary": { "text": "primary-token" },
+    "text.secondary": { "text": "secondary-token" },
+    "text.tertiary": { "text": "tertiary-token" },
+    "text.quaternary": { "text": "quaternary-token" },
+    "text.disabled": { "text": "disabled-token" },
+    "border.subtle": { "border": "subtle" },
+    "border.default": { "border": "default" },
+    "border.strong": { "border": "strong" },
+    "border.focus": { "border": "focus" }
+  },
+  "fontSizes": {
+    "10": "text-3xs",
+    "12": "text-2xs",
+    "14": "text-mid",
+    "16": "text-lg",
+    "20": "text-xl",
+    "24": "text-2xl",
+    "32": "text-3xl",
+    "40": "text-4xl"
+  },
+  "fontFamilies": { "inter": "font-sans", "satoshi": "font-display" },
+  "fontWeights": {
+    "300": "font-light",
+    "400": "font-normal",
+    "500": "font-medium",
+    "600": "font-semibold",
+    "700": "font-bold"
+  },
+  "typeRoles": [
+    {
+      "name": "marketing-display",
+      "family": "satoshi",
+      "minSize": 96,
+      "maxSize": 112,
+      "tag": "h1",
+      "classes": "font-display text-(length:--ds-marketing-display-size) leading-(--ds-marketing-display-leading) tracking-(--ds-marketing-display-tracking)"
+    }
+  ],
+  "components": [
+    { "match": "^Canonical header", "action": "layout-provided" },
+    {
+      "match": "Primary . visible pill",
+      "action": "Button",
+      "props": { "variant": "primary", "size": "lg" }
+    }
+  ],
+  "colorOverrides": {},
+  "typeOverrides": {},
+  "links": {}
+}

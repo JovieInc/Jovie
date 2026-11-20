@@ -6,6 +6,7 @@ import {
 } from '../app-shell-route-context';
 import { loadProfilesWorkspaceData } from '../profiles/data';
 import { ProfilesWorkspace } from '../profiles/ProfilesWorkspace';
+import { loadPresenceRemovalPrincipal } from '../profiles/removal-principal.server';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +20,6 @@ export default async function PresencePage() {
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.PRESENCE,
     authFailure: 'notFound',
-    requiredFlag: 'PROFILES_WORKSPACE',
     dashboardErrorLogMessage: 'Dashboard data load failed on Profiles page',
     dashboardErrorMessage: 'Failed to load Profiles. Please refresh the page.',
   });
@@ -42,5 +42,14 @@ export default async function PresencePage() {
     profileId: identityId,
   });
 
-  return <ProfilesWorkspace data={data} scope={scope} />;
+  const removalPrincipal = await loadPresenceRemovalPrincipal(
+    routeContext.userId
+  );
+  return (
+    <ProfilesWorkspace
+      data={data}
+      scope={scope}
+      removalPrincipal={removalPrincipal}
+    />
+  );
 }

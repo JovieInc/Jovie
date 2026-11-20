@@ -33,7 +33,7 @@ const DEFAULT_CALLOUTS = [
   {
     id: 'release',
     title: 'What Is Current',
-    body: 'The newest release leads without asking fans to search for it.',
+    body: 'The newest release leads without asking listeners to search for it.',
   },
   {
     id: 'action',
@@ -91,12 +91,12 @@ export function ArtistProfileAnnotatedTruth({
             ))}
           </div>
 
-          <ol className='ap-annotated-truth__callouts border-t border-subtle'>
+          <ol className='ap-annotated-truth__callouts divide-y divide-subtle border-y border-subtle'>
             {callouts.map((callout, index) => (
               <li
                 key={callout.id}
                 data-testid='artist-profile-truth-tile'
-                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-subtle py-5'
+                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 py-5'
               >
                 <span className='font-mono text-3xs text-tertiary-token'>
                   {String(index + 1).padStart(2, '0')}
@@ -226,7 +226,10 @@ export function ArtistProfileLandingPage({
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle}>
-        <ArtistProfileReleaseCycleGallery releaseCycle={copy.releaseCycle} />
+        <ArtistProfileReleaseCycleGallery
+          releaseCycle={copy.releaseCycle}
+          id='bring-them-back-automatically'
+        />
       </div>
       {flags.FAQ ? (
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>

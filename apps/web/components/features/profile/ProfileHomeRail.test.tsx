@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileHomeRail } from './ProfileHomeRail';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 
@@ -69,6 +70,21 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
+  it('does not fake a release card from streaming destinations alone', () => {
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    expect(screen.queryByTestId('profile-pac')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Listen now' })).toBeNull();
+  });
+
   it('features the newest playable release, not a far-future one', () => {
     render(
       <ProfileHomeRail
@@ -127,5 +143,36 @@ describe('ProfileHomeRail', () => {
 
     expect(screen.queryByRole('link', { name: 'Listen now' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Coming soon' })).toBeTruthy();
+  });
+
+  it('has no axe violations with a featured card or with no card subject', async () => {
+    const { container, rerender } = render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        latestRelease={{
+          title: 'Never Say A Word',
+          slug: 'never-say-a-word',
+          artworkUrl: '/images/avatars/tim-white.jpg',
+          releaseDate: '2026-08-01T00:00:00.000Z',
+          releaseType: 'single',
+        }}
+        profileSettings={{ showOldReleases: true }}
+        hasPlayableDestinations
+        renderMode='preview'
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+      />
+    );
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+      /Profile Highlights From/
+    );
+    await expectNoA11yViolations(container);
   });
 });

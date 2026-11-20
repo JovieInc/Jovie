@@ -86,9 +86,10 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
   });
 
   it('publishes one Atom entry per customer outcome using the outcome title and tertiary line', async () => {
-    const { GET, atomEntryId } = await import(
+    const { GET } = await import(
       '../../../app/(marketing)/changelog/feed.xml/route'
     );
+    const { changelogEntryUrl } = await import('@/lib/changelog-feed-xml');
     const response = await GET();
     const body = await response.text();
 
@@ -101,10 +102,10 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
     );
     expect(body).toContain('<summary>August 14, 2026 · v26.8.0</summary>');
     expect(body).toContain(
-      '<link href="https://jov.ie/changelog#update-added-0" rel="alternate"/>'
+      '<link href="https://jov.ie/changelog#update-added-0" rel="alternate" type="text/html"/>'
     );
-    expect(atomEntryId({ slug: 'update-added-0' })).toBe(
-      'https://jov.ie/changelog#update-added-0'
-    );
+    expect(
+      changelogEntryUrl('https://jov.ie', { slug: 'update-added-0' })
+    ).toBe('https://jov.ie/changelog#update-added-0');
   });
 });

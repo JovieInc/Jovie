@@ -49,7 +49,7 @@ export function EntityMentionText({ segments }: EntityMentionTextProps) {
             key={key}
             href={segment.href}
             prefetch={false}
-            className='profile-entity-mention font-medium underline underline-offset-4 transition-colors duration-subtle'
+            className='profile-entity-mention relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 font-medium underline underline-offset-4 transition-colors duration-subtle'
             style={accentStyle}
             data-entity-kind={segment.type}
           >

@@ -1,0 +1,302 @@
+import hashlib
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import machine_gap as gap  # noqa: E402
+import remediation  # noqa: E402
+
+NOW = 2_000_000_000.0
+
+
+class GateTest(unittest.TestCase):
+    def test_a_cancelled_sibling_does_not_define_a_second_fix_red_class(self):
+        failed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        mixed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        cancelled = {"statusCheckRollup": [{"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"}]}
+        solo = gap.check_fingerprint(failed)
+        self.assertEqual(gap.check_fingerprint(mixed), solo)
+        self.assertNotEqual(gap.check_fingerprint(cancelled), solo)
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        pair = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence|Source Validation").hexdigest()[:10]
+        self.assertEqual(pair, "fix-red-6c3efaf400")
+        self.assertNotEqual(solo, pair)
+
+    def test_a_superseded_cancelled_run_is_not_its_own_fix_red_class(self):
+        # 2026-11-11 #24646: Fleet Rules Evidence cancelled at 20:57:09Z and succeeded
+        # at 20:57:46Z. The rollup stayed FAILURE and hashed fix-red-72d43f8ba6.
+        superseded = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:46Z"},
+        ]}
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        fleet = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence").hexdigest()[:10]
+        self.assertEqual(gap.check_fingerprint(superseded), empty)
+        self.assertNotEqual(empty, fleet)
+        later = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "FAILURE",
+             "completedAt": "2026-11-11T21:00:00Z"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(later), fleet)
+        import fix_red_classes
+        self.assertEqual(fix_red_classes.real_failures(superseded), [])
+        self.assertEqual(fix_red_classes.real_failures(later)[0]["conclusion"], "FAILURE")
+        same_stamp = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED", "completedAt": "t"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS", "completedAt": "t"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(same_stamp), empty)
+
+    def test_an_advisory_sibling_does_not_define_a_second_fix_red_class(self):
+        import pr_events
+        self.assertEqual(gap.ADVISORY_CHECKS, pr_events.NON_REQUIRED_CHECKS)
+        advisory = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "Tently", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        solo = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(gap.check_fingerprint(advisory), solo)
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        self.assertNotEqual(
+            solo, "fix-red-" + hashlib.sha256(b"Source Validation|Tently").hexdigest()[:10])
+
+    def test_a_dequeued_merge_group_log_names_the_check_when_the_rollup_is_empty(self):
+        # 2026-11-17 #24748: the queue ejected the PR, the head rollup was green, and
+        # queue_failure's "### merge group: CI" log still hashed fix-red-e3b0c44298.
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        self.assertEqual(empty, "fix-red-e3b0c44298")
+        log = "\n".join([
+            "### merge group: CI",
+            "AssertionError [ERR_ASSERTION]: stub warden was invoked",
+            "Error: ENOENT: marker file missing",
+        ])
+        named = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "CI", "conclusion": "SUCCESS"}],
+            "queueFailure": log,
+        })
+        ci = "fix-red-" + hashlib.sha256(b"CI").hexdigest()[:10]
+        self.assertEqual(named, ci)
+        self.assertNotEqual(named, empty)
+        self.assertEqual(gap.merge_group_check_names({"mergeGroupLog": log}), ["CI"])
+        rollup = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}],
+            "queueFailure": log,
+        })
+        self.assertEqual(rollup, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        self.assertEqual(gap.check_fingerprint({"statusCheckRollup": [], "queueFailure": ""}), empty)
+
+    def test_a_lone_pr_ready_failure_is_not_the_empty_fix_red_class(self):
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        self.assertEqual(empty, "fix-red-e3b0c44298")
+        solo = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"PR Ready").hexdigest()[:10])
+        self.assertNotEqual(solo, empty)
+        beside = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]})
+        self.assertEqual(beside, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        cancelled = gap.check_fingerprint({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "CANCELLED"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+        ]})
+        self.assertEqual(cancelled, "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence").hexdigest()[:10])
+
+    def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
+        a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
+        b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, gap.fingerprint("billing webhook retries", []))
+        self.assertEqual(gap.fingerprint("anything", ["remediation:stripe-reconcile"]), "stripe-reconcile")
+
+    def test_third_occurrence_inside_14_days_requires_the_machine(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            for index, subject in enumerate(("JOV-1", "JOV-2")):
+                decision = gap.decide(state, "fp1", now=NOW + index)
+                self.assertFalse(decision["required"], decision)
+                gap.record(state, "fp1", "lane-run", subject, now=NOW + index)
+            third = gap.decide(state, "fp1", now=NOW + 10)
+            self.assertEqual((third["required"], third["reason"], third["occurrences"]), (True, "recurrence", 3))
+            # the same subject recorded twice is one occurrence; an old occurrence ages out
+            gap.record(state, "fp1", "lane-run", "JOV-2", now=NOW + 20)
+            self.assertEqual(len(gap.occurrences(gap.read(state), "fp1", NOW + 30)), 2)
+            late = gap.decide(state, "fp1", now=NOW + gap.WINDOW_S + 5)
+            self.assertFalse(late["required"])
+
+    def test_projected_cost_above_ten_dollars_requires_the_machine(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(gap.decide(Path(tmp), "x", "Estimated cost: $12", now=NOW)["required"])
+            self.assertFalse(gap.decide(Path(tmp), "x", "Estimated cost: $4", now=NOW)["required"])
+            gap.record(Path(tmp), "y", "lane-run", "A", est_usd=6.0, now=NOW)
+            decision = gap.decide(Path(tmp), "y", est_usd=5.0, now=NOW + 1)
+            self.assertEqual((decision["required"], decision["reason"]), (True, "cost"))
+
+    def test_waivers_cover_one_time_migrations_and_incidents_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            costly = "Estimated cost: $50"
+            self.assertEqual(gap.decide(Path(tmp), "x", costly + "\nMachine-gap waiver: one-time-migration", now=NOW)["waived"],
+                             "one-time-migration")
+            self.assertFalse(gap.decide(Path(tmp), "x", costly, labels=["incident"], now=NOW)["required"])
+            self.assertTrue(gap.decide(Path(tmp), "x", costly + "\nMachine-gap waiver: because", labels=["bug"], now=NOW)["required"])
+
+    def test_clause_states_the_obligation_and_the_escape_hatches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = "\n".join(gap.clause(gap.decide(Path(tmp), "fp", "Estimated cost: $50", now=NOW)))
+        for needle in ("REQUIRED", "machine-gap", "Machine: built", "Machine-gap: <issue identifier>", "one-time-migration", "incident"):
+            self.assertIn(needle, lines)
+        quiet = "\n".join(gap.clause(gap.decide(Path("/nonexistent-state"), "fp", now=NOW)))
+        self.assertNotIn("REQUIRED", quiet)
+        self.assertIn("Before one-off work", quiet)
+
+    def test_machine_line_is_read_from_a_pr_body(self):
+        self.assertEqual(gap.machine_line("x\nMachine: built scripts/lanes/fix_red_classes.py\n"), "built scripts/lanes/fix_red_classes.py")
+        self.assertEqual(gap.machine_line("Machine-gap: JOV-9"), "JOV-9")
+        self.assertIsNone(gap.machine_line("no marker"))
+
+    def test_recurring_lists_fingerprints_at_the_threshold(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for subject in ("a", "b", "c"):
+                gap.record(Path(tmp), "hot", "lane-run", subject, now=NOW)
+            gap.record(Path(tmp), "cold", "lane-run", "a", now=NOW)
+            self.assertEqual(gap.recurring(Path(tmp), NOW + 1), {"hot": 3})
+
+
+class PromptTest(unittest.TestCase):
+    def test_coder_and_fix_prompts_carry_the_gate_and_the_ledger_counts_the_run(self):
+        import lane_runner as lane
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            issue = lane.Issue(id="i", identifier="JOV-5", title="Fix flaky profile test", description="Estimated cost: $30",
+                               priority=2, created_at="2026-10-01T00:00:00Z", labels=[])
+            receipt = {}
+            clause = lane.machine_gate(host, issue.identifier, issue.title, issue.labels, issue.description, "codex", receipt=receipt)
+            prompt = lane.render_prompt(issue, "codex/jov-5", "ctx", provider="codex", machine=clause)
+            self.assertIn("## Abstraction gate", prompt)
+            self.assertIn("REQUIRED", prompt)
+            self.assertTrue(receipt["machineGate"]["required"])
+            self.assertEqual(len(gap.read(Path(tmp))), 1)
+            # the other prompt kinds render the same clause from the same function
+            pr = {"number": 4, "statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}]}
+            fix = lane.machine_gate(host, "PR4", "", (), "", "codex", fp=gap.check_fingerprint(pr))
+            self.assertTrue(any("Abstraction gate" in line for line in fix))
+
+    def test_binding_and_epic_prompts_carry_the_gate_too(self):
+        import bindings
+        import epics
+        binding = SimpleNamespace(slug="JovieInc/LogYourBody", key="LYB")
+        pr = {"number": 3, "headRefOid": "h", "statusCheckRollup": [{"name": "Lint", "conclusion": "FAILURE"}]}
+        clause = ["## Abstraction gate (build the machine, not the thing)", "- REQUIRED: x"]
+        repair = bindings.render_prompt(binding, "fix/x", pr=pr, machine=clause)
+        issue = SimpleNamespace(title="t", identifier="LYB-1", description="d")
+        coder = bindings.render_prompt(binding, "b", issue=issue, machine=clause)
+        for prompt in (repair, coder):
+            self.assertIn("## Abstraction gate", prompt)
+            self.assertLess(prompt.index("Abstraction gate"), prompt.index("## Contract"))
+        plan = epics.render_prompt(SimpleNamespace(identifier="JOV-1", title="e", description="d"), [])
+        self.assertIn("Build the machine, not the thing", plan)
+        self.assertIn("machine-gap", plan)
+
+    def test_a_broken_ledger_never_fails_the_run(self):
+        import lane_runner as lane
+        host = lane.Host(state=Path("/proc/does-not-exist"), repo=Path("/"))
+        self.assertIsInstance(lane.machine_gate(host, "JOV-1", "t", [], "", "codex"), list)
+
+
+class RemediationRecurrenceTest(unittest.TestCase):
+    def issue(self, ident, state, updated):
+        return {"id": "id-" + ident, "identifier": ident, "title": "e2e-login-timeout", "description": "",
+                "createdAt": "2026-10-01T00:00:00Z", "updatedAt": updated, "url": "u",
+                "state": {"name": "Todo" if state == "unstarted" else "Done", "type": state},
+                "team": {"key": "JOV", "states": {"nodes": [{"id": "todo", "name": "Todo", "type": "unstarted"}]}},
+                "labels": {"nodes": [{"id": "l", "name": "remediation:e2e-login-timeout"}]}}
+
+    def stamp(self, days_ago):
+        return datetime.fromtimestamp(NOW - days_ago * 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def providers(self):
+        return {"codex": {"enabled": True, "tier": 1}}
+
+    def plan(self, closed_days):
+        issues = [self.issue("JOV-9", "unstarted", self.stamp(0))] + [
+            self.issue(f"JOV-{i}", "completed", self.stamp(days)) for i, days in enumerate(closed_days, 1)]
+        return remediation.plan_labeled_events(issues, {}, self.providers(), NOW, healthy=lambda *_: True)["events"]["e2e-login-timeout"]
+
+    def test_third_occurrence_in_14_days_becomes_a_machine_builder_task(self):
+        row = self.plan([2, 5])
+        self.assertTrue(row["machineBuilder"])
+        self.assertIn("Machine-builder task", row["dossier"])
+        self.assertIn("Blocker class", row["dossier"], "the ordinary dossier is kept")
+
+    def test_older_or_fewer_recurrences_keep_the_ordinary_task(self):
+        for closed in ([2], [20, 30], []):
+            row = self.plan(closed)
+            self.assertFalse(row["machineBuilder"], closed)
+            self.assertNotIn("Machine-builder task", row["dossier"])
+
+
+class LoneReadyTest(unittest.TestCase):
+    def test_a_lone_pr_ready_quota_deferral_reruns(self):
+        import fix_red_classes as classes
+        log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) until 2026-11-10T12:59:15.000Z\n"
+               "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
+        solo = {"mergeStateStatus": "BLOCKED", "statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+            {"name": "Source Validation", "conclusion": "SUCCESS"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+        ]}
+        got = classes.classify(solo, {"PR Ready": log})
+        self.assertEqual((got["cls"], got["action"], got["checks"]), ("quota-deferred", "rerun", ["PR Ready"]))
+        beside = {"mergeStateStatus": "BLOCKED", "statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"}]}
+        still = classes.classify(beside, {"Source Validation": "AssertionError: expected 1"})
+        self.assertEqual(still["checks"], ["Source Validation"])
+        cancelled = classes.real_failures({"statusCheckRollup": [
+            {"name": "PR Ready", "conclusion": "CANCELLED"}]})
+        self.assertEqual(cancelled, [])
+
+    def test_lone_pr_ready_quota_deferral_reruns_instead_of_the_empty_class(self):
+        import test_lane_runner as harness
+        case = harness.FixRedTest("test_quota_deferred_red_is_rerun_not_dispatched_and_carries_its_fingerprint")
+        case.setUp()
+        try:
+            pr = case.pr(checks=[{
+                "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+                "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+            log = ("::warning::github-quota-deferred: gh api primary after 1 attempt(s)\n"
+                   "::error::Fleet rule evidence is missing (github-quota-deferred or not yet complete)")
+            with tempfile.TemporaryDirectory() as tmp:
+                _, receipt, agent, again = case.run_gate(tmp, log, pr=pr)
+            case.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            case.assertEqual(receipt["failureFingerprint"]["cls"], "quota-deferred")
+            agent.assert_not_called()
+            again.assert_called_once()
+            case.assertNotEqual(harness.lane.machine_gap.check_fingerprint(pr), "fix-red-e3b0c44298")
+        finally:
+            case.doCleanups()
+
+
+if __name__ == "__main__":
+    unittest.main()

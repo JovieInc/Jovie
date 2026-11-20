@@ -45,3 +45,29 @@ export const LongContent: Story = {
     </SimpleTooltip>
   ),
 };
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <SimpleTooltip
+        content={
+          <span dir='rtl'>
+            انسخ رابط الملف الشخصي العام لمشاركته في أي مكان
+          </span>
+        }
+        defaultOpen
+        side='bottom'
+      >
+        <Button variant='secondary'>نسخ الرابط</Button>
+      </SimpleTooltip>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left trigger and content: the Arabic explanation wraps within the rich tooltip width instead of overflowing it.',
+      },
+    },
+  },
+};

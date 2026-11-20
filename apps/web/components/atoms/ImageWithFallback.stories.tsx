@@ -44,3 +44,27 @@ export const FillFallback: Story = {
     fallbackVariant: 'release',
   },
 };
+
+/** No artwork URL at all: the release placeholder takes the image's place. */
+export const EmptySource: Story = {
+  args: {
+    src: undefined,
+    alt: 'Night Drive artwork',
+    fallbackVariant: 'release',
+    fill: true,
+  },
+};
+
+/**
+ * The source exists but fails to decode (an expired CDN URL behaves the same),
+ * so the image swaps to the placeholder. The broken data URL keeps the story
+ * offline and fails deterministically.
+ */
+export const ErrorBrokenSource: Story = {
+  args: {
+    src: 'data:image/png;base64,AAAA',
+    alt: 'Night Drive artwork',
+    fallbackVariant: 'release',
+    fill: true,
+  },
+};

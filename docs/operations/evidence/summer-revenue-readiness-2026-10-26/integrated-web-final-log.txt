@@ -1,0 +1,27 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+
+ RUN  v5.0.5 /workspace/Jovie/apps/web
+
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts (9 tests) 19ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts (7 tests) 103ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts (38 tests) 157ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-funnel.test.ts (14 tests) 43ms
+ ✓ |jsdom| lib/ovie/company-state.test.ts (4 tests) 36ms
+ ✓ |jsdom| lib/analytics/signup-funnel.server.test.ts (10 tests) 40ms
+ ✓ |node| tests/unit/lib/waitlist/qualification.test.ts (18 tests) 20ms
+ ✓ |node| tests/unit/lib/waitlist/auto-accept.test.ts (16 tests) 212ms
+ ✓ |node| tests/unit/lib/waitlist/critical-flows.test.ts (4 tests) 13ms
+ ✓ |node| tests/unit/lib/waitlist/access-request.test.ts (29 tests) 3345ms
+   ✓ submitWaitlistAccessRequest (29)
+     ✓ does NOT downgrade an active user when re-running the waitlist flow 3233ms
+
+ Test Files  10 passed (10)
+      Tests  149 passed (149)
+   Start at  23:08:44
+   Duration  7.54s (environment 46%, tests 26%, setup 13%, import 11%, transform 4%, worker 1%)
+
+JSON report written to /tmp/jovie-readiness-evidence/integrated-web-final.json

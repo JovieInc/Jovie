@@ -1,8 +1,9 @@
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
+import { discogReleases } from '@/lib/db/schema/content';
+import { getLiveRecordingTitles } from '@/lib/discography/live-catalog';
 
 /**
  * A merch phrase must have a source Jovie can name back to the artist.  This
@@ -120,16 +121,18 @@ export async function getMerchSourceCandidates(
   profileId: string
 ): Promise<readonly MerchSourceCandidate[]> {
   const [recordings, releases] = await Promise.all([
-    db
-      .select({ title: discogRecordings.title })
-      .from(discogRecordings)
-      .where(eq(discogRecordings.creatorProfileId, profileId))
-      .orderBy(desc(discogRecordings.updatedAt))
-      .limit(20),
+    getLiveRecordingTitles(profileId, 20).then(titles =>
+      titles.map(title => ({ title }))
+    ),
     db
       .select({ title: discogReleases.title })
       .from(discogReleases)
-      .where(eq(discogReleases.creatorProfileId, profileId))
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, profileId),
+          isNull(discogReleases.deletedAt)
+        )
+      )
       .orderBy(desc(discogReleases.updatedAt))
       .limit(20),
   ]);

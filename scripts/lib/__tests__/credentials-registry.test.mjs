@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   burnRate,
   claimNames,
+  closeSpendFunding,
   evaluateRegistry,
   evaluateThirdPartyGrants,
   isSecretName,
@@ -160,6 +161,25 @@ describe('spend runway and caps', () => {
       '2026-10-20T01:00:00Z'
     ).findings[0];
     expect(critical.severity).toBe('critical');
+  });
+
+  it('pages when a prepaid provider has under 3 days of runway', () => {
+    const { findings } = evaluate(
+      credentials(),
+      spend([{ ...gateway, burnPerDayUsd: { value: 8 } }]),
+      '2026-10-20T01:00:00Z'
+    );
+    expect(findings.map(f => f.fingerprint).sort()).toEqual([
+      'spend-runway-page:gateway',
+      'spend-runway:gateway',
+    ]);
+    expect(
+      findings.find(f => f.fingerprint === 'spend-runway-page:gateway')
+    ).toMatchObject({
+      type: 'runway-page',
+      severity: 'critical',
+      runwayDays: 2.6,
+    });
   });
 
   it('measures burn from the committed snapshot and a live read', () => {
@@ -349,9 +369,64 @@ describe('hygiene', () => {
     expect(
       validateSpendLedger(spend([{ id: 'x', cap: { amountUsd: 0 } }]))
     ).toHaveLength(1);
+    expect(
+      validateSpendLedger(
+        spend([
+          { id: 'pool' },
+          { id: 'a', funding: { source: 'credits', creditPoolId: 'pool' } },
+          { id: 'b', funding: { source: 'cash' } },
+        ])
+      )
+    ).toEqual([]);
+    expect(
+      validateSpendLedger(
+        spend([
+          { id: 'a', funding: { source: 'credits', creditPoolId: 'missing' } },
+          { id: 'b', funding: { source: 'free' } },
+        ])
+      )
+    ).toHaveLength(2);
     expect(() =>
       evaluate({ schema: 'nope' }, null, '2026-10-20T00:00:00Z')
     ).toThrow(/registry invalid/);
+  });
+
+  it('closes a spend slice under the credit pools it draws from', () => {
+    const providers = [
+      { id: 'pool' },
+      { id: 'other' },
+      {
+        id: 'mid',
+        funding: { source: 'credits', creditPoolId: 'pool' },
+      },
+      { id: 'a', funding: { source: 'credits', creditPoolId: 'mid' } },
+    ];
+    const sliced = providers.filter(entry => entry.id === 'a');
+    expect(validateSpendLedger(spend(sliced))).toEqual([
+      'a: funding.creditPoolId mid is not a spend entry',
+    ]);
+    const closed = closeSpendFunding(providers, sliced);
+    expect(closed.map(entry => entry.id)).toEqual(['pool', 'mid', 'a']);
+    expect(validateSpendLedger(spend(closed))).toEqual([]);
+    expect(
+      closeSpendFunding(providers, [{ id: 'other' }]).map(entry => entry.id)
+    ).toEqual(['other']);
+
+    const unresolved = [
+      { id: 'orphan', funding: { source: 'credits', creditPoolId: 'gone' } },
+    ];
+    expect(closeSpendFunding(providers, unresolved)).toEqual(unresolved);
+    expect(validateSpendLedger(spend(unresolved))).toEqual([
+      'orphan: funding.creditPoolId gone is not a spend entry',
+    ]);
+
+    const cycle = [
+      { id: 'a', funding: { source: 'credits', creditPoolId: 'b' } },
+      { id: 'b', funding: { source: 'credits', creditPoolId: 'a' } },
+    ];
+    expect(closeSpendFunding(cycle, [cycle[0]]).map(entry => entry.id)).toEqual(
+      ['a', 'b']
+    );
   });
 
   it('plans one remediation issue per alerting finding, skipping low', () => {

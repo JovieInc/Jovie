@@ -56,7 +56,7 @@ export const LocalImage: Story = {
   args: {
     handle: 'musicmaker',
     name: 'Music Maker',
-    src: '/images/avatars/music-maker.jpg',
+    src: '/images/avatars/tim-white.jpg',
     size: 'md',
     showName: true,
   },

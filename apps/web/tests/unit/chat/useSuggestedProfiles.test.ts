@@ -7,6 +7,21 @@ const defaultStarterContext = {
   conversationCount: 2,
   isRecentlyOnboarded: false,
   latestReleaseTitle: null,
+  profileReadiness: {
+    hasPhoto: true,
+    hasName: true,
+    hasHandle: true,
+    hasMusicDsp: true,
+    isComplete: true,
+  },
+};
+
+const incompleteReadiness = {
+  hasPhoto: false,
+  hasName: false,
+  hasHandle: false,
+  hasMusicDsp: false,
+  isComplete: false,
 };
 
 const playlistFallbackSuggestion = {
@@ -142,5 +157,117 @@ describe('useSuggestedProfiles', () => {
         method: 'POST',
       })
     );
+  });
+
+  // JOV-8137: liveness claims are gated on server-computed readiness.
+  describe('profile readiness gating (JOV-8137)', () => {
+    function mockFetchWithContext(context: Record<string, unknown>) {
+      return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({
+          success: true,
+          suggestions: [],
+          starterContext: context,
+        })
+      );
+    }
+
+    it('does not show "Your profile is live" for an incomplete profile', async () => {
+      mockFetchWithContext({
+        ...defaultStarterContext,
+        isRecentlyOnboarded: true,
+        profileReadiness: incompleteReadiness,
+      });
+
+      const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(
+        result.current.suggestions.some(s => s.type === 'profile_ready')
+      ).toBe(false);
+    });
+
+    it('shows one nudge card per missing essential instead', async () => {
+      mockFetchWithContext({
+        ...defaultStarterContext,
+        isRecentlyOnboarded: true,
+        profileReadiness: incompleteReadiness,
+      });
+
+      const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const titles = result.current.suggestions.map(s => s.title);
+      expect(titles).toEqual([
+        'Set a profile photo',
+        'Set your artist name',
+        'Claim your handle',
+        'Add your music (connect Spotify)',
+      ]);
+    });
+
+    it('shows the live card only when all four essentials are set', async () => {
+      mockFetchWithContext({
+        ...defaultStarterContext,
+        isRecentlyOnboarded: true,
+      });
+
+      const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0]?.type).toBe('profile_ready');
+      expect(result.current.suggestions[0]?.title).toBe('Your profile is live');
+    });
+
+    it('shows a single music nudge when only the DSP essential is missing', async () => {
+      mockFetchWithContext({
+        ...defaultStarterContext,
+        isRecentlyOnboarded: true,
+        profileReadiness: {
+          hasPhoto: true,
+          hasName: true,
+          hasHandle: true,
+          hasMusicDsp: false,
+          isComplete: false,
+        },
+      });
+
+      const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0]?.title).toBe(
+        'Add your music (connect Spotify)'
+      );
+    });
+
+    it('never claims liveness when readiness data is missing', async () => {
+      const { profileReadiness: _omitted, ...withoutReadiness } =
+        defaultStarterContext;
+      mockFetchWithContext({
+        ...withoutReadiness,
+        isRecentlyOnboarded: true,
+      });
+
+      const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.suggestions).toHaveLength(0);
+    });
   });
 });

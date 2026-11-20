@@ -18,7 +18,12 @@ export interface WorkspaceTabOption<T extends string> {
   readonly label: string;
 }
 
-const PRIMARY_TAB_RESET_KEYS = ['page', 'pageSize', 'q', 'sort'] as const;
+export const PRIMARY_TAB_RESET_KEYS = [
+  'page',
+  'pageSize',
+  'q',
+  'sort',
+] as const;
 
 export interface WorkspaceTabsSurfaceProps<
   TPrimary extends string,

@@ -258,12 +258,17 @@ describe('route publication policy — real registry', () => {
 
   it('capability index gate composes with sitemap rules', () => {
     expect(
-      isSitemapIndexableMarketingRoute({ url: '/card', status: 'active' })
+      isSitemapIndexableMarketingRoute({ url: '/pay', status: 'active' })
     ).toBe(true);
+    // Withheld dead-end pages stay out of the sitemap (withheldRoutes.ts).
+    expect(
+      isSitemapIndexableMarketingRoute({ url: '/card', status: 'active' })
+    ).toBe(false);
     expect(
       isSitemapIndexableMarketingRoute({ url: '/voice', status: 'active' })
     ).toBe(false);
-    expect(isIndexableCapabilityPath('/card')).toBe(true);
+    expect(isIndexableCapabilityPath('/pay')).toBe(true);
+    expect(isIndexableCapabilityPath('/card')).toBe(false);
     expect(isIndexableCapabilityPath('/voice')).toBe(false);
   });
 });

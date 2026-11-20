@@ -1,0 +1,85 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+
+ RUN  v5.0.5 /workspace/Jovie/apps/web
+      Coverage enabled with v8
+
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > is eligible when every existing owner reports green 12ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > blocks acquisition on a reconciled rail even when the old canary and other evidence remain green 5ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > maps a failing live M2 step to its cone requirement 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > marks the live-probed requirements unknown when the probe throws 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > turns a failed Golden Path lane into a red payment requirement 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce selectedRail evidence is missing 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce jov6258Preflight evidence is missing 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce handoffCorrelation evidence is missing 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce paymentJourney evidence is missing 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce reversal evidence is missing 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed without leaking a commerce reader error 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > redacts raw canary, workflow and funnel diagnostics 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > treats cancelled runs, missing runs and unreadable GitHub as unknown 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > treats an expired canary key and a red canary differently 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with empty underlying checks 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with contradictory underlying checks 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > cannot diagnose the funnel when the funnel read is degraded 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > serves a cached report without re-probing 7ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > expires evidence while the Redis entry still exists without probing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > recomputes and caches on a miss, a malformed entry, or fresh=1 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > still computes when Redis reads fail 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > reads the Golden Path job, not the dispatching run 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > keeps whole-run evidence for plain workflow files 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > reports an unreadable run or job list as unavailable 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > counts a skipped or missing Golden Path job as red unless cancelled 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > preserves a current complete report but invalidates it after its evidence expires 3ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > does not retain a nested green commerce decision after its canary expires 10ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for missing-evidence even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for missing-required-source even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for inflated-freshness-budget even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-status even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-budget even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for duplicate-requirement even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for contradictory-summary even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for duplicate-commerce-evidence even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for future-evaluation even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for zero-budget even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for nonfinite-budget even when the stored eligible flag is true 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > is eligible only when every cone requirement is green and current 5ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > blocks on a red receipt and names the owner and next action 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > reports the earliest journey blocker first 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > fails closed when a requirement has no evidence 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > treats a stale, undated, or future green receipt as unknown 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > takes the worst of several sources for one requirement 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > evaluateAcquisitionEligibility > turns eligible again without a toggle once evidence recovers 0ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > unknownAcquisitionEligibility > is never eligible and explains why 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.test.ts > describeAcquisitionBlock > summarizes the first blocker for logs and ramp reasons 1ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > returns 401 without probing when OIDC fails 12ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > uses company state without probing providers for an ordinary read 18ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > keeps a complete fresh eligible snapshot eligible without probing 2ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > returns the predicate uncached and honors fresh=1 2ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > never serves a stale eligible snapshot to Summer when the producer stops 2ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > rejects a pre-commerce company-state cache entry 1ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > fails closed with an UNKNOWN verdict instead of an error 2ms
+
+ Test Files  3 passed (3)
+      Tests  54 passed (54)
+   Start at  23:01:36
+   Duration  2.05s (environment 63%, setup 14%, transform 9%, import 7%, worker 4%, tests 3%)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   93.35 |    91.95 |   93.33 |    93.3 |
+ lib/acquisition   |   92.94 |     91.7 |   93.22 |   92.85 |
+  ...lity-cache.ts |   97.95 |     92.3 |     100 |     100 | 126,179-183
+  ...ity.server.ts |   88.23 |    88.98 |      84 |   88.18 | ...36,560-561,593
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 93.35% ( 239/256 )
+Branches     : 91.95% ( 183/199 )
+Functions    : 93.33% ( 56/60 )
+Lines        : 93.3% ( 209/224 )
+================================================================================

@@ -6,6 +6,72 @@ const VIEWPORTS = [
   { name: 'narrow desktop split', width: 390 },
 ] as const;
 
+test.describe('sticky table header occlusion (JOV-9079)', () => {
+  for (const grouped of [false, true]) {
+    for (const theme of ['light', 'dark']) {
+      test(`hides scrolled rows (${theme}, grouped=${grouped})`, async ({
+        page,
+      }, testInfo) => {
+        await page.addInitScript(value => {
+          localStorage.setItem('jovie-theme-storybook', value);
+        }, theme);
+        const story = `organisms-table-shellquality--profile-identity-cells${grouped ? '-grouped' : ''}`;
+        await page.goto(`/iframe.html?id=${story}&viewMode=story`);
+        const table = page.getByRole('table', {
+          name: 'Presence identity geometry fixture',
+        });
+        const header = table.getByRole('columnheader').first();
+        await expect(header).toBeVisible();
+        const initialBounds = await header.boundingBox();
+        await table.evaluate(element => {
+          element.parentElement!.scrollTop = 2000;
+        });
+        await expect
+          .poll(() =>
+            table.evaluate(element => element.parentElement!.scrollTop)
+          )
+          .toBe(2000);
+        const bounds = await header.boundingBox();
+        expect(bounds!.y).toBe(initialBounds!.y);
+        // Prove that content actually lies beneath the sticky header, so this
+        // pixel comparison cannot pass just because the fixture did not scroll.
+        const overlaps = await table.locator('tbody tr').evaluateAll(rows => {
+          const headerBounds = document
+            .querySelector('th')!
+            .getBoundingClientRect();
+          return rows.some(row => {
+            const rect = row.getBoundingClientRect();
+            return (
+              rect.top < headerBounds.bottom && rect.bottom > headerBounds.top
+            );
+          });
+        });
+        expect(overlaps).toBe(true);
+        const clip = { ...bounds!, height: bounds!.height - 2 };
+        const painted = await page.screenshot({ clip, animations: 'disabled' });
+        // Hiding rows preserves layout but removes the backdrop. An opaque
+        // header must paint the same pixels with or without those rows.
+        await table.locator('tbody').evaluate(element => {
+          element.style.visibility = 'hidden';
+        });
+        const cleared = await page.screenshot({ clip, animations: 'disabled' });
+        await testInfo.attach('header-with-scrolled-rows.png', {
+          body: painted,
+          contentType: 'image/png',
+        });
+        await testInfo.attach('header-without-scrolled-rows.png', {
+          body: cleared,
+          contentType: 'image/png',
+        });
+        expect(
+          painted.equals(cleared),
+          'scrolled rows must not change header pixels'
+        ).toBe(true);
+      });
+    }
+  }
+});
+
 for (const viewport of VIEWPORTS) {
   for (const theme of ['dark', 'light']) {
     const suffix = theme === 'light' ? '-light' : '';

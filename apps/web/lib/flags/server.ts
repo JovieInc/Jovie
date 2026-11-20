@@ -33,10 +33,6 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
     flagName =>
       flagName !== 'RELEASE_PLAN_DEMO' &&
       flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT' &&
-      // The inbox flag changes canonical customer navigation. Keep its
-      // rollout role-invariant so entering customer mode never gives admins
-      // a different sidebar from creators.
-      flagName !== 'INBOX_HOME' &&
       // Unapproved workspace doors remain off for admins and customers.
       flagName !== 'YOUTUBE_WORKSPACE_NAV' &&
       flagName !== 'JOVIE_WORK_NAV' &&
@@ -47,7 +43,9 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // owner-only financial data must stay dark for everyone — including
       // admins — until the privacy/correctness matrix is certified.
       flagName !== 'CREATOR_FINANCE' &&
-      flagName !== 'VISIBILITY_AUDIT_OFFER'
+      flagName !== 'VISIBILITY_AUDIT_OFFER' &&
+      flagName !== 'OUTBOUND_DOGFOOD_GATE' &&
+      flagName !== 'OUTBOUND_COLD_DRAFTS'
   )
 );
 
@@ -95,7 +93,10 @@ export async function getAppFlagValue(
     const envOverrides = await getFlagOverrideMap();
     envOverride = envOverrides[flagName];
   } catch {
-    // Retain registry/default behavior when the override store is unavailable.
+    // Draft gating fails closed even if the cache wrapper itself is unreadable.
+    if (flagName === 'OUTBOUND_DOGFOOD_GATE') return true;
+    if (flagName === 'OUTBOUND_COLD_DRAFTS') return false;
+    // Retain registry/default behavior for other flags.
   }
   if (envOverride === false) {
     return false;
@@ -123,6 +124,10 @@ export async function getAppFlagValue(
   // The mock release planner is a local demo. Keep it available in dev and
   // preview, and fail closed in production unless an override above published it.
   if (flagName === 'RELEASE_PLAN_DEMO' && !isProductionRuntime()) {
+    return true;
+  }
+
+  if (flagName === 'OUTBOUND_DOGFOOD_GATE' && process.env.NODE_ENV === 'test') {
     return true;
   }
 

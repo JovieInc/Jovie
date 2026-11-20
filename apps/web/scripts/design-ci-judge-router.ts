@@ -37,6 +37,11 @@ import {
 } from '../data/appScreens/registry';
 import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistry';
 import {
+  type ConsumerExecutionPlan,
+  commandFor,
+  consumerExecutionCacheKey,
+} from './design-ci-judge-consumer-memo';
+import {
   buildLiveJudges,
   type DispatchDeps,
   type DispatchResult,
@@ -540,18 +545,13 @@ export async function buildDesignCiJudgeMatrix(): Promise<DesignCiJudgeMatrix> {
 // exists for those routes yet (see the module doc comment).
 // ---------------------------------------------------------------------------
 
-export type ConsumerExecutionKind =
-  | 'node-test'
-  | 'node-cli'
-  | 'python'
-  | 'bash'
-  | 'vitest';
-
-export interface ConsumerExecutionPlan {
-  readonly kind: ConsumerExecutionKind;
-  /** Repo-relative (or, for vitest, apps/web-relative) path actually run. */
-  readonly execPath: string;
-}
+// Consumer execution plans and the memo key live in their own module so
+// this file stays under its size-500 pin; the types are re-exported so the
+// router's public API is unchanged.
+export type {
+  ConsumerExecutionKind,
+  ConsumerExecutionPlan,
+} from './design-ci-judge-consumer-memo';
 
 const CLI_GUARD_PATTERN =
   /process\.argv\[1\]\s*===\s*fileURLToPath\(import\.meta\.url\)/;
@@ -638,41 +638,6 @@ function truncateTail(text: string): string {
     : text;
 }
 
-function commandFor(plan: ConsumerExecutionPlan): {
-  file: string;
-  args: string[];
-  cwd: string;
-} {
-  switch (plan.kind) {
-    case 'node-test':
-      return {
-        file: process.execPath,
-        args: ['--test', plan.execPath],
-        cwd: REPO_ROOT,
-      };
-    case 'node-cli':
-      return { file: process.execPath, args: [plan.execPath], cwd: REPO_ROOT };
-    case 'python':
-      return { file: 'python3', args: [plan.execPath], cwd: REPO_ROOT };
-    case 'bash':
-      return { file: 'bash', args: [plan.execPath], cwd: REPO_ROOT };
-    case 'vitest':
-      return {
-        file: 'pnpm',
-        args: [
-          'exec',
-          'vitest',
-          'run',
-          '--config=vitest.config.mts',
-          plan.execPath,
-        ],
-        cwd: resolvePath(REPO_ROOT, 'apps/web'),
-      };
-    default:
-      throw new Error(`unreachable consumer kind: ${String(plan.kind)}`);
-  }
-}
-
 /**
  * Actually spawns the consumer's real check. The only place this module
  * runs anything. `timeoutMs` defaults to the production ceiling; tests
@@ -682,7 +647,7 @@ export function runConsumerExecution(
   plan: ConsumerExecutionPlan,
   timeoutMs: number = CONSUMER_TIMEOUT_MS
 ): ConsumerCheckOutcome {
-  const { file, args, cwd } = commandFor(plan);
+  const { file, args, cwd } = commandFor(plan, REPO_ROOT);
   const command = [file, ...args].join(' ');
   try {
     const output = execFileSync(file, args, {
@@ -749,7 +714,7 @@ export function evaluateDeterministicRow(
     .filter((plan): plan is ConsumerExecutionPlan => plan !== null);
   const uniquePlans = [
     ...new Map(
-      plans.map(plan => [`${plan.kind}:${plan.execPath}`, plan])
+      plans.map(plan => [consumerExecutionCacheKey(plan, repoRoot), plan])
     ).values(),
   ];
 
@@ -764,7 +729,7 @@ export function evaluateDeterministicRow(
   }
 
   const outcomes = uniquePlans.map(plan => {
-    const key = `${plan.kind}:${plan.execPath}`;
+    const key = consumerExecutionCacheKey(plan, repoRoot);
     let outcome = cache.get(key);
     if (!outcome) {
       outcome = runConsumerExecution(plan, timeoutMs);

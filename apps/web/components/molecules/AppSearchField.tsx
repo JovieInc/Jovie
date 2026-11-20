@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
+import { CompositeField } from '@jovie/ui/atoms/composite-field';
 import { Search, X } from 'lucide-react';
 import * as React from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
@@ -37,11 +38,11 @@ export function AppSearchField({
   React.useImperativeHandle(inputRef, () => internalInputRef.current!, []);
 
   return (
-    <div
-      className={cn(
-        'flex h-app-control-sm items-center gap-1.5 rounded-full border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-subtle hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/14 [&_input]:focus-visible:ring-offset-0',
-        className
-      )}
+    <CompositeField
+      shape='pill'
+      size='sm'
+      surface='shell'
+      className={className}
     >
       <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
       <Input
@@ -75,6 +76,6 @@ export function AppSearchField({
           <X />
         </AppIconButton>
       ) : null}
-    </div>
+    </CompositeField>
   );
 }

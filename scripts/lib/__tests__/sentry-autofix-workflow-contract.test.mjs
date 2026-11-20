@@ -18,59 +18,13 @@ import {
 } from '../workflow-triggers.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/sentry-autofix.yml'),
-  'utf8'
-);
 const RECURRENCE = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/sentry-autofix-recurrence.yml'),
   'utf8'
 );
 
-describe('Sentry autofix workflow contract', () => {
-  it('deduplicates automation by root signature with issue ID fallback', () => {
-    const keyExpression =
-      '${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}';
-
-    expect(WORKFLOW).toContain(`group: sentry-autofix-${keyExpression}`);
-    expect(WORKFLOW).toContain(`DEDUPE_KEY: ${keyExpression}`);
-    expect(WORKFLOW).toContain('BRANCH="sentry-fix/${DEDUPE_KEY}"');
-  });
-
-  it('carries release, environment, route, and recurrence evidence into repair', () => {
-    for (const field of [
-      'root_cause_fingerprint',
-      'environment',
-      'release',
-      'project',
-      'route',
-      'level',
-      'event_id',
-      'first_seen',
-      'last_seen',
-      'event_count',
-      'user_count',
-    ]) {
-      expect(WORKFLOW, `missing client payload field ${field}`).toContain(
-        `github.event.client_payload.context.${field}`
-      );
-    }
-  });
-
-  it('requires staged diagnosis and post-deploy recurrence proof', () => {
-    expect(WORKFLOW).toContain(
-      'Work in these gated stages. Do not advance when the prior stage lacks evidence'
-    );
-    expect(WORKFLOW).toContain(
-      'If customer impact or the current release is ambiguous, make no code change'
-    );
-    expect(WORKFLOW).toContain(
-      'This PR does not close the incident. Resolution requires post-deploy recurrence evidence'
-    );
-    expect(WORKFLOW).not.toMatch(/close[sd]?\s+(the\s+)?(Sentry\s+)?issue/i);
-  });
-
-  it('closes the loop on a scheduled or manual recurrence check, never source PRs', () => {
+describe('Sentry recurrence observation workflow contract', () => {
+  it('runs observations from main on a clock or manual dispatch, never source PRs', () => {
     // Clock wake (repository_dispatch) plus an hourly-or-better cron
     // backstop and manual dispatch; never a source-PR or merge-queue event.
     const on = workflowTriggers(RECURRENCE);
@@ -92,8 +46,10 @@ describe('Sentry autofix workflow contract', () => {
     expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
       'scripts/lib/__tests__/sentry-validation-observation.test.mjs'
     );
-    expect(RECURRENCE).toContain('observations_only:');
-    expect(RECURRENCE).toContain('SENTRY_RECURRENCE_OBSERVATIONS_ONLY:');
+    expect(RECURRENCE).not.toContain('observations_only');
+    expect(
+      existsSync(resolve(REPO_ROOT, '.github/workflows/sentry-autofix.yml'))
+    ).toBe(false);
     expect(RECURRENCE).toContain('sentry-recurrence-source-revision.txt');
     expect(RECURRENCE).toContain('sentry-recurrence-observation.json');
   });
@@ -111,7 +67,7 @@ describe('Sentry autofix workflow contract', () => {
           parseYaml(RECURRENCE)
         ).jobs.recurrence;
       const step = job.steps.find(
-        step => step.name === 'Check recurrence and resolve or reopen'
+        step => step.name === 'Run registered Sentry validation observations'
       );
       if (!step?.run || !step.env)
         throw new Error('Missing maintained recurrence shell');
@@ -202,13 +158,14 @@ exit "$TEST_NODE_EXIT"
 
   it('keeps recurrence off the production-mutation lease with a cost and permission boundary', () => {
     expect(RECURRENCE).toContain('permissions: {}');
-    expect(RECURRENCE).toContain('runs-on: ubuntu-latest');
+    expect(RECURRENCE).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(RECURRENCE).toContain('timeout-minutes: 10');
     expect(RECURRENCE).toContain('group: sentry-autofix-recurrence');
     expect(RECURRENCE).toContain('cancel-in-progress: false');
     expect(RECURRENCE).toContain('permission-contents: read');
-    expect(RECURRENCE).toContain('permission-pull-requests: write');
-    expect(RECURRENCE).toContain('permission-issues: write');
+    expect(RECURRENCE).toContain('permission-pull-requests: read');
+    expect(RECURRENCE).toContain('permission-issues: read');
+    expect(RECURRENCE).not.toMatch(/(?:pull-requests|issues): write/);
     expect(RECURRENCE).toContain('persist-credentials: false');
     expect(RECURRENCE).toContain('name: Production – jovie');
     expect(RECURRENCE).not.toContain('group: production-mutation');

@@ -56,8 +56,9 @@ describe('ovie-launchers.server', () => {
     expect(destinations.gbrain?.href).toBe('http://100.64.8.9:7801');
     expect(JSON.stringify(destinations)).not.toMatch(/\bq=1\b/);
     expect(destinations.hermes?.href).toBe('http://127.0.0.1:7800');
-    expect(destinations.symphony?.sshHost).toBe('gem');
-    expect(destinations.symphony?.href).toBeUndefined();
+    expect(destinations.fleet?.href).toBe('/app/ov/operations');
+    expect(destinations.fleet?.sshHost).toBeUndefined();
+    expect(destinations.symphony).toBeUndefined();
     hoisted.serverFetch.mockRejectedValue(new Error('connect ECONNREFUSED'));
     await expect(
       preflightWebDestination('http://127.0.0.1:7801/health')
@@ -99,7 +100,7 @@ describe('ovie-launchers.server', () => {
     });
     const inventory = await loadOvieLauncherInventory();
     expect(inventory.primary.map(item => item.id)).toEqual(
-      expect.arrayContaining(['gbrain', 'hermes', 'symphony'])
+      expect.arrayContaining(['gbrain', 'hermes', 'fleet'])
     );
     expect(inventory.primary.some(item => item.agentCliOnly)).toBe(false);
     expect(JSON.stringify(inventory)).not.toMatch(

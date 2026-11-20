@@ -35,6 +35,7 @@ import {
   headerRetryMs,
   immutableGithubCache,
   rateLimitWaitMs,
+  readClosedPullSnapshot,
   reconcileValidation,
 } from './validation-sync.mjs';
 
@@ -118,6 +119,18 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
   'JOV-6004',
 ]);
 
+/**
+ * Lifecycle candidates are evaluated ahead of the active backlog so a rate
+ * limit that kills a sweep partway can never starve them (2026-10-30, run
+ * 41157880216: ~70 issues in oldest-touched order starved a Merging issue
+ * for every sweep while the cursor could not be saved).
+ */
+/** @type {readonly string[]} */
+export const SWEEP_LIFECYCLE_FIRST_STATES = [
+  LIFECYCLE_STATES.merging,
+  LIFECYCLE_STATES.validating,
+];
+
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 // Prerequisites can belong to another Linear team; only Jovie issues are
 // eligible for this writer's transitions (see IDENTIFIER_RE above).
@@ -164,6 +177,47 @@ export function writeSweepCursor(dir, nextIdentifier) {
       savedAt: new Date().toISOString(),
     })}\n`
   );
+}
+
+/**
+ * Sweep order: Merging and Validating first (the states whose issues wait
+ * on this writer to progress), then In Progress / In Review / Rework, each
+ * tier oldest-touched first. A persisted cursor rotates only the tier it
+ * points into: a cursor inside the lifecycle tier resumes there, and a
+ * cursor inside the active tier still runs the whole lifecycle tier ahead of
+ * it, because issues move into Merging between sweeps and must not wait for
+ * a full pass of the backlog. An unknown cursor (issue left the lifecycle
+ * states) starts a fresh pass.
+ *
+ * @param {readonly { identifier: string, updatedAt: string, stateName?: string }[]} found
+ * @param {string} [cursorNextIdentifier]
+ * @returns {string[]}
+ */
+export function orderSweepLookups(found, cursorNextIdentifier = '') {
+  const oldestFirst = (left, right) =>
+    (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0);
+  const isLifecycle = entry =>
+    SWEEP_LIFECYCLE_FIRST_STATES.includes(String(entry.stateName ?? ''));
+  const lifecycle = found.filter(isLifecycle).sort(oldestFirst);
+  const active = found.filter(entry => !isLifecycle(entry)).sort(oldestFirst);
+  const cursor = String(cursorNextIdentifier ?? '').toUpperCase();
+  if (cursor) {
+    const lifecycleStart = lifecycle.findIndex(
+      entry => entry.identifier === cursor
+    );
+    if (lifecycleStart > 0) {
+      return [...lifecycle.slice(lifecycleStart), ...active].map(
+        entry => entry.identifier
+      );
+    }
+    const activeStart = active.findIndex(entry => entry.identifier === cursor);
+    if (activeStart > 0) {
+      return [...lifecycle, ...active.slice(activeStart)].map(
+        entry => entry.identifier
+      );
+    }
+  }
+  return [...lifecycle, ...active].map(entry => entry.identifier);
 }
 
 /**
@@ -1163,6 +1217,7 @@ function lifecyclePreimage(issue) {
  *   readonly assuranceMatrix: unknown,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
+ *   readonly closedPulls?: ReadonlyMap<number, import('./validation-sync.mjs').ClosedPullSnapshotEntry>,
  *   readonly dryRun?: boolean,
  *   readonly issue?: Awaited<ReturnType<typeof readLifecycleIssue>>,
  *   readonly log: (message: string) => void,
@@ -1240,6 +1295,13 @@ export async function reconcileIssueLifecycle(ctx) {
     harnessManifest: ctx.harnessManifest,
     assuranceMatrix: ctx.assuranceMatrix,
     eventPull: ctx.eventPull,
+    closedPulls: ctx.closedPulls,
+    openPullNumbers:
+      ctx.openPulls.complete && ctx.openPulls.pulls.length > 0
+        ? new Set(
+            ctx.openPulls.pulls.map(pull => normalizePullRequest(pull).number)
+          )
+        : undefined,
     dryRun: ctx.dryRun,
     log: ctx.log,
     linear: {
@@ -1350,6 +1412,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
  *   readonly assuranceMatrix?: unknown,
  *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
  * }} options
+ * @returns {Promise<{ action: string, comment: string, identifier: string, results: any[], deferred?: number, deferralKind?: string }>}
  */
 async function runSync(options) {
   /** @type {HttpFetch} */
@@ -1416,11 +1479,7 @@ async function runSync(options) {
     const flagged =
       /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (error);
     if (flagged.rateLimited && sweep) {
-      // Quota is already spent. Evaluating issues would 403 the first linked
-      // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
-      // deferral. Leave the cursor where it is and let the next sweep resume.
-      // A merge event still fails closed unless the answer is specifically an
-      // installation 403, which the process exit soft-fails.
+      // Quota is spent. Leave the cursor (JOV-7355). A merge still fails closed.
       if (isInstallationQuota403(message)) {
         log(installationQuotaLog('Linear Sync'));
       }
@@ -1449,64 +1508,110 @@ async function runSync(options) {
     // Read exactly its canonical record; the evaluator still owns admission.
     lookups.push(receiptIssue);
   } else if (sweep) {
-    /** @type {{ identifier: string, updatedAt: string }[]} */
+    /** @type {{ identifier: string, updatedAt: string, stateName: string }[]} */
     const found = [];
     let after = null;
-    for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
-      const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
-        states: [
-          'In Progress',
-          'In Review',
-          LIFECYCLE_STATES.merging,
-          LIFECYCLE_STATES.validating,
-          LIFECYCLE_STATES.rework,
-        ],
-        after,
-      });
-      for (const node of data.issues?.nodes ?? []) {
-        // A missed merge event can strand linked work before Merging. Scan
-        // that delivery evidence, without pulling unrelated active writers
-        // into the lifecycle or interpreting age/status as completion.
-        if (
-          ['In Progress', 'In Review'].includes(node.state?.name) &&
-          !(node.children?.nodes?.length > 0) &&
-          !(node.labels?.nodes ?? []).some(label =>
-            /epic|commission/i.test(label?.name ?? '')
-          ) &&
-          !(node.attachments?.nodes ?? []).some(attachment =>
-            String(attachment.url ?? '')
-              .toLowerCase()
-              .startsWith(
-                `https://github.com/${repository}/pull/`.toLowerCase()
-              )
+    try {
+      for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
+        const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
+          states: [
+            'In Progress',
+            'In Review',
+            LIFECYCLE_STATES.merging,
+            LIFECYCLE_STATES.validating,
+            LIFECYCLE_STATES.rework,
+          ],
+          after,
+        });
+        for (const node of data.issues?.nodes ?? []) {
+          // Missed merges strand linked work before Merging. Skip writers
+          // with no pull attachment.
+          if (
+            ['In Progress', 'In Review'].includes(node.state?.name) &&
+            !(node.children?.nodes?.length > 0) &&
+            !(node.labels?.nodes ?? []).some(label =>
+              /epic|commission/i.test(label?.name ?? '')
+            ) &&
+            !(node.attachments?.nodes ?? []).some(attachment =>
+              String(attachment.url ?? '')
+                .toLowerCase()
+                .startsWith(
+                  `https://github.com/${repository}/pull/`.toLowerCase()
+                )
+            )
           )
-        )
-          continue;
-        if (typeof node?.identifier === 'string') {
-          found.push({
-            identifier: node.identifier,
-            updatedAt: String(node.updatedAt ?? ''),
-          });
+            continue;
+          if (typeof node?.identifier === 'string') {
+            found.push({
+              identifier: node.identifier,
+              updatedAt: String(node.updatedAt ?? ''),
+              stateName: String(node.state?.name ?? ''),
+            });
+          }
         }
+        if (data.issues?.pageInfo?.hasNextPage !== true) break;
+        after = data.issues.pageInfo.endCursor;
       }
-      if (data.issues?.pageInfo?.hasNextPage !== true) break;
-      after = data.issues.pageInfo.endCursor;
+    } catch (error) {
+      const flagged = /** @type {{ rateLimited?: boolean }} */ (error);
+      if (!flagged.rateLimited) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      log(`Lifecycle sweep listing deferred: ${message}`);
+      return {
+        action: 'deferred',
+        comment: '',
+        identifier: ref.identifier,
+        results: [],
+        deferred: 0,
+        deferralKind: 'linear',
+      };
     }
-    // Least recently touched first. A persisted cursor rotates the list so a
-    // rate limit resumes at the issue that did not finish, instead of
-    // re-reading the same prefix until the quota is gone again.
-    found.sort(
-      (left, right) =>
-        (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
-    );
-    const ordered = found.map(entry => entry.identifier);
+    // Lifecycle tier first so a partial limit cannot starve it (41157880216).
     const cursor = readSweepCursor(env.LINEAR_SYNC_CURSOR_DIR);
-    const start = cursor?.nextIdentifier
-      ? ordered.indexOf(cursor.nextIdentifier)
-      : -1;
-    lookups.push(...(start > 0 ? ordered.slice(start) : ordered));
+    lookups.push(...orderSweepLookups(found, cursor?.nextIdentifier ?? ''));
   } else {
     lookups.push(ref.issueId || ref.identifier);
+  }
+
+  // Full sweeps pay for one closed-pull snapshot; merge and receipt wakes do not.
+  let closedPulls;
+  if (sweep && !receiptIssue && lookups.length > 0) {
+    try {
+      closedPulls = await readClosedPullSnapshot({
+        fetchImpl,
+        token,
+        repository,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (error);
+      if (flagged.rateLimited) {
+        // Same rationale as the open scan: the quota is already spent, so
+        // evaluating issues would 403 the first linked pull and mislabel it.
+        // Leave the cursor where it is and defer visibly.
+        if (isInstallationQuota403(message)) {
+          log(installationQuotaLog('Linear Sync'));
+        }
+        log(`Closed pull request snapshot deferred: ${message}`);
+        return {
+          action: 'deferred',
+          comment: '',
+          identifier: ref.identifier,
+          results: [],
+          deferred: 0,
+        };
+      }
+      if (flagged.forbidden) {
+        throw new Error(
+          `Closed pull request snapshot refused (${message}). This is a token permission gap; permissions and tokens were not changed.`
+        );
+      }
+      log(
+        `Closed pull request snapshot failed: ${message}; falling back to per-pull reads`
+      );
+      closedPulls = undefined;
+    }
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
@@ -1576,6 +1681,7 @@ async function runSync(options) {
             assuranceMatrix,
             allowlist: options.allowlist,
             eventPull,
+            closedPulls,
             dryRun: env.LIFECYCLE_DRY_RUN === '1',
             issue,
             log,
@@ -1638,6 +1744,7 @@ async function runSync(options) {
     identifier: first?.identifier ?? ref.identifier,
     results,
     deferred: deferredNote ? Number(deferredNote.split(' ')[0]) || 0 : 0,
+    ...(deferredDetail.startsWith('Linear') ? { deferralKind: 'linear' } : {}),
   };
 }
 
@@ -1697,6 +1804,60 @@ export async function recordValidationReceipt(args, options = {}) {
   return body;
 }
 
+/**
+ * Make a quota deferral visible: step output for the workflow's hold-and-retry
+ * and a summary line. Exit stays 0 (the 403 is not a verdict on any issue).
+ * @param {{ softFailed: boolean }} disposition
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function reportQuotaDeferral(disposition, env = process.env) {
+  if (!disposition?.softFailed) return false;
+  try {
+    if (env.GITHUB_OUTPUT)
+      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        '- Linear sync DEFERRED: GitHub installation quota 403; no lifecycle evaluation completed.\n'
+      );
+  } catch {
+    // Visibility must never turn a deferral into a crash.
+  }
+  return true;
+}
+
+/**
+ * A resolved deferral must set quota_deferred (exit stays 0). Without the
+ * flag the hold skipped and the run went green unfinished (41157880216).
+ * deferral_kind=linear skips that GitHub hold (43041615689).
+ *
+ * @param {{ action?: string, deferred?: number, deferralKind?: string } | null | undefined} result
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function reportSweepDeferral(result, env = process.env) {
+  if (!result || result.action !== 'deferred') return false;
+  const detail =
+    result.deferred && result.deferred > 0
+      ? `${result.deferred} issue(s) deferred to the next sweep by the rate limit; the retry resumes from the cursor`
+      : 'the rate limit stopped the sweep before any lifecycle evaluation';
+  try {
+    if (env.GITHUB_OUTPUT) {
+      const kind = result.deferralKind
+        ? `deferral_kind=${result.deferralKind}\n`
+        : '';
+      appendFileSync(env.GITHUB_OUTPUT, `quota_deferred=true\n${kind}`);
+    }
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `- Linear sync DEFERRED: ${detail}.\n`
+      );
+  } catch {
+    // Visibility must never turn a deferral into a crash.
+  }
+  return true;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
@@ -1705,11 +1866,15 @@ if (isDirectRun) {
   const run =
     command === 'receipt'
       ? recordValidationReceipt(rest).then(body => console.log(body))
-      : syncLinearIssueOnMerge();
+      : syncLinearIssueOnMerge().then(result => {
+          reportSweepDeferral(result);
+          return result;
+        });
   run
     .catch(error => {
       const disposition = failureDisposition('Linear Sync', error);
       console.error(disposition.log);
+      reportQuotaDeferral(disposition);
       if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {

@@ -1,0 +1,141 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  readCached: vi.fn(),
+  settings: vi.fn(),
+  learnings: vi.fn(),
+  bugReports: vi.fn(),
+}));
+
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  readCachedAcquisitionEligibility: mocks.readCached,
+}));
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: () => ({ from: () => ({ where: mocks.bugReports }) }),
+  },
+}));
+vi.mock('@/lib/waitlist/settings', () => ({
+  getWaitlistSettings: mocks.settings,
+}));
+vi.mock('@/lib/waitlist/cohort-learnings', () => ({
+  countOpenCohortLearnings: mocks.learnings,
+  MAX_OPEN_COHORT_LEARNINGS: 3,
+}));
+
+import {
+  decideGoldenPathAdmissionForArtist,
+  readGoldenPathTurnContext,
+  resetGoldenPathAdmissionCaches,
+} from '@/lib/waitlist/golden-path-admission.server';
+
+const artist = { spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm', reach: 3_200 };
+const green = { eligible: true, verdict: 'ELIGIBLE' };
+const roomy = {
+  autoAcceptEnabled: true,
+  autoAcceptDailyLimit: 10,
+  autoAcceptedToday: 2,
+};
+
+describe('golden-path admission server reads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetGoldenPathAdmissionCaches();
+    mocks.readCached.mockResolvedValue(green);
+    mocks.settings.mockResolvedValue(roomy);
+    mocks.learnings.mockResolvedValue(0);
+    mocks.bugReports.mockResolvedValue([{ open: 0 }]);
+  });
+
+  it('admits a resolved artist when green, with capacity and an open throttle', async () => {
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: true,
+      reason: 'admit_resolved_artist',
+    });
+  });
+
+  it('never triggers the heavy eligibility recompute: a cache miss holds', async () => {
+    mocks.readCached.mockResolvedValue(null);
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_golden_path_not_green',
+    });
+  });
+
+  it('does not trust a cached report that is not eligible even if it says ELIGIBLE', async () => {
+    mocks.readCached.mockResolvedValue({
+      eligible: false,
+      verdict: 'ELIGIBLE',
+    });
+    expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(
+      false
+    );
+  });
+
+  it('pauses admission while open bug reports pile up (support load)', async () => {
+    mocks.bugReports.mockResolvedValue([{ open: 10 }]);
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_support_load',
+    });
+  });
+
+  it('halves the daily budget under moderate support load', async () => {
+    mocks.bugReports.mockResolvedValue([{ open: 4 }]);
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 5 });
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_capacity_full',
+    });
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 4 });
+    expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(true);
+  });
+
+  it('narrows, not opens, when the support load cannot be read', async () => {
+    mocks.bugReports.mockRejectedValue(new Error('db down'));
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 5 });
+    expect((await decideGoldenPathAdmissionForArtist(artist)).reason).toBe(
+      'hold_capacity_full'
+    );
+  });
+
+  it.each([
+    [{ ...roomy, autoAcceptEnabled: false }, 'hold_auto_accept_disabled'],
+    [{ ...roomy, autoAcceptedToday: 10 }, 'hold_capacity_full'],
+  ])('holds with the exact capacity reason', async (settings, reason) => {
+    mocks.settings.mockResolvedValue(settings);
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason,
+    });
+  });
+
+  it('holds when the cohort-learnings throttle is closed or unreadable', async () => {
+    mocks.learnings.mockResolvedValue(3);
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_open_learnings',
+    });
+    resetGoldenPathAdmissionCaches();
+    mocks.learnings.mockResolvedValue(null);
+    expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(
+      false
+    );
+  });
+
+  it('fails closed when settings cannot be read', async () => {
+    mocks.settings.mockRejectedValue(new Error('db down'));
+    const context = await readGoldenPathTurnContext();
+    expect(context.holdReason).toBe('hold_capacity_full');
+  });
+
+  it('reads the throttle once per minute, not once per turn', async () => {
+    await readGoldenPathTurnContext();
+    await readGoldenPathTurnContext();
+    expect(mocks.learnings).toHaveBeenCalledTimes(1);
+  });
+});

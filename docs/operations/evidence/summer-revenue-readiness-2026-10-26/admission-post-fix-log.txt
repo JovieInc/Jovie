@@ -1,0 +1,22 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+JSON report written to /tmp/jovie-readiness-evidence/admission-final.json
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|---------------------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|---------------------------------
+All files          |    93.3 |    87.77 |   86.11 |   93.54 |
+ access-request.ts |   95.12 |     89.2 |   88.23 |   95.83 | 120,407,647,738,768
+ auto-accept.ts    |   88.31 |    81.66 |      80 |   87.67 | 113-119,138,252,275,301,311-312
+ qualification.ts  |     100 |    93.33 |     100 |     100 | 50-56
+-------------------|---------|----------|---------|---------|---------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 93.3% ( 209/224 )
+Branches     : 87.77% ( 201/229 )
+Functions    : 86.11% ( 31/36 )
+Lines        : 93.54% ( 203/217 )
+================================================================================

@@ -8,9 +8,14 @@ import {
   resolveLauncherDestination,
 } from '@/lib/hud/ovie-launchers';
 
+const macApp = vi.hoisted(() => ({ value: false }));
+const pushMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   launchOperatorControl: vi.fn().mockResolvedValue({ ok: true }),
+  useIsElectronRuntime: () => macApp.value,
 }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushMock }) }));
 
 const READY = Object.fromEntries(
   OVIE_LAUNCHER_CATALOG.filter(item => !item.agentCliOnly).map(item => [
@@ -28,7 +33,7 @@ const INVENTORY = rankLaunchers({
   ),
   state: {
     timActionCount: 0,
-    availability: { ...READY, symphony: 'unavailable' },
+    availability: { ...READY, gmail: 'unavailable' },
   },
 });
 
@@ -61,7 +66,39 @@ describe('OvieLauncherRail', () => {
     ).toBeInTheDocument();
   });
 
-  it('separates local/SSH from web, disables unavailable, and hides agent CLI', async () => {
+  it('web door never renders launchers it cannot reach and links Fleet in-app', async () => {
+    macApp.value = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
+    );
+    render(<OvieLauncherRail />);
+    await waitFor(() => {
+      expect(screen.getByTestId('ovie-launcher-fleet')).toBeEnabled();
+    });
+    expect(
+      screen.queryByTestId('ovie-launcher-gbrain')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('ovie-launcher-hermes')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('ovie-launcher-symphony')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('ovie-launcher-gmail')).toBeDisabled();
+    expect(
+      screen.queryByTestId('ovie-launcher-hermes-cli-worker')
+    ).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('ovie-launcher-fleet'));
+    expect(pushMock).toHaveBeenCalledWith('/app/ov/operations');
+    await user.click(screen.getByText('All tools'));
+    await user.type(screen.getByTestId('ovie-launcher-search'), 'gbrain');
+    expect(screen.getByText('No tools match that search.')).toBeInTheDocument();
+  });
+
+  it('Mac app shows local launchers as Local, enabled without server preflight', async () => {
+    macApp.value = true;
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
@@ -70,31 +107,18 @@ describe('OvieLauncherRail', () => {
     await waitFor(() => {
       expect(screen.getByTestId('ovie-launcher-gbrain')).toBeEnabled();
     });
+    expect(screen.getByTestId('ovie-launcher-hermes')).toBeEnabled();
     expect(
       screen.getByTestId('ovie-launcher-group-internal')
     ).toBeInTheDocument();
     expect(
       screen.getByTestId('ovie-launcher-group-external')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('ovie-launcher-symphony')).toBeDisabled();
-    expect(
-      screen.queryByTestId('ovie-launcher-hermes-cli-worker')
-    ).not.toBeInTheDocument();
-    const user = userEvent.setup();
-    await user.click(screen.getByText('All tools'));
-    await user.type(screen.getByTestId('ovie-launcher-search'), 'symphony');
-    expect(screen.getByTestId('ovie-launcher-all-symphony')).toHaveTextContent(
-      'ssh gem'
-    );
-    expect(screen.getByTestId('ovie-launcher-all-symphony')).toHaveTextContent(
-      'Preflight did not reach'
-    );
-    expect(
-      screen.queryByTestId('ovie-launcher-all-gmail')
-    ).not.toBeInTheDocument();
+    macApp.value = false;
   });
 
   it('names launcher buttons from their visible content (WCAG 2.5.3)', async () => {
+    macApp.value = true;
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
@@ -107,16 +131,16 @@ describe('OvieLauncherRail', () => {
     // The accessible name must contain the visible text: label and status
     // are both visible spans, so the content is the name (same convention
     // as the compact rail). No overriding aria-label on the buttons.
-    // Join-agnostic: the name comes from adjacent label + status spans,
-    // so accept either "Symphony Unavailable" or "SymphonyUnavailable".
     for (const [id, name] of [
-      ['symphony', /symphony\s*unavailable/i],
-      ['gbrain', /gbrain\s*ready/i],
+      ['gmail', /gmail\s*unavailable/i],
+      ['gbrain', /gbrain\s*local/i],
+      ['fleet', /fleet\s*ready/i],
     ] as const) {
       const button = screen.getByTestId(`ovie-launcher-${id}`);
       expect(button).not.toHaveAttribute('aria-label');
       expect(button).toHaveAccessibleName(name);
     }
+    macApp.value = false;
   });
 
   it('compact renders only ready primary destinations and no chrome', async () => {
@@ -127,7 +151,7 @@ describe('OvieLauncherRail', () => {
     render(<OvieLauncherRail compact />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('ovie-launcher-gbrain')).toBeEnabled();
+      expect(screen.getByTestId('ovie-launcher-fleet')).toBeEnabled();
     });
     expect(screen.queryByText('All tools')).not.toBeInTheDocument();
     expect(
@@ -182,5 +206,26 @@ describe('OvieLauncherRail loading geometry', () => {
       await screen.findByTestId('ovie-launcher-group-internal')
     ).toBeInTheDocument();
     expect(screen.queryByTestId('ovie-launcher-skeleton')).toBeNull();
+  });
+
+  it('keeps the reserved geometry when the lock status replaces the skeleton', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText(
+        'Admin data is locked. Unlock with Touch ID, then retry.'
+      )
+    ).toBeInTheDocument();
+    // The 403 swap must not collapse the reserved slot geometry: the
+    // skeleton stays mounted as invisible quiet structure under the status
+    // overlay, so the lock swap cannot shift the HUD below the rail
+    // (JOV-12518 CLS on /hud?fs=1).
+    const skeleton = screen.getByTestId('ovie-launcher-skeleton');
+    expect(skeleton.parentElement).toHaveClass('invisible');
   });
 });

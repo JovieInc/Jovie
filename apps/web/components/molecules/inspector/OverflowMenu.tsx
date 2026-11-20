@@ -42,8 +42,10 @@ export function OverflowMenu({
 }: OverflowMenuProps) {
   const visibleItems = items.filter(Boolean);
 
+  // Non-modal: a modal menu layer aria-hides the surrounding inspector
+  // content while it holds focusable elements (aria-hidden-focus).
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <IconButton
           type='button'
@@ -53,10 +55,7 @@ export function OverflowMenu({
           disabled={disabled || visibleItems.length === 0}
           data-testid={testId}
           data-disclosure-level='l4'
-          className={cn(
-            'text-tertiary-token hover:text-primary-token',
-            className
-          )}
+          className={cn(className)}
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
         </IconButton>

@@ -35,6 +35,22 @@ the only workflow that puts PRs into the merge queue. It admits an
 already-green head and skips drafts. That event does not start another source
 CI flight.
 
+A draft reaches ready on its own (Auto-Ready green-source) when its exact head
+is CLEAN with PR Ready and required checks SUCCESS, and its body carries either
+a complete writer-proof receipt or comes from a trusted writer, who ships on
+green by default (`pnpm pr:open` also writes `<!-- jovie-auto-ready: on-green -->`).
+To keep a WIP draft parked, pass `--park`: it writes
+`<!-- jovie-auto-ready: park -->`, and a refreshed body keeps it until
+`--on-green` replaces it. Holds, parks and controlled-proof markers still win.
+
+A draft that must wait on a designated outside review — or must not be readied
+at all — pins itself deterministically (JOV-13139): the writer or an agent adds
+the `needs-outside-review` (or `do-not-ready`) label, or writes the park
+marker; prose like "stays DRAFT" in the body is not machine-readable and never
+holds the flip. Both undraft controllers also refuse the flip while GitHub's
+`reviewDecision` is `CHANGES_REQUESTED` (an unresolved must-fix review); an
+approving review or a re-read clears it without a label.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
@@ -156,8 +172,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   every admitted environment is recorded with the
   `jovie-preview-env-admission/v1` contract and torn down with a
   `jovie-preview-env-cleanup/v1` receipt (PR close →
-  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; Neon
-  branch TTLs and on-limit cleanup cover missed events). External Vercel
+  `vercel-preview-cleanup.yml`; Neon branches expire on their own TTL and
+  branch creation cleans up when the project nears its limit). External Vercel
   preview status remains informational — see
   [`release.md`](../.claude/rules/release.md).
 
@@ -167,6 +183,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   GitHub enforces required checks, queue admission, merge-group checks, and the
   final merge. Do not use a direct merge or the retired `merge-queue` label.
   The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
+- **Bot review threads never hold a green PR.** Resolve bot review comments
+  yourself after you fix or answer them (`sentry[bot]` Seer, `coderabbitai[bot]`
+  and similar); leave human comments for their author. Auto-Ready Agent Drafts
+  resolves bot threads still open once PR Ready is green on the head
+  ([release rule](../.claude/rules/release.md#resolve-bot-threads-yourself-founder-rule-2026-11-11)).
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -183,8 +204,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 to ten green entries per merge push (`max_entries_to_merge=10`). Each entry
 still builds its own synthetic head on the entry ahead, and the changed-path
 classifier selects the Web, Mac, iOS, operations/tooling, and shared-contract
-lanes per member. The checked-in `max_entries_to_build=10` matches live (synced
-2026-10-21, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
+lanes per member. The checked-in `max_entries_to_build=4` matches live (synced
+2026-10-31, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
 count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
@@ -192,10 +213,10 @@ CI paths configured for 30 and 40 minutes. The source-first repair landed and
 live ruleset `10512119` was read back at 60 minutes on 2026-09-24. On
 2026-10-21 (Tim-approved) it went back to 20 minutes: merge-group runs now
 finish well inside it (3 of 287 exceeded 20 minutes in the first 12 hours, no
-timeout removals). Watch iOS and Mac selecting groups for timeouts. Re-read the
+timeout removals); live is 30 minutes as of 2026-10-29. Watch iOS and Mac selecting groups for timeouts. Re-read the
 live ruleset before changing capacity and retain exact queue attempts and
 removal reasons as outcome evidence. This changes waiting time, not required
-checks or ALLGREEN.
+checks or the HEADGREEN grouping (ALLGREEN until 2026-10-29).
 
 Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
@@ -342,7 +363,7 @@ each plane as separate evidence, never as a reason to repeat the mutation.
 | GitHub native queue and exact-head merge-group checks | Landing without current combined-head proof |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
-| gate-weakening detector (JOV-INV-045) | PRs that loosen required checks, shrink-only baselines, budgets, or blocking CI without `gate-change:` plus the `codeowners-approved` label |
+| gate-weakening detector (JOV-INV-045) | PRs that loosen required checks, shrink-only baselines, budgets, or blocking CI without `gate-change:` plus the `codeowners-approved` audit label (agent-applied after LLM review; no human approval) |
 
 ### Runner label policy
 
@@ -383,13 +404,13 @@ existed. Contract:
 
 1. Publish the first coherent commit as a draft.
    `JOVIE_PUSH_PHASE=publication git push` is the default husky path (diff,
-   secrets, hook policy only).
+   scoped Biome, secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   current merge-queue check budget (20 minutes since the 2026-10-21 tuning).
+   current merge-queue check budget (30 minutes, live readback 2026-10-29).
    Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
@@ -483,3 +504,28 @@ Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),
 [`ci-branching.md`](../.claude/rules/ci-branching.md),
 [`release.md`](../.claude/rules/release.md),
 [`docs/company/autonomous-shipping-doctrine.md`](company/autonomous-shipping-doctrine.md).
+
+## Local AI review (Sentry Warden)
+
+AI code review runs LOCALLY through Sentry Warden (`warden.toml`), never as a
+remote gate. The husky hooks run it for you:
+`warden --staged` on pre-commit (staged diff), `warden` on pre-push (branch vs
+`main`), via `scripts/hooks/warden-local-review.sh` (advisory rung
+`warden-local-review` in the gate ladder). A missing `warden` CLI or model
+credentials only warns — commits and pushes proceed, and Warden must never be
+wired as a status check, branch-protection rule, or merge gate (no
+`.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW` switches
+behavior: `off` skips, `warn` (default) reports findings and proceeds, `strict`
+fails the hook on a non-zero Warden exit.
+
+One-time local setup (not committed):
+
+```sh
+pnpm add -g @sentry/warden
+export WARDEN_MODEL=openai/gpt-5.5        # or anthropic/claude-sonnet-4-6
+export WARDEN_OPENAI_API_KEY=sk-...       # or WARDEN_ANTHROPIC_API_KEY=...
+warden                                    # review the current branch
+```
+
+Without a provider key, Warden falls back to local Claude Code auth when
+available. Never commit keys.

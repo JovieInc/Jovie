@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,6 +72,24 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('renders multi-artist credits through the canonical conjunction formatter', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-credits',
+          title: 'Neon Hearts',
+          artistNames: ['Vigel', 'Tim White'],
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: the release row never joins artist names
+    // locally — "Vigel and Tim White", matching the release drawer.
+    expect(screen.getByText('Vigel and Tim White')).toBeInTheDocument();
+  });
+
   it('opens the smart link without prefetching or selecting the row', async () => {
     const onSelect = vi.fn();
     render(
@@ -160,13 +178,13 @@ describe('ShellReleaseRow audio affordance', () => {
       />
     );
 
-    expect(screen.getByText('Lost in the Light').className).toContain(
-      'font-caption'
-    );
-    expect(screen.getByText('Lost in the Light').className).toContain(
-      'leading-[1.2]'
-    );
-    expect(screen.getByText('Bahamas').className).toContain('text-2xs');
+    // text-overflow needs a block box: the ellipsis lives on the inner span,
+    // never on the inline-flex link, and the artist line gives way first.
+    const title = screen.getByText('Lost in the Light');
+    expect(title).toHaveClass('truncate', 'min-w-0');
+    expect(title).not.toHaveClass('inline-flex');
+    expect(title.parentElement).toHaveClass('font-caption', 'leading-[1.2]');
+    expect(screen.getByText('Bahamas')).toHaveClass('text-2xs', 'shrink-9999');
   });
 
   it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
@@ -184,7 +202,7 @@ describe('ShellReleaseRow audio affordance', () => {
 
     // The h-8 dense row renders the title as the EntityHoverLink button;
     // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
-    expect(screen.getByText('Lost in the Light').className).toContain(
+    expect(screen.getByText('Lost in the Light').parentElement).toHaveClass(
       'min-h-6'
     );
   });
@@ -364,6 +382,62 @@ describe('ShellReleaseRow audio affordance', () => {
       expect.objectContaining({ hasLyrics: false })
     );
   });
+});
+
+describe('ShellReleaseRow DSP interaction', () => {
+  it.each(['pointer', 'Enter', 'Space'] as const)(
+    'keeps %s activation on the DSP trigger separate from row selection',
+    async activation => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      render(
+        <ul>
+          <ShellReleaseRow
+            release={fakeRelease({
+              id: 'r-dsp',
+              title: 'Distribution Details',
+            })}
+            isSelected={false}
+            onSelect={onSelect}
+          />
+        </ul>
+      );
+
+      const trigger = screen.getByRole('button', {
+        name: /^View DSP Distribution Details/i,
+      });
+      const row = screen.getByRole('listitem', {
+        name: 'Distribution Details',
+      });
+      const key = activation === 'Enter' ? '{Enter}' : ' ';
+
+      if (activation === 'pointer') {
+        await user.click(trigger);
+      } else {
+        act(() => trigger.focus());
+        await user.keyboard(key);
+      }
+
+      const details = screen.getByRole('dialog', {
+        name: 'DSP Distribution Details',
+      });
+      expect(details).toHaveFocus();
+      expect(onSelect).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText('Spotify'));
+      act(() => details.focus());
+      await user.keyboard('{Enter} ');
+      expect(onSelect).not.toHaveBeenCalled();
+
+      if (activation === 'pointer') {
+        await user.click(row);
+      } else {
+        act(() => row.focus());
+        await user.keyboard(key);
+      }
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 
 describe('ShellReleaseRow enrichment', () => {

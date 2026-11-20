@@ -26,9 +26,46 @@ Summer acts on it, and Tim can still give post-ship feedback.
 | `defaultDecision` | `approve` \| `reject`, optional | What the deadline records. Omitted: `reject` (no action). |
 | `defaultIfSilent` | string ≤ 300 | Required when `defaultDecision` is set. Says what ships. |
 
+| `facts` | string[], ≤ 3 items, each ≤ 100 chars, optional | The facts the decision turns on. The card face shows these, not `body`. |
+
 Validation: `spend` and `outbound` cards are refused with `defaultDecision: approve`.
 Cards that omit both new fields keep their payload digest, so replays filed
 before the contract still match.
+
+## Card copy contract (`jovie.decision-card-copy/v1`)
+
+Tim decides a card in seconds. The Ovie card shows, in order: the decision
+(`title`), what the deadline records and when (rendered from `defaultDecision`
+and `decideBy`), up to three `facts` with evidence links, then Approve, Reject
+and Discuss (opens a Summer conversation). `body` is the writer's brief for
+Summer and the conversation; it never reaches the card face. Cards filed
+without `facts` show the `recommendation` in their place.
+
+Write it so:
+
+- `title` states the decision in ≤ 80 characters: "Price Artist Presence at
+  $19/mo", not "Should we…?" and not "Taste JOV-1 @ abc:" prefixes.
+- `facts` are the 1-3 things that decide it, one line each. Numbers beat
+  adjectives. No restating the title.
+- `defaultIfSilent` says what ships in ≤ 120 characters and must agree with
+  `defaultDecision`. An omitted `defaultDecision` records `reject`, so "Ship…"
+  or "Apply…" text needs `defaultDecision: "approve"`. Put the deadline in
+  `decideBy`; the card renders it relatively ("Approves in 31h").
+- No emoji, no assistant filler ("Here's what I found", "I think", "let me
+  know", "please review"), no hedges ("perhaps", "potentially", "might want to").
+
+Enforcement: `POST /api/internal/ovie/summer-cards` runs
+`lintDecisionCardCopy` (`apps/web/lib/ovie/decision-card-copy.ts`) on `title`,
+`recommendation`, `defaultIfSilent` and `facts`. Errors (emoji, filler, hedge,
+default contradiction, more than three facts, a fact over 100 characters)
+return 422 `card_copy_lint` with `violations`; fix and refile. Warnings (long
+lines, question titles, label prefixes, absolute deadlines) are filed and
+returned as `copyWarnings` on the receipt.
+
+Baseline (2026-10-29, all 235 stored cards): 8 cards (3.4%) carried a default
+contradiction that would now be refused, including the live pricing card
+`sc_ef84c09c` and privacy/terms card `sc_ef46924c` (text says ship, deadline
+records reject); 121 more had warnings only. Emoji, filler and hedges: 0.
 
 ## Stored and returned card (Jovie → Summer, Ovie)
 

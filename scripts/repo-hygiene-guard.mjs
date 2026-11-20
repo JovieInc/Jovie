@@ -11,7 +11,12 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
-import { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
+import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
+import {
+  GEN_JSON_SIZE_ALLOWLIST,
+  HYGIENE_LIMITS,
+  MAX_GEN_JSON_BYTES,
+} from './lib/repo-hygiene-limits.mjs';
 
 export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
@@ -78,7 +83,7 @@ const BINARY_ALLOWLIST = [
   /^apps\/web\/public\//,
   /^apps\/web\/screenshot-catalog\/current\//,
   /^apps\/web\/tests\/(?:[^/]+\/)*__snapshots__\//,
-  /^docs\/screenshots\//,
+  /^docs\/(?:pen-stills|screenshots)\//,
 ];
 
 const FORBIDDEN_ROOT_DIRECTORIES = new Set([
@@ -616,6 +621,7 @@ export function evaluateRepoHygiene({
   const errors = [
     ...validateRepoHealthBaseline(baseline),
     ...validateRepoHealthRollout(rollout),
+    ...findOrphanReviewImages({ root, trackedPaths }),
   ];
   const candidateFindings = [];
   const added = [...new Set(addedPaths.map(normalizePath))];
@@ -641,6 +647,7 @@ export function evaluateRepoHygiene({
         if (!baseRef) return '';
         try {
           return execFileSync('git', ['show', `${baseRef}:${path}`], {
+            maxBuffer: 256 * 1024 * 1024,
             cwd: root,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'ignore'],
@@ -785,6 +792,14 @@ export function evaluateRepoHygiene({
     }
     if (!stats.isFile()) continue;
     trackedFilesTotal += 1;
+    if (
+      /\.gen\.json$/.test(path) &&
+      stats.size > MAX_GEN_JSON_BYTES &&
+      !GEN_JSON_SIZE_ALLOWLIST.includes(path)
+    )
+      errors.push(
+        `${path}: generated .gen.json is ${formatBytes(stats.size)} (over ${formatBytes(MAX_GEN_JSON_BYTES)}); shrink or untrack it, or allowlist it in GEN_JSON_SIZE_ALLOWLIST`
+      );
     if (!TRACKED_FILE_COUNT_EXCLUSIONS.some(pattern => pattern.test(path)))
       trackedFiles += 1;
     trackedBytes += stats.size;
@@ -938,11 +953,7 @@ export function collectGitPaths(args) {
     // conflict resolutions). Drop paths identical to MERGE_HEAD.
     let mergeHeadOids = null;
     try {
-      const mergeHead = execFileSync(
-        'git',
-        ['rev-parse', '--verify', '-q', 'MERGE_HEAD'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
-      ).trim();
+      const mergeHead = gitPathsRevParse('MERGE_HEAD');
       if (mergeHead) {
         mergeHeadOids = new Map();
         for (const record of gitPaths(['ls-tree', '-r', '-z', mergeHead])) {
@@ -1001,6 +1012,7 @@ function previousBaseline(args) {
   try {
     return JSON.parse(
       execFileSync('git', ['show', `${ref}:${REPO_HEALTH_BASELINE_PATH}`], {
+        maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       })
@@ -1104,7 +1116,7 @@ function main() {
   if (result.errors.length === 0) {
     const growth = `${result.netTrackedFiles >= 0 ? '+' : ''}${result.netTrackedFiles}`;
     console.log(
-      `[repo-hygiene] clean (${result.changedFiles} changed files, ${formatBytes(result.changedBytes)}, net ${growth} regular; ${result.trackedFilesTotal} tracked regular files, ${formatBytes(result.trackedBytes)}, ${formatBytes(result.trackedBinaryBytes)} binary; ${result.snapshotFiles} visual baselines, ${formatBytes(result.snapshotBytes)})`
+      `[repo-hygiene] clean (${result.changedFiles} changed files, ${formatBytes(result.changedBytes)}, net ${growth} regular; ${result.trackedFilesTotal} tracked regular files, ${formatBytes(result.trackedBytes)} of ${formatBytes(HYGIENE_LIMITS.maxTrackedBytes)}, ${formatBytes(HYGIENE_LIMITS.maxTrackedBytes - result.trackedBytes)} headroom, ${formatBytes(result.trackedBinaryBytes)} binary; ${result.snapshotFiles} visual baselines, ${formatBytes(result.snapshotBytes)})`
     );
     return;
   }

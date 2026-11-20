@@ -51,6 +51,8 @@ export interface OvieInboxCase extends InteractionCase {
   /** Present on no-default cards; Home badges and ranks levels 1 and 2 first. */
   readonly escalation?: InboxEscalation | null;
   readonly body: string;
+  /** The 1-3 facts the decision turns on (`jovie.decision-card-copy/v1`). */
+  readonly facts?: readonly string[];
   /** One-click answers offered by the asker (Linear `Options:` line). */
   readonly answers?: readonly string[];
   readonly certification?: {
@@ -109,6 +111,27 @@ function summerCardDefault(card: SummerCard): InboxDecisionDefault | null {
   };
 }
 
+const usd = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 2,
+});
+
+/**
+ * The card face: money and audience first, then the filed facts. Cards filed
+ * before the copy contract show the recommendation; never the brief.
+ */
+export function summerCardFacts(
+  card: Pick<SummerCard, 'amountUsd' | 'recipient' | 'facts' | 'recommendation'>
+): readonly string[] {
+  const stakes = [
+    card.amountUsd !== null ? `Spend: ${usd.format(card.amountUsd)}` : null,
+    card.recipient ? `To: ${card.recipient}` : null,
+  ].filter((fact): fact is string => fact !== null);
+  const filed = card.facts?.length ? card.facts : [card.recommendation];
+  return [...stakes, ...filed].slice(0, 3);
+}
+
 /** Source IDs and decision tokens remain owned by their existing domain stores. */
 export function projectOvieInbox(
   proposals: readonly DesignProposal[],
@@ -160,6 +183,7 @@ export function projectOvieInbox(
         .filter(Boolean)
         .join('\n\n'),
       recommendation: card.recommendation,
+      facts: summerCardFacts(card),
       // An escalated no-default card ranks above everything else.
       priority: escalationOf(card)?.level
         ? 0
@@ -310,7 +334,14 @@ export function inboxDecisionRequest(
   notes: string,
   actionId: string
 ) {
-  if (decision !== 'approve' && !notes.trim())
+  // Swipe-binary decisions (Tim, Ovie inbox model): rejecting a Summer card,
+  // design proposal or visual change needs no typed reason; Discuss carries
+  // opinions. Certification still records why evidence was refused.
+  if (
+    decision !== 'approve' &&
+    target.kind === 'certification' &&
+    !notes.trim()
+  )
     throw new Error('Add a reason or requested changes.');
   switch (target.kind) {
     case 'linear':

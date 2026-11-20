@@ -33,6 +33,8 @@ const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
  * - skipped-in-merge-group: the script returns before any API read.
  * - owned: REST reads owned by another lane, budgeted separately.
  * - on-rebuild: spends calls only when a superseded run exists.
+ * - on-download-failure: release asset reads only after an anonymous
+ *   pinned download fails (scripts/lib/github-release-asset.sh).
  * @type {Record<string, { kind: string, greenGroupCalls: number }>}
  */
 const LEDGER = {
@@ -54,6 +56,14 @@ const LEDGER = {
   'ci-merge-group-supersede/Cancel older runs of the same queued PR': {
     // Lists runs with the Jovie Bot token; one cancel per superseded run.
     kind: 'on-rebuild',
+    greenGroupCalls: 0,
+  },
+  'ci-secret-scan/Run secret scan': {
+    kind: 'on-download-failure',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining/Run actionlint': {
+    kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
   'ci-fast-remaining/Start base-branch history fetch': {
@@ -96,6 +106,18 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
+  'ci-fast-structural-lanes/Start base-branch history fetch': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-lanes/Decide structural lane': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-lanes/Run lanes coverage pytest': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
   'neon-db/Verify shared Neon branch admission before publish': {
     kind: 'path-gated',
     greenGroupCalls: 0,
@@ -116,6 +138,12 @@ const LEDGER = {
     kind: 'skipped-in-merge-group',
     greenGroupCalls: 0,
   },
+  // ci-slop-guard runs on pull_request only (job-level if), so a merge group never pays for it.
+  'ci-slop-guard/JovieInc/ci/actions/slop-guard@dc568f8b92fd8b3681e2f3c56b39a9bda5700d0d':
+    {
+      kind: 'off',
+      greenGroupCalls: 0,
+    },
   'ci-golden-path/Certify canonical outbound artist journey': {
     kind: 'off',
     greenGroupCalls: 0,
@@ -177,6 +205,10 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
     for (const { key, step } of tokenSteps()) {
       if (offGates[key]) expect(step.if, key).toContain(offGates[key]);
     }
+    expect(CI.jobs['ci-slop-guard'].if).toContain(
+      "github.event_name == 'pull_request'"
+    );
+    expect(CI.jobs['ci-slop-guard'].if).not.toContain("'merge_group'");
     expect(CI.jobs['ci-unit-runner-route'].if).toBe(
       "github.event_name == 'workflow_dispatch'"
     );

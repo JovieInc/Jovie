@@ -6,7 +6,11 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["media-ingest/**/*.ts"],
   "exclude": ["node_modules"]

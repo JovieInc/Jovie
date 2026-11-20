@@ -7,7 +7,19 @@ import {
   linksNavItem,
   presenceNavItem,
 } from './config';
-import { isNavigationItemActive } from './navigation-state';
+import {
+  getRailNavigation,
+  INBOX_NAVIGATION_ITEM_ID,
+  isNavigationItemActive,
+  isNavigationItemHighlighted,
+} from './navigation-state';
+
+describe('Inbox navigation identity', () => {
+  it('keeps the header bell and the retired rail row on the warm-probe id', () => {
+    expect(INBOX_NAVIGATION_ITEM_ID).toBe('home');
+    expect(INBOX_NAVIGATION_ITEM_ID).toBe(homeNavItem.id);
+  });
+});
 
 describe('isNavigationItemActive', () => {
   it('keeps Home scoped to the shell root', () => {
@@ -90,5 +102,33 @@ describe('isNavigationItemActive', () => {
         )
       ).toBe(true);
     }
+  });
+});
+
+describe('getRailNavigation', () => {
+  const items = [homeNavItem, presenceNavItem, libraryNavItem];
+
+  it('drops only the Inbox row when the header bell owns the inbox', () => {
+    expect(getRailNavigation(items, true)).toEqual([
+      presenceNavItem,
+      libraryNavItem,
+    ]);
+    expect(getRailNavigation(items, false)).toEqual(items);
+  });
+});
+
+describe('isNavigationItemHighlighted', () => {
+  it('paints the current page when nothing is pending', () => {
+    expect(isNavigationItemHighlighted('home', true, undefined)).toBe(true);
+    expect(isNavigationItemHighlighted('audience', false, undefined)).toBe(
+      false
+    );
+  });
+
+  it('moves the paint to the pending destination so one row is selected', () => {
+    expect(isNavigationItemHighlighted('home', true, 'audience')).toBe(false);
+    expect(isNavigationItemHighlighted('audience', false, 'audience')).toBe(
+      true
+    );
   });
 });

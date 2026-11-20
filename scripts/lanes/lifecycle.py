@@ -16,6 +16,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+import threading
 import time
 
 PROTOCOL = "jovie-lane-lifecycle/v1"
@@ -105,13 +106,81 @@ def active():
     return _active is not None
 
 
+# The dispatch tick sets this to its heartbeat file: every subprocess it starts proves it is alive and working,
+# so the watchdog tells a long tick from a hung one by progress, not by wall time (2026-10-26: a 30-minute tick
+# was restarted at the 22-minute grace on every cycle and never reached its doctor pass).
+HEARTBEAT = None
+HEARTBEAT_EVERY_S = 15.0
+_last_beat = 0.0
+
+
+def beat(now: float | None = None, force: bool = False) -> None:
+    global _last_beat
+    if HEARTBEAT is None:
+        return
+    now = time.time() if now is None else now
+    if not force and now - _last_beat < HEARTBEAT_EVERY_S:
+        return
+    _last_beat = now
+    try:
+        with open(HEARTBEAT, "a"):
+            os.utime(HEARTBEAT, (now, now))
+    except OSError:
+        pass  # liveness evidence is best effort; the tick itself never fails on it
+
+
+def _keepalive(timeout):
+    """Beat while one bounded child runs (a release self-test is minutes long). Bounded by the child's own
+    timeout, so a hung child still ends and the beat with it; an unbounded child gets no keepalive."""
+    if HEARTBEAT is None or timeout is None or timeout == float("inf"):
+        return lambda: None
+    stop = threading.Event()
+    def loop():
+        while not stop.wait(HEARTBEAT_EVERY_S):
+            beat(time.time(), force=True)
+    threading.Thread(target=loop, daemon=True).start()
+    return stop.set
+
+
+# Wall seconds and call counts per command label, for the tick-durations row: which command the tick spends its
+# time in (2026-10-26: a 25-60 minute tick, cause unmeasured).
+STATS: dict = {}
+
+
+def label_of(args) -> str:
+    try:
+        words = [Path(str(a)).name if i == 0 else str(a) for i, a in enumerate(args)][:3]
+    except (TypeError, ValueError):
+        return "?"
+    return " ".join(words)[:48]
+
+
 def run(args, **kwargs):
+    stop = _keepalive(kwargs.get("timeout"))
+    started = time.monotonic()
+    try:
+        return _run(args, **kwargs)
+    finally:
+        stop()
+        if HEARTBEAT is not None:
+            row = STATS.setdefault(label_of(args), [0, 0.0])
+            row[0] += 1
+            row[1] += time.monotonic() - started
+
+
+def top_stats(limit: int = 8) -> list:
+    return [[name, calls, round(seconds, 1)] for name, (calls, seconds) in
+            sorted(STATS.items(), key=lambda item: -item[1][1])[:limit]]
+
+
+def _run(args, **kwargs):
     """Retain ownership in a tracked helper across controller death.
 
     Preserve subprocess.run's stdin, stdout, stderr and exit/timeout contract.
     The helper reports a drained outcome on a dedicated pipe; a cleanup failure
     retains the shared lock and never produces an outcome eligible for retry.
     """
+    beat()
     if not active():
         return subprocess.run(args, **kwargs)
     timeout = kwargs.pop("timeout", None)

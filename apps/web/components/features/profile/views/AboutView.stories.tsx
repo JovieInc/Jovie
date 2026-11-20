@@ -17,6 +17,8 @@ const meta = {
   component: AboutView,
   parameters: {
     layout: 'fullscreen',
+    // Profile views render on the Noir stage; text tokens are white-on-dark.
+    themes: { themeOverride: 'dark' },
     jovie: {
       uncoveredProps: [
         'genres',

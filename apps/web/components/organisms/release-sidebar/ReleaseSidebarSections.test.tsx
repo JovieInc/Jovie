@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProviderKey } from '@/lib/discography/types';
 import { ReleaseEntityHeader } from './ReleaseSidebarSections';
@@ -201,6 +202,74 @@ describe('ReleaseSidebarSections', () => {
     expect(screen.getByText('Midnight Drive')).toBeTruthy();
   });
 
+  it('renders multi-artist credits through the canonical conjunction formatter', () => {
+    render(
+      <ReleaseEntityHeader
+        release={{ ...mockRelease, artistNames: ['Vigel', 'Tim White'] }}
+        artistName='Tim White'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    // One canonical credit line (ds-cert:credit-format): the drawer never
+    // joins artist names locally.
+    expect(screen.getByText('Vigel and Tim White')).toBeTruthy();
+  });
+
+  it('keeps every artist clickable when onArtistClick is provided', async () => {
+    const onArtistClick = vi.fn();
+    render(
+      <ReleaseEntityHeader
+        release={{ ...mockRelease, artistNames: ['Vigel', 'Cosmic Gate'] }}
+        artistName='Vigel'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+        onArtistClick={onArtistClick}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cosmic Gate' }));
+    expect(onArtistClick).toHaveBeenCalledWith('Cosmic Gate');
+  });
+
+  it('renders the fallback artist as the clickable credit when no artist names exist', async () => {
+    const onArtistClick = vi.fn();
+    render(
+      <ReleaseEntityHeader
+        release={{ ...mockRelease, artistNames: [] }}
+        artistName='Vigel'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+        onArtistClick={onArtistClick}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vigel' }));
+    expect(onArtistClick).toHaveBeenCalledWith('Vigel');
+  });
+
   it('exposes the release status via an icon-only glyph, never a visible word', () => {
     render(
       <ReleaseEntityHeader
@@ -241,7 +310,12 @@ describe('ReleaseSidebarSections', () => {
       />
     );
 
-    expect(screen.getByTestId('release-header-meta-strip')).toBeTruthy();
+    // Title block and meta strip share one px-3 inset on the flat rail.
+    const metaStrip = screen.getByTestId('release-header-meta-strip');
+    expect(metaStrip.parentElement).toHaveClass('px-3', 'pt-3');
+    expect(metaStrip.parentElement).toContainElement(
+      screen.getByTestId('entity-header')
+    );
   });
 
   it('uses one canonical artwork geometry and contain-fit contract', () => {

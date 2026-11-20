@@ -430,19 +430,13 @@ private struct MobileChatEntityChipView: View {
     }
   }
 
-  // Converged onto the web "input variant" chip recipe
-  // (apps/web/styles/design-system.css .system-b-entity-chip): border at
-  // accent-30%, background at accent-13% for both tones. Text stays
-  // accent-tinted on the dark assistant bubble (legible at full accent
-  // brightness against `surface1`); the light user bubble keeps a
-  // near-black text color since these saturated accents read too low-
-  // contrast on white to serve as body text there.
+  // Canonical accents paint the indicator, border and background; small text uses semantic ink.
   private var chipTextColor: Color {
     switch tone {
     case .onDark:
-      return accentColor
+      return JovieColor.textPrimary
     case .onLight:
-      return JovieColor.backgroundBase
+      return JovieColor.textInverse
     }
   }
 

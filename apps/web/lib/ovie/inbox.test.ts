@@ -131,9 +131,18 @@ describe('Ovie inbox projection', () => {
       notes: 'Fix copy',
     });
   });
-  it('requires rejection rationale and preserves design review day buckets', () => {
-    expect(() =>
+  it('rejects swipe-binary without a reason, certification only with one, and keeps day buckets', () => {
+    expect(
       inboxDecisionRequest({ kind: 'summer', id: 'sc_1' }, 'reject', '', 'a')
+        .body
+    ).toEqual({ decision: 'reject', comment: undefined });
+    expect(() =>
+      inboxDecisionRequest(
+        { kind: 'certification', id: 'row', evidenceDigest: 'd' },
+        'reject',
+        ' ',
+        'a'
+      )
     ).toThrow('reason');
     expect(
       inboxDecisionRequest(

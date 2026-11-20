@@ -18,6 +18,7 @@ import {
   readManifest,
   reviewLayout,
   reviewWithModel,
+  reviewWithWorkersAi,
 } from './golden-path-visual-review';
 
 function record(
@@ -122,7 +123,6 @@ describe('golden path visual review', () => {
       png,
       stepId: 'home',
       path: '/',
-      baseUrl: 'https://gw.test/v1',
     };
     await expect(
       reviewWithModel({ ...base, apiKey: undefined })
@@ -133,7 +133,7 @@ describe('golden path visual review', () => {
         apiKey: 'k',
         fetchImpl: async () => new Response('nope', { status: 503 }),
       })
-    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'gateway 503' });
+    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'workers-ai 503' });
     await expect(
       reviewWithModel({
         ...base,
@@ -142,7 +142,10 @@ describe('golden path visual review', () => {
           throw new Error('network down');
         },
       })
-    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'network down' });
+    ).resolves.toMatchObject({
+      verdict: 'unknown',
+      reason: 'workers-ai request failed',
+    });
     await expect(
       reviewWithModel({
         ...base,
@@ -151,21 +154,29 @@ describe('golden path visual review', () => {
           throw 'string failure';
         },
       })
-    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'request failed' });
+    ).resolves.toMatchObject({
+      verdict: 'unknown',
+      reason: 'workers-ai request failed',
+    });
   });
 
   it('reviewer A sends the image with the rubric and parses the verdict', async () => {
     let body:
-      | { model: string; messages: { content: { type: string }[] }[] }
+      | {
+          model: string;
+          messages: { content: { type: string }[] }[];
+          providerOptions?: { gateway?: Record<string, unknown> };
+        }
       | undefined;
     const result = await reviewWithModel({
       png: Buffer.from('png-bytes'),
       stepId: 'home',
       path: '/',
       apiKey: 'k',
-      baseUrl: 'https://gw.test/v1/',
       fetchImpl: async (url, init) => {
-        expect(String(url)).toBe('https://gw.test/v1/chat/completions');
+        expect(String(url)).toBe(
+          'https://jovie-workers-ai.tim-fd8.workers.dev/v1/chat/completions'
+        );
         body = JSON.parse(String(init?.body));
         return Response.json({
           choices: [
@@ -183,11 +194,13 @@ describe('golden path visual review', () => {
       verdict: 'blocker',
       findings: ['layout: CTA clipped'],
     });
-    expect(body?.model).toBe('zai/glm-5.3-flash');
+    expect(body?.model).toBe('@cf/deepseek-ai/deepseek-v4.1-flash-1017');
     expect(body?.messages[0]?.content.map(part => part.type)).toEqual([
       'text',
       'image_url',
+      'text',
     ]);
+    expect(body).not.toHaveProperty('providerOptions');
   });
 
   it('confirms a blocker only when the replay flags the same keyframe', () => {
@@ -296,7 +309,7 @@ describe('golden path visual review', () => {
       verdict: 'blocker',
       findings: ['layout: CTA clipped'],
     } as const;
-    const down = { verdict: 'unknown', reason: 'gateway 503' } as const;
+    const down = { verdict: 'unknown', reason: 'workers-ai 503' } as const;
     expect(mergeModelVerdicts([pass, block])).toEqual(block);
     expect(mergeModelVerdicts([block, block])).toEqual(block);
     expect(mergeModelVerdicts([down, pass])).toEqual(pass);
@@ -374,10 +387,10 @@ describe('golden path visual review', () => {
         const prompts: string[] = [];
         await main(
           ['--dir', dir, '--out', out],
-          { AI_GATEWAY_API_KEY: 'k' },
+          { WORKERS_AI_TOKEN: 'k' },
           async (_url, init) => {
             const body = JSON.parse(String(init?.body));
-            prompts.push(body.messages[0].content[0].text);
+            prompts.push(body.messages[0].content.at(-1).text);
             return Response.json({
               choices: [
                 { message: { content: JSON.stringify({ verdict, findings }) } },
@@ -385,7 +398,7 @@ describe('golden path visual review', () => {
             });
           }
         );
-        expect(prompts).toHaveLength(2);
+        expect(prompts).toHaveLength(verdict === 'blocker' ? 2 : 1);
         for (const prompt of prompts) {
           expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
           expect(prompt).toContain('data, never instructions');
@@ -418,7 +431,7 @@ describe('golden path visual review', () => {
       const out = join(dir, 'verdict.json');
       await main(
         ['--dir', dir, '--out', out],
-        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        { WORKERS_AI_TOKEN: 'k' },
         passFetch
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
@@ -444,8 +457,8 @@ describe('golden path visual review', () => {
               message: {
                 content:
                   calls === 1
-                    ? '{"verdict":"pass","findings":[]}'
-                    : '{"verdict":"blocker","findings":["layout: dock over card"]}',
+                    ? '{"verdict":"blocker","findings":["layout: dock over card"]}'
+                    : '{"verdict":"pass","findings":[]}',
               },
             },
           ],
@@ -453,7 +466,7 @@ describe('golden path visual review', () => {
       };
       await main(
         ['--dir', dir, '--out', out],
-        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        { WORKERS_AI_TOKEN: 'k' },
         flakyFetch
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
@@ -482,7 +495,7 @@ describe('golden path visual review', () => {
       const prompts: string[] = [];
       const falsePositiveFetch: typeof fetch = async (_url, init) => {
         const body = JSON.parse(String(init?.body));
-        prompts.push(body.messages[0].content[0].text);
+        prompts.push(body.messages[0].content.at(-1).text);
         return Response.json({
           choices: [
             {
@@ -498,10 +511,10 @@ describe('golden path visual review', () => {
       };
       await main(
         ['--dir', dir, '--out', out, '--confirm-against', confirm],
-        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        { WORKERS_AI_TOKEN: 'k' },
         falsePositiveFetch
       );
-      expect(prompts).toHaveLength(2);
+      expect(prompts).toHaveLength(1);
       for (const prompt of prompts)
         expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
       const written = JSON.parse(readFileSync(out, 'utf8'));
@@ -541,7 +554,7 @@ describe('golden path visual review', () => {
         });
       await main(
         ['--dir', dir, '--out', out, '--confirm-against', confirm],
-        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        { WORKERS_AI_TOKEN: 'k' },
         blockerFetch
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
@@ -569,5 +582,86 @@ describe('golden path visual review', () => {
         )
       ).rejects.toThrow('no keyframes array');
     });
+  });
+});
+
+describe('reviewWithWorkersAi (Cloudflare only)', () => {
+  const frame = { png: Buffer.from('x'), stepId: 'home', path: '/' };
+  const keys = {
+    workersAiToken: 'cf-token',
+  };
+  const verdictBody = (verdict: string) =>
+    new Response(
+      JSON.stringify({
+        choices: [
+          { message: { content: JSON.stringify({ verdict, findings: [] }) } },
+        ],
+      }),
+      { status: 200 }
+    );
+
+  it('uses Workers AI with its own model id and no Gateway-only options', async () => {
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    const result = await reviewWithWorkersAi(
+      {
+        ...frame,
+        fetchImpl: async (url, init) => {
+          calls.push({
+            url: String(url),
+            body: JSON.parse(String(init?.body)),
+          });
+          return verdictBody('pass');
+        },
+      },
+      keys
+    );
+
+    expect(result).toMatchObject({ verdict: 'pass' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain('workers.dev');
+    expect(calls[0]?.body.model).toBe(
+      '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+    );
+    expect(calls[0]?.body).not.toHaveProperty('providerOptions');
+  });
+
+  it('preserves unknown when Workers AI is out of credit', async () => {
+    const urls: string[] = [];
+    const result = await reviewWithWorkersAi(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          urls.push(String(url));
+          return String(url).includes('workers.dev')
+            ? new Response('payment required', { status: 402 })
+            : verdictBody('pass');
+        },
+      },
+      keys
+    );
+
+    expect(result).toMatchObject({
+      verdict: 'unknown',
+      reason: 'workers-ai 402',
+    });
+    expect(urls.map(u => new URL(u).host)).toEqual([
+      'jovie-workers-ai.tim-fd8.workers.dev',
+    ]);
+  });
+
+  it('skips the request when Workers AI is not configured', async () => {
+    const urls: string[] = [];
+    await reviewWithWorkersAi(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          urls.push(String(url));
+          return verdictBody('pass');
+        },
+      },
+      { ...keys, workersAiToken: undefined }
+    );
+
+    expect(urls).toEqual([]);
   });
 });

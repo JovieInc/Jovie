@@ -10,7 +10,8 @@ const DOT_COLOR: Record<OpportunityRowState, string> = {
   new: 'var(--color-accent)',
   accepted: 'var(--color-accent-green)',
   rejected: 'var(--color-text-quaternary-token)',
-  'in-progress': 'var(--color-accent-orange)',
+  // JOV-8964: in-progress status is neutral — the loud orange read as an alarm.
+  'in-progress': 'var(--color-text-secondary-token)',
   reported: 'var(--color-text-quaternary-token)',
 };
 
@@ -18,7 +19,7 @@ const ACTION_ACCENT: Record<OpportunityRowState, string> = {
   new: 'var(--color-accent)',
   accepted: 'var(--color-accent-green)',
   rejected: 'transparent',
-  'in-progress': 'var(--color-accent-orange)',
+  'in-progress': 'var(--color-text-secondary-token)',
   reported: 'transparent',
 };
 

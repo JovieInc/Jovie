@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { z } from 'zod';
+import { getProfileUrl } from '@/constants/domains';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
@@ -21,6 +22,7 @@ import {
   withStripeRetry,
 } from '@/lib/stripe/retry';
 import { logger } from '@/lib/utils/logger';
+import { hasProofPendingProfile } from '@/lib/waitlist/golden-path-admission.server';
 
 export const runtime = 'nodejs';
 
@@ -57,14 +59,26 @@ function getLineItemPriceId(
  * JOV-7701), so a paid buyer without a claimed profile is sent on to claim
  * or create one instead of into the app.
  */
-async function buyerNeedsProfile(userId: string): Promise<boolean> {
+async function buyerProfileState(userId: string): Promise<{
+  needsProfile: boolean;
+  isPublic: boolean;
+  username: string | null;
+}> {
   const [row] = await db
-    .select({ isClaimed: creatorProfiles.isClaimed })
+    .select({
+      isClaimed: creatorProfiles.isClaimed,
+      isPublic: creatorProfiles.isPublic,
+      username: creatorProfiles.username,
+    })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.id, userId))
     .limit(1);
-  return row?.isClaimed !== true;
+  return {
+    needsProfile: row?.isClaimed !== true,
+    isPublic: row?.isPublic === true,
+    username: row?.username ?? null,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -103,8 +117,14 @@ export async function GET(request: NextRequest) {
       (lineItemPriceId
         ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
         : null);
-    const needsProfile = plan ? await buyerNeedsProfile(userId) : false;
-    if (plan && !needsProfile) {
+    const profileState = plan
+      ? await buyerProfileState(userId)
+      : { needsProfile: false, isPublic: false, username: null };
+    const needsProfile = profileState.needsProfile;
+    const proofPending = plan ? await hasProofPendingProfile(userId) : false;
+    // Paying never publishes a page. The stage is "profile live", so a private
+    // page waiting for proof must not record it.
+    if (plan && !needsProfile && profileState.isPublic && !proofPending) {
       // Paid and the claimed profile is live: last artist-offer funnel stage.
       await recordArtistOfferStage(
         extractCheckoutCorrelation(session.metadata).acquisitionId,
@@ -112,8 +132,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Only a live, claimed page is shareable: a private page waiting for
+    // proof must not be handed out as a link.
+    const profileShareUrl =
+      plan &&
+      !needsProfile &&
+      profileState.isPublic &&
+      !proofPending &&
+      profileState.username
+        ? getProfileUrl(profileState.username)
+        : null;
+
     return NextResponse.json(
-      { plan, priceId: lineItemPriceId, needsProfile },
+      {
+        plan,
+        priceId: lineItemPriceId,
+        needsProfile,
+        proofPending,
+        profileShareUrl,
+      },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

@@ -9,12 +9,15 @@ import {
   commitRearmFailure,
   ENQUEUE_PULL_REQUEST_MUTATION,
   enqueueVictim,
+  frontFailurePassedOnBase,
   heldRevisionFromReceipt,
   implicatedPathsFromAnnotations,
+  latestDequeue,
   planVictimRearms,
   REARM_CAP,
   REARM_CONTEXT,
   RearmPermissionError,
+  rearmDescription,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -163,8 +166,8 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
-test('every admission-blocking label, including the tim-hold variants, prevents a rearm', () => {
-  for (const label of ['tim:hold', 'hold:tim', 'tim-hold', 'do-not-merge']) {
+test('every admission-blocking label, prevents a rearm', () => {
+  for (const label of ['hold', 'gated', 'incident', 'queue-deferred']) {
     const [decision] = planVictimRearms({
       runId: 7,
       implicatedPaths: ['CLAUDE.md'],
@@ -305,7 +308,7 @@ test('apply writes the receipt after a successful enqueue and skips a moved head
   assert.deepEqual(enables, [10]);
   assert.deepEqual(order, ['enable:10', 'write']);
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].description, `n=1;sha=${sha};run=7`);
+  assert.equal(writes[0].description, `n=1;sha=${sha};run=7;why=base-branch`);
   assert.equal(applied.length, 1);
 });
 
@@ -499,10 +502,13 @@ test('rearm enqueues the verified head and does not request a merge strategy', (
     '.github/workflows/merge-queue-green-enroll.yml',
     'utf8'
   );
+  // The enroll mutation may add `jump: true` for compounding PRs; the verified head
+  // is still bound and no merge strategy is ever requested.
   assert.match(
     enroll,
-    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid \}\)/
+    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid(\$\{withJump \? ', jump: true' : ''\})? \}\)/
   );
+  assert.doesNotMatch(enroll, /enablePullRequestAutoMerge\(|mergeMethod:/);
 });
 
 test('a token that cannot enqueue names the PR and fails the step', () => {
@@ -688,4 +694,231 @@ test('replays #22280: the failure owner is never rearmed at its failed head as a
   });
   assert.equal(plan[0].action, 'rearm');
   assert.equal(plan[0].classification, 'another-pr');
+});
+
+const NOW = Date.parse('2026-10-29T12:00:00Z');
+const dequeue = (actor, minutesAgo) => ({
+  actor,
+  atMs: NOW - minutesAgo * 60_000,
+});
+const flake = (overrides, extra = {}) =>
+  planVictimRearms({
+    runId: 800,
+    implicatedPaths: [],
+    now: NOW,
+    candidates: [
+      candidate({
+        dequeue: dequeue('github-merge-queue[bot]', 2),
+        ...overrides,
+      }),
+    ],
+    ...extra,
+  })[0];
+
+test('flake requeue: a green head GitHub just dropped is re-enqueued', () => {
+  const decision = flake({});
+  assert.equal(decision.action, 'rearm');
+  assert.equal(decision.classification, 'unattributed');
+  assert.equal(decision.n, 1);
+  assert.match(
+    rearmDescription({
+      n: Number(decision.n),
+      headSha: String(decision.headSha),
+      runId: Number(decision.runId),
+      classification: decision.classification,
+    }),
+    new RegExp(`^n=1;sha=${sha};run=800;why=unattributed$`)
+  );
+  assert.equal(trustedRearmRecords([]).length, 0);
+});
+
+test('flake requeue: a head that moved is a new candidate, so the old strikes do not follow it', () => {
+  const decision = flake({
+    headSha: other,
+    statuses: [status(1, sha, 1), status(2, sha, 2)],
+  });
+  assert.equal(decision.action, 'rearm');
+  assert.equal(decision.n, 1);
+});
+
+test('flake requeue: the per-head strike cap is honoured', () => {
+  const decision = flake({
+    statuses: [status(1, sha, 11), status(REARM_CAP, sha, 12)],
+  });
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.reason, 'cap');
+});
+
+test('flake requeue: a human or bot dequeue is never reversed', () => {
+  assert.equal(
+    flake({ dequeue: dequeue('timwhite', 2) }).reason,
+    'not-github-dequeue'
+  );
+  assert.equal(
+    flake({ dequeue: dequeue('jovie-bot[bot]', 2) }).reason,
+    'not-github-dequeue'
+  );
+});
+
+test('flake requeue: stale, unknown, held, red or breaker-labelled heads are skipped', () => {
+  assert.equal(
+    flake({ dequeue: dequeue('github-merge-queue[bot]', 31) }).reason,
+    'stale-dequeue'
+  );
+  assert.equal(flake({ dequeue: null }).reason, 'unclassified');
+  assert.equal(flake({ labels: ['lane-fix-red'] }).reason, 'blocking-label');
+  assert.equal(flake({ labels: ['hold'] }).reason, 'blocking-label');
+  assert.equal(flake({ mergeStateStatus: 'BLOCKED' }).reason, 'head-not-green');
+  assert.equal(flake({ autoMerge: true }).reason, 'already-armed');
+});
+
+test('flake requeue: the failure owner is left to the hold and the enroll job', () => {
+  const decision = flake(
+    {},
+    {
+      heldRevision: {
+        prNumber: 10,
+        headSha: sha,
+        retryDisposition: 'one-queue-authority-retry',
+      },
+    }
+  );
+  assert.equal(decision.reason, 'failure-owner');
+});
+
+test('latestDequeue picks the newest removal and ignores other events', () => {
+  assert.deepEqual(
+    latestDequeue([
+      {
+        event: 'removed_from_merge_queue',
+        created_at: '2026-10-29T11:00:00Z',
+        actor: { login: 'a' },
+      },
+      { event: 'labeled', created_at: '2026-10-29T11:59:00Z' },
+      {
+        event: 'removed_from_merge_queue',
+        created_at: '2026-10-29T11:30:00Z',
+        actor: { login: 'github-merge-queue[bot]' },
+      },
+    ]),
+    {
+      actor: 'github-merge-queue[bot]',
+      atMs: Date.parse('2026-10-29T11:30:00Z'),
+    }
+  );
+  assert.equal(latestDequeue([]), null);
+});
+
+// 2026-10-31: #24072's group (run 41247973238) failed Visual Snapshot Compare,
+// which had already passed on its base's run (41247971178). The hold had
+// deferred on the unfinished ahead run, so no receipt named #24072, and the
+// culprit was re-armed as base-branch by elimination.
+const visualFailed = [
+  { name: 'Visual Snapshot Compare', conclusion: 'failure' },
+  { name: 'PR Ready', conclusion: 'failure' },
+  { name: 'Unit Tests (1/14)', conclusion: 'success' },
+];
+
+test('front failure counts as its own only when the base run passed every failing job', () => {
+  const passed = [
+    {
+      name: 'Visual Snapshot Compare',
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ];
+  assert.equal(
+    frontFailurePassedOnBase({ currentJobs: visualFailed, baseJobs: passed }),
+    true
+  );
+  for (const baseJobs of [
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'completed',
+        conclusion: 'failure',
+      },
+    ],
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'in_progress',
+        conclusion: null,
+      },
+    ],
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'completed',
+        conclusion: 'skipped',
+      },
+    ],
+    [],
+    undefined,
+  ]) {
+    assert.equal(
+      frontFailurePassedOnBase({ currentJobs: visualFailed, baseJobs }),
+      false
+    );
+  }
+  assert.equal(
+    frontFailurePassedOnBase({
+      currentJobs: [{ name: 'PR Ready', conclusion: 'failure' }],
+      baseJobs: passed,
+    }),
+    false
+  );
+});
+
+test('the front entry is not re-armed as base-branch when its failing jobs passed on the base', () => {
+  const front = candidate({
+    prNumber: 24072,
+    files: ['apps/web/app/(marketing)/changelog/page.tsx'],
+  });
+  const plan = guard =>
+    planVictimRearms({
+      runId: 41247973238,
+      implicatedPaths: [
+        'apps/web/tests/product-screenshots/route-dom-certification.spec.ts',
+      ],
+      candidates: [front],
+      frontPr: 24072,
+      frontFailureOwn: guard,
+    });
+  assert.deepEqual(plan(true), [
+    { action: 'skip', prNumber: 24072, reason: 'front-failure-passed-on-base' },
+  ]);
+  assert.equal(plan(false)[0].action, 'rearm');
+  assert.equal(plan(false)[0].classification, 'base-branch');
+});
+
+test('the guard never blocks another PR in the group or a flake with no implicated path', () => {
+  const group = [
+    candidate({ prNumber: 10, files: ['docs/guide.md'] }),
+    candidate({ prNumber: 11, headSha: other, files: ['apps/web/story.tsx'] }),
+  ];
+  const decisions = planVictimRearms({
+    runId: 200,
+    implicatedPaths: ['apps/web/story.tsx'],
+    candidates: group,
+    frontPr: 10,
+    frontFailureOwn: true,
+  });
+  assert.equal(decisions[0].action, 'rearm');
+  assert.equal(decisions[0].classification, 'another-pr');
+  const flake = planVictimRearms({
+    runId: 201,
+    implicatedPaths: [],
+    candidates: [
+      candidate({
+        prNumber: 10,
+        dequeue: { actor: 'github-merge-queue[bot]', atMs: 1_000 },
+      }),
+    ],
+    frontPr: 10,
+    frontFailureOwn: true,
+    now: 2_000,
+  });
+  assert.equal(flake[0].action, 'rearm');
+  assert.equal(flake[0].classification, 'unattributed');
 });

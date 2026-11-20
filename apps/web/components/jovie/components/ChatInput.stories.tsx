@@ -103,6 +103,10 @@ export const Drafting: Story = {
   },
 };
 
+export const HeroDrafting: Story = {
+  args: { ...Drafting.args, variant: 'hero' },
+};
+
 export const ProcessingFile: Story = {
   args: {
     value: 'Use the attached cover art for the campaign.',
@@ -174,7 +178,7 @@ function DesktopGuidanceFixture({
         above={
           centered ? undefined : (
             <div className='space-y-4'>
-              <ChatEmptyStateGreeting firstName='Tim' insight={null} />
+              <ChatEmptyStateGreeting firstName='Tim' />
               <ChatEmptyStateOpportunityCards
                 cards={[
                   {

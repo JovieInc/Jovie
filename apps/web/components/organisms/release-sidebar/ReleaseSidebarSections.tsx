@@ -14,6 +14,7 @@ import {
 import type { ComponentType, ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import { CreditList } from '@/components/molecules/CreditList';
 import {
   DrawerAsyncToggle,
   DrawerFormGridRow,
@@ -92,60 +93,30 @@ interface ReleaseEntityHeaderProps {
   readonly footer?: ReactNode;
 }
 
-const releaseArtistListFormatter = new Intl.ListFormat('en', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 function renderArtistLine(
   artistNames: string[] | undefined,
   fallbackArtistName: string | null | undefined,
   onArtistClick: ((artistName: string) => void) | undefined
 ): ReactNode {
-  const normalizedNames = (artistNames ?? [])
-    .map(name => name.trim())
-    .filter(Boolean);
-
-  if (normalizedNames.length === 0) {
-    const fallback = fallbackArtistName?.trim();
-    if (!fallback) return null;
-    if (!onArtistClick) return fallback;
-    return (
-      <button
-        type='button'
-        onClick={() => onArtistClick(fallback)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
-      >
-        {fallback}
-      </button>
-    );
-  }
-
-  if (!onArtistClick) {
-    return releaseArtistListFormatter.format(normalizedNames);
-  }
-
-  const partKeyCounts = new Map<string, number>();
-
-  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part => {
-    const keyBase = `${part.type}:${part.value}`;
-    const occurrence = (partKeyCounts.get(keyBase) ?? 0) + 1;
-    partKeyCounts.set(keyBase, occurrence);
-    const key = `${keyBase}:${occurrence}`;
-
-    return part.type === 'element' ? (
-      <button
-        key={key}
-        type='button'
-        onClick={() => onArtistClick(part.value)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
-      >
-        {part.value}
-      </button>
-    ) : (
-      <span key={key}>{part.value}</span>
-    );
-  });
+  return (
+    <CreditList
+      names={artistNames}
+      fallback={fallbackArtistName}
+      renderName={
+        onArtistClick
+          ? name => (
+              <button
+                type='button'
+                onClick={() => onArtistClick(name)}
+                className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+              >
+                {name}
+              </button>
+            )
+          : undefined
+      }
+    />
+  );
 }
 
 function getReleaseTypeLabel(releaseType: string | undefined): string | null {
@@ -291,98 +262,101 @@ export function ReleaseEntityHeader({
 
   return (
     <div className='overflow-hidden' data-testid='release-header-card'>
-      <EntityHeader
-        title={release.title}
-        subtitle={detailsLine}
-        bodyClassName={actionBar ? 'space-y-0.5 pr-7' : 'space-y-0.5'}
-        titleClassName='leading-tight tracking-tight'
-        statusGlyph={
-          <EntityHeaderStatusGlyph
-            icon={RELEASE_STATUS_ICON[releaseStatus]}
-            label={STATUS_CHIP[releaseStatus].label}
-            tone={RELEASE_STATUS_TONE[releaseStatus]}
-          />
-        }
-        actions={actionBar}
-        thumbnail={
-          <div className='group/artwork relative shrink-0'>
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-              allowDownloads={allowDownloads}
-              releaseId={release.id}
-              canRevert={canRevertArtwork}
-              onRevert={canRevertArtwork ? onArtworkRevert : undefined}
-            >
-              {canUploadArtwork && onArtworkUpload ? (
-                <AvatarUploadable
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  name={release.title}
-                  size={RELEASE_HEADER_ARTWORK_SIZE}
-                  shape='artwork'
-                  uploadable={canUploadArtwork}
-                  onUpload={onArtworkUpload}
-                  showHoverOverlay
-                />
-              ) : (
-                <DrawerMediaThumb
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  dimension={RELEASE_HEADER_ARTWORK_SIZE_PX}
-                  sizeClassName={cn(
-                    'h-10 w-10',
-                    RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME
-                  )}
-                  imageClassName='object-contain'
-                  sizes={`${RELEASE_HEADER_ARTWORK_SIZE_PX}px`}
-                  fallback={
-                    <Icon
-                      name='AudioLines'
-                      className='h-6 w-6 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  }
-                />
-              )}
-            </AlbumArtworkContextMenu>
+      {/* Identity sits on the rail's px-3 seam; the footer rule stays full-bleed. */}
+      <div className='px-3 pt-3' data-release-header-identity>
+        <EntityHeader
+          title={release.title}
+          subtitle={detailsLine}
+          bodyClassName={actionBar ? 'space-y-0.5 pr-7' : 'space-y-0.5'}
+          titleClassName='leading-tight tracking-tight'
+          statusGlyph={
+            <EntityHeaderStatusGlyph
+              icon={RELEASE_STATUS_ICON[releaseStatus]}
+              label={STATUS_CHIP[releaseStatus].label}
+              tone={RELEASE_STATUS_TONE[releaseStatus]}
+            />
+          }
+          actions={actionBar}
+          thumbnail={
+            <div className='group/artwork relative shrink-0'>
+              <AlbumArtworkContextMenu
+                title={release.title}
+                sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+                allowDownloads={allowDownloads}
+                releaseId={release.id}
+                canRevert={canRevertArtwork}
+                onRevert={canRevertArtwork ? onArtworkRevert : undefined}
+              >
+                {canUploadArtwork && onArtworkUpload ? (
+                  <AvatarUploadable
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    name={release.title}
+                    size={RELEASE_HEADER_ARTWORK_SIZE}
+                    shape='artwork'
+                    uploadable={canUploadArtwork}
+                    onUpload={onArtworkUpload}
+                    showHoverOverlay
+                  />
+                ) : (
+                  <DrawerMediaThumb
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    dimension={RELEASE_HEADER_ARTWORK_SIZE_PX}
+                    sizeClassName={cn(
+                      'h-10 w-10',
+                      RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME
+                    )}
+                    imageClassName='object-contain'
+                    sizes={`${RELEASE_HEADER_ARTWORK_SIZE_PX}px`}
+                    fallback={
+                      <Icon
+                        name='AudioLines'
+                        className='h-6 w-6 text-tertiary-token'
+                        aria-hidden='true'
+                      />
+                    }
+                  />
+                )}
+              </AlbumArtworkContextMenu>
 
-            <button
-              type='button'
-              onClick={onTogglePreview}
-              disabled={!previewUrl}
-              aria-pressed={isPlaying}
-              className={cn(
-                'absolute inset-0 flex items-center justify-center transition-[background-color,opacity] duration-subtle',
-                RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME,
-                'bg-black/0 opacity-0',
-                'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
-                'disabled:pointer-events-none disabled:hidden'
-              )}
-              aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
-            >
-              {isPlaying ? (
-                <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
-              ) : (
-                <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
-              )}
-            </button>
+              <button
+                type='button'
+                onClick={onTogglePreview}
+                disabled={!previewUrl}
+                aria-pressed={isPlaying}
+                className={cn(
+                  'absolute inset-0 flex items-center justify-center transition-[background-color,opacity] duration-subtle',
+                  RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME,
+                  'bg-black/0 opacity-0',
+                  'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
+                  'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+                  'disabled:pointer-events-none disabled:hidden'
+                )}
+                aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
+              >
+                {isPlaying ? (
+                  <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
+                ) : (
+                  <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
+                )}
+              </button>
+            </div>
+          }
+        />
+        {hasMetaStrip ? (
+          <div
+            className='mt-2 flex flex-wrap items-center gap-1.5'
+            data-testid='release-header-meta-strip'
+          >
+            {releaseDate ? (
+              <DropDateChip tone={releaseDate.tone} label={releaseDate.label} />
+            ) : null}
+            {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
+            <DspAvatarStack dsps={dspItems} />
           </div>
-        }
-      />
-      {hasMetaStrip ? (
-        <div
-          className='mt-2 flex flex-wrap items-center gap-1.5'
-          data-testid='release-header-meta-strip'
-        >
-          {releaseDate ? (
-            <DropDateChip tone={releaseDate.tone} label={releaseDate.label} />
-          ) : null}
-          {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
-          <DspAvatarStack dsps={dspItems} />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       {footer ? (
         <div className='border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
           {footer}

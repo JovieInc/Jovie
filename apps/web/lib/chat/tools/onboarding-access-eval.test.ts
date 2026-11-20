@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import { QUALIFICATION_RULE_VERSION } from '@/lib/waitlist/decision';
 import {
   decideOnboardingAccess,
   evaluateAccessSignal,
@@ -76,15 +77,36 @@ describe('evaluateAccessSignal', () => {
     expect(result.rationale).toBe('insufficient_signal');
   });
 
-  it('forces waitlist after the max-turn cap with weak signal', () => {
-    const result = evaluateAccessSignal({
-      signal: { audienceBand: 'under_500' },
-      spotifyFollowers: null,
-      turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
-    });
-    expect(result.kind).toBe('waitlist');
-    expect(result.rationale).toContain('max_turns_reached');
-  });
+  it.each([
+    MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+    MAX_INTERVIEW_TURNS_BEFORE_FORCE + 1,
+  ])(
+    'preserves the cap rationale and incomplete-capture decision at %i turns',
+    turnCount => {
+      const result = evaluateAccessSignal({
+        signal: { audienceBand: 'under_500' },
+        spotifyFollowers: null,
+        turnCount,
+      });
+      expect(result.kind).toBe('waitlist');
+      expect(result.rationale).toBe(`max_turns_reached_${turnCount}`);
+      expect(result.score).toBe(30);
+      expect(result.qualificationDecision).toMatchObject({
+        ruleVersion: QUALIFICATION_RULE_VERSION,
+        outcome: 'queued',
+        reason: 'needs_capture_incomplete',
+        wants: [],
+      });
+      expect(result.qualification?.missingDimensions).toEqual([
+        'current_behavior',
+        'pain',
+        'spend',
+        'urgency',
+        'alternatives',
+        'desired_outcome',
+      ]);
+    }
+  );
 
   it('still grants instant access even at the turn cap if signal qualifies', () => {
     const result = evaluateAccessSignal({
@@ -201,5 +223,84 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
 
   it('evaluates verified Spotify data when the gate is off', () => {
     expect(decideOnboardingAccess(base).kind).toBe('instant_access');
+  });
+});
+
+describe('decideOnboardingAccess golden-path admission (Tim 2026-10-25)', () => {
+  const controlled = {
+    accessControlled: true,
+    spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+    spotifyFollowers: 3_200,
+    signals: [],
+    turnCount: 1,
+  };
+
+  it('admits a resolved, non-high-profile artist when the golden path is green', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      goldenPathVerdict: 'ELIGIBLE',
+    });
+    expect(decision.kind).toBe('instant_access');
+    expect(decision.rationale).toBe('golden_path_admit_resolved_artist');
+  });
+
+  it.each(['founder', 'author', 'creator', 'expert'] as const)(
+    'does not admit the %s job using a previous artist identity',
+    activeRole => {
+      const decision = decideOnboardingAccess({
+        ...controlled,
+        activeRole,
+        goldenPathVerdict: 'ELIGIBLE',
+        publicProfileUrl: 'https://example.com',
+      });
+      expect(decision.kind).toBe('waitlist');
+      expect(decision.goldenPathHold).toBe('hold_identity_unresolved');
+    }
+  );
+
+  it.each([undefined, null, 'BLOCKED', 'UNKNOWN'] as const)(
+    'still waitlists under the controlled gate when the verdict is %s',
+    goldenPathVerdict => {
+      expect(
+        decideOnboardingAccess({ ...controlled, goldenPathVerdict }).kind
+      ).toBe('waitlist');
+    }
+  );
+
+  it('never admits an unresolved identity or a high-profile artist', () => {
+    expect(
+      decideOnboardingAccess({
+        ...controlled,
+        spotifyArtistId: null,
+        goldenPathVerdict: 'ELIGIBLE',
+      }).kind
+    ).not.toBe('instant_access');
+    expect(
+      decideOnboardingAccess({
+        ...controlled,
+        spotifyFollowers: 40_000_000,
+        goldenPathVerdict: 'ELIGIBLE',
+      }).kind
+    ).toBe('waitlist');
+  });
+
+  it('keeps the capacity hold reason on the waitlist decision even when the verdict is green', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      goldenPathVerdict: 'ELIGIBLE',
+      goldenPathHold: 'hold_capacity_full',
+    });
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.goldenPathHold).toBe('hold_capacity_full');
+  });
+
+  it('records why an unresolved identity was held', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      spotifyArtistId: null,
+      publicProfileUrl: 'https://example.com',
+      goldenPathVerdict: 'ELIGIBLE',
+    });
+    expect(decision.goldenPathHold).toBe('hold_identity_unresolved');
   });
 });

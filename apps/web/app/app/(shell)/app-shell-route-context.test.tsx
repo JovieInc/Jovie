@@ -185,12 +185,12 @@ describe('loadAppShellRouteContext', () => {
     await expect(
       loadAppShellRouteContext({
         route: '/app/library',
-        requiredFlag: 'PROFILES_WORKSPACE',
+        requiredFlag: 'RELEASE_PLAN_DEMO',
         dashboardErrorMessage: 'Failed to load library data.',
       })
     ).rejects.toThrow('NEXT_NOT_FOUND');
 
-    expect(getAppFlagValueMock).toHaveBeenCalledWith('PROFILES_WORKSPACE', {
+    expect(getAppFlagValueMock).toHaveBeenCalledWith('RELEASE_PLAN_DEMO', {
       userId: 'user_1',
     });
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();
@@ -220,6 +220,40 @@ describe('loadAppShellRouteContext', () => {
       dashboardLoadError,
       { route: '/app/tasks' }
     );
+  });
+
+  it('returns the route error surface when the shell data read wedges past the bound', async () => {
+    // JOV-8791 / resilience.spec.ts: a hung read must become the named error
+    // surface, not a document parked on the loading skeleton forever.
+    vi.useFakeTimers();
+    try {
+      getDashboardShellDataMock.mockReturnValue(new Promise(() => {}));
+
+      const pending = loadAppShellRouteContext({
+        route: '/app/tasks',
+        dashboardErrorLogMessage: 'Dashboard data load failed on tasks page',
+        dashboardErrorMessage: 'Failed to load tasks data.',
+      });
+      await vi.advanceTimersByTimeAsync(10_001);
+      const result = await pending;
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        render(result.error);
+        expect(screen.getByTestId('page-error')).toHaveTextContent(
+          'Failed to load tasks data.'
+        );
+      }
+      expect(captureErrorMock).toHaveBeenCalledWith(
+        'Dashboard data load failed on tasks page',
+        expect.objectContaining({
+          message: expect.stringContaining('timed out'),
+        }),
+        { route: '/app/tasks' }
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('redirects incomplete profiles through onboarding before route prefetches', async () => {

@@ -7,6 +7,10 @@
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL, getProfileUrl } from '@/constants/domains';
 import {
+  getEmailPostalFooterHtml,
+  getEmailPostalFooterText,
+} from '@/lib/email/legal-footer';
+import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
   type TrackingTokenPayload,
@@ -97,7 +101,7 @@ Tim
 
 ---
 You received this because we created a profile for you based on your public music presence.
-If this wasn't you, you can ignore this email.${unsubscribeSection}`;
+If this wasn't you, you can ignore this email.${unsubscribeSection}${getEmailPostalFooterText()}`;
 }
 
 /**
@@ -279,6 +283,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
                 Tim
               </p>
               ${unsubscribeSection}
+              ${getEmailPostalFooterHtml()}
             </td>
           </tr>
         </table>

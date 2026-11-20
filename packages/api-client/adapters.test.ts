@@ -6,10 +6,11 @@ import { describe, expect, it } from 'vitest';
 
 import { main, status, summarize } from './cli.ts';
 import { createFakeProvider, FakeClock } from './fake-provider.ts';
-import { type GhRunner, ghShape, runGh, splitIncluded } from './gh.ts';
+
 import { createGitHubClient, pullRequestField } from './github.ts';
 import { githubBudgetHooks } from './legacy.ts';
 import { createLinearClient, issueField, linearScope } from './linear.ts';
+
 import { FileLedgerStore, MemoryLedgerStore } from './store.ts';
 
 const quiet = () => undefined;
@@ -228,104 +229,6 @@ describe('Linear adapter', () => {
     );
     expect(issues.size).toBe(2);
     expect(seen).toBe(2);
-  });
-});
-
-describe('gh through the ledger', () => {
-  it('classifies gh invocations by bucket and mutation', () => {
-    expect(ghShape(['api', 'repos/o/r/pulls'])).toEqual({
-      resource: 'core',
-      write: false,
-      idempotent: true,
-    });
-    expect(
-      ghShape(['api', '-X', 'PATCH', 'repos/o/r/pulls/1', '-f', 'state=closed'])
-    ).toMatchObject({ write: true, idempotent: false });
-    expect(
-      ghShape(['api', 'repos/o/r/issues/1/comments', '-f', 'body=x'])
-    ).toMatchObject({ write: true });
-    expect(ghShape(['api', '-X', 'GET', 'search/issues', '-f', 'q=x'])).toEqual(
-      { resource: 'search', write: false, idempotent: true }
-    );
-    expect(
-      ghShape(['api', 'graphql', '-f', 'query=mutation { x }'])
-    ).toMatchObject({ resource: 'graphql', write: true });
-    expect(ghShape(['pr', 'list'])).toEqual({
-      resource: 'graphql',
-      write: false,
-      idempotent: true,
-    });
-    expect(ghShape(['pr', 'merge', '1'])).toMatchObject({ write: true });
-  });
-
-  it('splits --include output into headers and body', () => {
-    expect(
-      splitIncluded('HTTP/2.0 200 OK\nX-Ratelimit-Remaining: 7\n\n{"a":1}')
-    ).toEqual({ headers: { 'x-ratelimit-remaining': '7' }, body: '{"a":1}' });
-    expect(splitIncluded('{"a":1}')).toBeNull();
-  });
-
-  it('retries a secondary limit, records the budget, then defers polls below the reserve', async () => {
-    const clock = new FakeClock();
-    const store = new MemoryLedgerStore();
-    const replies = [
-      {
-        code: 1,
-        stdout: '',
-        stderr: 'gh: You have exceeded a secondary rate limit (HTTP 403)',
-      },
-      {
-        code: 0,
-        stdout: `HTTP/2.0 200 OK\nX-Ratelimit-Limit: 1000\nX-Ratelimit-Remaining: 200\nX-Ratelimit-Reset: ${Math.floor(clock.now / 1000) + 900}\nX-Ratelimit-Resource: core\n\n[]`,
-        stderr: '',
-      },
-    ];
-    const run: GhRunner = async () =>
-      replies.shift() ?? { code: 0, stdout: '[]', stderr: '' };
-    const base = {
-      store,
-      credential: 'c',
-      run,
-      now: clock.read,
-      sleep: clock.sleep,
-      random: () => 0,
-      log: quiet,
-    };
-    const first = await runGh(['api', 'repos/o/r/pulls'], {
-      ...base,
-      priority: 'merge',
-    });
-    expect(first).toMatchObject({ code: 0, stdout: '[]', deferred: false });
-    expect(clock.now - new FakeClock().now).toBeGreaterThanOrEqual(60_000);
-    const poll = await runGh(['api', 'repos/o/r/pulls'], {
-      ...base,
-      priority: 'poll',
-    });
-    expect(poll).toMatchObject({ code: 75, deferred: true });
-  });
-
-  it('passes real gh failures through without retrying', async () => {
-    let calls = 0;
-    const run: GhRunner = async () => {
-      calls += 1;
-      return {
-        code: 1,
-        stdout: '',
-        stderr:
-          'GraphQL: Could not resolve to a PullRequest with the number of 9.',
-      };
-    };
-    const clock = new FakeClock();
-    const result = await runGh(['pr', 'view', '9'], {
-      store: new MemoryLedgerStore(),
-      credential: 'c',
-      run,
-      now: clock.read,
-      sleep: clock.sleep,
-      log: quiet,
-    });
-    expect(result).toMatchObject({ code: 1, deferred: false });
-    expect(calls).toBe(1);
   });
 });
 

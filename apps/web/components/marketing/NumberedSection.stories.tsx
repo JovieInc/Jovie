@@ -7,6 +7,21 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
   },
+  decorators: [
+    Story => (
+      // Render the settled section; scroll timelines need a full page to advance.
+      <div data-numbered-section-story>
+        <style>{`
+          [data-numbered-section-story] .reveal-on-scroll {
+            animation: none;
+            opacity: 1;
+            transform: none;
+          }
+        `}</style>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     sectionNumber: '1.0',
     sectionTitle: 'Intake',

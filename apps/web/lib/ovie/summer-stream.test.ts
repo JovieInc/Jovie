@@ -361,3 +361,47 @@ describe('Summer UI message stream', () => {
     expect(encodeToolEvents(message.parts)).toHaveLength(1);
   });
 });
+
+describe('Summer fast-path progress and acknowledgement mapping', () => {
+  async function raw(events: SummerTurnEvent[]) {
+    const response = await createSummerAssistantStreamResponse({
+      events: (async function* () {
+        yield* events;
+      })(),
+      requestId: 'progress-stream',
+      corsHeaders: {},
+    });
+    return response.text();
+  }
+  const ack = {
+    requestId: 'chat_1',
+    route: 'chat',
+    model: 'zai/glm-5.3-flash',
+    ttftMs: 700,
+    totalMs: 900,
+  };
+
+  it('sends progress as transient data parts and the ack as message metadata', async () => {
+    const text = await raw([
+      {
+        type: 'progress',
+        progress: { kind: 'tool', name: 'spend', phase: 'start', ms: null },
+      },
+      { type: 'text-delta', text: 'Fine.' },
+      { type: 'ack', ack },
+      { type: 'state', state: 'completed' },
+    ]);
+    expect(text).toContain('"type":"data-summer-progress"');
+    expect(text).toContain('"transient":true');
+    expect(text).toContain('"summerAck"');
+  });
+
+  it('never shows an ack or progress that the speaker did not send', async () => {
+    const text = await raw([
+      { type: 'text-delta', text: 'Fine.' },
+      { type: 'state', state: 'completed' },
+    ]);
+    expect(text).not.toContain('data-summer-progress');
+    expect(text).not.toContain('summerAck');
+  });
+});

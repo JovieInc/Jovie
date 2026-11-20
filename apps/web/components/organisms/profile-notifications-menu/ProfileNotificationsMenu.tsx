@@ -231,7 +231,7 @@ export function ProfileNotificationsMenu({
     <>
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
-          <div>
+          <div inert={open}>
             <ProfileNotificationsButton
               ariaExpanded={open}
               buttonRef={triggerRef}
@@ -242,13 +242,22 @@ export function ProfileNotificationsMenu({
             />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
-          {/* ── Channels ─────────────────────────────── */}
-          <DropdownMenuLabel>How You Get Notified</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {smsEnabled && renderChannelMenuItem('sms', 'Text')}
-          {renderChannelMenuItem('email', 'Email')}
-
+        <DropdownMenuContent
+          aria-orientation={undefined}
+          aria-labelledby={undefined}
+          role='dialog'
+          aria-label='Notification Preferences'
+          align='end'
+          className='w-72'
+          sideOffset={8}
+        >
+          <div role='menu' aria-label='Notification Channels'>
+            {/* ── Channels ─────────────────────────────── */}
+            <DropdownMenuLabel>How You Get Notified</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {smsEnabled && renderChannelMenuItem('sms', 'Text')}
+            {renderChannelMenuItem('email', 'Email')}
+          </div>
           {/* ── Listening preference ───────────────────── */}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Listening Preference</DropdownMenuLabel>
@@ -274,35 +283,37 @@ export function ProfileNotificationsMenu({
             </p>
           </div>
 
-          {/* ── Content types ────────────────────────── */}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>What You Hear About</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
-            <DropdownMenuItem
-              key={key}
-              className='flex items-center'
-              onSelect={event => {
-                // Prevent menu from closing on toggle
-                event.preventDefault();
-                handleContentToggle(key);
-              }}
-            >
-              <div className='flex-1 min-w-0'>
-                <p className='text-sm font-semibold text-primary-token'>
-                  {label}
-                </p>
-                <p className='truncate text-xs text-tertiary-token'>
-                  {description}
-                </p>
-              </div>
-              <Switch
-                checked={contentPrefs[key]}
-                aria-label={`${label} notifications`}
-                className='shrink-0 pointer-events-none'
-              />
-            </DropdownMenuItem>
-          ))}
+          <div role='menu' aria-label='Notification Content'>
+            {/* ── Content types ────────────────────────── */}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>What You Hear About</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
+              <DropdownMenuItem
+                key={key}
+                className='flex items-center'
+                onSelect={event => {
+                  // Prevent menu from closing on toggle
+                  event.preventDefault();
+                  handleContentToggle(key);
+                }}
+              >
+                <div className='flex-1 min-w-0'>
+                  <p className='text-sm font-semibold text-primary-token'>
+                    {label}
+                  </p>
+                  <p className='truncate text-xs text-tertiary-token'>
+                    {description}
+                  </p>
+                </div>
+                <Switch
+                  checked={contentPrefs[key]}
+                  aria-label={`${label} notifications`}
+                  className='shrink-0 pointer-events-none'
+                />
+              </DropdownMenuItem>
+            ))}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -3,8 +3,12 @@
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { reportOvieHomePanelError } from '@/lib/ovie/home/panel-alerts';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
-import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import {
+  parseShippingCockpitProjection,
+  shippingCockpitProjectionIssue,
+} from '@/lib/ovie/shipping-state/client';
 import {
   applyShippingStateRead,
   createEmptyShippingStateView,
@@ -150,11 +154,17 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
         requestController.abort();
       }, SHIPPING_STATE_REQUEST_TIMEOUT_MS);
       let response: Response;
+      let payload: unknown = null;
       try {
         response = await fetch(url, {
           signal: requestController.signal,
           cache: 'no-store',
         });
+        try {
+          payload = await response.json();
+        } catch (error) {
+          if (requestController.signal.aborted) throw error;
+        }
       } catch {
         if (signal.aborted) {
           throw new DOMException('Aborted', 'AbortError');
@@ -175,12 +185,6 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
         signal.removeEventListener('abort', abortRequest);
       }
 
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        payload = null;
-      }
       if (signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
@@ -202,6 +206,12 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
       const parsed = response.ok
         ? parseShippingCockpitProjection(payload)
         : null;
+      if (response.ok && !parsed) {
+        reportOvieHomePanelError(
+          'shipping-projection',
+          shippingCockpitProjectionIssue(payload) ?? 'unknown'
+        );
+      }
       return snapshotFor(
         key,
         next.view,

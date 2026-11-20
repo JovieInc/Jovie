@@ -3,10 +3,14 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { getContactCertificationInspection } from '@/lib/admin/contact-certification';
 import { getCanonicalContactByKey } from '@/lib/admin/contacts';
+import { checkDogfoodJudgeGate } from '@/lib/agent-os/dogfood-judge-ledger';
+import { getDogfoodJudgeLedger } from '@/lib/agent-os/dogfood-judge-runtime-store';
 import type { ContactCertificationInspection } from '@/lib/contacts/certification';
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
+import { existingRelationshipHold } from '@/lib/leads/existing-relationships';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import {
   type OutboundLeadIdentity,
   recordOutboundDecision,
@@ -29,13 +33,24 @@ export async function loadOutboundLead(
       contactEmail: leads.contactEmail,
       instagramHandle: leads.instagramHandle,
       creatorProfileId: leads.creatorProfileId,
-      claimToken: leads.claimToken,
+      claimTokenHash: leads.claimTokenHash,
+      claimTokenExpiresAt: leads.claimTokenExpiresAt,
       avatarUrl: leads.avatarUrl,
+      bio: leads.bio,
     })
     .from(leads)
     .where(eq(leads.id, leadId))
     .limit(1);
-  return lead ?? null;
+  if (!lead) return null;
+  const { claimTokenHash, claimTokenExpiresAt, ...identity } = lead;
+  return {
+    ...identity,
+    claimToken: await resolveLeadClaimToken({
+      id: lead.id,
+      claimTokenHash,
+      claimTokenExpiresAt,
+    }),
+  };
 }
 
 /** The JOV-7321 per-fact inspection for the lead's canonical contact. */
@@ -53,7 +68,15 @@ export async function getOutboundCertification(
 
 type Result =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: OutboundRefusal };
+  | {
+      readonly ok: false;
+      readonly reason: OutboundRefusal;
+      /** Present when the dogfood judge gate denied. */
+      readonly judgeReasons?: readonly string[];
+    };
+
+/** Surface the outbound review cards are judged under. */
+export const OUTBOUND_JUDGE_SURFACE = 'outbound-review-cards';
 
 /**
  * Approve one target and one exact message revision. Requires the current
@@ -67,6 +90,18 @@ export async function approveOutbound(input: {
 }): Promise<Result> {
   const lead = await loadOutboundLead(input.leadId);
   if (!lead) return { ok: false, reason: 'not_found' };
+  // Hard gate, ahead of certification and the judge: no approval for an
+  // artist Tim already works with. recordOutboundDecision refuses it too.
+  if (
+    existingRelationshipHold({
+      handle: lead.linktreeHandle,
+      displayName: lead.displayName,
+      contactEmail: lead.contactEmail,
+      instagramHandle: lead.instagramHandle,
+      bio: lead.bio,
+    })
+  )
+    return { ok: false, reason: 'existing_relationship' };
   if (input.copy.channel === 'email' && !lead.contactEmail)
     return { ok: false, reason: 'no_channel' };
   if (input.copy.channel === 'dm' && !lead.instagramHandle)
@@ -74,6 +109,14 @@ export async function approveOutbound(input: {
   const certification = await getOutboundCertification(lead);
   if (certification?.status !== 'certified_for_outreach')
     return { ok: false, reason: 'not_certified' };
+  // No outreach becomes sendable unless the dogfood judge passes the cards.
+  const judge = await checkDogfoodJudgeGate(
+    getDogfoodJudgeLedger(),
+    OUTBOUND_JUDGE_SURFACE,
+    { prodSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null }
+  ).catch(() => ({ allow: false, reasons: ['gate-error'] }));
+  if (!judge.allow)
+    return { ok: false, reason: 'judge_denied', judgeReasons: judge.reasons };
   const target = await recordOutboundDecision({
     lead,
     actorUserId: input.actorUserId,

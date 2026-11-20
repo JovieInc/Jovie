@@ -1,6 +1,6 @@
 {
   "root": true,
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -12,6 +12,7 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.github/actions/vendor/**",
       "!apps/web/drizzle/migrations/**",
       "!**/.context/**",
       "!.agents/skills/gstack/**",
@@ -21,10 +22,12 @@
       "!**/.next",
       "!apps/web/styles/generated/**",
       "!apps/web/lib/design/generated/**",
+      "!apps/web/lib/agent-distribution/generated/**",
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
       "!apps/web/typecheck-stories-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
+      "!scripts/ci-trigger-registry.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!scripts/public-benchmark/receipts",
       "!docs/design-system/drift-ledger.json",
@@ -59,7 +62,10 @@
         "noDistractingElements": "error",
         "noHeaderScope": "error",
         "noInteractiveElementToNoninteractiveRole": "error",
-        "noLabelWithoutControl": "error",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": { "inputComponents": ["HostDrawnInput"] }
+        },
         "noNoninteractiveElementInteractions": "error",
         "noNoninteractiveElementToInteractiveRole": "error",
         "noNoninteractiveTabindex": "error",
@@ -146,6 +152,26 @@
   },
   "overrides": [
     {
+      "includes": ["workers/mesh-hub/src/**"],
+      "javascript": {
+        "globals": ["WebSocketPair", "WebSocketRequestResponsePair"]
+      }
+    },
+    {
+      "includes": ["scripts/agent/pen-instance-drift.js"],
+      "javascript": {
+        "globals": [
+          "Get",
+          "Print",
+          "Replace",
+          "Insert",
+          "Move",
+          "Delete",
+          "__penDrift"
+        ]
+      }
+    },
+    {
       "includes": [
         "scripts/invariants/copy-leak/config.json",
         "scripts/invariants/copy-leak/positive-fixtures.json"
@@ -214,6 +240,16 @@
   "css": {
     "parser": {
       "tailwindDirectives": true
+    }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
     }
   },
   "assist": {

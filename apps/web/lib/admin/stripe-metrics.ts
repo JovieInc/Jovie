@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
+import { getInternalStripeCustomerIds } from '@/lib/accounts/internal-stripe-customers.server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
@@ -301,18 +302,25 @@ function buildErrorResponse(message: string): AdminStripeOverviewMetrics {
  * Summer's read passed one, so the HUD/overview counted the founder's own
  * comped Pro subscription as revenue.
  */
-const DEFAULT_INTERNAL_FILTER: StripeMetricsFilter = {
-  isInternalCustomer: ({ email }) => isInternalOrTestAccountEmail(email),
-};
+export async function buildInternalCustomerFilter(): Promise<StripeMetricsFilter> {
+  // A failed lookup must fail the read, not silently under-exclude.
+  const internalCustomerIds = await getInternalStripeCustomerIds();
+  return {
+    isInternalCustomer: ({ id, email }) =>
+      (id !== null && internalCustomerIds.has(id)) ||
+      isInternalOrTestAccountEmail(email),
+  };
+}
 
 export async function getAdminStripeOverviewMetrics(
-  filter: StripeMetricsFilter = DEFAULT_INTERNAL_FILTER
+  explicitFilter?: StripeMetricsFilter
 ): Promise<AdminStripeOverviewMetrics> {
   if (!isStripeConfigured()) {
     return buildUnconfiguredResponse();
   }
 
   try {
+    const filter = explicitFilter ?? (await buildInternalCustomerFilter());
     const accumulator: SubscriptionMetricsAccumulator = {
       mrrCents: 0,
       activeSubscribers: 0,

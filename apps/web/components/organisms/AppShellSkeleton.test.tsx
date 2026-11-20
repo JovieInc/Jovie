@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AppShellSkeleton } from './AppShellSkeleton';
 
 describe('AppShellSkeleton', () => {
@@ -7,6 +8,21 @@ describe('AppShellSkeleton', () => {
     const { container } = render(<AppShellSkeleton />);
 
     expect(container.querySelector('.skeleton')).toBeTruthy();
+  });
+
+  it('scopes the Ovie canvas to its loading frame when switching workspaces', () => {
+    const { container, rerender } = render(
+      <AppShellSkeleton brandVariant='ov' />
+    );
+    const frame = container.querySelector(
+      '[data-app-shell-placeholder="true"]'
+    );
+
+    expect(frame).toHaveAttribute('data-app-shell-workspace', 'ov');
+
+    rerender(<AppShellSkeleton brandVariant='jovie' />);
+
+    expect(frame).not.toHaveAttribute('data-app-shell-workspace');
   });
 
   it.each(['jovie', 'ov'] as const)(
@@ -46,6 +62,24 @@ describe('AppShellSkeleton', () => {
     ).toBeNull();
   });
 
+  it('insets the skeleton headers with the same tokens as the loaded shell', () => {
+    const { container } = render(<AppShellSkeleton />);
+
+    // Loaded header: px-(--app-shell-header-padding-x). Loaded sidebar
+    // header: px-(--app-shell-sidebar-inset). A literal inset here shifts
+    // the row sideways when the fallback is replaced.
+    const header = container.querySelector('header');
+    expect(header).toHaveClass('px-app-header');
+    for (const node of container.querySelectorAll(
+      '.h-\\(--app-shell-header-height\\)'
+    )) {
+      expect(node).not.toHaveClass('px-2.5');
+    }
+    expect(
+      container.querySelector('.px-\\(--app-shell-sidebar-inset\\)')
+    ).not.toBeNull();
+  });
+
   it('renders an explicit null sidebar override without the default nav skeleton', () => {
     const { container } = render(<AppShellSkeleton sidebar={null} />);
 
@@ -80,5 +114,35 @@ describe('AppShellSkeleton', () => {
     const status = container.querySelector('[role="status"]');
     expect(status).toBeTruthy();
     expect(status?.textContent).toContain('Loading your workspace');
+  });
+
+  it.each([
+    ['default loading', {}],
+    ['collapsed sidebar', { sidebarCollapsed: true }],
+    ['Ovie brand', { brandVariant: 'ov' as const }],
+    ['no sidebar', { sidebar: null }],
+    [
+      'long main override',
+      {
+        main: (
+          <p>
+            Preparing the release workspace for The Extraordinarily Long Album
+            Title That Keeps Going Well Past Any Reasonable Line Length
+          </p>
+        ),
+      },
+    ],
+  ])('has no axe violations in the %s state', async (_label, props) => {
+    const { container } = render(<AppShellSkeleton {...props} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <AppShellSkeleton main={<p>جارٍ تحميل مساحة العمل الخاصة بك…</p>} />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

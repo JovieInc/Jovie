@@ -11,13 +11,13 @@ Process ALL open pull requests to zero. Run once, walk away, come back to an emp
 
 This command has two modes:
 
-- **Lead/read-only mode:** Chief of Staff, default, CFO, Founder OS, and Code Orchestrator profiles may inventory PRs, classify blockers, enable safe GitHub-side auto-merge/update-branch actions, comment with status, and create repair manifests.
+- **Lead/read-only mode:** A session that is not `coder` may inventory PRs, classify blockers, enable safe GitHub-side auto-merge/update-branch actions, comment with status, and create repair manifests. Hermes profiles are retired. Do not select one.
 - **Implementation mode:** only a dispatched `coder` profile with a HUD/delegation manifest may check out branches, edit files, commit, push, or run repair validation.
 
 Before any checkout/edit/commit/push action, verify all of these are true:
 
 1. `JOVIE_AGENT_PROFILE=coder` or equivalent runtime profile is set.
-2. A manifest exists with `hud_id`, `kpi`, `owner`, `hermes_profile`, `runtime`, `model_route`, `worktree`, `gstack_skills`, `gbrain_queries`, `hard_gates`, `expected_output`, and `verification`.
+2. A manifest exists with `hud_id`, `kpi`, `owner`, `runtime`, `model_route`, `worktree`, `gstack_skills`, `gbrain_queries`, `hard_gates`, `expected_output`, and `verification`. There is no Hermes profile field.
 3. The manifest authorizes this PR and this branch.
 4. No hard gate is present: merge, deploy, destructive cleanup, credential/auth/payment change, migration, dependency replacement, or production-impacting script.
 
@@ -62,7 +62,7 @@ Classify each PR into one of these states:
 - **CONFLICT**: Has merge conflicts that need resolution
 - **FAILING_CHECKS**: CI failures (lint, typecheck, tests)
 - **REVIEW_BLOCKED**: Has requested changes or blocking reviews
-- **COMMENT_PENDING**: Has unaddressed review comments (AI or human)
+- **COMMENT_PENDING**: Has unaddressed human review comments (resolve bot comments yourself)
 - **DUPLICATE**: Overlaps with another PR addressing the same concern
 - **STUCK**: No progress possible without human intervention
 
@@ -73,7 +73,8 @@ This phase runs FIRST because it resolves the most PRs with the least effort.
 For EVERY open PR (unless it has conflicts or is a duplicate):
 
 ### 1a. Convert drafts that are ready
-If a draft PR has all checks passing and no unresolved comments:
+If a draft PR has all checks passing and no unresolved human comments (bot
+threads never hold a green PR: fix or answer them, then resolve them yourself):
 ```bash
 gh pr ready <NUMBER>
 ```
@@ -229,7 +230,7 @@ git merge origin/main
 
 3. **After resolving**, run full validation:
 ```bash
-pnpm install
+pnpm install --offline --frozen-lockfile
 pnpm turbo typecheck --filter=@jovie/web
 pnpm biome check .
 pnpm vitest --run --changed

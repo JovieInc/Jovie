@@ -7,16 +7,10 @@ import { describe, it } from 'node:test';
 
 import * as linear from '../linear-client.mjs';
 import { reconcileIssues } from '../reconcile.mjs';
-
-const jsonResponse = (
-  body,
-  { status = 200, contentType = 'application/json', headers = {} } = {}
-) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  headers: new Headers({ 'content-type': contentType, ...headers }),
-  text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
-});
+import {
+  concurrentRateLimitedFetches,
+  jsonResponse,
+} from './fixtures/linear-transport.mjs';
 
 let clock = Date.now();
 /** @param {string} query @param {any} variables @param {any} options */
@@ -34,14 +28,25 @@ function graphql(query, variables, options) {
 function withKey(key, fn) {
   const previous = process.env.LINEAR_API_KEY;
   const previousDir = process.env.LINEAR_BACKOFF_STATE_DIR;
+  const previousFallback = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
   const directory = fs.mkdtempSync(join(tmpdir(), 'linear-backoff-test-'));
+  // A failed publication keeps its deadline in the per-uid tmp fallback
+  // root, which LINEAR_BACKOFF_STATE_DIR does not isolate: a replay inside
+  // the deadline window reads the earlier run's fallback record and never
+  // reaches the failure under test. Each test owns its fallback root.
+  const fallback = fs.mkdtempSync(join(tmpdir(), 'linear-fallback-test-'));
   process.env.LINEAR_BACKOFF_STATE_DIR = directory;
+  process.env.LINEAR_COOLDOWN_FALLBACK_DIR = fallback;
   clock = Date.now();
   process.env.LINEAR_API_KEY = key;
   return Promise.resolve(fn()).finally(() => {
     fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(fallback, { recursive: true, force: true });
     if (previousDir === undefined) delete process.env.LINEAR_BACKOFF_STATE_DIR;
     else process.env.LINEAR_BACKOFF_STATE_DIR = previousDir;
+    if (previousFallback === undefined)
+      delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+    else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previousFallback;
     if (previous === undefined) delete process.env.LINEAR_API_KEY;
     else process.env.LINEAR_API_KEY = previous;
   });
@@ -758,6 +763,7 @@ describe('durable credential budget', () => {
   it('composes simultaneous cooldown writers by the latest reset without shortening it', async () => {
     await withKey('concurrent-secret', async () => {
       const now = clock;
+      const { requests, fetchFor } = concurrentRateLimitedFetches(2);
       await Promise.all(
         [120, 30].map(seconds =>
           assert.rejects(
@@ -766,16 +772,17 @@ describe('durable credential budget', () => {
               {},
               {
                 rateLimitMaxAttempts: 1,
-                fetchImpl: async () =>
-                  jsonResponse(
-                    {},
-                    { status: 429, headers: { 'retry-after': String(seconds) } }
-                  ),
+                fetchImpl: fetchFor(seconds),
               }
             ),
-            isLimited
+            (/** @type {any} */ error) =>
+              isLimited(error) && error.attempts === 1
           )
         )
+      );
+      assert.deepEqual(
+        requests.sort((a, b) => a - b),
+        [30, 120]
       );
       clock = now + 60_000;
       await assert.rejects(
@@ -789,7 +796,9 @@ describe('durable credential budget', () => {
           }
         ),
         (/** @type {any} */ error) =>
-          isLimited(error) && error.metadata.resetAt === now + 120_000
+          isLimited(error) &&
+          error.attempts === 0 &&
+          error.metadata.resetAt === now + 120_000
       );
     });
   });

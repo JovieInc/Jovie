@@ -17,10 +17,15 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
+import {
+  type LegacyNudge,
+  legacyNudgeForDashboard,
+} from '@/lib/claim/legacy-verification';
+import { countPendingCreatorInboxActions } from '@/lib/connectors/opportunity-inbox-data';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
-import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -31,7 +36,6 @@ import {
 } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
-import { suggestedActions } from '@/lib/db/schema/connectors';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorProfile,
@@ -50,7 +54,6 @@ import {
   type BioLinkActivation,
   getBioLinkActivationWindowEnd,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
-  isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
 import {
@@ -60,7 +63,6 @@ import {
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
-  PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
 } from '@/lib/inbox/navigation-availability';
@@ -72,7 +74,17 @@ import {
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
+import {
+  degradeAvatarQualityRead,
+  isCommitTransportFailure,
+  isIdleTransactionTermination,
+} from './avatar-quality-degrade';
+import {
+  degradeDistributionEventsRead,
+  degradeSocialLinksRead,
+  isDashboardReadRecoveryAdmitted,
+  tolerateMissingTourDatesConfirmationStatus,
+} from './dashboard-read-recovery';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -163,10 +175,15 @@ export interface DashboardData {
   isFirstSession?: boolean;
   /** Settled server-derived Inbox availability for conditional shell navigation. */
   inboxNavigation?: InboxNavigationAvailability;
+  /**
+   * Grandfathered claim waiting for a real proof (claim-verify spec Q2).
+   * Null when the selected profile is not a legacy claim. No UI reads it yet.
+   */
+  legacyNudge?: LegacyNudge | null;
 }
 
 export interface ProfileCompletionStep {
-  id: 'name' | 'avatar' | 'email' | 'music-links';
+  id: 'name' | 'avatar' | 'handle' | 'music-links';
   label: string;
   description: string;
   href: string;
@@ -213,15 +230,6 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
-
-function isIdleTransactionTermination(error: unknown): boolean {
-  const { code } = unwrapPgError(error);
-  return code
-    ? code === '25P03'
-    : /terminating connection due to idle-in-transaction timeout/i.test(
-        getDeepErrorMessage(error)
-      );
-}
 
 async function buildBioLinkActivation(
   clerkUserId: string,
@@ -278,48 +286,13 @@ async function buildBioLinkActivation(
     {
       maxRetries: 1,
       baseDelayMs: DB_CONFIG.retryDelay,
-      isRetryable: error =>
-        isIdleTransactionTermination(error) ||
-        (isRetryableError(error) && !isPostgresTimeoutError(error)),
+      isRetryable: isDashboardReadRecoveryAdmitted,
     }
-  ).catch((error: unknown) => {
+  ).catch((error: unknown) =>
     // The transaction wrapper has completed rollback/release before a
     // tolerated failure becomes fallback data or another read is attempted.
-    if (isMissingCreatorDistributionEventsTableError(error)) {
-      Sentry.logger.warn(
-        '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
-        { profileId: profile.id }
-      );
-      return [];
-    }
-
-    const migrationResult = handleMigrationErrors(error, {
-      userId: profile.id,
-      operation: 'creator_distribution_events',
-    });
-
-    if (!migrationResult.shouldRetry) {
-      return (migrationResult.fallbackData ?? []) as Array<{
-        createdAt: Date;
-        eventType: string;
-      }>;
-    }
-
-    const level =
-      isQueryTimeoutError(error) || isPostgresTimeoutError(error)
-        ? 'warning'
-        : 'error';
-
-    Sentry.captureException(error, {
-      level,
-      tags: {
-        query: 'creator_distribution_events',
-        context: 'dashboard_data_settled',
-      },
-      extra: { profileId: profile.id },
-    });
-    return [];
-  });
+    degradeDistributionEventsRead(error, profile.id)
+  );
 
   for (const eventRow of eventRows) {
     const eventType = eventRow.eventType as BioLinkActivationEventType;
@@ -389,36 +362,19 @@ async function fetchSocialLinkExistence(
       maxRetries: 1,
       baseDelayMs: 0,
       isRetryable: error =>
-        isIdleTransactionTermination(error) &&
+        isDashboardReadRecoveryAdmitted(error) &&
         performance.now() < retryDeadline,
     }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
-    .catch((error: unknown) => {
+    .catch((error: unknown) =>
       // Cleanup has finished before tolerated failures become fallback data.
-      const migrationResult = handleMigrationErrors(error, {
-        userId,
-        operation,
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return { hasLinks: false, hasMusicLinks: false };
-      }
-
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: operation,
-          context,
-        },
-      });
-      return { hasLinks: false, hasMusicLinks: false };
-    });
+      degradeSocialLinksRead(error, { context, operation, userId })
+    );
 }
 
 function buildProfileCompletion(
   selectedProfile: CreatorProfile | null,
-  email: string | null | undefined,
   hasMusicLinks: boolean
 ): ProfileCompletion {
   if (!selectedProfile) {
@@ -444,7 +400,7 @@ function buildProfileCompletion(
   const completion = calculateRequiredProfileCompletion({
     displayName: selectedProfile.displayName,
     avatarUrl: selectedProfile.avatarUrl,
-    email,
+    handle: selectedProfile.username,
     hasMusicLinks: hasMusicPresence,
   });
 
@@ -468,11 +424,12 @@ function buildProfileCompletion(
     });
   }
 
-  if (!completion.hasEmail) {
+  if (!completion.hasHandle) {
     steps.push({
-      id: 'email',
-      label: 'Add Your Account Email',
-      description: 'Email keeps your account recoverable and mission-critical.',
+      id: 'handle',
+      label: 'Claim Your Handle',
+      description:
+        'Your jov.ie handle is how fans find and share your profile.',
       href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
@@ -490,7 +447,10 @@ function buildProfileCompletion(
     completion.hasName &&
     completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    hasMusicPresence;
+    hasMusicPresence &&
+    // A private page waiting for ownership proof is set up, not public.
+    (selectedProfile.isPublic !== false ||
+      isProofBlockingPublication(selectedProfile.settings));
 
   return {
     percentage: completion.percentage,
@@ -522,17 +482,12 @@ async function loadInboxNavigationAvailability(
   if (!profileId) return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
 
   try {
-    const pendingSuggestedActions = await dashboardQuery(
-      () =>
-        tx
-          .select({ count: drizzleSql<number>`count(*)` })
-          .from(suggestedActions)
-          .where(
-            and(
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, PENDING_SUGGESTED_ACTION_STATUS)
-            )
-          ),
+    // Shared creator-review eligibility (countPendingCreatorInboxActions):
+    // operator-only pending rows (Ovie captures, founder/ops/ovie sources)
+    // never raise the badge, and the count is the uncapped total — never
+    // derived from the feed's capped candidate page.
+    const pendingSuggestedActionCount = await dashboardQuery(
+      () => countPendingCreatorInboxActions(userId, tx),
       'Inbox navigation suggested actions count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
@@ -549,23 +504,12 @@ async function loadInboxNavigationAvailability(
           ),
       'Inbox navigation tour dates count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-    ).catch((error: unknown) => {
-      // Migration drift (JOV-4857): migration 0042 (tour_dates
-      // .confirmation_status) not yet applied on prod. Degrade to 0 pending
-      // so the dashboard still renders and the 'Failed query' Sentry alert
-      // stops firing. Any other error still throws to the outer catch.
-      if (!isMissingTourDatesConfirmationStatusError(error)) {
-        throw error;
-      }
-      Sentry.logger.warn(
-        '[Dashboard] tour_dates.confirmation_status missing (migration drift); treating pending tour-date count as 0',
-        { profileId }
-      );
-      return [{ count: 0 }];
-    });
+    ).catch((error: unknown) =>
+      tolerateMissingTourDatesConfirmationStatus(error, profileId)
+    );
 
     return resolveInboxNavigationAvailability(
-      Number(pendingSuggestedActions[0]?.count ?? 0),
+      pendingSuggestedActionCount,
       Number(pendingTourDates[0]?.count ?? 0)
     );
   } catch (error) {
@@ -589,6 +533,20 @@ async function loadInboxNavigationAvailability(
     if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
       logger.warn(
         '[inbox-navigation] inbox count read timed out; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
+    // Transient Neon transport failures (dropped connections, postmaster
+    // exits, commit-wired transport kills) are infrastructure conditions on
+    // a fail-soft read — the same class the avatar/social-links boundaries
+    // degrade log-only (JOV-8864/JOV-8900). The count runs on the shared
+    // session transaction, so a killed transport cannot be replayed on the
+    // same tx; degrade log-only instead of paging Sentry (JOV-12477,
+    // Sentry 7846577230: `Failed query: select count(*) from
+    // "suggested_actions"` on a Neon suspend kill).
+    if (isDashboardReadRecoveryAdmitted(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read hit a transient transport failure; degrading to unknown availability'
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }
@@ -734,11 +692,7 @@ function createE2EDashboardCoreData(clerkUserId: string): CoreData {
     hasSocialLinks: false,
     hasMusicLinks: true,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(
-      profile,
-      'e2e-chat-smoke@example.test',
-      true
-    ),
+    profileCompletion: buildProfileCompletion(profile, true),
     bioLinkActivation: null,
     isFirstSession: false,
   };
@@ -756,7 +710,7 @@ function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
     hasSocialLinks: false,
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(null, null, false),
+    profileCompletion: buildProfileCompletion(null, false),
     bioLinkActivation: null,
     isFirstSession: false,
     ...overrides,
@@ -911,15 +865,26 @@ async function fetchDashboardBaseWithSession(
     hasSocialLinks: false,
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
-    profileCompletion: buildProfileCompletion(selected, userData.email, false),
+    profileCompletion: buildProfileCompletion(selected, false),
     bioLinkActivation: null,
     inboxNavigation,
+    legacyNudge: legacyNudgeForDashboard(selected.settings, new Date()),
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
 }
 
-/** Retry only this pure read after an idle-terminated setup has closed. */
+/**
+ * Retry only this pure read after an idle-terminated setup or a dropped
+ * connection has closed (JOV-8837).
+ *
+ * A read-only transaction's COMMIT can die on the wire after a Neon
+ * idle-in-transaction timeout without a 25P03 SQLSTATE or idle text —
+ * Drizzle then surfaces `Failed query: commit` wrapping a lost connection,
+ * which the idle-only predicate never recovers. The callback already
+ * succeeded and wrote nothing, so replaying this side-effect-free read once
+ * is unambiguous (JOV-3775 forbids replay only for uncertain writes).
+ */
 async function fetchAvatarQualityWithSession(
   clerkUserId: string,
   profileId: string
@@ -939,11 +904,16 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    if (
-      !isIdleTransactionTermination(error) ||
-      performance.now() >= retryDeadline
-    )
-      throw error;
+    // Same recovery admission as the distribution read: idle termination, a
+    // commit-wrapped transport failure (the `Failed query: commit` wrapper
+    // proves the callback succeeded and only the commit died — JOV-12096),
+    // or a transient transport failure that is not a PostgreSQL timeout (a
+    // statement timeout replaying immediately would only double the wait).
+    const recoverable =
+      isIdleTransactionTermination(error) ||
+      (isCommitTransportFailure(error) && !isPostgresTimeoutError(error)) ||
+      (isRetryableError(error) && !isPostgresTimeoutError(error));
+    if (!recoverable || performance.now() >= retryDeadline) throw error;
 
     // The first wrapper has completed rollback/release. RLS reporting remains
     // intact; only this side-effect-free avatar read gets one fresh attempt.
@@ -1007,16 +977,7 @@ async function fetchDashboardCoreWithSession(
     const avatarQuality = await fetchAvatarQualityWithSession(
       clerkUserId,
       selected.id
-    ).catch((error: unknown) => {
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: 'avatar_quality',
-          context: 'dashboard_data_settled',
-        },
-      });
-      return UNKNOWN_AVATAR_QUALITY;
-    });
+    ).catch((error: unknown) => degradeAvatarQualityRead(error, selected.id));
 
     const tippingStats = await withDbSessionTx(
       async tx => fetchTippingStatsWithSession(tx, selected.id),
@@ -1030,24 +991,13 @@ async function fetchDashboardCoreWithSession(
 
     const hasMusicLinks = linkCounts.hasMusicLinks;
 
-    // base.user contains { id, email, activeProfileId } at runtime,
-    // but CoreData.user is typed as { id: string }. Cast to access email
-    // for profileCompletion without an extra DB query.
-    const userEmail =
-      (base.user as { id: string; email?: string | null } | null)?.email ??
-      null;
-
     return {
       ...base,
       avatarQuality,
       hasSocialLinks: linkCounts.hasLinks,
       hasMusicLinks,
       tippingStats,
-      profileCompletion: buildProfileCompletion(
-        selected,
-        userEmail,
-        hasMusicLinks
-      ),
+      profileCompletion: buildProfileCompletion(selected, hasMusicLinks),
       bioLinkActivation,
     };
   } catch (error) {

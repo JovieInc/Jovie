@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { Icon } from '@/components/atoms/Icon';
+import { CreditList } from '@/components/molecules/CreditList';
 import { APP_ROUTES } from '@/constants/routes';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import {
@@ -28,11 +29,12 @@ import {
   SmartLinkShell,
 } from '@/features/release/SmartLinkShell';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
+import type { ProviderKey } from '@/lib/discography/types';
 import {
-  formatReleaseArtistLine,
-  formatReleaseArtistLineParts,
-} from '@/lib/discography/formatting';
-import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
+  type StorefrontProvider as Provider,
+  useStorefrontProviders,
+} from '@/lib/discography/useStorefrontProviders';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -42,14 +44,6 @@ import {
   resolveSmartLinkOutboundUtmParams,
   SMART_LINK_DEFAULT_UTM_PARAMS,
 } from '@/lib/utm';
-
-interface Provider {
-  key: ProviderKey;
-  label: string;
-  accent: string;
-  url: string | null;
-  confidence?: ProviderConfidence;
-}
 
 export interface FeaturedArtist {
   readonly name: string;
@@ -164,16 +158,22 @@ function SmartLinkClaimBanner({
     () => `smartlink:claim-banner:dismissed:${profileId}`,
     [profileId]
   );
-  const [isDismissed, setIsDismissed] = useState(
-    () => globalThis.localStorage?.getItem(dismissalKey) === '1'
-  );
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    setIsDismissed(globalThis.localStorage?.getItem(dismissalKey) === '1');
+    try {
+      setIsDismissed(globalThis.localStorage?.getItem(dismissalKey) === '1');
+    } catch {
+      setIsDismissed(false);
+    }
   }, [dismissalKey]);
 
   const handleDismiss = useCallback(() => {
-    globalThis.localStorage?.setItem(dismissalKey, '1');
+    try {
+      globalThis.localStorage?.setItem(dismissalKey, '1');
+    } catch {
+      // Storage may be unavailable in private/sandboxed browsing contexts.
+    }
     setIsDismissed(true);
   }, [dismissalKey]);
 
@@ -183,7 +183,10 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div
+      className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'
+      data-testid='smartlink-claim-banner'
+    >
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
@@ -194,7 +197,7 @@ function SmartLinkClaimBanner({
           </p>
           <Link
             href={signupUrl}
-            className='text-foreground/90 hover:text-foreground mt-2 inline-flex items-center gap-1 text-2xs font-semibold transition-colors'
+            className='text-foreground/90 hover:text-foreground relative mt-2 inline-flex items-center gap-1 rounded-sm text-2xs font-semibold transition-colors focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
           >
             Claim profile
             <Icon name='ArrowRight' className='h-3 w-3' aria-hidden='true' />
@@ -203,7 +206,7 @@ function SmartLinkClaimBanner({
         <button
           type='button'
           onClick={handleDismiss}
-          className='text-muted-foreground hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors'
+          className='text-muted-foreground hover:text-foreground relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
           aria-label='Dismiss Claim Profile Banner'
         >
           <Icon name='X' className='h-3.5 w-3.5' aria-hidden='true' />
@@ -244,6 +247,15 @@ function SmartLinkCreditName({
   return <span className='text-white/70'>{name}</span>;
 }
 
+function creditHandlesByName(artists: readonly FeaturedArtist[]) {
+  const handles = new Map<string, string | null>();
+  for (const artist of artists) {
+    const name = artist.name.trim();
+    if (name && !handles.has(name)) handles.set(name, artist.handle ?? null);
+  }
+  return handles;
+}
+
 function SmartLinkArtistLine({
   artist,
   primaryArtists,
@@ -254,71 +266,43 @@ function SmartLinkArtistLine({
   featuredArtists?: readonly FeaturedArtist[];
 }>) {
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
-  const featuredArtistKeyCounts = new Map<string, number>();
-  const getFeaturedArtistKey = (name: string, handle: string | null) => {
-    const base = handle ?? name;
-    const count = featuredArtistKeyCounts.get(base) ?? 0;
-    featuredArtistKeyCounts.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
-
   const bylineArtists =
     primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
-  const artistByHandle = new Map(
-    bylineArtists.map(entry => [entry.name, entry])
-  );
-  const bylineParts = formatReleaseArtistLineParts(
-    bylineArtists.map(entry => entry.name)
-  );
-  const bylinePartKeys = new Map<string, number>();
-  const getBylinePartKey = (type: string, value: string) => {
-    const base = `${type}:${value}`;
-    const count = bylinePartKeys.get(base) ?? 0;
-    bylinePartKeys.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
+  const bylineHandleByName = creditHandlesByName(bylineArtists);
+  const featuredHandleByName = creditHandlesByName(featuredArtists ?? []);
 
   return (
     <p
       className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
       data-testid='smart-link-artist-byline'
     >
-      {bylineParts.map(part =>
-        part.type === 'element' ? (
+      <CreditList
+        names={bylineArtists.map(entry => entry.name)}
+        renderName={name => (
           <SmartLinkCreditName
-            key={getBylinePartKey(part.type, part.value)}
-            name={part.value}
-            handle={artistByHandle.get(part.value)?.handle ?? null}
+            name={name}
+            handle={bylineHandleByName.get(name) ?? null}
             ownerHandle={artist.handle}
             ownerName={artist.name}
           />
-        ) : (
-          <span
-            key={getBylinePartKey(part.type, part.value)}
-            className='text-white/70'
-          >
-            {part.value}
-          </span>
-        )
-      )}
+        )}
+        literalClassName='text-white/70'
+      />
       {hasFeatured ? (
         <>
           <span className='text-white/40'> feat. </span>
-          {featuredArtists.map((fa, i) => (
-            <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
-              {i > 0 && (
-                <span className='text-white/40'>
-                  {i === featuredArtists.length - 1 ? ' & ' : ', '}
-                </span>
-              )}
+          <CreditList
+            names={featuredArtists.map(entry => entry.name)}
+            renderName={name => (
               <SmartLinkCreditName
-                name={fa.name}
-                handle={fa.handle}
+                name={name}
+                handle={featuredHandleByName.get(name) ?? null}
                 ownerHandle={artist.handle}
                 ownerName={artist.name}
               />
-            </span>
-          ))}
+            )}
+            literalClassName='text-white/40'
+          />
         </>
       ) : null}
     </p>
@@ -350,13 +334,7 @@ export function ReleaseLandingPage({
     setMenuOpen(initialMenuOpen);
   }, [initialMenuOpen]);
 
-  const clickableProviders = useMemo(
-    () =>
-      providers.filter((provider): provider is Provider & { url: string } =>
-        Boolean(provider.url)
-      ),
-    [providers]
-  );
+  const clickableProviders = useStorefrontProviders(providers);
   const resolvedUtmParams = useMemo(
     () => resolveReleaseUtmParams(utmParams),
     [utmParams]
@@ -370,6 +348,9 @@ export function ReleaseLandingPage({
     ) ?? artist.name;
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
   const sharePathname = getReleaseSharePathname(artist.handle, shareSlug);
+  const reportAt = parentRelease
+    ? `${parentRelease.url}/${shareSlug}`
+    : sharePathname;
   const shareContext = useMemo(
     () =>
       createReleaseShareContext({
@@ -433,16 +414,14 @@ export function ReleaseLandingPage({
             )
           : undefined
       }
-      heroOverlay={
-        <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
-          <div className='min-w-0 flex-1'>
-            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
-            <SmartLinkArtistLine
-              artist={artist}
-              primaryArtists={primaryArtists}
-              featuredArtists={featuredArtists}
-            />
-          </div>
+      heroMeta={
+        <div className='min-w-0'>
+          <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+          <SmartLinkArtistLine
+            artist={artist}
+            primaryArtists={primaryArtists}
+            featuredArtists={featuredArtists}
+          />
         </div>
       }
     >
@@ -483,7 +462,7 @@ export function ReleaseLandingPage({
                 {downloadUrl ? (
                   <Link
                     href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
-                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-(--color-text-tooltip) transition-colors hover:bg-white/15'
+                    className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-(--color-text-tooltip) transition-colors hover:bg-white/15 focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                   >
                     Download files
                   </Link>
@@ -491,7 +470,7 @@ export function ReleaseLandingPage({
                 {artist.handle ? (
                   <Link
                     href={`/${artist.handle}`}
-                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                    className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                   >
                     Visit artist profile
                   </Link>
@@ -499,7 +478,7 @@ export function ReleaseLandingPage({
                 <button
                   type='button'
                   onClick={() => setShareOpen(true)}
-                  className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                  className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                 >
                   Share release
                 </button>
@@ -508,12 +487,9 @@ export function ReleaseLandingPage({
           )}
         </div>
 
-        {/* Footer — always pinned at bottom */}
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
           <SmartLinkPoweredByFooter
-            reportTarget={
-              tracking?.smartLinkSlug ? (sharePathname ?? null) : null
-            }
+            reportTarget={tracking?.smartLinkSlug ? (reportAt ?? null) : null}
           />
         </div>
       </div>

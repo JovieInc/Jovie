@@ -55,13 +55,17 @@ describe('search adapters go through the api-client contract', () => {
   it('firecrawl: time-bounded search, errors surface as failures', async () => {
     const f = fakeFetch(() => ({
       body: {
-        data: [
-          {
-            url: 'https://f',
-            title: 'F',
-            description: '[x](https://y) ![i](z) ## d',
-          },
-        ],
+        success: true,
+        data: {
+          web: [
+            {
+              url: 'https://f',
+              title: 'F',
+              description: '[x](https://y) ![i](z) ## d',
+              position: 1,
+            },
+          ],
+        },
       },
     }));
     const out = await firecrawlSearch(
@@ -69,9 +73,13 @@ describe('search adapters go through the api-client contract', () => {
       'q',
       'month'
     );
-    expect(f.calls[0].url).toBe('https://api.firecrawl.dev/v1/search');
+    expect(f.calls[0].url).toBe('https://api.firecrawl.dev/v2/search');
+    expect(out.hits).toHaveLength(1);
+    expect(out.hits[0].url).toBe('https://f');
     expect(out.hits[0].snippet).toBe('x d');
-    expect((f.calls[0].body as { tbs?: string }).tbs).toBe('qdr:m');
+    const sent = f.calls[0].body as { tbs?: string; sources?: string[] };
+    expect(sent.tbs).toBe('qdr:m');
+    expect(sent.sources).toEqual(['web']);
     const bad = fakeFetch(() => ({
       status: 402,
       body: { error: 'Insufficient credits' },
@@ -212,10 +220,11 @@ describe('rendering', () => {
         ],
       })
     );
-    expect(text.split('\n')[1]).toContain('PRIOR DECISIONS');
+    expect(text).toContain('DEGRADED:');
+    expect(text).toContain('PRIOR DECISIONS');
     expect(text).toContain('skipped: exa:cap dailyUsd 1');
     expect(renderResult(sampleResult({ hits: [] }))).toContain(
-      'No relevant results'
+      'No verified external evidence'
     );
   });
 });

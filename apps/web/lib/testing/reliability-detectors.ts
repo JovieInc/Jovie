@@ -96,7 +96,7 @@ export const RELIABILITY_DETECTORS: readonly ReliabilityDetector[] = [
       'apps/web/scripts/check-bug-to-test-rule.ts',
       'apps/web/tests/unit/lib/testing/bug-to-test-rule.test.ts',
       'apps/web/dangerfile.ts',
-      '.github/PULL_REQUEST_TEMPLATE.md',
+      '.github/pull_request_template.md',
     ],
   },
   {

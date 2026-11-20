@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { LoadingSkeleton, Skeleton } from './skeleton';
 
@@ -319,5 +320,59 @@ describe('LoadingSkeleton', () => {
       expect(status.querySelectorAll('[role="status"]')).toHaveLength(0);
       expect(status.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
     });
+  });
+});
+
+describe('Skeleton state stories', () => {
+  it('reserves many lines for long content with a shorter last line', () => {
+    render(
+      <LoadingSkeleton
+        lines={8}
+        height='h-3'
+        label='Loading the full release description'
+      />
+    );
+
+    const owner = screen.getByRole('status', {
+      name: 'Loading the full release description',
+    });
+    const lines = owner.querySelectorAll('[data-slot="skeleton"]');
+    expect(lines).toHaveLength(8);
+    expect(lines[6]).toHaveClass('w-full', 'h-3');
+    expect(lines[7]).toHaveClass('w-3/4', 'h-3');
+  });
+
+  it('announces an RTL label from the single loading owner', () => {
+    render(
+      <div dir='rtl'>
+        <LoadingSkeleton lines={3} label='جارٍ تحميل الملف الشخصي' />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'جارٍ تحميل الملف الشخصي' })
+    ).toHaveAttribute('aria-busy', 'true');
+  });
+});
+
+describe('Skeleton accessibility', () => {
+  it('has no axe violations for shimmer, static, partial, long and RTL placeholders', async () => {
+    const { container } = render(
+      <div>
+        <Skeleton className='h-10 w-64' />
+        <Skeleton className='h-10 w-64' shimmer={false} />
+        <div className='flex items-center gap-3'>
+          <Skeleton className='size-10 shrink-0' rounded='full' />
+          <p>Tim White</p>
+          <LoadingSkeleton height='h-3' label='Loading listener stats' />
+        </div>
+        <LoadingSkeleton lines={8} height='h-3' label='Loading description' />
+        <div dir='rtl' lang='ar'>
+          <LoadingSkeleton lines={3} label='جارٍ تحميل الملف الشخصي' />
+        </div>
+      </div>
+    );
+
+    await expectNoA11yViolations(container);
   });
 });

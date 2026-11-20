@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
 import { FounderFunnelDrilldown } from '@/components/features/admin/hud/FounderFunnelDrilldown';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { GoldenPathFunnelPanel } from '@/components/features/admin/leads/GoldenPathFunnelPanel';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
 import {
   GtmFunnel,
@@ -11,8 +12,10 @@ import {
 } from '@/components/features/admin/leads/GtmFunnel';
 import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
+import { PmfMetricsPanel } from '@/components/features/admin/leads/PmfMetricsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { getArtistOfferFunnelReport } from '@/lib/acquisition/artist-offer-funnel.server';
 import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
 import {
   getFounderFunnelData,
@@ -20,6 +23,7 @@ import {
   isFounderFunnelDrilldownStage,
 } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getPmfMetrics } from '@/lib/admin/pmf-metrics';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
 import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
@@ -53,14 +57,20 @@ export default async function AdminGrowthPage({
   const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
     ? params.funnelStage
     : null;
-  const [counts, funnel, lifecycleMetrics, drilldown] = await Promise.all([
-    getLeadFunnelCounts(),
-    getFounderFunnelData(params.funnelRange),
-    getCanonicalContactMetrics(),
-    drilldownStage
-      ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
-      : Promise.resolve(null),
-  ]);
+  const [counts, funnel, lifecycleMetrics, drilldown, goldenPath, pmf] =
+    await Promise.all([
+      getLeadFunnelCounts(),
+      getFounderFunnelData(params.funnelRange),
+      getCanonicalContactMetrics(),
+      drilldownStage
+        ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
+        : Promise.resolve(null),
+      // A failed read renders an honest error state, never a fake zero.
+      getArtistOfferFunnelReport()
+        .then(report => report.goldenPath ?? null)
+        .catch(() => null),
+      getPmfMetrics(),
+    ]);
 
   return (
     <AdminPage
@@ -79,6 +89,8 @@ export default async function AdminGrowthPage({
           urlSearchParams={urlSearchParams}
         />
       ) : null}
+      <GoldenPathFunnelPanel report={goldenPath} />
+      <PmfMetricsPanel metrics={pmf} />
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

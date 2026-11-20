@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
 import { fastRender } from '@/tests/utils/fast-render';
 
@@ -91,6 +91,10 @@ vi.mock('@/lib/chat/copy-markdown', () => ({
 }));
 
 describe('ChatMessage', () => {
+  afterEach(() => {
+    window.localStorage.removeItem('jovie:chat-verbose');
+  });
+
   it('renders user messages as compact CTA-style pills', () => {
     const messageProps = {
       id: 'user-1',
@@ -318,6 +322,8 @@ describe('ChatMessage', () => {
   });
 
   it('renders one generic tool as an indented subordinate activity row without card chrome', () => {
+    // Unconfirmed tool rows are hidden by default; layout is checked in verbose mode.
+    window.localStorage.setItem('jovie:chat-verbose', '1');
     const messageProps = {
       id: 'assistant-tool-1',
       role: 'assistant' as const,
@@ -348,6 +354,8 @@ describe('ChatMessage', () => {
   });
 
   it('connects multiple generic tools with timeline lines in one quiet activity run', () => {
+    // Unconfirmed tool rows are hidden by default; layout is checked in verbose mode.
+    window.localStorage.setItem('jovie:chat-verbose', '1');
     const messageProps = {
       id: 'assistant-tool-2',
       role: 'assistant' as const,

@@ -1,8 +1,14 @@
 import { z } from 'zod';
 import {
+  musicResolveFailureSchema,
   musicResolveOutputSchema,
   musicResolveSchema,
 } from '@/lib/music-resolver/public-schemas';
+import {
+  GOLDEN_PATH_OPENAPI_PATHS,
+  GOLDEN_PATH_OPENAPI_SCHEMAS,
+} from './golden-path-openapi';
+import { MUSIC_RPC_OPENAPI_SCHEMAS } from './music-rpc-openapi';
 import type {
   JsonSchema,
   OpenApiOperation,
@@ -79,6 +85,38 @@ const body = (name: string) => ({
   content: { 'application/json': { schema: ref(name) } },
 });
 
+function musicResolveResponse(
+  description: string,
+  schema: string,
+  retryable = false
+): OpenApiResponse {
+  const response = jsonResponse(description, ref(schema), retryable);
+  return {
+    ...response,
+    headers: {
+      ...response.headers,
+      Link: {
+        description: 'Active v1 lifecycle policy pointer.',
+        schema: { type: 'string' },
+      },
+      'RateLimit-Policy': {
+        description:
+          'Shared public-artist IP quota: 100 requests per 60 seconds.',
+        schema: { type: 'string' },
+      },
+      RateLimit: {
+        description: 'Remaining requests and seconds to reset when available.',
+        schema: { type: 'string' },
+      },
+      'X-Request-Id': {
+        description:
+          'Server-generated request identifier; supplied IDs are ignored.',
+        schema: { type: 'string', format: 'uuid' },
+      },
+    },
+  };
+}
+
 const guide = (summary: string, artist = false): OpenApiOperation => ({
   operationId: artist ? 'getArtistGuide' : 'getAgentGuide',
   summary,
@@ -107,6 +145,7 @@ const guide = (summary: string, artist = false): OpenApiOperation => ({
 export const PUBLIC_AGENT_PATHS: Readonly<
   Record<string, Partial<Record<'get' | 'post', OpenApiOperation>>>
 > = {
+  ...GOLDEN_PATH_OPENAPI_PATHS,
   '/api/agents/creator-lookup': {
     get: {
       operationId: 'lookupCreator',
@@ -248,6 +287,64 @@ export const PUBLIC_AGENT_PATHS: Readonly<
         ),
         '499': jsonResponse('Request cancelled', ref('MusicHttpError')),
         '503': jsonResponse('Limiter unavailable', ref('MusicHttpError'), true),
+      },
+    },
+  },
+  '/api/v1/music/resolve': {
+    post: {
+      operationId: 'resolvePublicMusicV1',
+      summary: 'Resolve public artist, track or album identity',
+      description:
+        'Anonymous read-only music capability, using exactly the MCP resolve schema and resolver. No tenant data, profile creation, claims, publishing or charges. Artist input accepts a name, MusicBrainz artist ID or supported artist HTTPS URL. Track input accepts a URL, ISRC or title with artist; album input accepts a URL, UPC or title with artist. Territory applies to tracks/albums only. Ambiguity returns real candidates; resubmit the selected candidate URL. no_match and ambiguous are successful domain outcomes. Aggregate confidence is legacy heuristic evidence, not calibrated assurance. Canonical persisted revisions, history, batch/jobs, freshness/field selection, spend authorization and tenant credentials are not supported by this resource; unknown request fields are rejected. Body limit is 16384 bytes, body deadline 5 seconds and provider deadline 45 seconds. Cancellation aborts provider work when the server runtime propagates a client disconnect; deployed propagation is separate commissioning evidence. Read retries may repeat upstream work; no durable replay snapshot is promised. Unknown Origin is denied. Response facts and errors match MCP structuredContent; REST additionally maps failures to HTTP statuses. This is not vendor compatibility or full parity certification.',
+      security: [],
+      requestBody: body('MusicResolveInput'),
+      responses: {
+        '200': musicResolveResponse(
+          'Resolved, ambiguous or no match',
+          'MusicResolveOutput'
+        ),
+        '400': musicResolveResponse(
+          'Invalid JSON, input or unsupported fields',
+          'MusicResolveFailure'
+        ),
+        '403': musicResolveResponse(
+          'Origin not allowed',
+          'MusicResolveFailure'
+        ),
+        '408': musicResolveResponse(
+          'Body read timed out',
+          'MusicResolveFailure',
+          true
+        ),
+        '413': musicResolveResponse(
+          'Body exceeds 16384 bytes',
+          'MusicResolveFailure'
+        ),
+        '415': musicResolveResponse(
+          'Content-Type must be application/json',
+          'MusicResolveFailure'
+        ),
+        '429': musicResolveResponse(
+          'Client IP quota exceeded',
+          'MusicResolveFailure',
+          true
+        ),
+        '499': musicResolveResponse('Request cancelled', 'MusicResolveFailure'),
+        '502': musicResolveResponse(
+          'Provider failed or returned invalid data',
+          'MusicResolveFailure',
+          true
+        ),
+        '503': musicResolveResponse(
+          'Quota store unavailable',
+          'MusicResolveFailure',
+          true
+        ),
+        '504': musicResolveResponse(
+          'Provider deadline exceeded',
+          'MusicResolveFailure',
+          true
+        ),
       },
     },
   },
@@ -402,112 +499,11 @@ export const PUBLIC_AGENT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       },
     },
   },
-  MusicHttpError: {
-    type: 'object',
-    required: ['error'],
-    properties: {
-      error: {
-        type: 'object',
-        required: ['code', 'retryable'],
-        properties: {
-          code: {
-            type: 'string',
-            enum: [
-              'BODY_TIMEOUT',
-              'CANCELLED',
-              'INVALID_BODY',
-              'RATE_LIMITED',
-              'RATE_LIMIT_UNAVAILABLE',
-            ],
-          },
-          retryable: { type: 'boolean' },
-        },
-      },
-    },
-  },
-  MusicParseError: {
-    type: 'object',
-    required: ['error'],
-    properties: { error: { type: 'string' }, details: { type: 'string' } },
-  },
+  ...MUSIC_RPC_OPENAPI_SCHEMAS,
+  MusicResolveFailure: z.toJSONSchema(musicResolveFailureSchema) as JsonSchema,
   MusicResolveInput: z.toJSONSchema(musicResolveSchema, {
     io: 'input',
   }) as JsonSchema,
   MusicResolveOutput: z.toJSONSchema(musicResolveOutputSchema) as JsonSchema,
-  MusicResolveRpcRequest: {
-    type: 'object',
-    required: ['jsonrpc', 'id', 'method', 'params'],
-    properties: {
-      jsonrpc: { type: 'string', enum: ['2.0'] },
-      id: { type: ['string', 'integer'] },
-      method: { type: 'string', enum: ['tools/call'] },
-      params: {
-        type: 'object',
-        required: ['name', 'arguments'],
-        properties: {
-          name: { type: 'string', enum: ['resolve'] },
-          arguments: ref('MusicResolveInput'),
-        },
-      },
-    },
-  },
-  MusicResolveRpcResponse: {
-    type: 'object',
-    required: ['jsonrpc', 'id'],
-    properties: {
-      jsonrpc: { type: 'string', enum: ['2.0'] },
-      id: { type: ['string', 'integer', 'null'] },
-      error: {
-        type: 'object',
-        required: ['code', 'message'],
-        properties: { code: { type: 'integer' }, message: { type: 'string' } },
-      },
-      result: {
-        type: 'object',
-        required: ['content'],
-        properties: {
-          content: {
-            type: 'array',
-            items: {
-              type: 'object',
-              required: ['type', 'text'],
-              properties: {
-                type: { type: 'string', enum: ['text'] },
-                text: { type: 'string' },
-              },
-            },
-          },
-          isError: { type: 'boolean' },
-          structuredContent: {
-            oneOf: [
-              ref('MusicResolveOutput'),
-              {
-                type: 'object',
-                required: ['error'],
-                properties: {
-                  error: {
-                    type: 'object',
-                    required: ['code', 'retryable'],
-                    properties: {
-                      code: {
-                        type: 'string',
-                        enum: [
-                          'CANCELLED',
-                          'INVALID_INPUT',
-                          'UNKNOWN_TOOL',
-                          'UPSTREAM_FAILURE',
-                          'UPSTREAM_TIMEOUT',
-                        ],
-                      },
-                      retryable: { type: 'boolean' },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      },
-    },
-  },
+  ...GOLDEN_PATH_OPENAPI_SCHEMAS,
 };

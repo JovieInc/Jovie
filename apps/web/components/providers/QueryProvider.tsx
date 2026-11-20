@@ -10,12 +10,16 @@ import {
 import dynamic from 'next/dynamic';
 import { type ReactNode, useEffect, useState } from 'react';
 import { getFeedbackErrorMessage, toast } from '@/components/feedback';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { isDevChromeDisabledClient } from '@/lib/demo-recording';
 import {
   applyCacheScope,
   type CacheFenceReason,
+  classifyCacheScopeChange,
   copyShareableQueryData,
+  getCacheGeneration,
+  getCacheScope,
   subscribeCacheFence,
 } from '@/lib/queries/cache-isolation';
 import {
@@ -117,6 +121,7 @@ const createQueryClientConfig = (): QueryClientConfig => ({
 // Browser: singleton QueryClient for consistent cache across navigations
 // Server: new client per request (handled by server.ts)
 let browserQueryClient: QueryClient | undefined;
+let browserQueryClientGeneration = -1;
 
 /**
  * Canonical API-error feedback fallback (JOV feedback system).
@@ -150,22 +155,39 @@ function getQueryClient(): QueryClient {
   // Browser: reuse singleton for cache persistence across navigations
   if (!browserQueryClient) {
     browserQueryClient = createClient();
+    browserQueryClientGeneration = getCacheGeneration();
+  } else if (browserQueryClientGeneration !== getCacheGeneration()) {
+    // A scope can change while no provider is mounted. Never reuse that
+    // retired private cache on the next mount.
+    return fenceBrowserQueryClient('account-change', getCacheGeneration());
   }
   return browserQueryClient;
 }
 
-export function fenceBrowserQueryClient(reason: CacheFenceReason): QueryClient {
+export function fenceBrowserQueryClient(
+  reason: CacheFenceReason,
+  generation?: number
+): QueryClient {
+  if (
+    generation !== undefined &&
+    browserQueryClient &&
+    browserQueryClientGeneration === generation
+  ) {
+    return browserQueryClient;
+  }
   const previous = browserQueryClient ?? createClient();
   const next = createClient();
   copyShareableQueryData(previous, next, reason);
   void previous.cancelQueries();
   previous.clear();
   browserQueryClient = next;
+  browserQueryClientGeneration = generation ?? getCacheGeneration();
   return next;
 }
 
 export function resetBrowserQueryClientForTests(): void {
   browserQueryClient = undefined;
+  browserQueryClientGeneration = -1;
 }
 
 export function getBrowserQueryClientForTests(): QueryClient | undefined {
@@ -190,11 +212,43 @@ interface QueryProviderProps {
  * - Dashboard/app: Use TanStack Query (client caching, background refresh)
  */
 export function QueryProvider({ children }: QueryProviderProps) {
-  const { userId, sessionId, isLoaded, isSignedIn } = useAuthSafe();
+  const {
+    userId,
+    sessionId,
+    isLoaded,
+    isSignedIn,
+    bootstrapSessionPending = false,
+  } = useAuthSafe();
   // Use useState to ensure client gets the singleton on hydration
-  const [queryClient, setQueryClient] = useState(getQueryClient);
+  const [{ client: queryClient, generation }, setQueryClient] = useState(
+    () => ({
+      client: getQueryClient(),
+      generation: getCacheGeneration(),
+    })
+  );
 
-  useEffect(() => {
+  // Subscribe before applying this provider's scope, including on first mount.
+  useIsomorphicLayoutEffect(() => {
+    const unsubscribe = subscribeCacheFence(event => {
+      if (event.reason === 'hydrate' || event.reason === 'manual') return;
+      setQueryClient({
+        client: fenceBrowserQueryClient(event.reason, event.generation),
+        generation: event.generation,
+      });
+    });
+    // Descendant layout effects may already have fenced before this parent
+    // subscribed. Synchronize that committed generation before the first paint.
+    const client = getQueryClient();
+    const currentGeneration = getCacheGeneration();
+    setQueryClient(current =>
+      current.client === client && current.generation === currentGeneration
+        ? current
+        : { client, generation: currentGeneration }
+    );
+    return unsubscribe;
+  }, []);
+
+  useIsomorphicLayoutEffect(() => {
     if (!isLoaded) {
       return;
     }
@@ -202,18 +256,22 @@ export function QueryProvider({ children }: QueryProviderProps) {
       userId: isSignedIn ? userId : null,
       sessionId: isSignedIn ? sessionId : null,
       ready: true,
+      bootstrapSessionPending,
       ...(isSignedIn ? {} : { profileId: null, impersonationSubject: null }),
     });
-  }, [isLoaded, isSignedIn, userId, sessionId]);
+  }, [isLoaded, isSignedIn, userId, sessionId, bootstrapSessionPending]);
 
-  useEffect(() => {
-    return subscribeCacheFence(event => {
-      if (event.reason === 'hydrate' || event.reason === 'manual') {
-        return;
-      }
-      setQueryClient(fenceBrowserQueryClient(event.reason));
-    });
-  }, []);
+  const currentScope = getCacheScope();
+  const pendingFence = isLoaded
+    ? classifyCacheScopeChange(currentScope, {
+        ...currentScope,
+        userId: isSignedIn ? userId : null,
+        sessionId: isSignedIn ? sessionId : null,
+        ready: true,
+        bootstrapSessionPending,
+        ...(isSignedIn ? {} : { profileId: null, impersonationSubject: null }),
+      })
+    : null;
 
   // Gated E2E-only hook: exposes window.__JOVIE_E2E_INVALIDATE_QUERIES__ so
   // Playwright specs can trigger a TanStack Query invalidation and assert the
@@ -238,8 +296,8 @@ export function QueryProvider({ children }: QueryProviderProps) {
   }, [queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
+    <QueryClientProvider key={generation} client={queryClient}>
+      {pendingFence && pendingFence !== 'hydrate' ? null : children}
       <DevToolsLoader />
     </QueryClientProvider>
   );

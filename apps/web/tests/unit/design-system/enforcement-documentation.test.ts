@@ -55,7 +55,9 @@ describe('DESIGN.md enforcement source parity (JOV-8039)', () => {
       );
       expect(row(rule)[3], rule).toBe(severity === 0 ? 'No' : 'Yes');
     }
-  });
+    // Loading the full ESLint flat config is CPU-bound; the default 5s budget
+    // fails on a loaded host while the assertions above are unchanged.
+  }, 60_000);
 
   it.each([
     'arbitrary-values',

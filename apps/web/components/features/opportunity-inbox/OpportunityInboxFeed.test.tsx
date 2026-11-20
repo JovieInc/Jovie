@@ -98,14 +98,13 @@ const SOCIAL_REPLY_CARD: OpportunityInboxCardViewModel = {
 };
 
 describe('creator inbox composition', () => {
-  it('uses creator decisions without a founder stack or recorder when Inbox Home is on', () => {
+  it('uses creator decisions without a founder stack or recorder without rollout configuration', () => {
     render(
       <OpportunityInboxFeed
         cards={[{ ...SUGGESTION_CARD, sourceKind: undefined }]}
         onApprove={vi.fn()}
         onDismiss={vi.fn()}
         onFeedback={vi.fn()}
-        enableStackInteractions
       />
     );
     expect(screen.queryByTestId('founder-stack')).not.toBeInTheDocument();
@@ -122,7 +121,6 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
         onApprove={vi.fn()}
         onDismiss={vi.fn()}
         onFeedback={vi.fn()}
-        enableStackInteractions
       />
     );
 
@@ -137,14 +135,13 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     );
   });
 
-  it('keeps YouTube thumbnail candidates on the creator stack when swipe review is on', () => {
+  it('keeps YouTube thumbnail candidates on the creator stack during swipe review', () => {
     render(
       <OpportunityInboxFeed
         cards={[YOUTUBE_CARD, SUGGESTION_CARD]}
         onApprove={vi.fn()}
         onDismiss={vi.fn()}
         onFeedback={vi.fn()}
-        enableStackInteractions
       />
     );
 
@@ -154,7 +151,7 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     expect(screen.queryByTestId('founder-stack')).not.toBeInTheDocument();
   });
 
-  it('renders the YouTube swipe card in the list feed and wires decision actions', async () => {
+  it('renders the YouTube swipe card and wires decision actions', async () => {
     const user = userEvent.setup();
     const onApprove = vi.fn();
     const onDismiss = vi.fn();
@@ -182,49 +179,43 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     expect(onDismiss).toHaveBeenCalledWith('yt-feed-1');
   });
 
-  it.each([false, true])(
-    'preserves social reply actions and provenance (stack=%s)',
-    async enableStackInteractions => {
-      const user = userEvent.setup();
-      const onApprove = vi.fn();
-      const onDismiss = vi.fn();
-      const onRevise = vi.fn();
+  it('preserves social reply actions and provenance', async () => {
+    const user = userEvent.setup();
+    const onApprove = vi.fn();
+    const onDismiss = vi.fn();
+    const onRevise = vi.fn();
 
-      render(
-        <OpportunityInboxFeed
-          enableStackInteractions={enableStackInteractions}
-          cards={[SOCIAL_REPLY_CARD]}
-          onApprove={onApprove}
-          onDismiss={onDismiss}
-          onFeedback={vi.fn()}
-          onRevise={onRevise}
-        />
-      );
+    render(
+      <OpportunityInboxFeed
+        cards={[SOCIAL_REPLY_CARD]}
+        onApprove={onApprove}
+        onDismiss={onDismiss}
+        onFeedback={vi.fn()}
+        onRevise={onRevise}
+      />
+    );
 
-      expect(
-        screen.getByTestId('opportunity-inbox-card-reply-1')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId('social-reply-draft-reply-1')
-      ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('opportunity-inbox-card-reply-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('social-reply-draft-reply-1')
+    ).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
-      await user.click(screen.getByRole('button', { name: 'Dismiss' }));
-      await user.click(screen.getByRole('button', { name: 'Revise' }));
-      await user.type(
-        screen.getByLabelText('Revision feedback for Jovie'),
-        'Make it warmer'
-      );
-      await user.click(
-        screen.getByRole('button', { name: 'Request revision' })
-      );
+    await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    await user.click(screen.getByRole('button', { name: 'Revise' }));
+    await user.type(
+      screen.getByLabelText('Revision feedback for Jovie'),
+      'Make it warmer'
+    );
+    await user.click(screen.getByRole('button', { name: 'Request revision' }));
 
-      expect(onApprove).toHaveBeenCalledWith('reply-1');
-      expect(onDismiss).toHaveBeenCalledWith('reply-1');
-      expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
-      expect(screen.getByLabelText('Revision feedback for Jovie')).toHaveValue(
-        'Make it warmer'
-      );
-    }
-  );
+    expect(onApprove).toHaveBeenCalledWith('reply-1');
+    expect(onDismiss).toHaveBeenCalledWith('reply-1');
+    expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
+    expect(screen.getByLabelText('Revision feedback for Jovie')).toHaveValue(
+      'Make it warmer'
+    );
+  });
 });

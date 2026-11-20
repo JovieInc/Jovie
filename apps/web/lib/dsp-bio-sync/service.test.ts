@@ -32,13 +32,16 @@ const f = vi.hoisted(() => ({
   limit: vi.fn(),
 }));
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/artist-rules/store', () => ({
+  listEnforcedArtistRules: vi.fn(async () => []),
+}));
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: async (run: (tx: unknown) => unknown) =>
     run({ select: f.select }),
 }));
 vi.mock('@/lib/db', () => ({ db: { select: f.select } }));
-vi.mock('@/lib/notifications/providers/resend', () => ({
-  ResendEmailProvider: class {
+vi.mock('@/lib/notifications/providers/gateway', () => ({
+  GatewayEmailProvider: class {
     sendEmail = f.send;
   },
 }));

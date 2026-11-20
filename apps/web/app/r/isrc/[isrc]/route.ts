@@ -15,8 +15,10 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { discogRecordings } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isCreatorRowPubliclyVisible } from '@/lib/profile/public-creator-visibility.server';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
@@ -59,22 +61,37 @@ export async function GET(
     return new NextResponse('Invalid ISRC format', { status: 400 });
   }
 
-  // Look up recording + creator handle in one query
+  // Look up recording + creator publication visibility in one query
   const [record] = await db
     .select({
       slug: discogRecordings.slug,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      isPublic: creatorProfiles.isPublic,
+      settings: creatorProfiles.settings,
+      ownerEmail: users.email,
     })
     .from(discogRecordings)
     .innerJoin(
       creatorProfiles,
       eq(creatorProfiles.id, discogRecordings.creatorProfileId)
     )
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(discogRecordings.isrc, normalizedIsrc))
     .limit(1);
 
-  if (!record?.usernameNormalized) {
-    return new NextResponse('Track not found', { status: 404 });
+  if (
+    !record?.usernameNormalized ||
+    !isCreatorRowPubliclyVisible({
+      handle: record.usernameNormalized,
+      isPublic: record.isPublic,
+      ownerEmail: record.ownerEmail,
+      settings: record.settings,
+    })
+  ) {
+    return new NextResponse('Track not found', {
+      status: 404,
+      headers: NO_STORE_HEADERS,
+    });
   }
 
   // Build canonical URL and redirect

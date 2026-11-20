@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/TruncatedText.test.tsx
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { memo, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,8 @@ interface TruncatedTextProps {
   readonly tooltipAlign?: 'start' | 'center' | 'end';
   /** Always show tooltip regardless of truncation */
   readonly alwaysShowTooltip?: boolean;
+  /** Optional title attribute forwarded to the text span (e.g. the full credit list behind a truncated line). */
+  readonly title?: string;
 }
 
 /**
@@ -33,7 +36,7 @@ interface TruncatedTextProps {
  *
  * @example
  * // Two-line truncation with fixed height
- * <TruncatedText lines={2} className="min-h-[2.5rem]">
+ * <TruncatedText lines={2} className="min-h-10">
  *   This is a longer description that spans multiple lines
  * </TruncatedText>
  */
@@ -44,6 +47,7 @@ export const TruncatedText = memo(function TruncatedText({
   tooltipSide = 'top',
   tooltipAlign = 'start',
   alwaysShowTooltip = false,
+  title,
 }: TruncatedTextProps) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -75,6 +79,7 @@ export const TruncatedText = memo(function TruncatedText({
     <span
       ref={textRef}
       className={cn(lines === 1 ? 'line-clamp-1' : 'line-clamp-2', className)}
+      title={title}
     >
       {children}
     </span>

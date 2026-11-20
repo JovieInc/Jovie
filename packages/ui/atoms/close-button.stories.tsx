@@ -54,3 +54,49 @@ export const IconSizes: Story = {
     </div>
   ),
 };
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='relative w-72 rounded-xl border border-subtle bg-surface-1 p-5 pr-14'>
+      <p className='font-medium text-primary-token'>
+        Remove Midnight Sessions (Extended Club Mix) from every smart link and
+        pre-save campaign?
+      </p>
+      <button type='button' className={closeButtonClassName} aria-label='Close'>
+        <CloseButtonIcon />
+      </button>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long dialog title wraps beside the anchored close control; the header reserves inline space so text never runs under the 44px target.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      className='relative w-72 rounded-xl border border-subtle bg-surface-1 p-5 pr-14'
+    >
+      <p className='font-medium text-primary-token'>
+        إزالة الإصدار من جميع الروابط الذكية وحملات الحفظ المسبق؟
+      </p>
+      <button type='button' className={closeButtonClassName} aria-label='إغلاق'>
+        <CloseButtonIcon />
+      </button>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left header: the close control keeps its physical top-right anchor and the wrapped Arabic title reserves room for it.',
+      },
+    },
+  },
+};

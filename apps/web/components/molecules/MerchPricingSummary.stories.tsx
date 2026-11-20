@@ -30,3 +30,33 @@ export const Compact: Story = {
     compact: true,
   },
 };
+
+/** The recommendation priced the sale but not the profit yet; ChatMerchCard
+ * falls back to $0.00 for the missing half. */
+export const PartialProfitPending: Story = {
+  args: {
+    salePrice: '$28.00',
+    profit: '$0.00',
+  },
+};
+
+export const LongContentPrices: Story = {
+  args: {
+    salePrice: 'CA$1,249,999.99',
+    profit: 'CA$1,034,567.89',
+  },
+};
+
+export const RtlPrices: Story = {
+  args: {
+    salePrice: '٢٨٫٠٠ US$',
+    profit: '١٠٫٤٠ US$',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar' className='w-48'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -33,7 +33,6 @@ import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
 const CMD_LABEL = String.fromCodePoint(0x2318);
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
@@ -156,7 +155,9 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       />
     );
 
-    expect(screen.getByText('No matches')).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'No matches' })
+    ).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });
@@ -763,7 +764,6 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(prefetchMock).not.toHaveBeenCalled();
 
     fireEvent.keyDown(input, { key: 'Enter' });
-
     expect(onAdditionalSelect).toHaveBeenCalledWith('upload-audio');
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onSelectAudio).not.toHaveBeenCalled();

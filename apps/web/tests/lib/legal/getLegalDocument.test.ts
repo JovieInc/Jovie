@@ -6,10 +6,10 @@ describe('getLegalDocument', () => {
     const doc = await getLegalDocument('privacy');
 
     expect(doc.title).toBe('Privacy Policy');
-    expect(doc.lastUpdated).toBe('February 2026');
+    expect(doc.lastUpdated).toBe('October 2026');
     expect(doc.practicalSummary).toContain('collect only what is essential');
     expect(doc.html).not.toContain('<h2 id="privacy-policy"');
-    expect(doc.html).not.toContain('Last updated: February 2026');
+    expect(doc.html).not.toContain('Last updated: October 2026');
   });
 
   it('renders cookie policy GFM tables in the legal body', async () => {

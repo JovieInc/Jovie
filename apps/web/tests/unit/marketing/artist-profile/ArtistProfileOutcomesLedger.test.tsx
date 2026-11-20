@@ -10,7 +10,7 @@ describe('ArtistProfileOutcomesCarousel (feature-grid 4-ledger)', () => {
       <ArtistProfileOutcomesCarousel outcomes={ARTIST_PROFILE_COPY.outcomes} />
     );
 
-    const ledger = screen.getByRole('list', { name: 'Fan Outcomes' });
+    const ledger = screen.getByRole('list', { name: 'Audience Outcomes' });
     expect(ledger.tagName).toBe('OL');
 
     const rows = screen.getAllByTestId('artist-profile-outcome-card');

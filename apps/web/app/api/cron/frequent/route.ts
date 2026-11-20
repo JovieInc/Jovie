@@ -1,25 +1,23 @@
 /**
  * Consolidated Frequent Cron Handler
  *
- * Runs every 15 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
+ * Runs every 30 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
  * One cold start + one DB connection serves all jobs.
  *
  * Representative sub-jobs (docs/CRON_REGISTRY.md is the complete registry):
- * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
- * - Process campaigns: every invocation (15 min)
- * - Pixel forwarding retry: every other invocation (~30 min)
- * - Schedule + send release notifications: every invocation (15 min)
+ * - DB warm ping (keeps Neon awake) and campaigns: every invocation
+ * - Pixel forwarding retry: every other invocation (hourly)
+ * - Schedule + send release notifications: every invocation
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
+ * - Proof stats (public counts) refresh + freshness withdrawal: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
- *
- * Schedule: every 15 minutes (configured in vercel.json)
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
@@ -32,6 +30,10 @@ import {
   assertCanaryReceiptsFresh,
   CanaryReceiptFreshnessError,
 } from '@/lib/canaries/receipt-freshness';
+import {
+  getReleaseEmailCanaryStatus,
+  runReleaseEmailCanary,
+} from '@/lib/canaries/release-email.server';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db, withRetry } from '@/lib/db';
@@ -42,10 +44,12 @@ import {
 } from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { captureError } from '@/lib/error-tracking';
+import { founderWelcomeJob } from '@/lib/founder-welcome/server';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
   processJob,
+  SELF_MANAGED_JOB_TYPES,
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -56,8 +60,11 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
+import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
+import { proofStatsCronJob } from '@/lib/proof-stats/cron.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -161,19 +168,38 @@ export async function GET(request: Request) {
   // JOV-7895: reuse the hourly detector slot; two Redis reads, no new cron.
   // Missing, stale or unreadable reports fail loud through the existing Sentry
   // error path even when acquisition/outreach is disabled.
+  // JOV-9779: hourly release-email canary. Evaluates the canary release it
+  // triggered last hour, then triggers the next one; steps 4-5 below schedule
+  // and send it in this same invocation. One synthetic release and at most one
+  // email to the synthetic canary inbox per hour; nothing when unconfigured.
+  results.releaseEmailCanary =
+    minute < 15
+      ? await runSubJob('releaseEmailCanary', async () => {
+          const receipt = await runReleaseEmailCanary(new Date());
+          return { ...receipt } as unknown as Record<string, unknown>;
+        })
+      : { success: true, skipped: true };
+
   results.canaryReceiptFreshness =
     minute < 15
       ? await runSubJob('canaryReceiptFreshness', async () => {
-          const [auth, profile] = await Promise.all([
+          const [auth, profile, releaseEmail] = await Promise.all([
             getAuthSignupOnboardingCanaryStatus(),
             getPublicProfileCanaryStatus(),
+            getReleaseEmailCanaryStatus(),
           ]);
           return assertCanaryReceiptsFresh(
-            { 'auth-signup-onboarding': auth, 'public-profile': profile },
+            {
+              'auth-signup-onboarding': auth,
+              'public-profile': profile,
+              'release-email': releaseEmail,
+            },
             new Date()
           );
         })
       : { success: true, skipped: true };
+
+  results.proofStats = await proofStatsCronJob(minute, runSubJob);
 
   // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.
   results.companyState = await runSubJob('companyState', async () => {
@@ -187,6 +213,10 @@ export async function GET(request: Request) {
     };
   });
 
+  // Hourly Ovie backstops: company history and the fleet room (webhook-first).
+  results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+  results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
+
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
   // One indexed KV read per run; at most 100 compare-and-set writes.
@@ -194,6 +224,8 @@ export async function GET(request: Request) {
     'summerCardDefaults',
     async () => ({ ...(await applySummerCardDefaults(new Date())) })
   );
+  // Welcome cards per admitted visitor; sends only the ones Tim approved.
+  results.founderWelcome = await runSubJob('founderWelcome', founderWelcomeJob);
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {
@@ -229,11 +261,12 @@ export async function GET(request: Request) {
   // 6. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
     // Fetch settings (upsert default if missing).
-    // COST GATE (JOV-1901): `leadPipelineSettings.enabled` is DB-backed and
-    // defaults to false (see makeDefaultSettings() in /api/admin/leads/settings).
-    // When enabled=true, SerpAPI is called every 15 min → 96 calls/day.
-    // DO NOT flip this flag without documenting expected SerpAPI cost in the
-    // enabling PR. Keep disabled while GTM is paused.
+    // COST GATE (JOV-1901, JOV-12539): `enabled` defaults to false.
+    // Discovery spends at most `daily_query_budget` SerpAPI searches a day
+    // (10 per run). At SEARCH_QUERY_COST_USD.serpapi ($0.015), the approved
+    // sample budget of 100 is at most $1.50/day. Auto-ingest stays off.
+    // A larger budget goes back to Tim. Outreach still sends nothing:
+    // Instantly is default-off and audience delivery is hard-denied.
     let [settings] = await db
       .select()
       .from(leadPipelineSettings)
@@ -247,54 +280,61 @@ export async function GET(request: Request) {
         .returning();
     }
 
-    if (!settings?.enabled || !settings.discoveryEnabled) {
+    if (!settings?.enabled) {
       return { skipped: true, reason: 'pipeline_disabled' };
     }
 
-    // Reset daily query budget if past reset time (or never initialized)
-    settings = await resetBudgetIfNeeded(settings);
+    // Discovery (SerpAPI spend) stays behind its own `discoveryEnabled` flag.
+    let discoveryResult: Awaited<ReturnType<typeof runDiscovery>> | null = null;
+    if (settings.discoveryEnabled) {
+      // Reset daily query budget if past reset time (or never initialized)
+      settings = await resetBudgetIfNeeded(settings);
 
-    const keywords = await db.select().from(discoveryKeywords);
-    const discoveryResult = await runDiscovery(settings, keywords);
+      const keywords = await db.select().from(discoveryKeywords);
+      discoveryResult = await runDiscovery(settings, keywords);
 
-    // Health warning: zero results across all queries
-    if (
-      discoveryResult.queriesUsed > 0 &&
-      discoveryResult.newLeadsFound === 0 &&
-      discoveryResult.candidatesProcessed === 0
-    ) {
-      pipelineWarn(
-        'discovery',
-        'Zero results across all queries — check SerpAPI key and quota',
-        {
-          queriesUsed: discoveryResult.queriesUsed,
-          budgetRemaining: discoveryResult.budgetRemaining,
-        }
-      );
+      // Health warning: zero results across all queries
+      if (
+        discoveryResult.queriesUsed > 0 &&
+        discoveryResult.newLeadsFound === 0 &&
+        discoveryResult.candidatesProcessed === 0
+      ) {
+        pipelineWarn(
+          'discovery',
+          'Zero results across all queries — check SerpAPI key and quota',
+          {
+            queriesUsed: discoveryResult.queriesUsed,
+            budgetRemaining: discoveryResult.budgetRemaining,
+          }
+        );
+      }
     }
 
-    // Qualify any newly discovered leads
+    // Qualify any unqualified leads on every tick, whatever their source.
+    // Leads added by URL (POST /api/admin/leads) or left `discovered` after a
+    // failed scrape must not wait for discovery to find something new.
     let qualificationResult = null;
-    if (discoveryResult.newLeadsFound > 0) {
-      const newLeads = await db
-        .select({ id: leads.id })
-        .from(leads)
-        .where(eq(leads.status, 'discovered'))
-        .limit(30);
-      if (newLeads.length > 0) {
-        qualificationResult = await processLeadBatch(newLeads.map(l => l.id));
+    const unqualifiedLeads = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.status, 'discovered'))
+      .orderBy(asc(leads.updatedAt))
+      .limit(30);
+    if (unqualifiedLeads.length > 0) {
+      qualificationResult = await processLeadBatch(
+        unqualifiedLeads.map(l => l.id)
+      );
 
-        // Health warning: high qualification error rate
-        if (
-          qualificationResult.total > 0 &&
-          qualificationResult.error > qualificationResult.total * 0.5
-        ) {
-          pipelineWarn('qualify', 'High error rate in qualification batch', {
-            errorRate: qualificationResult.error / qualificationResult.total,
-            errors: qualificationResult.error,
-            total: qualificationResult.total,
-          });
-        }
+      // Health warning: high qualification error rate
+      if (
+        qualificationResult.total > 0 &&
+        qualificationResult.error > qualificationResult.total * 0.5
+      ) {
+        pipelineWarn('qualify', 'High error rate in qualification batch', {
+          errorRate: qualificationResult.error / qualificationResult.total,
+          errors: qualificationResult.error,
+          total: qualificationResult.total,
+        });
       }
     }
 
@@ -302,7 +342,10 @@ export async function GET(request: Request) {
     const autoApproveResult = await runAutoApprove(settings);
 
     return {
-      discovery: discoveryResult,
+      discovery: discoveryResult ?? {
+        skipped: true,
+        reason: 'discovery_disabled',
+      },
       qualification: qualificationResult,
       autoApprove: autoApproveResult,
     } as unknown as Record<string, unknown>;
@@ -405,10 +448,16 @@ export async function GET(request: Request) {
         let processed = 0;
         for (const job of claimed) {
           try {
-            await withSystemIngestionSession(async tx => {
-              await processJob(tx, job);
-              await succeedJob(tx, job);
-            });
+            // Self-managed social processors own their short DB-only
+            // phases and must not run inside a spanning transaction
+            // (JOV-10139); DSP/email processors keep the ingestion-session
+            // transaction for RLS identity and atomicity.
+            if (SELF_MANAGED_JOB_TYPES.has(job.jobType)) {
+              await processJob(db, job);
+            } else {
+              await withSystemIngestionSession(tx => processJob(tx, job));
+            }
+            await withSystemIngestionSession(tx => succeedJob(tx, job));
             processed++;
           } catch (error) {
             await withSystemIngestionSession(tx =>

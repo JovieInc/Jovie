@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-10-29
 
 Design exists to increase customer throughput: make the next correct action obvious, trustworthy, and valuable.
 
@@ -15,6 +15,13 @@ Reduce friction between customer intent and customer value.
 Primary design question:
 
 > What is the smallest design change that helps more customers reach the next value moment?
+
+Art-directed marketing surfaces — the homepage and other public marketing
+routes — follow the
+[art-directed marketing brief](./MARKETING.md#art-directed-marketing-surfaces).
+On those surfaces, use the composition, mockup proportion, material, and
+narrative that brief requires. Product UI (app shell, auth, settings) still
+answers the question above.
 
 ---
 
@@ -45,6 +52,9 @@ Design work is justified when evidence shows one of these is limiting throughput
 ## Principles
 
 - Clarity beats novelty.
+- On art-directed marketing surfaces, the
+  [marketing brief](./MARKETING.md#art-directed-marketing-surfaces) governs
+  composition. Product UI still prefers clarity over novelty.
 - Conversion-critical paths outrank decorative polish.
 - Polish is required when lack of polish blocks trust or activation.
 - Layout stability is part of correctness.
@@ -54,6 +64,18 @@ Design work is justified when evidence shows one of these is limiting throughput
   into the scene as a Jovie scene hue or neutral before capture/generation,
   while human biology, creator identity, safety, trademark, documentary, and
   other protected colors remain truthful.
+
+---
+
+## Shell, IA and the living canvas
+
+**EVENT:** Tim White, 2026-10-29 ([JOV-9748](https://linear.app/jovie/issue/JOV-9748)):
+the main content area is a living canvas, a cinematic window into the user's
+world. Jovie is a circle that becomes the composer and compacts back to a circle
+for voice. Chrome recedes; one motion grammar (circle, composer, voice) carries
+presence. Every surface (app, Ovie, public, marketing) uses one shell and IA:
+[`docs/design-system/shell-ia.md`](../docs/design-system/shell-ia.md), enforced by
+`JOV-INV-047`.
 
 ---
 
@@ -67,6 +89,9 @@ Do not spend design effort on:
 - Dominant delight that has not passed the executable intentionality gate in
   [`packages/ui/theme/motion-policy.ts`](../packages/ui/theme/motion-policy.ts).
 - Component churn without product bottleneck evidence.
+
+The marketing brief covers public marketing routes only. It leaves product UI
+on the rules above.
 
 ---
 
@@ -82,5 +107,7 @@ UI judge calibration set: [`docs/screenshots/ui-escape-holdout/holdout.json`](..
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-29 | Living-canvas north star; one shell and IA across all surfaces (JOV-INV-047). | Tim White (JOV-9748) |
+| 2026-10-23 | Scoped an art-directed marketing exception to smallest-change guidance. Product UI rules are unchanged. | Homepage art-direction brief; founder wording review |
 | 2026-08-21 | Canonized scene-first color harmony for Jovie-owned generated brand imagery. | Tim White approval |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

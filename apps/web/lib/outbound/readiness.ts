@@ -6,6 +6,8 @@
  * to clear", so every item reports a count or a state that can shrink.
  */
 
+import { EXISTING_RELATIONSHIP_LABEL } from '@/lib/leads/existing-relationships';
+
 export type ReadinessStatus = 'green' | 'red' | 'unknown' | 'info';
 
 export interface ReadinessItem {
@@ -61,6 +63,8 @@ export interface ReadinessInputs {
     readonly certified: number;
     readonly approved: number;
     readonly needsProfile: number;
+    /** Held out of cold outreach by the existing-relationship registry. */
+    readonly relationshipHeld?: number;
   } | null;
   readonly evidence: {
     readonly built: number;
@@ -87,7 +91,7 @@ export interface ReadinessInputs {
 /** Linear work that blocks onboarding artists, in the order it unblocks. */
 export const READINESS_BLOCKING_ISSUES = [
   { id: 'JOV-7192', label: 'Golden Path Nightly green', owner: 'billing' },
-  { id: 'JOV-7794', label: 'Proof gaps on the $199 path', owner: 'proof' },
+  { id: 'JOV-7794', label: 'Proof gaps on the $12 path', owner: 'proof' },
   {
     id: 'JOV-7628',
     label: 'Consent, quiet hours, creator-generic copy (#20462)',
@@ -149,7 +153,7 @@ export function buildOutboundReadiness(
     detail: !input.cone
       ? 'Eligibility could not be read; outbound stays held.'
       : input.cone.eligible
-        ? 'Every $199 cone receipt is green.'
+        ? 'Every $12 cone receipt is green.'
         : `${input.cone.requirements.filter(r => r.status !== 'green').length} of ${input.cone.requirements.length} receipts not green`,
     owner: 'revenue',
     href: null,
@@ -193,7 +197,11 @@ export function buildOutboundReadiness(
         : 'red',
     detail: !queue
       ? 'Outbound queue could not be read.'
-      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved`,
+      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved${
+          queue.relationshipHeld
+            ? ` · ${queue.relationshipHeld} held: ${EXISTING_RELATIONSHIP_LABEL}`
+            : ''
+        }`,
     owner: 'Tim',
     href: '/app/ov/outbound',
   });

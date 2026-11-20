@@ -15,6 +15,14 @@ vi.mock('@/lib/rate-limit', () => ({
     getStatus: mockPublicClickLimiterGetStatus,
     limit: mockPublicClickLimiterLimit,
   },
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'This action is temporarily unavailable. Please try again later.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -181,6 +189,68 @@ describe('POST /api/audience/click', () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toBe('Rate limit exceeded');
+  });
+
+  it('returns 503, not 429, when the IP rate-limit backend is unavailable', async () => {
+    mockPublicClickLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+      reason: 'Public Click rate limiter is temporarily unavailable',
+      unavailable: true,
+      backend: 'unavailable',
+    });
+    const request = new NextRequest('http://localhost/api/audience/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        linkId: '123e4567-e89b-12d3-a456-426614174001',
+        linkType: 'social',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.error).toBe('Click tracking is temporarily unavailable.');
+    expect(data.reason).toBe(
+      'Public Click rate limiter is temporarily unavailable'
+    );
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    // No DB work when the durable backend is down.
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('returns 503, not 429, when the per-profile rate-limit backend is unavailable', async () => {
+    mockPublicClickLimiterLimit.mockResolvedValue({ success: true });
+    mockCheckClickRateLimit.mockResolvedValue({
+      success: false,
+      limit: 10_000,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+      reason:
+        'Tracking Clicks (Creator) rate limiter is temporarily unavailable',
+      unavailable: true,
+      backend: 'unavailable',
+    });
+    const request = new NextRequest('http://localhost/api/audience/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        linkId: '123e4567-e89b-12d3-a456-426614174001',
+        linkType: 'social',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.error).toBe('Click tracking is temporarily unavailable.');
   });
 
   it('returns 400 when the request body is empty', async () => {

@@ -4,6 +4,7 @@ import { buildCanon, check, loadAll } from '../../capacity-registry.mjs';
 import { apiListUsd, subscriptionMarginal } from '../capacity-pricing.mjs';
 import {
   evaluateRegistry,
+  laneRoutingOrder,
   priceModel,
   resolveRole,
   routingOrder,
@@ -13,6 +14,8 @@ import {
 const NOW = Date.parse('2026-10-25T02:00:00Z');
 const base = () => structuredClone(loadAll().registry);
 const spend = () => loadAll().spend;
+// The concrete id comes from the family registry (modelFamilies), never a literal.
+const LUNA = loadAll().registry.modelFamilies.families['openai:luna'].latest;
 const find = (view, id) => view.providers.find(p => p.id === id);
 
 describe('capacity registry (committed data)', () => {
@@ -316,10 +319,17 @@ describe('access-path pricing', () => {
       spend: spend(),
       models,
     });
-    const rows = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    const rows = priceModel(registry, models, view, LUNA, task);
     const api = rows.find(r => r.accessPath === 'api');
     const seats = rows.filter(r => r.accessPath === 'subscription');
-    expect(api.usd).toBeCloseTo(0.32, 9);
+    const price = models.models.find(
+      m => m.model === LUNA && m.provider === 'codex'
+    );
+    // 1M input + 100k output tokens at the family's current list price.
+    expect(api.usd).toBeCloseTo(
+      price.list_price_in + 0.1 * price.list_price_out,
+      9
+    );
     expect(seats).toHaveLength(3);
     for (const seat of seats) expect(seat.usd).toBeLessThan(api.usd);
     const byAccount = Object.fromEntries(seats.map(r => [r.account, r]));
@@ -339,16 +349,16 @@ describe('access-path pricing', () => {
       spend: spend(),
       models,
     });
-    expect(
-      priceModel(registry, models, view, 'gpt-5.6-luna', task)[0].accessPath
-    ).toBe('subscription');
+    expect(priceModel(registry, models, view, LUNA, task)[0].accessPath).toBe(
+      'subscription'
+    );
     for (const provider of view.providers) {
       if (provider.id !== 'openai-codex') continue;
       for (const a of provider.accounts)
         if (a.quota)
           Object.assign(a, { quota: { ...a.quota, usedPercent: 100 } });
     }
-    const spent = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    const spent = priceModel(registry, models, view, LUNA, task);
     expect(spent[0].accessPath).toBe('api');
     expect(
       spent.filter(r => r.accessPath === 'subscription').every(r => !r.routable)
@@ -362,7 +372,7 @@ describe('access-path pricing', () => {
       spend: spend(),
       models,
     });
-    const rows = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    const rows = priceModel(registry, models, view, LUNA, task);
     const seat = rows.find(r => r.account === 'jovie-pro');
     expect(seat.usd).toBeNull();
     expect(seat.reason).toBe('usable-quota-unmeasured');
@@ -422,5 +432,77 @@ describe('roles', () => {
     expect(errors.join('\n')).toMatch(
       /modelRegistryId nope not in the model registry/
     );
+  });
+});
+
+describe('lane routing (Tim 2026-10-25)', () => {
+  const view = codexVerdicts => ({
+    providers: [
+      {
+        id: 'openai-codex',
+        metrics: { costPerMergedUsd: 2.71 },
+        accounts: codexVerdicts.map(verdict => ({ quota: { verdict } })),
+      },
+      { id: 'hyperagent', metrics: { costPerMergedUsd: 4.76 }, accounts: [] },
+    ],
+  });
+
+  it('prefers a Codex account behind pace', () => {
+    expect(
+      laneRoutingOrder(view(['under-burning', 'over-burning'])).order[0]
+    ).toBe('openai-codex');
+  });
+
+  it('falls to Hyperagent when every Codex account is ahead of pace', () => {
+    expect(
+      laneRoutingOrder(view(['over-burning', 'over-burning'])).order[0]
+    ).toBe('hyperagent');
+  });
+
+  it('uses Hyperagent for a model Codex lacks and for launch-critical work while gem is loaded', () => {
+    const v = view(['under-burning']);
+    expect(laneRoutingOrder(v, { needsModelCodexLacks: true }).order[0]).toBe(
+      'hyperagent'
+    );
+    expect(
+      laneRoutingOrder(v, { launchCritical: true, gemLoaded: true }).order[0]
+    ).toBe('hyperagent');
+    expect(laneRoutingOrder(v, { launchCritical: true }).order[0]).toBe(
+      'openai-codex'
+    );
+  });
+
+  it('breaks on-pace ties by measured cost per merge and never claims codex cloud without an environment', () => {
+    const result = laneRoutingOrder(view(['on-pace']), { gemLoaded: true });
+    expect(result.order[0]).toBe('openai-codex');
+    expect(result.codexWhere).toBe('gem-throttled');
+  });
+});
+
+describe('Hyperagent slot cap', () => {
+  it('reports the one-slot cap when Hyperagent is first', () => {
+    const view = {
+      providers: [
+        {
+          id: 'openai-codex',
+          accounts: [{ quota: { verdict: 'over-burning' } }],
+        },
+        {
+          id: 'hyperagent',
+          accounts: [],
+          limits: { laneSlots: { value: 1 } },
+        },
+      ],
+    };
+    const result = laneRoutingOrder(view);
+    expect(result.order[0]).toBe('hyperagent');
+    expect(result.hyperagentSlots).toBe(1);
+    expect(result.reasons.join(' ')).toContain('capped at 1 slot');
+  });
+
+  it('is recorded in the committed registry', () => {
+    const { registry } = loadAll();
+    const hyper = registry.providers.find(p => p.id === 'hyperagent');
+    expect(hyper.limits.laneSlots).toMatchObject({ value: 1, previous: 10 });
   });
 });

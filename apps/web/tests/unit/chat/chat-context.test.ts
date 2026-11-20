@@ -84,9 +84,10 @@ describe('Chat session context: full artist profile', () => {
     expect(prompt).toContain('8,400');
   });
 
-  it('includes Spotify popularity score in prompt', () => {
+  it('keeps Spotify popularity jargon out of the prompt', () => {
     const prompt = buildSystemPrompt(mockArtistContext, mockReleases);
-    expect(prompt).toContain('38');
+    expect(prompt).not.toMatch(/Spotify Popularity:/i);
+    expect(prompt).not.toMatch(/popularity \d+\/100/i);
   });
 
   it('includes profile view count in prompt', () => {
@@ -210,7 +211,7 @@ describe('Chat session context: null/missing field handling', () => {
     const prompt = buildSystemPrompt(mockArtistContext, releasesWithNull);
     expect(prompt).toContain('Undated Single');
     // No date should appear in the release line
-    expect(prompt).toContain('(single, 1 track)');
+    expect(prompt).toContain('(single, 1 track; date not set)');
   });
 });
 

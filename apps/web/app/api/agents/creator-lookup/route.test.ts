@@ -46,7 +46,7 @@ describe('GET /api/agents/creator-lookup', () => {
     hoisted.match.mockResolvedValue(null);
   });
 
-  it('returns extracted creator fields without creating a profile', async () => {
+  it('returns fields supplied by an available extractor without creating a profile', async () => {
     hoisted.lookup.mockResolvedValue({
       platform: 'youtube',
       sourceUrl: 'https://www.youtube.com/@creator/about',
@@ -74,25 +74,25 @@ describe('GET /api/agents/creator-lookup', () => {
 
   it('resolves to an existing Jovie profile without fetching the source', async () => {
     hoisted.match.mockResolvedValue({
-      username: 'creator',
-      displayName: 'Creator',
-      profileUrl: 'https://jov.ie/creator',
+      username: 'tim',
+      displayName: 'Tim White',
+      profileUrl: 'https://jov.ie/tim',
     });
 
-    const response = await get('https://youtube.com/@creator');
+    const response = await get('https://youtube.com/@timwhite');
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       platform: 'youtube',
-      sourceUrl: 'https://youtube.com/@creator',
+      sourceUrl: 'https://youtube.com/@timwhite',
       exists: true,
-      username: 'creator',
-      displayName: 'Creator',
-      profileUrl: 'https://jov.ie/creator',
+      username: 'tim',
+      displayName: 'Tim White',
+      profileUrl: 'https://jov.ie/tim',
     });
     expect(hoisted.match).toHaveBeenCalledWith(
       'youtube',
-      'https://youtube.com/@creator'
+      'https://youtube.com/@timwhite'
     );
     expect(hoisted.lookup).not.toHaveBeenCalled();
   });
@@ -133,7 +133,21 @@ describe('GET /api/agents/creator-lookup', () => {
     hoisted.lookup.mockResolvedValue(null);
     const response = await get('https://example.com/creator');
     expect(response.status).toBe(422);
-    expect((await response.json()).error.code).toBe('UNSUPPORTED_URL');
+    const body = await response.json();
+    expect(body.error.code).toBe('UNSUPPORTED_URL');
+    expect(body.error.message).toContain('existing public Jovie profile');
+    expect(body.error.message).toContain('jovie artist get');
+    expect(body.error.message).not.toContain('YouTube channel URL');
+  });
+
+  it('does not recommend YouTube when an extractor cannot handle a validated URL', async () => {
+    hoisted.lookup.mockResolvedValue(null);
+    const response = await get('https://youtube.com/@creator');
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body.error.code).toBe('UNSUPPORTED_URL');
+    expect(body.error.message).toContain('existing public Jovie profile');
+    expect(body.error.message).not.toContain('YouTube channel URL');
   });
 
   it.each([
@@ -148,10 +162,32 @@ describe('GET /api/agents/creator-lookup', () => {
       expect(response.status).toBe(status);
       const body = await response.json();
       expect(body.error.code).toBe(apiCode);
-      expect(body.error.message).toContain('YouTube channel URL');
+      expect(body.error.message).toContain('existing public Jovie profile');
+      expect(body.error.message).toContain('jovie artist get');
+      expect(body.error.message).toContain('exact Jovie username');
+      expect(body.error.message).not.toContain('YouTube channel URL');
       expect(hoisted.captureError).not.toHaveBeenCalled();
     }
   );
+
+  it('explains disabled fresh YouTube extraction without sending the user back to YouTube', async () => {
+    hoisted.lookup.mockRejectedValue(
+      new ExtractionError('disabled', 'SOCIAL_HTML_DISABLED')
+    );
+    const response = await get('https://youtube.com/@radiohead');
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body.error.code).toBe('SOURCE_UNSUPPORTED');
+    expect(body.error.message).toContain(
+      'Fresh profile extraction is unavailable'
+    );
+    expect(body.error.message).toContain('existing public Jovie profile');
+    expect(body.error.message).toContain('jovie artist get');
+    expect(body.error.message).toContain('exact Jovie username');
+    expect(body.error.message).not.toMatch(/try .*YouTube|use a YouTube/i);
+    expect(body.exists).toBeUndefined();
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+  });
 
   it('fails closed when the durable limiter denies or is unavailable', async () => {
     hoisted.limit.mockResolvedValueOnce({ success: false });

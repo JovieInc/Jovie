@@ -15,7 +15,6 @@ import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
-import type { AppFlagName } from '@/lib/flags/contracts';
 import { isDiscoverabilityFlagEnabled } from '@/lib/flags/discoverability-flags';
 
 /**
@@ -29,7 +28,7 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
   checkHandle:
     'Onboarding-only follow-up after Spotify identity; not useful as a standalone slash command.',
   checkCanvasStatus:
-    'Diagnostic; results surface inside writeWorldClassBio / createPromoStrategy.',
+    'Diagnostic; results surface inside writeWorldClassBio and the promo-strategy skill.',
   confirmSpotifyArtist:
     'Onboarding-only continuation from the Spotify picker; requires a selected candidate.',
   createMerch:
@@ -38,12 +37,10 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Follow-up from a saved merch card; shown as card/menu actions once a source design exists.',
   findMerchSources:
     'Merch source discovery is a conversational prerequisite for merch creation, not a root slash command.',
-  createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
   createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
   deleteOrArchiveMerchCard:
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
-  generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
   importBioFromUrl:
     'Triggered conversationally from an explicit URL import request before profile-edit preview.',
   inspectPressSource:
@@ -89,12 +86,14 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
   showTopInsights: 'Surfaced as a home-screen card, not a slash command.',
   showUsage:
     'Usage details are triggered conversationally or from settings surfaces, not slash.',
-  suggestRelatedArtists:
-    'Always part of createPromoStrategy; never a standalone user action.',
   unpauseMerchCard:
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   writeWorldClassBio:
     'Pro-only; chat surfaces it conversationally rather than via slash.',
+  useSkill:
+    "Model-invoked to load a skill's steps; skills surface through the conversation, not slash.",
+  requestCapability:
+    "Model-invoked when Jovie can't do something yet; not a user command.",
   researchArtistPresence:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
   checkLinkDrift:
@@ -168,8 +167,6 @@ export interface NavCommand {
   };
   /** Optional shortcut hint rendered on the cmd+k row. */
   readonly shortcutLabel?: string;
-  /** Hide this row unless the flag is on. A missing value stays hidden. */
-  readonly requiredFlag?: AppFlagName;
 }
 
 export type Command = SkillCommand | NavCommand;
@@ -213,7 +210,6 @@ function nav(
   description: string,
   iconName: string,
   href: string,
-  requiredFlag?: AppFlagName,
   keyboardShortcut?: NavCommand['keyboardShortcut']
 ): NavCommand {
   return {
@@ -224,7 +220,6 @@ function nav(
     iconName,
     surfaces: CMDK_ONLY,
     href,
-    ...(requiredFlag ? { requiredFlag } : {}),
     ...(keyboardShortcut ? { keyboardShortcut } : {}),
   };
 }
@@ -233,15 +228,6 @@ export interface CommandDiscoverability {
   readonly youtubeWorkspaceNav?: boolean;
   readonly jovieWorkNav?: boolean;
 }
-/** Skills stay visible. Nav rows with a required flag render only when it is on. */
-export function isCommandVisible(
-  command: Command,
-  flags: Partial<Record<AppFlagName, boolean>>
-): boolean {
-  if (command.kind !== 'nav' || !command.requiredFlag) return true;
-  return flags[command.requiredFlag] === true;
-}
-
 export function buildCommands(
   discoverability: CommandDiscoverability = {}
 ): readonly Command[] {
@@ -302,7 +288,6 @@ export function buildCommands(
       'Open your Jovie home.',
       'Home',
       APP_ROUTES.DASHBOARD,
-      undefined,
       { id: 'nav-dashboard', firstKey: 'g', secondKey: 'd' }
     ),
     nav(
@@ -310,8 +295,7 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.identity.label,
       PRODUCT_ONTOLOGY.identity.definition,
       'User',
-      PRODUCT_ONTOLOGY.identity.canonicalRoute,
-      PRODUCT_ONTOLOGY.identity.requiredFlag
+      PRODUCT_ONTOLOGY.identity.canonicalRoute
     ),
     nav(
       'go-work',
@@ -319,7 +303,6 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.work.definition,
       'Layers',
       PRODUCT_ONTOLOGY.work.canonicalRoute,
-      undefined,
       { id: 'nav-releases', firstKey: 'g', secondKey: 'r' }
     ),
     nav(
@@ -356,7 +339,6 @@ export function buildCommands(
       'Open the links workspace. Shortcut G then K.',
       'Link',
       APP_ROUTES.LINKS,
-      undefined,
       { id: 'nav-links', firstKey: 'g', secondKey: 'k' }
     ),
     nav(
@@ -389,7 +371,6 @@ export function buildCommands(
       'Plan release dates and campaign moments.',
       'Calendar',
       APP_ROUTES.CALENDAR,
-      undefined,
       { id: 'nav-calendar', firstKey: 'g', secondKey: 'l' }
     ),
     nav(
@@ -405,7 +386,6 @@ export function buildCommands(
       'Manage show dates. Shortcut G then O.',
       'CalendarDays',
       APP_ROUTES.TOUR_DATES,
-      undefined,
       { id: 'nav-tour-dates', firstKey: 'g', secondKey: 'o' }
     ),
     nav(
@@ -414,7 +394,6 @@ export function buildCommands(
       'Account, billing, and profile settings.',
       'Settings',
       APP_ROUTES.SETTINGS,
-      undefined,
       { id: 'nav-settings', firstKey: 'g', secondKey: 's' }
     ),
     ...(showYouTube

@@ -92,3 +92,32 @@ describe('withGatewayReportingTags', () => {
     });
   });
 });
+
+describe('background reasoning default', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('defaults non-chat generate calls to low reasoning', async () => {
+    await generateText({
+      prompt: 'x',
+      experimental_telemetry: { functionId: 'jovie-email-classifier' },
+    } as never);
+    expect(generateTextMock.mock.calls[0]?.[0]).toMatchObject({
+      reasoning: 'low',
+    });
+  });
+
+  it('keeps a caller-set reasoning level', async () => {
+    await generateObject({ prompt: 'x', reasoning: 'high' } as never);
+    expect(generateObjectMock.mock.calls[0]?.[0]).toMatchObject({
+      reasoning: 'high',
+    });
+  });
+
+  it('leaves chat-tagged calls on the provider default', async () => {
+    await generateText({
+      prompt: 'x',
+      experimental_telemetry: { functionId: 'jovie-chat-title' },
+    } as never);
+    expect(generateTextMock.mock.calls[0]?.[0]).not.toHaveProperty('reasoning');
+  });
+});

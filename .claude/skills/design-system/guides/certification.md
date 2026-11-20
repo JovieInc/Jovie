@@ -9,6 +9,7 @@
 Ten criteria, fail closed (unknown counts as missing): ds-owner, tokens, states (story per reachable state or a written waiver), tests, a11y (axe), frontend-rules (focus loss, input reset, layout shift, nested bordered surfaces, input retention), mutation (>= 80), visual (CI capture), journeys, benchmark (judgment against the benchmark library with adopt/adapt gaps done). The certificate binds to the source hash. `--spec` renders the agent work order. Baseline 2026-10-25: 0 of 1,324 shippable components certified.
 
 ## Alignment rules (apply when art-directing and when judging)
+- Column layouts also follow [grid.md](grid.md): one source of truth, overlay in the content box, ink aligned, measured at widths above and below max.
 - Everything sits on the 4px beat; icon and label share a center line; text baselines align across a row; equal gutters; rail and table edges align to shell edges.
 - One focus ring, one hover and one pressed treatment per control family; destructive actions need confirm or undo.
 - Empty, loading, error, disabled, long-content, compact, and permission-denied states exist for every surface.

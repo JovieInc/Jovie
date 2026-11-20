@@ -1,0 +1,123 @@
+{
+  "schema": "jovie.defect-guard-registry/v1",
+  "rule": "Every defect (found by a human, reviewer, dogfood run or guard) is classified and mapped to the cheapest durable guard that would have caught it everywhere: a lint/AST rule, a DS primitive constraint, a shared test helper, a frontend-skill rule, a dogfood mission assertion, a search-relevance fixture or a benchmark-library entry. Measure per week: found by humans vs caught by guards. `node scripts/component-certificate.mjs --guards` validates the registry and prints the weekly counts.",
+  "defects": [
+    {
+      "id": "DG-001",
+      "component": "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx",
+      "title": "Connect Spotify dialog asks the already-connected artist to search again",
+      "class": "prove-dont-ask",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "shared-test-helper",
+        "ref": "providerDialogReadsConnectionBeforeSearch(renderDialog): a provider connect dialog must render connected state, not a search, when the provider is already linked (planned in the SpotifyConnectDialog job)",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "DG-002",
+      "component": "apps/web/app/api/spotify/search/route.ts",
+      "title": "Search 'tim whi' returns Watt White, Tim McGraw, Waves Of Time and not Tim White",
+      "class": "search-relevance",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "search-relevance-fixture",
+        "ref": "fixture: query 'tim whi' with a candidate pool containing Tim White must rank exact/prefix-name and already-linked or likely artist first (planned in the search-ranking job)",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "DG-003",
+      "component": "SpotifyConnectDialog.tsx",
+      "title": "Box in box in box: dialog card, bordered panel, bordered input, bordered results",
+      "class": "surface-nesting",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "lint-ast-rule",
+        "ref": "scripts/lib/component-certificate.mjs findJank rule surface:nested-bordered (frontend-rules criterion)",
+        "status": "landed"
+      }
+    },
+    {
+      "id": "DG-004",
+      "component": "SpotifyConnectDialog.tsx",
+      "title": "Triple-redundant copy: subtitle, panel label and description, paste-URL link say the same thing",
+      "class": "copy-redundancy",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "frontend-skill-rule",
+        "ref": "copy-redundancy check in scripts/design-frontend-skill-check.mjs (dialog title/description/label token overlap above threshold, validated against the existing copy corpus before enforcing)",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "DG-005",
+      "component": "SpotifyConnectDialog.tsx",
+      "title": "Primary 'Connect Spotify' button enabled with nothing selected",
+      "class": "ambiguous-primary",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "shared-test-helper",
+        "ref": "primaryActionDisabledWithoutSelection(renderDialog): a dialog whose primary action needs a selection renders it disabled or absent until one exists",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "DG-006",
+      "component": "SpotifyConnectDialog.tsx",
+      "title": "No visible loading, empty, error or no-match states for search; no keyboard hints",
+      "class": "missing-states",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T03:00:00Z",
+      "guard": {
+        "type": "ds-primitive-constraint",
+        "ref": "certificate criterion `states` (story per reachable state) plus benchmark pattern command-and-keyboard",
+        "status": "landed"
+      }
+    },
+    {
+      "id": "DG-007",
+      "component": "apps/web/components/features/dashboard/ (add-release drawer)",
+      "title": "Add-release drawer loses typed characters and focus; Escape resets the form",
+      "class": "input-retention",
+      "foundBy": "human",
+      "foundAt": "2026-10-25T00:00:00Z",
+      "guard": {
+        "type": "lint-ast-rule",
+        "ref": "findJank rules input-reset:effect-resets-on-open-state and focus-loss:inline-component, plus the input-retention test requirement in the frontend-rules criterion",
+        "status": "landed"
+      }
+    },
+    {
+      "id": "DG-008",
+      "component": "apps/web/app/app/(shell)/admin/product/page.tsx (Shipping views)",
+      "title": "Ovie Product page used hand-built text tabs and decorative lifecycle pills instead of the canonical segment control and a status pipeline",
+      "class": "ia-drift",
+      "foundBy": "human",
+      "foundAt": "2026-10-29T00:00:00Z",
+      "guard": {
+        "type": "ds-primitive-constraint",
+        "ref": "apps/web/tests/unit/design-system/ovie-ia-registry.test.ts (every Ovie page matches data/appScreens/ovie-ia.ts; sub-navigation only through AdminPage views/tabs) and canonical-nav-metric-ratchet.test.ts adHocTabs/adHocRouteNav/localMetricComponent",
+        "status": "landed"
+      }
+    },
+    {
+      "id": "DG-009",
+      "component": "apps/web/components/features/admin (Delivery, capability evidence)",
+      "title": "Metrics rendered a bare n/a when a source had not answered, hiding whether data was missing, stale or broken",
+      "class": "missing-states",
+      "foundBy": "human",
+      "foundAt": "2026-10-29T00:00:00Z",
+      "guard": {
+        "type": "lint-ast-rule",
+        "ref": "apps/web/tests/unit/design-system/canonical-nav-metric-ratchet.test.ts barePlaceholder (shrink-only); MeasuredValue is the only unknown/stale owner",
+        "status": "landed"
+      }
+    }
+  ]
+}

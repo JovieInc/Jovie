@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Checkbox } from './checkbox';
 
@@ -335,5 +336,58 @@ describe('Checkbox', () => {
       fireEvent.click(checkbox);
       expect(onCheckedChange).toHaveBeenCalledWith(true);
     });
+  });
+});
+
+describe('Checkbox certificate evidence', () => {
+  it('has no axe violations across unchecked, checked, indeterminate, and disabled states', async () => {
+    const { container } = render(
+      <div>
+        <Checkbox id='cb-a11y-off' />
+        <label htmlFor='cb-a11y-off'>Subscribe</label>
+        <Checkbox id='cb-a11y-on' defaultChecked />
+        <label htmlFor='cb-a11y-on'>Subscribed</label>
+        <Checkbox id='cb-a11y-mixed' checked='indeterminate' />
+        <label htmlFor='cb-a11y-mixed'>Some tracks selected</label>
+        <Checkbox id='cb-a11y-disabled' disabled />
+        <label htmlFor='cb-a11y-disabled'>Unavailable</label>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Subscribe' }));
+    expect(screen.getByRole('checkbox', { name: 'Subscribe' })).toBeChecked();
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe('Checkbox uncontrolled indicator', () => {
+  it('renders the minus icon for defaultChecked="indeterminate"', () => {
+    // Deliberate-red: the icon used to follow the checked prop, so an
+    // uncontrolled indeterminate checkbox showed a check mark.
+    const { container } = render(
+      <Checkbox defaultChecked='indeterminate' aria-label='Select all' />
+    );
+    expect(container.querySelector('svg.lucide-minus')).toBeInTheDocument();
+    expect(container.querySelector('svg.lucide-check')).not.toBeInTheDocument();
+  });
+
+  it('switches to the check icon after an uncontrolled click', () => {
+    const changes: unknown[] = [];
+    const { container } = render(
+      <Checkbox
+        defaultChecked='indeterminate'
+        aria-label='Select all'
+        onCheckedChange={next => changes.push(next)}
+      />
+    );
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(changes).toEqual([true]);
+    expect(screen.getByRole('checkbox')).toHaveAttribute(
+      'data-state',
+      'checked'
+    );
+    expect(container.querySelector('svg.lucide-check')).toBeInTheDocument();
+    expect(container.querySelector('svg.lucide-minus')).not.toBeInTheDocument();
   });
 });

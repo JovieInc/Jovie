@@ -25,6 +25,10 @@ describe('SuggestionCard', () => {
   it('disables the action button when no onAct is provided', () => {
     render(<SuggestionCard title='t' body='b' actionLabel='Go' />);
     expect(screen.getByRole('button', { name: /Go/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Go/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('fires onAct when the action button is clicked', () => {

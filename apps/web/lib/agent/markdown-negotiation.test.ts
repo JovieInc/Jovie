@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   negotiateAgentMarkdown,
   shouldPassThroughMarkdownNegotiation,
@@ -61,8 +61,9 @@ describe('negotiateAgentMarkdown', () => {
     expect(res?.headers.get('link')).toBe(HOMEPAGE_HTML_ALTERNATE_LINK);
 
     const body = await res?.text();
-    expect(body).toContain(`# ${COMPANY_IDENTITY.headline}`);
-    expect(body).toContain(HOMEPAGE_COPY.hero.subhead);
+    expect(body).toContain(`# ${HOMEPAGE_EDITORIAL_COPY.hero.headline}`);
+    expect(body).toContain(COMPANY_IDENTITY.definition);
+    expect(body).toContain(HOMEPAGE_EDITORIAL_COPY.hero.subhead);
     expect(body).toContain('## When to use Jovie');
     expect(body).not.toMatch(/\bfans?\b/i);
     expect(body).not.toContain('public artist API');

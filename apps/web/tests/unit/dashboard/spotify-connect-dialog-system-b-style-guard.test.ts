@@ -33,12 +33,12 @@ describe('SpotifyConnectDialog System B style guard', () => {
       offenders,
       `SpotifyConnectDialog leaked ${offenders.join(', ')}`
     ).toEqual([]);
-    expect(source).toContain("data-spotify-connect-surface='card'");
-    expect(source).toContain('system-b-spotify-connect-input-shell');
-    expect(source).toContain('system-b-spotify-connect-trailing');
-    expect(source).toContain('system-b-spotify-connect-dropdown');
-    expect(source).toContain('system-b-spotify-connect-result-row');
-    expect(source).toContain('system-b-spotify-connect-paste-row');
+    for (const atom of ['Input', 'Button', 'Kbd'])
+      expect(source).toContain(`<${atom}`);
+    expect(source).not.toMatch(/<(input|select)[\s>]/);
+    expect(source).toContain("role='option'");
+    expect(source).toContain("role='listbox'");
+    expect(source).not.toContain('DrawerSurfaceCard');
   });
 
   it('keeps dialog primitives token-backed', () => {

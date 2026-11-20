@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useJovieAuth', () => ({ useJovieAuth: () => mocks.auth }));
 vi.mock('./OnboardingShell', () => ({
+  ONBOARDING_FRAME_CLASS: 'onboarding-frame',
   OnboardingShell: (props: OnboardingShellProps) => {
     mocks.shell(props);
     return (
@@ -129,6 +130,36 @@ describe('onboarding identity boundary', () => {
       'could not be restored'
     );
   });
+  it('holds the in-tab anonymous chat while sign-up links it, instead of a blank restore screen', async () => {
+    mocks.auth.isSignedIn = false;
+    mocks.auth.userId = null;
+    mocks.fetch.mockResolvedValue(snapshot(null, history, false));
+    const { rerender } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    await screen.findByText('Saved artist progress');
+    let resolve!: (response: Response) => void;
+    mocks.fetch.mockReturnValue(
+      new Promise<Response>(r => {
+        resolve = r;
+      })
+    );
+    mocks.auth.isSignedIn = true;
+    mocks.auth.userId = 'account-a';
+    rerender(<OnboardingSessionBoundary sessionLabel='pending' />);
+    // Same conversation stays on screen, frozen; no blank restore state.
+    expect(screen.getByTestId('history')).toHaveTextContent(
+      'Saved artist progress'
+    );
+    expect(screen.queryByTestId('onboarding-session-boundary')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeDisabled();
+    await act(async () => resolve(snapshot('account-a')));
+    expect(mocks.shell.mock.lastCall?.[0]).toMatchObject({
+      isSignedIn: true,
+      conversationId: 'conversation-a',
+    });
+  });
+
   it('does not read or display history until auth initialization finishes', () => {
     mocks.auth.isLoaded = false;
     render(<OnboardingSessionBoundary sessionLabel='pending' />);
@@ -140,6 +171,18 @@ describe('onboarding identity boundary', () => {
         name: 'Restoring your conversation…',
       })
     ).toBeVisible();
+  });
+  it('restores inside the same shell panel the chat paints into', () => {
+    mocks.auth.isLoaded = false;
+    const { container } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    const frame = container.querySelector('[data-app-shell-placeholder]');
+    expect(frame).not.toBeNull();
+    expect(
+      frame?.querySelector('main [data-testid="onboarding-session-boundary"]')
+    ).not.toBeNull();
+    expect(container.querySelector('#main-content')).toBeNull();
   });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;
@@ -183,6 +226,47 @@ describe('onboarding identity boundary', () => {
     });
     expect(screen.getByTestId('handoff')).toHaveTextContent('');
   });
+  it('restarts in one click when the snapshot conversation id is stale (JOV-10170)', async () => {
+    // Fresh visitor: the boundary's snapshot has no conversation id; the
+    // chat mints one server-side with the first message. The first Start
+    // Over click used to 409 on the stale id, forcing a manual reload plus
+    // a second click.
+    mocks.fetch
+      .mockResolvedValueOnce(snapshot('account-a', [], false))
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: 'Your conversation changed. Reload to continue.' },
+          { status: 409 }
+        )
+      )
+      .mockResolvedValueOnce(snapshot('account-a', history, true))
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(snapshot('account-a', [], false));
+    render(<OnboardingSessionBoundary sessionLabel='pending' />);
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(5));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mocks.fetch.mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'restart',
+        identityId: 'account-a',
+        conversationId: null,
+      }),
+    });
+    expect(mocks.fetch.mock.calls[3][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'restart',
+        identityId: 'account-a',
+        conversationId: 'conversation-a',
+      }),
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('history')).toHaveTextContent('')
+    );
+  });
   it('keeps history and a retryable error when restart fails', async () => {
     mocks.fetch
       .mockResolvedValueOnce(snapshot())
@@ -220,6 +304,57 @@ describe('onboarding identity boundary', () => {
     expect(await screen.findByRole('alert')).toBe(boundary);
     expect(boundary).toHaveAttribute('data-restore-state', 'failed');
   });
+
+  it('exposes the restore-failure code and auth state for the nightly stall annotation (JOV-7653)', async () => {
+    const unmounts: Array<() => void> = [];
+    const renderStalled = async (
+      rejection: () => Promise<unknown>,
+      auth: Partial<typeof mocks.auth>
+    ) => {
+      unmounts.pop()?.();
+      mocks.fetch.mockReset();
+      mocks.fetch.mockImplementationOnce(rejection);
+      Object.assign(mocks.auth, auth);
+      const mounted = render(
+        <OnboardingSessionBoundary sessionLabel='pending' />
+      );
+      unmounts.push(() => mounted.unmount());
+      return await screen.findByRole('alert');
+    };
+
+    // HTTP failure surfaces the status.
+    let boundary = await renderStalled(
+      () => Promise.resolve(Response.json({ error: 'no' }, { status: 503 })),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'status:503');
+
+    // Identity mismatch (client anonymous vs server session) is distinct.
+    boundary = await renderStalled(
+      () =>
+        Promise.resolve(
+          Response.json({
+            identityId: 'account-a',
+            conversationId: null,
+            owned: false,
+            messages: [],
+          })
+        ),
+      { userId: null }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'invalid-restore');
+    expect(boundary).toHaveAttribute('data-auth-state', 'anonymous');
+
+    // Network failure is distinct from a parsed error response.
+    boundary = await renderStalled(
+      () => Promise.reject(new TypeError('fetch failed')),
+      { userId: 'account-a' }
+    );
+    expect(boundary).toHaveAttribute('data-restore-error', 'restore-network');
+    expect(boundary).toHaveAttribute('data-auth-state', 'signed-in');
+
+    unmounts.pop()?.();
+  });
   it('offers restoration retry without fabricating a fresh onboarding flow', async () => {
     mocks.fetch
       .mockRejectedValueOnce(new Error('offline'))
@@ -229,5 +364,58 @@ describe('onboarding identity boundary', () => {
     expect(mocks.shell).not.toHaveBeenCalled();
     fireEvent.click(retry);
     await screen.findByText('Saved artist progress');
+  });
+  describe('server-seeded first visit', () => {
+    const seed = {
+      identityId: null,
+      conversationId: null,
+      owned: false,
+      messages: [] as UIMessage[],
+    };
+
+    it('paints the chat before auth loads and without fetching an empty snapshot', () => {
+      mocks.auth.isLoaded = false;
+      mocks.auth.isSignedIn = false;
+      mocks.auth.userId = null;
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          initialSnapshot={seed}
+        />
+      );
+      expect(mocks.shell).toHaveBeenCalled();
+      expect(screen.queryByText('Restoring your conversation…')).toBeNull();
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it('keeps the starter handoff for the seeded first visit', () => {
+      mocks.auth.isLoaded = true;
+      mocks.auth.isSignedIn = false;
+      mocks.auth.userId = null;
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          starterHandoff={{ kind: 'prompt', prompt: 'Hello from home' }}
+          initialSnapshot={seed}
+        />
+      );
+      expect(screen.getByTestId('handoff')).toHaveTextContent(
+        'Hello from home'
+      );
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it('discards the seed and restores from the server when the client is signed in', async () => {
+      mocks.auth.isLoaded = true;
+      mocks.auth.userId = 'account-a';
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          initialSnapshot={seed}
+        />
+      );
+      await screen.findByText('Saved artist progress');
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

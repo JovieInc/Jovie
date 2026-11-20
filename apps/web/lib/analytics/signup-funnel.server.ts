@@ -6,7 +6,14 @@ import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { trackServerEvent } from '@/lib/server-analytics';
 import type { AccountMetricCohort } from '@/lib/utils/email';
 import {
+  buildDelightReport,
+  type DelightDistribution,
+  type DelightInput,
+  type DelightReport,
+} from './golden-path-delight';
+import {
   isSignupFunnelStep,
+  normalizeFunnelTimingMs,
   normalizeSignupFunnelReason,
   SIGNUP_FUNNEL_CONTRACT_VERSION,
   SIGNUP_FUNNEL_IDS,
@@ -34,6 +41,8 @@ export async function recordFunnelStep<F extends SignupFunnelId>(
           ? normalizeSignupFunnelReason(input.reason)
           : undefined,
       cohort: input.cohort ?? 'unattributed',
+      step_ms: normalizeFunnelTimingMs(input.stepMs),
+      entry_ms: normalizeFunnelTimingMs(input.entryMs),
     });
   } catch {
     // trackServerEvent reports its own failures to Sentry.
@@ -64,9 +73,24 @@ export interface FunnelAggregateRow {
   readonly count7d: number;
 }
 
+/** 7d time-from-previous-step distribution for one funnel step and cohort. */
+export interface FunnelTimingRow {
+  readonly cohort?: AccountMetricCohort | null;
+  readonly funnelId: string | null;
+  readonly step: string | null;
+  readonly samples: number;
+  readonly p50Ms: number | null;
+  readonly p95Ms: number | null;
+}
+
 export interface FunnelStepReport {
   readonly step: string;
   readonly count: number;
+  /** Median ms since the previous step (7d window only). Null without data. */
+  readonly stepMsP50: number | null;
+  /** 95th percentile ms since the previous step (7d window only). */
+  readonly stepMsP95: number | null;
+  readonly stepMsSamples: number;
   /** count / previous step count, 0..1+ rounded to 4dp. Null on step 1. */
   readonly conversionFromPrevious: number | null;
   readonly errors: number;
@@ -118,6 +142,11 @@ export interface SummerFunnelResponse {
   readonly unattributed: Readonly<{
     windows: Readonly<Record<FunnelWindowKey, FunnelWindowReport>>;
   }>;
+  /**
+   * Golden-path delight and continuity (7d, journey-keyed): time-to-wow, wow
+   * reach, turns before wow, and the metrics still uninstrumented.
+   */
+  readonly delight?: DelightReport;
 }
 
 const ratio = (numerator: number, denominator: number): number | null =>
@@ -128,7 +157,8 @@ const ratio = (numerator: number, denominator: number): number | null =>
 function buildFunnelReport(
   funnelId: SignupFunnelId,
   rows: readonly FunnelAggregateRow[],
-  pick: (row: FunnelAggregateRow) => number
+  pick: (row: FunnelAggregateRow) => number,
+  timings: readonly FunnelTimingRow[] = []
 ): FunnelReport {
   const funnelRows = rows.filter(row => row.funnelId === funnelId);
   const steps = SIGNUP_FUNNEL_STEPS[funnelId].map(
@@ -155,9 +185,15 @@ function buildFunnelReport(
                   (row.outcome ?? 'reached') === 'reached'
               )
               .reduce((total, row) => total + pick(row), 0);
+      const timing = timings.find(
+        row => row.funnelId === funnelId && row.step === step
+      );
       return {
         step,
         count,
+        stepMsP50: timing?.p50Ms ?? null,
+        stepMsP95: timing?.p95Ms ?? null,
+        stepMsSamples: timing?.samples ?? 0,
         previous,
         conversionFromPrevious:
           previous === null ? null : ratio(count, previous),
@@ -211,10 +247,13 @@ function buildFunnelReport(
 /** Pure: turn grouped rows into the Summer response. Exported for tests. */
 export function buildSummerFunnelResponse(
   rows: readonly FunnelAggregateRow[],
-  now: Date
+  now: Date,
+  timingRows: readonly FunnelTimingRow[] = [],
+  delightInput?: DelightInput
 ): SummerFunnelResponse {
   const buildWindows = (
-    selectedRows: readonly FunnelAggregateRow[]
+    selectedRows: readonly FunnelAggregateRow[],
+    timings: readonly FunnelTimingRow[]
   ): Readonly<Record<FunnelWindowKey, FunnelWindowReport>> => {
     const buildWindow = (
       window: FunnelWindowKey,
@@ -224,7 +263,12 @@ export function buildSummerFunnelResponse(
       window,
       since: new Date(now.getTime() - hours * 3_600_000).toISOString(),
       funnels: SIGNUP_FUNNEL_IDS.map(funnelId =>
-        buildFunnelReport(funnelId, selectedRows, pick)
+        buildFunnelReport(
+          funnelId,
+          selectedRows,
+          pick,
+          window === '7d' ? timings : []
+        )
       ),
     });
     return {
@@ -232,9 +276,11 @@ export function buildSummerFunnelResponse(
       '7d': buildWindow('7d', 24 * 7, row => row.count7d),
     };
   };
+  const timingsFor = (cohort: AccountMetricCohort) =>
+    timingRows.filter(row => (row.cohort ?? 'unattributed') === cohort);
   const rowsFor = (cohort: AccountMetricCohort) =>
     rows.filter(row => (row.cohort ?? 'unattributed') === cohort);
-  const windows = buildWindows(rowsFor('customer'));
+  const windows = buildWindows(rowsFor('customer'), timingsFor('customer'));
 
   return {
     contractVersion: SUMMER_FUNNEL_CONTRACT_VERSION,
@@ -243,10 +289,108 @@ export function buildSummerFunnelResponse(
     unit: 'events',
     metricScope: 'customer_only',
     windows,
-    rawWindows: buildWindows(rows),
-    syntheticHealth: { windows: buildWindows(rowsFor('synthetic')) },
-    unattributed: { windows: buildWindows(rowsFor('unattributed')) },
+    rawWindows: buildWindows(rows, timingRows),
+    syntheticHealth: {
+      windows: buildWindows(rowsFor('synthetic'), timingsFor('synthetic')),
+    },
+    unattributed: {
+      windows: buildWindows(
+        rowsFor('unattributed'),
+        timingsFor('unattributed')
+      ),
+    },
+    ...(delightInput ? { delight: buildDelightReport(delightInput) } : {}),
   };
+}
+
+interface DistributionRow {
+  readonly samples: number | string | null;
+  readonly p50: number | string | null;
+  readonly p95: number | string | null;
+}
+
+function toDistribution(
+  row: DistributionRow | undefined
+): DelightDistribution | null {
+  if (!row) return null;
+  const num = (value: number | string | null) =>
+    value === null ? null : Math.round(Number(value) * 10) / 10;
+  return {
+    samples: Number(row.samples) || 0,
+    p50: num(row.p50),
+    p95: num(row.p95),
+  };
+}
+
+function rowsOf<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  const rows = (result as { rows?: unknown } | null)?.rows;
+  return Array.isArray(rows) ? (rows as T[]) : [];
+}
+
+/**
+ * Journey-keyed delight inputs over the 7d window. Never throws: a failed read
+ * leaves the metric null (reported as insufficient sample), not the funnel.
+ */
+export async function getDelightInput(since: Date): Promise<DelightInput> {
+  const empty: DelightInput = {
+    timeToWowSeconds: null,
+    wowReach: null,
+    turnsBeforeWow: null,
+  };
+  try {
+    const [wowResult, turnsResult] = await Promise.all([
+      db.execute(drizzleSql`
+        WITH journeys AS (
+          SELECT acquisition_id,
+                 min(occurred_at) FILTER (WHERE stage = 'start') AS started_at,
+                 min(occurred_at) FILTER (WHERE stage = 'catalog-preview') AS wow_at
+          FROM acquisition_journey_stages
+          WHERE stage IN ('start', 'catalog-preview') AND occurred_at >= ${since}
+          GROUP BY acquisition_id
+        ), timed AS (
+          SELECT extract(epoch FROM wow_at - started_at) AS seconds
+          FROM journeys
+          WHERE started_at IS NOT NULL AND wow_at IS NOT NULL AND wow_at >= started_at
+        )
+        SELECT
+          (SELECT count(*) FROM journeys WHERE started_at IS NOT NULL)::int AS started,
+          (SELECT count(*) FROM journeys WHERE started_at IS NOT NULL AND wow_at IS NOT NULL)::int AS reached,
+          (SELECT count(*) FROM timed)::int AS samples,
+          (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds) FROM timed) AS p50,
+          (SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY seconds) FROM timed) AS p95
+      `),
+      db.execute(drizzleSql`
+        WITH sessions AS (
+          SELECT max((${serverAnalyticsEvents.properties}->>'turn_index')::int) + 1 AS turns
+          FROM ${serverAnalyticsEvents}
+          WHERE ${serverAnalyticsEvents.eventName} = 'onboarding_reply'
+            AND ${serverAnalyticsEvents.occurredAt} >= ${since}
+            AND ${serverAnalyticsEvents.properties}->>'turn_index' ~ '^[0-9]+$'
+          GROUP BY ${serverAnalyticsEvents.properties}->>'session_id'
+        )
+        SELECT count(*)::int AS samples,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY turns) AS p50,
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY turns) AS p95
+        FROM sessions
+      `),
+    ]);
+    const wow = rowsOf<
+      DistributionRow & { started: number | string; reached: number | string }
+    >(wowResult)[0];
+    return {
+      timeToWowSeconds: toDistribution(wow),
+      wowReach: wow
+        ? {
+            started: Number(wow.started) || 0,
+            reached: Number(wow.reached) || 0,
+          }
+        : null,
+      turnsBeforeWow: toDistribution(rowsOf<DistributionRow>(turnsResult)[0]),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 /** One grouped scan over the 7d window; 24h is a filtered count of it. */
@@ -281,12 +425,46 @@ export async function getSummerFunnel(
     )
     .groupBy(funnelId, step, outcome, reason, cohort);
 
+  const stepMs = drizzleSql`(${props}->>'step_ms')::numeric`;
+  const timingRows = await db
+    .select({
+      funnelId,
+      step,
+      cohort,
+      samples: drizzleSql<number>`count(*)::int`,
+      p50Ms: drizzleSql<
+        number | null
+      >`percentile_cont(0.5) within group (order by ${stepMs})`,
+      p95Ms: drizzleSql<
+        number | null
+      >`percentile_cont(0.95) within group (order by ${stepMs})`,
+    })
+    .from(serverAnalyticsEvents)
+    .where(
+      and(
+        eq(serverAnalyticsEvents.eventName, 'funnel_step'),
+        gte(serverAnalyticsEvents.occurredAt, since7d),
+        drizzleSql`${props} ? 'step_ms'`
+      )
+    )
+    .groupBy(funnelId, step, cohort);
+
+  const toMs = (value: number | string | null) =>
+    value === null ? null : Math.round(Number(value));
+  const delightInput = await getDelightInput(since7d);
   return buildSummerFunnelResponse(
     rows.map(row => ({
       ...row,
       count24h: Number(row.count24h) || 0,
       count7d: Number(row.count7d) || 0,
     })),
-    now
+    now,
+    timingRows.map(row => ({
+      ...row,
+      samples: Number(row.samples) || 0,
+      p50Ms: toMs(row.p50Ms),
+      p95Ms: toMs(row.p95Ms),
+    })),
+    delightInput
   );
 }

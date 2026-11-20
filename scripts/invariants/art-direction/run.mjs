@@ -8,7 +8,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { REPO_ROOT } from './paths.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SKIP = new Set(['color.mjs', 'paths.mjs', 'ratchet.mjs', 'run.mjs']);
+const SKIP = new Set([
+  'color.mjs',
+  'paths.mjs',
+  'ratchet.mjs',
+  'run.mjs',
+  'vision-calibration.mjs',
+]);
 
 export async function loadChecks(dir = HERE) {
   const files = readdirSync(dir)

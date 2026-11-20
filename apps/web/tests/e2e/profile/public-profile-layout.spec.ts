@@ -915,7 +915,15 @@ test.describe('Public profile /tim layout hardening @regression', () => {
     expect(
       nameGeometry.scrollWidth - nameGeometry.clientWidth
     ).toBeLessThanOrEqual(2);
-    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    if (PROFILE_DESKTOP_SURFACE_ENABLED) {
+      // The flagged wide surface excludes the CSS-only desktop composition.
+      expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    } else {
+      // The default >=1024px composition puts identity left of the featured
+      // rail, with aligned tops, rather than stacking the rail below it.
+      expect(identity.right).toBeLessThanOrEqual(homeRail.left);
+      expect(Math.abs(homeRail.top - identity.top)).toBeLessThanOrEqual(8);
+    }
   });
 
   for (const viewport of VIEWPORTS) {

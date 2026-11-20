@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { CanonicalUserState } from './canonical-user-state';
 
@@ -34,7 +34,13 @@ import SignUpPage from '../../app/(auth)/signup/page';
 describe.each([SignUpPage, SignInPage, SignupModalPage, SigninModalPage])(
   'canonical auth entry %s',
   Page => {
+    afterEach(() => vi.unstubAllEnvs());
+
     beforeEach(() => {
+      // This canonical-entry table exercises the open default (Tim,
+      // 2026-11-09); the closed kill switch is covered in
+      // public-signup-closed.test.tsx.
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
       resolveUserState.mockReset();
     });
     it('routes current paid subscribers to billing and never mounts a trial pitch', async () => {

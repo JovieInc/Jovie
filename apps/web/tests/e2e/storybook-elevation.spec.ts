@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test';
+import {
+  desktopUpdateInstalls,
+  desktopUpdateListener,
+  fireDesktopUpdate,
+  installDesktopUpdateFixture,
+} from './utils/desktop-update-fixture';
 
 /**
  * Surface-elevation matrix visual regression (JOV-2156).
@@ -572,68 +578,35 @@ test.describe('central runtime notifications', () => {
   test('desktop update stays pending and is actionable in Inbox', async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      const fixture = window as unknown as {
-        available?: () => void;
-        downloaded?: () => void;
-        installs: number;
-        electronAPI: unknown;
-      };
-      fixture.installs = 0;
-      fixture.electronAPI = {
-        platform: 'darwin',
-        electronVersion: 'fixture',
-        onUpdateAvailable: (cb: () => void) => {
-          fixture.available = cb;
-          return () => {};
-        },
-        onUpdateDownloaded: (cb: () => void) => {
-          fixture.downloaded = cb;
-          return () => {};
-        },
-        installUpdateAndRestart: () => {
-          fixture.installs++;
-        },
-      };
-    });
+    await installDesktopUpdateFixture(page);
     await openStory(
       page,
       'dashboard-navigation-customer-rail--runtime-update',
       'light'
     );
     await expect
-      .poll(() =>
-        page.evaluate(
-          () => typeof (window as unknown as { available?: unknown }).available
-        )
-      )
+      .poll(() => desktopUpdateListener(page, 'available'))
       .toBe('function');
-    await page.evaluate(() =>
-      (window as unknown as { available: () => void }).available()
-    );
+    await fireDesktopUpdate(page, 'available');
     await expect(
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
+    // The update is announced by the shell pill, never on the Inbox bell.
     await expect(
-      page.getByRole('link', { name: 'Inbox — App Update Available' })
+      page
+        .getByRole('link', { name: 'Inbox', exact: true })
+        .and(page.locator('[data-navigation-item-id="inbox"]'))
     ).toHaveAttribute('href', '/app');
-    await page.evaluate(() =>
-      (window as unknown as { downloaded: () => void }).downloaded()
-    );
+    await expect(
+      page.getByRole('link', { name: /App Update Available/ })
+    ).toHaveCount(0);
+    await fireDesktopUpdate(page, 'downloaded');
     await expect(
       page.getByRole('button', { name: 'Restart Jovie To Update' })
     ).toBeEnabled();
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { installs: number }).installs
-      )
-    ).toBe(0);
+    expect(await desktopUpdateInstalls(page)).toBe(0);
     await page.getByRole('button', { name: 'Restart Jovie To Update' }).click();
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { installs: number }).installs
-      )
-    ).toBe(1);
+    expect(await desktopUpdateInstalls(page)).toBe(1);
   });
 });
 
@@ -663,7 +636,7 @@ test.describe('sidebar attention and Settings header', () => {
       exact: true,
     });
     const search = mobile.getByRole('button', {
-      name: 'Search Jovie',
+      name: /Search Jovie$/,
       exact: true,
     });
     await expect(collapse).toBeVisible();
@@ -682,7 +655,7 @@ test.describe('sidebar attention and Settings header', () => {
     await openStory(page, 'organisms-unifiedsidebar--demo', 'light');
     const slot = page.locator('[data-sidebar-search-slot]');
     const search = page.getByRole('button', {
-      name: 'Search Jovie',
+      name: /Search Jovie$/,
       exact: true,
     });
     const divider = page.locator('[data-sidebar-search-divider]');
@@ -774,7 +747,7 @@ test.describe('sidebar attention and Settings header', () => {
       await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
       const row = page.locator('[data-sidebar-brand-row]');
       const inbox = page.getByRole('link', { name: /Inbox —/ });
-      const search = page.getByRole('button', { name: 'Search Jovie' });
+      const search = page.getByRole('button', { name: /Search Jovie$/ });
       await expect(inbox).toHaveAttribute('href', '/app');
       await expect(search).toHaveCount(1);
       await expect(row).toContainText('Jovie');
@@ -782,23 +755,38 @@ test.describe('sidebar attention and Settings header', () => {
       const searchBox = (await search.boundingBox())!;
       expect(Math.abs(bellBox.y - searchBox.y)).toBeLessThanOrEqual(1);
       expect(searchBox.x).toBeGreaterThan(bellBox.x);
+      // Bell, search and rail toggle: one 28px box, one rhythm (Tim
+      // 2026-11-14 alignment pass).
+      const toggleBox = (await page
+        .locator('[data-sidebar-brand-row] [data-testid="sidebar-rail-toggle"]')
+        .boundingBox())!;
+      for (const box of [bellBox, searchBox, toggleBox]) {
+        expect(box.width).toBeCloseTo(28, 0);
+        expect(box.height).toBeCloseTo(28, 0);
+        expect(
+          Math.abs(box.y + box.height / 2 - (bellBox.y + bellBox.height / 2))
+        ).toBeLessThanOrEqual(0.5);
+      }
+      const firstGap = searchBox.x - (bellBox.x + bellBox.width);
+      const secondGap = toggleBox.x - (searchBox.x + searchBox.width);
+      expect(Math.abs(firstGap - secondGap)).toBeLessThanOrEqual(0.5);
+      // The bell is the only `/app` entry: the rail's Inbox row is gone.
       await expect(
         page.getByRole('link', { name: 'Inbox', exact: true })
-      ).toHaveCount(1);
+      ).toHaveCount(0);
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
-        ['Inbox', '/app'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
+        // JOV-7733 retired the Identity rollout gate, so it is part of the
+        // default-flags navigation.
+        ['Identity', '/app/presence'],
       ]) {
         const destination = page.getByRole('link', { name, exact: true });
         await expect(destination).toBeVisible();
         await expect(destination).toHaveAttribute('href', href);
       }
-      await expect(
-        page.getByRole('link', { name: 'Identity', exact: true })
-      ).toHaveCount(0);
     });
   }
 });

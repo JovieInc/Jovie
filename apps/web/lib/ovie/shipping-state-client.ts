@@ -57,9 +57,24 @@ export type ShippingStateView = {
   readonly ciGreen: ShippingMeaningView;
   readonly productionVerified: ShippingMeaningView;
   readonly exactLiveBuild: ShippingMeaningView;
-  /** Per-metric delivery truth; a failed source leaves only its metrics n/a. */
+  /** Per-metric delivery truth; a failed source leaves only its metrics unknown. */
   readonly delivery: DeliverySummary;
+  /**
+   * Per-source provenance, so an unknown metric can name its source, why it
+   * has no reading and when that source last answered. Absent until the
+   * first projection arrives.
+   */
+  readonly sources?: Readonly<Record<string, ShippingSourceEvidence>>;
   readonly flags: ReadonlySet<ShippingFlag>;
+};
+
+export type ShippingSourceEvidence = {
+  /** Server observation state, e.g. fresh, stale, unavailable, unauthorized. */
+  readonly state: string;
+  /** Sanitized error code from the last failed read, when there was one. */
+  readonly code: string | null;
+  /** ISO time the source last answered successfully. */
+  readonly lastSuccessAt: string | null;
 };
 export type ShippingStateRead =
   | { readonly kind: 'projection'; readonly payload: unknown }
@@ -158,6 +173,24 @@ function nestedCount(
     ? record[sourceId].counts
     : null;
   return counts ? parseCount(counts[key]) : NONE;
+}
+
+function parseSourceEvidence(
+  record: unknown
+): Readonly<Record<string, ShippingSourceEvidence>> {
+  if (!isRecord(record)) return {};
+  const out: Record<string, ShippingSourceEvidence> = {};
+  for (const [sourceId, source] of Object.entries(record)) {
+    if (!isRecord(source)) continue;
+    out[sourceId] = {
+      state: str(source.state) ?? 'unknown',
+      code: isRecord(source.lastError) ? str(source.lastError.code) : null,
+      lastSuccessAt: isRecord(source.lastSuccess)
+        ? str(source.lastSuccess.at)
+        : null,
+    };
+  }
+  return out;
 }
 
 function mapServerState(state: unknown): ShippingTruth {
@@ -290,6 +323,7 @@ export function parseShippingStateProjection(
     productionVerified: parseMeaning(meanings.productionVerified),
     exactLiveBuild: parseMeaning(meanings.exactLiveBuild),
     delivery: parseDeliverySummary(payload.delivery),
+    sources: parseSourceEvidence(payload.sources),
     flags,
   };
   return { ok: true, projection: view };

@@ -15,6 +15,7 @@ import {
   classifyFailure,
   type Failure,
   type HeaderBag,
+  type Observation,
   parseBudget,
 } from './headers.ts';
 import {
@@ -70,7 +71,29 @@ export function ghShape(args: readonly string[]): {
   resource: string;
   write: boolean;
   idempotent: boolean;
+  cost?: number;
 } {
+  const logArgs =
+    (args.length === 7 || args.length === 9) &&
+    args[2] === '--repo' &&
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(args[3] ?? '')
+      ? [...args.slice(0, 2), ...args.slice(4)]
+      : args;
+  if (
+    (logArgs.length === 5 ||
+      (logArgs.length === 7 &&
+        logArgs[4] === '--attempt' &&
+        /^[1-9][0-9]*$/.test(logArgs[5] ?? ''))) &&
+    logArgs[0] === 'run' &&
+    logArgs[1] === 'view' &&
+    logArgs[2] === '--job' &&
+    /^[1-9][0-9]*$/.test(logArgs[3] ?? '') &&
+    ['--log', '--log-failed'].includes(logArgs[logArgs.length - 1] ?? '')
+  ) {
+    // Per-job logs use REST, returning before the summary's GraphQL PR lookup.
+    // gh 2.103 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
+    return { resource: 'core', write: false, idempotent: true, cost: 5 };
+  }
   if (args[0] === 'api') {
     const target =
       args.find(
@@ -95,6 +118,19 @@ export function ghShape(args: readonly string[]): {
         : 'core',
       write,
       idempotent: !write || effective === 'PUT' || effective === 'DELETE',
+      // GET /rate_limit is exempt from primary quota, never secondary limits.
+      ...(effective === 'GET' &&
+      !args.includes('--hostname') &&
+      !args.some(arg =>
+        /^(?:--(?:hostname|method|field|raw-field|input)=|-X.|-[fF].)/.test(arg)
+      ) &&
+      [
+        'rate_limit',
+        '/rate_limit',
+        'https://api.github.com/rate_limit',
+      ].includes(target)
+        ? { cost: 0 }
+        : {}),
     };
   }
   const read = args[0] === 'search' || READ_PORCELAIN.has(args[1] ?? '');
@@ -147,6 +183,36 @@ export function ghCredential(env: NodeJS.ProcessEnv): string {
   return token ? hashCredential('github', token) : 'gh-cli-login';
 }
 
+/** Only the exact rate_limit response can describe other resources. */
+function quotaObservations(body: string): Observation[] {
+  let resources: Record<string, Record<string, number>>;
+  try {
+    resources = JSON.parse(body)?.resources;
+  } catch {
+    return [];
+  }
+  if (!resources || typeof resources !== 'object') return [];
+  const observations: Observation[] = [];
+  for (const resource of ['core', 'graphql', 'search']) {
+    const row = resources[resource];
+    if (
+      !row ||
+      !['limit', 'remaining', 'reset'].every(
+        key => Number.isSafeInteger(row[key]) && row[key]! >= 0
+      ) ||
+      row.remaining! > row.limit!
+    )
+      continue;
+    observations.push({
+      resource,
+      limit: row.limit!,
+      remaining: row.remaining!,
+      resetAt: row.reset! * 1000,
+    });
+  }
+  return observations;
+}
+
 export async function runGh(
   args: readonly string[],
   options: RunGhOptions = {}
@@ -158,6 +224,8 @@ export async function runGh(
   };
   const spec = providerSpec('github');
   const store = options.store ?? defaultStore(env);
+  const persistenceFailures = () =>
+    (store as LedgerStore & { unpersisted?: number }).unpersisted ?? 0;
   const credential = options.credential ?? ghCredential(env);
   const priority = options.priority ?? 'default';
   const now = options.now ?? Date.now;
@@ -198,12 +266,14 @@ export async function runGh(
     });
 
   for (let attempt = 0; ; ) {
+    const unpersisted = persistenceFailures();
     const decision = await inLedger((s, at) => {
       const d = decide(
         s,
         {
           priority,
-          costs: { [shape.resource]: 1 },
+          // A free quota observation still passes the same circuit breaker.
+          costs: shape.cost === 0 ? {} : { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
         },
@@ -213,6 +283,8 @@ export async function runGh(
         bump(s, priority, d.action === 'shed' ? 'shed' : 'waited', at);
       return d;
     });
+    if (persistenceFailures() !== unpersisted)
+      return defer('ledger-admission-unpersisted', now() + 1000);
     if (decision.action === 'shed')
       return defer(`shed (${decision.reason})`, decision.until);
     if (decision.action === 'wait') {
@@ -249,9 +321,25 @@ export async function runGh(
       !GH_TRANSIENT.test(result.stderr)
         ? 'client'
         : failure.kind;
-    const settled: Failure = { kind, retryAtMs: failure.retryAtMs };
+    // A primary-free endpoint cannot spend core quota. If a server throttle
+    // carries an empty core header, keep the secondary breaker authoritative
+    // and preserve the full provider reset/backoff window for free probes.
+    const freeProbeThrottle = shape.cost === 0 && kind === 'primary';
+    const settled: Failure = {
+      kind: freeProbeThrottle ? 'secondary' : kind,
+      retryAtMs: failure.retryAtMs,
+    };
+    const observations = parseBudget(spec, headers, at, shape.resource);
+    if (result.code === 0 && shape.cost === 0) {
+      const headerResources = new Set(observations.map(row => row.resource));
+      observations.push(
+        ...quotaObservations(body).filter(
+          row => !headerResources.has(row.resource)
+        )
+      );
+    }
     await inLedger((s, t) => {
-      observe(s, parseBudget(spec, headers, t, shape.resource), t);
+      observe(s, observations, t, true);
       return recordOutcome(
         s,
         {

@@ -191,7 +191,13 @@ export function RevenueLiftDashboardView({
         >
           Metric → Signal → VC Interpretation
         </h2>
-        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
+        <ContentSurfaceCard
+          surface='table'
+          className='overflow-x-auto'
+          // Scrollable regions must be keyboard-focusable (WCAG 2.1.1 / axe
+          // scrollable-region-focusable); the wide tables overflow on mobile.
+          tabIndex={0}
+        >
           <table className='w-full min-w-[40rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -300,8 +306,14 @@ export function RevenueLiftDashboardView({
           </ContentSurfaceCard>
         </div>
         <SourceLine source={data.cohorts.source} />
-        <ContentSurfaceCard surface='table' className='mt-3 overflow-x-auto'>
-          <table className='w-full min-w-[32rem] text-left text-sm'>
+        <ContentSurfaceCard
+          surface='table'
+          className='mt-3 overflow-x-auto'
+          // Scrollable regions must be keyboard-focusable (WCAG 2.1.1 / axe
+          // scrollable-region-focusable); the wide tables overflow on mobile.
+          tabIndex={0}
+        >
+          <table className='w-full min-w-lg text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>
@@ -384,8 +396,14 @@ export function RevenueLiftDashboardView({
         >
           Multi Agent Contribution
         </h2>
-        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
-          <table className='w-full min-w-[36rem] text-left text-sm'>
+        <ContentSurfaceCard
+          surface='table'
+          className='overflow-x-auto'
+          // Scrollable regions must be keyboard-focusable (WCAG 2.1.1 / axe
+          // scrollable-region-focusable); the wide tables overflow on mobile.
+          tabIndex={0}
+        >
+          <table className='w-full min-w-xl text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>

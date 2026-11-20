@@ -2,13 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { APP_ROUTES } from '@/constants/routes';
-import { ProfileBentoView } from './ProfileContactSidebarSections';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import {
+  ProfileBentoView,
+  ProfileSidebarHeaderCard,
+} from './ProfileContactSidebarSections';
 
 vi.mock('./ProfileSmartLinkAnalytics', () => ({
   ProfileSmartLinkAnalytics: () => null,
 }));
-const flags = vi.hoisted(() => ({ identity: true }));
-vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => flags.identity }));
 
 const previewData: PreviewPanelData = {
   username: 'alex',
@@ -43,7 +45,6 @@ describe('ProfileBentoView', () => {
   });
 
   it('routes the current Identity label to its canonical destination', () => {
-    flags.identity = true;
     render(
       <ProfileBentoView
         previewData={previewData}
@@ -57,7 +58,6 @@ describe('ProfileBentoView', () => {
   });
 
   it('passes the projected destination to the host callback', async () => {
-    flags.identity = true;
     const onManageConnections = vi.fn();
     render(
       <ProfileBentoView
@@ -73,8 +73,7 @@ describe('ProfileBentoView', () => {
       APP_ROUTES.PRESENCE
     );
   });
-  it('shows the settings fallback without claiming the disabled workspace', () => {
-    flags.identity = false;
+  it('always hands off to Identity without a rollout provider', () => {
     render(
       <ProfileBentoView
         previewData={previewData}
@@ -82,9 +81,8 @@ describe('ProfileBentoView', () => {
       />
     );
     expect(
-      screen.getByRole('link', { name: 'Manage Profile' })
-    ).toHaveAttribute('href', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`);
-    expect(screen.queryByText('Manage In Identity')).not.toBeInTheDocument();
+      screen.getByRole('link', { name: 'Manage In Identity' })
+    ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
   });
 });
 
@@ -123,4 +121,68 @@ it('carries source verification into the profile rail through image failure with
   expect(
     screen.queryByRole('img', { name: 'Verified Jovie Profile' })
   ).toBeNull();
+});
+
+describe('ProfileContactSidebarSections states', () => {
+  it('shows a new profile by handle with zero links and closes on request', async () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <ProfileSidebarHeaderCard
+        previewData={{ ...previewData, displayName: '', bio: null }}
+        profileUrl='https://jov.ie/alex'
+        onClose={onClose}
+        overflowActions={[]}
+      />
+    );
+    const card = screen.getByTestId('profile-contact-header-card');
+    expect(card).toHaveTextContent('@alex');
+    expect(card).toHaveTextContent('0 links');
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the bio out when the profile has none', async () => {
+    const { container } = render(
+      <ProfileBentoView
+        previewData={{ ...previewData, bio: null }}
+        profileUrl='https://jov.ie/alex'
+      />
+    );
+    const header = screen.getByTestId('profile-preview-entity-header');
+    expect(header).toHaveTextContent('Alex Rivera');
+    expect(header).not.toHaveTextContent('Independent artist');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps long identity text whole for assistive tech', async () => {
+    const displayName =
+      'The Extremely Long Artist Name Of A Collective With Many Members';
+    const { container } = render(
+      <ProfileBentoView
+        previewData={{ ...previewData, displayName }}
+        profileUrl='https://jov.ie/alex'
+      />
+    );
+    expect(
+      screen.getByTestId('profile-preview-entity-header')
+    ).toHaveTextContent(displayName);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders a right-to-left identity accessibly', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ProfileBentoView
+          previewData={{ ...previewData, displayName: 'ليلى حداد' }}
+          profileUrl='https://jov.ie/alex'
+        />
+      </div>
+    );
+    expect(
+      screen.getByTestId('profile-preview-entity-header')
+    ).toHaveTextContent('ليلى حداد');
+    await expectNoA11yViolations(container);
+  });
 });

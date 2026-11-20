@@ -36,25 +36,6 @@ export const Default: Story = {
     pendingActionId: null,
     pendingFeedbackId: null,
     pendingNextStepId: null,
-    enableStackInteractions: false,
-  },
-  render: args => (
-    <div className='bg-(--app-shell-content-surface) p-6'>
-      <OpportunityInboxFeed {...args} />
-    </div>
-  ),
-};
-
-export const StackInteractions: Story = {
-  args: {
-    cards: [baseCard],
-    onApprove: () => {},
-    onDismiss: () => {},
-    onFeedback: (id: string, rating: 'positive' | 'negative') => {
-      void id;
-      void rating;
-    },
-    enableStackInteractions: true,
   },
   render: args => (
     <div className='bg-(--app-shell-content-surface) p-6'>
@@ -101,7 +82,6 @@ export const YoutubeThumbnailCandidate: Story = {
       void id;
       void rating;
     },
-    enableStackInteractions: false,
   },
   render: args => (
     <div className='bg-(--app-shell-content-surface) p-6'>
@@ -120,7 +100,6 @@ export const Loading: Story = {
       void rating;
     },
     pendingActionId: 'feed-card-1',
-    enableStackInteractions: true,
   },
   render: args => (
     <div className='bg-(--app-shell-content-surface) p-6'>

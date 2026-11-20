@@ -38,10 +38,7 @@ describe('ProfilePaymentsCard', () => {
     ]);
     expect(within(group).getByRole('radio', { name: '$10' })).toBeChecked();
     const cta = within(card).getByRole('link', { name: 'Pay $10' });
-    expect(cta).toHaveAttribute(
-      'href',
-      `${VENMO}?utm_amount=10&utm_username=timwhite`
-    );
+    expect(cta).toHaveAttribute('href', `${VENMO}?txn=pay&amount=10`);
     expect(cta).toHaveAttribute('target', '_blank');
     // Generalized payments copy, never "support" or "fund".
     expect(card).not.toHaveTextContent(/support|fund|tip/i);
@@ -61,7 +58,7 @@ describe('ProfilePaymentsCard', () => {
     expect(screen.getByRole('radio', { name: '$20' })).toBeChecked();
     expect(screen.getByRole('link', { name: 'Pay $20' })).toHaveAttribute(
       'href',
-      `${VENMO}?utm_amount=20&utm_username=timwhite`
+      `${VENMO}?txn=pay&amount=20`
     );
   });
 
@@ -140,5 +137,24 @@ describe('ProfilePaymentsCard', () => {
     cta.addEventListener('click', event => event.preventDefault());
     fireEvent.click(cta);
     expect(trackPixel).not.toHaveBeenCalled();
+  });
+
+  it('keeps each amount chip a visually hidden native radio in one named group', () => {
+    render(
+      <ProfilePaymentsCard
+        artistName='Tim White'
+        venmoLink={VENMO}
+        accent={ACCENT}
+      />
+    );
+
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(PROFILE_PAYMENT_AMOUNTS.length);
+    const names = new Set(radios.map(radio => radio.getAttribute('name')));
+    expect(names.size).toBe(1);
+    for (const radio of radios) {
+      expect(radio).toHaveAttribute('type', 'radio');
+      expect(radio).toHaveClass('peer');
+    }
   });
 });

@@ -62,7 +62,7 @@ describe('AgentOsRunsPanel', () => {
         screen.getByTestId(
           'agent-os-board-card-agentos-run-post-land-certification'
         )
-      ).getByRole('button', { name: 'Feature-flag certification' })
+      ).getByRole('button', { name: /^Select run: Feature-flag certification/ })
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
@@ -98,6 +98,11 @@ describe('AgentOsRunsPanel', () => {
       name: /Filter by Queued/i,
     });
     expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'false');
+
+    // The visible lane count must be a clean token inside the accessible
+    // name (label-content-name-mismatch): "Filter by Queued: 1", not parens.
+    expect(queuedFilterBtn).toHaveAccessibleName(/Filter by Queued: \d+/);
+    expect(queuedFilterBtn).not.toHaveAccessibleName(/\(\d+\)/);
 
     await userEvent.click(queuedFilterBtn);
     expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'true');

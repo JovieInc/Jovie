@@ -150,9 +150,20 @@ describe('generateProfileStructuredData', () => {
     expect(validateProfileRichResults(data)).toEqual([]);
   });
 
+  it('matches the page meta description when a bioless artist has location and genres', () => {
+    const data = generateProfileStructuredData(
+      { ...BASE_PROFILE, bio: null, location: 'Los Angeles, CA' },
+      ['pop', 'electronic'],
+      MOCK_LINKS
+    );
+    expect(findInGraph(data, 'MusicGroup')?.description).toBe(
+      "Los Angeles, CA-based pop, electronic artist. Stream Test Artist's music on Spotify, Apple Music & more on Jovie."
+    );
+  });
+
   it('emits MusicGroup + Person and music wording for an artist profile', () => {
     const data = generateProfileStructuredData(
-      { ...BASE_PROFILE, bio: null },
+      { ...BASE_PROFILE, bio: null, location: null },
       null,
       MOCK_LINKS
     );

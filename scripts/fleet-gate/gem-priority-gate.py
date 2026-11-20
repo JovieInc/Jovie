@@ -77,6 +77,12 @@ LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
+# A working tick can hold tick.json's start-of-tick stamp past CONTROLLER_SNAPSHOT_TTL
+# (dispatch ticks were measured at 25-60 minutes on 2026-10-26). Liveness for that
+# in-flight window is the controller's own heartbeat: lifecycle.beat touches
+# tick-heartbeat while the tick runs tracked children, the same signal the stay-up
+# watchdog consumes. Past this bound the heartbeat is silence, not progress.
+NATIVE_HEARTBEAT_ALIVE_S = 3 * 60  # factory_watchdog.HEARTBEAT_ALIVE_S
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -982,6 +988,22 @@ def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/u
     return {**env, **canonical}
 
 
+def native_heartbeat_age(state_dir: Path, now: datetime) -> float | None:
+    """Age (seconds) of the controller's tick-heartbeat, or None when absent/irregular.
+
+    The heartbeat is regular-file liveness evidence written by the same tracked
+    lifecycle helper the tick receipt comes from; a symlink or special file is
+    not evidence.
+    """
+    try:
+        info = (state_dir / "tick-heartbeat").lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+    return now.timestamp() - info.st_mtime
+
+
 def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
     """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
     failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
@@ -1028,8 +1050,24 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         observed = (datetime.fromisoformat(tick_at.replace("Z", "+00:00"))
                     if isinstance(tick_at, str) else None)
         tick_revision = tick.get("release")
+        tick_age = (now - observed) if observed is not None else None
+        # A tick stamp older than CONTROLLER_SNAPSHOT_TTL is not by itself a dead
+        # controller: a working dispatch holds tick.json's start-of-tick stamp past
+        # that bound (ticks ran 25-60 minutes on 2026-10-26), exactly while the
+        # service keeps spawning workers. For that in-flight window the tick's own
+        # heartbeat is the liveness evidence — lifecycle.beat touches
+        # tick-heartbeat while the tick runs tracked children. A missing,
+        # irregular or stale heartbeat still fails closed, as does a failed tick,
+        # an unbound release identity or a future-dated stamp: the heartbeat
+        # never manufactures health, it only certifies an in-flight tick.
+        heartbeat_age = native_heartbeat_age(state, now)
+        receipt_fresh = (tick_age is not None
+                         and -timedelta(seconds=30) <= tick_age <= CONTROLLER_SNAPSHOT_TTL)
+        heartbeat_fresh = (tick_age is not None and tick_age >= -timedelta(seconds=30)
+                           and heartbeat_age is not None
+                           and heartbeat_age <= NATIVE_HEARTBEAT_ALIVE_S)
         if (observed is None or observed.tzinfo is None or observed.utcoffset() is None
-                or not -timedelta(seconds=30) <= now - observed <= CONTROLLER_SNAPSHOT_TTL
+                or not (receipt_fresh or heartbeat_fresh)
                 or not isinstance(tick_revision, str) or not re.fullmatch(r"[0-9a-f]{7,40}", tick_revision)
                 or not str(objects.get("scripts/lanes", "")).startswith(tick_revision) or "error" not in tick or tick["error"] is not None):
             raise ValueError("native controller tick is stale, failed or unbound")
@@ -1066,6 +1104,7 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         return {"status": "green", "kind": "native-lanes", "source": "native-runtime",
                 "observedAt": isoformat(now), "tickAt": tick["at"],
                 "sourceCommit": revision, "bundleDigest": parts[0],
+                "heartbeatAgeS": round(heartbeat_age, 1) if heartbeat_age is not None else None,
                 "service": "jovie-lanes.service", "timer": "jovie-lanes.timer"}
     except (OSError, ValueError, TypeError, IndexError, AttributeError, subprocess.SubprocessError):
         return {**failed, "error": "native-controller-evidence-unavailable"}
@@ -1250,12 +1289,22 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
     }
 
 
+DATABASE_PROBE_ATTEMPTS = 3
+
+
 def observe_database(production_url: str) -> dict[str, str]:
     """Observe public DB liveness on the configured production origin only.
 
     Deploy liveness deliberately omits private dependency diagnostics. Never
     infer database readiness from that aggregate response or carry diagnostics
     into a fleet receipt. Uncertain DB evidence remains unknown.
+
+    A transport blip (connection error, timeout, or an edge error page) is
+    not a database verdict, so transport-class failures get the same bounded
+    three-attempt retry as the other live observers. Authoritative verdicts
+    (a parseable liveness document in any state, a redirect, an unexpected
+    status) return immediately and are never retried. Pass conditions,
+    freshness bounds, and the unknown-blocks-visibly rule are unchanged.
     """
     def unknown(reason: str) -> dict[str, str]:
         return {"status": "unknown", "detail": f"database health probe: {reason}"}
@@ -1269,33 +1318,60 @@ def observe_database(production_url: str) -> dict[str, str]:
         # Validate the port before constructing the credential-free same-origin URL.
         origin.port
         url = urllib.parse.urlunsplit((origin.scheme, origin.netloc, "/api/health/db", "", ""))
+    except (OSError, ValueError, OverflowError):
+        return unknown("untrusted production origin")
+
+    last_transport_reason = ""
+    for attempt in range(DATABASE_PROBE_ATTEMPTS):
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
-                status, final_url = response.status, response.geturl()
-                value = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            status, final_url = error.code, error.geturl()
-            value = json.loads(error.read().decode("utf-8"))
-        if final_url != url:
-            return unknown("redirected away from the configured database endpoint")
-        if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
-            return unknown("malformed public liveness schema")
-        timestamp = value.get("timestamp")
-        if not isinstance(timestamp, str):
-            return unknown("missing observation timestamp")
-        observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        if observed_at.tzinfo is None:
-            return unknown("timestamp has no timezone")
-        age = utc_now() - observed_at.astimezone(UTC)
-        if not timedelta(0) <= age <= timedelta(minutes=10):
-            return unknown("stale or future-dated observation")
-        if value["healthy"] is False and status in (200, 503):
-            return {"status": "red", "detail": "same-origin database health check failed"}
-        if value["healthy"] is True and status == 200:
-            return {"status": "green", "detail": "same-origin database health check passed"}
-        return unknown("unexpected HTTP status or contradictory liveness")
-    except (OSError, ValueError, OverflowError, urllib.error.URLError):
-        return unknown("transport or malformed response")
+            try:
+                with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
+                    status, final_url = response.status, response.geturl()
+                    body = response.read().decode("utf-8")
+            except urllib.error.HTTPError as error:
+                status, final_url = error.code, error.geturl()
+                body = error.read().decode("utf-8", "replace")
+            try:
+                value = json.loads(body)
+            except ValueError:
+                # An HTML edge/error page is a transport-class blip, not a
+                # liveness verdict; retry it like any other blip.
+                last_transport_reason = f"attempt {attempt + 1}: edge returned a non-JSON body"
+                if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                    time.sleep(attempt + 1)
+                continue
+        except (OSError, urllib.error.URLError) as error:
+            last_transport_reason = f"attempt {attempt + 1}: {error}"
+            if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                time.sleep(attempt + 1)
+            continue
+        try:
+            if final_url != url:
+                return unknown("redirected away from the configured database endpoint")
+            if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
+                return unknown("malformed public liveness schema")
+            timestamp = value.get("timestamp")
+            if not isinstance(timestamp, str):
+                return unknown("missing observation timestamp")
+            observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if observed_at.tzinfo is None:
+                return unknown("timestamp has no timezone")
+            age = utc_now() - observed_at.astimezone(UTC)
+            if not timedelta(0) <= age <= timedelta(minutes=10):
+                return unknown("stale or future-dated observation")
+            if value["healthy"] is False and status in (200, 503):
+                return {"status": "red", "detail": "same-origin database health check failed"}
+            if value["healthy"] is True and status == 200:
+                return {"status": "green", "detail": "same-origin database health check passed"}
+            return unknown("unexpected HTTP status or contradictory liveness")
+        except ValueError:
+            # A parseable response with unparseable evidence is authoritative
+            # brokenness, not a transport blip: return it, never retry it.
+            return unknown("transport or malformed response")
+    return unknown(
+        f"transport or malformed response after {DATABASE_PROBE_ATTEMPTS} "
+        f"attempts: {last_transport_reason or 'no response'}"
+    )
 
 
 def observe_production(url: str) -> dict[str, Any]:

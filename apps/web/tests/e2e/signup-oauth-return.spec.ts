@@ -186,16 +186,24 @@ test('signup recovers the callback URL emitted by its provider control @smoke', 
   ]);
   // AuthShell records the explicit start and the locally aborted failure.
   expect(funnelSteps).toHaveLength(2);
+  // #23126 times every funnel step, so each /api/journey/step payload also
+  // carries stepMs/entryMs (and may grow further instrumentation). Match the
+  // identity fields exactly via objectContaining instead of whole-object
+  // equality, so intentional extra fields cannot fail the contract check.
   expect(funnelSteps).toEqual(
     expect.arrayContaining([
-      { funnel: 'artist_signup', step: 'auth_start', surface: 'signup' },
-      {
+      expect.objectContaining({
+        funnel: 'artist_signup',
+        step: 'auth_start',
+        surface: 'signup',
+      }),
+      expect.objectContaining({
         funnel: 'artist_signup',
         step: 'auth_start',
         outcome: 'error',
         surface: 'signup',
         reason: 'oauth_start_failed',
-      },
+      }),
     ])
   );
 });

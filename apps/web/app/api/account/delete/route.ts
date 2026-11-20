@@ -1,6 +1,7 @@
 import { del } from '@vercel/blob';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { deleteAgentDraftsByIds } from '@/lib/agent-acquisition/draft-purge.server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -172,6 +173,26 @@ export async function POST(request: Request) {
       );
 
     await deleteFounderReviewBlobs(founderReviewRows);
+
+    // Agent connector drafts hold no user id; the link is the draft id on the
+    // claimed profile. The drafts table is unreachable inside an RLS session,
+    // so ids are read in-session and deleted with plain db BEFORE the profiles
+    // go (a retry after partial failure still finds the profiles).
+    const draftIdRows = await withDbSession(
+      async () =>
+        db
+          .select({
+            draftId: drizzleSql<
+              string | null
+            >`${creatorProfiles.settings}->'agentAcquisition'->>'draft_id'`,
+          })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id)),
+      { clerkUserId }
+    );
+    await deleteAgentDraftsByIds(
+      draftIdRows.flatMap(row => (row.draftId ? [row.draftId] : []))
+    );
 
     const profiles = await withDbSessionTx(
       async tx => {

@@ -75,10 +75,19 @@ describe('DesktopUpdateModalView', () => {
       },
       { version: '26.9.16' }
     );
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '42'
+    );
+    expect(screen.getByText('42%')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Downloading Jovie 26.9.16'
+    );
     expect(screen.getByText('Downloading Jovie 26.9.16')).toBeInTheDocument();
     expect(screen.getByText('84 MB of 200 MB')).toBeInTheDocument();
     expect(screen.getByText('12 MB/s')).toBeInTheDocument();
+    expect(screen.getByText('84 MB of 200 MB')).toHaveClass('tabular-nums');
+    expect(screen.getByText('12 MB/s')).toHaveClass('tabular-nums');
     expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
     expect(props.onDownload).not.toHaveBeenCalled();
   });
@@ -137,5 +146,17 @@ describe('DesktopUpdateModal', () => {
       />
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('DesktopUpdateModalView scroll region (JOV-8873)', () => {
+  it('makes the release-notes scroll region keyboard focusable', () => {
+    renderView(available, {
+      notes: { summary: 'Ship it', items: ['Faster sync'] },
+    });
+    expect(screen.getByTestId('desktop-update-notes')).toHaveAttribute(
+      'tabindex',
+      '0'
+    );
   });
 });

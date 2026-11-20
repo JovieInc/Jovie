@@ -4,16 +4,13 @@ import {
   buildInvalidRequestResponse,
   verifyEmailOtpDomain,
 } from '@/lib/notifications/domain';
+import { emailOtpVerifyLimiter } from '@/lib/notifications/email-otp-limiters';
 import {
   SUBSCRIPTION_MANAGEMENT_COOKIE,
   SUBSCRIPTION_MANAGEMENT_TTL_SECONDS,
 } from '@/lib/notifications/management-token';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
-import {
-  createRateLimiter,
-  generalLimiter,
-  getClientIP,
-} from '@/lib/rate-limit';
+import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
   createNotificationJsonResponse,
@@ -21,16 +18,6 @@ import {
 } from '../route-helpers';
 
 export const runtime = 'nodejs';
-
-const emailOtpVerifyLimiter = createRateLimiter({
-  name: 'Email OTP Verify',
-  limit: 10,
-  window: '10 m',
-  prefix: 'notifications:email-otp:verify',
-  analytics: false,
-  algorithm: 'fixed-window',
-  trafficClass: 'anonymous',
-});
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request);

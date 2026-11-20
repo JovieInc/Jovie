@@ -1,4 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import {
+  CF_SECRET_NAMES,
+  cloudflareReadOnlyEnv,
+  signedTurboJson,
+} from './lib/turbo-remote-cache.mjs';
 
 const rawArgs = process.argv.slice(2);
 const leadingSeparatorRemoved =
@@ -36,7 +44,61 @@ function readDopplerSecret(name) {
   }
 }
 
+/** One Doppler call for every Cloudflare cache secret; {} when any is missing. */
+function readDopplerSecrets(names) {
+  try {
+    const out = execFileSync(
+      'doppler',
+      [
+        'secrets',
+        'get',
+        ...names,
+        '--project',
+        'jovie-web',
+        '--config',
+        'dev',
+        '--json',
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    const parsed = JSON.parse(out);
+    return Object.fromEntries(
+      Object.entries(parsed).map(([k, v]) => [k, v?.computed ?? ''])
+    );
+  } catch {
+    return {};
+  }
+}
+
 const env = { ...process.env };
+
+// Prefer the read-only Cloudflare R2 cache (infra/turbo-cache). CI already
+// exported TURBO_API from the setup-node-pnpm action; leave that alone.
+if (!env.TURBO_API) {
+  const cf = CF_SECRET_NAMES.every(name => env[name])
+    ? env
+    : { ...readDopplerSecrets([...CF_SECRET_NAMES]), ...env };
+  let signedJsonPath;
+  if (cf.CF_TURBO_SIGNATURE_KEY) {
+    signedJsonPath = path.join(tmpdir(), `turbo.signed.${process.pid}.json`);
+    writeFileSync(
+      signedJsonPath,
+      signedTurboJson(readFileSync('turbo.json', 'utf8'))
+    );
+  }
+  const selected = cloudflareReadOnlyEnv({
+    url: cf.CF_TURBO_CACHE_URL,
+    roToken: cf.CF_TURBO_CACHE_RO_TOKEN,
+    signatureKey: cf.CF_TURBO_SIGNATURE_KEY,
+    signedJsonPath,
+  });
+  if (selected) Object.assign(env, selected);
+}
+
 env.TURBO_CACHE ??= 'local:rw,remote:r';
 env.TURBO_TOKEN ||= readDopplerSecret('TURBO_TOKEN');
 env.TURBO_TEAM ||= readDopplerSecret('TURBO_TEAM');

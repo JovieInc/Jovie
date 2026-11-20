@@ -51,6 +51,19 @@ export async function createSummerAssistantStreamResponse(input: {
           writeDelta(event.text);
           continue;
         }
+        if (event.type === 'progress') {
+          // Transient: shown while it happens, never part of the saved message.
+          writer.write({
+            type: 'data-summer-progress',
+            data: event.progress,
+            transient: true,
+          });
+          continue;
+        }
+        if (event.type === 'ack') {
+          metadata = { ...metadata, summerAck: event.ack };
+          continue;
+        }
         if (event.type === 'notice') {
           lastNotice = { text: event.text, code: event.code };
           continue;

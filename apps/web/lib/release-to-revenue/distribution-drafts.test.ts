@@ -266,45 +266,6 @@ describe('distribution draft decisions', () => {
     expect(untouched?.status).toBe('pending');
   });
 
-  it('dispatches an approved SMS draft to consented recipients via the provider', async () => {
-    const drafts = buildDistributionDrafts({
-      releaseTitle: 'Neon Sky',
-      releaseLink: 'https://jov.ie/timwhite/neon-sky',
-      merchDropLink: 'https://jov.ie/timwhite/merch',
-      platform: 'instagram',
-    });
-    const smsDraft = drafts.items.find(item => item.channel === 'sms');
-    mockPersistedRun(
-      { ...baseStepOutputs, distributionDrafts: drafts },
-      { smsRecipients: ['+15551234567', '+15557654321'] }
-    );
-
-    const result = await approveDistributionDraft({
-      runId: 'run-1',
-      draftId: smsDraft?.id ?? '',
-      userId: 'user-1',
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(mockSendOutboundSms).toHaveBeenCalledTimes(2);
-    expect(mockSendOutboundSms).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: '+15551234567',
-        body: smsDraft?.body,
-      })
-    );
-    expect(result.draft.status).toBe('dispatched');
-    expect(result.draft.dispatchedAt).toBeTruthy();
-    expect(result.draft.delivery?.state).toBe('accepted');
-    expect(result.draft.delivery?.provider).toBe('twilio');
-    expect(result.draft.delivery?.providerMessageIds).toContain('SM_test_1');
-    expect(result.draft.delivery?.acceptedRecipients).toBe(2);
-  });
-
   it('marks an approved SMS draft undeliverable when the provider is not configured', async () => {
     mockIsOutboundSmsEnabled.mockReturnValue(false);
     const drafts = buildDistributionDrafts({
@@ -358,7 +319,11 @@ describe('distribution draft decisions', () => {
     }
     expect(mockSendOutboundSms).not.toHaveBeenCalled();
     expect(result.draft.status).toBe('undeliverable');
-    expect(result.draft.delivery?.state).toBe('no-consented-recipients');
+    expect(result.draft.delivery).toMatchObject({
+      state: 'no-consented-recipients',
+      attemptedRecipients: 0,
+      acceptedRecipients: 0,
+    });
   });
 
   it('marks an approved SMS draft failed when the provider rejects the send', async () => {

@@ -87,7 +87,7 @@ describe('primary marketing navigation contract', () => {
     expect(new Set(destinations).size).toBe(destinations.length);
     expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
       'Music Smart Links',
-      'Fan Notifications',
+      'Audience notifications',
       'Instant Merch',
       'CLI',
     ]);

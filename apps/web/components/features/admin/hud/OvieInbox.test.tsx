@@ -172,22 +172,16 @@ describe('Ovie Inbox', () => {
     expect(summary).not.toHaveTextContent('Marketing component');
     expect(disclosure.querySelectorAll('li')).toHaveLength(27);
   });
-  it('keeps the requested case and its notes across a reordered refresh', async () => {
+  it('keeps the requested case across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };
     mountRequested(item.id, response([item, other]), response([other, item]));
     await screen.findByText('First decision');
-    fireEvent.change(screen.getByLabelText('Decision notes'), {
-      target: { value: 'Check this scope' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled()
     );
     expect(screen.getByText('First decision')).toBeInTheDocument();
     expect(screen.queryByText('Other decision')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Decision notes')).toHaveValue(
-      'Check this scope'
-    );
   });
   it.each([200, 409])(
     'never advances a requested case to another actionable card after response %s',
@@ -200,9 +194,6 @@ describe('Ovie Inbox', () => {
         response([other])
       );
       await screen.findByText('First decision');
-      fireEvent.change(screen.getByLabelText('Decision notes'), {
-        target: { value: 'Hold for scope correction' },
-      });
       fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
       await screen.findByText(
         'This decision is not in the current inbox. Refresh to check its status.'
@@ -227,7 +218,7 @@ describe('Ovie Inbox', () => {
     await screen.findByText('First decision');
     expect(screen.queryByText('Other decision')).not.toBeInTheDocument();
   });
-  it('shows one decision and advances only after a successful receipt', async () => {
+  it('advances optimistically to the next decision and leaves a receipt', async () => {
     const second = {
       ...item,
       id: 'summer:two',
@@ -243,24 +234,50 @@ describe('Ovie Inbox', () => {
     expect(screen.queryByText('Second decision')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('ovie-inbox-decision')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    await screen.findByText('Second decision');
+    expect(await screen.findByText('Second decision')).toBeInTheDocument();
+    expect(screen.getByTestId('ovie-inbox-receipt')).toHaveTextContent(
+      'Approved First decision'
+    );
     expect(fetcher.mock.calls[1]?.[0]).toBe(
       '/api/ovie/summer-cards/one/decision'
     );
-    expect(screen.queryByText('First decision')).not.toBeInTheDocument();
-  });
-  it('preserves notes and current decision when submission fails', async () => {
-    mount(response([item]), new Response('{}', { status: 503 }));
-    await screen.findByText('First decision');
-    fireEvent.change(screen.getByLabelText('Decision notes'), {
-      target: { value: 'Do not buy this' },
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toEqual({
+      decision: 'approve',
     });
+  });
+  it('decides with arrow keys on the decision buttons and links Discuss to Summer', async () => {
+    const fetcher = mount(response([item]), new Response('{}'), response([]));
+    const approve = await screen.findByRole('button', { name: 'Approve' });
+    expect(screen.getByTestId('decision-card-discuss')).toHaveAttribute(
+      'href',
+      '/app/ov/chat?discuss=summer%3Aone'
+    );
+    fireEvent.keyDown(approve, { key: 'ArrowLeft' });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toEqual({
+      decision: 'reject',
+    });
+  });
+  it('restores the decision with Retry when the write fails', async () => {
+    const fetcher = mount(
+      response([item]),
+      new Response('{}', { status: 503 }),
+      response([item]),
+      new Response('{}'),
+      response([])
+    );
+    await screen.findByText('First decision');
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
-    await screen.findByRole('alert');
-    expect(screen.getByLabelText('Decision notes')).toHaveValue(
-      'Do not buy this'
+    expect(await screen.findByTestId('decision-card-error')).toHaveTextContent(
+      'Not recorded. Retry.'
     );
     expect(screen.getByText('First decision')).toBeInTheDocument();
+    expect(screen.queryByTestId('ovie-inbox-receipt')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(5));
+    expect(JSON.parse(fetcher.mock.calls[3]![1].body)).toEqual({
+      decision: 'reject',
+    });
     expect(
       screen.queryByTestId('operator-note-capture')
     ).not.toBeInTheDocument();
@@ -271,19 +288,17 @@ describe('Ovie Inbox', () => {
       'founder.brain_dump'
     );
   });
-  it('does not carry old notes onto a new decision after a conflict', async () => {
+  it('shows the current inbox after a conflict instead of a false receipt', async () => {
     mount(
       response([item]),
       new Response('{}', { status: 409 }),
       response([{ ...item, id: 'new', title: 'New decision' }])
     );
     await screen.findByText('First decision');
-    fireEvent.change(screen.getByLabelText('Decision notes'), {
-      target: { value: 'Original notes' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     await screen.findByText('New decision');
-    expect(screen.getByLabelText('Decision notes')).toHaveValue('');
+    expect(screen.getByRole('alert')).toHaveTextContent('already recorded');
+    expect(screen.queryByTestId('ovie-inbox-receipt')).not.toBeInTheDocument();
   });
   it('distinguishes a failed read from an empty inbox and supports retry', async () => {
     mount(new Response('{}', { status: 503 }), response([]));

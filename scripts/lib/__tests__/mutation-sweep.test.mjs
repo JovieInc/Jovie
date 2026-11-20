@@ -8,13 +8,17 @@ import {
   emptyState,
   extractSurvivors,
   MIN_RATCHET_VALID,
+  mergeStates,
   moduleKey,
+  parseShard,
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
   ratchetVerdict,
   recordRun,
   SURVIVORS_PER_TASK,
+  selectPool,
+  shardOf,
   survivorFingerprint,
   validateEquivalents,
 } from '../mutation-sweep.mjs';
@@ -305,5 +309,136 @@ describe('ratchet', () => {
 describe('spare-compute contract', () => {
   it('preflight reports no problems or plain strings', () => {
     expect(Array.isArray(preflight(REPO_ROOT))).toBe(true);
+  });
+});
+
+describe('baseline shards', () => {
+  it('parses an index/count pair and rejects out-of-range or malformed values', () => {
+    expect(parseShard('3/40')).toEqual({ index: 3, count: 40 });
+    expect(parseShard('0/1')).toEqual({ index: 0, count: 1 });
+    for (const bad of ['40/40', '-1/4', '1/0', '2', 'a/b', '1/4/2'])
+      expect(() => parseShard(bad)).toThrow(/--shard/u);
+  });
+
+  it('puts every module in exactly one shard, stably', () => {
+    const files = Array.from({ length: 500 }, (_, i) => `lib/m${i}.ts`);
+    const counts = new Array(8).fill(0);
+    for (const file of files) {
+      const shard = shardOf(file, 8);
+      expect(shard).toBe(shardOf(file, 8));
+      expect(shard).toBeGreaterThanOrEqual(0);
+      expect(shard).toBeLessThan(8);
+      counts[shard] += 1;
+    }
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(500);
+    // A hash split, not one bucket: every shard gets real work.
+    for (const n of counts) expect(n).toBeGreaterThan(30);
+  });
+
+  it('merges shard states keeping the newest entry per module', () => {
+    const entry = (at, score) => ({ at, score, status: 'scored' });
+    const a = {
+      ...emptyState(),
+      modules: {
+        'lib/a.ts': entry('2026-11-01T00:00:00Z', 50),
+        'lib/b.ts': entry('2026-11-03T00:00:00Z', 70),
+      },
+    };
+    const b = {
+      ...emptyState(),
+      modules: {
+        'lib/a.ts': entry('2026-11-02T00:00:00Z', 60),
+        'lib/b.ts': entry('2026-11-02T00:00:00Z', 10),
+        'lib/c.ts': entry('2026-11-02T00:00:00Z', 80),
+      },
+    };
+    const merged = mergeStates(a, b, { schemaVersion: 99, modules: {} });
+    expect(merged.schemaVersion).toBe(emptyState().schemaVersion);
+    expect(
+      Object.fromEntries(
+        Object.entries(merged.modules).map(([k, v]) => [k, v.score])
+      )
+    ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
+  });
+
+  it('lets a re-arm beat an older baseline score but not a newer one', () => {
+    const scored = at => ({ at, score: 70, status: 'scored' });
+    const rearmed = {
+      ...scored('2026-11-01T00:00:00Z'),
+      at: new Date(0).toISOString(),
+      rearmedAt: '2026-11-05T00:00:00Z',
+    };
+    const stateOf = entry => ({
+      ...emptyState(),
+      modules: { 'lib/a.ts': entry },
+    });
+    const old = stateOf(scored('2026-11-03T00:00:00Z'));
+    const current = stateOf(rearmed);
+    const newer = stateOf(scored('2026-11-06T00:00:00Z'));
+    for (const states of [
+      [current, old, old],
+      [old, current, old],
+      [old, old, current],
+    ]) {
+      const merged = mergeStates(...states);
+      expect(merged.modules['lib/a.ts']).toBe(rearmed);
+      expect(mergeStates(merged, old).modules['lib/a.ts']).toBe(rearmed);
+      for (const observations of [
+        [merged, newer],
+        [newer, merged],
+      ]) {
+        expect(mergeStates(...observations).modules['lib/a.ts']).toBe(
+          newer.modules['lib/a.ts']
+        );
+      }
+    }
+    const tiedScore = stateOf(scored(rearmed.rearmedAt));
+    expect(mergeStates(current, tiedScore).modules['lib/a.ts']).toBe(rearmed);
+    expect(mergeStates(tiedScore, current).modules['lib/a.ts']).toBe(
+      tiedScore.modules['lib/a.ts']
+    );
+  });
+
+  it('keeps top-level fields from the first state that has them', () => {
+    const merged = mergeStates(
+      { ...emptyState(), modelFingerprint: 'f1', modelIds: ['m1'] },
+      { ...emptyState(), modelFingerprint: 'f2', note: 'shard' }
+    );
+    expect(merged).toEqual({
+      ...emptyState(),
+      modelFingerprint: 'f1',
+      modelIds: ['m1'],
+      note: 'shard',
+    });
+  });
+});
+
+describe('selectPool', () => {
+  const candidates = ['lib/a.ts', 'lib/b.ts', 'lib/c.ts', 'lib/d.ts'].map(
+    file => ({ file, blob: `${file}@2`, testCount: 1 })
+  );
+  const state = {
+    modules: {
+      'lib/a.ts': { blob: 'lib/a.ts@1' },
+      'lib/b.ts': { blob: 'lib/b.ts@2' },
+    },
+  };
+
+  it('keeps every candidate in sweep mode and only changed scored ones in incremental', () => {
+    expect(selectPool(candidates, state, { mode: 'sweep' })).toEqual(
+      candidates
+    );
+    expect(
+      selectPool(candidates, state, { mode: 'incremental' }).map(c => c.file)
+    ).toEqual(['lib/a.ts']);
+  });
+
+  it('splits the pool into disjoint shards that cover it', () => {
+    const files = [0, 1, 2].flatMap(index =>
+      selectPool(candidates, state, { mode: 'sweep', shard: `${index}/3` }).map(
+        c => c.file
+      )
+    );
+    expect(files.sort()).toEqual(candidates.map(c => c.file));
   });
 });

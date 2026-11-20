@@ -4,18 +4,61 @@ const { postJsonBeacon } = vi.hoisted(() => ({ postJsonBeacon: vi.fn() }));
 vi.mock('@/lib/tracking/json-beacon', () => ({ postJsonBeacon }));
 
 const {
+  advanceFunnelClock,
   consumeSignupFirstValue,
   forwardAnalyticsEventToFunnel,
   markSignupFirstValuePending,
+  resetFunnelClockForTests,
   SIGNUP_FUNNEL_BEACON_ENDPOINT,
 } = await import('./signup-funnel-client');
 
-const sent = () => postJsonBeacon.mock.calls.map(call => call[1]);
+/** Beacon payloads without the anonymous timing fields. */
+const sent = () =>
+  postJsonBeacon.mock.calls.map(call => {
+    const { stepMs: _stepMs, entryMs: _entryMs, ...rest } = call[1];
+    return rest;
+  });
 
 describe('signup funnel client', () => {
   beforeEach(() => {
     postJsonBeacon.mockReset();
     globalThis.localStorage.clear();
+    resetFunnelClockForTests();
+  });
+
+  it('times each step from the previous one and from session entry', () => {
+    const t0 = 1_000_000;
+    expect(advanceFunnelClock(t0)).toEqual({});
+    expect(advanceFunnelClock(t0 + 4_000)).toEqual({
+      stepMs: 4_000,
+      entryMs: 4_000,
+    });
+    expect(advanceFunnelClock(t0 + 10_500)).toEqual({
+      stepMs: 6_500,
+      entryMs: 10_500,
+    });
+  });
+
+  it('starts a new session clock after a long idle gap', () => {
+    const t0 = 1_000_000;
+    advanceFunnelClock(t0);
+    expect(advanceFunnelClock(t0 + 31 * 60_000)).toEqual({});
+    expect(advanceFunnelClock(t0 + 31 * 60_000 + 2_000)).toEqual({
+      stepMs: 2_000,
+      entryMs: 2_000,
+    });
+  });
+
+  it('sends timing on the beacon from the second step on, never an id', () => {
+    forwardAnalyticsEventToFunnel('onboarding_started');
+    forwardAnalyticsEventToFunnel('chat_started');
+    const [first, second] = postJsonBeacon.mock.calls.map(call => call[1]);
+    expect(first).not.toHaveProperty('stepMs');
+    expect(second.stepMs).toBeGreaterThanOrEqual(0);
+    expect(second.entryMs).toBeGreaterThanOrEqual(0);
+    expect(Object.keys(second).sort()).toEqual(
+      ['entryMs', 'funnel', 'stepMs', 'step', 'surface'].sort()
+    );
   });
 
   it('maps existing onboarding events onto funnel steps', () => {

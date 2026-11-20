@@ -25,7 +25,10 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateShrinkOnlyCount } from '../../apps/web/lib/design/shrink-only-count-ratchet.ts';
+import {
+  evaluateShrinkOnlyCount,
+  SHRINK_ONLY_COUNT_STATUSES,
+} from '../../apps/web/lib/design/shrink-only-count-ratchet.ts';
 
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..', '..');
@@ -206,6 +209,8 @@ export function evaluateNativeSpacingScale({ measured, baseline, event }) {
       metric: `${surface}: off-grid native spacing literals`,
     });
     if (!verdict.ok) issues.push(verdict.message);
+    else if (verdict.status === SHRINK_ONLY_COUNT_STATUSES.UNBASELINED_SHRINK)
+      warnings.push(verdict.message);
     if (result.strict > floor.strict) {
       warnings.push(
         `${surface}: strict off-grid literals grew: ${result.strict} > baseline ${floor.strict} (not armed).`

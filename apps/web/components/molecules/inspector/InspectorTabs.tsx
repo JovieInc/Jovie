@@ -3,6 +3,11 @@
 // @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import type { SegmentControlOption } from '@jovie/ui';
 import type { KeyboardEvent, ReactNode } from 'react';
+import {
+  TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME,
+  TAB_BAR_DRAWER_TRIGGER_CLASSNAME,
+  TAB_BAR_RAIL_CLASSNAME,
+} from '@/components/molecules/tab-bar/TabBar';
 import { cn } from '@/lib/utils';
 import { handleInspectorTabListKeyDown } from './inspector-tab-keyboard';
 
@@ -16,17 +21,11 @@ export interface InspectorTabsProps<T extends string> {
   readonly className?: string;
 }
 
-const INSPECTOR_TAB_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 min-w-18 flex-1 shrink-0 items-center justify-center whitespace-nowrap rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-0/70 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
-
-const INSPECTOR_TAB_TRIGGER_ACTIVE_CLASSNAME =
-  'border-accent bg-surface-0/80 font-medium text-primary-token';
-
 /**
  * Inspector tab primitive.
  *
- * Selected = quiet fill + ion underline. Unselected stays tertiary.
- * Keyboard: Arrow / Home / End with roving tabindex. Not pill or toggle chrome.
+ * Canonical pill segmented control (shared TabBar classes) plus roving
+ * tabindex. Keyboard: Arrow / Home / End.
  * Lives here so Contacts/Audience TabBar stays off the exact-head --changed set.
  */
 export function InspectorTabs<T extends string>({
@@ -46,10 +45,7 @@ export function InspectorTabs<T extends string>({
         onKeyDown={(event: KeyboardEvent<HTMLDivElement>) =>
           handleInspectorTabListKeyDown(event, options, value, onValueChange)
         }
-        className={cn(
-          'flex min-w-0 w-full items-center gap-1 rounded-none border-0 bg-transparent p-0',
-          className
-        )}
+        className={cn(TAB_BAR_RAIL_CLASSNAME, 'w-full', className)}
         data-testid='inspector-tabs'
       >
         {options.map(option => (
@@ -64,8 +60,9 @@ export function InspectorTabs<T extends string>({
             disabled={option.disabled}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              INSPECTOR_TAB_TRIGGER_CLASSNAME,
-              value === option.value && INSPECTOR_TAB_TRIGGER_ACTIVE_CLASSNAME,
+              TAB_BAR_DRAWER_TRIGGER_CLASSNAME,
+              'min-w-18 flex-1',
+              value === option.value && TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME,
               option.disabled && 'pointer-events-none opacity-45'
             )}
           >

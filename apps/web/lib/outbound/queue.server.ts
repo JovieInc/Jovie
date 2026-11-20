@@ -6,6 +6,10 @@ import { db } from '@/lib/db';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getAppFlagValue } from '@/lib/flags/server';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
+import { readDogfoodGates } from './cold/dogfood-gate.server';
+import { createColdQueueDraftContextReader } from './cold/queue-draft.server';
 import { outboundTargetFromLead, readOutboundLedger } from './ledger.server';
 import {
   buildOutboundRow,
@@ -15,7 +19,7 @@ import {
 } from './queue';
 import type { OutboundQueue } from './types';
 
-/** Reply events, once a provider webhook records them (none exist yet). */
+/** Reply milestones recorded by provider webhooks, including Instantly. */
 const REPLY_EVENT_TYPES = ['replied', 'email_replied', 'dm_replied'];
 
 /** Admin-scale bound; the whole outbound inventory is far below this. */
@@ -76,7 +80,7 @@ async function readEvidenceClasses(
 export async function getOutboundQueue(
   now = new Date()
 ): Promise<OutboundQueue> {
-  const leadRows = await db
+  const rawLeadRows = await db
     .select({
       id: leads.id,
       linktreeHandle: leads.linktreeHandle,
@@ -91,7 +95,8 @@ export async function getOutboundQueue(
       outreachRoute: leads.outreachRoute,
       outreachStatus: leads.outreachStatus,
       dmCopy: leads.dmCopy,
-      claimToken: leads.claimToken,
+      claimTokenHash: leads.claimTokenHash,
+      claimTokenExpiresAt: leads.claimTokenExpiresAt,
       fitScore: leads.fitScore,
       fitScoreBreakdown: leads.fitScoreBreakdown,
       priorityScore: leads.priorityScore,
@@ -111,6 +116,19 @@ export async function getOutboundQueue(
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, leads.creatorProfileId))
     .where(notInArray(leads.status, ['discovered', 'disqualified']))
     .limit(OUTBOUND_SCAN_LIMIT);
+
+  const leadRows = await Promise.all(
+    rawLeadRows.map(
+      async ({ claimTokenHash, claimTokenExpiresAt, ...row }) => ({
+        ...row,
+        claimToken: await resolveLeadClaimToken({
+          id: row.id,
+          claimTokenHash,
+          claimTokenExpiresAt,
+        }),
+      })
+    )
+  );
 
   const leadIds = leadRows.map(row => row.id);
   const dedupeKeys = new Map(
@@ -133,53 +151,90 @@ export async function getOutboundQueue(
         .filter((id): id is string => id !== null)
     ),
   ];
-  const [ledger, certifications, replies, evidence] = await Promise.all([
-    readOutboundLedger(leadIds),
-    keys.length
-      ? db
-          .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
-          .from(contactEvidenceReviews)
-          .where(
-            and(
-              inArray(contactEvidenceReviews.dedupeKey, keys),
-              eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+  // An unreadable flag must not expose drafts. Explicit off preserves rollout behavior.
+  const gateEnabled = await getAppFlagValue('OUTBOUND_DOGFOOD_GATE').catch(
+    () => true
+  );
+  const coldDraftEnabled = await getAppFlagValue('OUTBOUND_COLD_DRAFTS').catch(
+    () => false
+  );
+  const [ledger, certifications, replies, evidence, dogfood] =
+    await Promise.all([
+      readOutboundLedger(leadIds),
+      keys.length
+        ? db
+            .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
+            .from(contactEvidenceReviews)
+            .where(
+              and(
+                inArray(contactEvidenceReviews.dedupeKey, keys),
+                eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+              )
             )
-          )
-      : Promise.resolve([]),
-    leadIds.length
-      ? db
-          .select({ leadId: leadFunnelEvents.leadId })
-          .from(leadFunnelEvents)
-          .where(
-            and(
-              inArray(leadFunnelEvents.leadId, leadIds),
-              inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+        : Promise.resolve([]),
+      leadIds.length
+        ? db
+            .select({ leadId: leadFunnelEvents.leadId })
+            .from(leadFunnelEvents)
+            .where(
+              and(
+                inArray(leadFunnelEvents.leadId, leadIds),
+                inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+              )
             )
-          )
-      : Promise.resolve([]),
-    readEvidenceClasses(profileIds),
-  ]);
+        : Promise.resolve([]),
+      readEvidenceClasses(profileIds),
+      gateEnabled && leadRows.length ? readDogfoodGates(profileIds, now) : null,
+    ]);
   const certified = new Set(certifications.map(row => row.dedupeKey));
   const replied = new Set(replies.map(row => row.leadId));
 
-  const built = leadRows.map(row => {
-    const dedupeKey = dedupeKeys.get(row.id) ?? null;
-    const facts: OutboundLeadFacts = {
-      ...row,
-      certified: dedupeKey !== null && certified.has(dedupeKey),
-      replied: replied.has(row.id),
-      evidenceClasses: row.creatorProfileId
-        ? (evidence.get(row.creatorProfileId) ?? [])
-        : null,
-    };
-    return buildOutboundRow({
-      facts,
-      target: outboundTargetFromLead(row),
-      dedupeKey,
-      ledger: ledger.get(row.id) ?? [],
-      now,
-    });
-  });
+  const readDraftContext = createColdQueueDraftContextReader(keys);
+  const built: ReturnType<typeof buildOutboundRow>[] = [];
+  // Bound catalog/suppression read concurrency for the admin inventory.
+  for (let offset = 0; offset < leadRows.length; offset += 8) {
+    built.push(
+      ...(await Promise.all(
+        leadRows.slice(offset, offset + 8).map(async row => {
+          const dedupeKey = dedupeKeys.get(row.id) ?? null;
+          const facts: OutboundLeadFacts = {
+            ...row,
+            certified: dedupeKey !== null && certified.has(dedupeKey),
+            replied: replied.has(row.id),
+            evidenceClasses: row.creatorProfileId
+              ? (evidence.get(row.creatorProfileId) ?? [])
+              : null,
+          };
+          const dogfoodGate = gateEnabled
+            ? row.creatorProfileId
+              ? dogfood?.byProfile.get(row.creatorProfileId)
+              : undefined
+            : null;
+          const input = {
+            facts,
+            target: outboundTargetFromLead(row),
+            dedupeKey,
+            ledger: ledger.get(row.id) ?? [],
+            now,
+            dogfoodGate,
+            coldDraftEnabled,
+          };
+          const initial = buildOutboundRow(input);
+          if (
+            !coldDraftEnabled ||
+            !dogfoodGate?.passed ||
+            !facts.certified ||
+            initial.channel !== 'email'
+          )
+            return initial;
+          return buildOutboundRow({
+            ...input,
+            coldDraftContext: await readDraftContext(facts, now),
+          });
+        })
+      ))
+    );
+  }
   const rows = rankOutboundRows(
     built,
     new Map(leadRows.map(row => [row.id, row.priorityScore]))

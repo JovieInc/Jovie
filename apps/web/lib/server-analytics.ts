@@ -2,26 +2,17 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
-import {
-  LIMITED_DROP_CARD_PLACEMENTS,
-  LIMITED_DROP_EVENT_NAMES,
-  LIMITED_DROP_FUNNEL_CONTRACT_VERSION,
-  LIMITED_DROP_ITEM_MODES,
-  LIMITED_DROP_PAGE_IDS,
-  LIMITED_DROP_STATES,
-  LIMITED_DROP_TERMINAL_REASONS,
-} from '@/lib/analytics/limited-drop-funnel';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
-import {
-  SIGNUP_FUNNEL_ALL_STEPS,
-  SIGNUP_FUNNEL_IDS,
-  SIGNUP_FUNNEL_OUTCOMES,
-  SIGNUP_FUNNEL_SURFACES,
-} from '@/lib/analytics/signup-funnel';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
-import { ACCOUNT_METRIC_COHORTS } from '@/lib/utils/email';
+import {
+  ENUM_PROPERTY_VALUES,
+  SAFE_TOKEN_PROPERTY_NAMES,
+  SERVER_ANALYTICS_CALLSITE_INVENTORY,
+  UTM_PROPERTY_VALUES,
+  UUID_PROPERTY_NAMES,
+} from '@/lib/server-analytics-allowlist';
 
 export const SERVER_ANALYTICS_CONTRACT_VERSION = 'server-analytics/v2';
 export const SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS = 2_000;
@@ -52,7 +43,8 @@ interface ServerAnalyticsEventDefinition {
     | 'notification'
     | 'entitlement'
     | 'funnel'
-    | 'billing';
+    | 'billing'
+    | 'winback';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -234,6 +226,11 @@ export const SERVER_ANALYTICS_EVENTS = {
     properties: ['profileId', 'source'],
     source: { property: 'profileId', type: 'creator_profile' },
   },
+  claim_private_created: {
+    category: 'funnel',
+    properties: ['profileId', 'source', 'requestedAtMs'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
   signup_completed: {
     category: 'funnel',
     properties: ['profileId', 'source'],
@@ -264,7 +261,40 @@ export const SERVER_ANALYTICS_EVENTS = {
   // to a profile, user, or visitor.
   funnel_step: {
     category: 'funnel',
-    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason', 'cohort'],
+    properties: [
+      'funnel_id',
+      'step',
+      'outcome',
+      'surface',
+      'reason',
+      'cohort',
+      'step_ms',
+      'entry_ms',
+    ],
+  },
+  // One row per fresh /start chat: how its bot check resolved, by client.
+  onboarding_bot_check: {
+    category: 'funnel',
+    properties: ['result', 'reason', 'client_status', 'ua_class'],
+  },
+  // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
+  // onboarding session, which chat_conversations carries and claim attaches to
+  // a user, so a row joins to later billing and retention.
+  onboarding_reply: {
+    category: 'funnel',
+    properties: [
+      'session_id',
+      'engine',
+      'guarded_step',
+      'reply_intent',
+      'classifier',
+      'line_key',
+      'decision_kind',
+      'confidence',
+      'server_ms',
+      'turn_index',
+      'fallback',
+    ],
   },
   asset_page_viewed: limitedDropEvent,
   drop_countdown_viewed: limitedDropEvent,
@@ -299,274 +329,70 @@ export const SERVER_ANALYTICS_EVENTS = {
     properties: ['profileId', 'plan'],
     source: { property: 'profileId', type: 'creator_profile' },
   },
+  // Win-back loop plumbing (founder dispatch 2026-11-09): the person's own
+  // waitlist cohort (queued/waitlisted/disqualified) rides winback_cohort;
+  // entry ids are pseudonymous uuids under the first-party consent policy.
+  requalify_matched: {
+    category: 'winback',
+    properties: ['entry_id', 'capability_key', 'winback_cohort'],
+  },
+  data_certified: {
+    category: 'winback',
+    properties: ['entry_id', 'capability_key'],
+  },
+  winback_drafted: {
+    category: 'winback',
+    properties: [
+      'entry_id',
+      'capability_key',
+      'batch_id',
+      'template_version',
+      'winback_cohort',
+    ],
+  },
+  winback_approved: {
+    category: 'winback',
+    properties: [
+      'batch_id',
+      'capability_key',
+      'template_version',
+      'winback_cohort',
+    ],
+  },
+  winback_sent: {
+    category: 'winback',
+    properties: [
+      'entry_id',
+      'capability_key',
+      'batch_id',
+      'template_version',
+      'winback_cohort',
+    ],
+  },
+  winback_opened: {
+    category: 'winback',
+    properties: ['entry_id', 'batch_id'],
+  },
+  winback_clicked: {
+    category: 'winback',
+    properties: ['entry_id', 'capability_key', 'batch_id', 'winback_cohort'],
+  },
+  returned: {
+    category: 'winback',
+    properties: ['entry_id', 'batch_id'],
+  },
+  paid: {
+    category: 'winback',
+    properties: ['entry_id', 'batch_id'],
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
 
-export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
-  {
-    path: 'app/api/auth/native/exchange/route.ts',
-    invocations: 1,
-    events: ['auth_exchange_succeeded', 'auth_exchange_failed'],
-  },
-  {
-    path: 'app/api/dashboard/profile/lib/response.ts',
-    invocations: 1,
-    events: ['dashboard_profile_updated'],
-  },
-  {
-    path: 'app/app/(shell)/dashboard/releases/actions.ts',
-    invocations: 7,
-    events: [
-      'release_isrc_rescan',
-      'apple_music_rescan',
-      'releases_synced',
-      'release_archived',
-      'release_deleted',
-      'release_restored',
-    ],
-  },
-  {
-    path: 'app/app/(shell)/dashboard/tour-dates/actions.ts',
-    invocations: 6,
-    events: [
-      'bandsintown_api_key_saved',
-      'bandsintown_api_key_removed',
-      'tour_dates_synced',
-      'tour_date_created',
-      'tour_date_deleted',
-    ],
-  },
-  {
-    path: 'app/app/(shell)/dashboard/tour-dates/events-actions.ts',
-    invocations: 2,
-    events: [
-      'event_confirmed',
-      'event_rejected',
-      'event_reject_undone',
-      'events_confirmed_bulk',
-      'events_rejected_bulk',
-    ],
-  },
-  {
-    path: 'app/auth/callback/route.ts',
-    invocations: 1,
-    events: ['auth_callback_received', 'auth_returned_to_client'],
-  },
-  {
-    path: 'app/auth/start/route.ts',
-    invocations: 1,
-    events: [
-      'auth_started',
-      'auth_provider_opened',
-      'auth_wrong_surface_prevented',
-    ],
-  },
-  {
-    path: 'app/onboarding/actions/connect-spotify.ts',
-    invocations: 1,
-    events: ['releases_synced', 'claim_completed', 'activation_achieved'],
-  },
-  {
-    path: 'app/onboarding/actions/index.ts',
-    invocations: 0,
-    events: ['claim_completed', 'signup_completed', 'activation_achieved'],
-  },
-  {
-    path: 'lib/onboarding/upgrade-offer.ts',
-    invocations: 1,
-    events: [
-      'onboarding_upgrade_offer_seen',
-      'onboarding_upgrade_offer_accepted',
-      'onboarding_upgrade_offer_dismissed',
-    ],
-  },
-  {
-    path: 'app/r/[slug]/page.tsx',
-    invocations: 1,
-    events: ['smart_link_clicked'],
-  },
-  {
-    path: 'lib/notifications/analytics.ts',
-    invocations: 7,
-    events: [
-      'notifications_subscribe_attempt',
-      'notifications_subscribe_error',
-      'notifications_subscribe_success',
-      'notifications_unsubscribe_attempt',
-      'notifications_unsubscribe_error',
-      'notifications_unsubscribe_success',
-    ],
-  },
-  {
-    path: 'lib/entitlements/demand-signal.ts',
-    invocations: 1,
-    events: ['entitlement_denial'],
-  },
-  {
-    path: 'app/api/stripe/checkout/route.ts',
-    invocations: 1,
-    events: ['checkout_initiated'],
-  },
-  {
-    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
-    invocations: 1,
-    events: ['payment_succeeded', 'subscription_renewed'],
-  },
-  {
-    path: 'lib/stripe/webhooks/handlers/subscription-handler.ts',
-    invocations: 1,
-    events: ['subscription_churned'],
-  },
-  {
-    path: 'lib/claim/context.ts',
-    invocations: 1,
-    events: ['claim_started'],
-  },
-  {
-    path: 'lib/analytics/signup-funnel.server.ts',
-    invocations: 1,
-    events: ['funnel_step'],
-  },
-  {
-    path: 'lib/analytics/limited-drop-funnel.server.ts',
-    invocations: 1,
-    events: LIMITED_DROP_EVENT_NAMES,
-  },
-] as const satisfies ReadonlyArray<{
-  readonly path: string;
-  readonly invocations: number;
-  readonly events: readonly ServerAnalyticsEventName[];
-}>;
+export { SERVER_ANALYTICS_CALLSITE_INVENTORY };
 
 type SafePropertyValue = string | number | boolean | null;
 
-const UUID_PROPERTY_NAMES = new Set([
-  'artist_id',
-  'asset_id',
-  'drop_id',
-  'eventId',
-  'event_id',
-  'profileId',
-  'releaseId',
-  'session_id',
-  'tourDateId',
-]);
-const SAFE_TOKEN_PROPERTY_NAMES = new Set([
-  'billingReason',
-  'campaign_id',
-  'checkoutSessionId',
-  'code',
-  'error_type',
-  'experiment_id',
-  'gate',
-  'plan',
-  'planRequired',
-  'provider',
-  'reason',
-  'result',
-  'share_id',
-  'source',
-  'stripeEventId',
-  'toolName',
-  'variant_id',
-]);
-const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
-  card_placement: new Set(LIMITED_DROP_CARD_PLACEMENTS),
-  channel: new Set(['email', 'sms']),
-  client: new Set(['web', 'ios', 'electron']),
-  contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
-  intent: new Set(['sign_in', 'sign_up']),
-  method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
-  funnel_id: new Set(SIGNUP_FUNNEL_IDS),
-  step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
-  outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
-  cohort: new Set(ACCOUNT_METRIC_COHORTS),
-  item_mode: new Set(LIMITED_DROP_ITEM_MODES),
-  page_id: new Set(LIMITED_DROP_PAGE_IDS),
-  state: new Set(LIMITED_DROP_STATES),
-  surface: new Set(SIGNUP_FUNNEL_SURFACES),
-  terminal_reason: new Set(LIMITED_DROP_TERMINAL_REASONS),
-};
-const UTM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
-  utm_source: new Set([
-    'apple_music',
-    'bandcamp',
-    'blog',
-    'collab',
-    'discord',
-    'email_blast',
-    'epk',
-    'facebook',
-    'google',
-    'influencer',
-    'instagram',
-    'jovie',
-    'label',
-    'linkedin',
-    'linktree',
-    'live_show',
-    'merch',
-    'meta',
-    'newsletter',
-    'playlist_pitch',
-    'podcast',
-    'pr',
-    'qr_code',
-    'radio',
-    'reddit',
-    'referral',
-    'sms',
-    'snapchat',
-    'soundcloud',
-    'spotify',
-    'threads',
-    'tiktok',
-    'twitter',
-    'website',
-    'youtube',
-  ]),
-  utm_medium: new Set([
-    'ad',
-    'announcement',
-    'audio',
-    'banner',
-    'bio_link',
-    'cpc',
-    'digital',
-    'discovery_mode',
-    'email',
-    'insert',
-    'interview',
-    'marquee',
-    'organic',
-    'paid',
-    'paid_social',
-    'paid_video',
-    'partner',
-    'popup',
-    'press',
-    'print',
-    'profile',
-    'social',
-    'sound',
-    'text',
-  ]),
-  utm_content: new Set([
-    'announcement',
-    'bio',
-    'community',
-    'curator',
-    'description',
-    'outreach',
-    'post',
-    'press',
-    'promo',
-    'server',
-    'story',
-    'use_sound',
-  ]),
-};
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -779,8 +605,9 @@ export async function trackServerEvent(
   const prepared = prepareServerAnalyticsInsert(event, properties, options);
   if (!prepared.ok) return prepared;
 
+  const delivery = insertServerAnalyticsRow(db, prepared);
   try {
-    return await withTimeout(insertServerAnalyticsRow(db, prepared), {
+    return await withTimeout(delivery, {
       timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
       context: 'Server analytics delivery',
     });
@@ -789,27 +616,141 @@ export async function trackServerEvent(
       error instanceof Error &&
       error.message ===
         `Server analytics delivery timed out after ${SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS}ms`;
-    Sentry.captureException(error, {
-      tags: {
-        context: 'server_analytics_delivery',
-        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
-        delivery_outcome: deliveryUnknown ? 'unknown' : 'failed',
-        event_name: prepared.eventName,
+
+    if (!deliveryUnknown) {
+      Sentry.captureException(error, {
+        tags: {
+          context: 'server_analytics_delivery',
+          contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+          delivery_outcome: 'failed',
+          event_name: prepared.eventName,
+        },
+      });
+      return { ok: false, error: 'persistence_failed' };
+    }
+
+    // JOV-8319: the JavaScript guard lost the race, but withTimeout abandons
+    // only the await — the insert itself keeps running against Postgres, so
+    // the event frequently lands after the caller already received
+    // `delivery_unknown`. A timeout at this boundary is handled (every
+    // caller treats the structured result as best-effort), so it is reported
+    // as a warning instead of an error exception, and the still-running
+    // insert settles the true outcome below: a late success leaves a
+    // breadcrumb proving the event was not lost; a late failure is a real
+    // loss and still reaches Sentry as an error.
+    Sentry.captureMessage(
+      `Server analytics delivery timed out after ${SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS}ms`,
+      {
+        level: 'warning',
+        tags: {
+          context: 'server_analytics_delivery',
+          contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+          delivery_outcome: 'unknown',
+          event_name: prepared.eventName,
+        },
+      }
+    );
+    void delivery.then(
+      result => {
+        if (!result.ok) return;
+        Sentry.addBreadcrumb({
+          category: 'database',
+          level: 'info',
+          message:
+            'server_analytics_delivery: insert settled successfully after the delivery timeout; the event was not lost',
+          data: {
+            contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+            deduplicated: result.deduplicated,
+            event_name: prepared.eventName,
+            phase: 'late_success',
+          },
+        });
       },
-    });
-    return {
-      ok: false,
-      error: deliveryUnknown ? 'delivery_unknown' : 'persistence_failed',
-    };
+      lateError => {
+        Sentry.captureException(lateError, {
+          tags: {
+            context: 'server_analytics_delivery',
+            contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+            delivery_outcome: 'failed_after_timeout',
+            event_name: prepared.eventName,
+          },
+        });
+      }
+    );
+    return { ok: false, error: 'delivery_unknown' };
   }
 }
 
 /**
- * Emit a server analytics event inside an existing transaction so the
- * business state write and its measurement commit atomically. Use this for
- * revenue-critical transitions (claim/signup/activation) where a post-commit
- * emission could permanently lose the event. A duplicate `eventIdentity`
- * deduplicates instead of throwing.
+ * Best-effort transaction-scoped statement_timeout guard (JOV-8761).
+ *
+ * Returns the caller's previous timeout when the guard was applied, or null
+ * when it failed. The guard statements must never throw: a failure surfacing
+ * as "Failed query: SELECT set_config('statement_timeout', $1, true)" masks
+ * the real error (the transaction aborts on the first statement error, so the
+ * next statement — usually the guard — is the one Sentry names) or fails an
+ * otherwise-successful business transaction. When the guard fails we degrade
+ * to the caller's own timeout and let the insert report its own error.
+ */
+async function applyServerAnalyticsTimeoutGuard(
+  tx: DbOrTransaction,
+  eventName: ServerAnalyticsEventName
+): Promise<string | null> {
+  try {
+    const previousTimeoutResult = await tx.execute<{
+      statementTimeout: string;
+    }>(
+      drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
+    );
+    const previousTimeout =
+      previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
+    await tx.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)}, true)`
+    );
+    return previousTimeout;
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `server_analytics_timeout_guard: set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { event_name: eventName, phase: 'guard' },
+    });
+    return null;
+  }
+}
+
+/**
+ * Restores the caller's statement_timeout after a successful analytics
+ * insert. A failed restore must not destroy the business transaction the
+ * delivery already succeeded in (JOV-8761) — the caller's timeout re-applies
+ * from the next transaction onward.
+ */
+async function restoreServerAnalyticsTimeout(
+  tx: DbOrTransaction,
+  previousTimeout: string,
+  eventName: ServerAnalyticsEventName
+): Promise<void> {
+  try {
+    await tx.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
+    );
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `server_analytics_timeout_restore: set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { event_name: eventName, phase: 'restore' },
+    });
+  }
+}
+
+/**
+ * Emit inside an existing transaction so a revenue-critical business write and
+ * its measurement commit atomically. A duplicate `eventIdentity` deduplicates.
  */
 export async function trackServerEventTx(
   tx: DbOrTransaction,
@@ -825,20 +766,20 @@ export async function trackServerEventTx(
   // transaction remain pinned after the caller has already timed out. Restore
   // the caller's timeout after a successful insert so later business queries
   // in the same transaction do not inherit this analytics-specific budget.
-  const previousTimeoutResult = await tx.execute<{
-    statementTimeout: string;
-  }>(
-    drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
-  );
-  const previousTimeout =
-    previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
-  await tx.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)}, true)`
+  // Guard and restore are best-effort (JOV-8761): the insert itself stays
+  // strict so business state and its measurement commit atomically.
+  const previousTimeout = await applyServerAnalyticsTimeoutGuard(
+    tx,
+    prepared.eventName
   );
   const delivery = await insertServerAnalyticsRow(tx, prepared);
-  await tx.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
-  );
+  if (previousTimeout !== null) {
+    await restoreServerAnalyticsTimeout(
+      tx,
+      previousTimeout,
+      prepared.eventName
+    );
+  }
   return delivery;
 }
 

@@ -43,6 +43,13 @@ historical console cleanup.
 
 ## Operational Notes
 
+- JOV-7733 retires Inbox Home and Profiles Workspace product gates. Their routes,
+  navigation, stack interactions and profile handoffs are permanent; missing or
+  stale overrides cannot hide them. Search monitoring remains a separate provider
+  work stop control, with its existing default, scheduler, health and spending
+  limits unchanged. See the disposition inventory in `docs/FEATURE_REGISTRY.md`;
+  source retirement does not certify deployment or authorize blind DB cleanup.
+
 - Product app flags resolve from internal v1 defaults and are passed to client
   components via bootstrap payloads. The app does not load a Statsig browser
   SDK.

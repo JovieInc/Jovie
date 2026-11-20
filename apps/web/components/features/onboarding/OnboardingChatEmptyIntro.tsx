@@ -10,6 +10,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   ONBOARDING_ENTRY_SUPPORT,
   ONBOARDING_ENTRY_TITLE,
+  ONBOARDING_STARTER_SUGGESTIONS,
 } from '@/lib/onboarding/empty-state';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,12 @@ interface OnboardingChatEmptyIntroProps {
   readonly entryProfile?: StartEntryProfile | null;
   /** Taken handle: focus the composer so the visitor can ask for another name. */
   readonly onTryAnotherName?: () => void;
+  /**
+   * Default (less-personalized) walkthrough for the blank entry — shown when
+   * the visitor arrives with no homepage intent and no entry profile, so
+   * /start never opens as a bare composer. Clicking a pill sends its prompt.
+   */
+  readonly onSuggestionSelect?: (prompt: string) => void;
 }
 
 const MAX_ENTRY_ICONS = 6;
@@ -143,6 +150,7 @@ export function OnboardingChatEmptyIntro({
   mode,
   entryProfile,
   onTryAnotherName,
+  onSuggestionSelect,
 }: OnboardingChatEmptyIntroProps) {
   if (mode === 'handle_entry' && entryProfile) {
     const copy = getHandleEntryCopy(entryProfile);
@@ -156,7 +164,7 @@ export function OnboardingChatEmptyIntro({
           <EntryProfileCard entry={entryProfile} />
         )}
         <div className='mb-6 text-center'>
-          <h1 className='text-2xl font-semibold text-primary-token'>
+          <h1 className='text-balance text-lg font-medium text-primary-token'>
             {copy.title}
           </h1>
           <p className='mx-auto mt-2 max-w-112 text-sm leading-6 text-secondary-token'>
@@ -198,7 +206,7 @@ export function OnboardingChatEmptyIntro({
       ) : null}
 
       <div className='mb-6 text-center'>
-        <h1 className='text-2xl font-semibold text-primary-token'>
+        <h1 className='text-balance text-lg font-medium text-primary-token'>
           {copy.title}
         </h1>
         {!isBlank && copy.support ? (
@@ -207,6 +215,26 @@ export function OnboardingChatEmptyIntro({
           </p>
         ) : null}
       </div>
+      {isBlank && onSuggestionSelect ? (
+        <div
+          className='flex flex-wrap items-center justify-center gap-2'
+          data-testid='onboarding-starter-walkthrough'
+        >
+          {ONBOARDING_STARTER_SUGGESTIONS.map(suggestion => (
+            <Button
+              key={suggestion.label}
+              type='button'
+              variant='secondary'
+              size='sm'
+              data-testid='onboarding-starter-suggestion'
+              data-suggestion-label={suggestion.label}
+              onClick={() => onSuggestionSelect(suggestion.prompt)}
+            >
+              {suggestion.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import 'server-only';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import type { EnforcedArtistRule } from '@/lib/artist-rules/gate';
+import { listEnforcedArtistRules } from '@/lib/artist-rules/store';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   confirmationFor,
@@ -10,13 +12,16 @@ import {
 import { getProfileDestination } from '@/lib/connectors/profile-writes/destinations';
 import { profileWriteLedger } from '@/lib/connectors/profile-writes/ledger.server';
 import { ProfileWriteService } from '@/lib/connectors/profile-writes/service';
-import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
+import {
+  assertArtistRulesFloor,
+  assertCustomerVoiceFloor,
+} from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
 import { connectorWriteReceipts } from '@/lib/db/schema/connector-write-receipts';
 import { dspBioSyncRequests } from '@/lib/db/schema/dsp-bio-sync';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { createBioSubmissionAdapter } from './adapter';
 
 export interface BioSyncRequest {
@@ -98,7 +103,7 @@ export async function createDspBioWriteService(
   const adapter = createBioSubmissionAdapter({
     providerId,
     load,
-    send: message => new ResendEmailProvider().sendEmail(message),
+    send: message => new GatewayEmailProvider().sendEmail(message),
   });
   return {
     destination,
@@ -126,6 +131,7 @@ export async function syncBioToDsps(
     ).map(match => match.id);
   const ids = [...new Set(targets)];
   const results: BioSyncResult[] = [];
+  let artistRules: readonly EnforcedArtistRule[] | undefined;
   for (const providerId of ids) {
     if (getProfileDestination(providerId)?.method !== 'email') {
       results.push({ providerId, status: 'unsupported' });
@@ -142,6 +148,8 @@ export async function syncBioToDsps(
     );
     const bio = request.bioText ?? sourceBio;
     assertCustomerVoiceFloor(bio ?? '', 'dsp-bio-sync');
+    artistRules ??= await listEnforcedArtistRules(request.creatorProfileId);
+    assertArtistRulesFloor(bio ?? '', artistRules, 'dsp-bio-sync');
     const proposal = await service.propose({
       userId: request.userId,
       destination,

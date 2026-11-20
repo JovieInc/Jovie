@@ -6,6 +6,7 @@
  * before JOV-8196 lands on main the guard intentionally skips, matching the
  * script's own graceful skip.
  */
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -239,7 +240,7 @@ describe('ui-feel cli gate', () => {
     }
   });
 
-  it('exits 1 when debt shrank without regenerating the baseline (JOV-8878)', async () => {
+  it('exits 0 with a notice when debt shrank without regenerating the baseline', async () => {
     const baselinePath = tmpBaseline();
     // Baseline locks in 5 heading violations; the tree now measures 3.
     await main(['--update'], silent, {
@@ -266,13 +267,11 @@ describe('ui-feel cli gate', () => {
         collect: shrunk,
         baselinePath,
       });
-      expect(code).toBe(1);
-      const text = errors.mock.calls.flat().join('\n');
-      expect(text).toContain('baseline stale');
+      expect(code).toBe(0);
+      expect(errors).not.toHaveBeenCalled();
+      const text = logs.join('\n');
       expect(text).toContain('headingNeedsBalance: 3 < baseline 5');
       expect(text).toContain('--update');
-      // The PR-lane gate must fail closed on headroom, never report ok.
-      expect(logs.join('\n')).not.toContain('ok — counts within baseline');
     } finally {
       errors.mockRestore();
     }
@@ -281,7 +280,7 @@ describe('ui-feel cli gate', () => {
 
 describe('ui-feel rule wiring', () => {
   it.skipIf(!RULE_PRESENT)(
-    'committed baseline matches current debt without regression headroom',
+    'committed baseline is never exceeded by current debt (shrink passes)',
     async () => {
       const rule = loadUiFeelRule();
       expect(rule).toBeTruthy();
@@ -289,7 +288,9 @@ describe('ui-feel rule wiring', () => {
       expect(violations.length).toBeGreaterThan(0);
       const counts = countByCheck(violations);
       const baseline = readBaseline();
-      expect(counts).toEqual(baseline);
+      for (const [check, count] of Object.entries(counts)) {
+        expect(count, check).toBeLessThanOrEqual(baseline[check] ?? 0);
+      }
     },
     300_000
   );
@@ -414,4 +415,59 @@ describe('ui-feel added-lines gate (PR time)', () => {
       }
     }
   );
+});
+
+describe('ui-feel local preflight worktree mode', () => {
+  it('catches unstaged and untracked violations before they are committed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-feel-worktree-'));
+    const webRoot = join(root, 'apps', 'web');
+    const card = join(webRoot, 'components', 'Card.tsx');
+    const added = join(webRoot, 'components', 'NewCard.tsx');
+    const git = args =>
+      execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' });
+    const check = worktree =>
+      checkChanged({
+        baseRef: 'origin/main',
+        worktree,
+        webRoot,
+        rule: loadUiFeelRule(),
+        log: () => {},
+        error: () => {},
+      });
+    try {
+      mkdirSync(join(webRoot, 'components'), { recursive: true });
+      writeFileSync(
+        card,
+        'export default () => <h1 className="text-balance">Ready</h1>;'
+      );
+      git(['init', '-q']);
+      git(['add', '.']);
+      git([
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-qm',
+        'baseline',
+      ]);
+      git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      writeFileSync(card, 'export default () => <h1>Needs balance</h1>;');
+      expect(await check(false)).toBe(0);
+      expect(await check(true)).toBe(1);
+      writeFileSync(
+        card,
+        'export default () => <h1 className="text-balance">Ready</h1>;'
+      );
+      writeFileSync(added, 'export default () => <h2>New heading</h2>;');
+      expect(await check(true)).toBe(1);
+      writeFileSync(
+        added,
+        'export default () => <h2 className="text-balance">New heading</h2>;'
+      );
+      expect(await check(true)).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

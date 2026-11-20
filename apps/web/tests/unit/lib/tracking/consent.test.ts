@@ -36,6 +36,15 @@ describe('tracking consent', () => {
     });
   });
 
+  it('never forwards advertising events when only analytics is accepted', () => {
+    setConsentState('accepted');
+    localStorage.setItem(
+      'jv_cc',
+      JSON.stringify({ essential: true, analytics: true, marketing: false })
+    );
+    expect(isTrackingAllowed()).toBe(false);
+  });
+
   describe('isGPCEnabled', () => {
     it('returns false when navigator.globalPrivacyControl is undefined', () => {
       expect(isGPCEnabled()).toBe(false);
@@ -152,6 +161,7 @@ describe('tracking consent', () => {
     });
 
     it('preserves the default allow behavior where consent is not required', () => {
+      setCookie('jv_cc_required=0');
       expect(isMarketingAllowed()).toBe(true);
     });
 
@@ -208,6 +218,7 @@ describe('tracking consent', () => {
     });
 
     it('preserves the non-required-region default for malformed consent data', () => {
+      setCookie('jv_cc_required=0');
       localStorage.setItem('jv_cc', '{');
 
       expect(isMarketingAllowed()).toBe(true);
@@ -252,6 +263,10 @@ describe('tracking consent', () => {
 
   describe('isTrackingAllowed', () => {
     it('returns true only when consent state is "accepted"', () => {
+      // Opt-out region: accepted consent with no granular advertising
+      // rejection allows tracking. Consent-required regions also need
+      // an affirmative marketing choice (covered above).
+      setCookie('jv_cc_required=0');
       localStorage.setItem('jovie_tracking_consent', 'accepted');
       expect(isTrackingAllowed()).toBe(true);
     });
@@ -328,12 +343,13 @@ describe('tracking consent', () => {
     it('keeps the stored id when it already exists', () => {
       const storedId = '11111111-2222-4333-8444-555555555555';
       localStorage.setItem('jovie_acquisition_id', storedId);
-      setCookie(`jv_acquisition_id=${existingId}`);
+      setCookie(`jv_cc_required=0; jv_acquisition_id=${existingId}`);
 
       expect(getOrCreateAcquisitionId()).toBe(storedId);
     });
 
     it('mints a new id only when neither storage nor the cookie has one', () => {
+      setCookie('jv_cc_required=0');
       const minted = getOrCreateAcquisitionId();
 
       expect(minted).toMatch(
@@ -355,6 +371,7 @@ describe('tracking consent', () => {
   describe('rememberAcquisitionId', () => {
     const acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
     it('retains the server identity for later events and revocation', () => {
+      setCookie('jv_cc_required=0');
       rememberAcquisitionId(acquisitionId);
       expect(localStorage.getItem('jovie_acquisition_id')).toBe(acquisitionId);
       expect(document.cookie).toContain(`jv_acquisition_id=${acquisitionId}`);

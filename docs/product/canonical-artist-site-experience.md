@@ -23,7 +23,7 @@ obvious action; Jovie remains supporting infrastructure.
 | Smart Link | A release opens in the native artist/release shell, names the artist, offers streaming destinations, and has an explicit `Back to Tim White` route to `/tim`. `/tim/never-say-a-word` is the reference release loop. |
 | Claim | An unclaimed profile remains visibly complete. Claim copy says the profile is ready and asks the artist to verify/take ownership; it never presents an empty site builder. |
 | Free | Free is a durable public profile plus audience capture. It remains useful without payment and is described as free forever. |
-| Pro | Artist Presence is the explicit `$199/mo` expansion. Limited access is honest; the handoff does not imply that payment is required for the basic artist site. |
+| Pro | Artist Presence is the explicit `$12/mo` expansion. The handoff is honest; it does not imply that payment is required for the basic artist site. |
 | After claim | Ownership persists onto the existing profile and its dashboard. The next state is first value on the claimed site, not “start your profile” from zero. |
 | After pay | Checkout stays pending until verified, has an honest recovery state, and only then shows `Artist Visibility is starting` with Monitor → Surface → Approve → Fix and an `Open Artist Visibility` action. |
 
@@ -38,7 +38,7 @@ obvious action; Jovie remains supporting infrastructure.
   language.
 - Claim as ownership of a populated profile, including unsupported and
   in-progress truthful states.
-- A complete Free state and the explicit, non-coercive `$199/mo` Pro handoff.
+- A complete Free state and the explicit, non-coercive `$12/mo` Pro handoff.
 - Pending, recovery, and activated post-pay states; never infer entitlement
   from a return URL alone.
 
@@ -75,7 +75,11 @@ unsupported state; no placeholder control may imply fake completeness.
   while the separate wide surface remains feature-gated.
 - The production profile and reference release were reachable during this
   review, and the release returned to the artist profile. Pricing published
-  Free, `$199/mo` Pro, and the truthful limited-access handoff.
+  Free, the `$199/mo` Pro tier (since retired), and the truthful limited-access handoff.
 - JOV-6572 should consume the journey and keep/change/hide rules above. It must
   not broaden JOV-6571 into a new selector, a new IA, or generalized
   certification.
+
+> Price correction (2026-10-25): the `$199/mo` limited-access tier was retired on 2026-10-20 (Tim). The Pro price
+> is `$12/mo` (1200 cents); price truth lives in `lib/config/plan-prices.ts` and the offer-truth registry, and the
+> certifier derives its text from it and fails on any contradicting price claim.

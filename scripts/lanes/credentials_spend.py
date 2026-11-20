@@ -47,6 +47,19 @@ def app_access_token(state_dir: Path) -> str | None:
         return None
 
 
+def app_token_status(state_dir: Path, now: float, available: bool) -> dict:
+    """Allowlisted metadata from the existing status view; never mint or return a token."""
+    import linear_app_token
+    try:
+        view = linear_app_token.status(state_dir, now=now) or {}
+    except (OSError, ValueError, TypeError, OverflowError):
+        view = {}
+    return {"schema": "jovie.linear-app-status/v1", "observedAt": _iso(now),
+            "available": available, "scopeMatches": view.get("scope") == linear_app_token.SCOPE,
+            "expiresInS": view.get("expiresInS"),
+            "mintFailed": view.get("mintFailedAt") is not None or bool(view.get("mintError"))}
+
+
 def receipt_path(home: Path | None = None) -> Path:
     return (Path.home() if home is None else home) / ".local/state/jovie-registry/credentials-runs.jsonl"
 
@@ -82,6 +95,22 @@ def summarize(stdout: str) -> dict:
     return {"findings": len(findings), "bySeverity": severities}
 
 
+HEADROOM_SCRIPT = "scripts/rate-limit-headroom.mjs"
+
+
+def publish_headroom(state_dir: Path, release: Path, env: dict, run=subprocess.run) -> str:
+    """Best-effort: write $LANES_STATE/api-ledger/headroom.json for Summer and Ovie."""
+    if not (release / HEADROOM_SCRIPT).is_file():
+        return "script-missing"
+    try:
+        done = run(["node", str(release / HEADROOM_SCRIPT), "--write"], cwd=str(release),
+                   env={**env, "LANES_STATE": str(state_dir)}, capture_output=True, text=True,
+                   timeout=60, stdin=subprocess.DEVNULL)
+        return "ok" if done.returncode == 0 else "failed"
+    except (OSError, subprocess.SubprocessError):
+        return "failed"
+
+
 def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None = None,
          home: Path | None = None, linear_token=None) -> dict:
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
@@ -110,6 +139,8 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
         access = (linear_token or app_access_token)(state_dir)
     except Exception:  # filing is optional; the check and its receipt still run
         access = None
+    # Observe AFTER the existing filing-token lookup, which may have renewed the cache.
+    env["LANES_LINEAR_APP_STATUS"] = json.dumps(app_token_status(state_dir, now, bool(access)))
     if access:
         env["LINEAR_ACCESS_TOKEN"] = access
         args.append("--file-linear")
@@ -122,6 +153,12 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
         if done.returncode != 0:
             raise RuntimeError(f"exit {done.returncode}")
         result = {"status": "ok", **summarize(done.stdout), "filing": "linear-app" if access else "unavailable"}
+        # Headroom never needs the Linear app token. Hand publish_headroom a copy
+        # without it instead of popping in place: env is also held by the caller
+        # (release self-tests assert the child DID get the token — merge group
+        # 41154614683), and mutating a borrowed dict fails them with KeyError.
+        headroom_env = {key: value for key, value in env.items() if key != "LINEAR_ACCESS_TOKEN"}
+        result["headroom"] = publish_headroom(state_dir, release, headroom_env, run)
         state["nextAttemptAt"] = now + INTERVAL_S
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError, TypeError) as error:
         # Output can carry provider details; keep only the error class.

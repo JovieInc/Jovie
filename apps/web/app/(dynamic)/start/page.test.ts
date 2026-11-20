@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveUserState: vi.fn().mockResolvedValue({
@@ -9,11 +11,19 @@ const mocks = vi.hoisted(() => ({
   isWaitlistGateEnabled: vi.fn(),
   getSession: vi.fn(),
   resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
+  resolveSyntheticPassageToken: vi.fn().mockResolvedValue(null),
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
+  getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
+  // Null gives every headers() call its own object (no cross-test memo).
+  requestHeaders: null as Headers | null,
+}));
+
+vi.mock('@/lib/onboarding/session', () => ({
+  getCurrentOnboardingSessionId: mocks.getCurrentOnboardingSessionId,
 }));
 
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers(),
+  headers: async () => mocks.requestHeaders ?? new Headers(),
 }));
 
 vi.mock('@/lib/auth/better-auth', () => ({
@@ -22,6 +32,10 @@ vi.mock('@/lib/auth/better-auth', () => ({
 
 vi.mock('@/lib/synthetic/passage.server', () => ({
   resolveSyntheticPassage: mocks.resolveSyntheticPassage,
+}));
+
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: mocks.resolveSyntheticPassageToken,
 }));
 
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
@@ -49,9 +63,31 @@ vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.isWaitlistGateEnabled,
 }));
 
+const winbackMocks = vi.hoisted(() => ({
+  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),
+  recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
+  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,
+  recordWinbackResumeClick: winbackMocks.recordWinbackResumeClick,
+}));
+
+import { getRequestSession } from '@/lib/auth/request-session';
 import StartPage from './page';
 
 describe('StartPage', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    mocks.requestHeaders = null;
+  });
+
+  beforeEach(() => {
+    // These entry-property fixtures exercise the open default (Tim,
+    // 2026-11-09); the closed kill switch is covered in
+    // public-signup-closed.test.tsx.
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+  });
   it('renders the onboarding shell without minting a server-component cookie', async () => {
     const result = await StartPage({ searchParams: Promise.resolve({}) });
 
@@ -60,6 +96,30 @@ describe('StartPage', () => {
         sessionLabel: 'pending',
       },
     });
+  });
+
+  it('seeds an empty snapshot for a visitor with no account and no onboarding cookie', async () => {
+    const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.initialSnapshot).toEqual({
+      identityId: null,
+      conversationId: null,
+      owned: false,
+      messages: [],
+    });
+  });
+
+  it('never seeds a snapshot when an onboarding cookie or an account may own history', async () => {
+    mocks.getCurrentOnboardingSessionId.mockResolvedValueOnce('session-1');
+    const withCookie = await StartPage({ searchParams: Promise.resolve({}) });
+    expect(withCookie.props.initialSnapshot).toBeUndefined();
+
+    mocks.resolveUserState.mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      context: { email: 'test@example.com' },
+    });
+    const signedIn = await StartPage({ searchParams: Promise.resolve({}) });
+    expect(signedIn.props.initialSnapshot).toBeUndefined();
   });
 
   it('passes signed-in state into the chat shell after OTP', async () => {
@@ -127,8 +187,11 @@ describe('StartPage', () => {
     expect(result.props.entryProfile).toEqual(entry);
   });
 
-  it('skips the handle lookup when an explicit starter prompt drives the chat', async () => {
-    mocks.resolveStartEntryProfile.mockClear();
+  it('keeps an explicit starter prompt in charge of an open or claimable handle', async () => {
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce({
+      status: 'available',
+      handle: 'megaran',
+    });
 
     const result = await StartPage({
       searchParams: Promise.resolve({
@@ -137,8 +200,27 @@ describe('StartPage', () => {
       }),
     });
 
-    expect(mocks.resolveStartEntryProfile).not.toHaveBeenCalled();
     expect(result.props.entryProfile).toBeNull();
+    expect(result.props.starterHandoff).toMatchObject({ kind: 'prompt' });
+  });
+
+  it('still reports a taken handle when a starter prompt rides along (JOV-9624)', async () => {
+    const entry = {
+      status: 'claimed',
+      handle: 'tim',
+      displayName: 'Tim',
+      avatarUrl: null,
+    } as const;
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        handle: 'tim',
+        starter_prompt: 'I want my own jov.ie.',
+      }),
+    });
+
+    expect(result.props.entryProfile).toEqual(entry);
   });
 
   it('lets a pending account resume without an advisory waitlist read', async () => {
@@ -182,6 +264,30 @@ describe('StartPage', () => {
       expect(mocks.getSession).not.toHaveBeenCalled();
     });
 
+    it('mounts the test sitekey for an anonymous canary passage token without consuming it (JOV-9625)', async () => {
+      mocks.getSession.mockClear();
+      mocks.resolveSyntheticPassageToken.mockResolvedValueOnce({
+        actorId: 'prodcert',
+      });
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(true);
+      expect(mocks.resolveSyntheticPassageToken).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'onboarding_chat',
+        { consume: false }
+      );
+      expect(mocks.getSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps the production widget when the passage token check throws', async () => {
+      mocks.resolveSyntheticPassageToken.mockRejectedValueOnce(
+        new Error('bad')
+      );
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+      expect(result.props.turnstileTestMode).toBe(false);
+    });
+
     it('keeps a signed-in account without passage on the production widget', async () => {
       mocks.resolveUserState.mockResolvedValueOnce({
         state: 'NEEDS_ONBOARDING',
@@ -213,6 +319,30 @@ describe('StartPage', () => {
         'onboarding_chat'
       );
       expect(result.props.turnstileTestMode).toBe(true);
+    });
+
+    it('reuses the session the auth gate already read for this request', async () => {
+      // One request: Next returns the same headers() object throughout.
+      mocks.requestHeaders = new Headers();
+      const session = { user: { id: 'u3' } };
+      mocks.getSession.mockReset().mockResolvedValue(session);
+      // The gate's own cookie-mode read (resolveUserState is mocked here).
+      await getRequestSession();
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'artist@band.com' },
+      });
+
+      await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(mocks.getSession).toHaveBeenCalledOnce();
+      expect(mocks.getSession).toHaveBeenCalledWith({
+        headers: mocks.requestHeaders,
+      });
+      expect(mocks.resolveSyntheticPassage).toHaveBeenLastCalledWith(
+        session,
+        'onboarding_chat'
+      );
     });
 
     it('falls back to the production widget when the passage check throws', async () => {
@@ -261,5 +391,55 @@ describe('StartPage', () => {
       expect(result.props.entryProfile).toEqual(entry);
       expect(result.props.turnstileTestMode).toBe(true);
     });
+  });
+
+  // LCP guard: a loading.tsx makes Next stream the real page behind a Suspense
+  // boundary that React reveals from a throttled inline script, so the visible
+  // heading painted 2.3s+ late and read 7.9s in the throttled-mobile entry gate
+  // (apps/web/performance-entry-budgets.json, budget 4000ms). Keep the heading
+  // in the first HTML instead.
+  it('has no loading.tsx, so the LCP heading is in the first HTML', () => {
+    expect(existsSync(path.join(__dirname, 'loading.tsx'))).toBe(false);
+  });
+});
+
+describe('StartPage winback resume', () => {
+  afterEach(() => {
+    winbackMocks.resolveWinbackResumeToken.mockReset();
+    winbackMocks.recordWinbackResumeClick.mockClear();
+  });
+
+  it('lands a valid winback resume token in setup while public signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    winbackMocks.resolveWinbackResumeToken.mockResolvedValueOnce({
+      entryId: '11111111-1111-4111-8111-111111111111',
+      batchId: 'batch-a',
+      capabilityKey: 'public-profile-pages',
+    });
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        resume: 'winback',
+        w: 'valid-token',
+      }),
+    });
+
+    expect(result).toMatchObject({ props: { sessionLabel: 'pending' } });
+    expect(winbackMocks.recordWinbackResumeClick).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the closed-signup redirect for an unknown winback token', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    winbackMocks.resolveWinbackResumeToken.mockResolvedValueOnce(null);
+
+    await expect(
+      StartPage({
+        searchParams: Promise.resolve({
+          resume: 'winback',
+          w: 'invalid-token',
+        }),
+      })
+    ).rejects.toThrow('redirect:/waitlist');
+    expect(winbackMocks.recordWinbackResumeClick).not.toHaveBeenCalled();
   });
 });

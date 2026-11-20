@@ -7,10 +7,11 @@
  */
 
 import { type RuntimeSecret, readDopplerSecret } from './credentials';
-import type {
-  ImageGenerationAdapter,
-  ImageGenerationOutcome,
-  ImageGenerationRequest,
+import {
+  type ImageGenerationAdapter,
+  type ImageGenerationOutcome,
+  type ImageGenerationRequest,
+  marketingImagePrompt,
 } from './image-adapter';
 
 export const FAL_KEY_SECRET = 'FAL_KEY';
@@ -86,7 +87,7 @@ export function createFalImageAdapter(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            prompt: request.prompt,
+            prompt: marketingImagePrompt(request),
             image_size: { width: request.width, height: request.height },
             num_images: 1,
             output_format: 'png',

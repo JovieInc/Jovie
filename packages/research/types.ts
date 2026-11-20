@@ -88,6 +88,8 @@ export interface SourceRun {
 
 export interface ResearchResult {
   readonly schema: 'jovie-research-result/v1';
+  readonly verdict: 'ok' | 'degraded';
+  readonly reasons: readonly string[];
   readonly query: string;
   readonly key: string;
   readonly freshness: Freshness;

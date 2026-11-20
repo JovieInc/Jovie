@@ -26,10 +26,9 @@ function renderWithQueryClient(ui: ReactElement) {
 describe('ProfileViewTracker', () => {
   beforeEach(() => {
     mockTrack.mockClear();
-    vi.stubGlobal('requestIdleCallback', (cb: () => void) => {
-      cb();
-      return 0;
-    });
+    // An idle callback that never runs must not hold back the view: artists
+    // pay for this audience, bounces included (JOV-10246).
+    vi.stubGlobal('requestIdleCallback', () => 0);
     Object.defineProperty(navigator, 'sendBeacon', {
       value: vi.fn(() => true),
       writable: true,
@@ -54,6 +53,21 @@ describe('ProfileViewTracker', () => {
         campaignKey: 'proof-to-claim',
         profile_handle: 'tim',
       })
+    );
+  });
+
+  it('sends the page view on mount with no idle wait or user interaction', () => {
+    renderWithQueryClient(
+      <ProfileViewTracker handle='someartist' artistId='artist-1' />
+    );
+
+    expect(navigator.sendBeacon).toHaveBeenCalledWith(
+      '/api/profile/view',
+      expect.anything()
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'profile_view',
+      expect.objectContaining({ handle: 'someartist', artist_id: 'artist-1' })
     );
   });
 });

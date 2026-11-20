@@ -13,7 +13,6 @@ import {
   buildCommands,
   COMMANDS,
   type Command,
-  isCommandVisible,
 } from '../lib/commands/registry';
 import {
   FOUNDER_DOOR_SHORTCUT,
@@ -70,19 +69,7 @@ export function collectProductSurfaceCounts() {
     secondKey: shortcut.secondKey ?? null,
   }));
 
-  const visibleByDefault = COMMANDS.filter(command =>
-    isCommandVisible(command, {})
-  );
-  const flagGatedNavigation = COMMANDS.flatMap(command => {
-    if (command.kind !== 'nav' || !command.requiredFlag) return [];
-    return [
-      {
-        id: command.id,
-        requiredFlag: command.requiredFlag,
-        visibleByDefault: isCommandVisible(command, {}),
-      },
-    ];
-  });
+  const visibleByDefault = COMMANDS;
 
   const defaultIds = new Set(COMMANDS.map(command => command.id));
   const discoverabilityGatedNavigation = (
@@ -137,7 +124,6 @@ export function collectProductSurfaceCounts() {
     commands: {
       defaultRegistry: countByKind(COMMANDS),
       visibleByDefault: countByKind(visibleByDefault),
-      flagGatedNavigation,
       discoverabilityGatedNavigation,
     },
     trackedLinks: {

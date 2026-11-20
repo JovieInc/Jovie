@@ -12,9 +12,8 @@ import {
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
 
-// The live repository variable and active ruleset both use GitHub native.
-// Keep bare read-only/local callers aligned with that canon; mutations still
-// require the dedicated native authorization below.
+// The live repository variable and active ruleset both use GitHub native; keep bare
+// read-only/local callers on that canon; mutations need the dedicated native auth below.
 export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['native']);
 export const CANONICAL_NATIVE_MUTATION_ACTOR = 'jovie-bot[bot]';
@@ -44,6 +43,7 @@ const REQUIRED_CHECKS = Object.freeze([
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ]);
 const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'QUEUED',
@@ -1515,6 +1515,12 @@ function assertEnrollCandidate(state, expectedHeadOid) {
       `PR #${state.number} must be open and ready for review before enrollment`
     );
   }
+  if (state.baseRefName !== 'main') {
+    throw backendError(
+      'non_main_base',
+      `PR #${state.number} targets ${state.baseRefName ?? 'an unknown base'}, not main; auto-merge and enqueue are refused (a stacked child would merge into its parent branch)`
+    );
+  }
   if (state.headRefOid.toLowerCase() !== expectedHeadOid) {
     throw backendError(
       'head_changed',
@@ -1801,11 +1807,8 @@ export async function reconcileDraftQueueEntry({
 
 /**
  * @param {{
- *   backend?: string,
- *   repository?: string,
- *   number?: string | number,
- *   expectedHeadOid?: string,
- *   requireDraft?: boolean,
+ *   backend?: string, repository?: string, number?: string | number,
+ *   expectedHeadOid?: string, requireDraft?: boolean,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1851,15 +1854,6 @@ export async function dequeuePullRequest({
       state: before,
     };
   }
-  if (dequeuePostcondition(before)) {
-    return {
-      backend: resolvedBackend,
-      changed: false,
-      mutationActor,
-      state: before,
-    };
-  }
-
   const noLongerDraft = state =>
     requireDraft && (state.state !== 'OPEN' || state.isDraft !== true);
   if (noLongerDraft(before)) {
@@ -1872,7 +1866,14 @@ export async function dequeuePullRequest({
       state: before,
     };
   }
-
+  if (dequeuePostcondition(before)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      mutationActor,
+      state: before,
+    };
+  }
   let mutationBefore = before;
   let guardedQueueEntry = null;
   if (expectedHead !== null) {
@@ -1932,7 +1933,6 @@ export async function dequeuePullRequest({
       };
     }
   }
-
   const mutationErrors = [];
   if (
     mutationBefore.isInMergeQueue ||
@@ -1982,7 +1982,6 @@ export async function dequeuePullRequest({
     }
     current = await readPullRequestQueueState(stateOptions);
   }
-
   if (
     expectedHead !== null &&
     String(current.headRefOid ?? '').toLowerCase() !== expectedHead
@@ -1994,6 +1993,13 @@ export async function dequeuePullRequest({
     );
   }
 
+  if (noLongerDraft(current)) {
+    throw backendError(
+      'dequeue_draft_raced',
+      'Draft cleanup cannot prove an open draft after native dequeue',
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
   if (dequeuePostcondition(current)) {
     return {
       backend: resolvedBackend,

@@ -1,0 +1,467 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
+import { assignExperimentArm, experimentArmBody } from './experiment';
+import { validateContentRecord } from './kind';
+import {
+  DEFAULT_HOME_SPEC,
+  MARKETING_PAGE_KIND,
+  MarketingPageSectionSchema,
+  type MarketingPageSpec,
+  SPEC_SECTION_REGISTRY,
+} from './marketing-page';
+
+afterEach(() => vi.unstubAllEnvs());
+
+const clone = <T>(value: T): T => structuredClone(value);
+
+function cleanSpec(): MarketingPageSpec {
+  const spec = clone(DEFAULT_HOME_SPEC);
+  const hero = spec.sections[0];
+  if (hero?.section !== 'hero') throw new Error('hero first');
+  hero.copy.subhead =
+    'Your profile, every release, and a link to each place the music is streaming.';
+  return spec;
+}
+
+const validate = (data: unknown, key = 'home') =>
+  validateContentRecord(MARKETING_PAGE_KIND, key, data);
+
+const errorsOf = (data: unknown) => {
+  const result = validate(data);
+  return result.ok ? [] : result.errors;
+};
+
+describe('marketing-page content kind', () => {
+  it('accepts a spec built from registered DS sections', () => {
+    expect(validate(cleanSpec())).toEqual({ ok: true, data: cleanSpec() });
+  });
+
+  it('keeps the code default in sync with the rendered homepage order', () => {
+    expect(DEFAULT_HOME_SPEC.sections.map(s => s.section)).toEqual([
+      'hero',
+      'feature-split',
+      'product-gallery',
+      'cta',
+    ]);
+  });
+
+  it('accepts the code default: the music line is permitted on / only', () => {
+    // Tim 2026-11-03: music language is scoped to the root route, so the
+    // default validates, and so does a slot that uses the audience terms.
+    expect(errorsOf(DEFAULT_HOME_SPEC)).toEqual([]);
+    const spec = cleanSpec();
+    const hero = spec.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero first');
+    hero.copy.subhead = 'Move your music forward, one release at a time.';
+    expect(errorsOf(spec)).toEqual([]);
+  });
+
+  it('keeps the ICP term list the source guard enforces for general pages', () => {
+    // No general page key is registered yet (GENERAL_PAGE_KEYS is empty), so
+    // the rule has no reachable key. The shared term list must still carry
+    // "music", so the next general key inherits MKT-D16 rather than losing it.
+    expect(icpLanguage.terms).toContain('music');
+  });
+
+  it('rejects unknown records', () => {
+    expect(errorsOf({ ...cleanSpec() }).length).toBe(0);
+    expect(validate(cleanSpec(), 'pricing')).toEqual({
+      ok: false,
+      errors: ['Unknown marketing-page key: pricing'],
+    });
+  });
+
+  it('has no slot for the locked headline', () => {
+    const spec = cleanSpec() as unknown as {
+      sections: { copy: Record<string, string> }[];
+    };
+    spec.sections[0]!.copy.headline = 'A new headline';
+    expect(errorsOf(spec).join(' ')).toMatch(/headline/);
+    expect(JSON.stringify(DEFAULT_HOME_SPEC.sections[0])).not.toMatch(
+      /move your music forward/
+    );
+  });
+
+  it('rejects variants and sections outside the renderer registry', () => {
+    const spec = cleanSpec() as unknown as {
+      sections: { variant: string; section: string }[];
+    };
+    spec.sections[0]!.variant = 'centered-phone';
+    expect(errorsOf(spec).length).toBeGreaterThan(0);
+
+    const unknown = cleanSpec() as unknown as { sections: unknown[] };
+    unknown.sections.push({ section: 'logo-cloud', variant: 'inline-strip' });
+    expect(errorsOf(unknown).length).toBeGreaterThan(0);
+  });
+
+  it('rejects prices typed into copy (same price everywhere)', () => {
+    for (const text of ['Only $12 to start', 'Pro is 12 USD', 'Pay 9/mo']) {
+      const spec = cleanSpec();
+      const cta = spec.sections[3];
+      if (cta?.section !== 'cta') throw new Error('cta last');
+      cta.copy.subhead = text;
+      expect(errorsOf(spec).join(' ')).toMatch(/offer truth/);
+    }
+  });
+
+  it('enforces hero first, cta last, and one of each section', () => {
+    const swapped = cleanSpec();
+    swapped.sections.reverse();
+    expect(errorsOf(swapped).join(' ')).toMatch(/hero section must come first/);
+
+    const ctaMiddle = cleanSpec();
+    const [hero, split, gallery, cta] = ctaMiddle.sections;
+    ctaMiddle.sections = [hero!, split!, cta!, gallery!];
+    expect(errorsOf(ctaMiddle).join(' ')).toMatch(/closing cta must be last/);
+
+    const duplicate = cleanSpec();
+    duplicate.sections.splice(2, 0, clone(duplicate.sections[2]!));
+    expect(errorsOf(duplicate).join(' ')).toMatch(/appears twice/);
+  });
+
+  it('rejects markup and multi-line copy', () => {
+    const spec = cleanSpec();
+    const gallery = spec.sections[2];
+    if (gallery?.section !== 'product-gallery') throw new Error('gallery');
+    gallery.copy.headline = 'Bold <b>claim</b>';
+    expect(errorsOf(spec).join(' ')).toMatch(/Single line/);
+  });
+
+  it('validates experiment variants with the same rules as the control', () => {
+    const spec = cleanSpec();
+    const variantBody = clone(spec.sections);
+    const gallery = variantBody[2];
+    if (gallery?.section !== 'product-gallery') throw new Error('gallery');
+    gallery.copy.headline = 'Every release, only $12 a month.';
+    spec.experiment = {
+      id: 'home-gallery-headline',
+      hypothesis: 'A sharper gallery headline lifts invite requests.',
+      metric: { funnel: 'artist_signup', step: 'cta_click' },
+      status: 'running',
+      variants: [{ id: 'sharper', weight: 50, body: variantBody }],
+    };
+    expect(errorsOf(spec)).toEqual([
+      expect.stringContaining(
+        'experiment.variants[0].body[2].copy.headline: prices and plan terms'
+      ),
+    ]);
+
+    gallery.copy.headline = 'Every release, found in one place.';
+    expect(errorsOf(spec)).toEqual([]);
+  });
+
+  it('rejects experiment weights over 100 and reserved or duplicate ids', () => {
+    const spec = cleanSpec();
+    const body = clone(spec.sections);
+    spec.experiment = {
+      id: 'too-much',
+      hypothesis: 'Weights above one hundred are invalid.',
+      metric: { funnel: 'artist_signup', step: 'claim_complete' },
+      status: 'draft',
+      variants: [
+        { id: 'a', weight: 60, body },
+        { id: 'a', weight: 50, body },
+      ],
+    };
+    const errors = errorsOf(spec).join(' ');
+    expect(errors).toMatch(/sum to 110/);
+    expect(errors).toMatch(/Duplicate variant id/);
+
+    spec.experiment.variants = [{ id: 'control', weight: 10, body }];
+    expect(errorsOf(spec).join(' ')).toMatch(/reserved/);
+  });
+
+  it('only accepts conversion steps after landing_view as metrics', () => {
+    const spec = cleanSpec() as unknown as Record<string, unknown>;
+    spec.experiment = {
+      id: 'bad-metric',
+      hypothesis: 'Landing views are the denominator.',
+      metric: { funnel: 'artist_signup', step: 'landing_view' },
+      status: 'draft',
+      variants: [{ id: 'b', weight: 10, body: cleanSpec().sections }],
+    };
+    expect(errorsOf(spec).length).toBeGreaterThan(0);
+  });
+});
+
+describe('spec section registry', () => {
+  it('binds every schema section to an existing, registered DS component', () => {
+    const schemaPairs = MarketingPageSectionSchema.options.map(option => [
+      option.shape.section.value,
+      option.shape.variant.value,
+    ]);
+    expect(
+      SPEC_SECTION_REGISTRY.map(entry => [entry.section, entry.variant])
+    ).toEqual(schemaPairs);
+    for (const entry of SPEC_SECTION_REGISTRY) {
+      const section = MARKETING_SECTIONS.find(s => s.id === entry.section);
+      expect(section?.variants.map(v => v.id)).toContain(entry.variant);
+      const source = readFileSync(
+        resolve(process.cwd(), '../..', entry.source),
+        'utf8'
+      );
+      expect(source).toContain(`export function ${entry.component}(`);
+    }
+  });
+
+  it('marks homepage sections migrating while the census holds them out', () => {
+    // surfaceCensus `home` is a holdout (JOV-8101); flip with the census.
+    expect(new Set(SPEC_SECTION_REGISTRY.map(e => e.dsStatus))).toEqual(
+      new Set(['migrating'])
+    );
+  });
+});
+
+describe('migration for the retired spec revision (JOV-12824)', () => {
+  const retiredRecord = {
+    sections: [
+      {
+        section: 'hero',
+        variant: 'centered-handle-claim',
+        copy: {
+          eyebrow: 'Jovie',
+          headline: 'Find yourself.',
+          subhead: 'Search your artist name to claim your profile.',
+        },
+      },
+      {
+        section: 'feature-split',
+        variant: 'phone-right',
+        copy: {
+          headline: 'One name. Found everywhere.',
+          body: 'Your profile at jov.ie leads with what matters now.',
+        },
+      },
+    ],
+  };
+
+  it('migrates the retired centered-handle hero record to the current schema', () => {
+    const migrated = MARKETING_PAGE_KIND.migrate?.(retiredRecord);
+    expect(migrated).not.toBeNull();
+    expect(migrated?.sections.map(s => s.section)).toEqual([
+      'hero',
+      'feature-split',
+      'product-gallery',
+      'cta',
+    ]);
+    // The killed hero copy does not survive the migration; the approved
+    // editorial copy fills the retired slots.
+    const hero = migrated?.sections[0];
+    expect(hero).toMatchObject({ section: 'hero', variant: 'left-none' });
+    // A still-valid published section passes through untouched.
+    const featureSplit = migrated?.sections[1];
+    expect(featureSplit).toMatchObject({
+      section: 'feature-split',
+      copy: { headline: 'One name. Found everywhere.' },
+    });
+    expect(validate(migrated)).toEqual({ ok: true, data: migrated });
+  });
+
+  it('migrates with no invite-only language anywhere in the fallback or migrated copy', () => {
+    for (const spec of [
+      DEFAULT_HOME_SPEC,
+      MARKETING_PAGE_KIND.migrate?.(retiredRecord),
+    ]) {
+      for (const section of spec?.sections ?? []) {
+        for (const text of Object.values(section.copy)) {
+          expect(text.toLowerCase()).not.toContain('invit');
+          expect(text.toLowerCase()).not.toContain('opens by invitation');
+        }
+      }
+    }
+    expect(
+      DEFAULT_HOME_SPEC.sections[0]?.section === 'hero' &&
+        DEFAULT_HOME_SPEC.sections[0].copy.primaryAction
+    ).toBe('Claim your profile');
+  });
+
+  it('migrates the stored record for the live read without a warning', () => {
+    // Store-level behavior is covered in store-versions.server.test.ts; here
+    // the hook must accept exactly what that read path passes it.
+    expect(MARKETING_PAGE_KIND.migrate?.({ sections: [] })).toBeNull();
+    expect(MARKETING_PAGE_KIND.migrate?.('not a spec')).toBeNull();
+    expect(
+      MARKETING_PAGE_KIND.migrate?.({ sections: [{ section: 42 }] })
+    ).toBeNull();
+  });
+
+  it.each([
+    { sections: [{ section: 'unknown' }] },
+    { sections: [retiredRecord.sections[0], null] },
+    {
+      sections: [
+        retiredRecord.sections[0],
+        { section: 'feature-split', variant: 'phone-right', copy: {} },
+      ],
+    },
+    { sections: [retiredRecord.sections[0], retiredRecord.sections[0]] },
+    { sections: [...retiredRecord.sections].reverse() },
+    { ...retiredRecord, unexpected: true },
+    { ...retiredRecord, experiment: { id: 'broken' } },
+  ])(
+    'rejects unrecognized or damaged content without dropping it: %j',
+    record => {
+      expect(MARKETING_PAGE_KIND.migrate?.(record)).toBeNull();
+    }
+  );
+
+  it.each([
+    { body: cleanSpec().sections },
+    { body: cleanSpec().sections.slice(0, 1) },
+  ])(
+    'preserves experiment attribution, arm copy and the immutable input: %j',
+    ({ body }) => {
+      const record = {
+        sections: retiredRecord.sections,
+        experiment: {
+          id: 'home-gallery-headline',
+          hypothesis: 'A different gallery headline lifts claim completion.',
+          metric: { funnel: 'artist_signup', step: 'claim_complete' },
+          status: 'running',
+          variants: [{ id: 'alternate', weight: 35, body }],
+        },
+      };
+      const before = clone(record);
+      const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+      expect(migrated?.experiment).toEqual(record.experiment);
+      expect(record).toEqual(before);
+      expect(MARKETING_PAGE_KIND.migrate?.(migrated)).toEqual(migrated);
+      expect(MARKETING_PAGE_KIND.migrate?.(cleanSpec())).toEqual(cleanSpec());
+    }
+  );
+
+  it.each([false, true])(
+    'uses canonical fallback and migration copy for closed signup=%s',
+    closed => {
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', String(closed));
+      const fallback = MARKETING_PAGE_KIND.defaultRecord('home');
+      const migrated = MARKETING_PAGE_KIND.migrate?.(retiredRecord, fallback);
+      for (const spec of [fallback, migrated]) {
+        expect(validate(spec).ok).toBe(true);
+        expect(spec?.sections[0]).toMatchObject({
+          copy: {
+            primaryAction: closed
+              ? HOMEPAGE_EDITORIAL_COPY.hero.primaryAction
+              : getClaimProfileIntent().label,
+          },
+        });
+        expect(spec?.sections.at(-1)).toMatchObject({
+          copy: {
+            headline: closed
+              ? HOMEPAGE_EDITORIAL_COPY.invite.headline
+              : HOMEPAGE_EDITORIAL_COPY.claim.headline,
+          },
+        });
+      }
+    }
+  );
+
+  it('migrates legacy experiment bodies without changing attribution or weights', () => {
+    const record = {
+      sections: retiredRecord.sections,
+      experiment: {
+        id: 'home-copy',
+        hypothesis: 'A revised homepage lifts claim completion.',
+        metric: { funnel: 'artist_signup', step: 'claim_complete' },
+        status: 'running',
+        variants: [{ id: 'legacy', weight: 35, body: retiredRecord.sections }],
+      },
+    };
+    const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+    expect(validate(migrated).ok).toBe(true);
+    expect(migrated?.experiment?.variants[0]).toEqual({
+      id: 'legacy',
+      weight: 35,
+      body: migrated?.sections,
+    });
+    expect(record.experiment.variants[0]?.body).toEqual(retiredRecord.sections);
+  });
+
+  it.each(['centered-none', 'split-claim-card'])(
+    'recognizes the historical %s hero and canonical invitation close',
+    variant => {
+      const spec = cleanSpec();
+      const hero = spec.sections[0];
+      const record = {
+        sections: [
+          {
+            section: 'hero',
+            variant,
+            copy:
+              variant === 'centered-none' && hero?.section === 'hero'
+                ? hero.copy
+                : {
+                    subhead: 'Your catalog in one place.',
+                    claimAction: getClaimProfileIntent().label,
+                  },
+          },
+          ...spec.sections.slice(1, -1),
+          {
+            section: 'cta',
+            variant: 'final-single-claim',
+            copy: {
+              headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
+              subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+            },
+          },
+        ],
+      };
+      const migrated = MARKETING_PAGE_KIND.migrate?.(record);
+      expect(validate(migrated).ok).toBe(true);
+      expect(migrated?.sections.at(-1)?.copy).toEqual({
+        headline: HOMEPAGE_EDITORIAL_COPY.claim.headline,
+        subhead: HOMEPAGE_EDITORIAL_COPY.claim.subhead,
+      });
+      expect(migrated?.sections[1]).toEqual(spec.sections[1]);
+    }
+  );
+});
+
+describe('experiment assignment', () => {
+  const experiment = {
+    id: 'home-test',
+    status: 'running' as const,
+    variants: [
+      { id: 'a', weight: 25, body: 'A' },
+      { id: 'b', weight: 25, body: 'B' },
+    ],
+  };
+
+  it('is deterministic per visitor', () => {
+    const first = assignExperimentArm(experiment, 'visitor-1');
+    for (let i = 0; i < 5; i++) {
+      expect(assignExperimentArm(experiment, 'visitor-1')).toBe(first);
+    }
+  });
+
+  it('splits traffic close to the declared weights', () => {
+    const counts: Record<string, number> = { a: 0, b: 0, control: 0 };
+    for (let i = 0; i < 20_000; i++) {
+      const arm = assignExperimentArm(experiment, `visitor-${i}`);
+      counts[arm] = (counts[arm] ?? 0) + 1;
+    }
+    expect(counts.a! / 20_000).toBeGreaterThan(0.22);
+    expect(counts.a! / 20_000).toBeLessThan(0.28);
+    expect(counts.b! / 20_000).toBeGreaterThan(0.22);
+    expect(counts.control! / 20_000).toBeGreaterThan(0.46);
+  });
+
+  it('serves control unless the experiment is running', () => {
+    expect(
+      assignExperimentArm({ ...experiment, status: 'stopped' }, 'visitor-1')
+    ).toBe('control');
+    expect(assignExperimentArm(undefined, 'visitor-1')).toBe('control');
+  });
+
+  it('resolves arm bodies with control as the fallback', () => {
+    expect(experimentArmBody('C', experiment, 'b')).toBe('B');
+    expect(experimentArmBody('C', experiment, 'control')).toBe('C');
+    expect(experimentArmBody('C', experiment, 'missing')).toBe('C');
+    expect(experimentArmBody('C', undefined, 'a')).toBe('C');
+  });
+});

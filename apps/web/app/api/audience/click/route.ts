@@ -20,7 +20,12 @@ import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { publicClickLimiter } from '@/lib/rate-limit';
+import {
+  createRateLimitHeaders,
+  publicClickLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+} from '@/lib/rate-limit';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -181,6 +186,27 @@ export async function POST(request: NextRequest) {
 
     const ipRateLimitResult = await publicClickLimiter.limit(clientIP);
     if (!ipRateLimitResult.success) {
+      // Distinguish backend unavailability from genuine exhaustion so an
+      // outage is never mislabeled as a 429 (JOV-5132 WS3).
+      if (ipRateLimitResult.unavailable) {
+        return NextResponse.json(
+          {
+            error: rateLimitDenialMessage(
+              ipRateLimitResult,
+              'Rate limit exceeded',
+              'Click tracking is temporarily unavailable.'
+            ),
+            reason: ipRateLimitResult.reason,
+          },
+          {
+            status: rateLimitDenialStatus(ipRateLimitResult),
+            headers: {
+              ...NO_STORE_HEADERS,
+              ...createRateLimitHeaders(ipRateLimitResult),
+            },
+          }
+        );
+      }
       const retryAfterSeconds = Math.ceil(
         (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
       );
@@ -200,6 +226,25 @@ export async function POST(request: NextRequest) {
 
     const rateLimitResult = await checkClickRateLimit(profileId, resolvedIP);
     if (!rateLimitResult.success) {
+      if (rateLimitResult.unavailable) {
+        return NextResponse.json(
+          {
+            error: rateLimitDenialMessage(
+              rateLimitResult,
+              'Rate limit exceeded',
+              'Click tracking is temporarily unavailable.'
+            ),
+            reason: rateLimitResult.reason,
+          },
+          {
+            status: rateLimitDenialStatus(rateLimitResult),
+            headers: {
+              ...NO_STORE_HEADERS,
+              ...getRateLimitHeaders(rateLimitResult),
+            },
+          }
+        );
+      }
       return NextResponse.json(
         { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
         {

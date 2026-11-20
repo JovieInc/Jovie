@@ -90,7 +90,8 @@ function unsealVerificationValue(
     const decipher = createDecipheriv(
       'aes-256-gcm',
       getAuthRoutingEncryptionKey(),
-      Buffer.from(encodedIv, 'base64url')
+      Buffer.from(encodedIv, 'base64url'),
+      { authTagLength: 16 }
     );
     decipher.setAAD(Buffer.from(identifier, 'utf8'));
     decipher.setAuthTag(Buffer.from(encodedTag, 'base64url'));

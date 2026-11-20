@@ -35,6 +35,11 @@ export interface ProfileCompletenessFields {
   displayName: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
+  /**
+   * A free-admission page waiting for ownership proof is private by design:
+   * the artist is not incomplete and keeps using the product.
+   */
+  proofPending?: boolean;
 }
 
 export function isProfileComplete(profile: ProfileCompletenessFields): boolean {
@@ -42,7 +47,7 @@ export function isProfileComplete(profile: ProfileCompletenessFields): boolean {
     Boolean(profile.username?.trim()) &&
     Boolean(profile.usernameNormalized?.trim()) &&
     Boolean(profile.displayName?.trim()) &&
-    profile.isPublic !== false &&
+    (profile.isPublic !== false || profile.proofPending === true) &&
     Boolean(profile.onboardingCompletedAt)
   );
 }

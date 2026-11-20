@@ -46,7 +46,7 @@ export function NewReleaseHeaderAction({
   if (!canCreateManualReleases) {
     return (
       <DashboardHeaderActionButton
-        ariaLabel='Sync releases from Spotify'
+        ariaLabel={isSyncing ? 'Syncing...' : 'Sync from Spotify'}
         onClick={onSyncSpotify}
         disabled={isSyncing}
         icon={
@@ -106,10 +106,9 @@ export function NewReleaseHeaderAction({
           <span>{isSyncing ? 'Syncing...' : 'Sync from Spotify'}</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onSelect={event => {
-            event.preventDefault();
-            onCreateManual();
-          }}
+          // Let the menu close: preventDefault keeps it open over the drawer,
+          // where it traps focus and swallows the first keystrokes of the title.
+          onSelect={() => onCreateManual()}
           data-testid='new-release-add-manually'
         >
           <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />

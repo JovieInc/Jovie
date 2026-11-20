@@ -183,6 +183,52 @@ function publicProfileContextOptions(
 test.describe('Public profile responsive shell @regression', () => {
   test.setTimeout(120_000);
 
+  test('centers the compact profile through embedded browser widths', async ({
+    page,
+  }, testInfo) => {
+    const home = PROFILE_MATRIX_ROUTES.find(route => route.id === 'home');
+    if (!home) throw new Error('The public profile home fixture is missing');
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(home.path, { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+    const shell = page.getByTestId('profile-compact-shell');
+    await expect(shell).toBeVisible();
+
+    // Overflow-only checks missed the 430px shell stuck against the left of
+    // 640–767px panes. Resize the same page to also cover embedded split views.
+    for (const width of [390, 431, 640, 670, 754, 767, 768, 900, 1024]) {
+      await page.setViewportSize({ width, height: 844 });
+      const geometry = await shell.evaluate(element => {
+        const column = element.getBoundingClientRect();
+        const slot = element.parentElement!.getBoundingClientRect();
+        return {
+          leftSpace: column.left - slot.left,
+          rightSpace: slot.right - column.right,
+          left: column.left,
+          right: column.right,
+          viewport: window.innerWidth,
+        };
+      });
+      expect(geometry.viewport).toBe(width);
+      expect(
+        Math.abs(geometry.leftSpace - geometry.rightSpace),
+        `The compact profile must stay centered at ${width}px`
+      ).toBeLessThanOrEqual(2);
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(width);
+      await expect(
+        page.getByRole('button', { name: 'Menu', exact: true })
+      ).toBeVisible();
+      if (width === 670 || width === 754) {
+        await testInfo.attach(`embedded-profile-${width}px`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+      }
+    }
+  });
+
   for (const viewport of PROFILE_RESPONSIVE_VIEWPORTS) {
     for (const route of PROFILE_MATRIX_ROUTES) {
       test(`${viewport.label} ${route.id} renders without overflow`, async ({
@@ -389,6 +435,23 @@ test.describe('Public profile redirect parity @regression', () => {
       expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
         expectedFinalPath
       );
+    } catch (error) {
+      // Attach the guard-level history receipts (lib/testing/runtime-trace)
+      // so a red run names the misfiring guard instead of needing a rerun.
+      const trace = await page
+        .evaluate(
+          () =>
+            (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+              .__JOVIE_RUNTIME_TRACE__ ?? null
+        )
+        .catch(() => null);
+      await testInfo
+        .attach('profile-history-trace.json', {
+          body: JSON.stringify(trace, null, 2),
+          contentType: 'application/json',
+        })
+        .catch(() => undefined);
+      throw error;
     } finally {
       await page.close().catch(() => undefined);
       await context.close().catch(() => undefined);

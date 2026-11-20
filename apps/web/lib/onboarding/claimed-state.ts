@@ -5,6 +5,14 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import {
+  type OnboardingCatalogPreview,
+  readOnboardingCatalogPreview,
+} from '@/lib/onboarding/catalog-preview';
+import {
+  type OnboardingProfileDraft,
+  readOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export interface ClaimedOnboardingArtist {
@@ -18,6 +26,8 @@ export interface ClaimedOnboardingArtist {
 }
 
 export interface ClaimedOnboardingState {
+  readonly profileDraft?: OnboardingProfileDraft | null;
+  readonly catalogPreview?: OnboardingCatalogPreview | null;
   readonly artist: ClaimedOnboardingArtist | null;
   readonly handle: string | null;
   readonly socialLinks: readonly string[];
@@ -112,19 +122,26 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   events: readonly PersistedToolEvent[]
 ): ClaimedOnboardingState {
   let artist: ClaimedOnboardingArtist | null = null;
+  let catalogPreview: OnboardingCatalogPreview | null = null;
   let handle: string | null = null;
   const socialLinks: string[] = [];
   const interviewSignals: InterviewSignal[] = [];
+  let profileDraft: OnboardingProfileDraft | null = null;
 
   for (const event of events) {
     const output = isRecord(event.output) ? event.output : null;
 
     if (output) {
-      artist = readArtist(output) ?? artist;
+      profileDraft = readOnboardingProfileDraft(output) ?? profileDraft;
+      const nextArtist = readArtist(output);
+      if (nextArtist) {
+        artist = nextArtist;
+        catalogPreview = readOnboardingCatalogPreview(output.catalogPreview);
+      }
 
       if (
-        output.action === 'check_handle' ||
-        output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+        output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED ||
+        (output.action === 'check_handle' && output.available !== false)
       ) {
         handle = cleanHandle(output.handle) ?? handle;
       }
@@ -140,9 +157,18 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   }
 
   return {
+    ...(profileDraft ? { profileDraft } : {}),
+    ...(catalogPreview ? { catalogPreview } : {}),
     artist,
     handle,
-    socialLinks: Array.from(new Set(socialLinks)),
+    socialLinks: Array.from(
+      new Set([
+        ...socialLinks,
+        ...(profileDraft?.selectedSource
+          ? [profileDraft.selectedSource.url]
+          : []),
+      ])
+    ),
     interviewSignals,
   };
 }

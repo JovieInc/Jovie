@@ -105,6 +105,45 @@ describe('POST /api/internal/ovie/summer-cards', () => {
     );
   });
 
+  it('refuses card copy errors with the violations and never stores the card', async () => {
+    const response = await POST(
+      post({
+        ...input,
+        kind: 'decision',
+        recipient: undefined,
+        // The live pricing card's shape: an "apply" default with no
+        // defaultDecision, which the deadline records as reject.
+        defaultIfSilent: 'Apply the recommendation at the deadline.',
+        facts: ['I think this lifts conversion'],
+      })
+    );
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      error: 'card_copy_lint',
+      contract: 'jovie.decision-card-copy/v1',
+    });
+    expect(body.violations.map((v: { rule: string }) => v.rule).sort()).toEqual(
+      ['default_contradiction', 'filler']
+    );
+    expect(hoisted.submit).not.toHaveBeenCalled();
+  });
+
+  it('files a card with copy warnings and returns them on the receipt', async () => {
+    hoisted.submit.mockResolvedValue({ outcome: 'created', card });
+    const response = await POST(
+      post({ ...input, title: 'Should we email 12 claimed artists?' })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.copyWarnings).toEqual([
+      expect.objectContaining({ rule: 'question', severity: 'warn' }),
+    ]);
+    expect(hoisted.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ facts: [] })
+    );
+  });
+
   it('replays an identical submission with 200 and the existing card', async () => {
     hoisted.submit.mockResolvedValue({ outcome: 'replayed', card });
     const response = await POST(post(input));

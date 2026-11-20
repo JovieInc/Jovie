@@ -1,11 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfilePreviewBento } from './ProfilePreviewBento';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
-  ProfileCompactSurface: ({ dataTestId }: { dataTestId?: string }) => (
-    <div data-testid={dataTestId ?? 'profile-compact-surface'} />
+  ProfileCompactSurface: ({
+    dataTestId,
+    releases = [],
+  }: {
+    dataTestId?: string;
+    releases?: readonly { id: string; title: string }[];
+  }) => (
+    <div data-testid={dataTestId ?? 'profile-compact-surface'}>
+      {releases.map(release => (
+        <span key={release.id}>{release.title}</span>
+      ))}
+    </div>
   ),
 }));
 
@@ -23,6 +34,13 @@ function renderBento(
 }
 
 describe('ProfilePreviewBento', () => {
+  it('uses domain-specific phone content without mounting the music surface', () => {
+    renderBento({ phoneContent: <p>Company draft</p> });
+    expect(screen.getByText('Company draft')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-compact-surface')
+    ).not.toBeInTheDocument();
+  });
   it('pins the overlay to the hero corner, outside the phone preview', () => {
     renderBento({
       phonePreviewTestId: 'phone-preview',
@@ -36,6 +54,23 @@ describe('ProfilePreviewBento', () => {
     // CTA band. It lives outside the phone in the hero's top-left corner;
     // the storybook clearance spec measures the rendered geometry.
     expect(phonePreview).not.toContainElement(strip);
+  });
+
+  it('passes real releases to the phone preview surface (JOV-9758)', () => {
+    renderBento({
+      releases: [
+        {
+          id: 'r1',
+          title: 'Newest Single',
+          slug: 'newest-single',
+          releaseType: 'single',
+          releaseDate: '2026-08-14',
+          artworkUrl: null,
+          artistNames: ['Artist'],
+        },
+      ],
+    });
+    expect(screen.getByText('Newest Single')).toBeInTheDocument();
   });
 
   it('renders the phone preview directly when no overlay is supplied', () => {
@@ -52,8 +87,39 @@ describe('ProfilePreviewBento', () => {
       footer: <div data-testid='bento-footer'>footer</div>,
     });
 
-    expect(screen.getByText('Live')).toBeInTheDocument();
+    // ASR-022: the badge reads "Live" as written, never forced into caps.
+    expect(screen.getByText('Live')).not.toHaveClass('uppercase');
     expect(screen.getByText('Your live profile')).toBeInTheDocument();
     expect(screen.getByTestId('bento-footer')).toBeInTheDocument();
+  });
+
+  it('paints the default hero and bottom fade from the bento tokens', () => {
+    const { container } = renderBento({
+      dataTestId: 'bento',
+      phoneAlign: 'top',
+      showBottomFade: true,
+    });
+
+    const hero = screen.getByTestId('bento').firstElementChild as HTMLElement;
+    expect(hero.style.background).toBe('var(--profile-preview-bento-hero)');
+    const fade = container.querySelector(
+      '.pointer-events-none.absolute.bottom-0'
+    ) as HTMLElement;
+    expect(fade.style.background).toBe('var(--profile-preview-bento-fade)');
+  });
+
+  it('has no accessibility violations with the live badge and caption', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ProfilePreviewBento
+          artist={PROFILE_STORY_ARTIST}
+          socialLinks={[]}
+          profileHref='/timwhite'
+          showLiveBadge
+          caption='Your live profile'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

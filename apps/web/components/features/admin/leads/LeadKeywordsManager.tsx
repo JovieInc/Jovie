@@ -15,13 +15,20 @@ import {
   useSeedLeadKeywordsMutation,
   useToggleLeadKeywordMutation,
 } from '@/lib/queries';
+import { pluralize } from '@/lib/utils/pluralize';
 
 interface LeadKeywordsManagerProps {
   readonly embedded?: boolean;
+  /** Reports the exact failure message alongside the error toast, so
+   * storybook lanes can assert mutation failures (the harness's mock
+   * pathname is a profile route, where FeedbackProvider mounts no
+   * Toaster). */
+  readonly onActionError?: (message: string) => void;
 }
 
 export function LeadKeywordsManager({
   embedded = false,
+  onActionError,
 }: Readonly<LeadKeywordsManagerProps> = {}) {
   const queryClient = useQueryClient();
   const [newQueries, setNewQueries] = useState('');
@@ -55,6 +62,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to add keywords');
+      onActionError?.('Failed to add keywords');
     }
   }
 
@@ -67,6 +75,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to seed keywords');
+      onActionError?.('Failed to seed keywords');
     }
   }
 
@@ -77,6 +86,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to toggle keyword');
+      onActionError?.('Failed to toggle keyword');
     } finally {
       setTogglingId(null);
     }
@@ -90,6 +100,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to delete keyword');
+      onActionError?.('Failed to delete keyword');
     } finally {
       setDeletingId(null);
     }
@@ -136,7 +147,7 @@ export function LeadKeywordsManager({
               </div>
               <div className='flex items-center gap-2'>
                 <Badge variant='secondary' className='text-2xs'>
-                  {keyword.resultsFoundTotal} Results
+                  {pluralize(keyword.resultsFoundTotal, 'Result')}
                 </Badge>
                 <Button
                   type='button'
@@ -161,6 +172,7 @@ export function LeadKeywordsManager({
 
       <div className='space-y-2'>
         <Textarea
+          aria-label='New Discovery Keywords'
           rows={3}
           value={newQueries}
           onChange={e => setNewQueries(e.target.value)}

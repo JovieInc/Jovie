@@ -59,7 +59,7 @@ export interface CertificationInboxRankingSignals {
  * Revenue-cone tiers for the $5K sprint (JOV-7695), ranked before any score:
  * 1. first-dollar blocker where the founder is the remaining blocker;
  * 2. live revenue-path regression that needs judgment;
- * 3. human certification on stranger → claim/signup → $199 → paid → activated;
+ * 3. human certification on stranger → claim/signup → $12 → paid → activated;
  * 4. high-traffic or high-impact non-revenue surface;
  * 5. everything else.
  */
@@ -284,7 +284,7 @@ const REVENUE_PATH_PATTERN =
   /\b(home|homepage|landing|claim|signup|sign-up|onboarding|start|pricing|checkout|billing|pay|paid|subscription|activation|profile)\b/i;
 
 const DOMAIN_TIERS: Readonly<Record<string, CertificationInboxRevenueTier>> = {
-  // The public artist profile is the canonical object the $199 offer sells.
+  // The public artist profile is the canonical object the $12 offer sells.
   public_profiles: 'revenue_path_certification',
   smart_links: 'high_impact_surface',
   customers: 'high_impact_surface',
@@ -293,14 +293,14 @@ const DOMAIN_TIERS: Readonly<Record<string, CertificationInboxRevenueTier>> = {
 
 const TIER_UNBLOCKS: Record<CertificationInboxRevenueTier, string> = {
   first_dollar_blocker:
-    'First dollar: this is the remaining founder blocker on the $199 path.',
+    'First dollar: this is the remaining founder blocker on the $12 path.',
   revenue_path_regression:
-    'Keeps the live stranger → claim/signup → $199 → paid → activated path certified after a change.',
+    'Keeps the live stranger → claim/signup → $12 → paid → activated path certified after a change.',
   revenue_path_certification:
-    'Certifies a step on the stranger → claim/signup → $199 → paid → activated path.',
+    'Certifies a step on the stranger → claim/signup → $12 → paid → activated path.',
   high_impact_surface:
-    'A high-traffic or high-impact surface outside the $199 path.',
-  other: 'Not on the $199 revenue path.',
+    'A high-traffic or high-impact surface outside the $12 path.',
+  other: 'Not on the $12 revenue path.',
 };
 
 function revenueTierFor(

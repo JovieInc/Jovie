@@ -7,8 +7,6 @@
  */
 
 import { CircleHelp } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -52,6 +50,8 @@ const PROVIDER_PLATFORM_MAP: Record<string, string> = {
   line_music: 'linemusic',
   trebel: 'trebel',
   yandex: 'yandexmusic',
+  vk_music: 'vk',
+  traxsource: 'traxsource',
 };
 
 export function ProviderIcon({
@@ -59,21 +59,11 @@ export function ProviderIcon({
   className = 'h-5 w-5',
   'aria-label': ariaLabel,
 }: ProviderIconProps) {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const providerConfig = PROVIDER_CONFIG[provider];
   const platform = PROVIDER_PLATFORM_MAP[provider];
   const brandColor = providerConfig?.accent ?? 'currentColor';
-  const isDark = mounted ? resolvedTheme === 'dark' : false;
-  const color = useMemo(
-    () => getContrastSafeIconColor(brandColor, isDark),
-    [brandColor, isDark]
-  );
+  // light-dark() follows `.dark { color-scheme: dark }`, so no theme hook needed.
+  const color = `light-dark(${getContrastSafeIconColor(brandColor, false)}, ${getContrastSafeIconColor(brandColor, true)})`;
 
   if (!providerConfig || !platform) {
     return (

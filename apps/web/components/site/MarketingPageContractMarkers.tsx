@@ -1,11 +1,11 @@
 // @coverage-via apps/web/components/site/PublicPageShell.test.tsx
 'use client';
 
-import { usePathname } from 'next/navigation';
 import {
   getMarketingPageContractForPathname,
   type MarketingPageContract,
 } from '@/data/marketing/pageContracts';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 
 interface MarketingPageContractMarkersProps {
   /**
@@ -18,7 +18,7 @@ interface MarketingPageContractMarkersProps {
 export function MarketingPageContractMarkers({
   contract: recordContract,
 }: MarketingPageContractMarkersProps = {}) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const contract =
     recordContract ?? getMarketingPageContractForPathname(pathname);
 

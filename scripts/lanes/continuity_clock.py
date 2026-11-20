@@ -49,6 +49,9 @@ class Clock:
     # False: the workflow has no GitHub cron backstop (JOV-INV-042), so this clock is its only
     # trigger and an empty run history means it has never run and is due, not unobservable.
     github_cron: bool = True
+    # Triggers whose runs neither count as a fresh invocation nor make the page
+    # invalid: the workflow also runs on them, but they do not do the clocked work.
+    ignored_events: frozenset = frozenset()
 
     @property
     def endpoint(self) -> str:
@@ -69,16 +72,45 @@ CLOCKS = (
     # Runaway production event volume (cost) can start with no deploy.
     Clock("costAnomaly", "cost-anomaly-gate.yml", "clock_cost_anomaly_gate", 900,
           "cost-anomaly-clock.json"),
-    # Resolve or reopen autofixed incidents once their 45-minute post-deploy soak elapses.
+    # Evaluate registered Sentry validation observations against the verified production artifact.
     Clock("sentryRecurrence", "sentry-autofix-recurrence.yml", "clock_sentry_autofix_recurrence", 3600,
           "sentry-recurrence-clock.json"),
     # Weekly archive-then-delete of stale remote branches (7,752 on 2026-10-20). A clock event
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Daily deep evidence on main HEAD (waste audit 2026-10-29): these ran on every main
+    # push and were mostly cancelled or always red. One run a day is the same evidence.
+    # Historical push runs stay visible in GitHub's recent page after the trigger moves
+    # to repository_dispatch; ignore them so they neither refresh nor invalidate cadence.
+    Clock("nightlyTests", "nightly-tests.yml", "clock_nightly_tests", 86400,
+          "nightly-tests-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
+    Clock("e2eFullMatrix", "e2e-full-matrix.yml", "clock_e2e_full_matrix", 86400,
+          "e2e-full-matrix-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
+    Clock("testCoverageAudit", "test-coverage-audit.yml", "clock_test_coverage_audit", 86400,
+          "test-coverage-audit-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
+    # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
+    # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
+    Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
+          "security-advisory-clock.json", frozenset({"push"}), github_cron=False),
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
+    # Weekly re-measure of the published jov.ie vs Linktree claims; flags any that stopped being true.
+    Clock("vsLinktreeClaims", "vs-linktree-claims.yml", "clock_vs_linktree_claims", 7 * 86400,
+          "vs-linktree-claims-clock.json", github_cron=False),
+    # Production golden-path certification freshness (JOV-9822): consumers need all eight
+    # surfaces green on the served SHA within 24 h. Promotions certify on workflow_run; this
+    # 12 h clock covers quiet days. workflow_run runs are mostly neutral, so they never count.
+    Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
+          "prod-golden-path-cert-clock.json", github_cron=False,
+          ignored_events=frozenset({"workflow_run"})),
+    # Hourly Vercel budget forecast and runtime-log signatures (2026-10-29 pause went unwarned ~1 h).
+    Clock("spendGuard", "spend-guard.yml", "clock_spend_guard", 3600,
+          "spend-guard-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
@@ -97,6 +129,12 @@ def observe(run, now: float, clock: Clock = CONTINUITY) -> dict:
     rows = data.get("workflow_runs")
     if isinstance(rows, list) and not rows and not clock.github_cron and data.get("total_count") == 0:
         return {"status": "overdue", "runId": None, "ageSeconds": None, "neverRun": True}
+    if isinstance(rows, list) and clock.ignored_events:
+        rows = [row for row in rows
+                if not (isinstance(row, dict) and row.get("event") in clock.ignored_events)]
+        if not rows and not clock.github_cron:
+            # Only ignored triggers in the recent page: no clocked run is visible, so it is due.
+            return {"status": "overdue", "runId": None, "ageSeconds": None}
     if not isinstance(rows, list) or not rows:
         raise ValueError("workflow-runs-unobservable")
     observations = []
@@ -160,7 +198,15 @@ def tick_one(state_dir: Path, clock: Clock, run, now: float) -> dict:
         try:
             result = observe(run, now, clock)
         except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError, AttributeError, RuntimeError) as error:
+            # JOV-12812: a failed observation (gh api error, quota, malformed page) used to
+            # consume the whole interval -- the hourly summerCanary ran 2h apart on
+            # 2026-11-16 because its 03:38 tick failed here and the next attempt was
+            # 04:38. Retry after the same short window an uncertain dispatch gets, but
+            # never longer than the clock's own interval (a 5-minute clock keeps its
+            # cadence). The error class is the only safe detail: api() scrubs output that
+            # can carry credentials.
             result = {"status": "failed", "error": type(error).__name__}
+            state["nextAttemptAt"] = now + min(UNCERTAIN_S, clock.interval_s)
         if result["status"] == "overdue":
             state.update(nextAttemptAt=now + UNCERTAIN_S,
                          lastResult={"status": "dispatch-uncertain", "requestedAt": now})
@@ -171,6 +217,17 @@ def tick_one(state_dir: Path, clock: Clock, run, now: float) -> dict:
                 state["nextAttemptAt"] = now + clock.interval_s
             except (OSError, subprocess.SubprocessError, RuntimeError) as error:
                 result = {**result, "status": "dispatch-uncertain", "error": type(error).__name__}
+        elif (
+            result.get("status") == "current"
+            and isinstance(result.get("ageSeconds"), int)
+            and 0 <= result["ageSeconds"] < clock.interval_s
+        ):
+            # Wake when this run becomes due. Sleeping a full interval from
+            # this tick ignores a heartbeat that landed between ticks (a push
+            # on security-advisory-loop). The next dispatch then lands almost
+            # two intervals after that heartbeat and trips maxSilenceMinutes
+            # (JOV-9993: 314m silent against a 300m budget on a 4h clock).
+            state["nextAttemptAt"] = now + (clock.interval_s - result["ageSeconds"])
         state["lastResult"] = result
         save(path, state)
         return result

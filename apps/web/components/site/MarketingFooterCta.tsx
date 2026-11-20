@@ -1,28 +1,17 @@
 // @coverage-via apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx
-'use client';
-
-import { useId } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
-import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
+import Link from 'next/link';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { MarketingTerminalCta } from './MarketingTerminalCta';
-
-const FOOTER_CTA_ARCS = [
-  { radiusX: 70, radiusY: 245 },
-  { radiusX: 130, radiusY: 235 },
-  { radiusX: 195, radiusY: 225 },
-  { radiusX: 265, radiusY: 215 },
-  { radiusX: 340, radiusY: 205 },
-  { radiusX: 420, radiusY: 198 },
-  { radiusX: 505, radiusY: 192 },
-  { radiusX: 590, radiusY: 188 },
-] as const;
+import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
+import { cn } from '@/lib/utils';
 
 interface MarketingFooterCtaProps {
   readonly className?: string;
-  readonly title?: string;
-  readonly body?: string;
+  /** Link label. Defaults to the shared claim-profile intent label. */
   readonly ctaLabel?: string;
+  /** Link destination. Defaults to the shared claim-profile intent route. */
   readonly ctaHref?: string;
   readonly ctaAnalyticsEvent?: string;
   readonly ctaAnalyticsSource?: string;
@@ -31,101 +20,44 @@ interface MarketingFooterCtaProps {
   readonly sectionVariant?: string;
 }
 
+/**
+ * Closing line for marketing pages: one quiet link at normal section height on
+ * the matte background. No glow, gradient, or artwork.
+ */
 export function MarketingFooterCta({
   className,
-  title = 'Request Access to Jovie.',
-  body,
-  ctaLabel = HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel,
-  ctaHref = APP_ROUTES.SIGNUP,
-  ctaAnalyticsEvent,
+  ctaLabel = MARKETING_CTA_INTENTS.claimProfile.label,
+  ctaHref = MARKETING_CTA_INTENTS.claimProfile.href,
+  ctaAnalyticsEvent = MARKETING_CTA_INTENTS.claimProfile.eventName,
   ctaAnalyticsSource,
   prefetch,
   sectionVariant,
 }: Readonly<MarketingFooterCtaProps>) {
-  const instanceId = useId().replaceAll(':', '-');
-  const primaryGradientId = `marketing-footer-cta-primary-${instanceId}`;
-  const secondaryGradientId = `marketing-footer-cta-secondary-${instanceId}`;
-
   return (
-    <MarketingTerminalCta
-      penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
-      variant='cinematic'
-      sectionVariant={sectionVariant}
-      testId='marketing-footer-cta'
-      title={title}
-      body={body}
-      ctaLabel={ctaLabel}
-      ctaHref={ctaHref}
-      ctaAnalyticsEvent={ctaAnalyticsEvent}
-      ctaAnalyticsSource={ctaAnalyticsSource}
-      prefetch={prefetch}
-      className={className}
-      decoration={
-        <>
-          <div
-            aria-hidden='true'
-            className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
-          />
-          <svg
-            className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
-            viewBox='0 0 1200 540'
-            preserveAspectRatio='xMidYMax slice'
-            aria-hidden='true'
-          >
-            <defs>
-              <linearGradient
-                id={primaryGradientId}
-                x1='0'
-                x2='0'
-                y1='0'
-                y2='1'
-              >
-                <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-                <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
-                <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
-                <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
-              </linearGradient>
-              <linearGradient
-                id={secondaryGradientId}
-                x1='0'
-                x2='0'
-                y1='0'
-                y2='1'
-              >
-                <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-                <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
-                <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
-              </linearGradient>
-            </defs>
-            <ellipse
-              cx='600'
-              cy='600'
-              rx='22'
-              ry='260'
-              stroke={`url(#${secondaryGradientId})`}
-              strokeWidth='2.2'
-              fill='none'
-            />
-            {FOOTER_CTA_ARCS.map((arc, index) => (
-              <ellipse
-                key={`${arc.radiusX}-${arc.radiusY}`}
-                cx='600'
-                cy='600'
-                rx={arc.radiusX}
-                ry={arc.radiusY}
-                stroke={
-                  index % 2 === 0
-                    ? `url(#${primaryGradientId})`
-                    : `url(#${secondaryGradientId})`
-                }
-                strokeWidth={index < 4 ? 1.5 : 1.2}
-                fill='none'
-                opacity={1 - index * 0.05}
-              />
-            ))}
-          </svg>
-        </>
+    <MarketingCtaSection
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
+      data-testid={
+        sectionVariant ? 'marketing-section-cta' : 'marketing-footer-cta'
       }
-    />
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/site/MarketingTerminalCta.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
+      className={cn('bg-base py-12 sm:py-16', className)}
+    >
+      <MarketingContainer width='page' className='flex justify-center'>
+        <Link
+          href={ctaHref}
+          prefetch={resolveMarketingAuthPrefetch(ctaHref, prefetch)}
+          data-analytics-event={ctaAnalyticsEvent}
+          data-analytics-source={ctaAnalyticsSource}
+          className='text-base font-medium tracking-tight text-secondary-token transition-colors hover:text-primary-token focus-visible:text-primary-token'
+        >
+          {ctaLabel}
+        </Link>
+      </MarketingContainer>
+    </MarketingCtaSection>
   );
 }

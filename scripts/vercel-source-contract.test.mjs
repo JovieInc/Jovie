@@ -55,7 +55,7 @@ function ignoredFiles(paths) {
   const output = execFileSync(
     'git',
     ['ls-files', '-ci', '--exclude-from=.vercelignore', '--', ...paths],
-    { encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
   );
   return output.split('\n').filter(Boolean);
 }
@@ -72,7 +72,7 @@ describe('Vercel source contract', () => {
         'apps/docs/next.config.mjs',
         'apps/docs/app/page.mdx',
       ],
-      { encoding: 'utf8' }
+      { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
     );
 
     assert.equal(ignored.trim(), '');
@@ -101,14 +101,14 @@ describe('Vercel source contract', () => {
       'apps/docs/lib/article-registry.test.mjs',
       'apps/docs/lib/help-center-seo.test.mjs',
       'scripts/help-center-visual-assets.mjs',
-      'docs/screenshots/pitch-v1/portal-desktop.png',
+      'docs/screenshots/gem-symphony-hud-430x90.png',
     ]);
     assert.ok(stillIgnored.includes('apps/docs/lib/visual-proof-assets.mjs'));
     assert.ok(stillIgnored.includes('apps/docs/lib/article-registry.test.mjs'));
     assert.ok(stillIgnored.includes('apps/docs/lib/help-center-seo.test.mjs'));
     assert.ok(stillIgnored.includes('scripts/help-center-visual-assets.mjs'));
     assert.ok(
-      stillIgnored.includes('docs/screenshots/pitch-v1/portal-desktop.png')
+      stillIgnored.includes('docs/screenshots/gem-symphony-hud-430x90.png')
     );
   });
 

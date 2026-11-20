@@ -105,7 +105,9 @@ describe('global marketing page contract', () => {
 
   it('mounts contract markers from every shared marketing shell route', () => {
     expect(publicShellSource).toContain('MarketingPageContractMarkers');
-    expect(publicShellSource).toContain('<MarketingPageContractMarkers />');
+    expect(publicShellSource).toContain(
+      '<MarketingPageContractMarkers contract={pageContract} />'
+    );
 
     for (const layoutPath of [
       'app/(home)/layout.tsx',

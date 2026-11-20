@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { generateReleaseMerchDrop } from './merch-drop';
@@ -21,7 +21,8 @@ export async function runReleaseAutopilot(
     .where(
       and(
         eq(discogReleases.id, input.releaseId),
-        eq(discogReleases.creatorProfileId, input.profileId)
+        eq(discogReleases.creatorProfileId, input.profileId),
+        isNull(discogReleases.deletedAt)
       )
     )
     .limit(1);

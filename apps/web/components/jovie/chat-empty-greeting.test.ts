@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type ChatEmptyStateResult,
+  chatEmptyStateResultActionLabel,
+  chatEmptyStateResultProblem,
+  findChoreWording,
   getChatEmptyStateFirstName,
   getChatEmptyStateGreetingText,
   getTimeOfDayGreeting,
-  resolveChatEmptyStateInsight,
+  selectChatEmptyStateResult,
 } from './chat-empty-greeting';
 
 describe('getTimeOfDayGreeting', () => {
@@ -39,7 +43,15 @@ describe('getChatEmptyStateFirstName', () => {
   it('takes the first token of a real display name', () => {
     expect(getChatEmptyStateFirstName('Tim White')).toBe('Tim');
     expect(getChatEmptyStateFirstName('  Tim   White  ')).toBe('Tim');
+  });
+
+  it('greets a band or artist by the whole name, never its first word', () => {
+    expect(getChatEmptyStateFirstName('Good Dropouts')).toBe('Good Dropouts');
+    expect(getChatEmptyStateFirstName('The Weeknd')).toBe('The Weeknd');
     expect(getChatEmptyStateFirstName('Cher')).toBe('Cher');
+    expect(getChatEmptyStateFirstName('DJ Snake')).toBe('DJ Snake');
+    // Golden path (tests/e2e/golden-path.spec.ts) asserts the artist name.
+    expect(getChatEmptyStateFirstName('UNMARKED')).toBe('UNMARKED');
   });
 
   it('never fabricates a name when none is real', () => {
@@ -64,117 +76,123 @@ describe('getChatEmptyStateGreetingText', () => {
   });
 });
 
-const now = Date.parse('2026-10-14T20:00:00Z');
-const actionableInsight = {
-  id: 'insight-1',
-  insightType: 'release_momentum',
-  category: 'content',
-  priority: 'high',
-  title: 'Your release is getting attention',
-  description: '',
-  actionSuggestion: 'Draft an update about your release.',
-  confidence: '0.90',
-  status: 'active',
-  periodStart: '2026-10-01T00:00:00Z',
-  periodEnd: '2026-10-14T00:00:00Z',
-  createdAt: '2026-10-14T00:00:00Z',
-  expiresAt: '2026-10-15T00:00:00Z',
-} satisfies import('@/types/insights').InsightResponse;
+const draftForRelease: ChatEmptyStateResult = {
+  id: 'draft-1',
+  item: { kind: 'release', id: 'release-9', label: 'Wheels Up' },
+  result: {
+    kind: 'draft',
+    summary: 'Your playlist pitch for Wheels Up is ready.',
+    href: '/app/chat/thread-1',
+  },
+};
 
-describe('resolveChatEmptyStateInsight', () => {
-  it('uses the first eligible entry in server priority order, retaining its context', () => {
-    const action = resolveChatEmptyStateInsight(
-      [actionableInsight, { ...actionableInsight, id: 'second' }],
-      now
-    );
-    expect(action?.insightId).toBe('insight-1');
-    expect(action?.suggestion).toBe('Draft a release update');
-    expect(action?.prompt).toContain(
-      'Insight insight-1: Your release is getting attention'
-    );
+describe('findChoreWording (Nov 14: "Review your tip flow with Jovie")', () => {
+  it('flags the suggestion Tim saw, which asked him to do our job', () => {
+    expect(findChoreWording('Review your tip flow with Jovie')).not.toBeNull();
+    expect(findChoreWording('Draft This With Jovie')).not.toBeNull();
   });
 
-  it.each(['dismissed', 'acted_on', 'expired'] as const)(
-    'skips %s entries',
-    status => {
-      expect(
-        resolveChatEmptyStateInsight(
-          [
-            { ...actionableInsight, status },
-            { ...actionableInsight, id: 'eligible' },
-          ],
-          now
-        )?.insightId
-      ).toBe('eligible');
+  it('flags vague asks that hand work back to the artist', () => {
+    for (const text of [
+      'Check your signup flow',
+      'Consider your next step',
+      'Optimize your traffic sources',
+      'Think about your audience',
+    ]) {
+      expect(findChoreWording(text), text).not.toBeNull();
     }
-  );
-
-  it.each([
-    { expiresAt: '2026-10-14T20:00:00Z' },
-    { expiresAt: 'invalid' },
-    { actionSuggestion: null },
-    { actionSuggestion: '  ' },
-    { actionSuggestion: 'x'.repeat(241) },
-    { id: '' },
-    { title: '  ' },
-  ])('skips stale or unusable content: %s', invalid => {
-    expect(
-      resolveChatEmptyStateInsight(
-        [
-          { ...actionableInsight, ...invalid },
-          { ...actionableInsight, id: 'eligible' },
-        ],
-        now
-      )?.insightId
-    ).toBe('eligible');
   });
 
-  it('does not infer verified success or readiness from model prose', () => {
+  it('passes a sentence that reports finished work on a named item', () => {
+    expect(findChoreWording(draftForRelease.result.summary)).toBeNull();
     expect(
-      resolveChatEmptyStateInsight(
-        [
-          {
-            ...actionableInsight,
-            title: 'Conversion improved 500%',
-            actionSuggestion: null,
-          },
-        ],
-        now
-      )
+      findChoreWording('Spotify shows Wheels Up on 3 new playlists this week.')
     ).toBeNull();
-    expect(resolveChatEmptyStateInsight([], now)).toBeNull();
-    const unverifiedProse = resolveChatEmptyStateInsight(
-      [
-        {
-          ...actionableInsight,
-          actionSuggestion: 'Your streams are up 320% today.',
-        },
-      ],
-      now
+  });
+});
+
+describe('chatEmptyStateResultProblem', () => {
+  it('accepts a finished draft for a real item that opens in the app', () => {
+    expect(chatEmptyStateResultProblem(draftForRelease)).toBeNull();
+    expect(chatEmptyStateResultActionLabel(draftForRelease)).toBe(
+      'Review Draft'
     );
-    expect(unverifiedProse?.suggestion).toBe('Draft a release update');
-    expect(unverifiedProse?.suggestion).not.toMatch(/320|streams|\bup\b/);
-    expect(unverifiedProse?.prompt).toContain('do not invent results');
   });
 
-  it.each([
-    ['tip_hotspot', 'tip'],
-    ['capture_rate_change', 'signup'],
-  ] as const)('keeps %s conversion work with Jovie', (insightType, flow) => {
-    const action = resolveChatEmptyStateInsight(
-      [
-        {
-          ...actionableInsight,
-          insightType,
-          title: '27 clicks, zero completions',
-          actionSuggestion: 'Fix your conversion gap.',
+  it('rejects the old canned suggestion even when it is attached to an item', () => {
+    const problem = chatEmptyStateResultProblem({
+      ...draftForRelease,
+      result: {
+        ...draftForRelease.result,
+        summary: 'Review your tip flow with Jovie',
+      },
+    });
+    expect(problem).toMatch(/chore wording|does not name its item/);
+  });
+
+  it('rejects a suggestion with no backing item', () => {
+    expect(
+      chatEmptyStateResultProblem({
+        ...draftForRelease,
+        item: { ...draftForRelease.item, id: '' },
+      })
+    ).toBe('no backing item');
+  });
+
+  it('rejects a suggestion with no finished result', () => {
+    expect(
+      chatEmptyStateResultProblem({
+        ...draftForRelease,
+        result: { ...draftForRelease.result, summary: '' },
+      })
+    ).toBe('no finished result');
+  });
+
+  it('rejects a result that does not open inside the app', () => {
+    expect(
+      chatEmptyStateResultProblem({
+        ...draftForRelease,
+        result: { ...draftForRelease.result, href: 'https://example.com' },
+      })
+    ).toBe('result does not open');
+    expect(
+      chatEmptyStateResultProblem({
+        ...draftForRelease,
+        result: { ...draftForRelease.result, href: '//example.com/x' },
+      })
+    ).toBe('result does not open');
+  });
+
+  it('rejects a summary that never names its item', () => {
+    expect(
+      chatEmptyStateResultProblem({
+        ...draftForRelease,
+        result: {
+          ...draftForRelease.result,
+          summary: 'Your playlist pitch is ready.',
         },
-      ],
-      now
+      })
+    ).toBe('summary does not name its item');
+  });
+});
+
+describe('selectChatEmptyStateResult', () => {
+  it('returns null when Jovie has nothing finished, so only the composer shows', () => {
+    expect(selectChatEmptyStateResult([])).toBeNull();
+    expect(selectChatEmptyStateResult(undefined)).toBeNull();
+  });
+
+  it('skips results that fail the contract and returns the first valid one', () => {
+    const chore = {
+      ...draftForRelease,
+      id: 'chore',
+      result: {
+        ...draftForRelease.result,
+        summary: 'Review your tip flow with Jovie',
+      },
+    };
+    expect(selectChatEmptyStateResult([chore, draftForRelease])?.id).toBe(
+      'draft-1'
     );
-    expect(action?.suggestion).toBe(`Review your ${flow} flow with Jovie`);
-    expect(action?.prompt).toContain('concrete improvement Jovie can make');
-    expect(action?.prompt).toContain('27 clicks, zero completions');
-    expect(action?.suggestion).not.toContain('gap');
   });
 });

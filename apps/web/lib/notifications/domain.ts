@@ -51,6 +51,7 @@ import {
   buildInvalidRequestResponse,
   buildMissingIdentifierResponse,
   buildServerErrorResponse,
+  buildSmsPendingSubscribeResponse,
   buildStatusSuccessResponse,
   buildSubscribeNotFoundError,
   buildSubscribeServerError,
@@ -67,11 +68,13 @@ import {
   type ConsentSnapshot,
   getCurrentConsentSnapshot,
 } from '@/lib/notifications/sms-consent';
+import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { fireSubscribeCAPIEvent } from '@/lib/tracking/fire-subscribe-event';
 import { getAccountMetricCohort } from '@/lib/utils/email';
 import {
@@ -123,10 +126,7 @@ const sanitizeCountryCode = (raw: string | null | undefined) => {
 
 export { buildInvalidRequestResponse };
 
-/**
- * Validates and normalizes the contact value based on channel type.
- * Returns error response if validation fails.
- */
+/** Validates and normalizes the contact value based on channel type. */
 async function validateContactForChannel(
   channel: NotificationChannel,
   normalizedEmail: string | null,
@@ -145,7 +145,6 @@ async function validateContactForChannel(
       'Please provide a valid email address'
     );
   }
-
   if (channel === 'sms' && !normalizedPhone) {
     await trackSubscribeError({
       artist_id,
@@ -155,29 +154,19 @@ async function validateContactForChannel(
     });
     return buildSubscribeValidationError('Please provide a valid phone number');
   }
-
   return null;
 }
 
-/**
- * Checks if an email is suppressed (hard bounce, spam complaint, etc.)
- * Returns an error response if suppressed, null otherwise.
- */
+/** Returns a validation error response when an email is hard-bounced or suppressed. */
 async function checkEmailSuppression(
   channel: NotificationChannel,
   normalizedEmail: string | null,
   artist_id: string,
   source: string | undefined
 ): Promise<NotificationSubscribeDomainResponse | null> {
-  if (channel !== 'email' || !normalizedEmail) {
-    return null;
-  }
-
+  if (channel !== 'email' || !normalizedEmail) return null;
   const suppressionCheck = await isEmailSuppressed(normalizedEmail);
-  if (!suppressionCheck.suppressed) {
-    return null;
-  }
-
+  if (!suppressionCheck.suppressed) return null;
   await trackSubscribeError({
     artist_id,
     error_type: 'suppressed',
@@ -191,9 +180,26 @@ async function checkEmailSuppression(
   );
 }
 
-/**
- * Creates or updates an audience member for dynamic engagement tracking.
- */
+/** STOP/blocked numbers are never re-subscribed by a web form post. */
+async function isSmsSubscribeSuppressed(
+  channel: NotificationChannel,
+  normalizedPhone: string | null,
+  artist_id: string,
+  source: string | undefined
+): Promise<boolean> {
+  if (channel !== 'sms' || !normalizedPhone) return false;
+  const state = await isPhoneSmsSuppressed(normalizedPhone);
+  if (!state.suppressed) return false;
+  await trackSubscribeError({
+    artist_id,
+    error_type: 'suppressed',
+    validation_errors: [`SMS suppressed: ${state.reason ?? 'unknown'}`],
+    source,
+  });
+  return true;
+}
+
+/** Upserts an audience member using core columns so older DB branches stay compatible. */
 async function upsertAudienceMember(
   artist_id: string,
   normalizedEmail: string,
@@ -202,11 +208,6 @@ async function upsertAudienceMember(
 ): Promise<void> {
   const fingerprint = createFingerprint(ipAddress, userAgent);
   const now = new Date();
-
-  // Use core columns only so fan capture works on DB branches that have not yet
-  // picked up optional audience summary migrations (latest_referrer_url, etc.).
-  // Drizzle's insert() always emits the full schema column list and fails when
-  // those optional columns are absent — same class of bug as audience/visit.
   await db.execute(drizzleSql`
     INSERT INTO audience_members (
       creator_profile_id,
@@ -289,9 +290,7 @@ interface ArtistProfileResult {
   dynamicEnabled: boolean;
 }
 
-/**
- * Fetches artist profile and computes dynamic engagement status.
- */
+/** Fetches a published, claimed artist profile and dynamic engagement status. */
 async function fetchArtistProfile(
   artist_id: string
 ): Promise<ArtistProfileResult | NotificationSubscribeDomainResponse> {
@@ -300,16 +299,35 @@ async function fetchArtistProfile(
       id: creatorProfiles.id,
       displayName: creatorProfiles.displayName,
       username: creatorProfiles.username,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      isPublic: creatorProfiles.isPublic,
+      isClaimed: creatorProfiles.isClaimed,
       settings: creatorProfiles.settings,
+      ownerEmail: users.email,
       creatorIsPro: users.isPro,
       creatorClerkId: users.clerkId,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.id, artist_id))
+    .where(
+      and(
+        eq(creatorProfiles.id, artist_id),
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
     .limit(1);
 
-  if (!artistProfile) {
+  if (
+    !artistProfile ||
+    artistProfile.isPublic === false ||
+    artistProfile.isClaimed === false ||
+    shouldHideTestProfileFromDirectUrl({
+      handle: artistProfile.usernameNormalized ?? artistProfile.username,
+      ownerEmail: artistProfile.ownerEmail,
+      settings: artistProfile.settings,
+    })
+  ) {
     await trackSubscribeError({
       artist_id: null,
       error_type: 'artist_not_found',
@@ -362,6 +380,11 @@ async function sendSubscriptionConfirmationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'fan-subscription-confirmed',
+        consent: 'opt-in',
+      },
       subject: `Notifications on for ${artistName} on Jovie`,
       text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
       html: `
@@ -401,6 +424,11 @@ async function sendSubscriptionVerificationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'fan-subscription-verify',
+        consent: 'auth-request',
+      },
       subject: `Your verification code for ${artistName}`,
       text: `Use this code to confirm notifications for ${artistName}: ${otpCode}. This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes.`,
       html: `
@@ -758,6 +786,19 @@ export const subscribeToNotificationsDomain = async (
       return suppressionError;
     }
 
+    // STOP and blocked numbers get the same answer as a pending subscribe and
+    // no write, so the response does not reveal suppression state.
+    if (
+      await isSmsSubscribeSuppressed(
+        channel,
+        normalizedPhone,
+        artist_id,
+        source
+      )
+    ) {
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
+    }
+
     // Default preferences: all content categories enabled
     const defaultPreferences: FanNotificationPreferences = {
       releasePreview: true,
@@ -817,6 +858,12 @@ export const subscribeToNotificationsDomain = async (
       phone: normalizedPhone,
     });
 
+    if (channel === 'sms') {
+      // Double opt-in: the form post only records a pending row. Funnel, CAPI
+      // and subscribe-success events fire when the join text confirms it.
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
+    }
+
     await trackSubscribeSuccess({
       artist_id,
       channel,
@@ -837,8 +884,8 @@ export const subscribeToNotificationsDomain = async (
       });
     }
 
-    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
-    // email subscribers who are already verified from a previous subscription).
+    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (email
+    // subscribers who are already verified from a previous subscription).
     // Email OTP subscribers fire this event in verifyEmailOtpDomain() instead.
     await firePostSubscribeActions({
       dynamicEnabled,

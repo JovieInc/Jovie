@@ -14,4 +14,18 @@ describe('insights page route contract', () => {
     expect(source).not.toContain('getDashboardDataEssential');
     expect(source).not.toMatch(/\bgetDashboardData\(/);
   });
+
+  it('keeps the audience workspace navigation in the insights panel toolbar', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/insights/InsightsPanel.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('AudienceWorkspaceSwitch');
+    expect(source).not.toContain('AppSegmentControl');
+    expect(source).not.toContain('RouteSegmentControl');
+  });
 });

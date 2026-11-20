@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toolEventToMessagePart } from '@/lib/chat/tool-events';
 import { TOOL_STATUS_EVENT, TOOL_STATUS_PARTS } from './fixtures/tool-status';
 import { hydratePersistedMessageParts } from './message-parts';
@@ -23,7 +23,15 @@ function row() {
   return screen.getByTestId('tool-status-row');
 }
 
-describe('truthful chat operation status', () => {
+describe('truthful chat operation status in verbose mode', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('jovie:chat-verbose', '1');
+  });
+
+  afterEach(() => {
+    window.localStorage.removeItem('jovie:chat-verbose');
+  });
+
   it('shows one check only after persistence, keeping one accessible owner', () => {
     const { container, rerender } = render(
       <ToolPartsRenderer
@@ -245,5 +253,43 @@ describe('truthful chat operation status', () => {
     );
     expect(checks(container)).toHaveLength(0);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
+describe('chat operation status in default mode', () => {
+  it('hides unconfirmed results until persistence supplies a saved receipt', () => {
+    const { container, rerender } = render(
+      <ToolPartsRenderer
+        variant='chat'
+        isStreaming
+        parts={TOOL_STATUS_PARTS.working}
+      />
+    );
+    expect(row()).toHaveAttribute('data-operation-status', 'working');
+    expect(checks(container)).toHaveLength(0);
+
+    rerender(
+      <ToolPartsRenderer
+        variant='chat'
+        isStreaming
+        parts={TOOL_STATUS_PARTS.unconfirmed}
+      />
+    );
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(checks(container)).toHaveLength(0);
+
+    rerender(
+      <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.unconfirmed} />
+    );
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(checks(container)).toHaveLength(0);
+
+    rerender(
+      <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.succeeded} />
+    );
+    expect(row()).toHaveAttribute('data-operation-status', 'succeeded');
+    expect(checks(container)).toHaveLength(1);
+    expect(screen.getAllByRole('status')).toHaveLength(1);
   });
 });

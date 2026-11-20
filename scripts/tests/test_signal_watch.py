@@ -422,6 +422,23 @@ class RunTests(unittest.TestCase):
         finally:
             W.shutil.which = original
 
+    def test_degraded_triage_is_failure_even_with_exit_zero(self):
+        done = subprocess.CompletedProcess([], 0, json.dumps({
+            "verdict": "degraded", "reasons": ["no external sources"]}), "")
+        result = W.triage_signals("x", runner=lambda *a, **k: done)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["reasons"], ["no external sources"])
+        run = self.run_once(Poster(), Brain(), triage=lambda since: result)
+        self.assertEqual(run["status"], "failed")
+        self.assertTrue(any("research triage" in failure for failure in run["failures"]))
+
+    def test_malformed_triage_is_failure_but_healthy_empty_triage_is_ok(self):
+        for output in ("not json", "[]", "{}"):
+            done = subprocess.CompletedProcess([], 0, output, "")
+            self.assertEqual(W.triage_signals("x", runner=lambda *a, **k: done)["status"], "failed")
+        done = subprocess.CompletedProcess([], 0, '{"scanned":0,"actionable":0,"reviews":[]}', "")
+        self.assertEqual(W.triage_signals("x", runner=lambda *a, **k: done)["status"], "ok")
+
     def test_undeployed_summer_route_keeps_cards_in_outbox(self):
         poster = Poster({"Queues GA": jev_answer("adopt", 0.9)}, summer_status=404)
         result = self.run_once(poster, Brain())

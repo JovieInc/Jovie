@@ -42,9 +42,6 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
     >
       <Link
         href={`/blog/${post.slug}`}
-        aria-labelledby={
-          post.image && artworkHeadline ? `${artworkId} ${titleId}` : titleId
-        }
         className='group row-span-2 grid grid-rows-subgrid gap-y-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
       >
         <div className='relative aspect-video overflow-hidden rounded-lg bg-surface-3'>
@@ -68,10 +65,7 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
               )}
             </div>
           ) : (
-            <div
-              aria-hidden='true'
-              className='flex h-full items-center justify-center p-6 text-center text-xl font-semibold text-primary-token'
-            >
+            <div className='flex h-full items-center justify-center p-6 text-center text-xl font-semibold text-primary-token'>
               {post.title}
             </div>
           )}

@@ -42,8 +42,8 @@ class SelectTests(unittest.TestCase):
                 row(8, description=BODY + "\n**Sequencing:** after LYB-138.\n"), row(9)]
         rows.append(row(138, state="In Progress"))
         picked, skipped = br.select(rows, 10, excluded=("hold",))
-        self.assertEqual([r["identifier"] for r in picked], ["LYB-9"])
-        self.assertEqual(skipped["LYB-1"], "not-agent-ready")
+        self.assertEqual([r["identifier"] for r in picked], ["LYB-1", "LYB-9"])  # agent-ready is retired as a requirement
+        self.assertNotIn("LYB-1", skipped)
         self.assertEqual(skipped["LYB-2"], "thin-description")
         self.assertEqual(skipped["LYB-3"], "label:type:epic")
         self.assertEqual(skipped["LYB-4"], "label:needs-tim")
@@ -51,6 +51,11 @@ class SelectTests(unittest.TestCase):
         self.assertEqual(skipped["LYB-6"], "no-acceptance-criteria")
         self.assertEqual(skipped["LYB-7"], "blocked-by:LYB-1")
         self.assertEqual(skipped["LYB-8"], "blocked-by:LYB-138")
+
+    def test_done_heading_counts_as_acceptance(self):
+        body = BODY.replace("## Acceptance criteria", "## Done")
+        picked, skipped = br.select([row(1, description=body)], 1)
+        self.assertEqual(len(picked), 1, skipped)
 
     def test_closed_blocker_does_not_block(self):
         picked, _ = br.select([row(7, description=BODY + "\nBlocked by LYB-99.\n")], 1)  # LYB-99 not open
@@ -100,6 +105,23 @@ class RefillTests(unittest.TestCase):
         self.assertEqual(len(moves), 4)
         self.assertEqual(receipt["deficitSince"], 1010.0)
 
+    def test_lyb_ios_rows_wait_while_the_macos_pool_is_loaded_and_other_rows_still_promote(self):
+        rows = [row(n, labels=("agent-ready", "area:iOS")) for n in range(1, 4)] + [row(n) for n in range(4, 9)]
+        self.mirror(rows)
+        (self.state / "macos-pool.json").write_text(json.dumps(
+            {"at": 1005.0, "repos": {"JovieInc/LogYourBody": {"running": 3, "queued": 4}}, "poolCap": 5}))
+        receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
+        self.assertFalse(set(receipt["promoted"]) & {"LYB-1", "LYB-2", "LYB-3"})
+        self.assertTrue(receipt["promoted"])
+        self.assertEqual(receipt["skipped"]["LYB-1"], "macos-admission-hold")
+        self.assertTrue(receipt["macosAdmission"]["hold"])
+
+    def test_lyb_ios_rows_promote_when_the_pool_has_room_or_no_fresh_sample(self):
+        self.mirror([row(n, labels=("agent-ready", "area:iOS")) for n in range(1, 8)])
+        receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
+        self.assertEqual(len(receipt["promoted"]), 4)
+        self.assertEqual(receipt["macosAdmission"]["reason"], "no-sample")
+
     def test_pending_promotions_count_so_a_second_tick_does_not_double_promote(self):
         self.mirror([row(n) for n in range(1, 8)])
         br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
@@ -124,11 +146,11 @@ class RefillTests(unittest.TestCase):
         self.assertFalse((self.state / "linear" / "outbox.json").exists())
 
     def test_nothing_ready_reports_why(self):
-        self.mirror([row(1, labels=()), row(2, description="short")])
+        self.mirror([row(1, labels=("hold",)), row(2, description="short")])
         receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
         self.assertEqual(receipt["promoted"], [])
         self.assertEqual(receipt["short"], 4)
-        self.assertEqual(receipt["skipped"], {"LYB-1": "not-agent-ready", "LYB-2": "thin-description"})
+        self.assertEqual(receipt["skipped"], {"LYB-1": "label:hold", "LYB-2": "thin-description"})
 
 
 if __name__ == "__main__":

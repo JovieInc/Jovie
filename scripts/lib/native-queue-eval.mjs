@@ -94,7 +94,7 @@ export function evaluate(bundle, now = Date.now()) {
       continue;
     }
     require(requiredNames.every(n => p.required.some(r => r.context === n)) &&
-      p.queue.grouping_strategy === 'ALLGREEN' &&
+      ['ALLGREEN', 'HEADGREEN'].includes(p.queue.grouping_strategy) &&
       p.bypassActors?.length === 0 &&
       p.classicProtection === null &&
       p.enforcement === 'active', 'native-policy-incomplete-or-bypass');

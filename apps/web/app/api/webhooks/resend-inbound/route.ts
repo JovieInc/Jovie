@@ -24,7 +24,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-
+import { isAutomatedEmail } from '@/lib/customer-voice/classify';
+import {
+  CUSTOMER_VOICE_EMAIL_LOCAL_PARTS,
+  captureInboundSupportEmail,
+} from '@/lib/customer-voice/inbound-email.server';
 import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -218,8 +222,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
 
-  const [username] = recipientEmail.split('@');
+  // Plus-addressing (`artist+tag@`) delivers to the artist's inbox; the tag
+  // is kept on `toEmail`. The JOV-9779 release-email canary relies on this.
+  const [localPart] = recipientEmail.split('@');
+  const [username] = (localPart ?? '').split('+');
   if (!username) {
+    return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
+  }
+
+  // Mail to Jovie itself (support@, help@, ...) is customer voice: it goes to
+  // Tim through Summer with a drafted reply. These local parts are reserved
+  // usernames, so no artist inbox can collide with them.
+  if (CUSTOMER_VOICE_EMAIL_LOCAL_PARTS.has(username.toLowerCase())) {
+    const full = await fetchFullEmail(data.email_id);
+    if (
+      isAutomatedEmail({
+        from: data.from,
+        subject: data.subject ?? null,
+        headers: full?.headers ?? null,
+      })
+    ) {
+      logger.info('Inbound support email skipped as automated', {
+        emailId: data.email_id,
+      });
+      return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
+    }
+    await captureInboundSupportEmail({
+      from: data.from,
+      fromName: data.from_name ?? null,
+      subject: data.subject ?? null,
+      messageId: data.message_id ?? full?.headers?.['message-id'] ?? null,
+      text: full?.stripped_text || full?.text || data.subject || '',
+      localPart: username.toLowerCase(),
+    });
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
 
@@ -312,8 +347,11 @@ interface ResendFullEmail {
 async function fetchFullEmail(
   emailId: string
 ): Promise<ResendFullEmail | null> {
-  if (!env.RESEND_API_KEY) {
-    logger.warn('RESEND_API_KEY not configured for full email fetch', {
+  // Received bodies need a read-capable key; the sending key is send-only in
+  // production. Received mail lives under /emails/receiving (JOV-9779).
+  const apiKey = env.RESEND_RECEIVING_API_KEY ?? env.RESEND_API_KEY;
+  if (!apiKey) {
+    logger.warn('No Resend key configured for full email fetch', {
       emailId,
     });
     return null;
@@ -321,10 +359,10 @@ async function fetchFullEmail(
 
   try {
     const response = await serverFetch(
-      `https://api.resend.com/emails/${emailId}`,
+      `https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`,
       {
         headers: {
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         timeoutMs: 10_000,
         context: 'Resend received email fetch',

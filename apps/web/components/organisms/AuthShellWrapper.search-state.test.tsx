@@ -24,6 +24,7 @@ const {
   routeConfig,
   railScope,
   shortcutsRender,
+  routerPush,
 } = vi.hoisted(() => ({
   route: { pathname: '/app/tasks' },
   lifecycle: vi.fn(),
@@ -39,6 +40,7 @@ const {
     defaultOpen: undefined as boolean | undefined,
   },
   shortcutsRender: vi.fn(),
+  routerPush: vi.fn(),
 }));
 vi.mock('@jovie/ui', async importOriginal => {
   const actual = await importOriginal<typeof import('@jovie/ui')>();
@@ -47,7 +49,7 @@ vi.mock('@jovie/ui', async importOriginal => {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: vi.fn(), prefetch: vi.fn() }),
 }));
 vi.mock('@/hooks/useAuthRouteConfig', () => ({
   useAuthRouteConfig: () => ({
@@ -58,9 +60,6 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     isChatRoute: routeConfig.isChatRoute,
     isProfileSettings: routeConfig.isProfileSettings,
   }),
-}));
-vi.mock('@/hooks/useDashboardShortcuts', () => ({
-  useDashboardShortcuts: vi.fn(),
 }));
 vi.mock('@/hooks/useGlobalShortcutActions', () => ({
   useGlobalShortcutActions: vi.fn(),
@@ -277,6 +276,7 @@ beforeEach(() => {
   lifecycle.mockClear();
   shortcutsRender.mockClear();
   routeEscape.mockClear();
+  routerPush.mockClear();
   privacyState.mockReset();
 });
 afterEach(() => {
@@ -284,6 +284,37 @@ afterEach(() => {
 });
 
 describe('main-plane Search route recovery', () => {
+  it('routes operator G-keys from the mounted shell without exposing customer sequences', () => {
+    route.pathname = APP_ROUTES.ADMIN_NOW;
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='ov'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    fireEvent.keyDown(document.body, { key: 'g' });
+    fireEvent.keyDown(document.body, { key: 'h' });
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.ADMIN_NOW);
+    routerPush.mockClear();
+    fireEvent.keyDown(document.body, { key: 'g' });
+    fireEvent.keyDown(document.body, { key: 'd' });
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('preserves customer G-key navigation from the mounted customer shell', () => {
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    fireEvent.keyDown(document.body, { key: 'g' });
+    fireEvent.keyDown(document.body, { key: 'd' });
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.DASHBOARD);
+  });
+
   it('mounts shortcut help only on demand and can reopen it after closing', async () => {
     render(
       <DashboardDataProvider value={dashboard}>

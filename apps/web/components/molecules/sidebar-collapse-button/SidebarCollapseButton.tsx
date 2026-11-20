@@ -6,10 +6,17 @@ import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortc
 
 interface SidebarCollapseButtonProps {
   readonly className?: string;
+  /** Glyph size override, passed through to the rail toggle. */
+  readonly iconClassName?: string;
+  /** In-content instances opt out so a peek cannot cover the control the
+   * pointer is on (the flyout would swap it for the sidebar header). */
+  readonly previewTrigger?: boolean;
 }
 
 export function SidebarCollapseButton({
   className,
+  iconClassName,
+  previewTrigger,
 }: SidebarCollapseButtonProps) {
   const { toggleSidebar, state, isPreview, open: pinned } = useSidebar();
   const isCollapsed = state === 'closed';
@@ -19,12 +26,18 @@ export function SidebarCollapseButton({
       side='left'
       controlsId='shell-left-rail'
       open={!isCollapsed}
+      previewTrigger={previewTrigger}
+      // Pinned open, the control collapses the rail, so it shows the rail
+      // panel glyph (Pen canonical) rather than a crossed-out pin. Only the
+      // floating peek offers to pin.
+      iconOverride={isPreview ? 'Pin' : undefined}
       pinned={pinned}
       openLabel={isPreview ? 'Pin sidebar' : 'Collapse sidebar'}
       closedLabel='Expand sidebar'
       onToggle={toggleSidebar}
       shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
       className={className}
+      iconClassName={iconClassName}
       dataTestId='sidebar-rail-toggle'
       iconTestId='sidebar-rail-toggle-icon'
     />

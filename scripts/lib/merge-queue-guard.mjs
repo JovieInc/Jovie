@@ -10,26 +10,20 @@ export const REQUIRED_MERGE_STATUSES = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ];
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
   enqueueLabel: null,
-  // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
-  // vs 15m target after one week live; queue-depth deferral was a binding
-  // constraint during merge waves). Re-evaluate if runner-pool saturation
-  // (per-job queue wait >3m) returns.
+  // JOV-3833: depth 12→16 after p95 718m vs 15m target; revisit at >3m runner waits.
   maxQueueDepth: 16,
   perAgentEnqueueLimitPerHour: 6,
   queueTimeoutMinutes: 60,
   rulesetId: '10512119',
 });
 
-/**
- * Typed immutable native group policy (JOV-8112). Singleton groups start
- * immediately and keep each PR's synthetic head and path-selected product
- * lanes independent from slow or starved siblings.
- */
+/** JOV-8112: immediate singleton groups isolate each PR's head and product lanes. */
 export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
   schema: 'jovie-native-queue-cohort/v1',
   minEntriesToMerge: 1,
@@ -57,16 +51,17 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // Synced to live ruleset 10512119 on 2026-10-21 (.github/MERGE_QUEUE.md
-  // tuning log, Tim-approved): ten groups build at once and up to ten green
-  // entries land per push. Every lower live build count stays supported for
-  // rollback. Group CI spends repo GITHUB_TOKEN quota and the org's five hosted
-  // macOS slots, so raise this and the live ruleset together. Preserve ALLGREEN.
-  // A 20-minute check response budget ejects a stuck check instead of holding
-  // the queue head for an hour.
-  check_response_timeout_minutes: 20,
-  grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 10,
+  // Synced to live ruleset 10512119 on 2026-10-31 (.github/MERGE_QUEUE.md
+  // tuning log, Tim-approved): HEADGREEN grouping, four groups build at once,
+  // up to ten green entries land per push. Every lower live build count stays
+  // supported for rollback. Group CI spends repo GITHUB_TOKEN quota, so raise
+  // this and the live ruleset together. Preserve HEADGREEN: only the group
+  // head's build gates the merge, so a one-off intermediate failure does not
+  // eject green entries. A 30-minute check response budget ejects a stuck check
+  // instead of holding the queue head for an hour.
+  check_response_timeout_minutes: 30,
+  grouping_strategy: 'HEADGREEN',
+  max_entries_to_build: 4,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
@@ -74,10 +69,13 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
     NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
 
-/** Exact previous value (60, before the 2026-10-21 tightening to 20) stays
- * readable for rollback; no broad drift. */
+/** Exact previous values (60 before the 2026-10-21 tightening to 20, 20 before
+ * the live 30 of 2026-10-29) stay readable for rollback; no broad drift. */
 export function isPendingNativeCheckTimeoutCutover(field, observed) {
-  return field === 'check_response_timeout_minutes' && observed === 60;
+  return (
+    field === 'check_response_timeout_minutes' &&
+    (observed === 60 || observed === 20)
+  );
 }
 
 /**
@@ -270,7 +268,7 @@ export function buildNativeQueuePolicyReadback(observed = {}) {
 /**
  * Auto-eject a parked native UNMERGEABLE entry. Unknown evidence never
  * mutates. A MERGEABLE source PR in an UNMERGEABLE group is a group
- * collision (CHANGELOG under ALLGREEN is the measured case), not a source
+ * collision (CHANGELOG under ALLGREEN, the grouping before 2026-10-29, is the measured case), not a source
  * conflict.
  *
  * @param {{
@@ -490,9 +488,8 @@ export const NATIVE_BRANCH_PROTECTION_POLICY = Object.freeze({
 });
 
 /**
- * Allowed required-check contexts for main. These are aggregates — never pin
- * individual CI jobs (ci-fast, Typecheck, Unit Tests, …) or a batch failure
- * evicts siblings instead of bisecting to the culprit.
+ * Allowed required-check contexts for main — aggregates only; never pin an individual
+ * CI job (ci-fast, Typecheck, …): a batch failure evicts siblings instead of bisecting.
  */
 export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
   'CI / PR Ready',
@@ -533,6 +530,12 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Golden Path Lock',
   'CI / Visual Snapshot Compare',
   'Visual Snapshot Compare',
+  'CI / Visual Snapshot Compare (homepage)',
+  'Visual Snapshot Compare (homepage)',
+  'CI / Visual Snapshot Compare (marketing DOM)',
+  'Visual Snapshot Compare (marketing DOM)',
+  'CI / Visual Snapshot Compare (marketing routes)',
+  'Visual Snapshot Compare (marketing routes)',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',
@@ -2003,6 +2006,7 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
 // runner, and aggregate failures remain unclassified and retain the bounded
 // retry policy below.
 export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
+  'Run lanes coverage pytest',
   'Run deterministic brand safety scan',
   'Run deterministic Promptfoo evals',
   'Run golden eval-set CI gate',

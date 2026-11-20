@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,11 +10,17 @@ vi.mock('@/features/profile/ClaimBanner', () => ({
   ClaimBanner: ({
     displayName,
     prefetch,
+    variant,
   }: {
     displayName: string;
     prefetch?: boolean;
+    variant?: string;
   }) => (
-    <div data-testid='public-claim-banner' data-prefetch={String(prefetch)}>
+    <div
+      data-testid='public-claim-banner'
+      data-prefetch={String(prefetch)}
+      data-variant={variant}
+    >
       {displayName}
     </div>
   ),
@@ -28,6 +34,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     tourDates,
     showPayButton,
     releaseCredits,
+    releases,
+    allowFanCapture,
   }: {
     artist: { name: string };
     embeddedPreview: boolean;
@@ -35,6 +43,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     tourDates: readonly TourDateViewModel[];
     showPayButton?: boolean;
     releaseCredits?: readonly unknown[];
+    releases?: readonly { title: string }[];
+    allowFanCapture?: boolean;
   }) => (
     <div
       data-preview={String(embeddedPreview)}
@@ -42,6 +52,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       data-tour-dates={String(tourDates.length)}
       data-show-pay={String(Boolean(showPayButton))}
       data-release-credits={String(releaseCredits?.length ?? 0)}
+      data-fan-capture={String(Boolean(allowFanCapture))}
+      data-release-titles={(releases ?? []).map(r => r.title).join('|')}
     >
       <h1>{artist.name}</h1>
       {profileBanner}
@@ -50,6 +62,16 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('PublicProfileFixture', () => {
+  it('renders the single-word clipping regression through the real fixture props', () => {
+    render(<PublicProfileFixture displayName='UNMARKED' />);
+
+    expect(
+      screen.getByRole('heading', { name: 'UNMARKED' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('public-claim-banner')).toHaveTextContent(
+      'UNMARKED'
+    );
+  });
   it('paints the profile content in server HTML before JavaScript runs', () => {
     const html = renderToString(<PublicProfileFixture state='claimed' />);
     expect(html).toContain('data-testid="profile-template"');
@@ -92,6 +114,32 @@ describe('PublicProfileFixture', () => {
     ).toBeInTheDocument();
   });
 
+  it('exercises direct claim intent without changing the verified-claim default', () => {
+    const previousHref = window.location.href;
+    window.history.replaceState(null, '', '/unfazed?claim=1');
+    try {
+      const { rerender } = render(
+        <PublicProfileFixture state='unclaimed-direct' />
+      );
+      expect(screen.getByTestId('public-claim-banner')).toHaveAttribute(
+        'data-variant',
+        'claim_intent'
+      );
+      act(() => window.history.replaceState(null, '', '/unfazed'));
+      expect(screen.getByTestId('public-claim-banner')).toHaveAttribute(
+        'data-variant',
+        'organic'
+      );
+      rerender(<PublicProfileFixture />);
+      expect(screen.getByTestId('public-claim-banner')).toHaveAttribute(
+        'data-variant',
+        'verified_claim'
+      );
+    } finally {
+      window.history.replaceState(null, '', previousHref);
+    }
+  });
+
   it('forwards the selected event dataset to the profile template', () => {
     const populatedDates = HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES.slice(0, 1);
     const { rerender } = render(
@@ -108,6 +156,22 @@ describe('PublicProfileFixture', () => {
     expect(screen.getByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '0'
+    );
+  });
+
+  it('mounts the desktop rail and overlong titles only when asked', () => {
+    const { rerender } = render(<PublicProfileFixture />);
+    const template = () => screen.getByTestId('profile-template');
+    expect(template()).toHaveAttribute('data-fan-capture', 'false');
+    expect(template().getAttribute('data-release-titles')).not.toContain(
+      'Extended Midnight Radio Orchestra Remix'
+    );
+
+    rerender(<PublicProfileFixture fanCapture longTitles />);
+    expect(template()).toHaveAttribute('data-fan-capture', 'true');
+    const titles = template().getAttribute('data-release-titles') ?? '';
+    expect(titles.split('|').every(t => t.endsWith('Orchestra Remix)'))).toBe(
+      true
     );
   });
 });

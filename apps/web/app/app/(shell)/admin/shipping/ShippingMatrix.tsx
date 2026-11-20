@@ -14,8 +14,11 @@ import {
   EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import { HomeLoopStageStrip } from '@/components/organisms/home-loop/HomeLoopStageStrip';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
+import { buildStageStrip } from '@/lib/ovie/home/flow-home';
 import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import type { LaneAgent } from '@/lib/ovie/shipping-state/contract';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
@@ -53,7 +56,7 @@ export type MatrixRow = {
   readonly prUrl: string | null;
   readonly linearUrl: string | null;
   readonly branch: string | null;
-  readonly agent: 'devin' | 'codex' | null;
+  readonly agent: LaneAgent | null;
   readonly checksRollup: 'success' | 'failure' | 'pending' | 'unknown';
   readonly failingChecks: readonly string[];
   readonly queuePosition: number | null;
@@ -437,8 +440,22 @@ export function ShippingMatrix() {
       row.attention === 'stalled'
   ).length;
 
+  // Stage time (7d p50 / p95) moved here from Ovie Home, which keeps only
+  // metrics with a target; the drill-down is where the spans are read.
+  const strip = query.data ? buildStageStrip(query.data.delivery) : null;
+
   return (
     <>
+      {strip ? (
+        <div className='mb-3 px-1'>
+          <HomeLoopStageStrip
+            title='Stage time 7d (p50 / p95)'
+            items={strip.items}
+            coverage={strip.coverage}
+            emptyLabel='Not measured'
+          />
+        </div>
+      ) : null}
       <ContentSurfaceCard
         surface='details'
         className='overflow-hidden'

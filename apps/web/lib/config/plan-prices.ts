@@ -30,11 +30,6 @@ export const ARTIST_VISIBILITY_OFFER = {
     capabilities: {
       canAutoCreateLinks: true,
     },
-    outcomes: [
-      'Continuous visibility monitoring',
-      'Prioritized opportunities',
-      'Agentic fixes',
-    ],
   },
   enterprise: {
     displayName: 'Enterprise',

@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 // These cases cover the theme-switching policy itself; production ships with
 // theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
@@ -30,25 +31,24 @@ vi.mock('next-themes', () => ({
   useTheme: () => themeState,
 }));
 
-// Product default: SHOW_MARKETING_FULL_FOOTER is false (clean homepage baseline).
-// Enable it here so footer content assertions exercise expanded chrome in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_FULL_FOOTER: true,
-    },
-  };
-});
-
 function footerColumnTitle(name: string) {
   return screen.getByText(name, { selector: 'p.mf-eyebrow' });
 }
 
 describe('MarketingFooter', () => {
+  it('keeps privacy choices available even with published legal links', () => {
+    render(
+      <MarketingFooter
+        legalLinks={[{ href: '/legal/privacy', label: 'Privacy' }]}
+      />
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Do Not Sell or Share My Personal Information',
+      })
+    ).toHaveAttribute('href', '/legal/privacy#privacy-choices');
+  });
+
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
     themeState.theme = 'dark';
@@ -56,43 +56,38 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
-  it('keeps the Music column until generic creator nav is passed', () => {
+  it('renders three short sentence-case columns from the default chrome', () => {
     render(<MarketingFooter />);
-    expect(footerColumnTitle('Music')).toBeVisible();
-    expect(
-      screen.queryByText('Customers', { selector: 'p.mf-eyebrow' })
-    ).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Product' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Company' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Resources' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Connect' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Fan Capture' })).toHaveAttribute(
-      'href',
-      '/artist-profiles#capture-every-fan'
+    const titles = Array.from(
+      document.querySelectorAll('nav[aria-label="Footer"] .mf-eyebrow'),
+      node => node.textContent
     );
+    expect(titles).toEqual(['Product', 'Company', 'Resources']);
+    const links = document.querySelectorAll('nav[aria-label="Footer"] a');
+    expect(links.length).toBeGreaterThanOrEqual(8);
+    expect(links.length).toBeLessThanOrEqual(16);
+    for (const dead of ['Jovie Card', 'Product Demo', 'CLI', 'Engineering']) {
+      expect(screen.queryByRole('link', { name: dead })).toBeNull();
+    }
+    expect(
+      screen.getByRole('link', { name: 'Artist profiles' })
+    ).toHaveAttribute('href', '/artist-profiles');
   });
 
-  it('renames the Music column when generic creator nav is passed', () => {
-    render(<MarketingFooter genericCreatorNav />);
-    expect(footerColumnTitle('Customers')).toBeVisible();
-    expect(
-      screen.queryByText('Music', { selector: 'p.mf-eyebrow' })
-    ).toBeNull();
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/solutions/artists'
+  it('renders published columns passed from the content record', () => {
+    render(
+      <MarketingFooter
+        columns={[
+          { title: 'Alpha', links: [{ href: '/about', label: 'About us' }] },
+        ]}
+      />
     );
-    expect(screen.getByRole('link', { name: 'Smart Links' })).toHaveAttribute(
+    expect(footerColumnTitle('Alpha')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'About us' })).toHaveAttribute(
       'href',
-      '/smart-links'
+      '/about'
     );
-    expect(
-      screen.getByRole('link', { name: 'Audience Capture' })
-    ).toHaveAttribute('href', '/artist-profiles#capture-every-fan');
-    expect(
-      screen.getByRole('link', { name: 'Audience Reactivation' })
-    ).toHaveAttribute('href', '/artist-profiles#bring-them-back-automatically');
-    expect(screen.queryByRole('link', { name: 'Fan Capture' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Blog' })).toBeNull();
   });
 
   it('keeps the current footer columns while the about refresh flag is off', () => {
@@ -103,10 +98,10 @@ describe('MarketingFooter', () => {
       'href',
       '/blog'
     );
-    expect(footerColumnTitle('Connect')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    expect(footerColumnTitle('Company')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
-      '/product'
+      '/pricing'
     );
   });
 
@@ -135,7 +130,6 @@ describe('MarketingFooter', () => {
     // Investor pages are private: the public footer never links them.
     expect(screen.queryByRole('link', { name: 'Investors' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Pitch' })).toBeNull();
-    expect(footerColumnTitle('Product')).toHaveClass('line-clamp-2');
     // DETAILS.md text casing: never ALL CAPS for column headings.
     expect(footerColumnTitle('Product')).not.toHaveClass('mf-eyebrow--caps');
     // status.jov.ie currently serves Vercel DEPLOYMENT_NOT_FOUND; the public
@@ -154,7 +148,7 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByText('Built for artists. By artists.')
     ).not.toBeInTheDocument();
-    expect(footerColumnTitle('Connect')).toBeInTheDocument();
+    expect(footerColumnTitle('Resources')).toBeInTheDocument();
   });
 
   it('keeps developer resources discoverable in the minimal homepage footer', () => {
@@ -165,10 +159,6 @@ describe('MarketingFooter', () => {
     expect(screen.getByRole('link', { name: 'Developers' })).toHaveAttribute(
       'href',
       '/developers'
-    );
-    expect(screen.getByRole('link', { name: 'CLI' })).toHaveAttribute(
-      'href',
-      '/cli'
     );
     const homeLink = screen.getByRole('link', { name: 'Jovie Home' });
     const baseband = document.querySelector('.mf-baseband');
@@ -192,7 +182,7 @@ describe('MarketingFooter', () => {
       'expanded'
     );
     expect(footerColumnTitle('Product')).toBeVisible();
-    expect(footerColumnTitle('Connect')).toBeVisible();
+    expect(footerColumnTitle('Resources')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',
       '/legal/privacy'
@@ -233,7 +223,7 @@ describe('MarketingFooter', () => {
       'system-b-mounted-home-footer'
     );
     expect(footerColumnTitle('Product')).toBeInTheDocument();
-    expect(footerColumnTitle('Connect')).toBeInTheDocument();
+    expect(footerColumnTitle('Resources')).toBeInTheDocument();
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
@@ -288,21 +278,18 @@ describe('MarketingFooter', () => {
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
   });
 
-  it('links to the canonical Card route without duplicating its terminal CTA', () => {
+  it('omits the terminal CTA on /card and does not link the coming-soon page', () => {
     mockUsePathname.mockReturnValue('/card');
 
     render(<MarketingFooter />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Card' })).toHaveAttribute(
-      'href',
-      '/card'
-    );
+    expect(screen.queryByRole('link', { name: 'Jovie Card' })).toBeNull();
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
   });
 
-  it('honors the expanded footer variant when the full-footer flag is enabled', () => {
+  it('renders the expanded footer when a route asks for it', () => {
     mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter variant='expanded' />);
 
@@ -332,5 +319,64 @@ describe('MarketingFooter', () => {
     rerender(<MarketingFooter variant='minimal' />);
 
     expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
+  });
+
+  it.each([
+    ['expanded', {}],
+    ['minimal', { variant: 'minimal' as const }],
+    ['empty columns', { variant: 'expanded' as const, columns: [] }],
+  ])('has no axe violations in the %s footer', async (_label, props) => {
+    const { container } = render(<MarketingFooter {...props} />);
+    expect(screen.getByTestId('marketing-footer')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('labels each right-to-left column by its own heading', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <MarketingFooter
+          variant='expanded'
+          showCta={false}
+          columns={[
+            {
+              title: 'المنتج',
+              links: [{ href: '/pricing', label: 'الأسعار' }],
+            },
+            { title: 'الشركة', links: [{ href: '/about', label: 'من نحن' }] },
+          ]}
+        />
+      </div>
+    );
+    expect(screen.getByRole('region', { name: 'المنتج' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'الشركة' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the legal entity line in code, with the current year', () => {
+    render(<MarketingFooter variant='minimal' />);
+    expect(document.querySelector('.mf-copyright')?.textContent).toContain(
+      `© ${new Date().getFullYear()} Jovie Technology Inc.`
+    );
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingFooter.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingFooter.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+
+  it('tags the footer with the Pen section it is diffed against', () => {
+    render(<MarketingFooter variant='minimal' penSection='footer' />);
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-pen-section',
+      'footer'
+    );
   });
 });

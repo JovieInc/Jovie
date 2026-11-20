@@ -2,6 +2,7 @@ import {
   type CertificationEvidenceReceipt,
   type CertificationEvidenceStatus,
   type CertificationReviewPacket,
+  DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX,
   evaluateCertificationAdmission,
   type FounderCertificationDecision,
 } from '@/lib/agent-os/certification';
@@ -36,6 +37,19 @@ export function fixtureReceipt(
     digest: `sha256:${id.padEnd(64, '0').slice(0, 64)}`,
     summary: `${id} ${status}`,
   };
+}
+
+/** A dogfood-judge visual_proof receipt (the kernel requires a passing one). */
+export function fixtureJudgeReceipt(
+  subjectId: string,
+  status: CertificationEvidenceStatus = 'passed'
+): CertificationEvidenceReceipt {
+  return fixtureReceipt(
+    'visual_proof',
+    `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}${subjectId}`,
+    status,
+    `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}${subjectId}@sha256:${'a'.repeat(32)}`
+  );
 }
 
 export function fixturePacket(
@@ -75,6 +89,7 @@ export function fixturePacket(
         'passed',
         'https://example.test/screenshot.png'
       ),
+      fixtureJudgeReceipt(subjectId),
     ],
     requiredVariants: [
       {

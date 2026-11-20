@@ -111,6 +111,64 @@ describe('approveWaitlistEntryInTx', () => {
     );
   });
 
+  describe('one proof rule for every non-admin approval', () => {
+    const rows = () => [
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'waitlisted',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [
+        {
+          id: 'target-profile',
+          handle: 'midartist',
+          settings: {},
+          spotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+          displayName: 'Mid Artist',
+          followers: 3200,
+        },
+      ],
+      [],
+    ];
+    const wroteProofRecord = (updateSet: ReturnType<typeof vi.fn>) =>
+      updateSet.mock.calls.some(
+        ([values]) =>
+          (
+            values as {
+              settings?: { claimVerification?: { proofOnly?: boolean } };
+            }
+          ).settings?.claimVerification?.proofOnly === true
+      );
+
+    it('marks the held profile proof-only when a job approves it (the auto-accept drain)', async () => {
+      const { tx, updateSet } = createTxMock(rows());
+      const result = await approveWaitlistEntryInTx(tx, 'entry-1', {
+        actorType: 'job',
+        reason: 'auto_accept_after_days',
+        targetStatus: 'invited',
+      });
+      expect(wroteProofRecord(updateSet)).toBe(true);
+      expect(result).toMatchObject({
+        outcome: 'approved',
+        proofRequest: { profileId: 'target-profile', handle: 'midartist' },
+      });
+    });
+
+    it('treats an admin approval as operator proof: no marker', async () => {
+      const { tx, updateSet } = createTxMock(rows());
+      const result = await approveWaitlistEntryInTx(tx, 'entry-1', {
+        actorType: 'admin',
+        actorUserId: 'admin-1',
+      });
+      expect(wroteProofRecord(updateSet)).toBe(false);
+      expect(result).not.toHaveProperty('proofRequest');
+    });
+  });
+
   it('claims profile directly when user has no other claimed profile', async () => {
     const { tx, updateSet } = createTxMock([
       [

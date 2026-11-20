@@ -304,3 +304,43 @@ for (const [name, mutate, error] of invalidObservations)
     mutate(args);
     assert.throws(() => validateCompanyObservation(...args), error);
   });
+
+const RETIRED_NOTE_STUBS = [
+  'docs/AGENT_OS_ARCHITECTURE.md',
+  'docs/HERMES_AIR.md',
+  'docs/MEMORY_ADR.md',
+  'docs/MEMORY_CORE_ARCHITECTURE.md',
+  'docs/AUTOMATION_AUDIT.md',
+  'docs/spikes/eve-agent-sdk-fit.md',
+  'docs/operations/SUMMER_RUNTIME_RETIREMENT.md',
+  '.claude/rules/hermes-air.md',
+];
+
+const RETIRED_NOTE_PROCEDURES = [
+  'launchctl bootstrap',
+  'bootstrap-air.sh',
+  `~/.${'hermes'}/config.yaml`,
+  'Why WDK stays',
+  'Accepted for v1',
+  'free-model-router.ts',
+  'gemma3:4b',
+  'Historical documents are retained',
+];
+
+test('retired AgentOS and Hermes notes stay pointers', () => {
+  const root = new URL('../..', import.meta.url);
+  for (const relativePath of RETIRED_NOTE_STUBS) {
+    const text = readFileSync(new URL(relativePath, root), 'utf8');
+    assert.ok(
+      text.length < 2500,
+      `${relativePath} is ${text.length} chars; the runbook grew back`
+    );
+    for (const phrase of RETIRED_NOTE_PROCEDURES) {
+      assert.equal(
+        text.includes(phrase),
+        false,
+        `${relativePath} contains retired procedure: ${phrase}`
+      );
+    }
+  }
+});

@@ -1,0 +1,49 @@
+{
+  "gates": {
+    "apps/web/components/atoms/CopyableMonospaceCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerActionRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerChoiceChipGroup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/filters/FilterCheckboxItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/molecules/drawer/DrawerActionRow.tsx": {
+      "empty": "The row is a single labeled action, not a collection. The detector matched 'items-center' in its button classes; an unlabeled action is not a valid empty state."
+    },
+    "apps/web/components/molecules/filters/FilterCheckboxItem.tsx": {
+      "empty": "The component renders one required labeled menu item, not a list; the detector matched 'items-center' in trailingVisual.",
+      "permission-denied": "The menu item has no access-control branch; the detector matched role='menuitemcheckbox', not a permission check."
+    }
+  }
+}

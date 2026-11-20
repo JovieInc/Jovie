@@ -6,7 +6,7 @@ import { TabBar } from '@/components/molecules/tab-bar/TabBar';
 
 /**
  * Re-export classname constants for backward compatibility.
- * Used by AudienceHeaderBadge and tests.
+ * Drawer rails and tests import these names.
  */
 export {
   TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME as DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,

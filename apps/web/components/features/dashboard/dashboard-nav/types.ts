@@ -1,6 +1,5 @@
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import type { IconName } from '@/components/atoms/Icon';
-import type { AppFlagName } from '@/lib/flags/contracts';
 
 /**
  * Core destinations are founder-approved and always take primary-rail slots
@@ -30,7 +29,6 @@ export interface NavItem {
    * Hide this destination unless the flag is on. Fail closed: a missing
    * snapshot value does not render the row.
    */
-  requiredFlag?: AppFlagName;
 }
 
 export interface DashboardNavProps {

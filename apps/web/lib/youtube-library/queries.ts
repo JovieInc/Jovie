@@ -207,6 +207,7 @@ export interface ListVideosForProfileInput {
   readonly limit?: number;
 }
 
+/** Public MCP projection. Owner imports may also contain nonpublic uploads. */
 export async function listVideosForProfile(
   input: ListVideosForProfileInput
 ): Promise<PublicVideoListItem[]> {
@@ -236,6 +237,8 @@ export async function listVideosForProfile(
 
   const conditions = [
     eq(youtubeVideos.creatorProfileId, input.creatorProfileId),
+    // Unknown visibility must fail closed, including legacy NULL records.
+    eq(youtubeVideos.privacyStatus, 'public'),
   ];
   if (input.contentType) {
     conditions.push(eq(youtubeVideos.contentType, input.contentType));

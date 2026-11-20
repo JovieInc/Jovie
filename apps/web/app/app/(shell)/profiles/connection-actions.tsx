@@ -5,7 +5,11 @@ import {
   ExternalLink,
   Eye,
   Link2,
+  MessageCircle,
+  Pencil,
   RefreshCw,
+  Trash2,
+  Wrench,
 } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { ConnectionPrimaryAction } from '@/lib/profile-surfaces/workspace';
@@ -15,6 +19,11 @@ export interface BuildConnectionActionsCallbacks {
   readonly onViewDetails: (row: ProfileWorkspaceRow) => void;
   readonly onOpen: (row: ProfileWorkspaceRow) => void;
   readonly onPrimaryAction: (row: ProfileWorkspaceRow) => void;
+  readonly onRemoveLink?: (row: ProfileWorkspaceRow) => void;
+  readonly onAskJovie?: (row: ProfileWorkspaceRow) => void;
+  readonly onEditProfile?: (row: ProfileWorkspaceRow) => void;
+  /** Present only when the row has a fixable issue (never a dead end). */
+  readonly onFix?: (row: ProfileWorkspaceRow) => void;
 }
 
 const PRIMARY_ACTION_COPY: Record<
@@ -54,6 +63,30 @@ export function buildConnectionActions(
     },
   ];
 
+  if (callbacks.onAskJovie) {
+    const { onAskJovie } = callbacks;
+    items.unshift({
+      id: 'ask-jovie',
+      label: 'Ask Jovie',
+      icon: <MessageCircle className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onAskJovie(row),
+    });
+  }
+
+  if (
+    row.rowType === 'surface' &&
+    row.kind === 'jovie' &&
+    callbacks.onEditProfile
+  ) {
+    const { onEditProfile } = callbacks;
+    items.unshift({
+      id: 'edit-profile',
+      label: 'Edit Profile',
+      icon: <Pencil className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onEditProfile(row),
+    });
+  }
+
   if (primaryAction !== 'open') {
     const action = PRIMARY_ACTION_COPY[primaryAction];
     const Icon = action.icon;
@@ -72,5 +105,46 @@ export function buildConnectionActions(
     );
   }
 
+  if (callbacks.onFix) {
+    const { onFix } = callbacks;
+    items.push({
+      id: 'connection-fix',
+      label: 'Fix With Jovie',
+      icon: <Wrench className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onFix(row),
+    });
+  }
+
+  if (
+    row.rowType === 'surface' &&
+    row.kind !== 'jovie' &&
+    !row.id.startsWith('preview:') &&
+    row.removalTarget &&
+    callbacks.onRemoveLink
+  ) {
+    const { onRemoveLink } = callbacks;
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'remove-profile-link',
+        label: 'Remove From Jovie Profile',
+        icon: <Trash2 className='h-3.5 w-3.5' aria-hidden />,
+        destructive: true,
+        onClick: () => onRemoveLink(row),
+      }
+    );
+  }
   return items;
+}
+
+export function kindLabel(row: ProfileWorkspaceRow): string {
+  const labels = {
+    jovie: 'Jovie',
+    website: 'Website',
+    social: 'Social',
+    dsp: 'DSP',
+    authority: 'Source',
+    connector: 'Connector',
+  } as const;
+  return labels[row.kind];
 }

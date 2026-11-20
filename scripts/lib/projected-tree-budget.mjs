@@ -6,7 +6,9 @@
 // runs on the source pull_request with local git evidence: it builds the real
 // merged tree of base tip + PR head with `git merge-tree --write-tree` and
 // counts it with the exact parseTrackedRegularTree used by the merge_group
-// check. Scalar `base + (head - merge base)` arithmetic is wrong whenever both
+// check. An over-budget stale head must also incorporate base cleanup before
+// the head-based repository hygiene check can pass. Scalar
+// `base + (head - merge base)` arithmetic is wrong whenever both
 // sides touch the same path, so the merged tree itself is measured. It fails an
 // over-budget PR before queue admission and warns above 95% of budget.
 //
@@ -17,7 +19,7 @@ import { pathToFileURL } from 'node:url';
 import { parseTrackedRegularTree } from './merge-group-member-policy.mjs';
 import {
   HYGIENE_LIMITS,
-  trackedBytesBudgetWarning,
+  trackedBytesBudgetWarnings,
 } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -121,8 +123,15 @@ export function enforceProjectedTreeBudget({
       `${bytes} bytes of tracked regular files (${detail}) exceeds the ${maxTrackedBytes}-byte combined-tree budget; the merge queue would reject this PR`
     );
   }
-  const warning = trackedBytesBudgetWarning(bytes, maxTrackedBytes);
-  if (warning) log(`::warning::Projected combined tree: ${warning}`);
+  const head = measureGitTree(headSha, git);
+  if (head.bytes > maxTrackedBytes) {
+    throw new Error(
+      `PR head has ${head.bytes} tracked regular-file bytes, exceeding the ${maxTrackedBytes}-byte repository budget, while the merged tree fits at ${bytes} bytes; merge the current base branch into the PR branch to incorporate its cleanup, then rerun the guard`
+    );
+  }
+  for (const warning of trackedBytesBudgetWarnings(bytes, maxTrackedBytes)) {
+    log(`::warning::Projected combined tree: ${warning}`);
+  }
   log(
     `Projected combined tree: PASS — ${bytes} tracked regular-file bytes (${detail}).`
   );
@@ -132,14 +141,38 @@ export function enforceProjectedTreeBudget({
 export function runProjectedTreeBudget({
   env = process.env,
   git = localGit,
+  local = false,
   log = console.log,
 } = {}) {
+  // Local hooks have no Actions SHA environment. Resolve the committed branch
+  // against the fetched base; hosted CI keeps its explicit trusted bindings.
+  const refs = local
+    ? {
+        PR_BASE_SHA: git([
+          'rev-parse',
+          '--verify',
+          'refs/remotes/origin/main^{commit}',
+        ]).trim(),
+        PR_HEAD_SHA: git(['rev-parse', '--verify', 'HEAD^{commit}']).trim(),
+      }
+    : env;
+  if (local) {
+    refs.PR_MERGE_BASE = git([
+      'merge-base',
+      '--all',
+      refs.PR_BASE_SHA,
+      refs.PR_HEAD_SHA,
+    ])
+      .trim()
+      .split('\n')
+      .sort()[0];
+  }
   return enforceProjectedTreeBudget({
-    baseSha: env.PR_BASE_SHA,
+    baseSha: refs.PR_BASE_SHA,
     git,
-    headSha: env.PR_HEAD_SHA,
+    headSha: refs.PR_HEAD_SHA,
     log,
-    mergeBaseSha: env.PR_MERGE_BASE,
+    mergeBaseSha: refs.PR_MERGE_BASE,
   });
 }
 
@@ -148,7 +181,7 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
-    runProjectedTreeBudget();
+    runProjectedTreeBudget({ local: process.argv.includes('--local') });
   } catch (error) {
     console.error(
       `::error::${error instanceof Error ? error.message : String(error)}`

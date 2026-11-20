@@ -1,9 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 export interface SuggestionCardProps {
   /** Card heading. Renders as an h2 with the cinematic title weight + tracking. */
@@ -53,14 +52,9 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative min-h-37 w-full overflow-hidden rounded-2xl border border-white/[0.05] bg-(--app-shell-content-surface)',
+        'group/sug relative min-h-37 w-full overflow-hidden rounded-2xl border border-subtle bg-(--app-shell-content-surface)',
         className
       )}
-      style={{
-        boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.18), 0 16px 40px -16px rgba(0,0,0,0.4)',
-        transition: `box-shadow var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
-      }}
     >
       <div className='grid min-h-[inherit] grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
         <div className='min-w-0'>
@@ -74,23 +68,20 @@ export function SuggestionCard({
 
         <div className='flex shrink-0 items-center justify-start gap-1 sm:justify-end'>
           {onDismiss && (
-            <button
-              type='button'
-              onClick={onDismiss}
-              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
-            >
+            <Button variant='ghost' size='sm' type='button' onClick={onDismiss}>
               {dismissLabel}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant='primary'
+            size='sm'
             type='button'
             onClick={onAct}
             disabled={!onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-xs font-medium bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary-hover hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
           >
             {actionLabel}
             <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
-          </button>
+          </Button>
         </div>
       </div>
     </article>

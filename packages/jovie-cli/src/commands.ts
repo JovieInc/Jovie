@@ -1,3 +1,4 @@
+import { auditSummary, auditWho, formatSummary, formatWho } from './audit.js';
 import {
   createProfile,
   fetchArtist,
@@ -12,10 +13,22 @@ import {
 } from './client.js';
 import { invokeFleetAction } from './fleet-client.js';
 import { FLEET_COMMANDS } from './fleet-contract.generated.js';
+import {
+  answerOnboardingQuestion,
+  buildProfile,
+  claimHandle,
+  draftRef,
+  getQualification,
+  publishProfile,
+  shareProfile,
+  startUpgrade,
+} from './golden-path.js';
 
 export interface CommandInput {
   readonly arg?: string;
   readonly full?: boolean;
+  /** CLI `--json`: structured output instead of the human table. */
+  readonly json?: boolean;
   readonly flags?: Readonly<Record<string, string | undefined>>;
   /** Set by the caller (CLI or MCP); attached to reports as safe context. */
   readonly meta?: { readonly channel: 'cli' | 'mcp'; readonly version: string };
@@ -37,6 +50,8 @@ export interface CommandSpec {
   readonly flags?: readonly FlagSpec[];
   readonly readOnly: boolean;
   readonly internal?: boolean;
+  /** Talks to an operator service (e.g. the fleet audit Worker), not the published jov.ie contract. */
+  readonly operator?: boolean;
   readonly run: (
     input: CommandInput,
     options: ResourceOptions
@@ -57,6 +72,20 @@ const REPORT_FLAGS: readonly FlagSpec[] = [
   { name: 'command', description: 'Jovie command or tool that failed' },
   { name: 'code', description: 'apiCode/error code you received' },
   { name: 'scenario', description: 'Task or scenario you were attempting' },
+];
+
+const DRAFT_FLAGS: readonly FlagSpec[] = [
+  {
+    name: 'draft-id',
+    description: 'Draft id from workspace.create_draft',
+    required: true,
+  },
+  {
+    name: 'draft-token',
+    description:
+      'Private draft capability from artist.search_or_import; never share it',
+    required: true,
+  },
 ];
 
 function report(kind: ReportKind) {
@@ -113,6 +142,52 @@ export const COMMANDS: readonly CommandSpec[] = [
         },
         options
       ),
+  },
+  {
+    path: ['audit', 'who'],
+    tool: 'audit_who',
+    operator: true,
+    summary:
+      'Who did what to a repo, PR, issue, or branch: fleet audit events (agent, host, action, reason) plus GitHub changes no agent claimed. Needs FLEET_AUDIT_READ_TOKEN.',
+    arg: {
+      name: 'target',
+      description: 'Substring of the target, e.g. a repo, PR URL, or branch',
+    },
+    flags: [
+      {
+        name: 'since',
+        description: 'Window start: 7d, 24h, 30m, or an ISO timestamp',
+      },
+      { name: 'limit', description: 'Max events, 1-200 (default 50)' },
+    ],
+    readOnly: true,
+    run: async (input, options) => {
+      const result = await auditWho(
+        {
+          target: required(input),
+          since: input.flags?.since,
+          limit: input.flags?.limit,
+        },
+        options
+      );
+      return input.meta?.channel === 'cli' && !input.json
+        ? formatWho(result)
+        : result;
+    },
+  },
+  {
+    path: ['audit', 'summary'],
+    tool: 'audit_summary',
+    operator: true,
+    summary:
+      'Fleet audit summary: storage budget, dangerous actions and unattributed GitHub changes from the last 7d. Needs FLEET_AUDIT_READ_TOKEN.',
+    readOnly: true,
+    run: async (input, options) => {
+      const result = await auditSummary(options);
+      return input.meta?.channel === 'cli' && !input.json
+        ? formatSummary(result)
+        : result;
+    },
   },
   ...FLEET_COMMANDS.map(command => ({
     internal: true,
@@ -217,6 +292,90 @@ export const COMMANDS: readonly CommandSpec[] = [
     flags: REPORT_FLAGS,
     readOnly: false,
     run: report('bug'),
+  },
+  {
+    path: ['claim', 'handle'],
+    tool: 'claim_handle',
+    summary:
+      'Check and reserve jov.ie/<handle> for the draft artist. Taken handles return numbered suggested_alternatives; high-reach artists are routed to the verification path. Reservation completes when the artist signs in through claim_url.',
+    arg: {
+      name: 'handle',
+      description: 'The handle to reserve, e.g. radiohead',
+    },
+    flags: DRAFT_FLAGS,
+    readOnly: false,
+    run: (input, options) =>
+      claimHandle(required(input), draftRef(input.flags ?? {}), options),
+  },
+  {
+    path: ['onboarding', 'answer'],
+    tool: 'answer_onboarding_question',
+    summary:
+      'Record one onboarding Mom Test answer on the draft. Ask the questions conversationally (never lead, never ask willingness-to-pay), then pass --question lastGrowthAttempt|promoSpend and --answer.',
+    flags: [
+      ...DRAFT_FLAGS,
+      {
+        name: 'question',
+        description: 'lastGrowthAttempt or promoSpend',
+        required: true,
+      },
+      { name: 'answer', description: "The artist's answer", required: true },
+    ],
+    readOnly: false,
+    run: (input, options) =>
+      answerOnboardingQuestion(
+        input.flags?.question ?? '',
+        input.flags?.answer ?? '',
+        draftRef(input.flags ?? {}),
+        options
+      ),
+  },
+  {
+    path: ['onboarding', 'qualify'],
+    tool: 'get_qualification',
+    summary:
+      'Run the shared qualification for the draft artist. Returns qualified or queued with a reason; queued carries the locked waitlist line.',
+    flags: DRAFT_FLAGS,
+    readOnly: true,
+    run: (input, options) =>
+      getQualification(draftRef(input.flags ?? {}), options),
+  },
+  {
+    path: ['onboarding', 'setup'],
+    tool: 'build_profile',
+    summary:
+      "Build the draft profile from the artist's public data, including the real catalog preview when available. Nothing is published.",
+    flags: DRAFT_FLAGS,
+    readOnly: false,
+    run: (input, options) => buildProfile(draftRef(input.flags ?? {}), options),
+  },
+  {
+    path: ['onboarding', 'publish'],
+    tool: 'publish_profile',
+    summary:
+      'Publish step. The CLI never publishes: show claim_url so the artist signs in on Jovie and publishes from their dashboard.',
+    flags: DRAFT_FLAGS,
+    readOnly: false,
+    run: (input, options) =>
+      publishProfile(draftRef(input.flags ?? {}), options),
+  },
+  {
+    path: ['profile', 'share'],
+    tool: 'share_profile',
+    summary:
+      'Return the public jov.ie profile URL plus a factual share line for an already-public profile.',
+    arg: { name: 'username', description: 'Jovie username to share' },
+    readOnly: true,
+    run: (input, options) => shareProfile(required(input), options),
+  },
+  {
+    path: ['profile', 'upgrade'],
+    tool: 'start_upgrade',
+    summary:
+      'Return the existing Jovie checkout entry for the draft artist. Plans and prices are shown on Jovie from offer truth; never state a price yourself.',
+    flags: DRAFT_FLAGS,
+    readOnly: true,
+    run: (input, options) => startUpgrade(draftRef(input.flags ?? {}), options),
   },
   {
     path: ['report', 'feedback'],

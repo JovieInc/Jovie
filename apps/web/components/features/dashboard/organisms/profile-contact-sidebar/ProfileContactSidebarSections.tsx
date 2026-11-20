@@ -11,9 +11,7 @@ import {
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
-import { APP_ROUTES } from '@/constants/routes';
-import { getProductProjection, PRODUCT_ONTOLOGY } from '@/data/productOntology';
-import { useAppFlag } from '@/lib/flags/client';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 
 /**
@@ -34,15 +32,9 @@ export function ProfileBentoView({
   onEditProfile?: () => void;
 }>) {
   const title = previewData.displayName || `@${previewData.username}`;
-  const identityEnabled = useAppFlag(PRODUCT_ONTOLOGY.identity.requiredFlag);
-  const identity = getProductProjection({
-    PROFILES_WORKSPACE: identityEnabled,
-  }).features.find(feature => feature.featureId === 'identity');
-  const destination =
-    identity?.destination ?? `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`;
-  const actionLabel = identity
-    ? `Manage In ${identity.label}`
-    : 'Manage Profile';
+  const identity = PRODUCT_ONTOLOGY.identity;
+  const destination = identity.canonicalRoute;
+  const actionLabel = `Manage In ${identity.label}`;
 
   return (
     <div

@@ -20,6 +20,7 @@ import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
 import { submitWaitlistAccessRequest } from '@/lib/waitlist/access-request';
+import { acquisitionIdFromCookieHeader } from '@/lib/waitlist/acquisition-stages';
 
 export const runtime = 'nodejs';
 
@@ -239,6 +240,9 @@ export async function POST(request: Request) {
       data: parseResult.data,
       source: 'waitlist_form',
       syntheticRunId,
+      acquisitionId: acquisitionIdFromCookieHeader(
+        request.headers.get('cookie')
+      ),
     });
 
     return NextResponse.json(

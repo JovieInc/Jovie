@@ -7,16 +7,22 @@ import { getConnectorAvailability } from '@/lib/connectors/availability.server';
 import { getAdvertisedConnectorIntegrations } from '@/lib/connectors/capabilities';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.INTEGRATIONS}`;
 export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
   title: documentTitle('Integrations | Jovie'),
   description:
     'See the account integrations and specific capabilities available in Jovie.',
   alternates: { canonical: PAGE_URL },
 };
 const SCHEMA = buildBreadcrumbSchema([{ name: 'Integrations', url: PAGE_URL }]);
-const RELATED = [APP_ROUTES.DEVELOPERS, APP_ROUTES.CLI, APP_ROUTES.PRICING];
+const RELATED = [
+  { href: APP_ROUTES.DEVELOPERS, label: 'Developers' },
+  { href: APP_ROUTES.CLI, label: 'Command Line' },
+  { href: APP_ROUTES.PRICING, label: 'Pricing' },
+];
 
 // Public capabilities reflect deployment configuration. Rebuild this static
 // reference when provider configuration changes; Settings checks live availability.
@@ -77,9 +83,9 @@ export default function IntegrationsDirectoryPage() {
       </div>
       <p className='pt-6 text-sm text-secondary'>
         Related pages:{' '}
-        {RELATED.map(href => (
+        {RELATED.map(({ href, label }) => (
           <Link key={href} href={href} className='mr-3 underline'>
-            {href}
+            {label}
           </Link>
         ))}
       </p>

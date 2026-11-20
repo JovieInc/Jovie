@@ -6,12 +6,14 @@ const {
   mockCaptureError,
   mockLoadAdminPlatformConnectionsData,
   mockPlatformConnectionsClient,
+  mockRequireAdminAccess,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockLoadAdminPlatformConnectionsData: vi.fn(),
   mockPlatformConnectionsClient: vi.fn(() => (
     <div data-testid='admin-platform-connections-client-probe' />
   )),
+  mockRequireAdminAccess: vi.fn(),
 }));
 
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
@@ -41,7 +43,7 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/admin/page-access', () => ({
-  requireCurrentAdminPageAccess: vi.fn().mockResolvedValue('user_admin'),
+  requireCurrentAdminPageAccess: mockRequireAdminAccess,
 }));
 
 vi.mock(
@@ -61,6 +63,7 @@ vi.mock(
 describe('AdminPlatformConnectionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireAdminAccess.mockResolvedValue('user_admin');
     mockLoadAdminPlatformConnectionsData.mockResolvedValue({
       spotifyStatus: {
         connected: true,
@@ -87,6 +90,44 @@ describe('AdminPlatformConnectionsPage', () => {
         missingScopes: [],
       },
     });
+  });
+
+  it('starts no settings reads before the admin access gate resolves', async () => {
+    mockRequireAdminAccess.mockRejectedValueOnce(new Error('NEXT_REDIRECT'));
+
+    const { default: AdminPlatformConnectionsPage } = await import(
+      '@/app/app/(shell)/admin/platform-connections/page'
+    );
+
+    await expect(
+      AdminPlatformConnectionsPage({
+        searchParams: Promise.resolve({ tab: 'spotify' }),
+      })
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockLoadAdminPlatformConnectionsData).not.toHaveBeenCalled();
+    expect(mockPlatformConnectionsClient).not.toHaveBeenCalled();
+  });
+  it('keeps a step-up-locked admin from connection reads without rendering a disconnected state', async () => {
+    mockRequireAdminAccess.mockRejectedValueOnce(
+      new Error('PRIVACY_UNLOCK_REQUIRED')
+    );
+
+    const { default: AdminPlatformConnectionsPage } = await import(
+      '@/app/app/(shell)/admin/platform-connections/page'
+    );
+
+    await expect(
+      AdminPlatformConnectionsPage({
+        searchParams: Promise.resolve({ tab: 'spotify' }),
+      })
+    ).rejects.toThrow('PRIVACY_UNLOCK_REQUIRED');
+    expect(mockLoadAdminPlatformConnectionsData).not.toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalledWith(
+      'Admin platform connections failed to load optional settings',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mockPlatformConnectionsClient).not.toHaveBeenCalled();
   });
 
   it('withholds configuration controls when platform status cannot be read', async () => {

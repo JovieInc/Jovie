@@ -2,8 +2,17 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  Link as JovieLink,
+} from '@jovie/ui';
 import type { UIMessage } from 'ai';
+import { Ellipsis } from 'lucide-react';
 import NextLink from 'next/link';
 import {
   type ReactNode,
@@ -27,18 +36,25 @@ import {
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
-import {
-  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
-  type OnboardingProfileBuilderState,
-  OnboardingProfileRail,
-  resolvePreviewArtist,
-} from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import {
   isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
+import { endsInTerminalNextStep } from './onboardingChatHelpers';
+import { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  resolvePreviewArtist,
+} from './onboardingProfileRailState';
 import { useOnboardingClaim } from './useOnboardingClaim';
+import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
+
+export { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
+
+const SIGN_IN_LABEL = 'Sign in';
 
 /**
  * App-shell frame for the anonymous onboarding chat.
@@ -72,26 +88,8 @@ export interface OnboardingShellProps {
   readonly entryProfile?: StartEntryProfile | null;
 }
 
-/** Preview state for a prebuilt, unclaimed page so the rail shows it on first paint. */
-export function buildEntryProfileBuilderState(
-  entryProfile: StartEntryProfile | null | undefined
-): OnboardingProfileBuilderState {
-  if (entryProfile?.status !== 'claimable') {
-    return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
-  }
-  return {
-    artist: {
-      id: entryProfile.spotifyId ?? `handle-${entryProfile.handle}`,
-      name: entryProfile.displayName,
-      url: entryProfile.spotifyUrl ?? '',
-      imageUrl: entryProfile.avatarUrl,
-      genres: entryProfile.genres,
-    },
-    artistConfirmed: false,
-    handle: entryProfile.handle,
-    socialLinks: entryProfile.socialLinks,
-  };
-}
+/** The /start frame runs dark; the restore state reuses it so nothing repaints. */
+export const ONBOARDING_FRAME_CLASS = '[color-scheme:dark]';
 
 export function OnboardingShell({
   isSignedIn = false,
@@ -133,7 +131,15 @@ export function OnboardingShell({
     });
   }, []);
 
+  const [conversationStarted, setConversationStarted] = useState(false);
+  // "Start Over" means nothing before there is a conversation to discard.
+  const hasConversation =
+    conversationStarted ||
+    initialMessages.length > 0 ||
+    conversationId !== null;
+
   const handleConversationActivity = useCallback(() => {
+    setConversationStarted(true);
     setClaimTrigger(current => current + 1);
   }, []);
 
@@ -194,15 +200,12 @@ export function OnboardingShell({
     turnstileSiteKey
   );
 
-  const isTurnstileUnavailable =
-    turnstileState.status === 'error' ||
-    turnstileState.status === 'timeout' ||
-    turnstileState.status === 'unsupported' ||
-    turnstileState.status === 'unconfigured';
-  const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ??
-      "We couldn't start your chat. Refresh the page to try again.")
-    : null;
+  // No dead end: a failed check sends anyway on the unverified budget.
+  const failOpen = useOnboardingTurnstileFailOpen({
+    state: turnstileState,
+    token: turnstileToken,
+    instruction: turnstileInstruction,
+  });
 
   const handleTurnstileRequired = useCallback(
     (message?: string) => {
@@ -211,17 +214,30 @@ export function OnboardingShell({
     [requestTurnstileVerification]
   );
 
+  const { onServerRejected } = failOpen;
   const handleTurnstileRejected = useCallback(() => {
+    onServerRejected();
     resetTurnstileVerification('One quick check before we send');
-  }, [resetTurnstileVerification]);
+  }, [onServerRejected, resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
   // authenticated, then retry after completed chat turns. Durable waitlist
   // receipts route to /waitlist; admitted users go to checkout; missing
   // artist identity stays in this chat.
+  //
+  // A restored owned transcript normally waits for a genuine turn, except
+  // when it already ends in a terminal next-step decision: then a claim was
+  // committed whose response never arrived (the email-code form hard-navigates
+  // to /start while the pre-navigation claim is in flight), and only this
+  // claim's idempotent alreadyClaimed recovery can deliver the receipt
+  // (golden-path cert 2026-10-31 pm, mobile walks m1-m3).
+  const awaitingClaimHandoff = useMemo(
+    () => resumeOwnedConversation && endsInTerminalNextStep(initialMessages),
+    [resumeOwnedConversation, initialMessages]
+  );
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !resumeOwnedConversation || awaitingClaimHandoff || claimTrigger > 0
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
@@ -243,53 +259,27 @@ export function OnboardingShell({
       <AppShellFrame
         sidebar={null}
         flushContent
-        containerClassName='[color-scheme:dark]'
-        contentClassName='overflow-hidden!'
+        containerClassName={ONBOARDING_FRAME_CLASS}
+        contentClassName='overflow-clip!'
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>
             <div
               className='relative flex min-h-0 min-w-0 flex-1 flex-col'
               data-onboarding-session={sessionLabel}
             >
-              {onRestart || onLogout || !isSignedIn ? (
+              {(onRestart && hasConversation) || onLogout || !isSignedIn ? (
                 <OnboardingIdentityConflict
                   visible={claimStatus === 'identity-conflict'}
                   isSignedIn={isSignedIn}
                   onLogout={onLogout}
                   disabled={actionPending || controlsDisabled}
                 >
-                  {onRestart ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onRestart}
-                    >
-                      Start Over
-                    </Button>
-                  ) : null}
-                  {isSignedIn && onLogout ? (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='shrink-0 whitespace-nowrap'
-                      disabled={actionPending || controlsDisabled}
-                      onClick={onLogout}
-                    >
-                      Log Out
-                    </Button>
-                  ) : null}
-                  {!isSignedIn ? (
-                    <JovieLink
-                      asChild
-                      variant='compact'
-                      touchTarget
-                      className='shrink-0 whitespace-nowrap'
-                    >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
-                    </JovieLink>
-                  ) : null}
+                  <OnboardingOverflowMenu
+                    isSignedIn={isSignedIn}
+                    onRestart={hasConversation ? onRestart : undefined}
+                    onLogout={onLogout}
+                    disabled={actionPending || controlsDisabled}
+                  />
                 </OnboardingIdentityConflict>
               ) : null}
               <OnboardingChat
@@ -303,8 +293,8 @@ export function OnboardingShell({
                 onProfileBuilderChange={setProfileBuilderState}
                 starterHandoff={starterHandoff}
                 entryProfile={entryProfile}
-                turnstileToken={turnstileToken}
-                turnstileStatus={turnstileState.status}
+                turnstileToken={failOpen.token}
+                turnstileStatus={failOpen.status}
                 turnstilePanel={turnstilePanel}
                 turnstilePanelVisible={turnstilePanelVisible}
                 turnstileHasSiteKey={Boolean(turnstileSiteKey)}
@@ -319,13 +309,8 @@ export function OnboardingShell({
               />
 
               <OnboardingShellStatus
-                kind='error'
-                message={turnstileFailureMessage}
-                visible={Boolean(turnstileFailureMessage)}
-              />
-              <OnboardingShellStatus
                 kind='status'
-                message='Linking your conversation...'
+                message='Saving this conversation to your account…'
                 visible={isLinking}
               />
               <OnboardingShellStatus
@@ -341,6 +326,46 @@ export function OnboardingShell({
         }
       />
     </SidebarProvider>
+  );
+}
+
+/** Presentation only: the shell's existing callbacks retain action authority. */
+export function OnboardingOverflowMenu({
+  isSignedIn,
+  onRestart,
+  onLogout,
+  disabled = false,
+}: Readonly<{
+  isSignedIn: boolean;
+  onRestart?: () => void;
+  onLogout?: () => void;
+  disabled?: boolean;
+}>) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <IconButton ariaLabel='Onboarding options' variant='ghost' size='sm'>
+          <Ellipsis aria-hidden='true' />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end'>
+        {onRestart ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onRestart}>
+            Start over
+          </DropdownMenuItem>
+        ) : null}
+        {isSignedIn && onLogout ? (
+          <DropdownMenuItem disabled={disabled} onSelect={onLogout}>
+            Log out
+          </DropdownMenuItem>
+        ) : null}
+        {!isSignedIn ? (
+          <DropdownMenuItem asChild>
+            <NextLink href={APP_ROUTES.SIGNIN}>{SIGN_IN_LABEL}</NextLink>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -411,7 +436,7 @@ export function OnboardingIdentityConflict({
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>
               <NextLink href={APP_ROUTES.SIGNIN}>
-                Sign in with original account
+                Sign In with Original Account
               </NextLink>
             </JovieLink>
           ) : null}
@@ -421,7 +446,7 @@ export function OnboardingIdentityConflict({
   );
 }
 
-function OnboardingShellStatus({
+export function OnboardingShellStatus({
   kind,
   message,
   visible,
@@ -439,12 +464,13 @@ function OnboardingShellStatus({
         role='status'
         aria-live='polite'
         aria-busy='true'
-        data-testid='onboarding-linking-skeleton'
+        data-testid='onboarding-linking-status'
       >
-        <div className='flex h-3.5 w-44'>
-          <Skeleton className='flex-1' rounded='md' />
-        </div>
-        <span className='sr-only'>{message}</span>
+        {/* Words, not a bare skeleton bar: a wordless placeholder after sign-up
+            read as a stuck load (2026-10-31 golden-path walk). */}
+        <span className='text-xs leading-5 text-secondary-token'>
+          {message}
+        </span>
       </div>
     );
   }

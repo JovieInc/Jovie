@@ -5,7 +5,19 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  PRIVACY_CHOICES_HREF,
+  PRIVACY_CHOICES_LABEL,
+} from '@/lib/cookies/consent-state';
 import { cn } from '@/lib/utils';
+
+/**
+ * Profile legal links keep 10px type but own a 44x44pt hit box. FooterLink's
+ * default negative x-margin is zeroed so neighbouring boxes tile, and the
+ * negative y-margin returns the extra height to layout.
+ */
+const PROFILE_LEGAL_LINK_CLASS =
+  'min-h-11 min-w-11 items-center justify-center -my-3 mx-0 text-3xs leading-4 opacity-80 hover:opacity-100';
 
 const FOOTER_COLUMNS = [
   {
@@ -30,7 +42,7 @@ const FOOTER_COLUMNS = [
     heading: 'Account',
     links: [
       { href: APP_ROUTES.SIGNIN, label: 'Log In' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
+      { href: APP_ROUTES.START, label: 'Get Started' },
     ],
   },
   {
@@ -39,6 +51,7 @@ const FOOTER_COLUMNS = [
     links: [
       { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
       { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+      { href: PRIVACY_CHOICES_HREF, label: 'Your Privacy Choices' },
     ],
   },
 ] as const;
@@ -46,6 +59,7 @@ const FOOTER_COLUMNS = [
 const PROFILE_LEGAL_LINKS = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
   { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+  { href: PRIVACY_CHOICES_HREF, label: 'Your Privacy Choices' },
 ];
 
 import {
@@ -85,7 +99,13 @@ export function Footer({
 
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
+        {/* Mobile reserves the band the absolute legal links occupy
+            (bottom-2 right-4, 44pt hit boxes): without it the centered
+            branding link's own 44pt box overlaps them at narrow widths and
+            the unobscured target falls under 24px (axe target-size,
+            WCAG 2.5.8). Desktop pins its legal links to the viewport
+            corner instead, so the reservation is mobile-only. */}
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-16 md:pb-2'>
           <FooterBranding
             artistHandle={artistHandle}
             variant={config.colorVariant}
@@ -101,7 +121,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName={PROFILE_LEGAL_LINK_CLASS}
           />
         </div>
 
@@ -111,7 +131,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName={PROFILE_LEGAL_LINK_CLASS}
           />
         </div>
       </footer>
@@ -204,6 +224,13 @@ export function Footer({
                   Terms
                 </Link>
               </div>
+              <a
+                href={PRIVACY_CHOICES_HREF}
+                className={FOOTER_LINK_CLASS_NAME}
+                style={FOOTER_LINK_STYLE}
+              >
+                {PRIVACY_CHOICES_LABEL}
+              </a>
               <Copyright
                 variant='light'
                 className='text-2xs leading-4 font-normal tracking-tight opacity-100'
@@ -262,6 +289,13 @@ export function Footer({
                 </nav>
               )}
             </div>
+            <a
+              href={PRIVACY_CHOICES_HREF}
+              className={FOOTER_LINK_CLASS_NAME}
+              style={FOOTER_LINK_STYLE}
+            >
+              {PRIVACY_CHOICES_LABEL}
+            </a>
             <Copyright
               variant={config.colorVariant}
               className='text-2xs leading-4 font-normal tracking-tight opacity-100'

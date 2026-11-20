@@ -32,6 +32,17 @@ const traceExcludes = [
   'eslint-rules/**',
 ];
 
+// Sentry build plugin gate. `vercel pull` writes the literal "[SENSITIVE]" for
+// sensitive-typed env vars, which is not a usable token and must not enable
+// source map emission or upload.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
+const hasSentryAuthToken = Boolean(
+  sentryAuthToken && sentryAuthToken !== '[SENSITIVE]'
+);
+const shouldUseSentryPlugin =
+  hasSentryAuthToken &&
+  (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
+
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
   // Allow both so Next dev accepts asset/server-action requests from either host.
@@ -52,20 +63,22 @@ const nextConfig = {
     // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
     ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
-  // Never ship source maps to browsers (Sentry plugin uploads them separately)
-  productionBrowserSourceMaps: false,
+  // Maps ship only when the Sentry plugin uploads them (deleted from .next
+  // after upload) or on non-Vercel CI production builds — the Lighthouse
+  // gate's treemap needs served .map files (run 42614405519, JOV-12023).
+  productionBrowserSourceMaps:
+    shouldUseSentryPlugin ||
+    (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV),
   output: isVercelPreview ? undefined : 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
-  // These request-time readers build data paths dynamically, so NFT cannot
-  // reliably infer their files from the compiled route bundles. Keep this
-  // list limited to the data they actually read; the broad directory entries
-  // are small content and chat-topic catalogs.
-  // Monorepo files are staged into apps/web/runtime-data by
-  // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
-  // project root), which breaks deployment extraction.
+  // Request-time readers build data paths dynamically, so NFT cannot infer
+  // their files. List only the data they read; the broad directory entries
+  // are small content, chat-topic and chat-skill catalogs.
+  // Monorepo runtime data is staged inside apps/web by
+  // scripts/stage-runtime-data.mjs; traces must stay inside the project root.
   outputFileTracingIncludes: {
     '/*': [
       'runtime-data/CHANGELOG.md',
@@ -77,9 +90,11 @@ const nextConfig = {
       // Blog catalog validation checks these assets with fs.access at request time.
       'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
+      'lib/chat/skills/library/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
+    '/api/ovie/mcp': ['runtime-data/canon/invariants.jsonl'],
     '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
     '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],
     '/api/admin/outbound/readiness': [
@@ -87,8 +102,6 @@ const nextConfig = {
     ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
-    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
-    '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
   },
   // Dynamic fs paths make NFT over-approximate and copy repo files no route
   // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration
@@ -111,10 +124,8 @@ const nextConfig = {
   // externalized, re-introduce the includes via a non-symlinked path
   // (e.g. `.npmrc` public-hoist-pattern or a post-build dereference
   // step) instead of pnpm virtual-store globs.
-  trailingSlash: false,
   // Build optimizations
   poweredByHeader: false,
-  compress: true,
   // JOV-7985: Node.js is supported; enable after the dated migration exception clears.
   // JOV-7987: Cache Components requires migrating route-segment exports and
   // validating this entire app. Node.js is supported; the explicit `runtime`
@@ -196,8 +207,6 @@ const nextConfig = {
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year for better caching
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    // Enable blur placeholders for better UX
-    unoptimized: false,
   },
   async headers() {
     const securityHeaders = [
@@ -241,10 +250,6 @@ const nextConfig = {
 
     // Cache control header helpers
     const cacheHeaders = {
-      immutable: {
-        key: 'Cache-Control',
-        value: 'public, max-age=31536000, s-maxage=31536000, immutable',
-      },
       noStore: {
         key: 'Cache-Control',
         value: 'private, no-cache, no-store, must-revalidate',
@@ -255,9 +260,10 @@ const nextConfig = {
       },
     };
 
-    // Cache-Control merges when multiple sources match. Keep health identity
-    // routes AFTER the general /api rule so no-store wins over s-maxage=300
-    // (JOV-1958: stale public build-info after promote).
+    // When several rules set the same key for one path, the LAST rule wins.
+    // Keep health identity routes AFTER the general /api rule so their
+    // CDN-level no-store headers always apply (JOV-1958: stale public
+    // build-info after promote).
     const healthNoStoreHeaders = [
       {
         key: 'Cache-Control',
@@ -270,18 +276,22 @@ const nextConfig = {
     ];
 
     return [
+      // Order matters: for one path and one header key the LAST matching rule
+      // wins. The public catch-all goes first so every private rule below
+      // overrides it; never add a rule above it expecting it to stick.
+      {
+        source: '/(.*)',
+        headers: [...securityHeaders, cacheHeaders.revalidate],
+      },
+      // API default is fail-closed. A handler that is public and cacheable on
+      // purpose sets its own Cache-Control, which wins over this default; one
+      // that forgets must never be shared-cached (JOV-1958, JOV-7557).
       {
         source: '/api/(.*)',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=300, s-maxage=300', // 5 minutes
-          },
-        ],
+        headers: [...securityHeaders, cacheHeaders.noStore],
       },
       {
-        // Public deployment identity receipt — must never inherit API s-maxage.
+        // Public deployment identity receipt — never CDN-cacheable.
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
       },
@@ -296,8 +306,8 @@ const nextConfig = {
         ],
       },
       {
-        // Billing sync detail is credentialed. A public s-maxage would let
-        // the CDN replay an authorized body to anonymous callers (JOV-7557).
+        // Billing sync detail is credentialed. A shared cache would replay
+        // an authorized body to anonymous callers (JOV-7557).
         source: '/api/billing/health',
         headers: [
           ...healthNoStoreHeaders,
@@ -322,33 +332,18 @@ const nextConfig = {
           },
         ],
       },
-      {
-        source: '/(pricing|support|engagement-engine|blog|changelog)',
-        headers: [...securityHeaders, cacheHeaders.immutable],
-      },
-      {
-        source: '/legal/:path*',
-        headers: [...securityHeaders, cacheHeaders.immutable],
-      },
       // App routes and dynamic pages - no cache
       {
         source: '/app/:path*',
         headers: [...securityHeaders, cacheHeaders.noStore],
       },
+      // Whole path segments only: a bare `(go|r|…)(.*)` prefix would also
+      // match public paths such as /robots.txt, /report and any profile
+      // whose handle starts with "r" or "go".
       {
         source:
-          '/(go|r|onboarding|account|billing|hud|signin|signup|sso-callback)(.*)',
+          '/:section(go|r|onboarding|account|billing|hud|hud-tv|signin|signup|sso-callback)/:path*',
         headers: [...securityHeaders, cacheHeaders.noStore],
-      },
-      // Dynamic profile pages - no cache
-      {
-        source: '/:username/:path*',
-        headers: [...securityHeaders, cacheHeaders.revalidate],
-      },
-      // Catch-all for other routes - revalidate on each request
-      {
-        source: '/(.*)',
-        headers: [...securityHeaders, cacheHeaders.revalidate],
       },
       // Internal render-fixture surface (lib/render-fixture-policy.ts). These
       // pages deny in production; authorized non-production renders must still
@@ -751,8 +746,6 @@ const nextConfig = {
     // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
     // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
     cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
-    // Turbopack filesystem cache for faster dev server startup
-    turbopackFileSystemCacheForDev: true,
     // Enable auth interrupts for unauthorized()/forbidden() in server components
     authInterrupts: true,
     // Cache client-side RSC responses to prevent skeleton flashes on navigation.
@@ -765,11 +758,10 @@ const nextConfig = {
     },
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
+    // lucide-react, @headlessui/react and recharts are optimized by default
+    // (Next 16 optimizePackageImports docs); list only the extras.
     optimizePackageImports: [
       '@jovie/ui',
-      '@headlessui/react',
-      'lucide-react',
-      'simple-icons',
       'web-vitals', // Prevent ChunkLoadError in E2E tests
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
@@ -787,7 +779,6 @@ const nextConfig = {
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-radio-group',
-      'recharts',
       '@tanstack/react-pacer',
       'clsx',
       'class-variance-authority',
@@ -803,10 +794,6 @@ const nextConfig = {
       '@tanstack/react-table',
       '@tanstack/react-virtual',
     ],
-    // Build optimizations
-    // Turbopack: remove unsupported option
-    // forceSwcTransforms: true,
-    swcTraceProfiling: false,
     // Web vitals attribution with valid metric names only
     webVitalsAttribution: ['CLS', 'FCP', 'INP', 'LCP', 'TTFB'],
   },
@@ -862,11 +849,6 @@ module.exports = exposeBaseStaticConfigForTooling(
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
 const { withSentryConfig } = require('@sentry/nextjs/config');
 
-const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
-const shouldUseSentryPlugin =
-  hasSentryAuthToken &&
-  (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
-
 module.exports = exposeBaseStaticConfigForTooling(
   shouldUseSentryPlugin
     ? withSentryConfig(module.exports, {
@@ -874,6 +856,7 @@ module.exports = exposeBaseStaticConfigForTooling(
         project: 'jovie-web',
         silent: !process.env.CI,
         widenClientFileUpload: true,
+        sourcemaps: { deleteSourcemapsAfterUpload: true },
         tunnelRoute: '/monitoring',
       })
     : module.exports

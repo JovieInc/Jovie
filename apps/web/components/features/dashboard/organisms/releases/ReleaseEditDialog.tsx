@@ -65,10 +65,10 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-2.5 text-lg font-semibold text-primary-token'>
+      <DialogTitle className='flex items-center gap-2.5 text-base font-semibold text-primary-token'>
         <Icon
           name='Link'
-          className='h-4.5 w-4.5 text-secondary-token'
+          className='h-4 w-4 text-secondary-token'
           aria-hidden='true'
         />
         Edit Release Links
@@ -141,7 +141,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
+                          className='rounded-md px-1.5 py-0.5 text-3xs'
                         >
                           Manual
                         </Badge>

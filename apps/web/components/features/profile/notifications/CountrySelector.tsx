@@ -95,7 +95,7 @@ const CountryOptionButton = memo(function CountryOptionButton({
     >
       <CountryFlag code={option.code} />
       <span className='flex-1 text-left'>{option.label}</span>
-      <span className='text-tertiary-token'>{option.dialCode}</span>
+      <span className='text-primary-token'>{option.dialCode}</span>
       {isSelected && <Check className='w-4 h-4 text-primary-token' />}
     </button>
   );
@@ -129,27 +129,25 @@ export function CountrySelector({
           type='button'
           className='flex h-12 items-center gap-1.5 rounded-full px-3 text-mid font-semibold tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
           style={FONT_SYNTHESIS_STYLE}
-          aria-label='Select Country Code'
+          aria-label={`Select Country Code: ${country.dialCode}`}
         >
           <CountryFlag code={country.code} />
           <span>{country.dialCode}</span>
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align='start'
-        sideOffset={6}
-        className='w-64 rounded-(--radius-3xl) border border-[color:var(--profile-panel-border)] bg-(--profile-drawer-bg) p-2 shadow-(--profile-panel-shadow) backdrop-blur-2xl'
-      >
-        <div className='max-h-64 overflow-y-auto'>
-          {COUNTRY_OPTIONS.map(option => (
-            <CountryOptionButton
-              key={option.code}
-              option={option}
-              isSelected={country.code === option.code}
-              onSelect={handleSelect}
-            />
-          ))}
+      <PopoverContent align='start' sideOffset={6} size='bare' className='w-64'>
+        <div className='bg-(--profile-drawer-bg) p-2 backdrop-blur-2xl'>
+          <div className='max-h-64 overflow-y-auto'>
+            {COUNTRY_OPTIONS.map(option => (
+              <CountryOptionButton
+                key={option.code}
+                option={option}
+                isSelected={country.code === option.code}
+                onSelect={handleSelect}
+              />
+            ))}
+          </div>
         </div>
       </PopoverContent>
     </Popover>

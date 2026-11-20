@@ -26,8 +26,7 @@ they do not establish authentication, distribution or installed performance.
 The scaffold is a bounded extraction from Tim White's #18958 (`3dde45bbe4d5`,
 co-authored with Claude Opus 5.5). JOV-7528 owns this source slice; JOV-6750,
 JOV-6754, JOV-6748 and JOV-6759 retain shared-client, parity and release acceptance.
-The deprecated standalone Swift Ovie implementation
-stays read-only by policy. Do not grow MenuMonitor into a second product shell.
+There is no native Ovie (founder decision 2026-10-28): Ovie is web at `/app/ov`, and the standalone Swift repo is archived. Do not grow MenuMonitor into a second product shell.
 
 ### Local editor boundary (JOV-7571)
 
@@ -55,6 +54,16 @@ binding, so an old replacement cannot reappear after composition.
 Native Debug/Release tests exercise local editing contracts. Physical input
 methods, VoiceOver and installed-Mac performance remain separate acceptance;
 source or app-hosted tests do not establish live native chat parity.
+
+## Hosted recovery lifetime (JOV-12806)
+
+`apps/desktop/src/renderer-recovery-unlatch.ts` owns one hosted recovery attempt.
+Restart, stop, hosted navigation, renderer boot and window disposal invalidate
+the old generation, cancel its timer and abort its reachability request. Late
+results cannot navigate or schedule another retry, even if a probe ignores
+cancellation. The existing `renderer-recovery.ts` policy and retry cadence remain
+the authority. Deferred-probe regressions in `renderer-recovery-unlatch.test.ts` exercise
+the consumed controller; source tests do not establish installed-app behavior.
 
 ## Transition plan
 

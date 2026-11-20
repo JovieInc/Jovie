@@ -1,4 +1,6 @@
 // Track instrumentation lifecycle for cold start detection
+import { BASE_URL } from '@/constants/domains';
+
 const INSTRUMENTATION_START_TIME = Date.now();
 let firstValidationAttemptTime: number | null = null;
 let validationResolvedTime: number | null = null;
@@ -79,19 +81,7 @@ function shouldReportToSentry(issues: string[]): boolean {
     return false;
   }
 
-  // Filter out issues that are warnings in disguise or expected in certain contexts
-  const trulyBlockingIssues = issues.filter(issue => {
-    if (
-      issue.includes('CLERK') &&
-      (process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
-        process.env.NEXT_PUBLIC_CLERK_MOCK === '1')
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  return trulyBlockingIssues.length > 0;
+  return issues.length > 0;
 }
 
 /**
@@ -178,6 +168,43 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // JOV-9959: staging/preview must never boot against the production DB.
+    // Throws (crashing boot loudly) on a host collision; warns when the prod
+    // host reference is not yet provisioned so the gap stays visible.
+    try {
+      const { assertStagingDatabaseIsolation } = await import(
+        '@/lib/startup/db-host-guard'
+      );
+      assertStagingDatabaseIsolation(process.env);
+    } catch (error) {
+      console.error('[STARTUP] DB host isolation guard failed:', error);
+      throw error;
+    }
+
+    // Release event hook for recovery emails (JOV-12766): stamp shipped
+    // fixes' deploy time once per production server boot. On Vercel a lambda
+    // boots only when the new deployment first serves traffic, so boot is the
+    // release event — and boot-time work never lands in a request trace.
+    // The stamp itself is idempotent (setIfAbsent). Never on the build-info
+    // request path: that public receipt is read by monitors on every probe
+    // and must not touch the database.
+    //
+    // This must stay a fetch, not an import: instrumentation.ts is bundled
+    // into every serverless function, so importing probes.server here traces
+    // its whole database dependency graph (drizzle-orm,
+    // @neondatabase/serverless, ws, the full schema barrel) into every
+    // function and pushed auth/ios/complete past Vercel's 250 MB
+    // uncompressed-function-size limit. The stamp route owns that graph in
+    // its own function; instrumentation-boot.test.ts guards this contract.
+    if (process.env.VERCEL_ENV === 'production' && process.env.CRON_SECRET) {
+      void fetch(`${BASE_URL}/api/internal/ovie/fix-deploy-stamp`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10_000),
+      }).catch(() => undefined);
+    }
+
     const { musicResolverCutoverReceipt } = await import(
       '@/lib/music-resolver/musicfetch-gate'
     );

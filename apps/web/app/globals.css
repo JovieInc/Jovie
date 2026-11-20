@@ -22,6 +22,7 @@
    (styles/system-b-app.css) can reference the same foundation without
    re-emitting it. Imported normally here so it is emitted once, globally. */
 @import "../styles/tailwind-foundation.css";
+@import "../styles/electron-chrome.css";
 
 /* Scan @jovie/ui package so Tailwind v4 detects its class usage */
 
@@ -110,34 +111,9 @@ body {
   --jovie-shell-overlay-z-index: 180;
 }
 
-html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
-  --electron-controls-width: 200px;
-  --electron-traffic-light-x: 20px;
-  /* JOV-8974: the titlebar band sits one shell gap below the window top, so
-     the native lights ride down with it (MACOS_TRAFFIC_LIGHT_Y + gap). */
-  --electron-traffic-light-y: 25px;
-  --electron-traffic-light-control-size: 14px;
-  --electron-traffic-light-clearance: 8px;
-  /* Content origin is the shell gap (titlebar padding-left). The reserve
-     places the first control at the native lights' trailing clearance.
-     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
-  --electron-traffic-light-safe-width: calc(
-    var(--electron-traffic-light-x) -
-    var(--app-shell-gap) +
-    (3 * var(--electron-traffic-light-control-size)) +
-    (2 * var(--electron-traffic-light-clearance)) +
-    var(--electron-traffic-light-clearance) -
-    var(--app-shell-sidebar-icon-gap)
-  );
-  --electron-sidebar-width: var(--app-shell-sidebar-width);
-  --electron-sidebar-collapsed-width: 52px;
-}
-
 html[data-desktop-runtime="electron"] body {
   background: rgb(var(--sidebar-background));
-  font-family:
-    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+  font-family: var(--font-sans);
 }
 
 [data-electron-titlebar="true"] {
@@ -159,7 +135,7 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
    equals the sides (--app-shell-gap), so the titlebar band and the shared
    header row start one shell gap below the window top. */
 html[data-desktop-runtime="electron"]
-[data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
+  [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
   padding-top: var(--app-shell-gap);
   transition-property: gap, padding-right, padding-bottom, padding-left;
 }
@@ -192,6 +168,12 @@ html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
 
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
+  > div,
+/* The dashboard header keeps its controls reservation (JOV-7207) on a
+   wrapper above the drag box, so its title row sits one level deeper. */
+  html[data-desktop-runtime="electron"]
+  [data-top-spacing-owner="shell-header"]
+  > header
   > div {
   height: var(--electron-titlebar-height);
   padding-block: 0;
@@ -276,9 +258,9 @@ html[data-desktop-runtime="electron"]
 
 /* Settings now supplies the shared desktop header inside its route panel. */
 html[data-desktop-runtime="electron"]
-[data-app-shell-content-inset="true"]:has(
-  [data-testid="settings-shell-content"]
-) {
+  [data-app-shell-content-inset="true"]:has(
+    [data-testid="settings-shell-content"]
+  ) {
   padding-top: 0;
 }
 
@@ -1050,47 +1032,6 @@ body {
       display: none;
     }
   }
-  /* Unique per-route hero photograph (marketing-routes-code-spec,
-     2026-09-26). Lives behind hero copy inside the existing
-     `.relative overflow-hidden` hero wrapper. The scrim guarantees
-     header + headline legibility no matter how bright the source
-     photo is; `MarketingHeroPhoto`'s `opacity` prop tunes overall
-     image strength for specific routes (/ai, /download). */
-  .marketing-hero-photo {
-    z-index: 0;
-  }
-  /* The photo is positioned; static hero copy would paint underneath it
-     (the /pricing headline rendered invisible). Lift every later sibling. */
-  .marketing-hero-photo ~ * {
-    position: relative;
-    z-index: 1;
-  }
-  .marketing-hero-photo__img {
-    object-fit: cover;
-    object-position: right center;
-  }
-  .marketing-hero-photo__scrim {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--system-b-cinematic-black) 55%, transparent),
-        transparent 18%
-      ),
-      linear-gradient(
-        90deg,
-        var(--system-b-cinematic-black) 0%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 68%, transparent)
-          34%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent)
-          62%,
-        transparent 82%
-      );
-  }
-  @media (prefers-contrast: more) {
-    .marketing-hero-photo {
-      display: none;
-    }
-  }
   /* System B marketing type (2026-10-20). One class per role, bound to the
      --ds-marketing-* ramp in design-system.css. New marketing pages use these
      instead of the retired marketing-*-linear classes or page-local clamps:
@@ -1766,6 +1707,18 @@ body {
     }
   }
 
+  /* Link's opt-in label uses the real control's font and box model. The
+     opening tag reserves its width before streamed children arrive. */
+  [data-variant="link"][data-reserved-label]::after {
+    content: attr(data-reserved-label);
+    visibility: hidden;
+    grid-area: 1 / 1;
+  }
+
+  [data-variant="link"][data-reserved-label] > span {
+    grid-area: 1 / 1;
+  }
+
   .btn-linear-login {
     background-color: transparent;
     border-color: transparent;
@@ -1824,7 +1777,7 @@ body {
     }
   }
   .text-destructive {
-    color: var(--color-error);
+    color: var(--color-error-text);
   }
 
   .homepage-section-shell {
@@ -2144,6 +2097,49 @@ body {
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
   }
+
+  /* CompositeField (packages/ui/atoms/composite-field): the container owns the
+     focus ring so it follows the field's radius. Keyed to a focus-visible text
+     control (same as :focus-within while typing) so clicking an inner button
+     does not light the whole field. The inner control paints no ring of its own. */
+  /* sm keeps the shell search field's 10px inline inset (8px + 2px), on-grid. */
+  .composite-field[data-size="sm"] {
+    padding-inline: calc(var(--space-2) + var(--space-0-5, 2px));
+  }
+  .composite-field[data-surface="page"] {
+    border: 1px solid transparent;
+    background: var(--color-bg-page);
+  }
+  .composite-field[data-surface="field"] {
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface-1);
+  }
+  .composite-field[data-surface="shell"] {
+    color: var(--color-text-primary-token);
+    border: 1px solid var(--app-shell-frame-seam);
+    background: var(--app-shell-content-surface);
+  }
+  .composite-field[data-surface="shell"]:hover {
+    background: var(--color-bg-surface-1);
+  }
+  .composite-field[data-surface="shell"]:focus-within {
+    border-color: var(--linear-border-focus);
+    background: var(--color-bg-surface-0);
+  }
+  .composite-field:has(:is(input, textarea, select):focus-visible) {
+    --tw-ring-color: var(--color-focus-ring);
+    --tw-ring-offset-color: var(--color-bg-page);
+    --tw-ring-offset-width: 2px;
+    --tw-ring-offset-shadow: 0 0 0 var(--tw-ring-offset-width)
+      var(--tw-ring-offset-color);
+    --tw-ring-shadow: 0 0 0 calc(2px + var(--tw-ring-offset-width))
+      var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow);
+  }
+  .composite-field :is(input, textarea, select):is(:focus, :focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
 }
 
 /* Menu animations */
@@ -2172,9 +2168,6 @@ body {
   body {
     background-color: var(--color-bg-base);
     color: var(--color-text-primary-token);
-    font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
   }
   h1,
   h2,
@@ -2422,17 +2415,44 @@ body {
   }
 }
 
-.ask-jovie-mark .ask-jovie-wordmark {
+/* Sidebar brand: mark only at rest; hover/keyboard focus reveals the word.
+   Width (0fr -> 1fr) and opacity move together inside the wordmark's own
+   overflow-hidden box, so the header actions beside it never shift. Shared
+   by the customer Ask Jovie mark and the admin workspace switcher (the
+   switcher's always-on label was what showed "Jovie" at rest). */
+.ask-jovie-mark .ask-jovie-wordmark,
+.sidebar-wordmark-reveal .sidebar-wordmark {
   display: grid;
   grid-template-columns: 0fr;
+  opacity: 0;
   font-weight: var(--font-weight-nav);
-  transition: grid-template-columns var(--duration-subtle)
-    var(--ease-interactive);
+  transition:
+    grid-template-columns var(--duration-subtle) var(--ease-interactive),
+    opacity var(--duration-subtle) var(--ease-interactive);
 }
 
 .ask-jovie-mark:hover .ask-jovie-wordmark,
-.ask-jovie-mark:focus-visible .ask-jovie-wordmark {
+.ask-jovie-mark:focus-visible .ask-jovie-wordmark,
+.sidebar-wordmark-reveal:hover .sidebar-wordmark,
+.sidebar-wordmark-reveal:focus-visible .sidebar-wordmark,
+.sidebar-wordmark-reveal[aria-expanded="true"] .sidebar-wordmark {
   grid-template-columns: 1fr;
+  opacity: 1;
+}
+
+/* The 52px icon rail centers the mark alone; a revealed word would push it
+   off-center and past the rail edge. */
+[data-collapsible="icon"] .ask-jovie-mark:hover .ask-jovie-wordmark,
+[data-collapsible="icon"] .ask-jovie-mark:focus-visible .ask-jovie-wordmark,
+[data-collapsible="icon"] .sidebar-wordmark-reveal:hover .sidebar-wordmark,
+[data-collapsible="icon"]
+  .sidebar-wordmark-reveal:focus-visible
+  .sidebar-wordmark,
+[data-collapsible="icon"]
+  .sidebar-wordmark-reveal[aria-expanded="true"]
+  .sidebar-wordmark {
+  grid-template-columns: 0fr;
+  opacity: 0;
 }
 
 .ask-jovie-panel {
@@ -2440,7 +2460,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask-jovie-mark .ask-jovie-wordmark {
+  .ask-jovie-mark .ask-jovie-wordmark,
+  .sidebar-wordmark-reveal .sidebar-wordmark {
     transition: none;
   }
 }

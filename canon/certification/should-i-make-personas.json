@@ -1,0 +1,19 @@
+{
+  "schema": "company.buyer-personas/v1",
+  "note": "Archetypes only: public, no PII. Real-signup personas live in the private persona dir, never in git. Briefs describe the buyer's job, budget and alternatives, never product features.",
+  "archetypes": [
+    {
+      "id": "core-buyer",
+      "brief": "TODO: the ideal paying customer, their job to be done, budget, current alternative"
+    },
+    {
+      "id": "skeptic",
+      "brief": "TODO: a fit buyer who has tried alternatives and doubts this one"
+    },
+    {
+      "id": "control-off-icp",
+      "control": true,
+      "brief": "TODO: someone clearly outside the ICP; must judge no_pay"
+    }
+  ]
+}

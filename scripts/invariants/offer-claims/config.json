@@ -1,0 +1,83 @@
+{
+  "schema": "jovie-offer-claims/v1",
+  "roots": ["apps", "public"],
+  "textExtensions": [
+    ".md",
+    ".mdx",
+    ".json",
+    ".html",
+    ".swift",
+    ".kt",
+    ".txt",
+    ".xml",
+    ".svg",
+    ".yml",
+    ".yaml"
+  ],
+  "exclude": [
+    {
+      "path": "(?:^|/)(?:node_modules|\\.next|coverage|dist|\\.cache)/",
+      "reason": "Dependency and build output; authored source is scanned."
+    },
+    {
+      "path": "^apps/web/lib/billing/offer/",
+      "reason": "The canonical offer module: the only place price, trial and terms prose may be written."
+    },
+    {
+      "path": "(?:^|/)(?:tests|__tests__|__mocks__|e2e|[A-Za-z]+Tests|[A-Za-z]+UITests)/|\\.(?:test|spec|stories)\\.[cm]?[jt]sx?$",
+      "reason": "Test runners and Storybook entrypoints assert rendered text; they are not shipped copy. Offer assertions go through claims()."
+    },
+    {
+      "path": "^apps/web/content/(?:blog|comparisons)/",
+      "reason": "Editorial: quotes third-party prices and trials. Must never state Jovie's own current offer; reviewed in content PRs."
+    },
+    {
+      "path": "(?:^|/)(?:package|tsconfig|pnpm-lock)[^/]*\\.json$|(?:^|/)(?:messages|locales)/.*\\.snap$|\\.lock$|\\.pbxproj$|\\.xcstrings$",
+      "reason": "Tooling manifests, lockfiles and snapshots. A future messages/ or locales/ catalog is NOT excluded and is in scope by design."
+    },
+    {
+      "path": "^apps/web/scripts/|(?:^|/)(?:AGENTS|CLAUDE|README)\\.md$",
+      "reason": "Developer tooling, seeds and engineering docs are not shipped copy."
+    }
+  ],
+  "skipLiterals": [
+    {
+      "id": "identifier-like",
+      "reason": "Single-token literals (plan ids, class names, route keys) are identifiers, not prose."
+    }
+  ],
+  "patterns": [
+    {
+      "id": "recurring_price",
+      "source": "\\$\\s?\\d[\\d,.]*\\s?(?:/\\s?(?:mo|month|yr|year)\\b|per\\s+(?:month|year)\\b|a\\s+(?:month|year)\\b|monthly|annually)"
+    },
+    {
+      "id": "plan_price",
+      "source": "\\$\\s?\\d[\\d,.]*.*\\b(?:pro|artist presence|plan|subscription|upgrade|billed|checkout|per month)\\b|\\b(?:pro|artist presence|plan|subscription|upgrade|billed|checkout)\\b.*\\$\\s?\\d"
+    },
+    {
+      "id": "trial_claim",
+      "source": "\\btrials?\\b|\\b\\d+[- ]days?\\s+(?:free|left|of)\\b|\\b\\d+-day\\b"
+    },
+    {
+      "id": "no_card_claim",
+      "source": "\\bno\\s+(?:credit\\s+)?cards?\\b|\\bcards?\\s+(?:required|needed|on file)\\b|\\bwithout\\s+(?:a\\s+)?(?:credit\\s+)?card\\b"
+    },
+    {
+      "id": "cancel_claim",
+      "source": "\\bcancel\\s*any\\s?time\\b|\\bcancel\\s+at\\s+any\\b|\\bcancel\\s+(?:your\\s+)?(?:subscription|plan|membership|trial)\\b|\\bcancellation\\s+(?:takes|policy|is)\\b"
+    },
+    {
+      "id": "refund_guarantee_claim",
+      "source": "\\brefunds?\\b|money[- ]back|\\bguarantee[ds]?\\b"
+    },
+    {
+      "id": "billing_claim",
+      "source": "\\bper\\s+(?:month|year)\\b|/\\s?(?:mo|month|yr|year)\\b|\\bbilled\\b|\\bauto-?renew\\w*|\\brenews?\\b|\\ba\\s+month\\b|\\bmonthly\\s+(?:plan|price|fee|subscription)\\b"
+    },
+    {
+      "id": "free_forever_claim",
+      "source": "\\bfree\\s+forever\\b|\\balways\\s+free\\b|\\bfree\\s+for\\s+\\d+"
+    }
+  ]
+}

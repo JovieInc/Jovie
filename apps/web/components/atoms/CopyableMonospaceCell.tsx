@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { memo, useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
@@ -61,7 +62,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   const styles = sizeClasses[size];
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleCopy}
       className={cn(
@@ -70,7 +71,10 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
         className
       )}
       title={`Copy ${label}`}
-      aria-label={`Copy ${label}`}
+      // aria-label keeps the visible value inside the accessible name with a
+      // real space (WCAG 2.5.3); an sr-only prefix lost its trailing space at
+      // the element boundary ("Copy ISRC:USRC…").
+      aria-label={`Copy ${label}: ${value}`}
     >
       <span
         className='truncate'
@@ -92,6 +96,6 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       <span className='sr-only' aria-live='polite'>
         {copied ? `${label} copied` : ''}
       </span>
-    </button>
+    </PlainButton>
   );
 });

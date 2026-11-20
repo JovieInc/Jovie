@@ -58,20 +58,24 @@ describe('investor respond page', () => {
     mocks.insert.mockReturnValue({ values: mocks.insertValues });
   });
 
-  it('records a call request instead of redirecting to a calendar', async () => {
+  it('requires a POST confirmation before recording a call request', async () => {
     render(
       await InvestorRespondPage({
         searchParams: searchParams({ t: CLAIM_TOKEN, action: 'interested' }),
       })
     );
 
-    expect(mocks.update).toHaveBeenCalled();
-    expect(mocks.insertValues).toHaveBeenCalledWith({
-      investorLinkId: 'link-1',
-      pagePath: '/investor-portal#event/call_requested',
-    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    const confirm = screen.getByRole('button', { name: 'Confirm interest' });
+    expect(confirm).toHaveAttribute('type', 'submit');
+    expect(confirm.closest('form')).toHaveAttribute('method', 'post');
+    expect(confirm.closest('form')).toHaveAttribute(
+      'action',
+      '/api/investors/respond'
+    );
     expect(
-      screen.getByRole('heading', { name: 'Thanks for your interest!' })
+      screen.getByRole('heading', { name: 'Confirm your interest' })
     ).toBeInTheDocument();
   });
 
@@ -87,20 +91,24 @@ describe('investor respond page', () => {
     expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.insert).not.toHaveBeenCalled();
     expect(
-      screen.getByRole('heading', { name: 'Thanks for your interest!' })
+      screen.getByRole('heading', { name: 'Confirm your interest' })
     ).toBeInTheDocument();
   });
 
-  it('marks the link passed without recording a call request', async () => {
+  it('requires a POST confirmation before marking the link passed', async () => {
     render(
       await InvestorRespondPage({
         searchParams: searchParams({ t: CLAIM_TOKEN, action: 'pass' }),
       })
     );
 
+    expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.insert).not.toHaveBeenCalled();
     expect(
-      screen.getByRole('heading', { name: 'Thanks for letting us know' })
+      screen.getByRole('button', { name: 'Confirm pass' })
+    ).toHaveAttribute('type', 'submit');
+    expect(
+      screen.getByRole('heading', { name: 'Confirm you are passing' })
     ).toBeInTheDocument();
   });
 

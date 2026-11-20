@@ -18,6 +18,7 @@ import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -470,7 +471,7 @@ function getReleaseCollaboratorLine(
     return null;
   }
 
-  return `w/ ${collaborators.join(', ')}`;
+  return `w/ ${formatReleaseArtistLine(collaborators) ?? ''}`;
 }
 
 function getUpcomingTourDates(

@@ -14,12 +14,13 @@
 
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { withRetry } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
   processJob,
+  SELF_MANAGED_JOB_TYPES,
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -53,36 +54,46 @@ export async function GET(request: Request) {
     const processJobTransaction = async (
       job: (typeof claimed)[number]
     ): Promise<boolean> => {
-      const result = await withSystemIngestionSession(async tx => {
-        try {
-          await processJob(tx, job);
-          await succeedJob(tx, job);
-          return { ok: true as const };
-        } catch (error) {
-          await handleIngestionJobFailure(tx, job, error);
-
-          const msg = error instanceof Error ? error.message : String(error);
-          logger.error('Ingestion job failed', {
-            jobId: job.id,
-            error:
-              error instanceof Error
-                ? { message: error.message, stack: error.stack }
-                : String(error),
-          });
-
-          await captureError('Ingestion job failed', error, {
-            route: '/api/cron/process-ingestion-jobs',
-            jobId: job.id,
-            jobType: job.jobType,
-            attempts: job.attempts,
-          });
-
-          errors.push(`Job ${job.id}: ${msg}`);
-          return { ok: false as const };
+      try {
+        // Self-managed processors (social imports) own their own short
+        // DB-only transaction phases and must NOT be wrapped: holding BEGIN
+        // across their external fetches leaves the Postgres session
+        // idle-in-transaction until Neon terminates it (JOV-10139).
+        // DSP/email processors keep the ingestion-session transaction for
+        // RLS identity and multi-statement atomicity.
+        if (SELF_MANAGED_JOB_TYPES.has(job.jobType)) {
+          await processJob(db, job);
+        } else {
+          await withSystemIngestionSession(tx => processJob(tx, job));
         }
-      });
+        await withSystemIngestionSession(tx => succeedJob(tx, job));
+        return true;
+      } catch (error) {
+        // Failure bookkeeping runs on its own healthy connection — never
+        // inside the session that observed the failure.
+        await withSystemIngestionSession(tx =>
+          handleIngestionJobFailure(tx, job, error)
+        );
 
-      return result.ok;
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error('Ingestion job failed', {
+          jobId: job.id,
+          error:
+            error instanceof Error
+              ? { message: error.message, stack: error.stack }
+              : String(error),
+        });
+
+        await captureError('Ingestion job failed', error, {
+          route: '/api/cron/process-ingestion-jobs',
+          jobId: job.id,
+          jobType: job.jobType,
+          attempts: job.attempts,
+        });
+
+        errors.push(`Job ${job.id}: ${msg}`);
+        return false;
+      }
     };
 
     for (let i = 0; i < claimed.length; i += MAX_CONCURRENT_JOBS) {

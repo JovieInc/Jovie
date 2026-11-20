@@ -2,7 +2,7 @@
 
 Owner: JOV-4875 / existing agent-native API workstream. Status: proposal only.
 Evidence checked: October 20, 2026, source base `68b1c4a7c31`.
-Pricing authority: [canonical proposal schema](../company/PRICING-STRATEGY.md#api-pricing-schema-proposal-jov-4875).
+Pricing authority: the private API pricing proposal schema (JOV-4875) in `JovieInc/Ops` at `jovie-private/docs/company/PRICING-STRATEGY.md`; public summary in [PRICING-STRATEGY.md](../company/PRICING-STRATEGY.md).
 
 ## Outcome, scope, and evidence
 
@@ -20,8 +20,8 @@ checkout, and the Fable thread's executable spec was not available here.
 GBrain query failed at `127.0.0.1:7801` (`gbrain-unavailable`). These are missing
 historical evidence, not approval for prices or a reason to invent a new stack.
 
-The [September priority lock](../../canon/strategy/theses/2026-09-03-apis-mcps-core-not-first.md)
-and [October outcome/subsidy thesis](../../canon/strategy/theses/2026-10-02-sell-outcomes-replaceable-substrate.md)
+The September priority lock (private thesis `2026-09-03-apis-mcps-core-not-first`, see [strategy canon](../../canon/strategy/README.md))
+and October outcome/subsidy thesis (private thesis `2026-10-02-sell-outcomes-replaceable-substrate`, see [strategy canon](../../canon/strategy/README.md))
 govern this work. Continue JOV-4073 (agent contract), JOV-4074 (MCP), and
 JOV-4075 (API/CLI); do not fork a parallel API product. This PR adds no routes,
 UI, credentials, database fields, infrastructure, or billing behavior.

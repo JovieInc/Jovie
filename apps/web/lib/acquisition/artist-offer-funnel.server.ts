@@ -12,6 +12,7 @@ import {
   OFFER_LANDING_PATHS,
   type RecordedArtistOfferStage,
 } from './artist-offer-funnel';
+import { realJourney, realJourneyJ } from './synthetic-traffic';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -103,6 +104,7 @@ export async function getArtistOfferFunnelReport(input?: {
     FROM acquisition_journeys
     WHERE captured_at >= ${start} AND captured_at < ${end}
       AND consent_revoked_at IS NULL
+      AND ${realJourney}
   `);
   const totalVisits = Number(
     rowsOf<{ visits: number }>(visitResult)[0]?.visits ?? 0
@@ -116,6 +118,7 @@ export async function getArtistOfferFunnelReport(input?: {
     INNER JOIN acquisition_journey_stages s ON s.acquisition_id = j.id
     WHERE j.captured_at >= ${start} AND j.captured_at < ${end}
       AND j.consent_revoked_at IS NULL
+      AND ${realJourneyJ}
     GROUP BY j.id, j.captured_at, j.linked_at
     LIMIT ${MAX_TIMELINES}
   `);
@@ -133,15 +136,32 @@ export async function getArtistOfferFunnelReport(input?: {
     'pending-verification': toDate(row.stages?.['pending-verification']),
     'claim-verified': toDate(row.stages?.['claim-verified']),
     'claim-rejected': toDate(row.stages?.['claim-rejected']),
+    'claim-link-open': toDate(row.stages?.['claim-link-open']),
+    start: toDate(row.stages?.start),
+    'catalog-preview': toDate(row.stages?.['catalog-preview']),
+    claimed: toDate(row.stages?.claimed),
+    'upgrade-viewed': toDate(row.stages?.['upgrade-viewed']),
   }));
 
   const diagnostics = await getFunnelDiagnostics(start, end);
+  const weekStart = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const weekResult = await db.execute(drizzleSql`
+    SELECT count(*)::int AS visits
+    FROM acquisition_journeys
+    WHERE captured_at >= ${weekStart} AND captured_at < ${end}
+      AND consent_revoked_at IS NULL
+      AND ${realJourney}
+  `);
+  const visitsLast7d = Number(
+    rowsOf<{ visits: number }>(weekResult)[0]?.visits ?? 0
+  );
   return buildArtistOfferFunnelReport({
     start,
     end,
     totalVisits,
     timelines,
     diagnostics,
+    visitsLast7d,
   });
 }
 
@@ -159,6 +179,7 @@ async function getFunnelDiagnostics(
       FROM acquisition_journeys
       WHERE captured_at >= ${start} AND captured_at < ${end}
         AND consent_revoked_at IS NULL
+        AND ${realJourney}
     )
     SELECT count(*) FILTER (WHERE path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ',')))::int AS offer,
            count(*) FILTER (WHERE NOT (path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ','))))::int AS other
@@ -172,6 +193,7 @@ async function getFunnelDiagnostics(
     INNER JOIN acquisition_journeys j ON j.id = s.acquisition_id
     WHERE s.occurred_at >= ${start} AND s.occurred_at < ${end}
       AND j.consent_revoked_at IS NULL
+      AND ${realJourneyJ}
     GROUP BY s.stage
   `);
   const stageEventsInWindow: Partial<Record<RecordedArtistOfferStage, number>> =

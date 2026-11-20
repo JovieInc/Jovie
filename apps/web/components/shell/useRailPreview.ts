@@ -43,11 +43,15 @@ export function useRailPreview({
   pinned,
   enabled,
   resetKey,
+  enterIntentMs = 0,
 }: {
   side: 'left' | 'right';
   pinned: boolean;
   enabled: boolean;
   resetKey?: unknown;
+  /** Hover-intent dwell before a pointer opens the preview. Focus and
+   * keyboard open immediately; touch never opens it (no hover dependence). */
+  enterIntentMs?: number;
 }) {
   const [isPreview, setIsPreview] = useState(false);
   const [presentationMode, setPresentationMode] = useState<
@@ -57,23 +61,31 @@ export function useRailPreview({
   const pointerInside = useRef(false);
   const pointerTarget = useRef<EventTarget | null>(null);
   const pointerPoint = useRef<{ x: number; y: number } | null>(null);
+  const pressedToggle = useRef<Element | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelIntent = useCallback(() => {
+    if (intentTimer.current !== null) clearTimeout(intentTimer.current);
+    intentTimer.current = null;
+  }, []);
   const cancel = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
   }, []);
   const dismissPreview = useCallback(() => {
     cancel();
+    cancelIntent();
     blocked.current = true;
     setIsPreview(false);
-  }, [cancel]);
+  }, [cancel, cancelIntent]);
 
   useEffect(() => {
     cancel();
+    cancelIntent();
     setIsPreview(false);
     setPresentationMode('pinned');
     blocked.current = false;
-  }, [cancel, resetKey, enabled]);
+  }, [cancel, cancelIntent, resetKey, enabled]);
 
   const previousPinned = useRef(pinned);
   useEffect(() => {
@@ -81,10 +93,11 @@ export function useRailPreview({
     if (pinned) {
       setPresentationMode('pinned');
       cancel();
+      cancelIntent();
       setIsPreview(false);
     }
     previousPinned.current = pinned;
-  }, [pinned, cancel, dismissPreview]);
+  }, [pinned, cancel, cancelIntent, dismissPreview]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -103,6 +116,7 @@ export function useRailPreview({
         cancel();
         return;
       }
+      cancelIntent();
       if (timer.current !== null) return;
       timer.current = setTimeout(() => {
         timer.current = null;
@@ -110,7 +124,12 @@ export function useRailPreview({
       }, SHELL_RAIL_PREVIEW_GRACE_MS);
     };
     const enter = (event: Event) => {
-      if (event.type === 'pointerover') {
+      // Re-entry can arrive from move() after an explicit close. It is still
+      // pointer intent: keep the dwell and touch guard instead of treating
+      // movement as immediate keyboard focus and moving the toggle mid-click.
+      const pointer =
+        event.type === 'pointerover' || event.type === 'pointermove';
+      if (pointer) {
         pointerTarget.current = event.target;
         pointerInside.current = inside(event.target);
       }
@@ -126,10 +145,19 @@ export function useRailPreview({
           blocked.current = false;
         return;
       }
-      if (event.type === 'pointerover') {
+      if (pointer) {
         pointerInside.current = true;
       }
       if (pinned) return;
+      // A pointer-down focuses a button before its click. Expanding here can
+      // move the same toggle away before pointer-up, losing the activation.
+      // Keyboard focus still previews immediately; pointer activation pins it.
+      if (
+        pressedToggle.current &&
+        event.target instanceof Element &&
+        pressedToggle.current.contains(event.target)
+      )
+        return;
       // An entity inspector already owns the right surface. Hover must not
       // reinterpret it as an unsolicited artist-profile preview.
       if (
@@ -141,10 +169,22 @@ export function useRailPreview({
       )
         return;
       cancel();
-      if (!blocked.current) {
+      if (blocked.current) return;
+      const open = () => {
         setPresentationMode('preview');
         setIsPreview(true);
+      };
+      if (pointer && (event as PointerEvent).pointerType === 'touch') return;
+      if (!pointer || enterIntentMs <= 0 || isPreview) {
+        cancelIntent();
+        open();
+        return;
       }
+      if (intentTimer.current !== null) return;
+      intentTimer.current = setTimeout(() => {
+        intentTimer.current = null;
+        if (pointerInside.current && !blocked.current) open();
+      }, enterIntentMs);
     };
     const leave = (event: MouseEvent | FocusEvent) => {
       const wasInside = inside(event.target);
@@ -154,6 +194,7 @@ export function useRailPreview({
       }
       if (!wasInside || inside(event.relatedTarget)) return;
       if (retain()) return;
+      cancelIntent();
       if (
         event.type === 'focusout' &&
         event.relatedTarget instanceof Element &&
@@ -187,16 +228,34 @@ export function useRailPreview({
       }
     };
     const outside = (event: PointerEvent) => {
+      pressedToggle.current =
+        event.target instanceof Element
+          ? event.target.closest(`[data-rail-toggle="${side}"]`)
+          : null;
+      if (pressedToggle.current) cancelIntent();
       if (isPreview && !inside(event.target)) {
         dismissPreview();
         if (!inside(document.activeElement)) blocked.current = false;
       }
     };
+    const release = () => {
+      pressedToggle.current = null;
+    };
     const escape = (event: KeyboardEvent) => {
       // A dialog/menu that consumed Escape in capture owns this dismissal.
       if (event.key === 'Escape' && !event.defaultPrevented && isPreview) {
         event.preventDefault();
+        const focused = document.activeElement;
         dismissPreview();
+        // Collapsing can hide the focused rail item; hand focus to the toggle
+        // so keyboard users never land on <body>.
+        if (
+          inside(focused) &&
+          !focused?.matches(`[data-rail-toggle="${side}"]`)
+        )
+          document
+            .querySelector<HTMLElement>(`[data-rail-toggle="${side}"]`)
+            ?.focus();
       }
     };
     const observer = new MutationObserver(() => {
@@ -225,19 +284,33 @@ export function useRailPreview({
     document.addEventListener('focusin', enter);
     document.addEventListener('focusout', leave);
     document.addEventListener('pointerdown', outside);
+    document.addEventListener('pointerup', release);
+    document.addEventListener('pointercancel', release);
     document.addEventListener('keydown', escape);
     return () => {
       observer.disconnect();
       cancel();
+      cancelIntent();
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerover', enter);
       document.removeEventListener('pointerout', leave);
       document.removeEventListener('focusin', enter);
       document.removeEventListener('focusout', leave);
       document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('pointerup', release);
+      document.removeEventListener('pointercancel', release);
       document.removeEventListener('keydown', escape);
     };
-  }, [enabled, pinned, side, isPreview, cancel, dismissPreview]);
+  }, [
+    enabled,
+    pinned,
+    side,
+    isPreview,
+    enterIntentMs,
+    cancel,
+    cancelIntent,
+    dismissPreview,
+  ]);
 
   return {
     isPreview: enabled && !pinned && isPreview,

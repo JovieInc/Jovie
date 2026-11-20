@@ -8,11 +8,9 @@ import { JOVIE_CARD_INTEREST_SOURCE } from '@/data/jovieCardCopy';
 import { JovieAuthValuesProvider, useUserSafe } from '@/hooks/useJovieAuth';
 
 const CARD_SIGNUP_COPY: ChangelogEmailSignupCopy = {
-  idleHeading: 'Join the Jovie Card list',
-  idleDescription: 'Get access updates as the Jovie Card rollout develops.',
+  idleHeading: 'Jovie Card access',
   buttonLabel: 'Join the list',
-  consent:
-    'Email me Jovie product updates, including Jovie Card access updates. Unsubscribe anytime.',
+  consent: 'Includes Jovie Card access updates. Unsubscribe anytime.',
   successHeading: 'Check your email',
   successDescription:
     'Confirm your email to receive Jovie Card access updates.',
@@ -28,6 +26,7 @@ export function JovieCardInterestCapture() {
       source={JOVIE_CARD_INTEREST_SOURCE}
       initialEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
       copy={CARD_SIGNUP_COPY}
+      deferSecurityCheck
     />
   );
 }

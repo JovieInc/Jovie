@@ -140,7 +140,6 @@ function fixture() {
     producerJobs,
   };
 }
-
 function canonicalFixture() {
   const f = fixture();
   const route = `repos/${repository}/actions/artifacts?name=staging-deployment-${sha}&per_page=100`;
@@ -151,6 +150,7 @@ function canonicalFixture() {
     expectedSha: sha,
     identity: { commitSha: sha, deploymentId: 'dpl_exactStage' },
   };
+  f.canonical.identity.environment = 'preview';
   return { ...f, route };
 }
 test('reuses a unique current deployment with its original successful CI attempt', () => {
@@ -414,6 +414,7 @@ function cliFixture() {
       EXPECTED_SHA: sha,
       CANONICAL_STAGING_IDENTITY: JSON.stringify(f.canonical.identity),
       RUNNER_TEMP: root,
+      STAGING_IDENTITY_BACKOFF_SECONDS: '0',
     },
   };
 }
@@ -563,7 +564,6 @@ test('actual controller Bash keeps exact artifact and authenticates empty-ID fal
     rmSync(f.root, { recursive: true, force: true });
   }
 });
-
 test('actual controller rebinds historical Web only to authenticated staging on its release lineage', () => {
   const workflow = readFileSync(
     '.github/workflows/production-controller.yml',

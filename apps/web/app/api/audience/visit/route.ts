@@ -35,7 +35,12 @@ import {
 } from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { publicVisitLimiter } from '@/lib/rate-limit';
+import {
+  createRateLimitHeaders,
+  publicVisitLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+} from '@/lib/rate-limit';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -368,6 +373,28 @@ export async function POST(request: NextRequest) {
 
     const ipRateLimitResult = await publicVisitLimiter.limit(clientIP);
     if (!ipRateLimitResult.success) {
+      // Distinguish backend unavailability (Redis down / fail-closed limiter)
+      // from genuine quota exhaustion so an outage is never mislabeled as a
+      // 429 against the visitor (JOV-5132 WS3 measurement reliability).
+      if (ipRateLimitResult.unavailable) {
+        return NextResponse.json(
+          {
+            error: rateLimitDenialMessage(
+              ipRateLimitResult,
+              'Rate limit exceeded',
+              'Visit tracking is temporarily unavailable.'
+            ),
+            reason: ipRateLimitResult.reason,
+          },
+          {
+            status: rateLimitDenialStatus(ipRateLimitResult),
+            headers: {
+              ...NO_STORE_HEADERS,
+              ...createRateLimitHeaders(ipRateLimitResult),
+            },
+          }
+        );
+      }
       const retryAfterSeconds = Math.ceil(
         (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
       );
@@ -390,6 +417,25 @@ export async function POST(request: NextRequest) {
       resolvedIpAddress
     );
     if (!rateLimitResult.success) {
+      if (rateLimitResult.unavailable) {
+        return NextResponse.json(
+          {
+            error: rateLimitDenialMessage(
+              rateLimitResult,
+              'Rate limit exceeded',
+              'Visit tracking is temporarily unavailable.'
+            ),
+            reason: rateLimitResult.reason,
+          },
+          {
+            status: rateLimitDenialStatus(rateLimitResult),
+            headers: {
+              ...NO_STORE_HEADERS,
+              ...getRateLimitHeaders(rateLimitResult),
+            },
+          }
+        );
+      }
       return NextResponse.json(
         { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
         {

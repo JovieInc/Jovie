@@ -25,7 +25,7 @@ inputs:
   protected_branches:
     description: 'Comma-separated list of protected branches'
     required: false
-    default: 'main,development,preview,br-main,br-production'
+    default: 'main,production,prod,development,preview,br-main,br-production'
   cleanup_threshold:
     description: 'Aggressive cleanup threshold (default: 3)'
     required: false

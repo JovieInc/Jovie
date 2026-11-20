@@ -1,14 +1,14 @@
 export interface RequiredProfileCompletionInput {
   displayName: string | null | undefined;
   avatarUrl: string | null | undefined;
-  email: string | null | undefined;
+  handle: string | null | undefined;
   hasMusicLinks: boolean;
 }
 
 export interface RequiredProfileCompletionResult {
   hasName: boolean;
   hasAvatar: boolean;
-  hasEmail: boolean;
+  hasHandle: boolean;
   hasMusicLinks: boolean;
   completedCount: number;
   totalCount: number;
@@ -23,11 +23,13 @@ function hasText(value: string | null | undefined): boolean {
 /**
  * Canonical profile completion calculation.
  *
- * Completion criteria (4 required fields):
+ * Completion criteria (4 required fields — JOV-8137):
  * - Name
  * - Profile photo
- * - Account email
+ * - Handle
  * - At least one DSP/music link
+ *
+ * Social links and other extras do not affect the score.
  */
 export function calculateRequiredProfileCompletion(
   input: RequiredProfileCompletionInput
@@ -35,7 +37,7 @@ export function calculateRequiredProfileCompletion(
   const checks = {
     hasName: hasText(input.displayName),
     hasAvatar: hasText(input.avatarUrl),
-    hasEmail: hasText(input.email),
+    hasHandle: hasText(input.handle),
     hasMusicLinks: input.hasMusicLinks,
   };
 

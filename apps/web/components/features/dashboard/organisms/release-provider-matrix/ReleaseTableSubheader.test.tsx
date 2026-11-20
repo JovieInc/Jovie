@@ -33,6 +33,24 @@ describe('ReleaseTableSubheader', () => {
     expect(screen.getByText('Releases')).toBeInTheDocument();
   });
 
+  it('keeps toolbar glyphs at the shared 14px size', () => {
+    renderSubheader(
+      <ReleaseTableSubheader
+        releases={[]}
+        allReleases={[]}
+        selectedIds={new Set()}
+        filters={DEFAULT_RELEASE_FILTERS}
+        onFiltersChange={vi.fn()}
+      />
+    );
+
+    // PAGE_TOOLBAR_ACTION_BUTTON_CLASS sizes glyphs at 14px; a local 12px
+    // override makes these buttons lighter than every other page toolbar.
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.className).not.toMatch(/\[&_svg\]:[hw]-3(?![.\d])/);
+    }
+  });
+
   it('renders the preview toggle in the toolbar', () => {
     renderSubheader(
       <ReleaseTableSubheader

@@ -11,7 +11,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('marketing CTA intent registry', () => {
   it('opens the canonical live artist from both public proof intents', () => {
-    const homepage = getHomepageFrontDoorCtaContract(false);
+    const homepage = getHomepageFrontDoorCtaContract();
     expect(MARKETING_CTA_INTENTS.seeLiveProfile.href).toBe(
       TIM_WHITE_PROFILE.publicProfilePath
     );
@@ -20,30 +20,28 @@ describe('marketing CTA intent registry', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
       TIM_WHITE_PROFILE.publicProfilePath
     );
-    expect(getHomepageFrontDoorCtaContract(true).secondary).toBeNull();
   });
 
-  it('preserves empty handles at the open auth entry', () => {
-    expect(buildClaimProfileStartHref(undefined)).toBe(APP_ROUTES.START);
-    expect(buildClaimProfileStartHref(' @ ')).toBe(APP_ROUTES.START);
+  it('preserves empty handles at the open auth entry with an automatic starter prompt', () => {
+    expect(buildClaimProfileStartHref(undefined)).toBe(
+      '/start?starter_prompt=I+want+to+claim+my+profile.'
+    );
+    expect(buildClaimProfileStartHref(' @ ')).toBe(
+      '/start?starter_prompt=I+want+to+claim+my+profile.'
+    );
   });
 
-  it('keeps the waitlist-mode claim truthful and routed to the qualify chat', () => {
+  it('keeps the open-door claim truthful and routed to the qualify chat', () => {
     const intent = getClaimProfileIntent();
 
     expect(intent).toBe(MARKETING_CTA_INTENTS.claimProfile);
-    expect(intent.label).toBe('Claim your profile');
-    expect(intent.href).toBe(APP_ROUTES.START);
     expect(intent.eventName).toBe('landing_cta_claim_profile');
-    expect(intent.support).toBe('Free to start. Reserve your name now.');
     expect(intent.support.toLowerCase()).not.toContain('limited access');
-  });
-
-  it('restores the open-door artist-profile claim CTA when waitlist is disabled', () => {
-    const intent = getClaimProfileIntent(false);
-
+    expect(intent.support.toLowerCase()).not.toContain('reserve');
     expect(intent.label).toBe('Claim your profile');
-    expect(intent.href).toBe(APP_ROUTES.START);
+    expect(intent.href).toBe(
+      '/start?starter_prompt=I+want+to+claim+my+profile.'
+    );
     expect(intent.support).toBe('Free to start. No credit card.');
     expect(buildClaimProfileStartHref('@river-signal')).toBe(
       '/start?starter_prompt=I+want+to+claim+jov.ie%2Friver-signal.&handle=river-signal'

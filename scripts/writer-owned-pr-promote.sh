@@ -46,7 +46,7 @@ blocker_body() {
     | node "$PROMOTION_LIB" blocker
 }
 compensate_to_draft() {
-  local state pr_id attempted=false
+  local state pr_id reason record attempted=false
   # Re-read before EVERY risky effect. Never compensate another writer's head,
   # and never replay an uncertain dequeue/ready/disable response.
   for operation in disable-auto dequeue draft; do
@@ -69,6 +69,18 @@ compensate_to_draft() {
           pr_id="$(jq -r '.id // ""' <<<"$state")"
           [[ -n "$pr_id" ]] || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
           attempted=true
+          reason="writer-owned promotion compensation requests dequeue before restoring draft after a failed promote step"
+          record="$(jq -nc --arg reason "$reason" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg head "$EXPECTED_HEAD" '{code:"other",reason:$reason,actor:"writer-owned-pr-promote",at:$at,head:$head,outcome:"requested"}')"
+          # Persist the reason before removal. An uncertain record cannot authorize
+          # a dequeue, and the added API call must not extend a stale head lease.
+          node "$SCRIPT_DIR/../packages/api-client/cli.ts" gh --priority repair -- \
+            pr comment "$PR_NUMBER" -R "$REPO" --body "Dequeue requested (other): $reason.
+<!-- queue-dequeue $record -->" >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
+          state="$(read_state 2>/dev/null)" || { jq -n --argjson attempted "$attempted" '{compensationAttempted:$attempted}'; return 1; }
+          if ! jq -e --arg head "$EXPECTED_HEAD" --arg id "$pr_id" '.head == $head and .id == $id and .state == "OPEN"' <<<"$state" >/dev/null; then
+            jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1
+          fi
+          [[ "$(jq -r '.queued' <<<"$state")" == "true" ]] || continue
           gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
             -f id="$pr_id" >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
         fi ;;

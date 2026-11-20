@@ -114,6 +114,27 @@ describe('POST /api/notifications/subscribe', () => {
     expect(data.success).toBe(true);
   });
 
+  it('never issues the signup-session cookie without mailbox proof', async () => {
+    mockSubscribeToNotificationsDomain.mockResolvedValue({
+      body: { success: true, pendingConfirmation: false },
+      status: 200,
+      audienceIdentified: true,
+    });
+
+    const { POST } = await import('@/app/api/notifications/subscribe/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'victim@example.com' }),
+      })
+    );
+
+    // A returning verified address (or SMS) has no proof: handing out jv_sub_mgmt
+    // here would let anyone who knows the email overwrite name and birthday.
+    expect(response.cookies.get('jv_sub_mgmt')).toBeUndefined();
+  });
+
   it('returns 500 on server error', async () => {
     mockSubscribeToNotificationsDomain.mockRejectedValue(
       new Error('Database error')

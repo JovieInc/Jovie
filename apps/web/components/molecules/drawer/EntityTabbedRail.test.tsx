@@ -118,4 +118,29 @@ describe('EntityTabbedRail', () => {
       container.querySelectorAll('[data-surface-variant="card"]')
     ).toHaveLength(0);
   });
+
+  it('keeps the entity header but drops the tab chrome when hideTabbedCard is set', () => {
+    render(
+      <EntityTabbedRail
+        isOpen
+        ariaLabel='Analytics'
+        activeTab='details'
+        onTabChange={() => undefined}
+        tabOptions={TABS}
+        tabsAriaLabel='Analytics tabs'
+        entityHeader={<div>Header with its own empty state</div>}
+        tabbedCardTestId='entity-tabbed-card'
+        hideTabbedCard
+      >
+        <div>Hidden ranked list</div>
+      </EntityTabbedRail>
+    );
+
+    expect(
+      screen.getByText('Header with its own empty state')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('entity-tabbed-card')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hidden ranked list')).not.toBeInTheDocument();
+  });
 });

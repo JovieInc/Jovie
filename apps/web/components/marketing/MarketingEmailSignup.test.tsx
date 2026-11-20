@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingEmailSignup } from './MarketingEmailSignup';
 
 const route = vi.hoisted(() => ({ pathname: '/blog' as string | null }));
@@ -9,11 +10,17 @@ vi.mock('@/app/(marketing)/changelog/ChangelogEmailSignup', () => ({
   ChangelogEmailSignup: ({
     source,
     marketingSection,
+    deferSecurityCheck,
   }: {
     source: string;
     marketingSection?: boolean;
+    deferSecurityCheck?: boolean;
   }) => (
-    <div data-testid='signup' data-marketing-section={marketingSection}>
+    <div
+      data-testid='signup'
+      data-marketing-section={marketingSection}
+      data-defer-security-check={deferSecurityCheck}
+    >
       {source}
     </div>
   ),
@@ -34,9 +41,9 @@ describe('MarketingEmailSignup placement', () => {
     '/pay',
     '/artist-profiles',
     '/developers',
-  ])('offers product updates on %s with route attribution', pathname => {
+  ])('offers product updates on %s with route attribution', async pathname => {
     route.pathname = pathname;
-    render(<MarketingEmailSignup />);
+    const { container } = render(<MarketingEmailSignup />);
     expect(screen.getByTestId('signup')).toHaveTextContent(
       `marketing:${pathname}`
     );
@@ -44,6 +51,12 @@ describe('MarketingEmailSignup placement', () => {
       'data-marketing-section',
       'true'
     );
+    // Footer signups never load the Cloudflare iframe on page view.
+    expect(screen.getByTestId('signup')).toHaveAttribute(
+      'data-defer-security-check',
+      'true'
+    );
+    await expectNoA11yViolations(container);
   });
   it.each([
     null,

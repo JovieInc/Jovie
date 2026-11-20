@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ArtistRuleView } from '@/lib/artist-rules/types';
@@ -55,5 +57,13 @@ describe('ArtistRulesSheet', () => {
       await screen.findByRole('button', { name: 'Confirm Rule' })
     ).toBeInTheDocument();
     expect(screen.getByText(/Suggested from memory/)).toBeInTheDocument();
+  });
+
+  it('keeps section headings Title Case, never uppercase-transformed', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ArtistRulesSheet.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\buppercase\b/);
   });
 });

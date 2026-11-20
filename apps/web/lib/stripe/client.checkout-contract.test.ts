@@ -60,6 +60,14 @@ describe('checkout validates billable price before session creation', () => {
       }),
       undefined
     );
+    // The chat and the offer copy promise a plain paid subscription: no trial
+    // and no card-free start. A trial/payment-method change here must also
+    // change lib/chat/prompts/onboarding.ts.
+    const params = mocks.create.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(params).not.toHaveProperty('payment_method_collection');
+    expect(
+      (params.subscription_data as Record<string, unknown>) ?? {}
+    ).not.toHaveProperty('trial_period_days');
     expect(mocks.retrieve.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.create.mock.invocationCallOrder[0]
     );

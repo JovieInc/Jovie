@@ -108,7 +108,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
               {registry.demo.description}
             </p>
           </div>
-          <div className='overflow-hidden rounded-xl border border-subtle bg-black shadow-card dark:bg-black'>
+          <div className='overflow-hidden rounded-xl border border-subtle bg-ink-on-media shadow-card'>
             <video
               aria-label='Jovie Product Walkthrough'
               className='aspect-video w-full object-contain'

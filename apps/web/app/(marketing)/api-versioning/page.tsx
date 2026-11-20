@@ -19,7 +19,7 @@ export const revalidate = false;
 const PAGE_URL = PUBLIC_ARTIST_API_POLICY_URL;
 
 export const metadata: Metadata = {
-  title: documentTitle(`API Versioning and Deprecation Policy - ${APP_NAME}`),
+  title: documentTitle('API versioning and deprecation policy'),
   description:
     // ui-casing-allow: metadata sentence with API lifecycle terms
     'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     canonical: PAGE_URL,
   },
   openGraph: {
-    title: `API Versioning and Deprecation Policy - ${APP_NAME}`,
+    title: `API versioning and deprecation policy | ${APP_NAME}`,
     description:
       // ui-casing-allow: metadata sentence with API lifecycle terms
       'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
@@ -82,7 +82,8 @@ export default function ApiVersioningPage() {
             id='api-versioning-hero-heading'
             className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
           >
-            API Versioning And Deprecation Policy
+            {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
+            API versioning and deprecation policy
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
             The canonical lifecycle contract for Jovie&apos;s public artist API.

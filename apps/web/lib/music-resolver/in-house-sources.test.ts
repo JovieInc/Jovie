@@ -494,9 +494,11 @@ describe('createDefaultInHouseSources', () => {
       )
     ).toBe(true);
     await sources.searchAlbums('Tim White', 'Release', 'CA');
-    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
-      'entity=album&limit=8&country=ca'
-    );
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('entity=album&limit=8&country=ca')
+      )
+    ).toBe(true);
     await sources.albumByUpc('123456789012', 'GB');
     expect(
       fetchMock.mock.calls.some(([url]) =>
@@ -580,4 +582,19 @@ describe('createDefaultInHouseSources', () => {
       expect(result?.metadata?.releaseGroups).toHaveLength(complete ? 27 : 2);
     }
   );
+});
+
+describe('appleCollectionTitle', () => {
+  it('drops the storefront format label but keeps real title text', async () => {
+    const { appleCollectionTitle } = await import('./in-house-sources');
+    expect(appleCollectionTitle('Seaside Heights - Single')).toBe(
+      'Seaside Heights'
+    );
+    expect(appleCollectionTitle('Sunset - EP')).toBe('Sunset');
+    expect(appleCollectionTitle('Single - Single')).toBe('Single');
+    expect(appleCollectionTitle('Take Me Over - Remixes')).toBe(
+      'Take Me Over - Remixes'
+    );
+    expect(appleCollectionTitle(null)).toBeNull();
+  });
 });

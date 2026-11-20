@@ -161,7 +161,7 @@ export function OpportunityInboxSocialReplyCard({
           href={reply.sourceUrl}
           target='_blank'
           rel='noreferrer'
-          className='text-secondary-token text-2xs underline'
+          className='inline-flex min-h-6 items-center text-secondary-token text-2xs underline'
         >
           View original
         </a>

@@ -39,14 +39,14 @@ function TasksUpgradeContent({
       )}
       data-testid={testId}
     >
-      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-amber-700'>
+      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-warning-text'>
         {compact ? (
           <Lock className='h-5 w-5' aria-hidden='true' />
         ) : (
           <CheckSquare className='h-5 w-5' aria-hidden='true' />
         )}
       </div>
-      <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
+      <h2 className='text-balance text-base font-semibold tracking-[-0.025em] text-primary-token'>
         {heading}
       </h2>
       <p className='mt-2 max-w-md text-app leading-normal text-secondary-token'>
@@ -79,7 +79,7 @@ export function TasksWorkspaceUpgradeInterstitial() {
       <section className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
         <TasksUpgradeContent
           heading='Upgrade to access Tasks'
-          description='Upgrade to turn releases into step-by-step plans and manage all of your work in one task workspace.'
+          description='Upgrade to manage the work for each release in one task workspace.'
           secondaryHref={APP_ROUTES.RELEASES}
           secondaryLabel='Back to Releases'
         />
@@ -99,8 +99,8 @@ export function ReleasePlanUpgradeInterstitial({
       data-testid='release-plan-upgrade-interstitial'
     >
       <TasksUpgradeContent
-        heading='Upgrade to Generate a Release Plan'
-        description={`Upgrade to turn ${releaseName} into a step-by-step plan with tasks you can assign to Jovie AI.`}
+        heading='Upgrade to Track Release Tasks'
+        description={`Upgrade to track the tasks for ${releaseName} in one place.`}
         secondaryHref={APP_ROUTES.RELEASES}
         secondaryLabel='Back to Releases'
       />
@@ -114,8 +114,8 @@ export function CompactReleasePlanUpgradeCard({
   return (
     <TasksUpgradeContent
       compact
-      heading='Upgrade to Generate a Release Plan'
-      description='Upgrade to turn this release into an assignable step-by-step plan.'
+      heading='Upgrade to Track Release Tasks'
+      description='Upgrade to track the tasks for this release in one place.'
       onSecondaryClick={onDismiss}
       secondaryLabel='Maybe Later'
       testId='compact-release-plan-upgrade-card'

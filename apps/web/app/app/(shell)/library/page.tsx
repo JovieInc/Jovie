@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
-import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { loadLibraryDocuments } from '@/lib/db/creator-documents/library-page';
+import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
@@ -19,7 +22,7 @@ import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility'
 import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
-import { queryKeys } from '@/lib/queries';
+import { type DspMatch, queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import {
@@ -27,12 +30,18 @@ import {
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
 import {
+  type TeleprompterTakeSummary,
+  toTeleprompterTakeSummary,
+} from '@/lib/teleprompter/takes/contract';
+import { listTeleprompterTakes } from '@/lib/teleprompter/takes/server';
+import {
   hasConnectedYouTubeAccount,
   listVideosForLibraryProjection,
   type PublicVideoListItem,
 } from '@/lib/youtube-library';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
+import { CatalogPromotionComposer } from './promotion/[releaseId]/CatalogPromotionComposer';
 
 export const runtime = 'nodejs';
 
@@ -41,14 +50,37 @@ export const metadata: Metadata = {
   description: 'Manage what you make and put into the world',
 };
 
+// Same rows GET /api/dsp/matches sends, which the client reads into this
+// key; the client types that JSON as DspMatch the same way.
+async function loadDspMatches(
+  profileId: string,
+  userId: string
+): Promise<DspMatch[]> {
+  const matches = await getDspMatchesForProfile(profileId, userId);
+  return matches.map(match => ({
+    ...match,
+    createdAt: match.createdAt.toISOString(),
+    updatedAt: match.updatedAt.toISOString(),
+  })) as DspMatch[];
+}
+
 export default async function LibraryPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{
+    readonly promotion?: string;
     readonly section?: string | string[] | undefined;
+    readonly view?: string | string[] | undefined;
+    readonly document?: string | string[];
   }>;
 }) {
-  await searchParams;
+  const { view, promotion } = await searchParams;
+  const requestedDocument = (await searchParams).document;
+  const requestedId =
+    typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
+      ? requestedDocument.toLowerCase()
+      : null;
+  const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
@@ -59,7 +91,18 @@ export default async function LibraryPage({
     return routeContext.error;
   }
 
+  if (typeof promotion === 'string')
+    return <CatalogPromotionComposer releaseId={promotion} />;
   const selectedProfile = routeContext.dashboardData.selectedProfile;
+  // Studio takes are private to the signed-in creator, not the profile.
+  const takesPromise = listTeleprompterTakes(routeContext.userId)
+    .then(records => records.map(toTeleprompterTakeSummary))
+    .catch((error): TeleprompterTakeSummary[] => {
+      void captureError('Studio takes load failed on library page', error, {
+        route: APP_ROUTES.LIBRARY,
+      });
+      return [];
+    });
   const profileId = selectedProfile?.id ?? null;
   let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
     [];
@@ -89,7 +132,10 @@ export default async function LibraryPage({
           userId: routeContext.userId,
           profileId,
         });
-        const privateDocuments = await listCreatorDocuments(profileId);
+        const privateDocuments = await loadLibraryDocuments(
+          profileId,
+          requestedId
+        );
         return {
           documents: [...privateDocuments.documents],
           nextCursor: privateDocuments.nextCursor,
@@ -167,6 +213,24 @@ export default async function LibraryPage({
             creatorProfileId: profileId,
             route: APP_ROUTES.LIBRARY,
           }),
+          // The releases view shows an Apple Music banner above its list.
+          // Read its matches here so the banner is in the first paint;
+          // fetched on the client, the banner landed after the list and
+          // pushed it down (layout shift 0.075 against the 0.06 budget).
+          isReleasesView
+            ? queryClient
+                .fetchQuery({
+                  queryKey: queryKeys.dspEnrichment.matches(profileId),
+                  queryFn: () => loadDspMatches(profileId, routeContext.userId),
+                })
+                .catch(error => {
+                  void captureError(
+                    'DSP matches prefetch failed on library page',
+                    error,
+                    { route: APP_ROUTES.LIBRARY }
+                  );
+                })
+            : undefined,
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;
@@ -206,6 +270,14 @@ export default async function LibraryPage({
     creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
+  if (
+    requestedId &&
+    !creatorDocumentsLoadFailed &&
+    !creatorDocuments.some(item => item.id === requestedId)
+  )
+    notFound();
+  const teleprompterTakes = await takesPromise;
+
   return (
     <HydrateClient state={getDehydratedState()}>
       <LibraryPageClient
@@ -221,6 +293,7 @@ export default async function LibraryPage({
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         youtubeVideos={youtubeVideos}
         youtubeConnected={youtubeConnected}
+        teleprompterTakes={teleprompterTakes}
         relationships={relationships}
         postReleaseBundle={postReleaseBundle}
       />

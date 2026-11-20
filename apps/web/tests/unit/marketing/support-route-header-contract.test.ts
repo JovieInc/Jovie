@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 function readWebSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -32,24 +34,24 @@ describe('support route header contract', () => {
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
     expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
-    );
-    // JOV-6860: every marketing-header route shares the waitlist-mode
+    expect(headerSource).toContain('getHomepageFrontDoorCtaContract().primary');
+    // JOV-6860: every marketing-header route shares the one
     // front-door CTA via the single resolver; no per-route CTA overrides
     // other than the locked homepage entry.
     expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
-    );
+    expect(headerSource).not.toContain('waitlistEnabled');
     expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
     expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
-    // Homepage conversion lock (JOV-5085, label EVENT 2026-10-20): / shows
-    // the artist-profile claim -> /start even while waitlisting; other routes
-    // keep the front-door CTA.
+    // Homepage claim action (Tim, 2026-11-12: "Switch it"): / sends its
+    // header action into /start with the shared claim-profile intent; other
+    // routes keep the front-door CTA.
     expect(headerSource).toContain(
-      "[APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START }"
+      '[APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA'
     );
+    expect(HOME_MARKETING_HEADER_CTA).toEqual({
+      label: getClaimProfileIntent().label,
+      href: getClaimProfileIntent().href,
+    });
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     // Canonical Pen header: the Customers flyout is the only glass flyout.
@@ -74,6 +76,8 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       "logoReveal={resolvedLogoVariant === 'icon'}"
     );
+    // Every shared marketing shell selects the named 28px mark, including support.
+    expect(headerSource).toContain("logoMarkSize='marketing'");
     expect(headerSource).not.toMatch(
       /textContent|innerText|querySelector\('h1/
     );
@@ -124,5 +128,38 @@ describe('support route header contract', () => {
     expect(headerStoryStart).toBeGreaterThanOrEqual(0);
     expect(footerStoryStart).toBeGreaterThan(headerStoryStart);
     expect(headerStory).toContain("<MarketingHeader variant='landing' />");
+  });
+
+  it('lets the published site-chrome nav replace the code-default links', () => {
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+    expect(headerSource).toContain('export interface MarketingHeaderChromeNav');
+    expect(headerSource).toContain('navLinks ?? chromeNav?.primary');
+    expect(headerSource).toContain('links: plainLinks(chromeNav.customers)');
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingHeader.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+});
+
+describe('homepage header CTA', () => {
+  it('MarketingHeader.tsx can hide the primary CTA for the invite-only homepage', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('hidePrimaryCta');
+    expect(source).toContain('leftWordmark');
   });
 });

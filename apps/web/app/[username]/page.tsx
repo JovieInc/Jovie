@@ -1,15 +1,15 @@
 import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
-// No `export const dynamic` here — the parent layout sets `revalidate: 3600`
-// (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
-// API (cookies(), headers()) in this RSC tree.
+// One-hour ISR. Publication is not decided by this cached render: the proxy
+// asks /api/profile-publication on every request and refuses to serve this
+// body when the handle is not published right now (JOV-8629 §6.2,
+// lib/routing/profile-publication-edge.ts).
+export const revalidate = 3600;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
-import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -18,6 +18,9 @@ import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClien
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
+// Artist-paid audience data (view, pixels, funnel) must fire right after
+// hydration with no idle or interaction gate, so these stay in the entry
+// bundle; only heavy, non-revenue islands are lazy (JOV-10246).
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
@@ -41,7 +44,7 @@ import {
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
-// ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
+// profile-variant.ts does not read cookies; anonymous rendering avoids a viewer session lookup.
 import {
   getMerchMvpEnabled,
   getProfileAlertOptInVariant,
@@ -83,7 +86,7 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
-import { ProfileLoading } from './_components/ProfileLoading';
+import { DeferredAliasCollisionRecovery } from './_components/ProfileDeferredIslands';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';
@@ -92,9 +95,7 @@ import {
   type PublicProfileLoaderResult,
 } from './_lib/public-profile-loader';
 
-// Profile loader (fetch + cache + per-request memo) lives in
-// _lib/public-profile-loader.ts so per-mode routes (plan PR 3a-2b) can
-// reuse it without duplicating the cache, error class, or TTL contract.
+// Per-mode routes share a fresh profile loader with per-request deduplication.
 
 /**
  * Pre-render featured artist profiles at build time to eliminate cold-start latency.
@@ -265,10 +266,10 @@ async function ArtistPageContent({
 }: Readonly<ArtistPageContentProps>) {
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 
-  // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
-  // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
+  // Keep viewer-cookie reads out of this anonymous render. The fresh loader
+  // enforces current publication independently of the visitor session.
   // The jv_aid cookie is set by middleware on every request (analytics still
-  // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
+  // work). The alertOptInVariant defaults to 'button'; ProfileCompactTemplate
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
   // Viewer geo reaches the client through the readable jv_country cookie the
@@ -284,7 +285,7 @@ async function ArtistPageContent({
     creatorIsPro,
     creatorClerkId,
     creatorMetaPixelId,
-    latestRelease: fetchedLatestRelease,
+    latestRelease,
     pressPhotos,
   } = profileResult;
 
@@ -327,14 +328,12 @@ async function ArtistPageContent({
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
-  const isClaimed = creatorClerkId !== null;
+  const isClaimed = Boolean(profile.is_claimed);
   const isProofProfile = isProofProfileHandle(artist.handle);
   const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
-  // Structured-credit profiles still expose a claim path when an exact
-  // Spotify identity exists. The route only seeds a pending flow; the
-  // onboarding Spotify action must match that exact ID before claiming.
+  // Exact Spotify identity seeds a pending flow; onboarding action verifies match.
   const directClaimSupported = supportsDirectProfileClaim({
     spotifyId: profile.spotify_id,
   });
@@ -343,6 +342,7 @@ async function ArtistPageContent({
       id: profile.id,
       username: artist.handle,
       isClaimed,
+      userId: profile.user_id,
       userClerkId: creatorClerkId,
       spotifyId: profile.spotify_id,
     },
@@ -355,11 +355,6 @@ async function ArtistPageContent({
   // Falls back to undefined gracefully if the secret is not configured.
   const visitTrackingToken =
     getClientTrackingToken(profile.id).token ?? undefined;
-
-  const latestRelease = fetchedLatestRelease;
-  const releaseCredits = latestRelease?.id
-    ? await loadPublicReleaseCredits(latestRelease.id).catch(() => [])
-    : [];
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -395,18 +390,23 @@ async function ArtistPageContent({
     entityLinks,
     creditedArtists,
     releaseCollaborators,
+    releaseCredits,
   ] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
     merchCardsPromise,
-    // stableId is null for ISR renders — returns the default 'button' variant.
+    // Anonymous server renders use the default 'button' variant without a stableId.
     // AnonCookieBootstrap resolves the per-user variant on the client side.
-    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    // .catch keeps a Statsig outage from failing the anonymous page render.
     getProfileAlertOptInVariant(null).catch(() => 'button' as const),
     getProfilePacAssignment(null).catch(() => DEFAULT_PROFILE_PAC_ASSIGNMENT),
     entityLinksPromise.catch(() => []),
     creditedArtistsPromise,
     releaseCollaboratorsPromise,
+    // Latest-release credits ride this batch instead of a serial await.
+    latestRelease?.id
+      ? loadPublicReleaseCredits(latestRelease.id).catch(() => [])
+      : [],
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -471,7 +471,7 @@ async function ArtistPageContent({
 
   return (
     <>
-      <AliasCollisionRecovery username={username} />
+      <DeferredAliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
@@ -603,25 +603,25 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   await enforceCanonicalPublicProfileUsername(username);
 
-  // Resolve a missing/private profile before the page-level Suspense boundary
-  // can stream its loading shell. This preserves the segment's profile-specific
-  // not-found UI and a real HTTP 404 instead of streaming that UI with HTTP 200.
-  // Only this identity lookup is pre-stream: tour, release, merch, and entity
-  // reads remain inside ArtistPageContent, so valid profiles still use the
-  // existing loading fallback while those independent reads settle.
+  // Resolve a missing/private profile before rendering so the segment keeps its
+  // profile-specific not-found UI and a real HTTP 404.
+  //
+  // There is deliberately no Suspense boundary and no loading fallback here.
+  // The page is ISR, so the cached HTML is complete either way; a boundary only
+  // buried the real content (artwork, name) in a hidden segment that React
+  // reveals from a throttled inline script, which made the claim-link LCP swing
+  // between 1.7s and 6.0s on the throttled-mobile entry gate (budget 4000ms).
   const profileResult = await getProfileAndLinks(username);
   if (profileResult.status === 'not_found') {
     notFound();
   }
 
   return (
-    <Suspense fallback={<ProfileLoading />}>
-      <ArtistPageContent
-        initialMode={initialMode}
-        username={username}
-        profileResult={profileResult}
-      />
-    </Suspense>
+    <ArtistPageContent
+      initialMode={initialMode}
+      username={username}
+      profileResult={profileResult}
+    />
   );
 }
 
@@ -650,8 +650,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status, creatorClerkId, latestRelease } =
-    profileResult;
+  const { profile, genres, status, latestRelease } = profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -664,7 +663,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildPublicProfileMetadata({
     profile,
     genres,
-    isClaimed: creatorClerkId !== null,
+    isClaimed: Boolean(profile.is_claimed),
     // latestRelease uses the public release-eligibility predicate, so null
     // means the profile has no publicly eligible release.
     hasPublicRelease: latestRelease !== null,

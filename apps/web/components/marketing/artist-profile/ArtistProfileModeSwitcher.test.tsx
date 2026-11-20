@@ -54,7 +54,7 @@ describe('ArtistProfileModeSwitcher', () => {
       const panel = screen.getByRole('tabpanel', { name: 'Out now' });
       expect(
         within(panel).getByText(
-          'When the song is live, fans go straight to the right service.',
+          'When the song is live, listeners go straight to the right service.',
           { exact: true }
         )
       ).toBeVisible();

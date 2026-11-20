@@ -99,7 +99,7 @@ export interface FeatureCardProps {
   readonly metric?: string;
   /** Icon element to display */
   readonly icon: React.ReactNode;
-  /** Color accent for the icon */
+  /** @deprecated Icons render bare; accent no longer tints a tile. */
   readonly accent?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray';
   /** Additional CSS classes */
   readonly className?: string;
@@ -112,19 +112,9 @@ export function FeatureCard({
   description,
   metric,
   icon,
-  accent = 'blue',
   className = '',
   interactive = true,
 }: FeatureCardProps) {
-  const accentClasses = {
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600',
-    purple: 'from-purple-500 to-purple-600',
-    orange: 'from-orange-500 to-orange-600',
-    red: 'from-red-500 to-red-600',
-    gray: 'from-gray-500 to-gray-600',
-  };
-
   // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
 
@@ -172,14 +162,7 @@ export function FeatureCard({
         transition={cardTransition}
       >
         {/* Icon */}
-        <div
-          className={`
-            inline-flex h-12 w-12 items-center justify-center rounded-xl 
-            text-white dark:text-white shadow-lg bg-gradient-to-br ${accentClasses[accent]}
-          `}
-        >
-          {icon}
-        </div>
+        <div className='inline-flex text-primary-token'>{icon}</div>
 
         {/* Title */}
         <h3 className='mt-6 text-xl font-semibold text-primary-token'>

@@ -464,4 +464,14 @@ describe('FounderReviewRegistry', () => {
       );
     });
   });
+
+  it('renders the ready mark with light-safe success text', async () => {
+    renderRegistry();
+
+    const readyRow = screen.getByTestId('founder-review-row-feature.ready');
+    const mark = await within(readyRow).findByText('Ready');
+    // The AA success text token is mode-aware (darker on light, full success
+    // on dark), replacing the raw emerald palette classes.
+    expect(mark.className).toContain('text-success-text');
+  });
 });

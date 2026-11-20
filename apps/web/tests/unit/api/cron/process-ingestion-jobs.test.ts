@@ -36,6 +36,13 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
+  SELF_MANAGED_JOB_TYPES: new Set([
+    'import_beacons',
+    'import_laylo',
+    'import_tiktok',
+    'import_twitter',
+    'import_youtube',
+  ]),
   claimPendingJobs: mockClaimPendingJobs,
   handleIngestionJobFailure: mockHandleIngestionJobFailure,
   processJob: mockProcessJob,

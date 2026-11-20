@@ -14,16 +14,66 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import {
+  extractLayloHandle,
+  isLayloUrl,
+} from '@/lib/ingestion/strategies/laylo';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
+import {
+  buildPagelessLeadProfile,
+  isPagelessLead,
+  type PagelessLeadSkipReason,
+} from './pageless-lead-profile';
 
 export interface LeadIngestionResult {
   success: boolean;
   profileId?: string;
   profileUsername?: string;
   error?: string;
+  /** Stable code when a pageless lead stays approved but not ingested. */
+  reason?: PagelessLeadSkipReason;
+}
+
+export type EvidenceQueueOutcome =
+  | { status: 'accepted'; jobId: string }
+  | { status: 'no_source' | 'not_accepted' | 'failed'; jobId: null };
+
+export interface LeadEvidenceRefreshResult {
+  status: 'accepted' | 'partial' | 'failed' | 'no_source';
+  /** Compatibility fields: true only with an acknowledged queue job ID. */
+  musicFetch: boolean;
+  dspDiscovery: boolean;
+  jobs: {
+    musicFetch: EvidenceQueueOutcome;
+    dspDiscovery: EvidenceQueueOutcome;
+  };
+  surfaces:
+    | { status: 'reconciled'; surfaces: number; sources: number }
+    | { status: 'failed' };
+}
+
+async function collectQueueReceipt(
+  enqueue: (() => Promise<string | null>) | null,
+  message: string,
+  leadId: string
+): Promise<EvidenceQueueOutcome> {
+  if (!enqueue) return { status: 'no_source', jobId: null };
+  try {
+    const jobId = await enqueue();
+    if (jobId) return { status: 'accepted', jobId };
+    // Null does not prove a deduplicated job exists. The queue returns an ID
+    // for a known existing job; do not manufacture acceptance without one.
+    await captureError(message, new Error('Queue returned no job receipt'), {
+      leadId,
+    });
+    return { status: 'not_accepted', jobId: null };
+  } catch (error) {
+    await captureError(message, error, { leadId });
+    return { status: 'failed', jobId: null };
+  }
 }
 
 /**
@@ -35,7 +85,7 @@ export interface LeadIngestionResult {
 export async function refreshLeadProfileEvidence(
   profileId: string,
   lead: Pick<Lead, 'id' | 'spotifyUrl'>
-): Promise<{ musicFetch: boolean; dspDiscovery: boolean }> {
+): Promise<LeadEvidenceRefreshResult> {
   const [createdProfile] = await db
     .select({
       spotifyUrl: creatorProfiles.spotifyUrl,
@@ -45,43 +95,78 @@ export async function refreshLeadProfileEvidence(
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
+  if (!createdProfile) throw new Error('Lead profile not found');
+
   const leadArtistId = lead.spotifyUrl
     ? extractSpotifyArtistId(lead.spotifyUrl)
     : null;
   const spotifyUrl =
-    createdProfile?.spotifyUrl ?? (leadArtistId ? lead.spotifyUrl : null);
-  const spotifyId = createdProfile?.spotifyId ?? leadArtistId;
+    createdProfile.spotifyUrl ?? (leadArtistId ? lead.spotifyUrl : null);
+  const spotifyId = createdProfile.spotifyId ?? leadArtistId;
 
+  let surfaces: LeadEvidenceRefreshResult['surfaces'];
   try {
-    await reconcileProfileSurfaces(profileId);
+    surfaces = {
+      status: 'reconciled',
+      ...(await reconcileProfileSurfaces(profileId)),
+    };
   } catch (err) {
+    surfaces = { status: 'failed' };
     await captureError('Lead profile surface reconcile failed', err, {
       leadId: lead.id,
     });
   }
 
-  if (spotifyUrl) {
-    void enqueueMusicFetchEnrichmentJob({
-      creatorProfileId: profileId,
-      spotifyUrl,
-    }).catch(err =>
-      captureError('MusicFetch enrichment enqueue failed for lead', err, {
-        leadId: lead.id,
-      })
+  // Await durable acceptance, not provider execution. These are independent;
+  // one rejection must not discard the other job's receipt.
+  const [musicFetch, dspDiscovery] = await Promise.all([
+    collectQueueReceipt(
+      spotifyUrl
+        ? () =>
+            enqueueMusicFetchEnrichmentJob({
+              creatorProfileId: profileId,
+              spotifyUrl,
+            })
+        : null,
+      'MusicFetch enrichment enqueue failed for lead',
+      lead.id
+    ),
+    collectQueueReceipt(
+      spotifyId
+        ? () =>
+            enqueueDspArtistDiscoveryJob({
+              creatorProfileId: profileId,
+              spotifyArtistId: spotifyId,
+              targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+            })
+        : null,
+      'DSP discovery enqueue failed for lead',
+      lead.id
+    ),
+  ]);
+  const jobs = { musicFetch, dspDiscovery };
+  const hasAcceptedJob = Object.values(jobs).some(
+    job => job.status === 'accepted'
+  );
+  const hasFailure =
+    surfaces.status === 'failed' ||
+    Object.values(jobs).some(
+      job => job.status === 'failed' || job.status === 'not_accepted'
     );
+  let status: LeadEvidenceRefreshResult['status'];
+  if (hasFailure) {
+    status =
+      hasAcceptedJob || surfaces.status === 'reconciled' ? 'partial' : 'failed';
+  } else {
+    status = hasAcceptedJob ? 'accepted' : 'no_source';
   }
-  if (spotifyId) {
-    void enqueueDspArtistDiscoveryJob({
-      creatorProfileId: profileId,
-      spotifyArtistId: spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-    }).catch(err =>
-      captureError('DSP discovery enqueue failed for lead', err, {
-        leadId: lead.id,
-      })
-    );
-  }
-  return { musicFetch: Boolean(spotifyUrl), dspDiscovery: Boolean(spotifyId) };
+  return {
+    status,
+    musicFetch: musicFetch.status === 'accepted',
+    dspDiscovery: dspDiscovery.status === 'accepted',
+    jobs,
+    surfaces,
+  };
 }
 
 /**
@@ -95,7 +180,26 @@ export async function ingestLeadAsCreator(
     return { success: false, error: 'Lead has no Linktree URL' };
   }
 
-  const handle = lead.linktreeHandle;
+  // Linktree, Beacons and other blocked hosts are never read: their profile
+  // comes from the search match and Spotify instead of the page.
+  const pageless = isPagelessLead(lead)
+    ? await buildPagelessLeadProfile(lead)
+    : null;
+  if (pageless && !pageless.ok) {
+    logger.warn('Lead left approved without a profile', {
+      leadId: lead.id,
+      reason: pageless.reason,
+    });
+    return { success: false, error: pageless.error, reason: pageless.reason };
+  }
+
+  // Hand-added Laylo leads are stored with a host-prefixed fallback handle
+  // (laylocom-<name>); Laylo's profile lookup needs the bare Laylo handle.
+  const isLaylo = isLayloUrl(lead.linktreeUrl);
+  const handle =
+    pageless?.handle ??
+    (isLaylo ? extractLayloHandle(lead.linktreeUrl) : null) ??
+    lead.linktreeHandle;
 
   try {
     const existingCheck = await checkExistingProfile(handle);
@@ -114,17 +218,21 @@ export async function ingestLeadAsCreator(
       };
     }
 
-    const extraction = await fetchFullExtractionProfile(
-      false, // not Laylo
-      lead.linktreeUrl,
-      handle
-    );
+    const extraction = pageless
+      ? pageless.extraction
+      : await fetchFullExtractionProfile(isLaylo, lead.linktreeUrl, handle);
 
     // Keep leads.displayName as the raw scrape provenance; only the public
     // profile receives the artist-name projection.
     const displayName =
-      cleanScrapedDisplayName(extraction.displayName) ?? handle;
-    const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
+      pageless?.displayName ??
+      cleanScrapedDisplayName(extraction.displayName) ??
+      handle;
+    // A pageless avatar comes only from Spotify; its links are never scanned.
+    const hostedAvatarUrl = await resolveHostedAvatarUrl(
+      handle,
+      pageless ? { avatarUrl: extraction.avatarUrl, links: [] } : extraction
+    );
 
     const extractionWithHostedAvatar = {
       ...extraction,
@@ -137,12 +245,14 @@ export async function ingestLeadAsCreator(
             existing: existingCheck.existing,
             extraction: extractionWithHostedAvatar,
             displayName,
+            leadHold: true,
           })
         : await handleNewProfileIngest({
             finalHandle: existingCheck.finalHandle,
             displayName,
             hostedAvatarUrl,
             extraction: extractionWithHostedAvatar,
+            leadHold: true,
           });
 
     const body = (await response.json()) as {
@@ -160,6 +270,11 @@ export async function ingestLeadAsCreator(
 
     // Update the lead with the creator profile ID and mark as ingested
     if (body.profile?.id) {
+      // A Spotify match found by search becomes the lead's Spotify link, so
+      // approval's Spotify enrichment and evidence refresh can use it.
+      const matchedSpotifyUrl = lead.spotifyUrl
+        ? null
+        : (pageless?.spotifyUrl ?? null);
       await db
         .update(leads)
         .set({
@@ -167,13 +282,17 @@ export async function ingestLeadAsCreator(
           creatorProfileId: body.profile.id,
           ingestedAt: new Date(),
           updatedAt: new Date(),
+          ...(matchedSpotifyUrl ? { spotifyUrl: matchedSpotifyUrl } : {}),
         })
         .where(eq(leads.id, lead.id));
 
       // Enqueue MusicFetch enrichment and DSP discovery for the new profile.
       // Wrapped in try/catch so failures don't flip the ingestion result.
       try {
-        await refreshLeadProfileEvidence(body.profile.id, lead);
+        await refreshLeadProfileEvidence(body.profile.id, {
+          id: lead.id,
+          spotifyUrl: lead.spotifyUrl ?? matchedSpotifyUrl,
+        });
       } catch (err) {
         await captureError(
           'Post-ingestion enrichment enqueue failed for lead',

@@ -5,6 +5,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  session: vi.fn(),
   flag: vi.fn(),
   shell: vi.fn(),
   capture: vi.fn(),
@@ -22,6 +23,9 @@ vi.mock('next/navigation', () => ({
   notFound: mocks.notFound,
   redirect: mocks.redirect,
 }));
+vi.mock('@/lib/auth/request-session', () => ({
+  getRequestSession: mocks.session,
+}));
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.auth }));
 vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.capture }));
@@ -35,12 +39,18 @@ vi.mock('../profiles/ProfilesWorkspace', () => ({
   ProfilesWorkspace: () => null,
 }));
 
+import LegacyPresencePage from '../dashboard/presence/page';
+import ProfilesPage from '../profiles/page';
 import PresencePage, { metadata } from './page';
 
 describe('Profiles public page route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ userId: 'actor-1' });
+    mocks.session.mockResolvedValue({
+      user: { id: 'ba-actor-1' },
+      session: { id: 'session-1', userId: 'ba-actor-1' },
+    });
     mocks.flag.mockResolvedValue(true);
     mocks.shell.mockResolvedValue({
       user: { id: 'database-user-1' },
@@ -72,10 +82,46 @@ describe('Profiles public page route', () => {
       { route: APP_ROUTES.PRESENCE }
     );
     expect(mocks.loadProfiles).not.toHaveBeenCalled();
-    expect(mocks.flag).toHaveBeenCalledWith('PROFILES_WORKSPACE', {
-      userId: 'actor-1',
-    });
+    expect(mocks.flag).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, false])(
+    'loads the supported workspace without a rollout override (%s)',
+    async value => {
+      mocks.flag.mockResolvedValue(value);
+
+      const result = await PresencePage();
+
+      expect(isValidElement(result)).toBe(true);
+      if (!isValidElement(result)) throw new Error('Expected workspace');
+      expect(result.props).toMatchObject({
+        removalPrincipal: {
+          appActorId: 'actor-1',
+          authUserId: 'ba-actor-1',
+          sessionId: 'session-1',
+          impersonationSubject: null,
+        },
+      });
+      expect(mocks.loadProfiles).toHaveBeenCalledWith({
+        clerkUserId: 'actor-1',
+        databaseUserId: 'database-user-1',
+        profileId: 'identity-1',
+      });
+      expect(mocks.flag).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([ProfilesPage, LegacyPresencePage])(
+    'redirects legacy bookmarks to Identity without a rollout lookup',
+    async page => {
+      mocks.flag.mockResolvedValue(false);
+
+      await expect(page()).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mocks.redirect).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+      expect(mocks.flag).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps unauthenticated callers out of shell and profile loading', async () => {
     mocks.auth.mockResolvedValue({ userId: null });

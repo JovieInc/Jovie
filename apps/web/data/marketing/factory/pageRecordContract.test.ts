@@ -180,7 +180,7 @@ describe('per-record page contracts', () => {
       routeGlob: '(marketing)/solutions/[audience]/page.tsx',
       url: '/solutions/artists',
       copyScope: 'music',
-      job: 'show artists how profiles connect music, links, and permissioned fan updates',
+      job: 'show artists how profiles connect music, links, and permissioned listener updates',
       proof: 'profile gallery, capture flow, and conversion sections',
       successEvent: 'artist claims a profile',
       primaryCta: { href: APP_ROUTES.SIGNUP, label: 'Claim your profile' },

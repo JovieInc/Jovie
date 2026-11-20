@@ -5,10 +5,7 @@ import {
   type AcquisitionCertificationPorts,
   AcquisitionCertificationStore,
 } from '@/lib/acquisition/certification-store';
-import {
-  buildCertificationDecisionDigest,
-  type CertificationEvidenceReceipt,
-} from '@/lib/agent-os/certification';
+import { buildCertificationDecisionDigest } from '@/lib/agent-os/certification';
 import { MarketingCertificationStore } from '@/lib/agent-os/certification-adapter';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import { projectOvieInbox } from '@/lib/ovie/inbox';
@@ -19,6 +16,7 @@ import {
   fixtureReceipt,
   memoryCertificationBackend,
 } from './fixtures';
+import { CUSTOMER_SHA, customerProof } from './inventory.fixtures';
 import {
   type CustomerCertificationCandidateRef,
   MARKETING_ASSURANCE_GATE,
@@ -27,7 +25,7 @@ import {
   readOvieCertificationInventory,
   recordOvieCertificationDecision,
 } from './inventory.server';
-import type { CertificationPacketFile } from './packet-files.server';
+import { deps, packetFile } from './inventory-read.helpers';
 
 vi.mock('@/lib/agent-os/certification-runtime-store', () => ({
   getMarketingCertificationStore: vi.fn(),
@@ -38,56 +36,6 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
   postgresRecordBackend: vi.fn(),
 }));
-
-function packetFile(
-  subjectId: string,
-  overrides: Partial<CertificationPacketFile> = {}
-): CertificationPacketFile {
-  return {
-    domain: 'flows',
-    surface: 'Golden Path',
-    packetUpdatedAt: '2026-09-27T07:00:00.000Z',
-    links: [{ label: 'Run', href: 'https://ci.test/1', kind: 'test_run' }],
-    packet: fixturePacket(subjectId),
-    file: `docs/certification/${subjectId}.packet.json`,
-    ...overrides,
-  };
-}
-
-function deps(
-  files: readonly CertificationPacketFile[],
-  backend = memoryCertificationBackend()
-): OvieCertificationInventoryDeps & {
-  readonly backendInstance: ReturnType<typeof memoryCertificationBackend>;
-} {
-  const marketingBackend = memoryCertificationBackend();
-  return {
-    backendInstance: backend,
-    backend: () => backend,
-    marketingStore: () =>
-      new MarketingCertificationStore(
-        marketingBackend,
-        MARKETING_COMPONENT_REGISTRY
-      ),
-    readPacketFiles: async () => ({
-      root: '/repo/docs/certification',
-      files,
-      issues: [
-        {
-          domain: null,
-          source: 'docs/certification/bad.packet.json',
-          message: 'Invalid JSON.',
-        },
-      ],
-    }),
-    featureRegistry: {
-      list: async () => ({
-        items: [],
-        sourceUpdatedAt: FIXTURE_NOW,
-      }),
-    },
-  };
-}
 
 describe('readOvieCertificationInventory', () => {
   it.each(['company', 'design_system', 'icps', 'outcomes'] as const)(
@@ -233,6 +181,40 @@ describe('readOvieCertificationInventory', () => {
       inventory.domains.find(d => d.domain === 'marketing_components')
     ).toMatchObject({ status: 'error', rowCount: 0 });
     expect(inventory.rows.map(row => row.id)).toEqual(['flows:signup']);
+  });
+
+  it('reads every packet-domain decision ledger in one backend batch (JOV-12821)', async () => {
+    const backend = memoryCertificationBackend();
+    backend.records.set(
+      'jovie:certification:v1:packet-decisions:flows',
+      JSON.stringify({
+        schemaVersion: 1,
+        contract: 'jovie.certification/v1',
+        domain: 'flows',
+        records: {},
+        updatedAt: '2026-09-27T07:00:00.000Z',
+      })
+    );
+    const getMany = vi.fn(async (keys: readonly string[]) => {
+      const rows = new Map<string, unknown>();
+      for (const key of keys) {
+        if (backend.records.has(key)) rows.set(key, backend.records.get(key));
+      }
+      return rows;
+    });
+    const batched = { ...backend, getMany };
+    const inventory = await readOvieCertificationInventory(
+      deps([packetFile('signup')], batched),
+      FIXTURE_NOW
+    );
+    // One round trip for all nine packet-domain ledger keys, not one
+    // identical SELECT per domain.
+    expect(getMany).toHaveBeenCalledTimes(1);
+    expect(getMany.mock.calls[0]?.[0]).toHaveLength(9);
+    expect(inventory.domains.find(d => d.domain === 'flows')).toMatchObject({
+      status: 'connected',
+      rowCount: 1,
+    });
   });
 
   it('fails a packet domain closed when its decision ledger cannot be read', async () => {
@@ -388,22 +370,7 @@ describe('recordOvieCertificationDecision', () => {
 });
 
 const CUSTOMER_SUBJECT = 'acquisition:premade-artist-profile:lead1:run1';
-const CUSTOMER_SHA = 'a'.repeat(40);
 const CUSTOMER_NOW = '2026-09-12T22:00:00.000Z';
-
-function customerProof(
-  tier: CertificationEvidenceReceipt['tier']
-): CertificationEvidenceReceipt {
-  return {
-    id: tier,
-    tier,
-    status: 'passed',
-    sourceSha: CUSTOMER_SHA,
-    ref: `fixture:${tier}`,
-    digest: `fixture-digest:${tier}`,
-    summary: 'Synthetic test evidence only',
-  };
-}
 
 function customerCandidate(): AcquisitionCertificationCandidate {
   return {
@@ -438,7 +405,9 @@ function customerCandidate(): AcquisitionCertificationCandidate {
       canonicalReferences: [customerProof('canonical_references')],
       invariantEvaluation: [customerProof('invariant_evaluation')],
       testsCoverage: [customerProof('tests_coverage')],
-      visualProof: [customerProof('visual_proof')],
+      visualProof: [
+        { ...customerProof('visual_proof'), id: 'dogfood-judge:customer' },
+      ],
       requiredVariants: [
         {
           id: 'profile',

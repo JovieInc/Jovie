@@ -1,0 +1,77 @@
+{
+  "schema": "jovie-product-surfaces/v1",
+  "policy": "One implementation per product surface. A new surface for an existing product extends that product's shared shell (Jovie and Ovie share one shell, canon/PRODUCT.md 'Jovie and Ovie mirror one shell'); it never creates a parallel app, repo, native rewrite or second shell. Every apps/* directory is registered here; a new one needs an explicit kind, and 'independent' needs a justification. Checked by scripts/invariants/one-surface-per-product.mjs (pnpm run surfaces:check).",
+  "products": {
+    "ovie": {
+      "surface": "web",
+      "shell": "apps/web /app/ov on the shared Jovie/Ovie shell",
+      "decision": "Tim White 2026-10-28: the native Ovie Mac app shouldn't exist; one Ovie, web, shared shell",
+      "forbiddenRepos": ["JovieInc/ovie"],
+      "forbiddenTrackedPaths": [
+        "^tools/shipping-menu-bar/",
+        "^apps/(ovie-mac|ovie-native|ovie-ios)/",
+        "(^|/)Ovie[A-Za-z]*\\.(xcodeproj|xcworkspace)(/|$)",
+        "(^|/)Sources/Ovie/",
+        "(^|/)OvieApp\\.swift$",
+        "^apps/web/components/features/admin/hud/OvieMacHud"
+      ]
+    }
+  },
+  "registryFiles": [
+    "canon/ownership.json",
+    "apps/web/lib/release-communications/sources.ts",
+    "scripts/fleet-gate/closure_health.py"
+  ],
+  "apps": {
+    "apps/web": {
+      "product": "jovie",
+      "kind": "shell",
+      "note": "jov.ie; owns the shared Jovie/Ovie shell, including Ovie at /app/ov"
+    },
+    "apps/ovie": {
+      "product": "ovie",
+      "kind": "deploy-boundary",
+      "note": "Next.js deploy of web Ovie; re-exports Jovie shell routes, owns no screens of its own (docs/OVIE.md)"
+    },
+    "apps/desktop": {
+      "product": "jovie",
+      "kind": "wrapper",
+      "note": "Electron wrapper loading hosted web; its Ovie door opens /app/ov"
+    },
+    "apps/ios": {
+      "product": "jovie",
+      "kind": "independent",
+      "justification": "Jovie creator iOS and JovieMac product surfaces; no Ovie screens"
+    },
+    "apps/macos": {
+      "product": "jovie",
+      "kind": "independent",
+      "justification": "media-ingest and MenuMonitor operator accessory; tracked for retirement in favor of web Ovie Shipping"
+    },
+    "apps/extension": {
+      "product": "jovie",
+      "kind": "independent",
+      "justification": "browser extension"
+    },
+    "apps/console": {
+      "product": "jovie",
+      "kind": "independent",
+      "justification": "console app"
+    },
+    "apps/docs": {
+      "product": "jovie",
+      "kind": "independent",
+      "justification": "documentation site"
+    },
+    "apps/eve-pilot": {
+      "product": "summer",
+      "kind": "independent",
+      "justification": "Jovie public Eve agent pilot"
+    },
+    "apps/should-i-make": {
+      "product": "should-i-make",
+      "kind": "independent",
+      "justification": "separate product"
+    }
+  }
+}

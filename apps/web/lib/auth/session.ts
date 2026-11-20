@@ -2,6 +2,8 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { replaySessionRead } from '@/lib/auth/session-read-replay';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import {
   applyRlsSessionUser,
   applyRlsTransactionUser,
@@ -56,13 +58,9 @@ export function validateClerkUserId(userId: string): void {
 }
 
 /**
- * Sets up the database session for the authenticated user
- * This enables RLS policies to work properly with the app user id.
- *
- * `getCachedAuth().userId` is the app `users.id` UUID post-cutover
- * (Clerk → Better Auth identity flip). RLS `set_config` is keyed on
- * the same value; legacy Clerk-era RLS policies that compared against
- * `clerk_user_id` are updated in lockstep with this commit.
+ * Resolves the app user id for session/RLS setup (`getCachedAuth()` returns
+ * the app `users.id` UUID post-cutover; Clerk-era RLS policies that compared
+ * against `clerk_user_id` are updated in lockstep).
  */
 async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   if (clerkUserId) {
@@ -113,12 +111,9 @@ async function applySessionUserId(userId: string): Promise<void> {
 }
 
 /**
- * Sets up the database session for the authenticated user
- * This enables RLS policies to work properly with Clerk user ID
- *
- * Uses session-scoped `set_config` calls and retry logic.
- * Avoid introducing new transaction usage in app code; keep legacy
- * transaction wrappers isolated in `lib/db/legacy-transaction.ts`.
+ * Sets up the database session for the authenticated user (enables RLS
+ * policies). Uses session-scoped `set_config` calls and retry logic; keep
+ * legacy transaction wrappers isolated in `lib/db/legacy-transaction.ts`.
  */
 export async function setupDbSession(clerkUserId?: string) {
   let userId: string;
@@ -264,6 +259,7 @@ export interface ProfileContext {
   isPublic: boolean | null;
   isClaimed: boolean | null;
   onboardingCompletedAt: Date | null;
+  proofPending?: boolean;
 }
 
 /**
@@ -276,12 +272,9 @@ export interface SessionContext {
 }
 
 /**
- * Get the current user's database record by app user id.
- * This is the single source of truth for user lookups.
- *
+ * Get the current user's database record by app user id (single source of
+ * truth for user lookups).
  * @param clerkUserId - App `users.id` UUID (uses auth() if not provided).
- *   Parameter name preserved for churn reduction; was a Clerk user id
- *   pre-cutover.
  * @returns User record or null if not found
  */
 export async function getDbUser(
@@ -289,68 +282,72 @@ export async function getDbUser(
 ): Promise<DbUserContext | null> {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  const [user] = await db
-    .select({
-      id: users.id,
-      clerkId: users.clerkId,
-      email: users.email,
-      isAdmin: users.isAdmin,
-      isPro: users.isPro,
-      userStatus: users.userStatus,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const [user] = await replaySessionRead(
+    () =>
+      db
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          isAdmin: users.isAdmin,
+          isPro: users.isPro,
+          userStatus: users.userStatus,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    'session_getDbUser'
+  );
 
   return user ?? null;
 }
 
 /**
- * Get the current user's claimed profile.
- * Returns the profile associated with the user's database record.
- *
+ * Get the current user's claimed profile (the profile associated with the
+ * user's database record).
  * @param dbUserId - Database user ID
  * @returns Profile record or null if not found
  */
 export async function getProfileByDbUserId(
   dbUserId: string
 ): Promise<ProfileContext | null> {
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      avatarUrl: creatorProfiles.avatarUrl,
-      isPublic: creatorProfiles.isPublic,
-      isClaimed: creatorProfiles.isClaimed,
-      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-    })
-    .from(users)
-    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.id, dbUserId))
-    .limit(1);
+  const [row] = await replaySessionRead(
+    () =>
+      db
+        .select({
+          id: creatorProfiles.id,
+          userId: creatorProfiles.userId,
+          username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          displayName: creatorProfiles.displayName,
+          avatarUrl: creatorProfiles.avatarUrl,
+          isPublic: creatorProfiles.isPublic,
+          isClaimed: creatorProfiles.isClaimed,
+          onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+          settings: creatorProfiles.settings,
+        })
+        .from(users)
+        .innerJoin(
+          creatorProfiles,
+          eq(creatorProfiles.id, users.activeProfileId)
+        )
+        .where(eq(users.id, dbUserId))
+        .limit(1),
+    'session_getProfileByDbUserId'
+  );
 
-  return profile ?? null;
+  if (!row) return null;
+  const { settings, ...profile } = row;
+  return {
+    ...profile,
+    ...(isProofBlockingPublication(settings) ? { proofPending: true } : {}),
+  };
 }
 
 /**
- * Get the full session context: clerkUserId, user, and profile.
- * This is the recommended way to get user/profile data in server actions and API routes.
- *
- * Replaces the common pattern:
- * ```typescript
- * const { userId } = await getCachedAuth();
- * const [user] = await db.select().from(users).where(eq(users.id, userId));
- * const [profile] = await db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
- * ```
- *
- * With:
- * ```typescript
- * const { user, profile } = await getSessionContext();
- * ```
- *
+ * Get the full session context: clerkUserId, user, and profile — the
+ * recommended way to get user/profile data in server actions and API routes
+ * (one JOIN query instead of two sequential user+profile lookups).
  * @param options.clerkUserId - Optional explicit Clerk user ID
  * @param options.requireUser - If true, throws if user not found (default: true)
  * @param options.requireProfile - If true, throws if profile not found (default: false)
@@ -367,28 +364,36 @@ export async function getSessionContext(options?: {
 
   // Performance optimization: Single JOIN query instead of two sequential queries
   // This reduces database round trips from 2 to 1 (50% reduction)
-  const [result] = await db
-    .select({
-      // User fields
-      userId: users.id,
-      userClerkId: users.clerkId,
-      userEmail: users.email,
-      userIsAdmin: users.isAdmin,
-      userIsPro: users.isPro,
-      userStatus: users.userStatus,
-      // Profile fields (nullable from LEFT JOIN)
-      profileId: creatorProfiles.id,
-      profileUsername: creatorProfiles.username,
-      profileUsernameNormalized: creatorProfiles.usernameNormalized,
-      profileDisplayName: creatorProfiles.displayName,
-      profileAvatarUrl: creatorProfiles.avatarUrl,
-      profileIsPublic: creatorProfiles.isPublic,
-      profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-    })
-    .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.id, clerkUserId))
-    .limit(1);
+  const [result] = await replaySessionRead(
+    () =>
+      db
+        .select({
+          // User fields
+          userId: users.id,
+          userClerkId: users.clerkId,
+          userEmail: users.email,
+          userIsAdmin: users.isAdmin,
+          userIsPro: users.isPro,
+          userStatus: users.userStatus,
+          // Profile fields (nullable from LEFT JOIN)
+          profileId: creatorProfiles.id,
+          profileUsername: creatorProfiles.username,
+          profileUsernameNormalized: creatorProfiles.usernameNormalized,
+          profileDisplayName: creatorProfiles.displayName,
+          profileAvatarUrl: creatorProfiles.avatarUrl,
+          profileIsPublic: creatorProfiles.isPublic,
+          profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+          profileSettings: creatorProfiles.settings,
+        })
+        .from(users)
+        .leftJoin(
+          creatorProfiles,
+          eq(creatorProfiles.id, users.activeProfileId)
+        )
+        .where(eq(users.id, clerkUserId))
+        .limit(1),
+    'session_getSessionContext'
+  );
 
   // User not found
   if (!result && requireUser) {
@@ -440,6 +445,9 @@ export async function getSessionContext(options?: {
         isPublic: result.profileIsPublic,
         isClaimed: true, // joined via activeProfileId = claimed
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
+        ...(isProofBlockingPublication(result.profileSettings)
+          ? { proofPending: true }
+          : {}),
       }
     : null;
 

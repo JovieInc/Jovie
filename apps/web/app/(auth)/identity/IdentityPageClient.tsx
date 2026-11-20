@@ -1,9 +1,11 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AuthAppleIcon } from '@/components/features/auth/atoms';
+import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
 import { authClient } from '@/lib/auth/client';
 
@@ -80,7 +82,21 @@ export function IdentityPageClient() {
           ) : null}
         </div>
         <p className='text-center text-xs leading-5 text-secondary-token'>
-          By continuing, you agree to the Terms and Privacy Policy.
+          By continuing, you agree to the{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_TERMS}
+            className='underline underline-offset-2'
+          >
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_PRIVACY}
+            className='underline underline-offset-2'
+          >
+            Privacy Policy
+          </Link>
+          .
         </p>
       </div>
     </AuthLayout>

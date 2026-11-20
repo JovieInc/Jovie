@@ -35,7 +35,9 @@ export function TaskProjectionListRow({
       interaction='none'
       className={cn(
         'group/row flex h-full w-full items-center gap-2 px-3 py-1 transition-opacity duration-subtle ease-subtle',
-        opacity === 'muted' && !isSelected && 'opacity-75',
+        // 90 keeps muted-row secondary text >= 4.5:1 on the light canvas;
+        // 75 composited it to 3.56:1 (axe color-contrast).
+        opacity === 'muted' && !isSelected && 'opacity-90',
         opacity === 'quiet' && !isSelected && 'opacity-60'
       )}
     >

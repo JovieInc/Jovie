@@ -1,7 +1,6 @@
 import '@/app/globals.css';
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { buildSpotifyCatalogConnectionRoute } from '@/constants/routes';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 
 const meta = {
@@ -9,7 +8,7 @@ const meta = {
   component: OpportunityInboxEmptyState,
   parameters: { layout: 'fullscreen' },
   render: args => (
-    <div className='flex h-[32rem] bg-(--app-shell-content-surface)'>
+    <div className='min-h-screen bg-(--app-shell-content-surface) px-3 py-5'>
       <OpportunityInboxEmptyState {...args} />
     </div>
   ),
@@ -18,21 +17,26 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Desktop: Story = {
+export const Desktop: Story = {};
+
+export const Narrow: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+};
+
+export const FirstRun: Story = {
   args: {
-    actionCards: [
-      {
-        id: 'connect-spotify',
-        title: 'Connect Spotify',
-        body: 'Link your catalog so Jovie can spot releases.',
-        actionLabel: 'Connect Spotify',
-        href: buildSpotifyCatalogConnectionRoute(),
-      },
-    ],
+    setup: { profileComplete: false, musicConnected: false, linksAdded: false },
   },
 };
 
-export const Narrow: Story = {
-  args: {},
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+export const PartiallyComplete: Story = {
+  args: {
+    setup: { profileComplete: true, musicConnected: true, linksAdded: false },
+  },
+};
+
+export const SetupComplete: Story = {
+  args: {
+    setup: { profileComplete: true, musicConnected: true, linksAdded: true },
+  },
 };

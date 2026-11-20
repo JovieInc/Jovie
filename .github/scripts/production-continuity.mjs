@@ -3,6 +3,8 @@
 import { appendFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { readJson as readObservedJson } from '../../scripts/lib/github-json-read.mjs';
+import { readMainArrival } from './production-continuity-arrival.mjs';
 
 export const CONTINUITY_SCHEMA = 'jovie-production-continuity/v1';
 export const DEFAULT_TIMEOUT_MS = 10_000;
@@ -141,19 +143,53 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
     unknownReasons: unknown.map(item => item.reason ?? 'unknown'),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
-    // A stale production is a release-pipeline failure, not a provider
-    // outage: it pages the founder but never admits a provider-recovery task.
-    requiresAgentIngress: unhealthy.some(
+    // Every unhealthy verdict is admitted to Summer's No Unattended Red queue.
+    // A stale production is a release-pipeline failure, not a provider outage,
+    // so it routes as production-controller-failed (gem investigates) instead
+    // of provider-unavailable. It used to be skipped, so only the founder knew.
+    requiresAgentIngress: unhealthy.length > 0,
+    agentIngressFailure: unhealthy.some(
       item => item.incidentClass !== FRESHNESS_INCIDENT_CLASS
-    ),
+    )
+      ? 'provider-unavailable'
+      : 'production-controller-failed',
   };
 }
 
 export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
 export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
-// 90 minutes (Tim 2026-10-24, throughput sentinel): a merged SHA that production
-// has not reached by then is a stall, not a slow release (plain release ~22 min).
-export const DEFAULT_STALE_AFTER_SECONDS = 5400;
+// Fallback only: 246 minutes, the measured p95 of normal merge-to-production lag over the 7 days to 2026-10-25.
+// The live bound is recomputed weekly from the trailing 7 days by the lanes doctor (its deploy_health module)
+// and read from the public lanes feed (`deployHealth.limits`); see resolveStaleAfterSeconds.
+export const DEFAULT_STALE_AFTER_SECONDS = 14760;
+const MIN_STALE_AFTER_SECONDS = 3600;
+const MAX_STALE_AFTER_SECONDS = 86_400;
+
+/** The freshness bound for `repository`: the feed's measured limit when readable and sane, else the fallback. */
+export async function resolveStaleAfterSeconds({
+  fetchImpl = fetch,
+  limitsUrl = '',
+  repository = '',
+  fallback = DEFAULT_STALE_AFTER_SECONDS,
+  timeoutMs = 5000,
+} = {}) {
+  if (!limitsUrl || !repository) return fallback;
+  try {
+    const response = await fetchImpl(limitsUrl, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return fallback;
+    const age = (await response.json())?.deployHealth?.limits?.[repository]
+      ?.ageS;
+    return Number.isFinite(age) &&
+      age >= MIN_STALE_AFTER_SECONDS &&
+      age <= MAX_STALE_AFTER_SECONDS
+      ? Math.floor(age)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 // Strict: only a real string can be a SHA (RegExp.test would stringify arrays).
 const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
@@ -164,20 +200,9 @@ const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
 const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
 /**
- * Production freshness: how long has main carried commits that production
- * lacks? Reads the live SHA from build-info, the unshipped range from the
- * GitHub compare API, and each unshipped commit's main arrival from the
- * landing ledger (the CI runs fired by pushes to main). The committer date
- * alone is not arrival evidence: merge-queue landings keep their original
- * timestamps, so a commit authored long before it merged would otherwise
- * count its queue residence as release lag (JOV-7674, 2026-10-25: a commit
- * authored 12:25 reached main 13:45 and the 90-minute bound paged a
- * 21-minute release as a 101-minute stall). When any source is unreadable
- * the result is `healthy: null` (unknown) with a reason, never healthy:
- * absence of evidence is not evidence of freshness (JOV-7694, JOV-7674).
- * An unknown does not page or file by itself, but it cannot report healthy
- * or resolve an incident. Runtime outages are reported by the
- * jovie-production target.
+ * Age unshipped main from CI landing receipts, preserving the measured bound.
+ * Unreadable evidence is unknown and cannot page or resolve an incident.
+ * Runtime outages remain the production endpoint probe's responsibility.
  */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
@@ -188,6 +213,7 @@ export async function observeProductionFreshness({
   staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   token = '',
+  githubClient,
 } = {}) {
   const base = {
     id: FRESHNESS_TARGET_ID,
@@ -204,31 +230,22 @@ export async function observeProductionFreshness({
     unshippedAgeSeconds: 0,
   };
   const unknownResult = extra => ({ ...base, ...extra, healthy: null });
-  // Not configured is an absent probe (the CLI only passes `freshness` when
-  // GITHUB_REPOSITORY is set), not an unreadable source, so it stays healthy.
+  // An unconfigured repository is an absent probe, not unreadable evidence.
   if (!/^[^/]+\/[^/]+$/.test(repository ?? '')) {
     return { ...base, reason: 'repository-not-configured' };
   }
   const readJson = async (url, headers = {}) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetchImpl(url, {
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-          ...headers,
-        },
-        signal: controller.signal,
-      });
-      if (response.status !== 200) return null;
-      return await response.json();
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timeout);
-    }
+    const result = await readObservedJson(
+      fetchImpl,
+      url,
+      {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        ...headers,
+      },
+      timeoutMs
+    );
+    return result.ok ? result.body : null;
   };
   const buildInfo = await readJson(buildInfoUrl);
   const liveSha = buildInfo?.commitSha;
@@ -262,84 +279,28 @@ export async function observeProductionFreshness({
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
-  const rangeCommits = Array.isArray(compare?.commits) ? compare.commits : [];
-  const rangeShas = new Set(rangeCommits.map(item => item?.sha).filter(isSha));
-  const oldestUnshippedAt =
-    typeof rangeCommits[0]?.commit?.committer?.date === 'string'
-      ? rangeCommits[0].commit.committer.date
-      : null;
-  if (rangeShas.size === 0) {
+  const arrival = await readMainArrival({
+    compare,
+    liveSha,
+    mainSha,
+    repository,
+    token,
+    fetchImpl,
+    githubApiUrl,
+    now,
+    timeoutMs,
+    githubClient,
+  });
+  if (!arrival.ok) {
     return unknownResult({
       liveSha,
       mainSha,
       unshippedCommits,
-      reason: 'unshipped-range-unreadable',
+      reason: arrival.reason,
     });
   }
-  // Main arrival comes from the landing ledger: every push that moves main
-  // fires a CI run (ci.yml: push: branches: [main], no path filter), and a
-  // run whose head is an unshipped commit marks the push that carried it and
-  // every unshipped commit before it, including batch pushes whose tip is a
-  // later commit in the same range.
-  const landingLedger = await readJson(
-    `${githubApiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=100`,
-    githubHeaders
-  );
-  const ledgerRuns = Array.isArray(landingLedger?.workflow_runs)
-    ? landingLedger.workflow_runs
-    : null;
-  if (!ledgerRuns) {
-    return unknownResult({
-      liveSha,
-      mainSha,
-      unshippedCommits,
-      reason: 'unshipped-arrival-unreadable',
-    });
-  }
-  const nowMs = new Date(now).getTime();
-  const landingTimes = ledgerRuns
-    .filter(run => isSha(run?.head_sha) && rangeShas.has(run.head_sha))
-    .flatMap(run => {
-      const ms = Date.parse(run?.created_at ?? '');
-      return Number.isFinite(ms) ? [ms] : [];
-    });
-  if (landingTimes.length === 0) {
-    // No unshipped commit landed within the ledger page, so the landing is
-    // older than the ledger's oldest entry. When that entry already clears
-    // the stale bound the arrival is provably past it; otherwise the arrival
-    // is unknown and, per JOV-7694, absence of evidence is not a page.
-    const horizonTimes = ledgerRuns
-      .map(run => Date.parse(run?.created_at ?? ''))
-      .filter(Number.isFinite);
-    const horizonAgeSeconds =
-      horizonTimes.length > 0
-        ? Math.max(0, Math.floor((nowMs - Math.min(...horizonTimes)) / 1000))
-        : null;
-    if (horizonAgeSeconds != null && horizonAgeSeconds >= staleAfterSeconds) {
-      return {
-        ...base,
-        healthy: false,
-        incidentClass: FRESHNESS_INCIDENT_CLASS,
-        reason: 'unshipped-past-landing-ledger',
-        liveSha,
-        mainSha,
-        unshippedCommits,
-        oldestUnshippedAt,
-        unshippedAgeSeconds: horizonAgeSeconds,
-      };
-    }
-    return unknownResult({
-      liveSha,
-      mainSha,
-      unshippedCommits,
-      reason: 'unshipped-arrival-unreadable',
-    });
-  }
-  const arrivedMs = Math.min(...landingTimes);
-  const unshippedAgeSeconds = Math.max(
-    0,
-    Math.floor((nowMs - arrivedMs) / 1000)
-  );
+  const { oldestUnshippedAt, unshippedArrivedAt, unshippedAgeSeconds } =
+    arrival;
   const stale = unshippedAgeSeconds >= staleAfterSeconds;
   return {
     ...base,
@@ -352,8 +313,13 @@ export async function observeProductionFreshness({
     mainSha,
     unshippedCommits,
     oldestUnshippedAt,
-    unshippedArrivedAt: new Date(arrivedMs).toISOString(),
+    unshippedArrivedAt,
     unshippedAgeSeconds,
+    // Within-bound main lag means the release FIFO is catching up.
+    catchingUp: !stale,
+    summary: stale
+      ? `behind by ${unshippedCommits}, stale`
+      : `behind by ${unshippedCommits}, catching up`,
   };
 }
 
@@ -644,13 +610,23 @@ export async function runCli({
   now = new Date(),
   stdout = process.stdout,
   writeFileImpl = writeFile,
+  githubClient,
 } = {}) {
   const args = parseCliArgs(argv);
   const repository = env.GITHUB_REPOSITORY?.trim() ?? '';
   const result = await observeProductionContinuity({
     fetchImpl,
     freshness: repository
-      ? { repository, token: env.GH_TOKEN?.trim() ?? '' }
+      ? {
+          repository,
+          githubClient,
+          token: env.GH_TOKEN?.trim() ?? '',
+          staleAfterSeconds: await resolveStaleAfterSeconds({
+            fetchImpl,
+            limitsUrl: env.PRODUCTION_LIMITS_FEED_URL?.trim() ?? '',
+            repository,
+          }),
+        }
       : null,
     now,
     targets: parseTargets(args.targets),
@@ -669,6 +645,7 @@ export async function runCli({
         `unknown_reasons=${result.unknownReasons.join(',')}`,
         `incident_key=${incidentKey}`,
         `requires_agent_ingress=${result.requiresAgentIngress}`,
+        `agent_ingress_failure=${result.agentIngressFailure}`,
       ].join('\n') + '\n',
       'utf8'
     );

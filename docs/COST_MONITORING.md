@@ -21,6 +21,21 @@ schedule, but workflow enablement is an explicit operational step; do not rely
 on it as continuous protection until its enabled state and Production secrets
 have been verified.
 
+### Spend guard (added 2026-10-30)
+
+`spend-guard.yml` runs hourly with a read-only Vercel token and `scripts/spend-guard.mjs`:
+it forecasts the cycle's spend from the trailing 7 complete days, alerts at 50/75/90 percent of
+the team budget or when the projected pause date is under 7 days away, flags per-project cost
+(or builds per hour) above 3x the 7-day baseline with the top resource named, and audits every
+project against `ops/registry/vercel-projects.json` (ignored-build policy). Alerts go to Slack and
+the remediation intake (`vercel-spend-guard` fingerprint), which routes to Summer. Allowed
+auto-remediation is limited to reversible actions (set an ignored-build command, report a
+missing one; throttling branch automation and pausing non-critical crons are planned, not
+applied); budgets are never raised. `scripts/vercel-log-errors.mjs` polls `vercel logs` (no log
+drain, no paid ingestion), clusters by signature, and files new or rising signatures and route
+spikes. `workers/prod-liveness` probes jov.ie and summer.jov.ie every minute from Cloudflare.
+Vercel's own budget webhook (`POST /summer/v1/events/vercel` on Summer) is the event-driven path.
+
 ### Production-continuity policy
 
 `production-continuity.yml` probes both `jov.ie` and `summer.jov.ie` outside
@@ -145,7 +160,7 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 #### On-demand build concurrency for `jovie` (hard-capped)
 
 **EVENT:** 2026-10-20, authorized by Tim. Vercel on-demand concurrency for
-jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
+`jovie` prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
 
 - Why: the `jovie` team has one concurrent build slot. On 2026-10-20 two
   staging generations queued 30+ min behind log-your-body `backup/**`
@@ -154,13 +169,13 @@ jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
   `buildMachineType: standard` (4 vCPU). Elastic or Turbo would multiply the
   cost per build (Turbo is 30 vCPU).
 - Price: each build is billed whole minutes × 4 vCPU × $0.0035. A prebuilt
-  jovie deploy builds in under a minute, so it costs $0.014. The measured
+  `jovie` deploy builds in under a minute, so it costs $0.014. The measured
   14 builds/day comes to about $6/month.
 - Hard stop: Vercel Spend Management cannot cap one feature. Its only hard
   action pauses production for every project on the team, which is not
   acceptable. Instead, `.github/scripts/vercel-on-demand-ledger.mjs` runs
   before every staging and production deploy and is the only writer of the
-  project's `elasticConcurrencyEnabled` flag. It reads jovie builds since the
+  project's `elasticConcurrencyEnabled` flag. It reads `jovie` builds since the
   later of the billing-period start and enablement, and Vercel's billed build
   charges (`/v1/billing/charges`). Spend counts as the larger of the two.
   If the token cannot read billing, the per-build estimate alone is used.
@@ -331,7 +346,7 @@ dates. It never holds a secret value.
 | File | Holds |
 | --- | --- |
 | `ops/registry/credentials.json` | Each credential (owner, consumers, scope, name patterns, created/expiry, rotation, blast radius) |
-| `ops/registry/third-party-grants.jsonl` | Grants third parties hold on Tim's and the org's accounts: Google linked apps (tim@jov.ie), GitHub OAuth and GitHub App user authorizations, JovieInc app installations. Each has scope, purpose, owner, last use and a revoke URL. The check lists stale, never-used or unexplained grants for review and never revokes anything |
+| `jovie-private/ops/registry/third-party-grants.jsonl` (private `JovieInc/Ops` repo, read via `JOVIE_PRIVATE_DIR`; absent or empty fails the check loudly: a failed `read-private-third-party-grants` stage and a high `private-data:third-party-grants-unavailable` finding) | Grants third parties hold on Tim's and the org's accounts: Google linked apps (tim@jov.ie), GitHub OAuth and GitHub App user authorizations, JovieInc app installations. Each has scope, purpose, owner, last use and a revoke URL. The check lists stale, never-used or unexplained grants for review and never revokes anything |
 | `ops/registry/inventory.gen.json` | Generated name inventory of every Doppler config, Vercel project, GitHub Actions store and the GitHub App installation list |
 | `ops/registry/spend.json` | Each spend line (balance or spend snapshot, burn per day, cap and period, dated credits, read path) |
 

@@ -168,7 +168,12 @@ describe('Cmd-K destination eligibility', () => {
     const onOpenChange = vi.fn();
     render(<MainPlane onOpenChange={onOpenChange} />);
     const input = search('Daft Punk');
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    // The empty-state hint is a disabled placeholder option; no selectable rows.
+    expect(
+      screen
+        .queryAllByRole('option')
+        .filter(row => row.getAttribute('aria-disabled') !== 'true')
+    ).toHaveLength(0);
     expect(screen.getByText('No matches.')).toBeVisible();
     expect(input).not.toHaveAttribute('aria-activedescendant');
     fireEvent.keyDown(input, { key: 'ArrowDown' });

@@ -16,12 +16,8 @@ import { logger } from '@/lib/utils/logger';
 export const dynamic = 'force-dynamic';
 
 function resolveDevFastAuthHealthContext() {
-  const authMockEnabled =
-    process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-  const authProxyDisabled =
-    process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  const authMockEnabled = process.env.NEXT_PUBLIC_AUTH_MOCK === '1';
+  const authProxyDisabled = process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
   const testAuthBypassEnabled = isTestAuthBypassEnabled();
   const active = authMockEnabled || authProxyDisabled || testAuthBypassEnabled;
 

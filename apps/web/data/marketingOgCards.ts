@@ -75,7 +75,7 @@ export const MARKETING_OG_CARDS = [
   {
     id: 'api-versioning',
     file: 'api-versioning.png',
-    title: 'API Versioning And Deprecation Policy',
+    title: 'API versioning and deprecation policy',
   },
   {
     id: 'download',
@@ -85,7 +85,7 @@ export const MARKETING_OG_CARDS = [
   {
     id: 'support',
     file: 'support.png',
-    title: "We're Here To Help.",
+    title: "We're here to help.",
   },
 ] as const satisfies readonly MarketingOgCard[];
 

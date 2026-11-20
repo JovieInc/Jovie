@@ -120,6 +120,7 @@ export const APP_ROUTES = {
   ADMIN_CREATORS_TOGGLE_VERIFY: '/app/ov/creators/toggle-verify',
   ADMIN_USERS: '/app/ov/users',
   ADMIN_ACTIVITY: '/app/ov/activity',
+  ADMIN_ROOM: '/app/ov/room',
   ADMIN_CAMPAIGNS: '/app/ov/campaigns',
   ADMIN_GROWTH_YC_METRICS: '/app/ov/growth/yc-metrics',
   ADMIN_INVESTORS: '/app/ov/investors',
@@ -146,6 +147,8 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/ov/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/ov/agent-runs/[id]',
   ADMIN_COSTS: '/app/ov/costs',
+  /** Agent capacity registry: plan, cost, quota, pace and policy per provider. */
+  ADMIN_CAPACITY: '/app/ov/capacity',
   /** VC/ops revenue-lift dashboard (IRPAA North Star + KPI tree). */
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
@@ -162,6 +165,8 @@ export const APP_ROUTES = {
   UNAVAILABLE: '/unavailable',
   USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
+  /** Signed, noindex preview of one content-record version (no auth). */
+  CONTENT_PREVIEW: '/content-preview',
   /** Admin Ops HUD — shipper status, KPIs, and live metrics (admin-gated). */
   HUD: '/hud',
   /** Legacy TV URL. Redirects to /hud. */
@@ -187,6 +192,8 @@ export const APP_ROUTES = {
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
   DEVELOPERS: '/developers',
+  DEVELOPERS_AGENTS: '/developers/agents',
+  PROOF_METHODOLOGY: '/proof/methodology',
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
@@ -274,6 +281,12 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+/**
+ * Where public CTAs send a new, anonymous visitor. There is one flow, not a
+ * separate waitlist and onboarding: the /start chat admits or holds them.
+ */
+export const PUBLIC_ENTRY_HREF = APP_ROUTES.START;
 
 const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
 const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';

@@ -1,17 +1,14 @@
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { Readable } from 'node:stream';
-import { resolveAppPath } from '@/lib/filesystem-paths';
 import {
   getInvestorPortalAccess,
   INVESTOR_PRIVATE_HEADERS,
 } from '@/lib/investors/portal-access';
+import { openInvestorPrivateFile } from '@/lib/investors/private-content';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Exact deck files served from apps/web/assets/investor-deck. An allowlist,
+ * Exact deck files served from the private investor store (assets/investor-deck/). An allowlist,
  * not a filesystem lookup: nothing outside this table is reachable, so there
  * is no path to traverse.
  */
@@ -44,21 +41,22 @@ export async function GET(
 
   if (!contentType || !(await getInvestorPortalAccess())) return notFound();
 
-  const filePath = resolveAppPath('assets', 'investor-deck', file);
-  let size: number;
+  let deck: Awaited<ReturnType<typeof openInvestorPrivateFile>>;
   try {
-    size = (await stat(filePath)).size;
+    deck = await openInvestorPrivateFile(
+      `assets/investor-deck/${file}`,
+      contentType
+    );
   } catch {
     return notFound();
   }
 
   const headers = {
     ...INVESTOR_PRIVATE_HEADERS,
-    'Content-Type': contentType,
-    'Content-Length': String(size),
+    'Content-Type': deck.contentType,
+    ...(deck.size === null ? {} : { 'Content-Length': String(deck.size) }),
     'Content-Disposition': `attachment; filename="${file}"`,
     'X-Content-Type-Options': 'nosniff',
   };
-  const body = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
-  return new Response(body, { headers });
+  return new Response(deck.stream, { headers });
 }

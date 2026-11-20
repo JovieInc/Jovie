@@ -1,0 +1,289 @@
+{
+  "schema": "jovie.benchmark-library/v1",
+  "version": 1,
+  "rule": "Adopt the behavior, never the visual identity. Every entry maps a job to the best-in-class behavior and to the Jovie primitive that should express it. A pattern with primitive null is a design-system gap and is built once, then reused.",
+  "decisions": ["adopt", "adapt", "skip"],
+  "categories": [
+    "motion",
+    "a11y",
+    "interaction",
+    "latency",
+    "rules-tests",
+    "delight"
+  ],
+  "patterns": [
+    {
+      "id": "checkout-success",
+      "job": "Confirm a payment and land the user in the paid product",
+      "peak": true,
+      "leaders": [
+        {
+          "name": "Stripe Checkout / Elements",
+          "behavior": "Button morphs to a spinner without changing width, then to an animated check; the success state is acknowledged before navigation; errors are inline, specific and keep entered card data",
+          "reference": "stripe.com/payments/checkout, success and processing states of the hosted page"
+        },
+        {
+          "name": "Linear",
+          "behavior": "Upgrade lands on the feature just unlocked with a brief confirmation, no interstitial dead end",
+          "reference": "linear.app upgrade flow"
+        }
+      ],
+      "primitive": "packages/ui/atoms/success-state.tsx (to build)",
+      "checks": [
+        "pending state keeps button geometry",
+        "success announced via aria-live=polite",
+        "reduced-motion shows a static check",
+        "failure keeps inputs and offers retry"
+      ]
+    },
+    {
+      "id": "profile-claimed",
+      "job": "Mark the moment an artist's profile goes live",
+      "peak": true,
+      "leaders": [
+        {
+          "name": "Stripe Dashboard",
+          "behavior": "Account activation shows a single clear completed state with the next action",
+          "reference": "stripe.com dashboard activation"
+        },
+        {
+          "name": "Apple HIG (Feedback, Onboarding)",
+          "behavior": "Celebrate rarely and briefly; confirmation is tied to the user's action, not decorative",
+          "reference": "developer.apple.com/design/human-interface-guidelines/feedback"
+        }
+      ],
+      "primitive": "apps/web/components/features/dashboard/molecules/ProfileLiveCelebration.tsx plus Celebration (to build)",
+      "checks": [
+        "fires once per event",
+        "skippable and non-blocking",
+        "reduced-motion variant",
+        "link to the live profile is the primary action"
+      ]
+    },
+    {
+      "id": "first-release-live",
+      "job": "Mark the first release published to the artist's page",
+      "peak": true,
+      "leaders": [
+        {
+          "name": "Frame.io",
+          "behavior": "Upload progress is continuous and resumable; completion resolves in place into the finished asset",
+          "reference": "frame.io upload to review flow"
+        },
+        {
+          "name": "Things",
+          "behavior": "Completion is a small physical animation, then the item settles into its final position",
+          "reference": "culturedcode.com/things completion animation"
+        }
+      ],
+      "primitive": "Celebration plus EmptyToFilled (to build)",
+      "checks": [
+        "empty to filled swap does not shift layout",
+        "share action appears in place",
+        "announced to assistive tech"
+      ]
+    },
+    {
+      "id": "first-fan-subscribed",
+      "job": "Tell the artist their first fan arrived",
+      "peak": true,
+      "leaders": [
+        {
+          "name": "Stripe Dashboard",
+          "behavior": "First payment moment shown as a notification with the specific amount and source",
+          "reference": "stripe.com dashboard first payment"
+        },
+        {
+          "name": "Raycast",
+          "behavior": "Success confirmation is a short HUD, never a modal",
+          "reference": "raycast.com HUD feedback"
+        }
+      ],
+      "primitive": "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx plus Celebration (to build)",
+      "checks": ["non-blocking", "names the fan source", "does not repeat"]
+    },
+    {
+      "id": "form-in-drawer",
+      "job": "Create or edit a record in a drawer or dialog without losing input",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Linear",
+          "behavior": "Typed text and focus survive re-renders; Escape on a dirty form asks before discarding; Cmd+Enter submits",
+          "reference": "linear.app create issue modal"
+        },
+        {
+          "name": "Apple HIG (Sheets)",
+          "behavior": "Dirty sheets confirm before dismiss",
+          "reference": "HIG Sheets"
+        }
+      ],
+      "primitive": "packages/ui dialog/sheet atoms",
+      "checks": [
+        "input retention under parent rerender",
+        "focus returns to trigger on close",
+        "dirty-close guard",
+        "submit shortcut discoverable"
+      ]
+    },
+    {
+      "id": "optimistic-mutation-undo",
+      "job": "Change data with instant feedback and a safe way back",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Linear",
+          "behavior": "Optimistic update with toast and Undo; failures roll back with the reason",
+          "reference": "linear.app list actions"
+        },
+        {
+          "name": "Things",
+          "behavior": "Every destructive action is undoable",
+          "reference": "Things undo"
+        }
+      ],
+      "primitive": "canonical toast with action",
+      "checks": [
+        "optimistic state",
+        "undo path",
+        "rollback on failure keeps focus"
+      ]
+    },
+    {
+      "id": "loading-skeleton",
+      "job": "Show that content is coming without layout shift",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Vercel",
+          "behavior": "Skeletons match final geometry; content fades in without reflow",
+          "reference": "vercel.com dashboard loading"
+        },
+        {
+          "name": "Linear",
+          "behavior": "Cached content renders instantly, refresh is silent",
+          "reference": "linear.app list load"
+        }
+      ],
+      "primitive": "packages/ui/atoms/skeleton.tsx",
+      "checks": ["skeleton size equals final size", "no null-while-loading"]
+    },
+    {
+      "id": "empty-state",
+      "job": "Teach the next action when there is no data",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Linear",
+          "behavior": "Empty states name one primary action and a shortcut",
+          "reference": "linear.app empty views"
+        },
+        {
+          "name": "Apple HIG (Empty states)",
+          "behavior": "Explain what belongs here and how to add it",
+          "reference": "HIG Loading and empty content"
+        }
+      ],
+      "primitive": "EmptyCell and empty-state molecules",
+      "checks": ["one primary action", "keyboard reachable"]
+    },
+    {
+      "id": "command-and-keyboard",
+      "job": "Power-user reach for frequent actions",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Raycast",
+          "behavior": "Every action reachable by keyboard, shortcuts shown inline, no animation on keyboard-initiated actions",
+          "reference": "raycast.com"
+        },
+        {
+          "name": "Linear",
+          "behavior": "g-sequences and Cmd+K",
+          "reference": "linear.app shortcuts"
+        }
+      ],
+      "primitive": "canonical keyboard registry",
+      "checks": ["registered shortcut with collision test", "discoverable"]
+    },
+    {
+      "id": "progress-steps",
+      "job": "Show multi-step progress (onboarding, import, upload)",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Stripe",
+          "behavior": "Linear step indicator, resume where left off",
+          "reference": "stripe.com onboarding"
+        },
+        {
+          "name": "Frame.io",
+          "behavior": "Per-file progress with ETA",
+          "reference": "frame.io uploads"
+        }
+      ],
+      "primitive": "ProgressSteps (to build)",
+      "checks": ["progressbar semantics", "resume state"]
+    },
+    {
+      "id": "error-recovery",
+      "job": "Fail without losing the user's work",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Stripe Elements",
+          "behavior": "Inline error by the field, specific copy, focus moved to the first invalid field",
+          "reference": "stripe.com/docs/elements"
+        },
+        {
+          "name": "Apple HIG (Alerts)",
+          "behavior": "Say what failed and what to do",
+          "reference": "HIG Alerts"
+        }
+      ],
+      "primitive": "FormStatus and field error atoms",
+      "checks": ["focus to first invalid field", "retry keeps input"]
+    },
+    {
+      "id": "offline-degraded",
+      "job": "Stay useful offline or degraded",
+      "peak": false,
+      "leaders": [
+        {
+          "name": "Linear",
+          "behavior": "Local-first reads, queued writes, subtle status",
+          "reference": "linear.app offline"
+        },
+        {
+          "name": "Things",
+          "behavior": "Works fully offline",
+          "reference": "Things sync"
+        }
+      ],
+      "primitive": "packages/ui/atoms/inline-offline.tsx",
+      "checks": ["writes queued or clearly blocked", "status announced"]
+    }
+  ],
+  "sharedPrimitivesToBuild": [
+    {
+      "id": "success-state",
+      "path": "packages/ui/atoms/success-state.tsx",
+      "contract": "animated check (token durations), aria-live polite, reduced-motion static, stable geometry, story per state"
+    },
+    {
+      "id": "celebration",
+      "path": "apps/web/components/atoms/Celebration.tsx",
+      "contract": "wraps Confetti; once-per-event; skippable; reduced-motion no-op; non-blocking"
+    },
+    {
+      "id": "progress-steps",
+      "path": "packages/ui/atoms/progress-steps.tsx",
+      "contract": "progressbar semantics, resume, determinate and indeterminate"
+    },
+    {
+      "id": "empty-to-filled",
+      "path": "apps/web/components/molecules/EmptyToFilled.tsx",
+      "contract": "layout-stable swap from empty state to first content with a single token-timed transition"
+    }
+  ]
+}

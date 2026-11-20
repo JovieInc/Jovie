@@ -24,8 +24,6 @@ async function ActivityContent({ query }: { readonly query: string }) {
   );
 }
 
-const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
-
 export default async function AdminActivityPage({
   searchParams,
 }: Readonly<AdminActivityPageProps>) {
@@ -35,17 +33,13 @@ export default async function AdminActivityPage({
 
   return (
     <AdminPage
+      views='shipping'
       title='Timeline'
       description={
         query
           ? 'Search covers the 200 most recent company events from the last 7 days.'
           : 'The 50 most recent company events from the last 7 days, with source evidence and observed outcomes.'
       }
-      tabs={{
-        param: 'view',
-        value: 'activity',
-        options: activityTabs,
-      }}
       testId='admin-activity-page'
       viewTestId='admin-activity-view'
     >

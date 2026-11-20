@@ -15,8 +15,21 @@ const STAGING_PATH = '.github/workflows/staging-controller.yml';
 const CI_PATH = '.github/workflows/ci.yml';
 const SHA = /^[a-f0-9]{40}$/;
 const ID = /^[1-9][0-9]*$/;
-const GH_MAX_ATTEMPTS = 3;
-const GH_RETRY_DELAY_MS = 5_000;
+// One bounded, configurable retry budget for gh transport reads. 2026-10-30:
+// Production Controller runs 41110078504 and 41108684462 lost their staging
+// bind to transient GitHub 5xx after only ~15s of retries. Nominal worst-case
+// window is now 7 attempts with waits 5+10+20+40+60+60s = 195s (~3.3 min);
+// +25% jitter can never push a single wait past maxDelayMs, so the budget
+// stays <= 6 * maxDelayMs. 4xx and evidence mismatches still fail closed on
+// the first response.
+const GH_RETRY = Object.freeze({
+  attempts: 7,
+  baseDelayMs: 5_000,
+  maxDelayMs: 60_000,
+});
+
+export { GH_RETRY };
+
 const TRANSIENT_GH_ERROR =
   /HTTP 5\d\d|rate limit|error connecting|connection (?:reset|refused|timed? ?out)|i\/o timeout|TLS handshake timeout|temporarily unavailable|EOF|Bad Gateway/i;
 function requireEvidence(condition, reason) {
@@ -267,12 +280,14 @@ export function command(
   args,
   options = {},
   {
-    retryDelayMs = GH_RETRY_DELAY_MS,
+    retryDelayMs = GH_RETRY.baseDelayMs,
+    retryMaxDelayMs = GH_RETRY.maxDelayMs,
+    random = Math.random,
     spawn = spawnSync,
     sleep = defaultSleep,
   } = {}
 ) {
-  const attempts = args[0] === 'gh' ? GH_MAX_ATTEMPTS : 1;
+  const attempts = args[0] === 'gh' ? GH_RETRY.attempts : 1;
   let result;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     result = spawn(args[0], args.slice(1), {
@@ -287,10 +302,19 @@ export function command(
     ) {
       break;
     }
-    const delayMs = retryDelayMs * 2 ** (attempt - 1);
+    const backoffMs = Math.min(
+      retryMaxDelayMs,
+      retryDelayMs * 2 ** (attempt - 1)
+    );
+    // Full jitter around the backoff curve, hard-capped so the total budget
+    // stays bounded even at the extremes.
+    const delayMs = Math.min(
+      retryMaxDelayMs,
+      Math.round(backoffMs * (0.75 + 0.5 * random()))
+    );
     const detail = transportError(result).trim().split(/\r?\n/, 1)[0];
     console.warn(
-      `::warning::gh transport attempt ${attempt}/${attempts} failed transiently${detail ? ` (${detail})` : ''}; retrying in ${delayMs / 1000}s.`
+      `::warning::gh transport attempt ${attempt}/${attempts} failed transiently${detail ? ` (${detail})` : ''}; retrying in ${(delayMs / 1000).toFixed(1)}s.`
     );
     sleep(delayMs);
   }

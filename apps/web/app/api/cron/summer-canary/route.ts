@@ -6,8 +6,13 @@ import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { runSummerCanary } from '@/lib/ovie/summer-canary';
+import {
+  readSummerTtftSummary,
+  runSummerCanary,
+  SUMMER_TTFT_TARGET_MS,
+} from '@/lib/ovie/summer-canary';
 import { founderPrincipalHash } from '@/lib/ovie/summer-founder-auth';
+import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -27,9 +32,8 @@ export async function GET(request: Request) {
       { status: 503, headers: NO_STORE_HEADERS }
     );
   }
-  const result = await runSummerCanary({
-    principalHash: founderPrincipalHash(founderUserId),
-  });
+  const principalHash = founderPrincipalHash(founderUserId);
+  const result = await runSummerCanary({ principalHash });
   if (!result.ok) {
     await captureError(
       'Summer canary failed',
@@ -41,5 +45,9 @@ export async function GET(request: Request) {
       headers: NO_STORE_HEADERS,
     });
   }
-  return NextResponse.json(result, { headers: NO_STORE_HEADERS });
+  const ttft = await readSummerTtftSummary(fetchSummerShadow, principalHash);
+  return NextResponse.json(
+    { ...result, targets: SUMMER_TTFT_TARGET_MS, ttftSummary: ttft },
+    { headers: NO_STORE_HEADERS }
+  );
 }

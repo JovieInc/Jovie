@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
+  ProfileReadiness,
   ProfileSuggestion,
   SuggestionsStarterContext,
 } from '@/app/api/suggestions/route';
+import { APP_ROUTES } from '@/constants/routes';
 
 export interface UseSuggestedProfilesReturn {
   suggestions: ProfileSuggestion[];
@@ -31,6 +33,81 @@ export interface UseSuggestedProfilesReturn {
 
 interface UseSuggestedProfilesOptions {
   enabled?: boolean;
+}
+
+/**
+ * Nudge card ids for missing profile essentials (JOV-8137). Exported so the
+ * carousel can pick an icon without duplicating the id strings.
+ */
+export const PROFILE_NUDGE_IDS = {
+  photo: '__nudge_photo__',
+  name: '__nudge_name__',
+  handle: '__nudge_handle__',
+  music: '__nudge_music__',
+} as const;
+
+function nudgeCard(id: string, title: string, href: string): ProfileSuggestion {
+  return {
+    id,
+    type: 'profile_nudge',
+    platform: '',
+    platformLabel: '',
+    title,
+    subtitle: 'Complete this essential so fans can find you.',
+    imageUrl: null,
+    externalUrl: href,
+    confidence: null,
+  };
+}
+
+/**
+ * One nudge card per missing profile essential, in score order (JOV-8137):
+ * photo, name, handle, then music. Shown in place of the "profile is live"
+ * card until all four essentials are set.
+ */
+export function buildProfileNudges(
+  readiness: ProfileReadiness
+): ProfileSuggestion[] {
+  const nudges: ProfileSuggestion[] = [];
+
+  if (!readiness.hasPhoto) {
+    nudges.push(
+      nudgeCard(
+        PROFILE_NUDGE_IDS.photo,
+        'Set a profile photo',
+        APP_ROUTES.SETTINGS_PROFILE
+      )
+    );
+  }
+  if (!readiness.hasName) {
+    nudges.push(
+      nudgeCard(
+        PROFILE_NUDGE_IDS.name,
+        'Set your artist name',
+        APP_ROUTES.SETTINGS_PROFILE
+      )
+    );
+  }
+  if (!readiness.hasHandle) {
+    nudges.push(
+      nudgeCard(
+        PROFILE_NUDGE_IDS.handle,
+        'Claim your handle',
+        APP_ROUTES.SETTINGS_PROFILE
+      )
+    );
+  }
+  if (!readiness.hasMusicDsp) {
+    nudges.push(
+      nudgeCard(
+        PROFILE_NUDGE_IDS.music,
+        'Add your music (connect Spotify)',
+        APP_ROUTES.CHAT_PROFILE_PANEL
+      )
+    );
+  }
+
+  return nudges;
 }
 
 export function useSuggestedProfiles(
@@ -67,19 +144,27 @@ export function useSuggestedProfiles(
           const ctx = data.starterContext ?? null;
           const items = [...data.suggestions];
 
-          // Prepend "Profile Ready" card for new users
+          // JOV-8137: "Your profile is live" requires photo, name, handle,
+          // and at least one music DSP — server-computed readiness is the
+          // source of truth. Incomplete profiles get nudge cards instead.
+          // Missing readiness data never claims liveness.
           if (ctx && (ctx.isRecentlyOnboarded || ctx.conversationCount === 0)) {
-            items.unshift({
-              id: '__profile_ready__',
-              type: 'profile_ready',
-              platform: '',
-              platformLabel: '',
-              title: 'Your profile is live',
-              subtitle: '',
-              imageUrl: null,
-              externalUrl: null,
-              confidence: null,
-            });
+            const readiness = ctx.profileReadiness;
+            if (readiness?.isComplete) {
+              items.unshift({
+                id: '__profile_ready__',
+                type: 'profile_ready',
+                platform: '',
+                platformLabel: '',
+                title: 'Your profile is live',
+                subtitle: '',
+                imageUrl: null,
+                externalUrl: null,
+                confidence: null,
+              });
+            } else if (readiness) {
+              items.unshift(...buildProfileNudges(readiness));
+            }
           }
 
           setSuggestions(items);
@@ -114,8 +199,11 @@ export function useSuggestedProfiles(
     const suggestion = suggestions[currentIndex];
     if (!suggestion || !profileId || isActioning) return;
 
-    // Profile ready card — dismiss locally, no API call
-    if (suggestion.type === 'profile_ready') {
+    // Profile ready + nudge cards — dismiss locally, no API call
+    if (
+      suggestion.type === 'profile_ready' ||
+      suggestion.type === 'profile_nudge'
+    ) {
       removeCurrent();
       return;
     }
@@ -162,8 +250,11 @@ export function useSuggestedProfiles(
     const suggestion = suggestions[currentIndex];
     if (!suggestion || !profileId || isActioning) return;
 
-    // Profile ready card — dismiss locally, no API call
-    if (suggestion.type === 'profile_ready') {
+    // Profile ready + nudge cards — dismiss locally, no API call
+    if (
+      suggestion.type === 'profile_ready' ||
+      suggestion.type === 'profile_nudge'
+    ) {
       removeCurrent();
       return;
     }

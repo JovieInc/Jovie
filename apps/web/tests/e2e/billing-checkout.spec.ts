@@ -30,8 +30,8 @@ const REQUIRED_ENV = {
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+  process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
@@ -228,7 +228,7 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
     const proMonthlyPriceId = proMonthlyOption!.priceId!;
     expect(
       proMonthlyOption!.amount,
-      'Artist Presence monthly price should be $199/mo (19900 cents)'
+      `Artist Presence monthly price should be $${ARTIST_VISIBILITY_OFFER.pro.monthlyUsd}/mo (${toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)} cents)`
     ).toBe(toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd));
 
     // Create checkout session with Pro monthly price

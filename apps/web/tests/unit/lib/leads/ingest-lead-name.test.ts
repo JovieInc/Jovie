@@ -50,7 +50,10 @@ function lead(displayName: string): Lead {
   return {
     id: '11111111-1111-4111-8111-111111111111',
     linktreeHandle: 'megaran',
-    linktreeUrl: 'https://linktr.ee/megaran',
+    // A host Jovie may read; Linktree and Beacons leads are covered in
+    // ingest-lead-pageless.test.ts.
+    linktreeUrl: 'https://laylo.com/megaran',
+    sourcePlatform: 'laylo',
     displayName,
     spotifyUrl: null,
   } as Lead;
@@ -99,6 +102,18 @@ describe('ingestLeadAsCreator display name', () => {
 
     expect(mocks.handleNewProfileIngest).toHaveBeenCalledWith(
       expect.objectContaining({ displayName: artistName })
+    );
+  });
+
+  it('builds the profile private until certified or claimed', async () => {
+    mocks.fetchFullExtractionProfile.mockResolvedValue({
+      avatarUrl: null,
+      displayName: 'Mega Ran',
+    });
+    await ingestLeadAsCreator(lead('Mega Ran'));
+
+    expect(mocks.handleNewProfileIngest).toHaveBeenCalledWith(
+      expect.objectContaining({ leadHold: true })
     );
   });
 
