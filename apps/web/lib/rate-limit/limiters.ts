@@ -10,6 +10,11 @@ import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import {
+  handleCheckLimiter,
+  publicProfileCaptureDismissalLimiter,
+  publicProfilePacEventLimiter,
+} from './public-anonymous-limiters';
+import {
   changelogSubscribeLimiter,
   waitlistJoinLimiter,
 } from './public-submission-limiters';
@@ -104,15 +109,11 @@ export const navigationTelemetryLimiter = createRateLimiter(
  */
 export const onboardingLimiter = createRateLimiter(RATE_LIMITERS.onboarding);
 
-/**
- * Rate limiter for handle availability checks
- * Limit: 30 checks per minute per IP - prevents enumeration attacks.
- * Fail-closed without Redis so cold starts cannot reset the per-IP budget.
- */
-export const handleCheckLimiter = createRateLimiter(
-  RATE_LIMITERS.handleCheck,
-  { requireRedis: true }
-);
+export {
+  handleCheckLimiter,
+  publicProfileCaptureDismissalLimiter,
+  publicProfilePacEventLimiter,
+};
 
 // ============================================================================
 // Anonymous Onboarding Chat (JOV-2132)
@@ -466,27 +467,6 @@ export const publicClickLimiter = createRateLimiter(RATE_LIMITERS.publicClick, {
 export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
   requireRedis: true,
 });
-
-/**
- * Public profile capture dismissal limiter. A dedicated prefix prevents the
- * status read/write path from competing with unrelated general API traffic.
- * Fail-closed without Redis (no per-instance memory fallback).
- */
-export const publicProfileCaptureDismissalLimiter = createRateLimiter(
-  RATE_LIMITERS.publicProfileCaptureDismissal,
-  { requireRedis: true }
-);
-
-/**
- * Public profile PAC telemetry limiter. Its 40/minute ceiling combines with
- * capture dismissal's 20/minute ceiling to preserve the former aggregate
- * 60/minute per-IP budget while isolating these endpoints from other APIs.
- * Fail-closed without Redis (no per-instance memory fallback).
- */
-export const publicProfilePacEventLimiter = createRateLimiter(
-  RATE_LIMITERS.publicProfilePacEvent,
-  { requireRedis: true }
-);
 
 /**
  * Rate limiter for health endpoints

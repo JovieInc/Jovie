@@ -21,7 +21,9 @@ vi.mock('./redis-limiter', () => ({
 
 import { RATE_LIMITERS, type RateLimiterName } from './config';
 import { MemoryRateLimiter } from './memory-limiter';
+import { PUBLIC_ANONYMOUS_RATE_LIMITERS } from './public-anonymous-config';
 import { resetRedisCircuitBreaker } from './rate-limiter';
+import type { RateLimitConfig } from './types';
 
 /**
  * Documented exceptions to durable public anonymous rate limits.
@@ -35,7 +37,7 @@ const ANONYMOUS_REQUIRE_REDIS_EXCEPTIONS = new Set<RateLimiterName>([
   'spotifyPublicSearch',
 ]);
 
-const SEC04_PUBLIC_LIMITERS = [
+const names = [
   'handleCheck',
   'publicProfileCaptureDismissal',
   'publicProfilePacEvent',
@@ -48,80 +50,59 @@ beforeEach(() => {
 });
 
 describe('public anonymous Redis durability (SEC-04)', () => {
+  it('preserves public exports and administrative census singleton identity', async () => {
+    const instances = await import('./public-anonymous-limiters');
+    const central = await import('./limiters');
+    const publicApi = await import('./index');
+    expect(central.handleCheckLimiter).toBe(instances.handleCheckLimiter);
+    expect(central.publicProfileCaptureDismissalLimiter).toBe(
+      instances.publicProfileCaptureDismissalLimiter
+    );
+    expect(central.publicProfilePacEventLimiter).toBe(
+      instances.publicProfilePacEventLimiter
+    );
+    expect(publicApi.handleCheckLimiter).toBe(instances.handleCheckLimiter);
+    expect(central.getAllLimiters().handleCheck).toBe(
+      instances.handleCheckLimiter
+    );
+    expect(central.getAllLimiters().publicProfilePacEvent).toBe(
+      instances.publicProfilePacEventLimiter
+    );
+  });
+
   it('pins every anonymous limiter to requireRedis except documented exceptions', () => {
     const missing = (Object.keys(RATE_LIMITERS) as RateLimiterName[])
       .filter(name => RATE_LIMITERS[name].trafficClass === 'anonymous')
       .filter(name => !ANONYMOUS_REQUIRE_REDIS_EXCEPTIONS.has(name))
-      .filter(name => RATE_LIMITERS[name].requireRedis !== true)
+      .filter(
+        name => (RATE_LIMITERS[name] as RateLimitConfig).requireRedis !== true
+      )
       .sort((a, b) => a.localeCompare(b));
 
     expect(missing).toEqual([]);
   });
 
-  it.each(SEC04_PUBLIC_LIMITERS)(
-    'keeps %s on durable Redis (config + limiter instance)',
-    async name => {
-      expect(RATE_LIMITERS[name].requireRedis).toBe(true);
-
-      const {
-        handleCheckLimiter,
-        publicProfileCaptureDismissalLimiter,
-        publicProfilePacEventLimiter,
-      } = await import('./limiters');
-      const limiter =
-        name === 'handleCheck'
-          ? handleCheckLimiter
-          : name === 'publicProfileCaptureDismissal'
-            ? publicProfileCaptureDismissalLimiter
-            : publicProfilePacEventLimiter;
-
-      expect(
-        (
-          limiter as unknown as {
-            options: { requireRedis: boolean };
-          }
-        ).options.requireRedis
-      ).toBe(true);
-      expect(limiter.getConfig()).toEqual(RATE_LIMITERS[name]);
-    }
-  );
-
-  it.each(SEC04_PUBLIC_LIMITERS)(
-    'denies %s without memory fallback when production Redis fails',
-    async name => {
-      const {
-        handleCheckLimiter,
-        publicProfileCaptureDismissalLimiter,
-        publicProfilePacEventLimiter,
-      } = await import('./limiters');
-      const limiter =
-        name === 'handleCheck'
-          ? handleCheckLimiter
-          : name === 'publicProfileCaptureDismissal'
-            ? publicProfileCaptureDismissalLimiter
-            : publicProfilePacEventLimiter;
-      const memory = vi.spyOn(MemoryRateLimiter.prototype, 'limit');
-      mocks.limit.mockRejectedValue(new Error('fixture backend unavailable'));
-
-      expect(await limiter.limit('fixture-ip')).toMatchObject({
-        success: false,
-        remaining: 0,
-        unavailable: true,
-        backend: 'unavailable',
+  it.each(names)(
+    'keeps %s on its canonical durable public-anonymous policy',
+    name => {
+      expect(RATE_LIMITERS[name]).toBe(PUBLIC_ANONYMOUS_RATE_LIMITERS[name]);
+      expect(RATE_LIMITERS[name]).toMatchObject({
+        trafficClass: 'anonymous',
+        requireRedis: true,
+        analytics: false,
+        algorithm: 'fixed-window',
       });
-      expect(memory).not.toHaveBeenCalled();
-      memory.mockRestore();
     }
   );
 
-  it.each(SEC04_PUBLIC_LIMITERS)(
+  it.each(names)(
     'preserves allowed and throttled Redis outcomes for %s',
     async name => {
       const {
         handleCheckLimiter,
         publicProfileCaptureDismissalLimiter,
         publicProfilePacEventLimiter,
-      } = await import('./limiters');
+      } = await import('./public-anonymous-limiters');
       const limiter =
         name === 'handleCheck'
           ? handleCheckLimiter
@@ -154,6 +135,35 @@ describe('public anonymous Redis durability (SEC-04)', () => {
         reason: `${RATE_LIMITERS[name].name} rate limit exceeded`,
       });
       expect(mocks.limit).toHaveBeenCalledWith('fixture-ip');
+      expect(limiter.getConfig()).toEqual(RATE_LIMITERS[name]);
+    }
+  );
+
+  it.each(names)(
+    'denies %s without memory fallback when production Redis fails',
+    async name => {
+      const {
+        handleCheckLimiter,
+        publicProfileCaptureDismissalLimiter,
+        publicProfilePacEventLimiter,
+      } = await import('./public-anonymous-limiters');
+      const limiter =
+        name === 'handleCheck'
+          ? handleCheckLimiter
+          : name === 'publicProfileCaptureDismissal'
+            ? publicProfileCaptureDismissalLimiter
+            : publicProfilePacEventLimiter;
+      const memory = vi.spyOn(MemoryRateLimiter.prototype, 'limit');
+      mocks.limit.mockRejectedValue(new Error('fixture backend unavailable'));
+
+      expect(await limiter.limit('fixture-ip')).toMatchObject({
+        success: false,
+        remaining: 0,
+        unavailable: true,
+        backend: 'unavailable',
+      });
+      expect(memory).not.toHaveBeenCalled();
+      memory.mockRestore();
     }
   );
 });
