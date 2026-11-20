@@ -182,17 +182,14 @@ describe('Golden eval-set CI gate: referenced-entity hydration', () => {
     expect(systemPrompt.toLowerCase()).toContain('never another artist');
   });
 
-  it('produces a reply that treats the owned release as the user own work', async () => {
+  it('calls generateText with the hydrated owned-release prompt and rejects mis-attribution', async () => {
     const systemPrompt = buildPromptWithReferencedEntities();
 
-    // The mock reply represents the quality bar given the hydrated prompt:
-    // it uses the resolved title/role and never disclaims it as someone else's.
     const reply =
       'Revival, your single, is at moderate popularity. Pitching it again to editorial is worth a shot now that it has some traction.';
-
     mockGenerateText.mockResolvedValueOnce({ text: reply });
 
-    const result = await generateText({
+    await generateText({
       model: { __model: CHAT_MODEL },
       system: systemPrompt,
       prompt: userPrompt,
@@ -201,15 +198,36 @@ describe('Golden eval-set CI gate: referenced-entity hydration', () => {
       temperature: 0,
     });
 
-    const lower = result.text.toLowerCase();
-    // Reflects correct catalog facts.
-    expect(lower).toContain('revival');
-    expect(lower).toContain('single');
-    // Never mis-attributes the owned release to another artist.
-    expect(lower).not.toContain('another artist');
-    expect(lower).not.toContain("another artist's");
-    expect(lower).not.toContain("someone else's");
-    expect(lower).not.toContain('not your');
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: userPrompt,
+        tools: evalTools,
+        system: expect.stringMatching(
+          /Referenced Entities[\s\S]*"Revival"[\s\S]*this artist's own catalog/i
+        ),
+      })
+    );
+
+    const ownedReleaseCase = {
+      name: 'Owned release hydration',
+      category: 'catalog' as const,
+      userPrompt,
+      mustSay: ['revival', 'single'],
+      mustNotSay: [
+        'another artist',
+        "another artist's",
+        "someone else's",
+        'not your',
+      ],
+      harmfulBlacklist: [],
+    };
+    assertGoldenCaseQuality(reply, ownedReleaseCase);
+    expect(() =>
+      assertGoldenCaseQuality(
+        "Revival is another artist's single, so you cannot pitch it.",
+        ownedReleaseCase
+      )
+    ).toThrow();
   });
 });
 

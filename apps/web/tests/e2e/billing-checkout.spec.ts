@@ -22,14 +22,10 @@ import { ensureSignedInUser } from '../helpers/auth';
 /* ------------------------------------------------------------------ */
 
 const REQUIRED_ENV = {
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
 
-const IS_LOCAL_AUTH_BYPASS =
-  process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+const IS_AUTH_MOCKED =
   process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
   process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 
@@ -56,9 +52,7 @@ interface CheckoutAttempt {
   readonly body: string;
 }
 
-async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
-  // Clerk → Better Auth migration: setupClerkTestingToken removed.
-  // The dev bypass session cookie persists, so no re-arm is needed.
+async function refreshBetterAuthSessionForApi(page: Page): Promise<boolean> {
   await page.goto(APP_ROUTES.CHAT, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
@@ -68,29 +62,10 @@ async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
     return false;
   }
 
-  return page
-    .evaluate(async () => {
-      const clerk = (window as any).Clerk;
-      if (!clerk) return true;
-      if (!clerk.loaded) {
-        await new Promise<void>(resolve => {
-          const startedAt = Date.now();
-          const tick = () => {
-            if (clerk.loaded || Date.now() - startedAt > 15_000) {
-              resolve();
-              return;
-            }
-            window.setTimeout(tick, 100);
-          };
-          tick();
-        });
-      }
-
-      if (!clerk.user?.id || !clerk.session) return false;
-      await clerk.session.getToken({ skipCache: true }).catch(() => null);
-      return true;
-    })
-    .catch(() => false);
+  const sessionRes = await page.request
+    .get('/api/auth/get-session', { failOnStatusCode: false })
+    .catch(() => null);
+  return Boolean(sessionRes?.ok());
 }
 
 async function createCheckoutSessionFromBrowser(
@@ -98,20 +73,11 @@ async function createCheckoutSessionFromBrowser(
   priceId: string
 ): Promise<CheckoutAttempt> {
   return page.evaluate(async targetPriceId => {
-    const clerk = (window as any).Clerk;
-    const token = await clerk?.session
-      ?.getToken({ skipCache: true })
-      .catch(() => null);
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-    };
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-
     const response = await fetch('/api/stripe/checkout', {
       method: 'POST',
-      headers,
+      headers: {
+        'content-type': 'application/json',
+      },
       credentials: 'include',
       body: JSON.stringify({ priceId: targetPriceId }),
     });
@@ -133,25 +99,19 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    if (IS_LOCAL_AUTH_BYPASS) {
-      test.skip(true, 'Billing checkout requires real Clerk auth');
+    if (IS_AUTH_MOCKED) {
+      test.skip(true, 'Billing checkout requires unmocked Better Auth');
     }
     if (!hasRealEnv()) {
-      test.skip(true, 'Real Clerk/DB env vars not configured');
-    }
-    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
-      test.skip(true, 'Clerk testing setup was not successful');
+      test.skip(true, 'Better Auth/DB env vars not configured');
     }
     if (
-      !process.env.E2E_CLERK_USER_USERNAME ||
-      !(
-        process.env.E2E_CLERK_USER_USERNAME.includes('+clerk_test') ||
-        process.env.E2E_CLERK_USER_PASSWORD
-      )
+      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
+      process.env.E2E_USE_STORED_AUTH !== '1'
     ) {
       test.skip(
         true,
-        'E2E_CLERK_USER_USERNAME/PASSWORD not configured for standing test user'
+        'Better Auth checkout E2E requires E2E_USE_TEST_AUTH_BYPASS=1 or E2E_USE_STORED_AUTH=1'
       );
     }
 
@@ -243,7 +203,7 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
             );
 
             if (checkoutAttempt.status === 401) {
-              const refreshed = await refreshClerkSessionForApi(page);
+              const refreshed = await refreshBetterAuthSessionForApi(page);
               if (!refreshed) return 'http-401';
               checkoutAttempt = await createCheckoutSessionFromBrowser(
                 page,
