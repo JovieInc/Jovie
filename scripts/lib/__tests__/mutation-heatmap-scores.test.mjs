@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import {
   mkdirSync,
   mkdtempSync,
@@ -8,7 +7,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import test from 'node:test';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   normalizeRepoWebPath,
   readMutationHeatmapScores,
@@ -16,9 +15,8 @@ import {
   scoresFromStrykerReport,
 } from '../mutation-heatmap-scores.mjs';
 
-function fixture(t) {
+function fixture() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'mut-heatmap-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (rel, value) => {
     const dest = join(root, rel);
     mkdirSync(dirname(dest), { recursive: true });
@@ -27,94 +25,102 @@ function fixture(t) {
       typeof value === 'string' ? value : JSON.stringify(value, null, 2)
     );
   };
-  return { root, write };
+  return { root, write, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-test('normalizeRepoWebPath accepts web-relative, repo-relative, and abs paths', () => {
-  assert.equal(normalizeRepoWebPath('proxy.ts'), 'apps/web/proxy.ts');
-  assert.equal(
-    normalizeRepoWebPath('apps/web/lib/stripe/dunning.ts'),
-    'apps/web/lib/stripe/dunning.ts'
-  );
-  assert.equal(
-    normalizeRepoWebPath('/workspace/checkout/apps/web/lib/auth/x.ts'),
-    'apps/web/lib/auth/x.ts'
-  );
-});
-
-test('scoresFromMutationBaseline maps measured floors to apps/web paths', t => {
-  const { root, write } = fixture(t);
-  write('baseline.json', {
-    schemaVersion: 1,
-    direction: 'lock_up',
-    files: {
-      'proxy.ts': { measured: 56.7, floor: 55.7, valid: 150 },
-      'lib/stripe/dunning.ts': { measured: 12.6, floor: 11.6, valid: 135 },
-    },
+describe('mutation-heatmap-scores', () => {
+  /** @type {Array<() => void>} */
+  const cleanups = [];
+  afterEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
   });
-  assert.deepEqual(scoresFromMutationBaseline(join(root, 'baseline.json')), {
-    'apps/web/proxy.ts': 57,
-    'apps/web/lib/stripe/dunning.ts': 13,
-  });
-});
 
-test('scoresFromStrykerReport derives kill ratio per file', t => {
-  const { root, write } = fixture(t);
-  write('stryker.json', {
-    files: {
-      'apps/web/proxy.ts': {
-        mutants: [
-          { status: 'Killed' },
-          { status: 'Killed' },
-          { status: 'Survived' },
-        ],
+  it('normalizeRepoWebPath accepts web-relative, repo-relative, and abs paths', () => {
+    expect(normalizeRepoWebPath('proxy.ts')).toBe('apps/web/proxy.ts');
+    expect(normalizeRepoWebPath('apps/web/lib/stripe/dunning.ts')).toBe(
+      'apps/web/lib/stripe/dunning.ts'
+    );
+    expect(
+      normalizeRepoWebPath('/workspace/checkout/apps/web/lib/auth/x.ts')
+    ).toBe('apps/web/lib/auth/x.ts');
+  });
+
+  it('scoresFromMutationBaseline maps measured floors to apps/web paths', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('baseline.json', {
+      schemaVersion: 1,
+      direction: 'lock_up',
+      files: {
+        'proxy.ts': { measured: 56.7, floor: 55.7, valid: 150 },
+        'lib/stripe/dunning.ts': { measured: 12.6, floor: 11.6, valid: 135 },
       },
-    },
+    });
+    expect(scoresFromMutationBaseline(join(root, 'baseline.json'))).toEqual({
+      'apps/web/proxy.ts': 57,
+      'apps/web/lib/stripe/dunning.ts': 13,
+    });
   });
-  assert.deepEqual(scoresFromStrykerReport(join(root, 'stryker.json')), {
-    'apps/web/proxy.ts': 67,
-  });
-});
 
-test('readMutationHeatmapScores prefers live Stryker over baseline', t => {
-  const { root, write } = fixture(t);
-  write('baseline.json', {
-    files: {
-      'proxy.ts': { measured: 50 },
-      'lib/stripe/dunning.ts': { measured: 12.6 },
-    },
-  });
-  write('stryker.json', {
-    files: {
-      'apps/web/proxy.ts': {
-        mutants: [{ status: 'Killed' }, { status: 'Killed' }],
+  it('scoresFromStrykerReport derives kill ratio per file', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('stryker.json', {
+      files: {
+        'apps/web/proxy.ts': {
+          mutants: [
+            { status: 'Killed' },
+            { status: 'Killed' },
+            { status: 'Survived' },
+          ],
+        },
       },
-    },
+    });
+    expect(scoresFromStrykerReport(join(root, 'stryker.json'))).toEqual({
+      'apps/web/proxy.ts': 67,
+    });
   });
-  assert.deepEqual(
-    readMutationHeatmapScores({
-      repoRoot: root,
-      baselinePath: join(root, 'baseline.json'),
-      strykerPath: join(root, 'stryker.json'),
-    }),
-    {
+
+  it('readMutationHeatmapScores prefers live Stryker over baseline', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('baseline.json', {
+      files: {
+        'proxy.ts': { measured: 50 },
+        'lib/stripe/dunning.ts': { measured: 12.6 },
+      },
+    });
+    write('stryker.json', {
+      files: {
+        'apps/web/proxy.ts': {
+          mutants: [{ status: 'Killed' }, { status: 'Killed' }],
+        },
+      },
+    });
+    expect(
+      readMutationHeatmapScores({
+        repoRoot: root,
+        baselinePath: join(root, 'baseline.json'),
+        strykerPath: join(root, 'stryker.json'),
+      })
+    ).toEqual({
       'apps/web/proxy.ts': 100,
       'apps/web/lib/stripe/dunning.ts': 13,
-    }
-  );
-});
-
-test('readMutationHeatmapScores falls back to baseline alone', t => {
-  const { root, write } = fixture(t);
-  write('baseline.json', {
-    files: { 'proxy.ts': { measured: 56.7 } },
+    });
   });
-  assert.deepEqual(
-    readMutationHeatmapScores({
-      repoRoot: root,
-      baselinePath: join(root, 'baseline.json'),
-      strykerPath: join(root, 'missing-stryker.json'),
-    }),
-    { 'apps/web/proxy.ts': 57 }
-  );
+
+  it('readMutationHeatmapScores falls back to baseline alone', () => {
+    const { root, write, cleanup } = fixture();
+    cleanups.push(cleanup);
+    write('baseline.json', {
+      files: { 'proxy.ts': { measured: 56.7 } },
+    });
+    expect(
+      readMutationHeatmapScores({
+        repoRoot: root,
+        baselinePath: join(root, 'baseline.json'),
+        strykerPath: join(root, 'missing-stryker.json'),
+      })
+    ).toEqual({ 'apps/web/proxy.ts': 57 });
+  });
 });
