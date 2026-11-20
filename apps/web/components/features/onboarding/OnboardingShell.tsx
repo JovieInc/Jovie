@@ -237,7 +237,8 @@ export function OnboardingShell({
   );
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || awaitingClaimHandoff || claimTrigger > 0
+    isSignedIn &&
+      (!resumeOwnedConversation || awaitingClaimHandoff || claimTrigger > 0)
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
