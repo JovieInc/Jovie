@@ -56,14 +56,24 @@ function isKnownSha(stage) {
 }
 
 /**
+ * Loose stage input — {@link normalizeStage} validates status before use.
+ * @typedef {{
+ *   readonly status?: string;
+ *   readonly sourceRevision?: string | null;
+ *   readonly version?: string | null;
+ *   readonly at?: string | null;
+ *   readonly verified?: boolean;
+ *   readonly reason?: string | null;
+ * }} StageReceiptInput
+ *
  * Reconcile one channel's stage receipts into a mismatch list.
  * @param {{
  *   readonly channel: 'production' | 'staging';
- *   readonly certified?: StageReceipt | null;
- *   readonly published?: StageReceipt | null;
- *   readonly feed?: StageReceipt | null;
- *   readonly installed?: StageReceipt | null;
- *   readonly running?: StageReceipt | null;
+ *   readonly certified?: StageReceiptInput | null;
+ *   readonly published?: StageReceiptInput | null;
+ *   readonly feed?: StageReceiptInput | null;
+ *   readonly installed?: StageReceiptInput | null;
+ *   readonly running?: StageReceiptInput | null;
  *   readonly desktopRelevantSincePublished?: boolean | null;
  *   readonly publishInFlight?: boolean | null;
  * }} input
@@ -222,7 +232,7 @@ export function reconcileArtifactFreshness(input) {
 }
 
 /**
- * @param {StageReceipt | null | undefined} stage
+ * @param {StageReceiptInput | null | undefined} stage
  * @returns {StageReceipt}
  */
 function normalizeStage(stage) {
@@ -233,7 +243,7 @@ function normalizeStage(stage) {
     return { status: 'unknown', reason: 'stage status invalid' };
   }
   return {
-    status: stage.status,
+    status: /** @type {StageReceipt['status']} */ (stage.status),
     sourceRevision: stage.sourceRevision ?? null,
     version: stage.version ?? null,
     at: stage.at ?? null,

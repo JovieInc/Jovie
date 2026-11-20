@@ -69,7 +69,7 @@ export function observationFailureReceipt(error) {
  *   readonly certified?: Awaited<ReturnType<typeof fetchLatestProductionVerifiedSha>>;
  *   readonly desktopRelevant?: boolean | null;
  *   readonly publishInFlight?: boolean | null;
- *   readonly fetchImpl?: typeof fetch;
+ *   readonly fetchImpl?: (input: any, init?: any) => Promise<any>;
  *   readonly token?: string | null;
  * }} [input]
  */
@@ -206,7 +206,7 @@ export async function collectArtifactFreshness(input = {}) {
  *   readonly receipt: ReturnType<typeof buildArtifactFreshnessReceipt>;
  *   readonly sourceUrl?: string;
  *   readonly apiKey?: string | null;
- *   readonly upsert?: typeof upsertLinearIssueByTitleFingerprint;
+ *   readonly upsert?: (args: any) => Promise<any>;
  * }} input
  */
 export async function pageSummerForFreshness(input) {
@@ -310,7 +310,7 @@ export function canResolveSummerForFreshness(receipt) {
  *   readonly sourceUrl?: string;
  *   readonly runId?: string;
  *   readonly apiKey?: string | null;
- *   readonly close?: typeof closeLinearIssueByFingerprint;
+ *   readonly close?: (args: any) => Promise<any>;
  * }} [input]
  */
 export async function resolveSummerForFreshness(input = {}) {

@@ -22,8 +22,13 @@ import {
   isStagingAssetName,
   validateReleaseEnvelope,
 } from './desktop-release-assets.mjs';
-import { isInstallationQuota403 } from './lib/github-installation-quota.mjs';
-import { classifyGitHubFailure } from './lib/github-rate-limit.mjs';
+import {
+  githubHttpErrorMessage,
+  isPublicationObservationError,
+  publishedFeedErrorMessage,
+} from './lib/publication-observation.mjs';
+
+export { isPublicationObservationError } from './lib/publication-observation.mjs';
 
 const APPLICATIONS_DIR = '/Applications';
 export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -372,40 +377,9 @@ async function githubJson(url, fetchImpl = fetch) {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    const detail = body.trim().slice(0, 240);
-    throw new Error(
-      `GitHub ${response.status} for ${url}${detail ? `: ${detail}` : ''}`
-    );
+    throw new Error(githubHttpErrorMessage(url, response.status, body));
   }
   return response.json();
-}
-
-/**
- * Transient fetch/API failures are incomplete observation — not a bad publish.
- * Digest/content mismatches stay verification failures.
- * Bare permission 403s stay verification/publication errors; only rate-limit /
- * secondary-rate-limit style 403s (same family as github-rate-limit.mjs) count
- * as observation failures.
- * @param {unknown} error
- */
-export function isPublicationObservationError(error) {
-  const name = error instanceof Error ? error.name : '';
-  const message = error instanceof Error ? error.message : String(error);
-  if (
-    name === 'AbortError' ||
-    /timeout|network|ECONNRESET|ENOTFOUND|fetch failed/i.test(message)
-  ) {
-    return true;
-  }
-  const statusMatch =
-    /\bGitHub (\d{3})\b/.exec(message) ??
-    /Published feed returned (\d{3})\./.exec(message);
-  if (!statusMatch) return false;
-  const status = Number(statusMatch[1]);
-  if (status === 429 || status >= 500) return true;
-  if (status !== 403) return false;
-  if (isInstallationQuota403(message, 403)) return true;
-  return classifyGitHubFailure({ status: 403, message }).kind !== 'none';
 }
 
 async function shippedVersion(release, channel, fetchImpl) {
@@ -495,10 +469,7 @@ async function shippedVersion(release, channel, fetchImpl) {
     );
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      const detail = body.trim().slice(0, 240);
-      throw new Error(
-        `Published feed returned ${response.status}.${detail ? ` ${detail}` : ''}`
-      );
+      throw new Error(publishedFeedErrorMessage(response.status, body));
     }
     const bytes = Buffer.from(await response.arrayBuffer());
     if (

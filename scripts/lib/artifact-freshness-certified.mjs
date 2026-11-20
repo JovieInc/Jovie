@@ -1,7 +1,10 @@
 /**
  * Production Verified + desktop-path relevance for artifact freshness.
+ *
+ * api-budget: github-actions-token 30/hr - desktop-release completion reconcile: one workflow runs page plus up to a few jobs pages for Production Verified
  */
 import { execFileSync } from 'node:child_process';
+import { GITHUB_API } from '../../packages/api-client/github.ts';
 
 export const DESKTOP_PRODUCTION_PATHS = Object.freeze([
   'VERSION',
@@ -20,14 +23,13 @@ export const DESKTOP_PRODUCTION_PATHS = Object.freeze([
 ]);
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
-const GITHUB_API = 'https://api.github.com';
 const DEFAULT_REPO = 'JovieInc/Jovie';
 const PRODUCTION_CONTROLLER_WORKFLOW = 'production-controller.yml';
 
 /**
  * @param {string} publishedSha
  * @param {string} certifiedSha
- * @param {{ readonly execFileSync?: typeof execFileSync }} [deps]
+ * @param {{ readonly execFileSync?: (...args: any[]) => string }} [deps]
  */
 export function desktopRelevantBetween(publishedSha, certifiedSha, deps = {}) {
   if (!FULL_SHA.test(publishedSha) || !FULL_SHA.test(certifiedSha)) {
@@ -61,7 +63,7 @@ export function desktopRelevantBetween(publishedSha, certifiedSha, deps = {}) {
  * @param {{
  *   readonly repo?: string;
  *   readonly token?: string | null;
- *   readonly fetchImpl?: typeof fetch;
+ *   readonly fetchImpl?: (input: any, init?: any) => Promise<any>;
  * }} [input]
  */
 export async function fetchLatestProductionVerifiedSha(input = {}) {

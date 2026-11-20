@@ -4,13 +4,15 @@
  * Keep-owned cursor/stable-desktop-publish-* means publish is in the normal
  * path — suppress Summer page, still block resolve. DIRTY/exhausted do not.
  * Keep-owned stamps older than STAMP_IN_FLIGHT_MAX_AGE_MS escalate (page).
+ *
+ * api-budget: github-actions-token 40/hr - desktop-release completion reconcile: open PR pages plus one stamp detail GET
  */
+import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
   findOpenDesktopStampPr,
   stampOwnershipDecision,
 } from '../desktop-stamp-ownership.mjs';
 
-const GITHUB_API = 'https://api.github.com';
 const DEFAULT_REPO = 'JovieInc/Jovie';
 const MAX_PULL_PAGES = 10;
 /** Ship now: 6h grace. Re-evaluate when queue dwell norms change. */
@@ -45,7 +47,7 @@ export function nextLinkUrl(link) {
  * @param {{
  *   readonly repo?: string;
  *   readonly token?: string | null;
- *   readonly fetchImpl?: typeof fetch;
+ *   readonly fetchImpl?: (input: any, init?: any) => Promise<any>;
  *   readonly nowMs?: number;
  *   readonly maxAgeMs?: number;
  * }} [input]
@@ -84,7 +86,7 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       const link =
         typeof listResponse.headers?.get === 'function'
           ? listResponse.headers.get('link')
-          : (listResponse.headers?.link ?? null);
+          : null;
       const next = nextLinkUrl(link);
       if (!next) {
         truncated = false;

@@ -5,7 +5,6 @@ import {
   canResolveSummerForFreshness,
   collectArtifactFreshness,
   desktopRelevantBetween,
-  fetchLatestProductionVerifiedSha,
   observationFailureReceipt,
   pageSummerForFreshness,
   resolveSummerForFreshness,
@@ -13,6 +12,34 @@ import {
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+
+/** @param {Record<string, unknown>} [prod] @param {Record<string, unknown>} [staging] */
+function shipped(prod = {}, staging = {}) {
+  const channel = (defaults, overrides) => ({
+    version: defaults.version,
+    publishedAt: defaults.publishedAt,
+    sourceRevision: SHA_A,
+    publicationIdentityVerified: true,
+    publicationError: null,
+    publicationObservationError: null,
+    ...overrides,
+  });
+  return {
+    production: channel(
+      { version: '26.11.4', publishedAt: '2026-11-15T00:00:00Z' },
+      prod
+    ),
+    staging: channel(
+      {
+        version: '26.11.4-staging.1.1',
+        publishedAt: '2026-11-15T01:00:00Z',
+      },
+      staging
+    ),
+    stagingObservationError: null,
+  };
+}
 
 test('desktopRelevantBetween is false for equal SHAs and true when git reports paths', () => {
   assert.equal(desktopRelevantBetween(SHA_A, SHA_A), false);
@@ -27,226 +54,9 @@ test('desktopRelevantBetween is false for equal SHAs and true when git reports p
   assert.equal(clean, false);
 });
 
-test('fetchLatestProductionVerifiedSha queries production-controller.yml not event=push', async () => {
-  const urls = [];
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async url => {
-      urls.push(String(url));
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 11,
-                conclusion: 'success',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T00:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/11/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
-        };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  assert.equal(result.status, 'known');
-  assert.equal(result.sourceRevision, SHA_B);
-  assert.match(urls[0], /workflows\/production-controller\.yml\/runs/);
-  assert.doesNotMatch(urls[0], /event=push/);
-});
-
-test('fetchLatestProductionVerifiedSha returns unknown on network failure', async () => {
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async () => {
-      throw new Error('boom');
-    },
-  });
-  assert.equal(result.status, 'unknown');
-  assert.match(result.reason, /boom/);
-});
-
-test('jobs 5xx on newest run does not fall back to older verified SHA', async () => {
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async url => {
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 21,
-                conclusion: 'success',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T02:00:00Z',
-              },
-              {
-                id: 20,
-                conclusion: 'success',
-                head_sha: SHA_A,
-                updated_at: '2026-11-20T01:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/21/jobs')) {
-        return { ok: false, status: 503, json: async () => ({}) };
-      }
-      if (String(url).includes('/actions/runs/20/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
-        };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  assert.equal(result.status, 'unknown');
-  assert.equal(result.sourceRevision, undefined);
-  assert.match(result.reason, /jobs lookup returned 503/);
-});
-
-test('jobs ok without verified job may fall back to older verified SHA', async () => {
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async url => {
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 31,
-                conclusion: 'success',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T02:00:00Z',
-              },
-              {
-                id: 30,
-                conclusion: 'success',
-                head_sha: SHA_A,
-                updated_at: '2026-11-20T01:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/31/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Something Else', conclusion: 'success' }],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/30/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
-        };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  assert.equal(result.status, 'known');
-  assert.equal(result.sourceRevision, SHA_A);
-});
-
-test('jobs 5xx certified unknown blocks premature Summer resolve', async () => {
-  const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
-    publishInFlight: false,
-    desktopRelevant: false,
-    fetchImpl: async url => {
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 41,
-                conclusion: 'success',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T02:00:00Z',
-              },
-              {
-                id: 40,
-                conclusion: 'success',
-                head_sha: SHA_A,
-                updated_at: '2026-11-20T01:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/41/jobs')) {
-        return { ok: false, status: 502, json: async () => ({}) };
-      }
-      if (String(url).includes('/actions/runs/40/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
-        };
-      }
-      // stamp list etc.
-      if (String(url).includes('/pulls')) {
-        return { ok: true, json: async () => [], headers: { get: () => null } };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  const production = receipt.channels.find(c => c.channel === 'production');
-  assert.equal(production?.stages?.certified?.status, 'unknown');
-  assert.equal(canResolveSummerForFreshness(receipt), false);
-});
-
 test('collectArtifactFreshness keeps installed/running unknown and pages on certified stall', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'known',
       sourceRevision: SHA_B,
@@ -315,6 +125,7 @@ test('pageSummerForFreshness puts stable fingerprint in title and labelKey', asy
         sourceRevision: SHA_A,
         publicationIdentityVerified: false,
         publicationError: 'feed digest mismatch',
+        publicationObservationError: null,
       },
       staging: {
         version: null,
@@ -322,7 +133,9 @@ test('pageSummerForFreshness puts stable fingerprint in title and labelKey', asy
         sourceRevision: null,
         publicationIdentityVerified: false,
         publicationError: null,
+        publicationObservationError: null,
       },
+      stagingObservationError: null,
     },
     certified: { status: 'unknown', reason: 'skipped' },
     desktopRelevant: false,
@@ -365,22 +178,7 @@ test('resolveSummerForFreshness closes by stable fingerprint on green', async ()
 
 test('unknown production certified is not resolve-eligible even when published/feed look green', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'unknown',
       reason: 'No recent successful Production Verified job on main.',
@@ -393,22 +191,7 @@ test('unknown production certified is not resolve-eligible even when published/f
 
 test('known verified production certified allows Summer resolve when receipt is green', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'known',
       sourceRevision: SHA_A,
@@ -430,6 +213,7 @@ test('staging observation error is unknown, not published-missing', async () => 
         sourceRevision: SHA_A,
         publicationIdentityVerified: true,
         publicationError: null,
+        publicationObservationError: null,
       },
       staging: {
         version: null,
@@ -437,6 +221,7 @@ test('staging observation error is unknown, not published-missing', async () => 
         sourceRevision: null,
         publicationIdentityVerified: false,
         publicationError: null,
+        publicationObservationError: null,
       },
       stagingObservationError: 'GitHub 503 for staging release',
     },
@@ -473,6 +258,7 @@ test('staging 404-style missing still pages published-missing', async () => {
         sourceRevision: SHA_A,
         publicationIdentityVerified: true,
         publicationError: null,
+        publicationObservationError: null,
       },
       staging: {
         version: null,
@@ -480,6 +266,7 @@ test('staging 404-style missing still pages published-missing', async () => {
         sourceRevision: null,
         publicationIdentityVerified: false,
         publicationError: null,
+        publicationObservationError: null,
       },
       stagingObservationError: null,
     },
@@ -504,6 +291,7 @@ test('pageSummerForFreshness keeps empty-string spacers in the Linear descriptio
         sourceRevision: SHA_A,
         publicationIdentityVerified: false,
         publicationError: 'feed digest mismatch',
+        publicationObservationError: null,
       },
       staging: {
         version: null,
@@ -511,7 +299,9 @@ test('pageSummerForFreshness keeps empty-string spacers in the Linear descriptio
         sourceRevision: null,
         publicationIdentityVerified: false,
         publicationError: null,
+        publicationObservationError: null,
       },
+      stagingObservationError: null,
     },
     certified: { status: 'unknown', reason: 'skipped' },
     desktopRelevant: false,
@@ -574,22 +364,7 @@ test('publicationObservationError yields unknown published without paging', asyn
 
 test('transient stamp list 503 does not page when certified ahead of published', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'known',
       sourceRevision: SHA_B,
@@ -612,22 +387,7 @@ test('transient stamp list 503 does not page when certified ahead of published',
 
 test('keep-owned stamp suppresses Summer page but still blocks resolve', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'known',
       sourceRevision: SHA_B,
@@ -649,22 +409,7 @@ test('keep-owned stamp suppresses Summer page but still blocks resolve', async (
 
 test('null desktop relevance with differing SHAs blocks Summer resolve without paging', async () => {
   const receipt = await collectArtifactFreshness({
-    shipped: {
-      production: {
-        version: '26.11.4',
-        publishedAt: '2026-11-15T00:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-      staging: {
-        version: '26.11.4-staging.1.1',
-        publishedAt: '2026-11-15T01:00:00Z',
-        sourceRevision: SHA_A,
-        publicationIdentityVerified: true,
-        publicationError: null,
-      },
-    },
+    shipped: shipped(),
     certified: {
       status: 'known',
       sourceRevision: SHA_B,

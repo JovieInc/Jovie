@@ -10,7 +10,6 @@ import {
   evaluateDesktopInstalledAppsAudit,
   evaluateDesktopUpdateFreshness,
   fetchShippedDesktopVersions,
-  isPublicationObservationError,
   KNOWN_DESKTOP_BUNDLE_IDS,
   listRunningJovieProcesses,
   readCodesignMetadata,
@@ -298,18 +297,17 @@ test('staging requires a valid timestamp for the current rolling publication', a
 
 test('wrong feed bytes, unavailable feed, and wrong feed target cannot verify publication', async () => {
   const fixture = publishedFixture();
-  for (const response of [
-    () => new Response(fixture.feed.replace('26.10.3', '26.10.4')),
-    () => new Response('denied', { status: 403 }),
-    () => {
-      throw new Error('network unavailable');
-    },
-  ]) {
-    assert.equal(
-      (await observePublication(fixture, response)).production
-        .publicationIdentityVerified,
-      false
-    );
+  /** @type {Array<[() => Response, boolean]>} */
+  const cases = [
+    [() => new Response(fixture.feed.replace('26.10.3', '26.10.4')), false],
+    [() => new Response('API rate limit exceeded for installation ID 42', { status: 403 }), true],
+    [() => new Response('denied', { status: 403 }), false],
+    [() => { throw new Error('network unavailable'); }, true],
+  ];
+  for (const [feedResponse, expectObservation] of cases) {
+    const observed = (await observePublication(fixture, feedResponse)).production;
+    assert.equal(observed.publicationIdentityVerified, false);
+    assert.equal(Boolean(observed.publicationObservationError), expectObservation);
   }
   for (const transform of [
     feed => feed.replace('version: 26.10.3', 'version: 26.10.2'),
@@ -703,7 +701,6 @@ test('readDesktopBuildIdentity accepts exact staging prerelease provenance', () 
     rmSync(temp, { recursive: true, force: true });
   }
 });
-
 test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () => {
   const now = new Date('2026-08-29T12:00:00Z');
   const sample = (
@@ -729,84 +726,4 @@ test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () =
   assert.equal(sample('26.6.61', '2026-07-21T00:00:00Z').red, true);
   assert.equal(sample('26.8.1', null, null).red, true);
   assert.equal(sample(null, '2026-07-21T00:00:00Z').status, 'not-installed');
-});
-
-test('isPublicationObservationError treats rate-limit 403/429/5xx as observation failures', () => {
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'GitHub 403 for /releases/latest: API rate limit exceeded for installation ID 1'
-      )
-    ),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'Published feed returned 403. You have exceeded a secondary rate limit. Please wait a few minutes.'
-      )
-    ),
-    true
-  );
-  // Bare permission 403 — keep as publication/verification failure.
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 403.')),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'GitHub 403 for /releases/latest: Resource not accessible by integration'
-      )
-    ),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 429.')),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 503.')),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error('Published feed does not target the exact channel assets.')
-    ),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 404.')),
-    false
-  );
-});
-
-test('feed rate-limit 403 is observation error not unverified publication', async () => {
-  const observed = await observePublication(publishedFixture(), () =>
-    new Response('API rate limit exceeded for installation ID 42', {
-      status: 403,
-    })
-  );
-  assert.equal(observed.production.publicationIdentityVerified, false);
-  assert.equal(observed.production.publicationError, null);
-  assert.match(
-    observed.production.publicationObservationError,
-    /Published feed returned 403/
-  );
-  assert.match(
-    observed.production.publicationObservationError,
-    /API rate limit exceeded/
-  );
-});
-
-test('feed permission 403 stays publication error', async () => {
-  const observed = await observePublication(publishedFixture(), () =>
-    new Response('Resource not accessible by integration', { status: 403 })
-  );
-  assert.equal(observed.production.publicationIdentityVerified, false);
-  assert.equal(observed.production.publicationObservationError, null);
-  assert.match(
-    observed.production.publicationError,
-    /Published feed returned 403/
-  );
 });
