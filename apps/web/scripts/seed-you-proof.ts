@@ -27,9 +27,7 @@ async function main() {
     apply: values.apply === true,
     store: createYouProofDbStore(db),
     log: (step, detail) => {
-      process.stdout.write(
-        `status=step;${step};${JSON.stringify(detail)}\n`
-      );
+      process.stdout.write(`status=step;${step};${JSON.stringify(detail)}\n`);
     },
   });
 
