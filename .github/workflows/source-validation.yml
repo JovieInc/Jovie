@@ -1089,28 +1089,32 @@ jobs:
           [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
           [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
+          # Same checks as before: every selected guard still runs, first failure
+          # wins the exit code, and log order stays list order. #26000 already
+          # pooled these in the structural lane; Source Validation still ran
+          # them serially on unit shard 4/4 (~328s of wall). Bounded concurrency
+          # (default ≤3) overlaps independent poles (script-contracts ~162s,
+          # merged-with-base ~105s) without weakening the guard set.
+          # SOURCE_GUARD_CONCURRENCY=1 reproduces the old serial loop.
+          export SOURCE_GUARD_CONCURRENCY="${SOURCE_GUARD_CONCURRENCY:-3}"
           source_guard_program="$(cat <<'SOURCE_GUARDS'
-            import { spawnSync } from "node:child_process";
-            import { randomUUID } from "node:crypto";
-            const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
-            const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
-            let exitCode = 0;
-            for (const guard of guards) {
-              // Guard tests print mocked `::error::` / `::warning::` lines (a fake
-              // rate-limit reset misled three workers on 2026-10-25). Stop workflow
-              // commands for the guard, then resume; a failing guard gets one real
-              // annotation from this loop instead.
-              const token = randomUUID();
-              console.log(`::stop-commands::${token}`);
-              const started = performance.now();
-              const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
-              console.log(`::${token}::`);
-              const code = result.status ?? 1;
-              console.log(`[source-guards] ${guard.id}: exit ${code}; duration_ms=${Math.round(performance.now() - started)}`);
-              if (code !== 0) console.log(`::error title=source guard ${guard.id}::${guard.id} failed (exit ${code}); read its output above.`);
-              if (code !== 0 && exitCode === 0) exitCode = code;
-            }
-            process.exitCode = exitCode;
+            import { dirname, join } from "node:path";
+            import { pathToFileURL } from "node:url";
+            const modulePath = process.env.SOURCE_GUARD_MODULE;
+            const { selectSourceGuards, listAllChangedFiles } = await import(
+              pathToFileURL(modulePath).href
+            );
+            const { runSourceGuards } = await import(
+              pathToFileURL(
+                join(dirname(modulePath), "lib", "ci-source-guard-pool.mjs")
+              ).href
+            );
+            const guards = selectSourceGuards(
+              process.env.GITHUB_EVENT_NAME,
+              listAllChangedFiles(process.cwd())
+            );
+            const { code } = await runSourceGuards(guards);
+            process.exitCode = code;
           SOURCE_GUARDS
           )"
           node --input-type=module -e "$source_guard_program"

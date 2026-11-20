@@ -52,7 +52,7 @@ describe('mocked rate-limit refusals never become annotations', () => {
     expect(output).not.toMatch(COMMAND);
   });
 
-  it('Source Validation wraps each disk-read source guard in stop-commands', () => {
+  it('Source Validation pools disk-read source guards and still wraps each in stop-commands', () => {
     const workflow = readFileSync(
       resolve(ROOT, '.github/workflows/source-validation.yml'),
       'utf8'
@@ -61,12 +61,20 @@ describe('mocked rate-limit refusals never become annotations', () => {
       workflow.indexOf('Validate disk-read source contracts from trusted base')
     );
     const body = step.slice(0, step.indexOf('\n      - name:', 10));
-    const stop = body.indexOf('::stop-commands::${token}');
-    const spawn = body.indexOf('spawnSync(guard.command');
-    const resume = body.indexOf('::${token}::');
+    // Bounded pool (#26000) owns the per-guard stop-commands window; the
+    // workflow must call it instead of a serial spawnSync loop.
+    expect(body).toContain('ci-source-guard-pool.mjs');
+    expect(body).toContain('runSourceGuards');
+    expect(body).toContain('SOURCE_GUARD_CONCURRENCY');
+    expect(body).not.toContain('spawnSync(guard.command');
+    const pool = readFileSync(
+      resolve(ROOT, 'scripts/lib/ci-source-guard-pool.mjs'),
+      'utf8'
+    );
+    const stop = pool.indexOf('::stop-commands::${token}');
+    const resume = pool.indexOf('::${token}::');
     expect(stop).toBeGreaterThan(-1);
-    expect(stop).toBeLessThan(spawn);
-    expect(spawn).toBeLessThan(resume);
-    expect(body).toContain('randomUUID()');
+    expect(stop).toBeLessThan(resume);
+    expect(pool).toContain('randomUUID()');
   });
 });

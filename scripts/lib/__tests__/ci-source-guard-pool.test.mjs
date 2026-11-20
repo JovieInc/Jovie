@@ -299,3 +299,27 @@ describe('merged-with-base-invariants pool', () => {
     expect(output).toContain('[merged-with-base] also-ok: exit 0;');
   });
 });
+
+describe('Source Validation disk-read guards', () => {
+  it('call the bounded pool instead of a serial spawnSync loop', () => {
+    const workflow = readFileSync(
+      fileURLToPath(
+        new URL(
+          '../../../.github/workflows/source-validation.yml',
+          import.meta.url
+        )
+      ),
+      'utf8'
+    );
+    const step = workflow.slice(
+      workflow.indexOf('Validate disk-read source contracts from trusted base')
+    );
+    const body = step.slice(0, step.indexOf('\n      - name:', 10));
+    expect(body).toContain('runSourceGuards');
+    expect(body).toContain('ci-source-guard-pool.mjs');
+    expect(body).toContain(
+      'SOURCE_GUARD_CONCURRENCY="${SOURCE_GUARD_CONCURRENCY:-3}"'
+    );
+    expect(body).not.toContain('spawnSync(guard.command');
+  });
+});

@@ -17,6 +17,7 @@ import {
   dependencyInputDigest,
   validateDependencyWorkspace,
 } from '../ci-dependency-workspace.mjs';
+import { SOURCE_GUARD_POOL_SERIAL_STUB } from './fixtures/source-guard-pool-serial-stub.mjs';
 import {
   expression,
   interpolate,
@@ -285,6 +286,8 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
     "export const listAllChangedFiles = () => ['feature.txt'];\n" +
       "export const selectSourceGuards = () => [{id:'exact-dependency-probe',command:'node scripts/dependency-probe.mjs'}];\n"
   );
+  // Fixture archive ships a serial pool stub (same run-all / first-failure).
+  write('scripts/lib/ci-source-guard-pool.mjs', SOURCE_GUARD_POOL_SERIAL_STUB);
   git('add', '.');
   git('commit', '-qm', 'shared dependency fork');
   git('switch', '-qc', 'source-head');
