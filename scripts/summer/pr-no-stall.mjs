@@ -22,6 +22,9 @@ export const DEFAULT_APPLY_LIMIT = 5;
 export const AGENT_BRANCH_RE =
   /^(cursor|codex|claude|linear|codegen-bot|glm|ha|evr|flash|hyperagent|grok|chloe|lola)\//i;
 
+/** Strict git ref segment allowlist — no shell metacharacters. */
+export const SAFE_BRANCH_RE = /^[A-Za-z0-9._/-]+$/;
+
 export const STOP_LABELS = new Set([
   'hold',
   'gated',
@@ -30,6 +33,13 @@ export const STOP_LABELS = new Set([
   'big-pr',
   'queue-poison',
   'queue-deferred',
+]);
+
+/** Green-enroll admits these; BLOCKED is not green (may be failing required checks). */
+export const GREENISH_MERGE_STATES = new Set([
+  'CLEAN',
+  'HAS_HOOKS',
+  'UNSTABLE',
 ]);
 
 /**
@@ -59,6 +69,65 @@ export function ageHours(updatedAt, nowMs = Date.now()) {
 }
 
 /**
+ * @param {string | null | undefined} branch
+ */
+export function isSafeBranchName(branch) {
+  const value = String(branch ?? '');
+  return (
+    value.length > 0 &&
+    value.length <= 255 &&
+    SAFE_BRANCH_RE.test(value) &&
+    value !== 'main' &&
+    !value.startsWith('gh-readonly-queue/')
+  );
+}
+
+/**
+ * Fail closed: missing rollup is not proof of green.
+ * @param {{ statusCheckRollup?: unknown }} pr
+ */
+export function requiredChecksSettledGreen(pr) {
+  const rollup = pr?.statusCheckRollup;
+  if (!Array.isArray(rollup) || rollup.length === 0) return false;
+  for (const check of rollup) {
+    if (!check || typeof check !== 'object') return false;
+    const status = String(
+      /** @type {{ status?: string }} */ (check).status ?? ''
+    ).toUpperCase();
+    const conclusion = String(
+      /** @type {{ conclusion?: string }} */ (check).conclusion ?? ''
+    ).toUpperCase();
+    if (status && status !== 'COMPLETED') return false;
+    if (conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * @param {{
+ *   isCrossRepository?: boolean,
+ *   headRepository?: { name?: string, nameWithOwner?: string } | null,
+ * }} pr
+ * @param {string} [repository]
+ */
+export function isCrossRepositoryPr(
+  pr,
+  repository = process.env.GITHUB_REPOSITORY
+) {
+  if (pr?.isCrossRepository === true) return true;
+  const repo = String(repository ?? 'JovieInc/Jovie');
+  const head =
+    pr?.headRepository?.nameWithOwner ||
+    (pr?.headRepository?.name
+      ? `${repo.split('/')[0]}/${pr.headRepository.name}`
+      : null);
+  if (!head) return false;
+  return String(head).toLowerCase() !== repo.toLowerCase();
+}
+
+/**
  * @param {{
  *   number?: number,
  *   title?: string,
@@ -70,8 +139,11 @@ export function ageHours(updatedAt, nowMs = Date.now()) {
  *   url?: string,
  *   labels?: unknown,
  *   autoMergeRequest?: unknown,
+ *   statusCheckRollup?: unknown,
+ *   isCrossRepository?: boolean,
+ *   headRepository?: { name?: string, nameWithOwner?: string } | null,
  * }} pr
- * @param {{ nowMs?: number, idleHours?: number }} [opts]
+ * @param {{ nowMs?: number, idleHours?: number, repository?: string }} [opts]
  */
 export function classifyOpenPr(pr, opts = {}) {
   const idleHours = opts.idleHours ?? DEFAULT_IDLE_HOURS;
@@ -80,6 +152,10 @@ export function classifyOpenPr(pr, opts = {}) {
   const labelSet = new Set(labels);
   const branch = String(pr.headRefName ?? '');
   const age = ageHours(pr.updatedAt, nowMs);
+  const mergeState = String(pr.mergeStateStatus ?? '').toUpperCase();
+  const noConflicts = String(pr.mergeable ?? '').toUpperCase() === 'MERGEABLE';
+  const checksGreen = requiredChecksSettledGreen(pr);
+  const greenishState = GREENISH_MERGE_STATES.has(mergeState);
   const base = {
     number: pr.number ?? null,
     title: pr.title ?? '',
@@ -91,7 +167,17 @@ export function classifyOpenPr(pr, opts = {}) {
     labels,
     ageHours: age,
     agentBranch: AGENT_BRANCH_RE.test(branch) || /(^|\/)jov-\d+/i.test(branch),
+    checksGreen,
   };
+
+  if (isCrossRepositoryPr(pr, opts.repository)) {
+    return {
+      ...base,
+      class: 'cross-repo',
+      action: 'none',
+      reason: 'fork-or-cross-repository',
+    };
+  }
 
   if (labels.some(name => STOP_LABELS.has(name))) {
     return {
@@ -102,24 +188,28 @@ export function classifyOpenPr(pr, opts = {}) {
     };
   }
 
-  const mergeableOk =
-    String(pr.mergeable ?? '').toUpperCase() === 'MERGEABLE' ||
-    ['CLEAN', 'HAS_HOOKS', 'UNSTABLE', 'BLOCKED'].includes(
-      String(pr.mergeStateStatus ?? '').toUpperCase()
-    );
   const idle = age != null && age >= idleHours;
   const red = labelSet.has('lane-fix-red');
   const draftGreen =
     pr.isDraft === true &&
     (labelSet.has('lane-fix-green') || labelSet.has('lane-fix-stale'));
 
-  if (!pr.isDraft && red && mergeableOk && idle) {
+  // Admission deadlock: lane-fix-red holds enroll even when required checks are
+  // green (mergeState often BLOCKED). Never classify failing heads as deadlock.
+  if (
+    !pr.isDraft &&
+    red &&
+    noConflicts &&
+    checksGreen &&
+    idle &&
+    isSafeBranchName(branch)
+  ) {
     return {
       ...base,
       class: 'admission-deadlock',
       action: 'empty-head-bump',
       reason:
-        'ready+lane-fix-red+idle: enroll blocked until new head releases breaker hold',
+        'ready+lane-fix-red+idle+required-green: enroll blocked until new head releases breaker hold',
     };
   }
 
@@ -134,7 +224,9 @@ export function classifyOpenPr(pr, opts = {}) {
 
   if (
     !pr.isDraft &&
-    mergeableOk &&
+    noConflicts &&
+    greenishState &&
+    checksGreen &&
     idle &&
     !red &&
     !pr.autoMergeRequest &&
@@ -167,7 +259,7 @@ export function classifyOpenPr(pr, opts = {}) {
 
 /**
  * @param {unknown[]} prs
- * @param {{ nowMs?: number, idleHours?: number }} [opts]
+ * @param {{ nowMs?: number, idleHours?: number, repository?: string }} [opts]
  */
 export function inventoryOpenPrs(prs, opts = {}) {
   const rows = (Array.isArray(prs) ? prs : []).map(pr =>
@@ -223,6 +315,14 @@ export function parseArgs(args) {
   return out;
 }
 
+/**
+ * @typedef {(command: string, args: string[], options?: object) => {status: number|null, stdout?: string, stderr?: string}} RunSync
+ */
+
+/**
+ * @param {string[]} args
+ * @param {RunSync} [run]
+ */
 function ghJson(args, run = spawnSync) {
   const done = run('gh', args, {
     encoding: 'utf8',
@@ -237,47 +337,55 @@ function ghJson(args, run = spawnSync) {
 }
 
 /**
- * Empty-bump a branch tip (new head). Never touches main.
+ * @param {RunSync} run
+ * @param {string[]} gitArgs
+ */
+function git(run, gitArgs) {
+  return run('git', gitArgs, { encoding: 'utf8', env: process.env });
+}
+
+/**
+ * Empty-bump a branch tip (new head). Never touches main. No shell.
  * @param {{ number: number, branch: string }} target
- * @param {{ run?: typeof spawnSync, repo?: string }} [deps]
+ * @param {{ run?: RunSync, repo?: string }} [deps]
  */
 export function emptyHeadBump(target, deps = {}) {
   const run = deps.run ?? spawnSync;
   const repo = deps.repo ?? process.env.GITHUB_REPOSITORY ?? 'JovieInc/Jovie';
   const branch = target.branch;
-  if (!branch || branch === 'main' || branch.startsWith('gh-readonly-queue/')) {
-    return { ok: false, reason: 'refused-protected-ref', branch };
+  if (!isSafeBranchName(branch)) {
+    return { ok: false, reason: 'refused-unsafe-or-protected-ref', branch };
   }
-  const work = run(
-    'bash',
-    [
-      '-lc',
-      [
-        'set -euo pipefail',
-        `git fetch origin ${JSON.stringify(branch)}`,
-        `git checkout -B "tmp-summer-no-stall-${target.number}" "origin/${branch}"`,
-        `git commit --allow-empty -m ${JSON.stringify(
-          `chore(ci): Summer no-stall head bump (#${target.number})\n\nReclaim admission-deadlock: new head so queue-breaker can release lane-fix-red and green-enroll can reconsider.`
-        )}`,
-        `git push origin "HEAD:refs/heads/${branch}"`,
-      ].join('\n'),
-    ],
-    { encoding: 'utf8', env: process.env }
-  );
-  if (work.status !== 0) {
-    return {
-      ok: false,
-      reason: (work.stderr || work.stdout || 'push-failed').slice(0, 400),
-      branch,
-      number: target.number,
-    };
+  const local = `tmp-summer-no-stall-${target.number}`;
+  const message = [
+    `chore(ci): Summer no-stall head bump (#${target.number})`,
+    '',
+    'Reclaim admission-deadlock: new head so queue-breaker can release lane-fix-red and green-enroll can reconsider.',
+  ].join('\n');
+
+  const steps = [
+    ['fetch', 'origin', branch],
+    ['checkout', '-B', local, `origin/${branch}`],
+    ['commit', '--allow-empty', '-m', message],
+    ['push', 'origin', `HEAD:refs/heads/${branch}`],
+  ];
+  for (const args of steps) {
+    const done = git(run, args);
+    if (done.status !== 0) {
+      return {
+        ok: false,
+        reason: (done.stderr || done.stdout || 'git-failed').slice(0, 400),
+        branch,
+        number: target.number,
+      };
+    }
   }
   return { ok: true, number: target.number, branch, repo };
 }
 
 /**
  * @param {string[]} argv
- * @param {{ run?: typeof spawnSync, listPrs?: () => unknown[], nowMs?: number }} [deps]
+ * @param {{ run?: RunSync, listPrs?: () => unknown[], nowMs?: number }} [deps]
  */
 export function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
@@ -299,7 +407,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
           '--limit',
           '100',
           '--json',
-          'number,title,isDraft,author,headRefName,updatedAt,url,labels,mergeable,mergeStateStatus,autoMergeRequest',
+          'number,title,isDraft,author,headRefName,updatedAt,url,labels,mergeable,mergeStateStatus,autoMergeRequest,statusCheckRollup,isCrossRepository,headRepository',
         ],
         deps.run
       ));
@@ -311,7 +419,12 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   const applied = [];
   if (args.apply) {
     const deadlocks = inventory.actionable
-      .filter(row => row.class === 'admission-deadlock' && row.branch)
+      .filter(
+        row =>
+          row.class === 'admission-deadlock' &&
+          row.branch &&
+          isSafeBranchName(row.branch)
+      )
       .slice(0, args.limit);
     for (const row of deadlocks) {
       applied.push(

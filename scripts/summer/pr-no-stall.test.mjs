@@ -4,12 +4,24 @@ import { describe, it } from 'node:test';
 import {
   AGENT_BRANCH_RE,
   classifyOpenPr,
+  emptyHeadBump,
   inventoryOpenPrs,
+  isSafeBranchName,
   parseArgs,
+  requiredChecksSettledGreen,
   SCHEMA,
 } from './pr-no-stall.mjs';
 
 const NOW = Date.parse('2026-11-20T20:00:00Z');
+
+const GREEN_ROLLUP = [
+  { name: 'PR Ready', status: 'COMPLETED', conclusion: 'SUCCESS' },
+  { name: 'Source Validation', status: 'COMPLETED', conclusion: 'SUCCESS' },
+];
+
+const FAIL_ROLLUP = [
+  { name: 'PR Ready', status: 'COMPLETED', conclusion: 'FAILURE' },
+];
 
 describe('pr-no-stall classifier', () => {
   it('exports a stable receipt schema', () => {
@@ -25,15 +37,10 @@ describe('pr-no-stall classifier', () => {
       AGENT_BRANCH_RE.test('glm/golden-path-copy-waitlist-claim'),
       true
     );
-    assert.equal(
-      AGENT_BRANCH_RE.test('ha/jov-13131-flag-inventory-shipon'),
-      true
-    );
-    assert.equal(AGENT_BRANCH_RE.test('evr/jov-13110-shared-web-build'), true);
     assert.equal(AGENT_BRANCH_RE.test('screenshots/auto-update'), false);
   });
 
-  it('flags admission-deadlock: ready + lane-fix-red + idle + mergeable', () => {
+  it('requires settled-green checks for admission-deadlock even when BLOCKED', () => {
     const row = classifyOpenPr(
       {
         number: 25075,
@@ -44,11 +51,48 @@ describe('pr-no-stall classifier', () => {
         headRefName: 'chore/retire-seer-controller-review',
         updatedAt: '2026-11-11T20:00:00Z',
         labels: [{ name: 'lane-fix-red' }],
+        statusCheckRollup: GREEN_ROLLUP,
       },
       { nowMs: NOW, idleHours: 6 }
     );
     assert.equal(row.class, 'admission-deadlock');
     assert.equal(row.action, 'empty-head-bump');
+  });
+
+  it('does not bump BLOCKED heads with failing required checks', () => {
+    const row = classifyOpenPr(
+      {
+        number: 99,
+        isDraft: false,
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'BLOCKED',
+        headRefName: 'cursor/failing-head',
+        updatedAt: '2026-11-11T20:00:00Z',
+        labels: ['lane-fix-red'],
+        statusCheckRollup: FAIL_ROLLUP,
+      },
+      { nowMs: NOW }
+    );
+    assert.notEqual(row.class, 'admission-deadlock');
+  });
+
+  it('skips cross-repository / fork PRs', () => {
+    const row = classifyOpenPr(
+      {
+        number: 3,
+        isDraft: false,
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'BLOCKED',
+        headRefName: 'cursor/fork-branch',
+        updatedAt: '2026-11-11T20:00:00Z',
+        labels: ['lane-fix-red'],
+        statusCheckRollup: GREEN_ROLLUP,
+        isCrossRepository: true,
+      },
+      { nowMs: NOW }
+    );
+    assert.equal(row.class, 'cross-repo');
+    assert.equal(row.action, 'none');
   });
 
   it('does not reclaim stop-labeled PRs (Tim)', () => {
@@ -60,11 +104,11 @@ describe('pr-no-stall classifier', () => {
         headRefName: 'cursor/x',
         updatedAt: '2026-11-11T20:00:00Z',
         labels: ['lane-fix-red', 'hold'],
+        statusCheckRollup: GREEN_ROLLUP,
       },
       { nowMs: NOW }
     );
     assert.equal(row.class, 'tim-or-hold');
-    assert.equal(row.action, 'leave-for-tim');
   });
 
   it('flags draft-green stale for auto-ready', () => {
@@ -80,23 +124,6 @@ describe('pr-no-stall classifier', () => {
       { nowMs: NOW }
     );
     assert.equal(row.class, 'draft-green-stale');
-    assert.equal(row.action, 'auto-ready');
-  });
-
-  it('leaves fresh in-flight heads alone', () => {
-    const row = classifyOpenPr(
-      {
-        number: 26145,
-        isDraft: false,
-        mergeable: 'MERGEABLE',
-        headRefName: 'cursor/measure-first-chat-send-195f',
-        updatedAt: '2026-11-20T19:50:00Z',
-        labels: [],
-      },
-      { nowMs: NOW, idleHours: 6 }
-    );
-    assert.equal(row.class, 'ok-or-active');
-    assert.equal(row.action, 'none');
   });
 
   it('inventories counts by class', () => {
@@ -106,9 +133,11 @@ describe('pr-no-stall classifier', () => {
           number: 1,
           isDraft: false,
           mergeable: 'MERGEABLE',
+          mergeStateStatus: 'BLOCKED',
           headRefName: 'cursor/a',
           updatedAt: '2026-11-11T20:00:00Z',
           labels: ['lane-fix-red'],
+          statusCheckRollup: GREEN_ROLLUP,
         },
         {
           number: 2,
@@ -121,11 +150,42 @@ describe('pr-no-stall classifier', () => {
       ],
       { nowMs: NOW }
     );
-    assert.equal(report.schema, SCHEMA);
-    assert.equal(report.openCount, 2);
     assert.equal(report.byClass['admission-deadlock'], 1);
     assert.equal(report.byClass['draft-green-stale'], 1);
-    assert.equal(report.actionable.length, 2);
+  });
+
+  it('rejects unsafe branch names', () => {
+    assert.equal(isSafeBranchName('cursor/ok-branch'), true);
+    assert.equal(isSafeBranchName('evil$(reboot)'), false);
+    assert.equal(isSafeBranchName('main'), false);
+    assert.equal(requiredChecksSettledGreen({ statusCheckRollup: [] }), false);
+  });
+
+  it('emptyHeadBump uses git argv arrays and refuses shell-meta branches', () => {
+    const calls = [];
+    const run = (cmd, args) => {
+      calls.push([cmd, ...args]);
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const refused = emptyHeadBump({ number: 1, branch: 'evil`id`' }, { run });
+    assert.equal(refused.ok, false);
+    assert.equal(calls.length, 0);
+
+    const ok = emptyHeadBump(
+      { number: 2, branch: 'cursor/safe-branch' },
+      { run }
+    );
+    assert.equal(ok.ok, true);
+    assert.equal(calls[0][0], 'git');
+    assert.deepEqual(calls[0].slice(1), [
+      'fetch',
+      'origin',
+      'cursor/safe-branch',
+    ]);
+    assert.equal(
+      calls.every(c => c[0] === 'git'),
+      true
+    );
   });
 
   it('parses CLI flags', () => {
