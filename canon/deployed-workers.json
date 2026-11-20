@@ -14,11 +14,6 @@
       "disposition": "Spike. Import with source or delete."
     },
     {
-      "name": "jovie-competitor-watch",
-      "modifiedOn": "2026-10-30",
-      "disposition": "Source is in open PR #23813 (workers/competitor-watch); remove from this list when it merges."
-    },
-    {
       "name": "jovie-copy-jam-ai",
       "modifiedOn": "2026-10-29",
       "disposition": "Source not recoverable (no source map). Import or delete."
