@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractSurfaceTokens } from '../coverage-surface-tokens.mjs';
+import {
+  extractSurfaceTokens,
+  surfaceAppPrefix,
+  testPathMatchesSurface,
+} from '../coverage-surface-tokens.mjs';
 
 describe('extractSurfaceTokens', () => {
   it('single-file proxy surface yields stem token, not proxy.ts', () => {
@@ -28,5 +32,53 @@ describe('extractSurfaceTokens', () => {
     });
     expect(tokens).toContain('app-shell-navigation');
     expect(tokens).toContain('dashboard-nav');
+  });
+});
+
+describe('testPathMatchesSurface', () => {
+  const proxy = { id: 'proxy', glob: 'apps/web/proxy.ts' };
+
+  it('scopes proxy matches to apps/web and rejects other packages', () => {
+    expect(surfaceAppPrefix(proxy)).toBe('apps/web/');
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/e2e/proxy-audience-gate.spec.ts',
+        proxy
+      )
+    ).toBe(true);
+    expect(
+      testPathMatchesSurface(
+        'apps/web/lib/auth/proxy-request-handler.test.ts',
+        proxy
+      )
+    ).toBe(true);
+    expect(testPathMatchesSurface('apps/ovie/proxy.test.ts', proxy)).toBe(
+      false
+    );
+    expect(
+      testPathMatchesSurface('packages/jovie-cli/src/proxy.test.ts', proxy)
+    ).toBe(false);
+  });
+
+  it('does not match mid-segment substrings', () => {
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/unit/lib/approxy-helper.test.ts',
+        proxy
+      )
+    ).toBe(false);
+  });
+
+  it('still matches stripe webhook tests under apps/web', () => {
+    const surface = {
+      id: 'stripe-webhooks',
+      glob: 'apps/web/app/api/stripe/webhooks/**',
+    };
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/unit/api/stripe/webhooks/route.test.ts',
+        surface
+      )
+    ).toBe(true);
   });
 });

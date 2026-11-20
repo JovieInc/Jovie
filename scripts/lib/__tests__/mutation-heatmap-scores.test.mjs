@@ -25,7 +25,11 @@ function fixture() {
       typeof value === 'string' ? value : JSON.stringify(value, null, 2)
     );
   };
-  return { root, write, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return {
+    root,
+    write,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
 describe('mutation-heatmap-scores', () => {

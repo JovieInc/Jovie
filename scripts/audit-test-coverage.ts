@@ -30,7 +30,7 @@ import { glob } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listSurfaceFiles } from './lib/coverage-surface-files.mjs';
-import { extractSurfaceTokens } from './lib/coverage-surface-tokens.mjs';
+import { testPathMatchesSurface } from './lib/coverage-surface-tokens.mjs';
 import { readMutationHeatmapScores } from './lib/mutation-heatmap-scores.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
@@ -453,9 +453,8 @@ function countSurfaceTests(
   e2eCount: number;
   assertionRatio: number | null;
 } {
-  const tokens = extractSurfaceTokens(surface);
   const matches = (testPath: string) =>
-    tokens.some(t => testPath.toLowerCase().includes(t));
+    testPathMatchesSurface(testPath, surface);
 
   const unitCount = inventory.unit.filter(matches).length;
   const integrationCount = inventory.integration.filter(matches).length;

@@ -2,6 +2,9 @@
 // risk-register surface. Single-file globs (proxy.ts) must yield stem tokens
 // (`proxy`), not extension-qualified ones (`proxy.ts`), or E2E inventory
 // stays at 0 forever.
+//
+// Matching is scoped to the surface's apps/<pkg>/ prefix and uses path-segment
+// boundaries so bare ids like `proxy` cannot hit apps/ovie/proxy.test.ts.
 
 /** @type {ReadonlySet<string>} */
 export const GENERIC_PATH_SEGMENTS = Object.freeze(
@@ -36,6 +39,28 @@ export const GENERIC_PATH_SEGMENTS = Object.freeze(
 const SOURCE_EXT = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/u;
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+/**
+ * App package prefix from a surface glob (`apps/web/proxy.ts` → `apps/web/`).
+ * @param {{ glob: string }} surface
+ * @returns {string | null}
+ */
+export function surfaceAppPrefix(surface) {
+  const pathOnly = surface.glob.split(':')[0].replace(/\/\*\*?$/u, '');
+  const parts = pathOnly.replaceAll('\\', '/').split('/');
+  if (parts[0] === 'apps' && parts[1]) {
+    return `apps/${parts[1].toLowerCase()}/`;
+  }
+  return null;
+}
+
+/**
  * @param {{ id: string, glob: string }} surface
  * @returns {string[]}
  */
@@ -43,12 +68,7 @@ export function extractSurfaceTokens(surface) {
   const pathOnly = surface.glob.split(':')[0].replace(/\/\*\*?$/u, '');
   const segments = pathOnly
     .split('/')
-    .map(s =>
-      s
-        .toLowerCase()
-        .replace(/[()]/gu, '')
-        .replace(SOURCE_EXT, '')
-    )
+    .map(s => s.toLowerCase().replace(/[()]/gu, '').replace(SOURCE_EXT, ''))
     .filter(
       s =>
         s.length > 0 &&
@@ -71,4 +91,34 @@ export function extractSurfaceTokens(surface) {
     tokens.add(surface.id.toLowerCase());
   }
   return Array.from(tokens);
+}
+
+/**
+ * True when `testPath` belongs to `surface`: same apps/<pkg>/ tree, and a
+ * token matches as a path segment (or multi-segment substring for `a/b`).
+ * @param {string} testPath
+ * @param {{ id: string, glob: string }} surface
+ * @param {readonly string[]} [tokens]
+ * @returns {boolean}
+ */
+export function testPathMatchesSurface(
+  testPath,
+  surface,
+  tokens = extractSurfaceTokens(surface)
+) {
+  const path = String(testPath).toLowerCase().replaceAll('\\', '/');
+  const prefix = surfaceAppPrefix(surface);
+  if (prefix && !path.startsWith(prefix)) return false;
+
+  return tokens.some(token => {
+    if (token.includes('/')) {
+      return path.includes(token);
+    }
+    // Segment boundary: /token/ or /token.ext or /token-… — not "…proxy…" midword
+    // outside a segment start. Requires the token to begin a path segment.
+    return new RegExp(
+      `(?:^|/)${escapeRegex(token)}(?:$|[./_-])`,
+      'u'
+    ).test(path);
+  });
 }

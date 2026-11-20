@@ -6,8 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const WEB_ROOT = 'apps/web';
-export const DEFAULT_STRYKER_REL =
-  'apps/web/reports/stryker-incremental.json';
+export const DEFAULT_STRYKER_REL = 'apps/web/reports/stryker-incremental.json';
 export const DEFAULT_BASELINE_REL = 'scripts/mutation-score-baseline.json';
 
 /**
