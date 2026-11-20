@@ -25,9 +25,9 @@ import {
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import {
-  dialBrowserScheduler,
   DIAL_HINT_SEEN_KEY,
   type DialGesture,
+  dialBrowserScheduler,
   isWheelNotch,
   MIN_HAPTIC_GAP_MS,
   MIN_PULSE_GAP_MS,
@@ -398,7 +398,7 @@ export function ActionDial({
       active.icon
     ) : (
       <span
-        className='relative h-5 w-5 shrink-0 overflow-hidden'
+        className='relative h-7 w-7 shrink-0 overflow-hidden [&_svg]:h-7 [&_svg]:w-7'
         aria-hidden='true'
         data-testid='action-dial-icon-track'
       >
@@ -485,7 +485,7 @@ export function ActionDial({
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
                   data-preferred={preferredRow ? 'true' : undefined}
-                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
+                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
                   style={{
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
@@ -507,9 +507,14 @@ export function ActionDial({
                   }}
                 >
                   {option.icon ? (
-                    <span aria-hidden='true'>{option.icon}</span>
+                    <span
+                      className='shrink-0 [&_svg]:h-7 [&_svg]:w-7'
+                      aria-hidden='true'
+                    >
+                      {option.icon}
+                    </span>
                   ) : null}
-                  <span>{option.label}</span>
+                  <span className='text-secondary-token'>{option.label}</span>
                 </div>
               );
             })}
@@ -530,7 +535,7 @@ export function ActionDial({
             primary
             disabled={disabled}
             ariaLabel={`${actionLabel} with ${active.label}`}
-            className='w-full tracking-tight'
+            className='w-full gap-3 tracking-tight [&_svg]:h-7 [&_svg]:w-7'
             onClick={event => {
               if (suppressClickRef.current) {
                 event.preventDefault();
@@ -550,16 +555,10 @@ export function ActionDial({
         <div className='mt-1 flex min-h-6 flex-col items-center justify-center gap-0.5'>
           <p
             data-testid='action-dial-selection'
-            className={cn(
-              'text-center text-xs font-medium tracking-tight',
-              isPreferred ? 'text-primary-token' : 'text-secondary-token'
-            )}
+            className='text-center text-2xs font-medium tracking-tight text-tertiary-token'
             aria-hidden='true'
           >
-            {active.label}
-            {isPreferred ? (
-              <span className='text-tertiary-token'> · Remembered</span>
-            ) : null}
+            {isPreferred ? 'Remembered' : active.label}
           </p>
           <div
             className='flex h-4 items-center justify-center'
@@ -598,15 +597,9 @@ export function ActionDial({
       ) : (
         <p
           data-testid='action-dial-selection'
-          className={cn(
-            'mt-1 text-center text-xs font-medium tracking-tight',
-            isPreferred ? 'text-primary-token' : 'text-secondary-token'
-          )}
+          className='mt-1 text-center text-2xs font-medium tracking-tight text-tertiary-token'
         >
-          {active.label}
-          {isPreferred ? (
-            <span className='text-tertiary-token'> · Remembered</span>
-          ) : null}
+          {isPreferred ? 'Remembered' : active.label}
         </p>
       )}
       <p className='sr-only' role='status' aria-live='polite'>

@@ -15,15 +15,13 @@ afterEach(() => {
 
 describe('action-dial-helpers', () => {
   it('normalizes wheel deltas by deltaMode', () => {
-    expect(
-      normalizeWheel({ deltaMode: 0, deltaY: 40 } as WheelEvent)
-    ).toBe(40);
-    expect(
-      normalizeWheel({ deltaMode: 1, deltaY: 1 } as WheelEvent)
-    ).toBe(ROW_STEP_PX);
-    expect(
-      normalizeWheel({ deltaMode: 2, deltaY: 1 } as WheelEvent)
-    ).toBe(ROW_STEP_PX * 3);
+    expect(normalizeWheel({ deltaMode: 0, deltaY: 40 } as WheelEvent)).toBe(40);
+    expect(normalizeWheel({ deltaMode: 1, deltaY: 1 } as WheelEvent)).toBe(
+      ROW_STEP_PX
+    );
+    expect(normalizeWheel({ deltaMode: 2, deltaY: 1 } as WheelEvent)).toBe(
+      ROW_STEP_PX * 3
+    );
   });
 
   it('detects discrete wheel notches', () => {

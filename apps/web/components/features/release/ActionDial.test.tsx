@@ -133,6 +133,10 @@ describe('ActionDial semantics', () => {
     expect(
       screen.queryByTestId('action-dial-icon-d50')
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-icon-track')).toHaveClass(
+      'h-7',
+      'w-7'
+    );
   });
   it('announces the settled selection politely', async () => {
     mockMotion(true);

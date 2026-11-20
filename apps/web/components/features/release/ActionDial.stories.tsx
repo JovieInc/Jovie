@@ -77,7 +77,7 @@ function DspGlyph({
     <svg
       viewBox='0 0 24 24'
       fill='currentColor'
-      className='h-5 w-5 shrink-0'
+      className='h-7 w-7 shrink-0'
       aria-hidden='true'
     >
       <path d={DSP_LOGO_CONFIG[provider]?.iconPath} />

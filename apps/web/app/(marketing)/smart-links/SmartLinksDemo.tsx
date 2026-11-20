@@ -44,7 +44,7 @@ export function SmartLinksDemo() {
             <svg
               viewBox='0 0 24 24'
               fill='currentColor'
-              className='h-5 w-5'
+              className='h-7 w-7'
               style={{ color: logo.color }}
               aria-hidden='true'
             >

@@ -60,7 +60,7 @@ describe('ActionDial preferred state', () => {
       'true'
     );
     expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
-      'Apple Music · Remembered'
+      'Remembered'
     );
     expect(status()).toBe('Apple Music selected, remembered');
     fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
@@ -101,6 +101,28 @@ describe('ActionDial preferred state', () => {
     );
     expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
       'Spotify'
+    );
+  });
+
+  it('keeps service icons first-class against Stream Now chrome', () => {
+    mockMotion(true);
+    render(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='spotify'
+        preferredId='spotify'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    expect(screen.getByTestId('action-dial-icon-track')).toHaveClass(
+      'h-7',
+      'w-7'
+    );
+    expect(screen.getByText('Stream Now')).toHaveClass('text-sm');
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Remembered'
     );
   });
 });

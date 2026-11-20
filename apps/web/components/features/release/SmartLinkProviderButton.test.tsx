@@ -111,6 +111,7 @@ describe('SmartLinkProviderButton', () => {
     expect(link).not.toHaveClass('bg-transparent');
     expect(link).not.toHaveClass('hover:bg-interactive-hover');
     expect(screen.getByText('Stream Now')).toHaveClass('tracking-tight');
+    expect(screen.getByText('Stream Now')).toHaveClass('text-sm');
   });
 
   it('locks the secondary class contract against a persistent rest fill', () => {

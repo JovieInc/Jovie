@@ -44,7 +44,7 @@ describe('MusicServiceDial', () => {
       'true'
     );
     expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
-      'Apple Music · Remembered'
+      'Remembered'
     );
     fireEvent.click(action);
     expect(onStream).toHaveBeenCalledWith('apple_music');
