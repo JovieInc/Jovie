@@ -287,6 +287,8 @@ test('staging observation error is unknown, not published-missing', async () => 
     ),
     false
   );
+  assert.equal(receipt.red, false);
+  assert.equal(canResolveSummerForFreshness(receipt), false);
 });
 
 test('staging 404-style missing still pages published-missing', async () => {

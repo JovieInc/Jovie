@@ -338,26 +338,34 @@ export async function pageSummerForFreshness(input) {
 }
 
 /**
- * Summer may close only when production certified was actually observed and
- * desktop relevance between certified/published is not an unobserved null.
- * Unknown certified or null git-diff relevance skips certified-unpublished;
- * closing on that green would bury an open stall.
+ * Summer may close only when every required server stage was observed.
+ * Installed/running stay unknown by design. Staging certified stays unknown
+ * (rolling tag). Unknown published/feed — including stagingObservationError —
+ * must not green-close an open stall.
  *
  * @param {ReturnType<typeof buildArtifactFreshnessReceipt>} receipt
  */
 export function canResolveSummerForFreshness(receipt) {
   if (receipt?.red === true) return false;
-  const production = (receipt?.channels ?? []).find(
-    channel => channel.channel === 'production'
-  );
-  if (!production) return false;
-  if (
-    (production.mismatches ?? []).some(
-      mismatch => mismatch.code === 'certified-relevance-unknown'
-    )
-  ) {
-    return false;
+  const channels = receipt?.channels ?? [];
+  const production = channels.find(channel => channel.channel === 'production');
+  const staging = channels.find(channel => channel.channel === 'staging');
+  if (!production || !staging) return false;
+
+  for (const channel of channels) {
+    if (
+      (channel.mismatches ?? []).some(
+        mismatch => mismatch.code === 'certified-relevance-unknown'
+      )
+    ) {
+      return false;
+    }
+    // Required server stages for both channels. Device stages stay unknown.
+    for (const name of /** @type {const} */ (['published', 'feed'])) {
+      if (channel.stages?.[name]?.status === 'unknown') return false;
+    }
   }
+
   const certified = production.stages?.certified;
   const published = production.stages?.published;
   if (
