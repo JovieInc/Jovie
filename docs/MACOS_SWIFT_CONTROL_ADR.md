@@ -77,7 +77,7 @@ The customer Mac app is Electron in `apps/desktop` loading hosted Jovie. Forbidd
 
 ### `ops/reviewed-invariants/native-swift-locked-atoms-v1`
 
-Swift on iOS and Mac consumes the one design system. Locked atoms stay ActionButton 32 / 510 / r999 and empty-greeting type 28 / 620 (`JovieActionButtonMetrics`, `JovieFont.emptyGreeting*`). Forbidden: remocking those atoms, new Swift token files, or Pen/source-bound mocks that fork them. Measure: `cta-label-weight` + `AppShellChatFirstTests` keep failing on 400/590/600 and on height/radius drift; `scripts/ios-best-practices-lint.sh` stays required for any new Swift tree.
+Swift on iOS and Mac consumes the one design system. Locked atoms stay ActionButton 28 / 510 / r999 (web KEEP; touch 44) and empty-greeting type 28 / 620 (`JovieActionButtonMetrics`, `JovieFont.emptyGreeting*`). Founder-locked Chat composer controls remain an independent 32pt face (`ChatComposerMetrics.lockedControlSize`). Forbidden: remocking those atoms, new Swift token files, or Pen/source-bound mocks that fork them. Measure: `cta-label-weight` + `AppShellChatFirstTests` keep failing on 400/590/600 and on height/radius drift; `scripts/ios-best-practices-lint.sh` stays required for any new Swift tree.
 
 ### `ops/reviewed-invariants/ovie-one-hud-no-second-surface-v1`
 
