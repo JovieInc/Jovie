@@ -937,10 +937,9 @@ struct AppShellView<
 
     ZStack {
       if showsChatUnderlay {
-        chatContent($chatDraft, $voiceCaptureTrigger, presentEntity, presentVideoProposal)
-          .opacity(isChatSelected ? 1 : 0)
-          .allowsHitTesting(isChatSelected)
-          .accessibilityHidden(!isChatSelected)
+        appShellChatUnderlayChrome(isChatSelected: isChatSelected) {
+          chatContent($chatDraft, $voiceCaptureTrigger, presentEntity, presentVideoProposal)
+        }
       }
 
       if !isChatSelected || !chatEnabled {

@@ -24,6 +24,10 @@ extension AppState {
       return
     }
     FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: activeUserID)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(
+      userID: activeUserID,
+      launchMode: launchMode
+    )
   }
 
   func applyLoadedReadyProfile(_ response: MobileMeResponse) {

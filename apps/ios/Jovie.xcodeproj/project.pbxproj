@@ -55,6 +55,11 @@
 		A0FV1384502 /* FirstValueLandingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384501 /* FirstValueLandingPolicy.swift */; };
 		A0FV1384504 /* AppState+FirstValueLanding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384503 /* AppState+FirstValueLanding.swift */; };
 		A0FV1384506 /* FirstValueLandingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384505 /* FirstValueLandingPolicyTests.swift */; };
+		A0PI1385802 /* PostIdentityChatMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385801 /* PostIdentityChatMeasurement.swift */; };
+		A0PI1385804 /* ChatRepository+PostIdentityMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */; };
+		A0PI1385806 /* ChatAuthFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385805 /* ChatAuthFailure.swift */; };
+		A0PI1385808 /* AppShellChatUnderlayChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385807 /* AppShellChatUnderlayChrome.swift */; };
+		A0PI1385810 /* PostIdentityChatMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385809 /* PostIdentityChatMeasurementTests.swift */; };
 		1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */; };
 		36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */; };
 		99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */; };
@@ -230,6 +235,11 @@
 		A0FV1384501 /* FirstValueLandingPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirstValueLandingPolicy.swift; sourceTree = "<group>"; };
 		A0FV1384503 /* AppState+FirstValueLanding.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AppState+FirstValueLanding.swift"; sourceTree = "<group>"; };
 		A0FV1384505 /* FirstValueLandingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirstValueLandingPolicyTests.swift; sourceTree = "<group>"; };
+		A0PI1385801 /* PostIdentityChatMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PostIdentityChatMeasurement.swift; sourceTree = "<group>"; };
+		A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatRepository+PostIdentityMeasurement.swift"; sourceTree = "<group>"; };
+		A0PI1385805 /* ChatAuthFailure.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatAuthFailure.swift; sourceTree = "<group>"; };
+		A0PI1385807 /* AppShellChatUnderlayChrome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellChatUnderlayChrome.swift; sourceTree = "<group>"; };
+		A0PI1385809 /* PostIdentityChatMeasurementTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PostIdentityChatMeasurementTests.swift; sourceTree = "<group>"; };
 		FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveRootContainer.swift; sourceTree = "<group>"; };
 		15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestHarnessViews.swift; sourceTree = "<group>"; };
 		25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatPlaceholderView.swift; sourceTree = "<group>"; };
@@ -473,6 +483,7 @@
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
 				A0FV1384505 /* FirstValueLandingPolicyTests.swift */,
+				A0PI1385809 /* PostIdentityChatMeasurementTests.swift */,
 				A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */,
 				A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
@@ -512,6 +523,7 @@
 				A0J0V3632A00000000000001 /* AppShellTabBar.swift */,
 				4C2C97BF3A0B42C58A62529F /* AppShellView.swift */,
 				A0FV1384501 /* FirstValueLandingPolicy.swift */,
+				A0PI1385807 /* AppShellChatUnderlayChrome.swift */,
 				A0J0V3632A00000000000005 /* EntityContextSheet.swift */,
 				A0J0V3632A00000000000003 /* TalkOverlayView.swift */,
 				A0F17E100000000000000003 /* VlogTeleprompterCore.swift */,
@@ -587,6 +599,8 @@
 				FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
+				A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */,
+				A0PI1385805 /* ChatAuthFailure.swift */,
 				918FBCBCF600AA8C10191F60 /* MeCache.swift */,
 				28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */,
 				A0J0V25490000000000000005 /* MobileChatClient.swift */,
@@ -652,6 +666,7 @@
 				A0B10F000000000000000004 /* Observability.swift */,
 				A0B10F000000000000000003 /* ObservabilityRedactor.swift */,
 				A0B10F000000000000000001 /* ObservabilityTypes.swift */,
+				A0PI1385801 /* PostIdentityChatMeasurement.swift */,
 				A0B10F000000000000000002 /* NoopObservabilityProvider.swift */,
 				A0B10F000000000000000005 /* SentryObservabilityProvider.swift */,
 				A0B10F000000000000000031 /* ObservabilityReportBuilder.swift */,
@@ -896,6 +911,7 @@
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
 				A0FV1384506 /* FirstValueLandingPolicyTests.swift in Sources */,
+				A0PI1385810 /* PostIdentityChatMeasurementTests.swift in Sources */,
 				A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */,
 				A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
@@ -924,6 +940,10 @@
 				A0J0WN39FEED0000000000AB2 /* WhatsNewFeed.swift in Sources */,
 				A0FV1384502 /* FirstValueLandingPolicy.swift in Sources */,
 				A0FV1384504 /* AppState+FirstValueLanding.swift in Sources */,
+				A0PI1385802 /* PostIdentityChatMeasurement.swift in Sources */,
+				A0PI1385804 /* ChatRepository+PostIdentityMeasurement.swift in Sources */,
+				A0PI1385806 /* ChatAuthFailure.swift in Sources */,
+				A0PI1385808 /* AppShellChatUnderlayChrome.swift in Sources */,
 				1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */,
 				36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */,
 				A87250000000000000000003 /* ChatPresentationMeasurement.swift in Sources */,
