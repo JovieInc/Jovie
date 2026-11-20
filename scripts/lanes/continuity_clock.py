@@ -92,8 +92,8 @@ CLOCKS = (
     Clock("testCoverageAudit", "test-coverage-audit.yml", "clock_test_coverage_audit", 86400,
           "test-coverage-audit-clock.json", github_cron=False,
           ignored_events=frozenset({"push"})),
-    # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
-    # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
+    # Dependabot alert wakes use repository_dispatch dependabot_alert (same intake).
+    # This 4h clock is the backstop only (JOV-INV-042: no GitHub cron on the workflow).
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
           "security-advisory-clock.json", frozenset({"push"}), github_cron=False),
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).

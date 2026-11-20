@@ -304,9 +304,14 @@ test('loop is wired: workflow runs sync + check on the lanes clock, registry row
     'utf8'
   );
   assert.match(wf, /clock_security_advisory_loop/);
+  assert.match(wf, /dependabot_alert/);
   assert.doesNotMatch(wf, /^\s*-\s*cron:/m, 'GitHub crons are frozen');
   assert.match(wf, /security-advisory-intake\.mjs --check/);
   assert.match(wf, /security-advisory-intake\.mjs\s*$/m);
+  assert.match(
+    wf,
+    /types:\s*\[[^\]]*dependabot_alert[^\]]*clock_security_advisory_loop/
+  );
   const rows = readFileSync(
     path.join(ROOT, 'canon/automation-registry.jsonl'),
     'utf8'
