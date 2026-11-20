@@ -6,4 +6,7 @@ export const TEST_PLANNER_CONTRACT_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/lib/__tests__/trusted-test-planner-snapshot.test.mjs',
   'scripts/lib/__tests__/product-shot-test-producers.test.mjs',
+  'scripts/invariants/pen-golden-path.test.mjs',
+  'scripts/invariants/pen-still-diff.test.mjs',
+  'scripts/invariants/pen-still-diff-guardrails.test.mjs',
 ]);

@@ -21,13 +21,14 @@ export async function withCaptureBrowser(run) { const { chromium } = await impor
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
 /**
 * @param {import('playwright').Browser} browser
-* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string}} options
+* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string, storageState?: Parameters<import('playwright').Browser['newPage']>[0]['storageState']}} options
 */
 export async function captureSurfacePng(browser, options) {
-const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath } = options;
+const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath, storageState } = options;
 const target = resolveCaptureViewport(viewport); const page = await browser.newPage({
 viewport: { width: target.width, height: target.height }, deviceScaleFactor: target.deviceScaleFactor,
-isMobile: target.isMobile, colorScheme: resolveCaptureColorScheme(mode), }); try {
+isMobile: target.isMobile, colorScheme: resolveCaptureColorScheme(mode),
+...(storageState ? { storageState } : {}), }); try {
 await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
 // A capture that landed on a different route (auth redirect, closed-signup
 // handoff) is not this frame's surface: report it instead of screenshotting

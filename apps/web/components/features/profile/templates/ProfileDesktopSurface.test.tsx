@@ -1173,8 +1173,7 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(secondary).getByRole('button', { name: 'View all' })
     ).toBeInTheDocument();
-
-    // D9kdx "Card / Payments" on the rail when a pay destination exists.
+    expect(within(secondary).getAllByRole('link')).toHaveLength(3);
     expect(screen.getByTestId('profile-desktop-payments-card')).toBeVisible();
     expect(screen.getByText('Pay Tim White directly.')).toBeVisible();
     screen.getByTestId('profile-desktop-open-payments').click();

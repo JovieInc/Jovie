@@ -21,7 +21,13 @@ export const MANIFEST_SCHEMA = 'pen-still-manifest/v1'; export const RECEIPT_SCH
 export const COMMENT_MARKER = '<!-- pen-still-diff -->'; const LOCKED_HEADLINE = 'Be found. Be understood.';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..'); function frameId(frame) { return {
 sectionId: frame.sectionId, penNodeId: frame.penNodeId, viewport: frame.viewport, mode: frame.mode,
+...(frame.auth === 'required' ? { auth: 'required' } : {}),
 ...(frame.route ? { route: frame.route } : {}), ...(frame.story ? { story: frame.story } : {}), }; }
+export function hasUsableStorageState(storageState) { if (!storageState) return false; try {
+const parsed = typeof storageState === 'string'
+? (existsSync(storageState) ? JSON.parse(readFileSync(storageState, 'utf8')) : null) : storageState;
+return Boolean(parsed && typeof parsed === 'object' && ((Array.isArray(parsed.cookies) && parsed.cookies.length > 0)
+|| (Array.isArray(parsed.origins) && parsed.origins.length > 0))); } catch { return false; } }
 /** @param {unknown} value */
 export function validateManifest(value) { const errors = []; if (!value || typeof value !== 'object')
 return { ok: false, errors: ['manifest must be an object'] };
@@ -38,6 +44,10 @@ errors.push(`${label}.${key} is required`); } if (frame.viewport !== 1440 && fra
 errors.push(`${label}.viewport must be 1440 or 390`); if (frame.mode !== 'dark' && frame.mode !== 'light')
 errors.push(`${label}.mode must be dark or light`); if (!['active', 'parked', 'fork'].includes(frame.status))
 errors.push(`${label}.status must be active, parked, or fork`);
+if (frame.auth !== undefined && frame.auth !== 'none' && frame.auth !== 'required')
+errors.push(`${label}.auth must be none or required`);
+if (frame.penFile !== undefined && (typeof frame.penFile !== 'string' || frame.penFile.length === 0))
+errors.push(`${label}.penFile must be a non-empty string`);
 if (frame.fileHash != null && typeof frame.fileHash !== 'string')
 errors.push(`${label}.fileHash must be a string or null`);
 const id = JSON.stringify([frame.route ?? null, frame.story ?? null, frame.sectionId, frame.mode, frame.viewport]);
@@ -90,7 +100,10 @@ const expectedHash = frame.fileHash?.replace(/^sha256:/, '') ?? null;
 if (expectedHash && expectedHash !== actualHash) { frames.push({ ...frameId(frame), verdict: 'fail',
 reason: 'file-hash-mismatch', }); continue; } const url = frameCaptureUrl(frame, options);
 if (!url || !options.capture) { frames.push({ ...frameId(frame), verdict: 'waiting',
-reason: 'capture-target-missing', }); continue; } const captured = await options.capture(frame, url);
+reason: 'capture-target-missing', }); continue; }
+if (frame.auth === 'required' && options.authAvailable === false) { frames.push({ ...frameId(frame),
+verdict: 'waiting', reason: 'capture-auth-missing', }); continue; }
+const captured = await options.capture(frame, url);
 // JOV-11623: an anonymous capture that landed on a different route (the
 // closed-signup /start handoff to /waitlist, /app/chat to /signin) is not
 // this frame's surface; diffing it against the Pen still fabricated
@@ -125,17 +138,20 @@ sample: comparable ? null : syntheticComparison(), pass: options.strict
 /** Lazily share Chromium; captureSurfacePng gives every frame its own page/context. */
 export async function evaluateManifestWithBrowser(manifest, options = {}) {
 if (options.capture || (!options.baseUrl && !options.storybookUrl)) return evaluateManifest(manifest, options);
+const authState = hasUsableStorageState(options.storageState) ? options.storageState : undefined;
 const session = /** @type {{ browser?: import('playwright').Browser }} */ ({});
 const launchBrowser = options.launchBrowser ?? (async () => {
 const { chromium } = await import('playwright'); return chromium.launch(); });
-try { return await evaluateManifest(manifest, { ...options, capture: async (frame, url) => {
+try { return await evaluateManifest(manifest, { ...options, authAvailable: Boolean(authState),
+capture: async (frame, url) => {
 if (session.browser && !session.browser.isConnected()) {
 const disconnected = session.browser; session.browser = undefined; await disconnected.close();
 }
 if (!session.browser) session.browser = await launchBrowser();
 return captureSurfacePng(session.browser, { url,
 viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
-mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, });
+mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname,
+...(frame.auth === 'required' && authState ? { storageState: authState } : {}), });
 } }); } finally { await session.browser?.close(); }
 }
 export function formatComment(receipt) { const lines = [ COMMENT_MARKER, `## Pen still diff (${receipt.advisory ? 'advisory' : 'strict'})`, '',
@@ -145,8 +161,9 @@ export function formatComment(receipt) { const lines = [ COMMENT_MARKER, `## Pen
 ); const rows = [...receipt.frames]; if (receipt.sample) { rows.push({ sectionId: 'synthetic sample',
 mode: 'dark', viewport: '—', verdict: receipt.sample.pass ? 'pass' : 'fail', judgment: receipt.sample.judgment,
 }); } for (const frame of rows) { const ssimScore = frame.judgment ? frame.judgment.ssim.toFixed(3) : '—';
-const ratio = frame.judgment ? frame.judgment.sectionHeightRatio.toFixed(3) : '—'; lines.push(
-`| ${frame.sectionId} | ${frame.mode} | ${frame.viewport} | ${frame.verdict} | ${ssimScore} | ${ratio} |` ); }
+const ratio = frame.judgment ? frame.judgment.sectionHeightRatio.toFixed(3) : '—';
+const verdict = frame.reason ? `${frame.verdict} (${frame.reason})` : frame.verdict; lines.push(
+`| ${frame.sectionId} | ${frame.mode} | ${frame.viewport} | ${verdict} | ${ssimScore} | ${ratio} |` ); }
 for (const item of receipt.triptychs) { if (item.file) lines.push('',
 `![Pen, render, and diff: ${String([item.route, item.story, item.sectionId].filter(Boolean).join(' / ')).replace(/[\[\]\r\n]/g, ' ')} (${item.mode}, ${item.viewport})](${item.file})`); }
 if (receipt.sample?.file) lines.push('', `![Synthetic sample (not design evidence)](${receipt.sample.file})`);
@@ -158,14 +175,17 @@ if (next === undefined || next.startsWith('--'))
 args[token.slice(2)] = true; else { args[token.slice(2)] = next; i += 1; } } return args; }
 export async function main(argv = process.argv.slice(2), options = {}) { const args = parseArgs(argv); if (args.help || !args.manifest) {
 process.stdout.write(
-'usage: pen-still-diff.mjs --manifest <file> [--route /] --out <dir> [--base-url URL] [--storybook-url URL] [--strict]\n' );
+'usage: pen-still-diff.mjs --manifest <file> [--route /] --out <dir> [--base-url URL] [--storybook-url URL] [--storage-state FILE] [--strict]\n' );
 process.exit(args.help ? 0 : 2); } const manifestText = readFileSync(String(args.manifest), 'utf8'); const manifest = JSON.parse(manifestText).schema === BINDING_SCHEMA
 ? { schema: MANIFEST_SCHEMA, primaryMode: 'dark', frames: bindingsToStillFrames(JSON.parse(manifestText), typeof args.route === 'string' ? args.route : null) }
 : parseManifest(manifestText);
 const baseUrl = args['base-url'] || process.env.PEN_STILL_BASE_URL; const storybookUrl =
-args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const receipt = await evaluateManifestWithBrowser(manifest, {
+args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL;
+const storageState = args['storage-state'] || process.env.PEN_CAPTURE_STORAGE_STATE;
+const receipt = await evaluateManifestWithBrowser(manifest, {
 root: options.root ?? REPO_ROOT, strict: Boolean(args.strict), baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
 storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined,
+storageState: typeof storageState === 'string' ? resolve(storageState) : options.storageState,
 capture: options.capture, launchBrowser: options.launchBrowser, });
 const outDir = resolve(String(args.out ?? 'pen-still-out')); mkdirSync(outDir, { recursive: true });
 // Hash the full identity, not a lossy slug: separators, case, Unicode and long IDs stay distinct.

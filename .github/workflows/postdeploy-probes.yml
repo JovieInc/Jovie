@@ -1034,7 +1034,23 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT"
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          auth_state="${RUNNER_TEMP}/pen-capture-auth.json"
+          trap 'rm -f "$auth_state"' EXIT
+          state_args=()
+          if [ -n "${DOPPLER_TOKEN:-}" ]; then
+            doppler run --project jovie-web --config prd \
+              --only-secrets=DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN \
+                node scripts/invariants/pen-capture-auth.mjs \
+                  --origin https://jov.ie \
+                  --out "$auth_state" ||
+              echo "::warning::Pen capture session not established; auth-required frames will record capture-auth-missing."
+          fi
+          if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
+          node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT" "${state_args[@]}"
 
       - name: Certify the golden path on production
         id: certify
