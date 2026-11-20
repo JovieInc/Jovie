@@ -39,9 +39,11 @@ if (
   if (!/^[0-9a-f]{40}$/.test(base ?? '')) {
     throw new Error('Exact diff base SHA required');
   }
+  // --no-renames: rename-out of the typecheck graph must still surface the
+  // deleted source path (repo convention; see resolve-merge-group-path-diff).
   const files = execFileSync(
     'git',
-    ['diff', '--name-only', '-z', base, 'HEAD'],
+    ['diff', '--no-renames', '--name-only', '-z', base, 'HEAD'],
     { encoding: 'utf8' }
   )
     .split('\0')

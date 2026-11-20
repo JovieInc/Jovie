@@ -16,6 +16,14 @@ import { selectMqParityScope } from './mq-parity-scope.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('CLI git diff uses --no-renames so rename-out of the graph still selects typecheck', () => {
+  const source = readFileSync(
+    new URL('./mq-parity-scope.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.match(source, /\['diff', '--no-renames', '--name-only', '-z'/);
+});
+
 test('docs and unrelated native changes allocate no typecheck parity work', () => {
   assert.deepEqual(
     selectMqParityScope(['docs/guide.md', 'apps/ios/Jovie/App.swift']),
