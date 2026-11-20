@@ -220,6 +220,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      expectedSubscriptionId: subscription.id,
       stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,

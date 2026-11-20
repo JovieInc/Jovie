@@ -336,7 +336,7 @@ export default function CheckoutSuccessPage() {
     successSubtitle = CHECKOUT_PENDING_COPY.subtitle;
   } else if (view.kind === 'recovery') {
     successSubtitle = CHECKOUT_RECOVERY_COPY.subtitle;
-  } else if (isOnboardingUpgrade && proofPending) {
+  } else if (proofPending) {
     successSubtitle = PROOF_PENDING_TERMS;
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess

@@ -201,6 +201,7 @@ interface UpdateBillingStatusBase {
   clerkUserId: string;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string | null;
+  expectedSubscriptionId?: string;
   stripePriceId?: string | null;
   stripeEventId?: string;
   stripeEventTimestamp?: Date;

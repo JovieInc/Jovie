@@ -171,13 +171,21 @@ export async function requiresProofBeforePublic(
   return !adminApproval;
 }
 
-/** True while any of the user's profiles is private awaiting proof. */
+/** True while the active profile (or any profile when omitted) is private awaiting proof. */
 export async function hasProofPendingProfile(
-  appUserId: string
+  appUserId: string,
+  profileId?: string | null
 ): Promise<boolean> {
   const rows = await db
     .select({ settings: creatorProfiles.settings })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, appUserId));
+    .where(
+      profileId
+        ? and(
+            eq(creatorProfiles.userId, appUserId),
+            eq(creatorProfiles.id, profileId)
+          )
+        : eq(creatorProfiles.userId, appUserId)
+    );
   return rows.some(row => isProofBlockingPublication(row.settings));
 }

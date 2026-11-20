@@ -47,14 +47,31 @@ interface OnboardingCheckoutClientProps {
   readonly catalog?: OnboardingCatalogPreview | null;
 }
 
-// formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
-
 function getAnnualSavingsPercent(
   monthlyAmount: number,
   annualAmount: number
 ): number {
   const yearlyAtMonthly = monthlyAmount * 12;
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
+}
+
+function getCheckoutHeaderHint(params: {
+  readonly isDefaultUpsell: boolean;
+  readonly username: string;
+  readonly displayName: string;
+  readonly proofPending: boolean;
+}): string {
+  const { isDefaultUpsell, username, displayName, proofPending } = params;
+  if (proofPending) {
+    return `Here's what ${displayName} adds once your profile is verified.`;
+  }
+  if (isDefaultUpsell && username) {
+    return `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${displayName} adds on top.`;
+  }
+  if (username) {
+    return `Your profile is live and stays free either way. Here's what ${displayName} adds on top.`;
+  }
+  return `Here's what ${displayName} adds on top of the free plan.`;
 }
 
 const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
@@ -434,11 +451,12 @@ export function OnboardingCheckoutClient({
             {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
-            {isDefaultUpsell && username
-              ? `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${planMarketing.displayName} adds on top.`
-              : username
-                ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
-                : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
+            {getCheckoutHeaderHint({
+              isDefaultUpsell,
+              username,
+              displayName: planMarketing.displayName,
+              proofPending,
+            })}
           </p>
         </div>
 
@@ -465,7 +483,6 @@ export function OnboardingCheckoutClient({
 
         <ClaimTimeProofCard findings={proofFindings} />
 
-        {/* Certified plan highlights (JOV-7794) */}
         <ContentSurfaceCard className='mb-6 p-4'>
           <div className='space-y-2.5'>
             {OFFER_HIGHLIGHTS.map(item => (
@@ -484,7 +501,6 @@ export function OnboardingCheckoutClient({
           </div>
         </ContentSurfaceCard>
 
-        {/* Annual toggle */}
         {hasAnnualOption ? (
           <BillingIntervalSelector
             isAnnual={isAnnual}
@@ -493,7 +509,6 @@ export function OnboardingCheckoutClient({
           />
         ) : null}
 
-        {/* Price display */}
         <div className='mb-6 text-center'>
           <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
             {formatAmount(currentAmount)}
@@ -503,7 +518,6 @@ export function OnboardingCheckoutClient({
           </span>
         </div>
 
-        {/* CTA */}
         <Button
           onClick={handleCheckout}
           disabled={isLoading}
@@ -517,7 +531,6 @@ export function OnboardingCheckoutClient({
             : `Upgrade to ${planMarketing.displayName}`}
         </Button>
 
-        {/* Below the button, so a failed checkout never pushes it down */}
         {error ? (
           <ContentSurfaceCard
             className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
@@ -527,7 +540,6 @@ export function OnboardingCheckoutClient({
           </ContentSurfaceCard>
         ) : null}
 
-        {/* Skip — the free profile is already live; never imply otherwise */}
         <button
           type='button'
           onClick={handleSkip}
@@ -536,7 +548,7 @@ export function OnboardingCheckoutClient({
         >
           {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
         </button>
-        {isDefaultUpsell ? (
+        {isDefaultUpsell && !proofPending ? (
           <p className='mt-2 text-center text-xs text-tertiary-token'>
             Your public profile stays live and free forever.
           </p>

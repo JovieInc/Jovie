@@ -181,7 +181,8 @@ export default async function OnboardingCheckoutPage({
   // Paying never publishes a page; proof does. A free-admission page that is
   // waiting for proof may still check out, and says so plainly.
   const proofPending = Boolean(
-    authResult.dbUserId && (await hasProofPendingProfile(authResult.dbUserId))
+    authResult.dbUserId &&
+      (await hasProofPendingProfile(authResult.dbUserId, profileData.id))
   );
 
   // Smart plan recommendation only for organic users with no expressed paid intent.

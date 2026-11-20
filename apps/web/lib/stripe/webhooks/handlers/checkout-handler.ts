@@ -15,37 +15,22 @@
 
 import type Stripe from 'stripe';
 
-import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
-import { markClaimVerificationsPaid } from '@/lib/claim/claim-verification.server';
-import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
-import { activateReferral } from '@/lib/referrals/service';
 import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
-import { logger } from '@/lib/utils/logger';
-import { admitPaidUser } from '@/lib/waitlist/paid-admission';
 
 import { BaseSubscriptionHandler } from '../base-handler';
+import { runActiveSubscriptionPostEffects } from '../post-activation';
 import type {
   HandlerResult,
   SupportedEventType,
   WebhookContext,
 } from '../types';
-import { getUserIdFromStripeCustomer, invalidateBillingCache } from '../utils';
-
-/**
- * Best-effort referral activation — logs but does not throw on failure.
- */
-async function tryActivateReferral(appUserId: string): Promise<void> {
-  try {
-    await activateReferral(appUserId);
-  } catch (error) {
-    logger.warn('Failed to activate referral on checkout', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
+import {
+  getCustomerId,
+  getUserIdFromStripeCustomer,
+  invalidateBillingCache,
+} from '../utils';
 
 /**
  * Handler for checkout.session.completed events.
@@ -87,14 +72,14 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
 
     // Extract user ID from session metadata
     let userId = session.metadata?.clerk_user_id;
+    const customerId = getCustomerId(session.customer);
 
     // Fallback: Look up user by Stripe customer ID if metadata is missing
-    if (!userId && typeof session.customer === 'string') {
+    if (!userId && customerId) {
       await logFallback('No user ID in checkout session metadata', {
         event: 'checkout.session.completed',
       });
-      userId =
-        (await getUserIdFromStripeCustomer(session.customer)) ?? undefined;
+      userId = (await getUserIdFromStripeCustomer(customerId)) ?? undefined;
     }
 
     if (!userId) {
@@ -142,78 +127,22 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
     // before the required outcome receipt so a retry still sees fresh Pro.
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && result.isActive) {
+    if (result.success && !result.skipped && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
 
-      // Paying admits: a verified active subscription moves a still-pending
-      // buyer past the waitlist gate (entitlement is already written above).
-      await admitPaidUser({
+      const { acquisitionId } = extractCheckoutCorrelation(session.metadata);
+      await runActiveSubscriptionPostEffects({
         appUserId: result.appUserId,
-        cacheKeys: [userId],
-      });
-
-      // Secondary revenue attribution always uses the canonical app UUID.
-      await tryActivateReferral(result.appUserId);
-
-      enqueuePaidWelcomeAfterEntitlement({
-        appUserId: result.appUserId,
-        clerkUserId: userId,
+        userId,
         subscription,
         plan: result.plan,
+        correlation: result.correlation,
+        acquisitionId,
+        stripeEventTimestamp,
+        eventName: 'checkout.session.completed',
       });
-
-      // JOV-6166: paid_converted is required. Swallowing here returned 200 to
-      // Stripe after JOV-6129, so retries never ran and funnel metrics stayed
-      // green without an outcome receipt.
-      try {
-        await attributeLeadPaidConversionByAppUserId(
-          result.appUserId,
-          subscription.id,
-          result.correlation
-        );
-      } catch (error) {
-        await captureCriticalError(
-          'Lead paid conversion outcome receipt failed',
-          error,
-          {
-            route: '/api/stripe/webhooks',
-            event: 'checkout.session.completed',
-            subscriptionId: subscription.id,
-            userId,
-          }
-        );
-        throw error;
-      }
-
-      const { acquisitionId } = extractCheckoutCorrelation(session.metadata);
-
-      // Funnel measurement only; never fails or retries the webhook.
-      await recordArtistOfferStage(acquisitionId, 'paid', stripeEventTimestamp);
-
-      // Claim integrity: a paid high-reach claim moves from awaiting_payment
-      // to pending_verification. Payment never links the artist identity; an
-      // operator verifies first. Retries are no-ops once transitioned.
-      try {
-        await markClaimVerificationsPaid({
-          appUserId: result.appUserId,
-          paidAt: stripeEventTimestamp,
-          acquisitionId,
-        });
-      } catch (error) {
-        await captureCriticalError(
-          'Claim verification payment transition failed',
-          error,
-          {
-            route: '/api/stripe/webhooks',
-            event: 'checkout.session.completed',
-            subscriptionId: subscription.id,
-            userId,
-          }
-        );
-        throw error;
-      }
     }
 
     return result;

@@ -93,6 +93,7 @@ export async function updateUserBillingStatus(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    expectedSubscriptionId,
     stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
@@ -122,6 +123,20 @@ export async function updateUserBillingStatus(
 
     const currentUser = userResult.data;
     affectedUserId = currentUser.id;
+
+    if (
+      !isPro &&
+      expectedSubscriptionId &&
+      currentUser.stripeSubscriptionId &&
+      currentUser.stripeSubscriptionId !== expectedSubscriptionId
+    ) {
+      return {
+        success: true,
+        appUserId: currentUser.id,
+        skipped: true,
+        reason: 'Active subscription replaced before downgrade',
+      };
+    }
 
     // Event ordering: Skip if this event is older than the last processed event
     if (isEventStale(stripeEventTimestamp, currentUser.lastBillingEventAt)) {
@@ -229,6 +244,7 @@ async function retryUpdateWithFreshData(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    expectedSubscriptionId,
     stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
@@ -271,6 +287,20 @@ async function retryUpdateWithFreshData(
 
     const freshUser = freshUserResult.data;
     affectedUserId = freshUser.id;
+
+    if (
+      !isPro &&
+      expectedSubscriptionId &&
+      freshUser.stripeSubscriptionId &&
+      freshUser.stripeSubscriptionId !== expectedSubscriptionId
+    ) {
+      return {
+        success: true,
+        appUserId: freshUser.id,
+        skipped: true,
+        reason: 'Active subscription replaced before downgrade',
+      };
+    }
 
     // Re-check event ordering with fresh data
     if (isEventStale(stripeEventTimestamp, freshUser.lastBillingEventAt)) {
