@@ -542,19 +542,19 @@ const MERGE_GROUP_ADMISSION_WEB_TESTS = [
 // Control-plane node:test suites, each with its own per-module coverage gate:
 // [test file, coverage include (null = no coverage gate), thresholds].
 const CI_CONTROL_NODE_COVERAGE_TESTS = [
-  [
+  ...['', '-arrival'].map(suffix => [
     [
       '.github/scripts/production-continuity.test.mjs',
       '.github/scripts/production-continuity-arrival.test.mjs',
       '.github/scripts/production-continuity-limits.test.mjs',
     ],
-    '.github/scripts/production-continuity{,-arrival}.mjs',
+    `.github/scripts/production-continuity${suffix}.mjs`,
     [
       '--test-coverage-lines=95',
       '--test-coverage-branches=90',
       '--test-coverage-functions=90',
     ],
-  ],
+  ]),
   [
     '.github/scripts/production-continuity-dedupe.test.mjs',
     '.github/scripts/production-continuity-dedupe.mjs',
