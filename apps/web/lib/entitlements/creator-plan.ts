@@ -25,7 +25,7 @@ const legacyUsers = aliasedTable(users, 'legacy_users');
  * back to 'free'), so trial expiry must be enforced at read time — mirrors
  * normalizeBillingPlan in @/lib/entitlements/server.ts.
  */
-function resolveEffectivePlan(
+export function resolveEffectivePlan(
   rawPlan: string | null | undefined,
   trialEndsAt: Date | null | undefined
 ): PlanId {

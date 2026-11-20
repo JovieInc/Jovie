@@ -15,6 +15,7 @@ import { users } from '@/lib/db/schema/auth';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveEffectivePlan } from '@/lib/entitlements/creator-plan';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
@@ -248,7 +249,7 @@ const fetchProfileAndLinks = async (
     const latestRelease = result.latestRelease ?? null;
     const creatorMetaPixelId = await getCreatorMetaPixelId(
       result.id,
-      result.userPlan ?? null
+      normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
     );
 
     return {
@@ -298,6 +299,7 @@ interface PublicationAuthority {
   readonly userIsPro: boolean | null;
   readonly userClerkId: string | null;
   readonly userPlan: string | null;
+  readonly userTrialEndsAt?: Date | null;
 }
 
 /**
@@ -319,6 +321,7 @@ async function readPublicationAuthority(
           userIsPro: users.isPro,
           userClerkId: users.clerkId,
           userPlan: users.plan,
+          userTrialEndsAt: users.trialEndsAt,
         })
         .from(creatorProfiles)
         .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -382,6 +385,14 @@ async function readCachedProfileBody(
  * invalidateProfileCache. They come from the fresh authority row, never from
  * the cached body, so a just-upgraded artist sees Pro behavior immediately.
  */
+function normalizeCreatorPixelPlan(
+  plan: string | null | undefined,
+  trialEndsAt?: Date | string | null
+): string | null {
+  if (!plan) return null;
+  return resolveEffectivePlan(plan, trialEndsAt);
+}
+
 async function withFreshEntitlements(
   body: PublicProfileLoaderResult,
   authority: PublicationAuthority
@@ -397,7 +408,7 @@ async function withFreshEntitlements(
       typeof authority.userClerkId === 'string' ? authority.userClerkId : null,
     creatorMetaPixelId: await getCreatorMetaPixelId(
       authority.id,
-      authority.userPlan ?? null
+      normalizeCreatorPixelPlan(authority.userPlan, authority.userTrialEndsAt)
     ),
   };
 }
