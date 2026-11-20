@@ -1138,8 +1138,15 @@ export function OnboardingChat({
   useEffect(() => {
     if (hasInjectedStarterPromptRef.current) return;
     let nextPrompt: string | null = null;
+    let nextMode: OnboardingEntryMode = 'prompt_handoff';
 
-    if (intentId) {
+    if (!takenHandleEntry && starterHandoff?.prompt) {
+      nextPrompt = starterHandoff.prompt;
+      nextMode =
+        starterHandoff.kind === 'spotify_artist'
+          ? 'spotify_handoff'
+          : 'prompt_handoff';
+    } else if (intentId) {
       const intent = readHomepageIntent(intentId);
       if (intent) {
         nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
@@ -1151,11 +1158,17 @@ export function OnboardingChat({
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
-      setEntryMode('prompt_handoff');
+      setEntryMode(nextMode);
     } else {
       setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [entryProfile, intentId, setComposerInput]);
+  }, [
+    entryProfile,
+    intentId,
+    setComposerInput,
+    starterHandoff,
+    takenHandleEntry,
+  ]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;

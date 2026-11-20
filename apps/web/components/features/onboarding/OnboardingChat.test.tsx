@@ -357,4 +357,26 @@ describe('OnboardingChat states', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('auto-sends an arriving starterHandoff prompt when landing from / -> /start', async () => {
+    const { rerender } = render(<OnboardingChat {...verified} />);
+    await screen.findByRole('textbox');
+    expect(chat.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...verified}
+        starterHandoff={{
+          kind: 'prompt',
+          prompt: 'I want to claim jov.ie/neonpulse.',
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(chat.sendMessage).toHaveBeenCalledWith({
+        text: 'I want to claim jov.ie/neonpulse.',
+      })
+    );
+  });
 });

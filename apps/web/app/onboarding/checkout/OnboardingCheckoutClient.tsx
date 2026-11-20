@@ -116,7 +116,7 @@ function CatalogPreviewCard({
                     alt=''
                     width={40}
                     height={40}
-                    className='h-10 w-10 shrink-0 rounded-md object-cover'
+                    className='h-10 w-10 shrink-0 rounded-md object-contain'
                   />
                 ) : (
                   <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
@@ -180,7 +180,7 @@ function ProfilePreviewCard({
           </div>
 
           <div className='w-full'>
-            <div className='flex items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3.5 py-2.5'>
+            <div className='flex items-center justify-between rounded-xl border border-subtle bg-surface-2 px-3.5 py-2.5'>
               <span className='text-app text-secondary-token'>
                 Jovie branding
               </span>
@@ -198,11 +198,14 @@ function ProfilePreviewCard({
       </ContentSurfaceCard>
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
-        <ContentSurfaceCard className='mb-4 px-4 py-3'>
-          <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
+        <ContentSurfaceCard className='mb-4 flex items-start gap-3 px-4 py-3'>
+          <Sparkles
+            className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+            aria-hidden='true'
+          />
           <p className='text-app text-secondary-token'>
             You have{' '}
-            <span className='font-medium text-primary-token'>
+            <span className='font-medium tabular-nums text-primary-token'>
               {spotifyFollowers.toLocaleString()} Spotify followers
             </span>
             {'. '}
@@ -466,13 +469,17 @@ export function OnboardingCheckoutClient({
         <ClaimTimeProofCard findings={proofFindings} />
 
         {/* Certified plan highlights (JOV-7794) */}
-        <ContentSurfaceCard className='mb-6 p-4'>
-          <div className='space-y-2.5'>
+        <ContentSurfaceCard
+          className='mb-6 p-4'
+          data-testid='onboarding-checkout-offer-card'
+        >
+          <div className='space-y-3'>
             {OFFER_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
-                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
-                </div>
+                <item.icon
+                  className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+                  aria-hidden='true'
+                />
                 <div>
                   <p className='text-app font-medium text-primary-token'>
                     {item.label}
@@ -508,7 +515,7 @@ export function OnboardingCheckoutClient({
           onClick={handleCheckout}
           disabled={isLoading}
           variant='primary'
-          size='xl'
+          size='lg'
           className='w-full'
           aria-busy={isLoading}
         >
@@ -528,14 +535,17 @@ export function OnboardingCheckoutClient({
         ) : null}
 
         {/* Skip — the free profile is already live; never imply otherwise */}
-        <button
-          type='button'
-          onClick={handleSkip}
-          disabled={isLoading}
-          className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
-        >
-          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
-        </button>
+        <div className='mt-4 flex justify-center'>
+          <button
+            type='button'
+            onClick={handleSkip}
+            disabled={isLoading}
+            data-testid='onboarding-checkout-skip'
+            className='relative inline-flex min-h-7 items-center justify-center rounded-full px-3 text-center text-app text-tertiary-token transition-colors hover:text-secondary-token focus-ring-themed disabled:opacity-50 before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
+          >
+            {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
+          </button>
+        </div>
         {isDefaultUpsell ? (
           <p className='mt-2 text-center text-xs text-tertiary-token'>
             Your public profile stays live and free forever.

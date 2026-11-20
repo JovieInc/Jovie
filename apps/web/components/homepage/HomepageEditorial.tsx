@@ -16,7 +16,10 @@ import {
   resolveHomepageHeroPrimaryAction,
 } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import {
+  CLAIM_PROFILE_STARTER_PROMPT,
+  getClaimProfileIntent,
+} from '@/data/marketingCtaIntents';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
 import { AppWindow, CatalogPlate } from './v3/ProductUi';
@@ -333,6 +336,11 @@ function ClaimCloseBody() {
             data-testid='homepage-claim-entry'
             className='hv3-claim'
           >
+            <Input
+              type='hidden'
+              name='starter_prompt'
+              value={CLAIM_PROFILE_STARTER_PROMPT}
+            />
             <label
               className='hv3-claim__label'
               htmlFor='homepage-claim-entry-handle'

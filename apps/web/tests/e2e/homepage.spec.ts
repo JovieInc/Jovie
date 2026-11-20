@@ -101,7 +101,7 @@ test.describe('Homepage', () => {
     for (const href of await startLinks.evaluateAll(links =>
       links.map(link => link.getAttribute('href'))
     )) {
-      expect(href).toBe('/start');
+      expect(href).toBe(getClaimProfileIntent().href);
     }
     await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
     await expect(page.locator('main')).not.toContainText(/\$\d/);

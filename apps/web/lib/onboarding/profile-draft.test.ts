@@ -264,6 +264,12 @@ describe('adaptive onboarding recorded conversations', () => {
     ['actor', 'creator'],
     ['podcaster', 'creator'],
     ['speaker', 'expert'],
+    ['music', 'artist'],
+    ['older catalog', 'artist'],
+    ['a company', 'founder'],
+    ['writing', 'author'],
+    ['content', 'creator'],
+    ['client services', 'expert'],
   ] as const)('adapts adjacent %s work', (text, role) => {
     expect(
       advanceOnboardingProfileDraft(emptyOnboardingProfileDraft(), {

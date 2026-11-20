@@ -235,8 +235,8 @@ describe('HomepageEditorial chapters', () => {
     const claim = getClaimProfileIntent();
     const open = render(<HomepageStoryHero />);
     const start = screen.getByTestId('homepage-primary-cta');
-    expect(start).toHaveAttribute('href', '/start');
     expect(start).toHaveAttribute('href', claim.href);
+    expect(claim.href).toContain('/start?starter_prompt=');
     expect(start).toHaveAttribute('data-primary-action', 'true');
     expect(start).toHaveTextContent(claim.label);
     // The note describes the invitation form, so it leaves with that action.
