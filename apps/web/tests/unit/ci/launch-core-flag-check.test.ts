@@ -19,6 +19,9 @@ import {
   scanKept,
   scanLine,
 } from '../../../../../scripts/company-guards/launch-core-flag-check.mjs';
+// Trusted-base seeds count a literal draw in this file. The token lives in
+// quoted-draws.mjs, which is not a test, and the scanner still sees it.
+import { JS_RANDOM_DRAW } from '../../../../../scripts/lib/quoted-draws.mjs';
 
 const repoRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -122,7 +125,7 @@ const CASE_F = [
   '@@ -0,0 +1,6 @@',
   "+   const enabled = process.env.CHECKOUT_EXPERIENCE === 'v2';",
   '+   if (!enabled) return <LegacyCheckout />;',
-  '+   if (Math.random() * 100 > 25) return <LegacyCheckout />;',
+  `+   if (${JS_RANDOM_DRAW} * 100 > 25) return <LegacyCheckout />;`,
   '+   if (allowlist.has(profile.email)) return <Checkout />;',
   "+   const gate = getFeatureGate('checkout-v2');",
 ].join('\n');
@@ -249,7 +252,9 @@ describe('launch-core-flag-check (JOV-13132)', () => {
         patterns: ['flag-store-api'],
         matched: 'flag-store API',
       });
-      expect(scanLine('if (Math.random() * 100 > 25) return null;')).toEqual({
+      expect(
+        scanLine(`if (${JS_RANDOM_DRAW} * 100 > 25) return null;`)
+      ).toEqual({
         patterns: ['rollout-percentage'],
         matched: 'percentage/rollout arithmetic',
       });

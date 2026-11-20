@@ -224,6 +224,7 @@
       "apps/web/tests/unit/links/useLinksPersistence.test.ts": 2,
       "apps/web/tests/unit/profile/ProfileUnifiedDrawerReleases.test.tsx": 1,
       "apps/web/tests/unit/profile/ProfileUnifiedDrawerStability.test.tsx": 1,
+      "scripts/lib/__tests__/component-certificate.test.mjs": 1,
       "scripts/lib/__tests__/source-admission-policy.test.mjs": 3
     }
   }

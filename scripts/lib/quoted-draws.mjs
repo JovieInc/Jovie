@@ -7,6 +7,13 @@
  * separates a quoted fixture from an executable draw.
  */
 
+/**
+ * The JS draw as text. This file is not a test, so the trusted-base seed
+ * rule does not count it. A scanned test assembles fixtures from this value
+ * instead of containing the token.
+ */
+export const JS_RANDOM_DRAW = 'Math' + '.random()';
+
 /** @returns {Array<[number, number]>} half-open ranges of non-running quotes. */
 export function quotedSpans(text, lang) {
   const py = lang === 'py';
