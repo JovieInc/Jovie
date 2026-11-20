@@ -5,10 +5,19 @@ import {
   collectArtifactFreshness,
   fetchLatestProductionVerifiedSha,
 } from '../artifact-freshness-reconcile.mjs';
+import { isProductionVerifiedJobSet } from './artifact-freshness-certified.mjs';
 import { isPublicationObservationError } from './publication-observation.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+const VERIFIED_JOBS = Object.freeze([
+  {
+    name: 'Production Release / Centralized production rollback',
+    conclusion: 'skipped',
+  },
+  { name: 'Production Verified', conclusion: 'success' },
+]);
 
 test('fetchLatestProductionVerifiedSha queries production-controller.yml not event=push', async () => {
   const urls = [];
@@ -33,9 +42,7 @@ test('fetchLatestProductionVerifiedSha queries production-controller.yml not eve
       if (String(url).includes('/actions/runs/11/jobs')) {
         return {
           ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
+          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
         };
       }
       throw new Error(`unexpected url ${url}`);
@@ -87,9 +94,7 @@ test('jobs 5xx on newest run does not fall back to older verified SHA', async ()
       if (String(url).includes('/actions/runs/20/jobs')) {
         return {
           ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
+          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
         };
       }
       throw new Error(`unexpected url ${url}`);
@@ -135,9 +140,7 @@ test('jobs ok without verified job may fall back to older verified SHA', async (
       if (String(url).includes('/actions/runs/30/jobs')) {
         return {
           ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
+          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
         };
       }
       throw new Error(`unexpected url ${url}`);
@@ -145,6 +148,72 @@ test('jobs ok without verified job may fall back to older verified SHA', async (
   });
   assert.equal(result.status, 'known');
   assert.equal(result.sourceRevision, SHA_A);
+});
+
+test('newest overall-failure run with verified job is certified (not older SHA)', async () => {
+  assert.equal(
+    isProductionVerifiedJobSet([
+      ...VERIFIED_JOBS,
+      { name: 'Customer changelog staleness', conclusion: 'failure' },
+    ]),
+    true
+  );
+  assert.equal(
+    isProductionVerifiedJobSet([
+      {
+        name: 'Production Release / Centralized production rollback',
+        conclusion: 'success',
+      },
+      { name: 'Production Verified', conclusion: 'success' },
+    ]),
+    false
+  );
+
+  const result = await fetchLatestProductionVerifiedSha({
+    fetchImpl: async url => {
+      if (String(url).includes('/workflows/production-controller.yml/runs')) {
+        return {
+          ok: true,
+          json: async () => ({
+            workflow_runs: [
+              {
+                id: 51,
+                conclusion: 'failure',
+                head_sha: SHA_B,
+                updated_at: '2026-11-20T03:00:00Z',
+              },
+              {
+                id: 50,
+                conclusion: 'success',
+                head_sha: SHA_A,
+                updated_at: '2026-11-20T01:00:00Z',
+              },
+            ],
+          }),
+        };
+      }
+      if (String(url).includes('/actions/runs/51/jobs')) {
+        return {
+          ok: true,
+          json: async () => ({
+            jobs: [
+              ...VERIFIED_JOBS,
+              { name: 'Customer changelog staleness', conclusion: 'failure' },
+            ],
+          }),
+        };
+      }
+      if (String(url).includes('/actions/runs/50/jobs')) {
+        return {
+          ok: true,
+          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
+        };
+      }
+      throw new Error(`unexpected url ${url}`);
+    },
+  });
+  assert.equal(result.status, 'known');
+  assert.equal(result.sourceRevision, SHA_B);
 });
 
 test('jobs 5xx certified unknown blocks premature Summer resolve', async () => {
@@ -198,9 +267,7 @@ test('jobs 5xx certified unknown blocks premature Summer resolve', async () => {
       if (String(url).includes('/actions/runs/40/jobs')) {
         return {
           ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
-          }),
+          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
         };
       }
       // stamp list etc.

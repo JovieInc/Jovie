@@ -25,6 +25,32 @@ export const DESKTOP_PRODUCTION_PATHS = Object.freeze([
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const DEFAULT_REPO = 'JovieInc/Jovie';
 const PRODUCTION_CONTROLLER_WORKFLOW = 'production-controller.yml';
+const PRODUCTION_VERIFIED_JOB = 'Production Verified';
+/** Same contract as production-marker-recovery / JOV-9998. */
+const ROLLBACK_JOB_SUFFIX = 'Centralized production rollback';
+
+/**
+ * A controller run is certified when Production Verified succeeded and the
+ * centralized rollback job was skipped — not when the whole workflow
+ * conclusion is success. Post-verification jobs (changelog publish/staleness)
+ * can fail without un-verifying production (JOV-9998).
+ * @param {ReadonlyArray<{ readonly name?: unknown; readonly conclusion?: unknown }>} jobs
+ */
+export function isProductionVerifiedJobSet(jobs) {
+  const list = Array.isArray(jobs) ? jobs : [];
+  const verified = list.some(
+    job =>
+      job?.name === PRODUCTION_VERIFIED_JOB && job?.conclusion === 'success'
+  );
+  if (!verified) return false;
+  const rollbacks = list.filter(
+    job =>
+      typeof job?.name === 'string' && job.name.endsWith(ROLLBACK_JOB_SUFFIX)
+  );
+  return (
+    rollbacks.length === 1 && rollbacks[0]?.conclusion === 'skipped'
+  );
+}
 
 /**
  * @param {string} publishedSha
@@ -91,7 +117,8 @@ export async function fetchLatestProductionVerifiedSha(input = {}) {
     const body = await response.json();
     const runs = Array.isArray(body?.workflow_runs) ? body.workflow_runs : [];
     for (const run of runs) {
-      if (run?.conclusion !== 'success') continue;
+      // Do not require run.conclusion === 'success': post-verification jobs
+      // can fail after Production Verified (JOV-9998) without un-certifying.
       if (typeof run?.head_sha !== 'string' || !FULL_SHA.test(run.head_sha)) {
         continue;
       }
@@ -110,11 +137,7 @@ export async function fetchLatestProductionVerifiedSha(input = {}) {
       }
       const jobsBody = await jobsResponse.json();
       const jobs = Array.isArray(jobsBody?.jobs) ? jobsBody.jobs : [];
-      const verified = jobs.some(
-        job =>
-          job?.name === 'Production Verified' && job?.conclusion === 'success'
-      );
-      if (verified) {
+      if (isProductionVerifiedJobSet(jobs)) {
         return {
           status: 'known',
           sourceRevision: run.head_sha,
