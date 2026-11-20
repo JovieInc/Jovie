@@ -44,6 +44,7 @@
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},
+    {"id": "workflow:flake-ledger", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/flake-ledger.yml", "note": "Workflow header names Eve as accountable writer; the routine owner is the agent role here. JOV-13105 event-driven collector hop."},
     {"id": "workflow:fleet-gate-refresh", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/fleet-gate-refresh.yml"},
     {"id": "workflow:fleet-rules-evidence", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/fleet-rules-evidence.yml", "note": "Base-branch-only PR fleet-rule evidence read on the CI App budget; PR Ready reads its runs."},
     {"id": "workflow:fleet-rules-ready-rerun", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/fleet-rules-ready-rerun.yml", "note": "Re-runs PR Ready when a completed Fleet Rules Evidence run is the only blocker."},
