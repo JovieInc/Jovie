@@ -2274,8 +2274,6 @@ test('automatic desktop publishing stamps production-impacting source before rel
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /\.github\/scripts\/resolve-main-sha\.sh/,
     /\.github\/scripts\/gh-api-hold\.sh/,
-    /node scripts\/desktop-stamp-ownership\.mjs decide/,
-    /Superseding unlandable desktop stamp/,
     /node scripts\/version-stamp\.mjs/,
     /node scripts\/version-check\.mjs/,
     /cursor\/stable-desktop-publish-/,

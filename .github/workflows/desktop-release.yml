@@ -1220,8 +1220,13 @@ jobs:
               exit 1
             }
             echo "Superseding unlandable desktop stamp #$stale_number ($ownership_reason): $stale_url"
-            gh pr close "$stale_number" --repo "$REPOSITORY" --comment \
-              "Superseded by desktop-release: stamp was unlandable ($ownership_reason). Opening a fresh stamp from the current verified generation so Mac dogfood is not starved."
+            bash .github/scripts/gh-api-hold.sh api -X PATCH \
+              "repos/$REPOSITORY/pulls/$stale_number" \
+              -f state=closed >/dev/null
+            bash .github/scripts/gh-api-hold.sh api -X POST \
+              "repos/$REPOSITORY/issues/$stale_number/comments" \
+              -f body="Superseded by desktop-release: stamp was unlandable ($ownership_reason). Opening a fresh stamp from the current verified generation so Mac dogfood is not starved." \
+              >/dev/null
             if [ -n "$stale_ref" ]; then
               git push origin --delete "$stale_ref" >/dev/null 2>&1 || true
             fi

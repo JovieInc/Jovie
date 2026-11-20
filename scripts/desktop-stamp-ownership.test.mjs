@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   findOpenDesktopStampPr,
   stampOwnershipDecision,
 } from './desktop-stamp-ownership.mjs';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('no open stamp creates a new one', () => {
   assert.deepEqual(stampOwnershipDecision(null), {
@@ -13,7 +18,13 @@ test('no open stamp creates a new one', () => {
 });
 
 test('clean or unknown stamp keeps single-writer ownership', () => {
-  for (const mergeable_state of ['clean', 'unstable', 'blocked', 'unknown', '']) {
+  for (const mergeable_state of [
+    'clean',
+    'unstable',
+    'blocked',
+    'unknown',
+    '',
+  ]) {
     const decision = stampOwnershipDecision({
       number: 1,
       html_url: 'https://example.test/1',
@@ -82,4 +93,17 @@ test('findOpenDesktopStampPr reads slurped pull pages', () => {
   );
   assert.equal(matches.length, 1);
   assert.equal(matches[0].number, 9);
+});
+
+test('desktop-release stamp job wires ownership decide + supersede', () => {
+  const workflow = readFileSync(
+    join(repoRoot, '.github/workflows/desktop-release.yml'),
+    'utf8'
+  );
+  assert.match(workflow, /node scripts\/desktop-stamp-ownership\.mjs decide/);
+  assert.match(workflow, /Superseding unlandable desktop stamp/);
+  assert.match(
+    workflow,
+    /bash \.github\/scripts\/gh-api-hold\.sh api -X PATCH/
+  );
 });
