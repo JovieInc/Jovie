@@ -1093,14 +1093,24 @@ jobs:
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/product-lane-classification"
+          # Only record ios/mac as queue-deferred when the classifier selected
+          # them. Unselected Apple lanes stay absent so post-queue main can tell
+          # deferral from "never touched Apple paths".
           jq '
-            .selectedLanes |= map(select(. != "ios" and . != "mac"))
+            .selectedLanes as $selected
+            | .selectedLanes |= map(select(. != "ios" and . != "mac"))
             | .skippedLanes = (
                 [.skippedLanes[] | select(.lane != "ios" and .lane != "mac")]
-                + [
-                  {"lane":"ios","reason":"merge queue does not wait on the hosted macOS pool"},
-                  {"lane":"mac","reason":"merge queue does not wait on the hosted macOS pool"}
-                ]
+                + (
+                    ["ios", "mac"]
+                    | map(
+                        select(. as $lane | ($selected | index($lane)) != null)
+                        | {
+                            lane: .,
+                            reason: "merge queue does not wait on the hosted macOS pool"
+                          }
+                      )
+                  )
               )
             | .requiredGates |= del(.ios, .mac)
           ' "$root/receipt.json" > "$root/receipt.queue.json"
@@ -4435,27 +4445,106 @@ jobs:
           allow-images: 'true'
           retention-days: 7
 
+  # Queue-proven main previously skipped Path Changes, so Apple lanes dropped
+  # from the merge queue never ran. This job re-classifies only ios/mac for the
+  # exact main push without unlocking web duplicate lanes.
+  ci-apple-post-queue:
+    name: Apple Post-Queue Selection
+    needs: [main-queue-provenance]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.main-queue-provenance.result == 'success' &&
+      needs.main-queue-provenance.outputs.is_current == 'true' &&
+      needs.main-queue-provenance.outputs.queue_proven == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}
+      run_macos: ${{ steps.classify.outputs.run_macos || 'false' }}
+      run_macos_native: ${{ steps.classify.outputs.run_macos_native || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify deferred Apple lanes
+        id: classify
+        shell: bash
+        env:
+          EVENT_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          PUSH_BASE_SHA="${EVENT_PUSH_BEFORE_SHA}"
+          if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+            [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "::error::push.before is not a usable exact main base SHA"
+            exit 1
+          fi
+          git cat-file -e "${PUSH_BASE_SHA}^{commit}"
+          root="$RUNNER_TEMP/apple-post-queue"
+          mkdir -p "$root"
+          git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD > "$root/changed-paths.txt"
+          # Policy from the pre-push main tip so a bad landing cannot rewrite
+          # its own Apple selection rules for this deferred evidence pass.
+          git show "${PUSH_BASE_SHA}:scripts/lib/product-lane-classifier.mjs" \
+            > "$root/product-lane-classifier.mjs"
+          git show "${PUSH_BASE_SHA}:scripts/lib/apple-post-queue-selection.mjs" \
+            > "$root/apple-post-queue-selection.mjs" || {
+            # First land of this helper: fall back to the checked-out copy.
+            cp scripts/lib/apple-post-queue-selection.mjs "$root/apple-post-queue-selection.mjs"
+          }
+          node "$root/product-lane-classifier.mjs" \
+            --files-from "$root/changed-paths.txt" \
+            --base-ref "$PUSH_BASE_SHA" \
+            --head-ref HEAD \
+            --json-out "$root/receipt.json"
+          test -s "$root/receipt.json"
+          node "$root/apple-post-queue-selection.mjs" \
+            --receipt "$root/receipt.json" \
+            --github-output "$GITHUB_OUTPUT"
+          {
+            printf '### Apple post-queue selection\n\n'
+            printf -- '- run_ios: `%s`\n' "$(sed -n 's/^run_ios=//p' "$GITHUB_OUTPUT" | tail -n1)"
+            printf -- '- run_macos: `%s`\n' "$(sed -n 's/^run_macos=//p' "$GITHUB_OUTPUT" | tail -n1)"
+            printf -- '- run_macos_native: `%s`\n' "$(sed -n 's/^run_macos_native=//p' "$GITHUB_OUTPUT" | tail -n1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # iOS unit coverage runs on push to main and on workflow_dispatch.
   # It does not run in the merge queue: the hosted macOS pool cannot hold
   # check_response_timeout. Full simulator regression stays a TestFlight gate.
+  # Queue-proven main recovers the deferred Fast Unit lane via
+  # ci-apple-post-queue.
   ci-ios:
     name: iOS Fast Unit + Coverage (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-apple-post-queue]
     if: >-
       always() &&
-      needs.ci-path-changes.result == 'success' &&
+      !cancelled() &&
       (
-        github.event_name != 'merge_group' ||
         (
-          needs.ci-merge-group-admission.result == 'success' &&
-          needs.ci-merge-group-admission.outputs.admitted == 'true'
+          needs.ci-path-changes.result == 'success' &&
+          (
+            github.event_name != 'merge_group' ||
+            (
+              needs.ci-merge-group-admission.result == 'success' &&
+              needs.ci-merge-group-admission.outputs.admitted == 'true'
+            )
+          ) &&
+          needs.ci-path-changes.outputs.run_ios == 'true' &&
+          (
+            github.event_name == 'workflow_dispatch' ||
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-apple-post-queue.result == 'success' &&
+          needs.ci-apple-post-queue.outputs.run_ios == 'true'
         )
-      ) &&
-      needs.ci-path-changes.outputs.run_ios == 'true' &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'merge_group' ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     # actions: write lets mac-lane-route.yml start and cancel the Mac child run.
     permissions:
@@ -4468,25 +4557,37 @@ jobs:
 
   # Mac product evidence stays on the synthetic combined head or direct-main
   # fallback. It covers both the MenuMonitor Swift package and the packaged
-  # Electron desktop application for the exact selected SHA.
+  # Electron desktop application for the exact selected SHA. Queue-proven main
+  # recovers the deferred Mac lane via ci-apple-post-queue.
   ci-macos:
     name: Mac Build + Test (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-apple-post-queue]
     if: >-
       always() &&
-      needs.ci-path-changes.result == 'success' &&
+      !cancelled() &&
       (
-        github.event_name != 'merge_group' ||
         (
-          needs.ci-merge-group-admission.result == 'success' &&
-          needs.ci-merge-group-admission.outputs.admitted == 'true'
+          needs.ci-path-changes.result == 'success' &&
+          (
+            github.event_name != 'merge_group' ||
+            (
+              needs.ci-merge-group-admission.result == 'success' &&
+              needs.ci-merge-group-admission.outputs.admitted == 'true'
+            )
+          ) &&
+          needs.ci-path-changes.outputs.run_macos == 'true' &&
+          (
+            github.event_name == 'workflow_dispatch' ||
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-apple-post-queue.result == 'success' &&
+          needs.ci-apple-post-queue.outputs.run_macos == 'true'
         )
-      ) &&
-      needs.ci-path-changes.outputs.run_macos == 'true' &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'merge_group' ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     concurrency:
       # A regenerated merge-group head supersedes the prior Mac flight for the
@@ -4500,7 +4601,7 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       mac-first: true
-      native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}
+      native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}
       supersede-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   ci-cross-product-integration:
@@ -9602,6 +9703,7 @@ jobs:
       [
         main-queue-provenance,
         ci-path-changes,
+        ci-apple-post-queue,
         ci-risk-classifier,
         ci-fast,
         ci-secret-scan,
@@ -9676,7 +9778,9 @@ jobs:
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
 
           if [ "$QUEUE_PROVEN" = "true" ]; then
-            # A queue-proven main SHA must not duplicate unit/build/fallback work.
+            # A queue-proven main SHA must not duplicate web unit/build/fallback
+            # work. Apple lanes are intentionally absent from the merge queue
+            # (hosted macOS pool), so path-selected ios/mac evidence runs here.
             for lane in \
               "Path Changes:$PATH_RESULT" \
               "CI Risk Classifier:$RISK_RESULT" \
@@ -9688,8 +9792,6 @@ jobs:
               "Ovie Build:$OVIE_BUILD_RESULT" \
               "Ovie Typecheck:$OVIE_TYPECHECK_RESULT" \
               "Storybook Surface Matrix:$STORYBOOK_SURFACES_RESULT" \
-              "iOS Fast Unit + Coverage:$IOS_RESULT" \
-              "Mac Build + Test:$MACOS_RESULT" \
               "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
               "Product Lane Receipt:$LANE_RECEIPT_RESULT" \
               "Promptfoo Evals:$PROMPTFOO_RESULT" \
@@ -9698,6 +9800,29 @@ jobs:
               result="${lane#*:}"
               if [ "$result" != "skipped" ]; then
                 echo "::error::Queue-proven main duplicated $name (result $result)."
+                exit 1
+              fi
+            done
+            APPLE_IOS="${{ needs.ci-apple-post-queue.outputs.run_ios }}"
+            APPLE_MAC="${{ needs.ci-apple-post-queue.outputs.run_macos }}"
+            APPLE_SELECT_RESULT="${{ needs.ci-apple-post-queue.result }}"
+            if [ "$APPLE_SELECT_RESULT" != "success" ]; then
+              echo "::error::Queue-proven main Apple post-queue selection did not pass ($APPLE_SELECT_RESULT)."
+              exit 1
+            fi
+            for selected_gate in \
+              "iOS Fast Unit + Coverage:${APPLE_IOS:-false}:$IOS_RESULT" \
+              "Mac Build + Test:${APPLE_MAC:-false}:$MACOS_RESULT"; do
+              name="${selected_gate%%:*}"
+              selection_and_result="${selected_gate#*:}"
+              selected="${selection_and_result%%:*}"
+              result="${selection_and_result#*:}"
+              if [ "$selected" = "true" ] && [ "$result" != "success" ]; then
+                echo "::error::Queue-proven main deferred $name did not pass (result $result)."
+                exit 1
+              fi
+              if [ "$selected" != "true" ] && [ "$result" != "skipped" ]; then
+                echo "::error::Queue-proven main ran unselected $name (result $result)."
                 exit 1
               fi
             done

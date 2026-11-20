@@ -148,11 +148,19 @@ jobs:
             -sdk "$mac_theme_sdk" -target "$(uname -m)-apple-macosx14.0" \
             apps/ios/Jovie/DesignSystem/JovieTheme.swift
 
+      # Fast gate: Debug only (~55–88s measured for Debug+Release on hosted
+      # macos-26). Release fixture-unavailable invariants stay on the full
+      # simulator/TestFlight regression where both configs still run.
       - name: Test native Mac development boundary
         timeout-minutes: 5
         run: |
           mkdir -p artifacts/macos-native-tests
-          for mac_configuration in Debug Release; do
+          if [[ "${{ inputs.full-regression }}" == "true" ]]; then
+            mac_configurations=(Debug Release)
+          else
+            mac_configurations=(Debug)
+          fi
+          for mac_configuration in "${mac_configurations[@]}"; do
             xcodebuild test -project apps/ios/JovieMac.xcodeproj -scheme JovieMac \
               -configuration "$mac_configuration" -destination platform=macOS \
               -derivedDataPath .build/macos-native-ci \
