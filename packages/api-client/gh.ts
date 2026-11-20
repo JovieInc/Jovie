@@ -4,12 +4,7 @@
  * via `gh api --include`, bounded retries, and exit 75 when deferred.
  */
 import { spawn } from 'node:child_process';
-import {
-  closeSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-} from 'node:fs';
+import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EX_TEMPFAIL } from './client.ts';
@@ -229,9 +224,24 @@ function captureToFile(
       return;
     }
     closeSync(fd);
+    const stderr = child.stderr;
+    if (!stderr) {
+      child.kill();
+      try {
+        unlinkSync(file);
+      } catch {
+        // best-effort cleanup
+      }
+      resolve({
+        code: 127,
+        stdout: Buffer.alloc(0),
+        stderr: 'gh stderr pipe missing',
+      });
+      return;
+    }
     const err: Buffer[] = [];
     let settled = false;
-    const finish = (code: number, stderr: string) => {
+    const finish = (code: number, message: string) => {
       if (settled) return;
       settled = true;
       let stdout: Buffer = Buffer.alloc(0);
@@ -245,9 +255,9 @@ function captureToFile(
       } catch {
         // The body was already read, or the file was never created.
       }
-      resolve({ code, stdout, stderr });
+      resolve({ code, stdout, stderr: message });
     };
-    child.stderr.on('data', c => err.push(c));
+    stderr.on('data', c => err.push(c));
     child.on('error', e => finish(127, String(e)));
     child.on('close', code =>
       finish(code ?? 1, Buffer.concat(err).toString('utf8'))
@@ -257,6 +267,7 @@ function captureToFile(
 
 const defaultRun: GhRunner = (args, env) =>
   ghWantsFileStdout(args) ? captureToFile(args, env) : capturePipe(args, env);
+
 export function ghCredential(env: NodeJS.ProcessEnv): string {
   if (env.JOVIE_GITHUB_CREDENTIAL) return env.JOVIE_GITHUB_CREDENTIAL;
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
@@ -423,8 +434,7 @@ export async function runGh(
     const observations = parseBudget(spec, headers, at, shape.resource);
     if (result.code === 0 && shape.cost === 0) {
       const headerResources = new Set(observations.map(row => row.resource));
-      const quotaBody =
-        typeof body === 'string' ? body : body.toString('utf8');
+      const quotaBody = typeof body === 'string' ? body : body.toString('utf8');
       observations.push(
         ...quotaObservations(quotaBody).filter(
           row => !headerResources.has(row.resource)

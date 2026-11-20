@@ -271,10 +271,7 @@ describe('gh through the ledger', () => {
 
   it('detects artifact zip endpoints that need file stdout', () => {
     expect(
-      ghWantsFileStdout([
-        'api',
-        'repos/JovieInc/Jovie/actions/artifacts/1/zip',
-      ])
+      ghWantsFileStdout(['api', 'repos/JovieInc/Jovie/actions/artifacts/1/zip'])
     ).toBe(true);
     expect(
       ghWantsFileStdout(['api', 'repos/JovieInc/Jovie/actions/artifacts/1'])
@@ -289,24 +286,18 @@ describe('gh through the ledger', () => {
       seen.push({ args: [...args], env: { ...env } });
       return { code: 0, stdout: zip, stderr: '' };
     };
-    const result = await runGh(
-      ['api', 'repos/o/r/actions/artifacts/9/zip'],
-      {
-        store: new MemoryLedgerStore(),
-        credential: 'zip',
-        run,
-        log: quiet,
-        env: { GH_FORCE_TTY: '0', GH_TOKEN: 't' },
-      }
-    );
+    const result = await runGh(['api', 'repos/o/r/actions/artifacts/9/zip'], {
+      store: new MemoryLedgerStore(),
+      credential: 'zip',
+      run,
+      log: quiet,
+      env: { GH_FORCE_TTY: '0', GH_TOKEN: 't' },
+    });
     expect(result.code).toBe(0);
     expect(Buffer.isBuffer(result.stdout)).toBe(true);
     expect(result.stdout).toEqual(zip);
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.args).toEqual([
-      'api',
-      'repos/o/r/actions/artifacts/9/zip',
-    ]);
+    expect(seen[0]?.args).toEqual(['api', 'repos/o/r/actions/artifacts/9/zip']);
     expect(seen[0]?.env.GH_FORCE_TTY).toBeUndefined();
   });
 
