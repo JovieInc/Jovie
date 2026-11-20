@@ -1,5 +1,5 @@
 import { ACTION_BUTTON_FACE_CLASSNAME } from '@jovie/ui/atoms/button-contract';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
 import { cn } from '@/lib/utils';
 
 /** Shared page-toolbar action styling, usable by molecules and organisms. */

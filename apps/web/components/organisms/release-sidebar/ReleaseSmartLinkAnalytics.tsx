@@ -1,12 +1,11 @@
 'use client';
 
-import { CommonDropdown } from '@jovie/ui';
+import { CommonDropdown, IconButton } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
-  DrawerInlineIconButton,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
@@ -191,13 +190,14 @@ function ReleaseSmartLinkControl({
           align='end'
           items={shareItems}
           trigger={
-            <DrawerInlineIconButton
+            <IconButton
+              size='lg'
+              variant='inline'
               title='Share smart link'
               aria-label='Share Smart Link'
-              className='h-7 w-7 rounded-full text-tertiary-token'
             >
               <Share2 className='h-3 w-3' />
-            </DrawerInlineIconButton>
+            </IconButton>
           }
         />
       </div>

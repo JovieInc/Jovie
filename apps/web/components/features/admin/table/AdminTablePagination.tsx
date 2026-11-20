@@ -10,7 +10,7 @@ import {
 } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
 import { cn } from '@/lib/utils';
 
 type PaginationDirection = 'previous' | 'next';
