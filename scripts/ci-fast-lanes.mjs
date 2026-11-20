@@ -722,19 +722,89 @@ export const SOURCE_GUARDS = Object.freeze([
 ]);
 
 /**
+ * Cheap-first Source Validation order (JOV-13111). Highest historical
+ * fail-probability per second runs first; every selected guard still runs.
+ * Ledger: scripts/lib/source-guard-history.json. Kept in this file because
+ * rolling-ci-dispatch.yml sparse-checks it by name — a new import breaks
+ * that closure. A missing or invalid ledger yields null and manifest order.
+ */
+export const SOURCE_GUARD_HISTORY_SCHEMA = 'jovie.source-guard-history/v1';
+const SOURCE_GUARD_HISTORY_URL = new URL(
+  './lib/source-guard-history.json',
+  import.meta.url
+);
+
+/** Entries, or null when the ledger is missing, unreadable, or off-schema. */
+export function loadSourceGuardHistory(
+  read = path => readFileSync(path, 'utf8')
+) {
+  try {
+    const parsed = JSON.parse(read(SOURCE_GUARD_HISTORY_URL));
+    if (
+      parsed?.schema !== SOURCE_GUARD_HISTORY_SCHEMA ||
+      !parsed.entries ||
+      typeof parsed.entries !== 'object' ||
+      Array.isArray(parsed.entries)
+    )
+      return null;
+    return parsed.entries;
+  } catch {
+    return null;
+  }
+}
+
+/** Fail-probability per second. 0 without usable runs. */
+function guardFailureScore(entry) {
+  const runs = Number(entry?.runs);
+  const failures = Number(entry?.failures);
+  if (
+    !Number.isInteger(runs) ||
+    runs <= 0 ||
+    !Number.isInteger(failures) ||
+    failures < 0
+  )
+    return 0;
+  const failProbability = Math.min(failures / runs, 1);
+  const durationMs = Number(entry?.durationMs);
+  const durationSeconds =
+    Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 0;
+  // No measured duration keeps the fail-probability. Never invent a duration.
+  return durationSeconds > 0
+    ? failProbability / durationSeconds
+    : failProbability;
+}
+
+/** Stable reorder: higher score first, ties keep manifest order. */
+export function orderSourceGuardsByFailureRate(guards, entries) {
+  if (!entries) return [...guards];
+  return guards
+    .map((guard, index) => ({
+      guard,
+      index,
+      score: guardFailureScore(entries[guard?.id]),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.guard);
+}
+
+/**
  * @param {string} event GITHUB_EVENT_NAME ('' locally)
  * @param {readonly string[] | null} changed changed paths; null = unreadable
  * @returns {Array<(typeof SOURCE_GUARDS)[number]>}
  */
 export function selectSourceGuards(event, changed) {
-  return SOURCE_GUARDS.filter(guard => {
-    if (guard.prOnly && event !== 'pull_request' && event !== '') return false;
-    // Manual, local, and unreadable or empty diffs fail closed onto the guard.
-    if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
-      return true;
-    }
-    return changed.some(file => guard.inputs.test(file));
-  });
+  return orderSourceGuardsByFailureRate(
+    SOURCE_GUARDS.filter(guard => {
+      if (guard.prOnly && event !== 'pull_request' && event !== '')
+        return false;
+      // Manual, local, and unreadable or empty diffs fail closed onto the guard.
+      if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
+        return true;
+      }
+      return changed.some(file => guard.inputs.test(file));
+    }),
+    loadSourceGuardHistory()
+  );
 }
 
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
@@ -1299,6 +1369,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
   'scripts/lib/__tests__/daily-changelog-editorial-publication.test.mjs',
+  'scripts/lib/__tests__/source-guard-scheduler.test.mjs',
   'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
