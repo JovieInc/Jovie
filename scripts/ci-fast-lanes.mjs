@@ -1294,6 +1294,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/dependabot-pin-sync.test.mjs',
   'scripts/lib/__tests__/merge-to-live.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
+  'scripts/lib/__tests__/scripts-typecheck-default-options.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',

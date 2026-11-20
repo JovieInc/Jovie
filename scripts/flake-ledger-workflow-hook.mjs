@@ -41,6 +41,10 @@ const API_CLIENT = fileURLToPath(
   new URL('../packages/api-client/cli.ts', import.meta.url)
 );
 
+/**
+ * @param {string} path
+ * @param {{ token?: string, method?: string }} [options]
+ */
 function githubRequest(path, { token, method = 'GET' } = {}) {
   try {
     const stdout = execFileSync(
