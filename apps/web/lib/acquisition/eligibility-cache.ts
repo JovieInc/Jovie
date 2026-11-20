@@ -6,6 +6,7 @@ import {
 } from './commerce-decision';
 import {
   ACQUISITION_ELIGIBILITY_CONTRACT,
+  CONE_WORKFLOWS,
   type ConeEvidence,
   type ConeRequirementId,
   evaluateAcquisitionEligibility,
@@ -88,7 +89,7 @@ export const LIVE_MAX_AGE_MS = 15 * 60_000;
 export const DAILY_CANARY_MAX_AGE_MS = 30 * 60 * 60_000;
 export const DAILY_WORKFLOW_MAX_AGE_MS = 48 * 60 * 60_000;
 
-const requiredSources: Partial<
+export const REQUIRED_ELIGIBILITY_SOURCES: Partial<
   Record<ConeRequirementId, Readonly<Record<string, number>>>
 > = {
   entry: { 'm2-revenue-path:live#signed_out': LIVE_MAX_AGE_MS },
@@ -98,13 +99,18 @@ const requiredSources: Partial<
   auth_signup: { 'canary:auth-signup-onboarding': DAILY_CANARY_MAX_AGE_MS },
   profile_truth: {
     'canary:public-profile': DAILY_CANARY_MAX_AGE_MS,
-    'github:m2-revenue-path-canary.yml@main': DAILY_WORKFLOW_MAX_AGE_MS,
+    [`github:${CONE_WORKFLOWS.revenuePath}@main`]: DAILY_WORKFLOW_MAX_AGE_MS,
+  },
+  buyer_would_pay: {
+    [`github:${CONE_WORKFLOWS.buyerEval}@main`]: DAILY_WORKFLOW_MAX_AGE_MS,
   },
   payment_entitlement: {
-    'github:ci.yml#Golden Path (manual)@main': DAILY_WORKFLOW_MAX_AGE_MS,
+    [`github:${CONE_WORKFLOWS.goldenPath}@main`]: DAILY_WORKFLOW_MAX_AGE_MS,
   },
   instrumentation: { 'founder-funnel:30d': LIVE_MAX_AGE_MS },
 };
+
+const requiredSources = REQUIRED_ELIGIBILITY_SOURCES;
 
 const commerceKeys = {
   'selected-rail': 'selectedRail',

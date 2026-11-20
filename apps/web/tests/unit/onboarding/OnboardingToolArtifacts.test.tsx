@@ -150,7 +150,14 @@ describe('onboarding tool artifacts', () => {
     ).toBeDefined();
     expect(screen.queryByText(/Request failed due/u)).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    const retryButton = screen.getByRole('button', { name: 'Retry' });
+    expect(retryButton).toHaveClass(
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    fireEvent.click(retryButton);
 
     expect(mocks.artistSearch.searchImmediate).toHaveBeenCalledWith(
       'Test Artist'
@@ -235,18 +242,10 @@ describe('onboarding tool artifacts', () => {
       </>
     );
 
-    expect(screen.getByTestId('onboarding-artist-picker')).not.toHaveClass(
-      'rounded-xl'
-    );
-    expect(screen.getByTestId('onboarding-artist-picker')).not.toHaveClass(
-      'bg-surface-1'
-    );
-    expect(screen.getByTestId('onboarding-handle-check')).not.toHaveClass(
-      'rounded-xl'
-    );
-    expect(screen.getByTestId('onboarding-handle-check')).not.toHaveClass(
-      'bg-surface-1'
-    );
+    const picker = screen.getByTestId('onboarding-artist-picker');
+    const handleCheck = screen.getByTestId('onboarding-handle-check');
+    expect(picker).not.toHaveClass('rounded-xl', 'bg-surface-1');
+    expect(handleCheck).not.toHaveClass('rounded-xl', 'bg-surface-1');
   });
 
   it('does not render confirmed artist fallback cards for unsafe links', () => {

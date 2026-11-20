@@ -40,6 +40,9 @@ from atomic_state import append_json_object
 from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
 from pr_repair_evidence import with_locking_pr
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
+from intake_linear import (  # noqa: E402  (Linear intake filing split out; size-500)
+    ensure_linear_intake, intake_destination, linear_intake_issue, linear_intake_team,
+    upsert_intake)  # noqa: E402
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
@@ -1131,6 +1134,7 @@ def api_gh(args, **_):
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
                             locking_pr: int | None = None, win_section: str | None = None,
+                            previous_win_section: str | None = None,
                             premise: dict | None = None, blast_radius: dict | None = None,
                             literal_mentions: tuple[str, ...] = ()) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
@@ -1143,7 +1147,8 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section, premise=premise, blast_radius=blast_radius, literal_mentions=literal_mentions)
+                                   win_section=win_section, previous_win_section=previous_win_section, premise=premise,
+                                   blast_radius=blast_radius, literal_mentions=literal_mentions)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
@@ -1245,37 +1250,9 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
     return cleared + added
 
 
-def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
-    """One GitHub issue per fingerprint. A hit inside 30 minutes is the claim window."""
-    now = time.time() if now is None else now
-    marker = f"fingerprint={event.get('fingerprint')}"
-    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
-                 "--limit", "50", "--json", "number,body,updatedAt"])
-    try:
-        rows = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
-    except (ValueError, AttributeError):
-        rows = []
-    if not isinstance(rows, list):
-        rows = []
-    for row in rows:
-        if not isinstance(row, dict) or marker not in (row.get("body") or ""):
-            continue
-        return None  # one record per fingerprint; the tick converts after the claim window
-    created = sh(["gh", "issue", "create", "--repo", REPO,
-                  "--title", remediation.linear_intake_plan(event)["title"][:80],
-                  "--body", remediation.intake_body(event),
-                  "--label", remediation.INTAKE_LABEL])
-    found = re.search(r"/issues/(\d+)", created.stdout or "")
-    if not found:
-        return None
-    # Touch nothing else inside the claim window; updatedAt on the new issue starts it.
-    if remediation.claim_open(now, now + 1):
-        return int(found.group(1))
-    return int(found.group(1))
-
-
 def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
-    """After the 30-minute claim window, one Linear issue per fingerprint. No new secret."""
+    """Legacy staging only (JOV-13077): after the 30-minute claim window, one Linear issue per
+    fingerprint, linked once, then the GitHub issue closes. No new secret."""
     listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
                  "--limit", "30", "--json", "number,title,body,updatedAt"])
     try:
@@ -1333,91 +1310,28 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
         except Exception:
             continue
         if not issue_id or issue_id in linked_ids:
+            if issue_id and issue_id in linked_ids:
+                close_legacy_intake(row["number"], sh)  # converted on an earlier tick; finish the close
             continue
+        comment_ok = False
         try:
-            sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
-                f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+            posted = sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
+                         f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+            comment_ok = getattr(posted, "returncode", 1) == 0
         except (OSError, subprocess.SubprocessError):
             pass  # The canonical Linear destination remains recoverable next tick.
+        if comment_ok:
+            close_legacy_intake(row["number"], sh)
         linked.append(row["number"])
     return linked or None
 
 
-def ensure_linear_intake(linear, event: dict) -> str | None:
-    """Resolve authoritative history first; a stable destination fences racing creates."""
-    fingerprint = event.get("fingerprint")
-    if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
-        return None
-    team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
-                      {})["teams"]["nodes"][0]
-    # Linear accepts a client-supplied UUID v4. Its unique entity ID is the
-    # cross-host fence, including a committed create whose response was lost.
-    digest = hashlib.sha256(f"symphony-remediation:{REPO}:{team['id']}:{fingerprint}".encode()).digest()
-    issue_id = str(uuid.UUID(bytes=digest[:16], version=4))
-    existing = linear_intake_issue(linear, team["id"], fingerprint, issue_id)
-    if existing:
-        return existing
-    names = {label["name"]: label["id"] for label in team["labels"]["nodes"]}
-    wanted = remediation.intake_labels(str(event.get("ws") or "ci"))
-    ids = []
-    for name in wanted:
-        if name in names:
-            ids.append(names[name])
-            continue
-        if name != remediation.REMEDIATION_LABEL:
-            continue
-        created = linear.gql('mutation($n:String!,$t:String!){issueLabelCreate(input:{name:$n,teamId:$t}){issueLabel{id}}}',
-                             {"n": name, "t": team["id"]})
-        ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
-    todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
-    plan = remediation.linear_intake_plan(event)
-    try:
-        data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id}}}',
-                          {"i": {"id": issue_id, "teamId": team["id"], "stateId": todo, "labelIds": ids,
-                                 "title": plan["title"], "description": plan["description"] +
-                                 f"\n<!-- symphony-remediation-repository:{REPO} -->"}})
-        if data.get("issueCreate", {}).get("success") is True and data["issueCreate"]["issue"]["id"] == issue_id:
-            return issue_id
-    except Exception:
-        pass  # No second mutation: a race or unknown result requires a fresh read.
-    return linear_intake_issue(linear, team["id"], fingerprint, issue_id)
-
-
-def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -> str | None:
-    """Only a complete, bounded authoritative inventory can authorize creation."""
-    marker = f"Fingerprint: `{fingerprint}`"
-    query = ('query($filter:IssueFilter!,$after:String){issues(filter:$filter,includeArchived:true,first:100,after:$after)'
-             '{nodes{id description createdAt} pageInfo{hasNextPage endCursor}}}')
-    filters = {"team": {"id": {"eq": team_id}},
-               "or": [{"id": {"eq": issue_id}}, {"description": {"contains": marker}}]}
-    matches, cursors, after = [], set(), None
-    for _ in range(10):
-        page = linear.gql(query, {"filter": filters, "after": after})["issues"]
-        nodes, info = page["nodes"], page["pageInfo"]
-        if not isinstance(nodes, list) or not isinstance(info, dict):
-            raise ValueError("intake-inventory-unreadable")
-        for row in nodes:
-            if not isinstance(row, dict) or not all(isinstance(row.get(key), str) and row[key]
-                                                   for key in ("id", "description", "createdAt")):
-                raise ValueError("intake-inventory-unreadable")
-            stamp = iso_ts(row["createdAt"])
-            if stamp is None:
-                raise ValueError("intake-inventory-unreadable")
-            uuid.UUID(row["id"])
-            bound = row["description"].startswith(f"Symphony remediation intake (intake).\n{marker}\n")
-            repository = re.search(r"<!-- symphony-remediation-repository:([^ ]+) -->", row["description"])
-            bound = bound and (repository.group(1) == REPO if repository else REPO == "JovieInc/Jovie")
-            if row["id"] == issue_id and not bound:
-                raise ValueError("intake-destination-binding-mismatch")
-            if bound:
-                matches.append((stamp, row["id"]))
-        if info.get("hasNextPage") is False:
-            return min(matches)[1] if matches else None
-        after = info.get("endCursor")
-        if info.get("hasNextPage") is not True or not isinstance(after, str) or not after or after in cursors:
-            raise ValueError("intake-inventory-incomplete")
-        cursors.add(after)
-    raise ValueError("intake-inventory-incomplete")
+def close_legacy_intake(number: int, sh=run) -> bool:
+    """Convert-once cleanup (JOV-13077): the GitHub intake issue was only ever a staging
+    surface; Linear holds the record now."""
+    closed = sh(["gh", "issue", "close", str(number), "--repo", REPO, "--comment",
+                 "Linear issue filed; Linear is the source of truth for remediation intake (JOV-13077)."])
+    return closed.returncode == 0
 
 
 def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "green", "orphan")) -> list[tuple[int, str]]:
@@ -2665,8 +2579,14 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     for number, failing in red_heads.items():
         failures = merge_failures(failures, number, failing)
     incidents = red_repair.incident_checks(failures, now)
-    for check in sorted(incidents):  # one fingerprinted intake per check, zero repairs for it
-        upsert_intake(red_repair.incident_event(check, incidents[check], now), lane.sh, now)
+    if incidents:  # one Linear intake per check, fingerprint-deduped (JOV-13077); no GitHub issue
+        try:
+            incident_linear = linear_factory()
+        except Exception:
+            incident_linear = None
+        for check in sorted(incidents):
+            upsert_intake(red_repair.incident_event(check, incidents[check], now), lane.sh, now,
+                          linear=incident_linear)
     for number, failing in red_heads.items():
         if not set(failing) & set(incidents) and add_label(number, "red", lane.sh):
             labeled.append((number, "red"))
@@ -2931,6 +2851,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"#{number} enroll wake dispatched")
         elif kind == "enroll-wake-failed":
             print(f"#{number} enroll wake dispatch failed", file=sys.stderr)
+        elif isinstance(number, str):
+            print(f"linear intake {number} ({kind})")
         else:
             print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")

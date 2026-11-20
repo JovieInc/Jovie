@@ -27,6 +27,9 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'app/api/stripe/',
   'app/api/webhooks/',
   'components/features/dashboard/dashboard-nav/',
+  'lib/acquisition/eligibility-cache.ts',
+  'lib/acquisition/eligibility.server.ts',
+  'lib/acquisition/eligibility.ts',
   'lib/app-shell/',
   'lib/auth/',
   'lib/billing/',
@@ -34,6 +37,7 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'lib/cron/auth.ts',
   'lib/entitlements/',
   'lib/idempotency.ts',
+  'lib/ovie/certifications/',
   'lib/stripe/',
   'proxy.ts',
 ]);

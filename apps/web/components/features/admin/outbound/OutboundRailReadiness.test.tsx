@@ -63,6 +63,18 @@ describe('OutboundRailReadiness', () => {
       )
     ).not.toBeInTheDocument();
   });
+  it('keeps the blockers list semantic while the refusal is announced', () => {
+    setup({ error: 'Approval refused: facts changed since certification.' });
+    const list = screen.getByTestId('outbound-eligibility');
+    // Every direct child stays a real listitem: role="alert" on the <li>
+    // overrides the listitem role and leaves the <ul> with no listitem
+    // children (axe list rule). The live announcement lives one node down.
+    for (const child of Array.from(list.children)) {
+      expect(child.tagName).toBe('LI');
+      expect(child).not.toHaveAttribute('role');
+    }
+    expect(screen.getByRole('alert').closest('li')).toBe(list.children[0]);
+  });
   it.each([
     ['sent', 'Delivery is not confirmed here'],
     ['replied', 'Signup is not recorded'],

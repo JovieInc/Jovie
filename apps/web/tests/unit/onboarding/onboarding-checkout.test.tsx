@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
@@ -360,8 +360,12 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     // Certified capabilities only (JOV-7794); monitoring is internal-only.
+    const offerCard = screen.getByTestId('onboarding-checkout-offer-card');
+    expect(
+      within(offerCard).getByRole('list', { name: 'Artist Presence' })
+    ).toBeInTheDocument();
     for (const highlight of getPaidPlanAdditionNames()) {
-      expect(screen.getByText(highlight)).toBeInTheDocument();
+      expect(within(offerCard).getByText(highlight)).toBeInTheDocument();
     }
     expect(
       screen.queryByText('Continuous visibility monitoring')

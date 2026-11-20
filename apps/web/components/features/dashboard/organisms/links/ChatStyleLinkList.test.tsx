@@ -226,6 +226,12 @@ describe('ChatStyleLinkList certificate', () => {
     });
 
     expect(await screen.findByText('Adding...')).toBeInTheDocument();
+    // The dim lives on the skeleton tile only: an opacity modifier on the
+    // row composites the secondary-token text below the 4.5:1 AA floor
+    // (axe color-contrast).
+    const addingRow = screen.getByText('Adding...').closest('.rounded-lg');
+    expect(addingRow).not.toHaveClass('opacity-60');
+    expect(addingRow?.querySelector('.skeleton')).toHaveClass('opacity-60');
     const headings = screen
       .getAllByRole('heading', { level: 3 })
       .map(heading => heading.textContent);

@@ -235,15 +235,20 @@ export default async function ContentSmartLinkPage({
 
   // Fetch track list + entity sameAs for structured data (errors silently ignored)
   const [trackList, artistSameAs] = await Promise.all([
-    content.type === 'release' && content.totalTracks && content.totalTracks > 0
+    !isFixtureRequest &&
+    content.type === 'release' &&
+    content.totalTracks &&
+    content.totalTracks > 0
       ? getReleaseTrackList(content.id).catch(() => null)
       : Promise.resolve(null),
-    getArtistEntitySameAs(creator.id, {
-      musicbrainzId: creator.musicbrainzId,
-      spotifyUrl: creator.spotifyUrl,
-      appleMusicUrl: creator.appleMusicUrl,
-      youtubeUrl: creator.youtubeUrl,
-    }).catch(() => [] as string[]),
+    !isFixtureRequest
+      ? getArtistEntitySameAs(creator.id, {
+          musicbrainzId: creator.musicbrainzId,
+          spotifyUrl: creator.spotifyUrl,
+          appleMusicUrl: creator.appleMusicUrl,
+          youtubeUrl: creator.youtubeUrl,
+        }).catch(() => [] as string[])
+      : Promise.resolve([] as string[]),
   ]);
 
   // Generate structured data for SEO
@@ -639,12 +644,22 @@ export async function generateMetadata({
     permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
   }
 
-  const creator = await getCreatorByUsername(normalizedUsername);
+  const isFixtureRequest =
+    isScreenCertSmartLinkFixtureRequest(normalizedUsername);
+  if (isFixtureRequest && slug !== SCREEN_CERT_SMARTLINK_RELEASE_SLUG) {
+    return { title: 'Not Found' };
+  }
+
+  const creator = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR
+    : await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     return { title: 'Not Found' };
   }
 
-  const content = await getContentBySlug(creator.id, slug);
+  const content = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_RELEASE_CONTENT
+    : await getContentBySlug(creator.id, slug);
   if (!content) {
     const unpublished = await getUnpublishedReleasePresence(creator.id, slug);
     if (unpublished) {

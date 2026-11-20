@@ -77,7 +77,7 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     })) {
       expect(image).toHaveAccessibleName(/^Jovie for Mac:/);
     }
-    expect(hero.querySelectorAll('a[href="/start"]')).toHaveLength(1);
+    expect(hero.querySelectorAll('a[href^="/start"]')).toHaveLength(1);
     expect(hero.querySelector('a[href="/signup"]')).toBeNull();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)

@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/AuthShell.flag.test.tsx
 
+import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -19,7 +20,14 @@ import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
-import { PersistentAudioBar } from './PersistentAudioBar';
+
+// The idle dock has no server markup. Keep its client-only transport UI out
+// of every route's initial shell bundle, while mounting it once for the shell.
+const PersistentAudioBar = dynamic(
+  () =>
+    import('./PersistentAudioBar').then(module => module.PersistentAudioBar),
+  { ssr: false }
+);
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -68,10 +76,10 @@ function AuthShellInner({
   // left-sidebar toggle in Electron. Keep the initial client tree identical to
   // SSR; the runtime CSS hides the header slot before paint, and this hook
   // removes it after hydration without replacing the shell or losing drafts.
+  // JOV-7207 requires this `isElectron ? null` assignment. The value stays a
+  // stable flag so the header memo below is not busted by a new element.
   const sidebarTrigger =
-    isMobile || isElectron ? null : !sidebarPinned ? (
-      <SidebarCollapseButton previewTrigger={false} />
-    ) : null;
+    isMobile || isElectron ? null : !sidebarPinned ? true : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -105,32 +113,56 @@ function AuthShellInner({
   );
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
+  // Memoize the header element. AuthShellInner re-renders on every sidebar
+  // context change (hover peek included); a rebuilt element would defeat the
+  // AppShellFrame memo and re-render the whole header each time.
+  const togglePreviewPanel = previewPanelState.toggle;
+  const header = useMemo(
+    () =>
+      hideTopHeader ? null : (
+        <DashboardHeader
+          breadcrumbs={breadcrumbs}
+          sidebarTrigger={
+            sidebarTrigger ? (
+              <SidebarCollapseButton previewTrigger={false} />
+            ) : null
+          }
+          railToggle={railToggle}
+          breadcrumbSuffix={headerBadge}
+          action={headerAction}
+          commandPaletteHeader={commandPaletteHeader}
+          mobileProfileSlot={
+            // The rail toggle opens the same profile panel; render the
+            // mobile fallback only when no rail toggle exists.
+            section === 'ov' || section === 'admin' || railToggle ? null : (
+              <MobileProfileDrawer onOpen={togglePreviewPanel} />
+            )
+          }
+          showDivider={isTableRoute}
+          transparent={isChatRoute}
+        />
+      ),
+    [
+      breadcrumbs,
+      commandPaletteHeader,
+      headerAction,
+      headerBadge,
+      hideTopHeader,
+      isChatRoute,
+      isTableRoute,
+      railToggle,
+      section,
+      sidebarTrigger,
+      togglePreviewPanel,
+    ]
+  );
+
   return (
     <RuntimeUpdateProvider>
       <AppShellFrame
         brandVariant={section === 'ov' ? 'ov' : 'jovie'}
         sidebar={sidebar}
-        header={
-          hideTopHeader ? null : (
-            <DashboardHeader
-              breadcrumbs={breadcrumbs}
-              sidebarTrigger={sidebarTrigger}
-              railToggle={railToggle}
-              breadcrumbSuffix={headerBadge}
-              action={headerAction}
-              commandPaletteHeader={commandPaletteHeader}
-              mobileProfileSlot={
-                // The rail toggle opens the same profile panel; render the
-                // mobile fallback only when no rail toggle exists.
-                section === 'ov' || section === 'admin' || railToggle ? null : (
-                  <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-                )
-              }
-              showDivider={isTableRoute}
-              transparent={isChatRoute}
-            />
-          )
-        }
+        header={header}
         // Ovie Home and dashboards share one flat shell canvas.
         chatAmbientGradient={isChatRoute && section !== 'ov'}
         main={children}

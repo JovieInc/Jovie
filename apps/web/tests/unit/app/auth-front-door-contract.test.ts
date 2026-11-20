@@ -6,7 +6,10 @@ import {
   PUBLIC_WAITLIST_URL,
 } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
-import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
+import {
+  buildClaimProfileStartHref,
+  MARKETING_CTA_INTENTS,
+} from '@/data/marketingCtaIntents';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -32,8 +35,14 @@ describe('auth front-door contract', () => {
 
   it('keeps the front door and claims on the qualify chat, free plans on signup, and Pro on the self-serve claim checkout', () => {
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.START);
-    // Claims enter the /start qualify chat (Tim 2026-09-28, JOV-3379).
-    expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.START);
+    // Claims enter the /start qualify chat with the canonical claim starter prompt (Tim 2026-09-28, JOV-3379).
+    expect(
+      new URL(MARKETING_CTA_INTENTS.claimProfile.href, 'https://jov.ie')
+        .pathname
+    ).toBe(APP_ROUTES.START);
+    expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(
+      buildClaimProfileStartHref()
+    );
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'free')?.ctaHref
     ).toBe(`${APP_ROUTES.SIGNUP}?plan=free`);

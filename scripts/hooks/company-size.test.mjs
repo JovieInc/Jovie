@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 import { compare, LIMIT, lineCount, run } from '../company-guards/size.mjs';
@@ -70,5 +77,92 @@ test('company size guard rejects growth introduced only by merging main', () => 
     assert.throws(() => run({ cwd, baseRef: 'missing-main' }));
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('a cold guard cache cannot modify the committing repository index or Git state', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'size-warm-index-'));
+  const parent = join(scratch, 'parent');
+  const remote = join(scratch, 'ci');
+  const git = (cwd, ...args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+  const init = cwd => {
+    mkdirSync(cwd);
+    git(cwd, 'init', '-q');
+    git(cwd, 'config', 'user.name', 'Fixture');
+    git(cwd, 'config', 'user.email', 'fixture@example.invalid');
+  };
+  try {
+    init(remote);
+    mkdirSync(join(remote, 'guards'));
+    mkdirSync(join(remote, 'canon'));
+    writeFileSync(
+      join(remote, 'guards/size.mjs'),
+      'export const LIMIT = 500;\n'
+    );
+    writeFileSync(join(remote, 'canon/COMPANY.md'), 'CI fixture canon\n');
+    git(remote, 'add', '.');
+    git(remote, '-c', 'commit.gpgSign=false', 'commit', '-qm', 'fixture');
+    const pin = git(remote, 'rev-parse', 'HEAD');
+    init(parent);
+    mkdirSync(join(parent, '.github/workflows'), { recursive: true });
+    writeFileSync(
+      join(parent, '.github/workflows/company-guards.yml'),
+      `# ci-ref: ${pin}\n`
+    );
+    writeFileSync(join(parent, 'source.txt'), 'original\n');
+    git(parent, 'add', '.');
+    git(parent, '-c', 'commit.gpgSign=false', 'commit', '-qm', 'parent');
+    writeFileSync(join(parent, 'source.txt'), 'staged work\n');
+    git(parent, 'add', 'source.txt');
+    const index = resolve(
+      parent,
+      git(parent, 'rev-parse', '--git-path', 'index')
+    );
+    const before = readFileSync(index);
+    const head = git(parent, 'rev-parse', 'HEAD');
+    const script = new URL('./company-size-local.sh', import.meta.url).pathname;
+    /** @type {Array<[string, Record<string, string>]>} */
+    const cases = [
+      ['index', { GIT_INDEX_FILE: index }],
+      [
+        'repository',
+        {
+          GIT_INDEX_FILE: index,
+          GIT_DIR: join(parent, '.git'),
+          GIT_WORK_TREE: parent,
+          GIT_COMMON_DIR: join(parent, '.git'),
+        },
+      ],
+    ];
+    for (const [label, extra] of cases) {
+      const cache = join(scratch, label);
+      const run = spawnSync('bash', [script, '--warm'], {
+        cwd: parent,
+        encoding: 'utf8',
+        timeout: 15000,
+        env: {
+          ...process.env,
+          ...extra,
+          XDG_CACHE_HOME: cache,
+          JOVIE_CI_REMOTE: remote,
+        },
+      });
+      assert.equal(run.status, 0, run.stderr);
+      assert.ok(existsSync(join(cache, 'jovie-ci', pin, 'guards/size.mjs')));
+      assert.deepEqual(
+        readFileSync(index),
+        before,
+        `${label}: parent index must remain byte-identical`
+      );
+      assert.equal(git(parent, 'rev-parse', 'HEAD'), head);
+      assert.equal(
+        readFileSync(join(parent, 'source.txt'), 'utf8'),
+        'staged work\n'
+      );
+      assert.equal(existsSync(join(parent, 'guards')), false);
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
   }
 });

@@ -3964,19 +3964,74 @@ jobs:
       # every aggregate that requires this one, so the build skips only that
       # duplicate pass. Both run scripts/routes.mjs and write apps/ovie/.next,
       # so they cannot share one workspace concurrently.
-      # Nothing restores apps/ovie/.next/cache, so the build keeps Turbopack's
-      # persistent cache read-only instead of spending ~14s persisting it.
+      # Turbopack's persistent build cache (Next 16 default) lives under
+      # apps/ovie/.next/cache/turbopack. Merge-group and dispatch runs only
+      # restore the newest trusted main entry. The writer is
+      # next-build-cache-warm.yml's warm-ovie job, which runs on every push
+      # to main (and manual dispatch on main) and builds at most once per UTC
+      # hour per dependency hash; keep its key scheme identical to this
+      # restore. Queue-proven main pushes skip this job, so the save steps
+      # below only fire on a direct-main fallback run. The path is compiler
+      # state only (no fetch/image cache, no build output), and Turbopack
+      # revalidates every entry against current inputs. A miss falls through
+      # to a full compile and must not fail the job. PR and merge-group runs
+      # never write this cache, so they cannot poison the shared main key.
+      - name: Resolve Ovie Next build cache hour
+        id: ovie-next-build-cache-hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore Ovie Next build cache (read-only)
+        id: ovie-next-build-cache
+        if: hashFiles('apps/ovie/package.json') != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-ovie-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/ovie/package.json', 'apps/ovie/next.config.mjs') }}-${{ steps.ovie-next-build-cache-hour.outputs.hour }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-ovie-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/ovie/package.json', 'apps/ovie/next.config.mjs') }}-
+            ${{ runner.os }}-next-build-ovie-v1-
       - name: Build independent Ovie app
         if: hashFiles('apps/ovie/package.json') != ''
         run: |
           set -euo pipefail
-          NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build
+          # Only push saves the cache: skip the ~14s persist elsewhere.
+          # Any value, even empty, sets read-only.
+          [ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1
+          NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build
           test -f apps/ovie/.next/BUILD_ID
           test -f apps/ovie/.next/standalone/apps/ovie/server.js
           test ! -d apps/ovie/.next/standalone/apps/docs/app
         env:
           NEXT_PUBLIC_APP_URL: http://localhost:3105
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+      - name: Measure Ovie Next build cache (trusted main only)
+        id: ovie-next-build-cache-size
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.ovie-next-build-cache.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/ovie/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Ovie Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Ovie Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Ovie Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Ovie Next build cache (trusted main only)
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.ovie-next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ steps.ovie-next-build-cache.outputs.cache-primary-key }}
 
   ci-typecheck-ovie:
     name: Ovie Typecheck (combined)
@@ -7524,6 +7579,7 @@ jobs:
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/canonical-artist-site/m2-receipt.json
@@ -7531,16 +7587,19 @@ jobs:
 
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
 
       - name: Verify waitlist admission
         id: canonical_waitlist
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
@@ -7549,6 +7608,7 @@ jobs:
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie

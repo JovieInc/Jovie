@@ -1,0 +1,1109 @@
+{
+  "schema": "jovie-type-safety-ratchet-baseline/v1",
+  "rule": "Shrink-only per-file counts of type-safety escapes (as-unknown-as, non-null, ts-ignore, any) in non-test TS/TSX under apps/, packages/, workers/. Never add a row: fix the escape instead. When a count drops, run --write to lock the floor lower.",
+  "files": {
+    "apps/console/lib/factory-health.ts": {
+      "non-null": 3
+    },
+    "apps/desktop/src/main.ts": {
+      "non-null": 2
+    },
+    "apps/desktop/src/preload-fullscreen.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/docs/components/help/HelpArticle.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/eve-pilot/agent/lib/design-refinement.ts": {
+      "non-null": 2
+    },
+    "apps/eve-pilot/agent/lib/governor-reservoir.ts": {
+      "non-null": 1
+    },
+    "apps/eve-pilot/agent/lib/summer-bottleneck-loop.ts": {
+      "non-null": 16
+    },
+    "apps/eve-pilot/agent/lib/summer-gem-dark-recovery.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/.storybook/dashboard-fixtures.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/.storybook/preview.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/(auth)/signin/SignInPageClient.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx": {
+      "non-null": 1
+    },
+    "apps/web/app/[username]/[slug]/_lib/data.ts": {
+      "non-null": 2
+    },
+    "apps/web/app/[username]/[slug]/page.tsx": {
+      "as-unknown-as": 1,
+      "non-null": 2
+    },
+    "apps/web/app/api/admin/campaigns/settings/route.ts": {
+      "non-null": 5
+    },
+    "apps/web/app/api/admin/creator-ingest/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/admin/creator-invite/bulk/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/admin/creator-social-links/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/cron/cleanup-photos/helpers.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/cron/frequent/route.ts": {
+      "as-unknown-as": 8
+    },
+    "apps/web/app/api/dashboard/activity/recent/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/dashboard/audience/members/route.ts": {
+      "non-null": 2
+    },
+    "apps/web/app/api/dev/unwaitlist/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/images/artwork/upload/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/api/images/upload/lib/image-processing.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/app/api/images/upload/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/api/insights/[id]/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/insights/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/app/api/internal/ovie/summer-cards/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/internal/ovie/summer-company/charts/metric/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/internal/ovie/summer-company/charts/shipping/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/library/documents/[id]/approve/route.ts": {
+      "non-null": 3
+    },
+    "apps/web/app/api/library/documents/[id]/claims/route.ts": {
+      "non-null": 3
+    },
+    "apps/web/app/api/library/documents/[id]/review/route.ts": {
+      "non-null": 2
+    },
+    "apps/web/app/api/library/documents/[id]/route.ts": {
+      "non-null": 3
+    },
+    "apps/web/app/api/library/documents/route.ts": {
+      "non-null": 6
+    },
+    "apps/web/app/api/mobile/v1/me/route.ts": {
+      "non-null": 3
+    },
+    "apps/web/app/api/stripe/webhooks/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/api/tips/create-checkout/route.ts": {
+      "non-null": 2
+    },
+    "apps/web/app/api/track/validation.ts": {
+      "non-null": 6
+    },
+    "apps/web/app/api/webhooks/instantly/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/webhooks/resend-inbound/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/api/webhooks/resend/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/api/webhooks/stripe-merch/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/app/(shell)/admin/ops/useHudMetricsQuery.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/app/app/(shell)/admin/waitlist/approve/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/app/(shell)/admin/waitlist/disapprove/route.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/actions/social-links.ts": {
+      "non-null": 3
+    },
+    "apps/web/app/app/(shell)/dashboard/audience/audience-data.ts": {
+      "non-null": 1
+    },
+    "apps/web/app/content-preview/[versionId]/page.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/atoms/IconGlyphFrame.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/atoms/ProviderIcon.stories.tsx": {
+      "ts-ignore": 1
+    },
+    "apps/web/components/features/admin/ActivityTableUnified.tsx": {
+      "any": 1
+    },
+    "apps/web/components/features/admin/FounderReviewRegistry.stories.tsx": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/admin/admin-users-table/AdminUsersTableUnified.tsx": {
+      "any": 1
+    },
+    "apps/web/components/features/admin/certifications/CertificationGlyphs.states.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/admin/certifications/CertificationReviewCard.states.stories.tsx": {
+      "non-null": 6
+    },
+    "apps/web/components/features/admin/certifications/CertificationReviewCard.stories.tsx": {
+      "non-null": 3
+    },
+    "apps/web/components/features/admin/certifications/CertificationSummary.stories.tsx": {
+      "non-null": 3
+    },
+    "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.tsx": {
+      "any": 2
+    },
+    "apps/web/components/features/admin/contacts-table/AdminContactsTable.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/admin/contacts-table/CanonicalLifecycleFunnel.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/contacts-table/CanonicalLifecycleFunnel.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/decision-card/DecisionCard.states.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/admin/decision-card/fixtures.ts": {
+      "non-null": 1
+    },
+    "apps/web/components/features/admin/feedback-table/AdminFeedbackTable.tsx": {
+      "any": 6
+    },
+    "apps/web/components/features/admin/hud/FleetVerdictPanel.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/hud/FleetVerdictPanel.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/hud/HudKpiSubgrid.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/hud/HudSystemHealthStrip.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/hud/HudSystemHealthStrip.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": {
+      "any": 1
+    },
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx": {
+      "any": 1
+    },
+    "apps/web/components/features/admin/waitlist-table/utils/context-menu-builders.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/dashboard/audience/table/molecules/AudienceTableHeader.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/dashboard-nav/capacity.ts": {
+      "non-null": 1
+    },
+    "apps/web/components/features/dashboard/organisms/EarningsTab.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/EarningsTab.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/ListenNowForm.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/PreviewDataHydrator.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAnalyticsSection.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAppearanceSection.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAppearanceSection.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsPaymentsSection.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SocialsForm.stories.tsx": {
+      "as-unknown-as": 1,
+      "non-null": 6
+    },
+    "apps/web/components/features/dashboard/organisms/contacts-table/columns.tsx": {
+      "any": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceAlertsCell.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/grouped-links/useSuggestionHandlers.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkList.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/links/SortableLinkItem.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/links/hooks/useLinksManager.ts": {
+      "as-unknown-as": 3
+    },
+    "apps/web/components/features/dashboard/organisms/links/link-category-grid/utils.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/links/services/link-enrichment.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/dashboard/organisms/links/services/visibility-enforcement.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/dashboard/organisms/links/utils/link-transformers.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/dashboard/organisms/listen-now-form/useMusicLinksForm.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableWithTracks.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.states.stories.tsx": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/features/dashboard/organisms/socials-form/useSocialLinkSuggestions.ts": {
+      "non-null": 2
+    },
+    "apps/web/components/features/dashboard/organisms/tour-dates/tour-date-actions.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": {
+      "non-null": 3
+    },
+    "apps/web/components/features/feedback/PageErrorState.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/home/PipelineBottleneckBanner.stories.tsx": {
+      "non-null": 5
+    },
+    "apps/web/components/features/home/ProfileMockup.states.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/library-share/LibraryShareDropSurface.states.stories.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/features/library/library-catalog-columns.stories.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/features/library/library-column-priority.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.stories.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/features/opportunity-inbox/WorkflowCaptureInboxCard.stories.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/features/profile/PayDrawer.tsx": {
+      "ts-ignore": 2
+    },
+    "apps/web/components/features/profile/ProfilePaymentsCard.tsx": {
+      "ts-ignore": 1
+    },
+    "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": {
+      "ts-ignore": 1
+    },
+    "apps/web/components/features/tracking/JoviePixel.tsx": {
+      "ts-ignore": 2
+    },
+    "apps/web/components/jovie/components/ChatFileChips.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/jovie/components/ChatInput.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/jovie/components/ChatMerchDesignCarousel.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/jovie/components/ChatStarterActionsRail.stories.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/jovie/components/EntityResolutionProvider.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/jovie/components/release-provider.stories.tsx": {
+      "as-unknown-as": 4
+    },
+    "apps/web/components/jovie/hooks/useSuggestedProfiles.ts": {
+      "non-null": 1
+    },
+    "apps/web/components/jovie/utils.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/components/molecules/AppSearchField.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/organisms/LegalPage.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/LegalPage.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/PaySection.tsx": {
+      "ts-ignore": 4
+    },
+    "apps/web/components/organisms/SettingsSidebarNav.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/SettingsSidebarNav.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/billing/BillingHistorySection.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/keyboard-shortcuts-sheet/KeyboardShortcutsSheet.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/profile-shell/ProfileShell.states.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/profile-shell/ProfileShell.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/profile-shell/ProfileShell.tsx": {
+      "ts-ignore": 2
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseMetadata.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/release-sidebar/ReleasePropertiesPanel.states.stories.tsx": {
+      "as-unknown-as": 4
+    },
+    "apps/web/components/organisms/release-sidebar/ReleasePropertiesPanel.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/table/molecules/TableContextMenu.tsx": {
+      "non-null": 2
+    },
+    "apps/web/components/organisms/table/molecules/TableHeaderCell.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/organisms/table/organisms/VirtualizedTableBody.stories.tsx": {
+      "any": 1
+    },
+    "apps/web/components/organisms/table/organisms/VirtualizedTableBody.tsx": {
+      "non-null": 1
+    },
+    "apps/web/components/organisms/table/organisms/VirtualizedTableRow.stories.tsx": {
+      "as-unknown-as": 1,
+      "any": 1
+    },
+    "apps/web/components/organisms/user-button/UsageMenuItem.stories.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/components/providers/ErrorBoundary.tsx": {
+      "ts-ignore": 1
+    },
+    "apps/web/data/appScreens/penParity.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/data/appScreens/validation.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/data/marketing/characterSystem.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/data/marketing/composition.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/data/marketing/routeManifest.ts": {
+      "non-null": 1
+    },
+    "apps/web/hooks/useTouchDevice.ts": {
+      "ts-ignore": 1
+    },
+    "apps/web/lib/acquisition/canonical-artist-site-certification.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/actions/capabilities.ts": {
+      "as-unknown-as": 1,
+      "non-null": 2
+    },
+    "apps/web/lib/actions/fleet/dispatcher.ts": {
+      "non-null": 12
+    },
+    "apps/web/lib/actions/fleet/retention.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/actions/fleet/runtime.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/actions/fleet/summer.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/activation/pilot-store.server.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/aeo/brand-integrity.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/agent-acquisition/artist-input.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/agent-acquisition/artist-resolution.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/agent-acquisition/draft-capability.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/agent-acquisition/release-launch.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/agent-acquisition/release-resolution.ts": {
+      "non-null": 5
+    },
+    "apps/web/lib/agent-distribution/distribution-io.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/agent-os/certification-adapter.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/agent-os/design-ci-judge-certification.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/agent-os/dogfood-judge-gate.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/agent-os/dogfood-receipt.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/agent-ready/web-mcp.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/agents/telemetry-metrics.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/ai/experiments/select.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/ai/experiments/stats.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ai/sdk.ts": {
+      "as-unknown-as": 3
+    },
+    "apps/web/lib/ai/stream-normalization.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/analytics/data-retention.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/analytics/funnel-receipt-eligibility.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/api/with-dashboard-route.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/artwork-fallback.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/auth/session.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/billing/price-lock-view.ts": {
+      "as-unknown-as": 1,
+      "non-null": 1
+    },
+    "apps/web/lib/billing/price-lock.server.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/billing/reconciliation/batch-processor.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/chat/grounding-guard.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/chat/onboarding-script/engine.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/chat/onboarding-script/route.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/chat/run.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/chat/tool-events.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/chat/writing-pilot.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/claim/claim-verification.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/connectors/brand-deal-opportunity.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/connectors/workflows/execute-approved-action.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/connectors/workflows/outcome-attribution.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/content-records/fixtures/content-store.fixture.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/content-records/marketing-page.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/content-records/store.server.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/db/cache-redis.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/db/client/connection.ts": {
+      "non-null": 8
+    },
+    "apps/web/lib/db/queries/audience-cursor.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/db/query-timeout.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/demand/allocation-governor.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/demand/outcome-compiler.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/demand/outcome-fulfillment.fixtures.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/demo-founder-video.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/desktop/electron-bridge.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/dial/dial-physics.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/discography/collaborator-profile-reconciliation.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/discography/discovery.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/docs/getMarkdownDocument.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/dsp-enrichment/jobs/release-enrichment.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/dsp-enrichment/providers/musicbrainz-catalog.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/dsp-enrichment/providers/musicbrainz.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/email/streams.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/entity/queries.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/finance/metrics.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/fit-scoring/calculator.ts": {
+      "non-null": 7
+    },
+    "apps/web/lib/flags/contracts.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/haptics/native-haptic-bridge.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/hud/detection-coverage.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/images/versioning.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ingestion/flows/profile-operations.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ingestion/flows/profile-processing.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/ingestion/services/avatar-processor.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/investors/answer-loop-certification-shared.ts": {
+      "as-unknown-as": 3
+    },
+    "apps/web/lib/investors/answer-loop-certification.ts": {
+      "as-unknown-as": 4
+    },
+    "apps/web/lib/investors/update-contract.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/keyboard-shortcuts.ts": {
+      "non-null": 12
+    },
+    "apps/web/lib/leads/outreach-batch.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/leads/pageless-lead-profile.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/leads/public-requalification-contract.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/leads/search-evidence.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/leads/sources/beacons-adapter.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/merch/design-generation.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/merch/graphic-engine.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/metrics/revenue-lift-dashboard.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/notifications/audience-alert-state.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/notifications/campaign-scheduling.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/notifications/reputation.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/nuqs/hooks.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/onboarding/presence-build/advance.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/onboarding/profile-draft.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/ovie/certifications/packet-decisions.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/ovie/certifications/prod-golden-path-ledger.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/ovie/certifications/quality-scoreboard-ledger.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/ovie/company-history/contract.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ovie/company-history/daily-metrics.server.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/ovie/company-history/shipping-chart.tsx": {
+      "non-null": 1
+    },
+    "apps/web/lib/ovie/company-history/store.server.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/ovie/conversation-insights.server.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/ovie/fleet-audit.server.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/ovie/fleet-room.server.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/ovie/linear-coordination.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ovie/mcp/authorization-request.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ovie/product-discovery.ts": {
+      "non-null": 8
+    },
+    "apps/web/lib/ovie/shipping-state/publisher.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/ovie/spend-preflight.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/profile-dsps.ts": {
+      "non-null": 6
+    },
+    "apps/web/lib/profile/unclaimed-artist-profile.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/lib/proof-briefs/compose.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/proof-briefs/feed.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/proof-stats/queries.server.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/proof/link-drift.server.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/queries/useAdminSocialLinksQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/queries/useChatConversationQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/queries/useHandleAvailabilityQuery.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/queries/usePublicProfileQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/queries/useSuggestionsQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/queries/useTasksQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/queries/useTourDateAnalyticsQuery.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/readiness/signed-in-auth.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/readiness/signup-onboarding.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/redis-local-client.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/sections/registry.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/sentry/client-full.ts": {
+      "as-unknown-as": 3
+    },
+    "apps/web/lib/seo/guardrail-check.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/seo/page-certification.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/services/album-art/ab-test.ts": {
+      "non-null": 4
+    },
+    "apps/web/lib/services/social-links/queries.ts": {
+      "non-null": 3
+    },
+    "apps/web/lib/smart-link-mvp/create-link.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/spotify/artist-id.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/spotify/env.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/spotify/retry.ts": {
+      "non-null": 1
+    },
+    "apps/web/lib/stripe/customer-sync/queries.ts": {
+      "as-unknown-as": 6
+    },
+    "apps/web/lib/stripe/webhooks/reconciliation.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/submission-agent/providers/xperi-allmusic.ts": {
+      "non-null": 6
+    },
+    "apps/web/lib/submission-agent/service.ts": {
+      "non-null": 2
+    },
+    "apps/web/lib/synthetic/passage-token.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/testing/runtime-trace.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/lib/tracking/consent.ts": {
+      "ts-ignore": 1
+    },
+    "apps/web/lib/wiki/namespace.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/backfill-credit-spotify-ids.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/scripts/chat-performance-environment.ts": {
+      "non-null": 3
+    },
+    "apps/web/scripts/chat-performance-reporter.ts": {
+      "non-null": 2
+    },
+    "apps/web/scripts/check-screenshot-catalog.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/scripts/check-signup-readiness.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/cleanup-test-profiles.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/scripts/design-ci-judge-dispatch.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/scripts/download-current-spotify-images.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/drizzle-migrate-preflight.ts": {
+      "non-null": 2
+    },
+    "apps/web/scripts/drizzle-migrate-verify.ts": {
+      "as-unknown-as": 1,
+      "non-null": 2
+    },
+    "apps/web/scripts/drizzle-migrate.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/drizzle-seed.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/scripts/fetch-current-artist-images.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/flaky-test-detector.ts": {
+      "non-null": 2
+    },
+    "apps/web/scripts/inspect-conversation-title-scope.ts": {
+      "as-unknown-as": 1,
+      "non-null": 2
+    },
+    "apps/web/scripts/lighthouse-exact-target-guard.ts": {
+      "non-null": 2
+    },
+    "apps/web/scripts/linear-compare/compare-dashboards.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/linear-compare/compare-landing-pages.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/linear-compare/extract-linear-tokens.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/m2-revenue-path-canary.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/marketing-factory/visual-review.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/scripts/marketing-media/fal-image-adapter.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/scripts/reenrich-all-artists.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/repair-conversation-titles.ts": {
+      "non-null": 3
+    },
+    "apps/web/scripts/run-interaction-latency-audit.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/seed-demo-account.ts": {
+      "non-null": 2
+    },
+    "apps/web/scripts/seo-ratchet-live-check.ts": {
+      "non-null": 1
+    },
+    "apps/web/scripts/seo-ratchet-live.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/scripts/vitest-phase-timing-reporter.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/e2e/helpers/e2e-helpers.ts": {
+      "non-null": 1,
+      "any": 1
+    },
+    "apps/web/tests/e2e/helpers/golden-path-keyframes.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/e2e/utils/better-auth-account-canary.ts": {
+      "non-null": 2
+    },
+    "apps/web/tests/e2e/utils/dashboard-click-navigation.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/tests/e2e/utils/desktop-update-fixture.ts": {
+      "as-unknown-as": 4
+    },
+    "apps/web/tests/e2e/utils/performance-test-utils.ts": {
+      "any": 1
+    },
+    "apps/web/tests/e2e/utils/production-signup-canary.ts": {
+      "non-null": 1
+    },
+    "apps/web/tests/e2e/utils/profile-mode-history.ts": {
+      "as-unknown-as": 1,
+      "non-null": 2
+    },
+    "apps/web/tests/e2e/utils/profile-overview-columns-admission.ts": {
+      "non-null": 5
+    },
+    "apps/web/tests/e2e/utils/route-dom-layout-shift.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/e2e/utils/shell-rail-controls.ts": {
+      "non-null": 2
+    },
+    "apps/web/tests/e2e/utils/start-entry-layout.ts": {
+      "as-unknown-as": 1,
+      "non-null": 1
+    },
+    "apps/web/tests/eval/promptfoo/jovie-chat-provider.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/fixtures/hud-cockpit.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/fixtures/money-overview.ts": {
+      "non-null": 1
+    },
+    "apps/web/tests/helpers/chat-performance-probe.ts": {
+      "as-unknown-as": 1,
+      "non-null": 1
+    },
+    "apps/web/tests/helpers/profile-cta-fixture-preflight.ts": {
+      "non-null": 1
+    },
+    "apps/web/tests/integration/fixtures/content-publication-certification.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/setup-browser.ts": {
+      "any": 2
+    },
+    "apps/web/tests/setup-db.ts": {
+      "as-unknown-as": 2
+    },
+    "apps/web/tests/test-utils/browser/clipboard-mocks.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/test-utils/db/royalty-database.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/unit/components/molecules/AvatarUploadable.test-utils.tsx": {
+      "any": 1
+    },
+    "apps/web/tests/unit/lib/stripe/webhooks/handlers/subscription-handler.test-utils.ts": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/unit/links/IngestedSuggestions.test-utils.tsx": {
+      "as-unknown-as": 1
+    },
+    "apps/web/tests/utils/lazy-mocks.ts": {
+      "any": 2
+    },
+    "apps/web/tests/utils/public-openapi.ts": {
+      "non-null": 1
+    },
+    "apps/web/tests/visual-qa/route-quality.ts": {
+      "as-unknown-as": 1
+    },
+    "packages/agent-transport-contracts/prediction-outcome.ts": {
+      "non-null": 1
+    },
+    "packages/agent-transport-contracts/prediction-receipt.ts": {
+      "non-null": 1
+    },
+    "packages/api-client/gh.ts": {
+      "non-null": 6
+    },
+    "packages/copy/judge.ts": {
+      "non-null": 1
+    },
+    "packages/release-channel-contracts/dogfood-exposure.ts": {
+      "as-unknown-as": 2
+    },
+    "packages/research/test-fixtures.ts": {
+      "as-unknown-as": 1
+    },
+    "packages/research/wiring.ts": {
+      "non-null": 5
+    },
+    "packages/ui/atoms/common-dropdown-utils.ts": {
+      "non-null": 4
+    },
+    "workers/mesh-hub/src/board.ts": {
+      "non-null": 1
+    },
+    "workers/mesh-hub/src/executor.ts": {
+      "as-unknown-as": 1
+    },
+    "workers/mesh-hub/src/mcp-oauth-service.ts": {
+      "non-null": 1
+    },
+    "workers/observability-ingest/src/audit/index.ts": {
+      "as-unknown-as": 1
+    },
+    "workers/prod-liveness/src/index.ts": {
+      "non-null": 2
+    }
+  }
+}

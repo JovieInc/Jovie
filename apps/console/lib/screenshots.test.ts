@@ -20,8 +20,6 @@ describe('captureWebScreenshot', () => {
     const result = await captureWebScreenshot({
       url: 'https://staging.jov.ie/',
       outputPath: path.join(dir, 'shot.png'),
-      apiToken: undefined,
-      accountId: undefined,
     });
 
     expect(result.ok).toBe(false);

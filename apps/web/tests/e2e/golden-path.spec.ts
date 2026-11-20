@@ -456,11 +456,13 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   });
 }
 
-/** Issued invitation, then visible email-OTP sign-in. E2E mode supplies 424242 for +e2e addresses. */
+/** Visible email-OTP sign-in; seeds invitation only when closed-signup kill switch is on. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
-  const sql = neon(process.env.DATABASE_URL!);
-  await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
+  if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
+    const sql = neon(process.env.DATABASE_URL!);
+    await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
+  }
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
     entryPath: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.START)}`,
@@ -513,9 +515,11 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) throw new Error('DATABASE_URL required for onboarding proof');
 
-  // Mark only this browser as local automation before React initializes so
-  // the anonymous turn bypasses Turnstile without enabling auth bypass.
+  // Mark only this browser as local automation before /start initializes
+  // (both for client-side Link transitions and full navigations) so the
+  // anonymous opener turn bypasses Turnstile without enabling auth bypass.
   await page.addInitScript(installRuntimeAutomationBypass);
+  await page.evaluate(installRuntimeAutomationBypass);
   await page.route('**/api/chat', async route => {
     await route.continue({
       headers: {
@@ -524,7 +528,17 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       },
     });
   });
-  await page.goto('/start', { waitUntil: 'domcontentloaded' });
+  const [openerResponse] = await Promise.all([
+    page.waitForResponse(
+      candidate =>
+        candidate.request().method() === 'POST' &&
+        new URL(candidate.url()).pathname === '/api/chat',
+      { timeout: 60_000 }
+    ),
+    page.getByTestId('homepage-primary-cta').click(),
+  ]);
+  expect(openerResponse.status()).toBe(200);
+  await expect(page).toHaveURL(/\/start\?.*starter_prompt=/);
   await expect
     .poll(
       () =>
@@ -537,6 +551,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     .toBe('1');
   const input = page.locator('[aria-label="Chat message input" i]');
   await expect(input).toBeVisible({ timeout: 30_000 });
+  await expect(input).toBeEditable({ timeout: 60_000 });
   const sendButton = page.getByRole('button', { name: 'Send message' });
   const sendChatMessage = async (text: string) => {
     await fillControlledInputUntilEnabled(input, sendButton, text);

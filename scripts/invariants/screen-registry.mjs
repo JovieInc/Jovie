@@ -30,6 +30,7 @@ web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/develope
 web.proof-methodology|web|proof-methodology|apps/web/app/(marketing)/proof/methodology/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
+web.sentry-example|web|developer-tooling|apps/web/app/sentry-example-page/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
 web.engineering-preview|web|engineering-preview|apps/web/app/(marketing)/engineering/preview/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile

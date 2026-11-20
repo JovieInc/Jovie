@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
@@ -286,10 +287,123 @@ process.stdout.write('${source}\\n${live}\\n');
     expect(step('canonical_waitlist')?.['continue-on-error']).toBe(true);
     expect(step('canonical_revenue')?.['continue-on-error']).toBe(true);
     expect(step('canonical_profile')?.['continue-on-error']).toBe(true);
+    expect(step('canonical_navigation')?.['continue-on-error']).toBe(true);
+    expect(step('visual_review')?.['continue-on-error']).toBeFalsy();
     expect(step('canonical_certification')?.['continue-on-error']).toBeFalsy();
-    expect(step('canonical_certification')?.if).toBe(
-      '${{ always() && !cancelled() }}'
+    for (const stepId of [
+      'canonical_revenue',
+      'canonical_claim_contract',
+      'canonical_waitlist',
+      'canonical_profile',
+      'canonical_navigation',
+      'canonical_certification',
+    ]) {
+      expect(
+        step(stepId)?.if,
+        `${stepId} must run after visual_review failure`
+      ).toBe('${{ always() && !cancelled() }}');
+    }
+  });
+
+  it('records all 5 canonical evidence steps and certificate writer after visual_review exits 1 while keeping job failure gating intact', () => {
+    const steps = parsedCi.jobs['ci-golden-path']?.steps ?? [];
+    const evalStepIf = (
+      rawIf: string | undefined,
+      state: { readonly jobFailed: boolean; readonly isCancelled: boolean }
+    ): boolean => {
+      if (!rawIf) return !state.jobFailed && !state.isCancelled;
+      const expr = rawIf
+        .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+        .replace(/\b(steps|needs)\.([\w-]+)/g, '$1["$2"]');
+      return Boolean(
+        runInNewContext(expr, {
+          always: () => true,
+          cancelled: () => state.isCancelled,
+          failure: () => state.jobFailed && !state.isCancelled,
+          success: () => !state.jobFailed && !state.isCancelled,
+          steps: {
+            canonical_journey: { outcome: 'success' },
+            'neon-branch': { outputs: { branch_id: '' } },
+          },
+          needs: {
+            'ci-path-changes': { outputs: { golden_path_no_ui_diff: 'false' } },
+            'neon-db': { result: 'success' },
+          },
+          hashFiles: () => 'hash',
+        })
+      );
+    };
+
+    const simulateJobAfterJourney = (
+      outcomesById: Record<string, 'success' | 'failure'>,
+      isCancelled = false
+    ) => {
+      const startIndex = steps.findIndex(s => s.id === 'canonical_journey');
+      expect(startIndex).toBeGreaterThan(-1);
+      let jobFailed = false;
+      const executedIds: string[] = [];
+      for (const candidate of steps.slice(startIndex)) {
+        if (!evalStepIf(candidate.if, { jobFailed, isCancelled })) continue;
+        if (candidate.id) executedIds.push(candidate.id);
+        const outcome =
+          (candidate.id && outcomesById[candidate.id]) ?? 'success';
+        if (outcome === 'failure' && candidate['continue-on-error'] !== true) {
+          jobFailed = true;
+        }
+      }
+      return {
+        executedIds,
+        conclusion: isCancelled
+          ? 'cancelled'
+          : jobFailed
+            ? 'failure'
+            : 'success',
+      };
+    };
+
+    // Regression for run 44680980672: visual_review exited 1, and all 5
+    // canonical evidence steps + canonical_certification must still run while
+    // the job conclusion stays failure even if certification itself exits 0.
+    const visualFailureRun = simulateJobAfterJourney({
+      canonical_journey: 'success',
+      visual_review: 'failure',
+      canonical_certification: 'success',
+    });
+    expect(visualFailureRun.executedIds).toEqual(
+      expect.arrayContaining([
+        'canonical_journey',
+        'visual_review',
+        'canonical_revenue',
+        'canonical_claim_contract',
+        'canonical_waitlist',
+        'canonical_profile',
+        'canonical_navigation',
+        'canonical_certification',
+      ])
     );
+    expect(visualFailureRun.conclusion).toBe('failure');
+
+    // Conversely, if visual_review passes and canonical_certification fails,
+    // the job conclusion still fails.
+    const certFailureRun = simulateJobAfterJourney({
+      canonical_journey: 'success',
+      visual_review: 'success',
+      canonical_certification: 'failure',
+    });
+    expect(certFailureRun.conclusion).toBe('failure');
+
+    // Cancelled runs must skip the canonical evidence probes and writer.
+    const cancelledRun = simulateJobAfterJourney({}, true);
+    for (const stepId of [
+      'canonical_revenue',
+      'canonical_claim_contract',
+      'canonical_waitlist',
+      'canonical_profile',
+      'canonical_navigation',
+      'canonical_certification',
+    ]) {
+      expect(cancelledRun.executedIds).not.toContain(stepId);
+    }
   });
 
   it('still certifies when the shared database lane fails (JOV-8614)', () => {

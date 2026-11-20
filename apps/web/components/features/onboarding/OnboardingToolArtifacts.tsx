@@ -461,30 +461,25 @@ export function OnboardingSpotifyArtistPickerCard({
               </span>
             </span>
             {hasQuery ? (
-              <button
+              <Button
                 type='button'
+                variant='secondary'
+                size='sm'
                 onClick={() => searchImmediate(query.trim())}
                 disabled={disabled}
-                className='mt-0.5 shrink-0 rounded-full border border-subtle px-2 py-0.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none disabled:opacity-50'
+                className='shrink-0'
               >
                 Retry
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
 
-        {!isSearching &&
-        !artistSearch.error &&
-        hasQuery &&
-        results.length === 0 ? (
+        {!isSearching && !artistSearch.error && results.length === 0 ? (
           <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
-            No exact match yet. Try the artist name from Spotify.
-          </div>
-        ) : null}
-
-        {!isSearching && !hasQuery ? (
-          <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
-            Start with the artist name as it appears on Spotify.
+            {hasQuery
+              ? 'No exact match yet. Try the artist name from Spotify.'
+              : 'Start with the artist name as it appears on Spotify.'}
           </div>
         ) : null}
 

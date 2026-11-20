@@ -43,6 +43,8 @@ from fix_red_source_edits import (  # noqa: F401
 )
 from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
 from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
+from fix_red_missing_contract import ACTION as DROP_MISSING_CONTRACT, hit as missing_contract_hit
+import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -52,7 +54,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SP
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win", "split-size-500")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR, DROP_MISSING_CONTRACT})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -206,7 +208,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch, or an empty failure list whose base tip moved, is `stale-branch`."""
     logs = logs or {}
-    import cert_stub_sync, detached_native_sync
+    import cert_stub_sync, detached_native_sync, fix_red_measured_win
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
@@ -214,8 +216,11 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         hit = fix_red_size_split.legacy_hit(text, hit)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
-            hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+            import fix_red_win_envelope
+            hit = fix_red_win_envelope.route(text)
+        hit = fix_red_measured_win.annotated_win_hit(text, hit)
+        per_check.append(missing_contract_hit(text) or detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+    per_check = fix_red_measured_win.promote_sole_win(per_check, names, logs)
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
@@ -647,9 +652,10 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     return text + "\n"
 
 
-def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace hunks that are one identifier list or one quoted pytest path list.
-    None when any hunk has another shape, so the caller leaves that merge to a model."""
+def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str | None:
+    """Replace identifier lists, quoted pytest path lists, or base-proven
+    additive named Node imports. None when any hunk has another shape, so the
+    caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -660,7 +666,13 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").merge_pytest_file_list(hunk.group("ours"), hunk.group("theirs"))
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None and base:
+            merged = fix_red_node_imports.merge_additive_node_imports(
+                hunk.group("ours"), hunk.group("theirs"), base)
+        if merged is None:
+            merged = __import__("fix_red_conflict_resolvers").merge_pytest_file_list(
+                hunk.group("ours"), hunk.group("theirs"))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

@@ -178,7 +178,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
     ).toEqual([]);
     expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
-      new Set(['/start'])
+      new Set([claim.href])
     );
   });
 

@@ -3561,12 +3561,13 @@ function getAuthReturnProtocolClientArgs():
     readonly defaultApp?: boolean;
   };
 
+  const devScriptArg = process.argv[1];
   if (
     defaultAppProcess.defaultApp &&
-    process.argv.length >= 2 &&
+    devScriptArg !== undefined &&
     !app.isPackaged
   ) {
-    return [process.execPath, [path.resolve(process.argv[1])]];
+    return [process.execPath, [path.resolve(devScriptArg)]];
   }
   return null;
 }

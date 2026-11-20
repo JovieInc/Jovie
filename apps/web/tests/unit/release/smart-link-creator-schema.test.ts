@@ -64,6 +64,7 @@ describe('smart-link creator schema compatibility', () => {
         usernameNormalized: 'dualipa',
         avatarUrl: null,
         settings: {},
+        isPublic: true,
       },
     ]);
 
@@ -91,6 +92,7 @@ describe('smart-link creator schema compatibility', () => {
         usernameNormalized: 'dualipa',
         avatarUrl: null,
         settings: {},
+        isPublic: true,
         isClaimed: false,
       },
     ]);
@@ -118,6 +120,7 @@ describe('smart-link creator schema compatibility', () => {
         usernameNormalized: 'dualipa',
         avatarUrl: null,
         settings: {},
+        isPublic: true,
         isClaimed: true,
       },
     ]);

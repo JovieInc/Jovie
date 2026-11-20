@@ -36,6 +36,9 @@ on:
       - 'apps/web/app/api/stripe/**'
       - 'apps/web/app/api/webhooks/**'
       - 'apps/web/components/features/dashboard/dashboard-nav/**'
+      - 'apps/web/lib/acquisition/eligibility-cache.ts'
+      - 'apps/web/lib/acquisition/eligibility.server.ts'
+      - 'apps/web/lib/acquisition/eligibility.ts'
       - 'apps/web/lib/app-shell/**'
       - 'apps/web/lib/auth/**'
       - 'apps/web/lib/billing/**'
@@ -43,6 +46,7 @@ on:
       - 'apps/web/lib/cron/auth.ts'
       - 'apps/web/lib/entitlements/**'
       - 'apps/web/lib/idempotency.ts'
+      - 'apps/web/lib/ovie/certifications/**'
       - 'apps/web/lib/stripe/**'
       - 'apps/web/proxy.ts'
       # Model registry change: re-arm the top-touch modules (a better model writes better tests).

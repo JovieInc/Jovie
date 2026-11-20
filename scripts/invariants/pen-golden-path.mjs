@@ -40,14 +40,112 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateManifest } from './pen-still-diff.mjs';
 
 // 0.3.10 rejects .pen format 2.21; 0.3.14 exports it (lead session, 2026-11-08).
 export const PEN_CLI_VERSION = '0.3.14';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
+export const BRIEF_DIR = 'docs/design-system/pen-briefs';
+export const GOLDEN_PATH_SURFACES = Object.freeze([
+  'landing',
+  'signup-signin',
+  'claim',
+  'onboarding',
+  'chat',
+  'public-profile',
+  'smartlink',
+  'checkout',
+]);
 // Bump when the export script or PNG naming changes, so old caches miss.
 export const EXPORT_CACHE_SCHEMA = 1;
 export const EXPORT_KEY_FILE = '.export-key';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** True when a Golden Path route redirects strangers to /signin unless authenticated. */
+export function isProtectedGoldenPathRoute(route) {
+  if (typeof route !== 'string') return false;
+  return (
+    route === '/app' ||
+    route.startsWith('/app/') ||
+    route === '/billing' ||
+    route.startsWith('/billing/') ||
+    route.startsWith('/onboarding/checkout') ||
+    route === '/admin' ||
+    route.startsWith('/admin/')
+  );
+}
+
+/**
+ * Closed-loop Golden Path manifest invariant: fails closed in preflight/CI on
+ * missing routes, unmapped Golden Path surfaces, protected routes missing
+ * `auth: "required"`, or `pending-*` frames missing an authored Pen brief.
+ * @param {any} manifest
+ * @param {{ root?: string, surfaceIds?: readonly string[] }} [options]
+ */
+export function validateGoldenPathManifest(
+  manifest,
+  { root = REPO_ROOT, surfaceIds = GOLDEN_PATH_SURFACES } = {}
+) {
+  const base = validateManifest(manifest);
+  const errors = base.ok ? [] : [...base.errors];
+  const allowedSurfaces = new Set(surfaceIds);
+  const activeBySurface = new Map(surfaceIds.map(id => [id, 0]));
+
+  for (const [index, frame] of (manifest?.frames ?? []).entries()) {
+    if (!frame || typeof frame !== 'object') continue;
+    const label = `frames[${index}] (${frame.sectionId ?? 'unknown'})`;
+    const parts = String(frame.sectionId ?? '').split('/');
+    const [surface, screen] = parts;
+    if (parts.length !== 2 || !surface || !screen) {
+      errors.push(`${label}: sectionId must be <surface>/<screen>`);
+      continue;
+    }
+    if (!allowedSurfaces.has(surface)) {
+      errors.push(`${label}: unknown Golden Path surface "${surface}"`);
+    }
+    if (frame.status !== 'active') continue;
+    if (activeBySurface.has(surface)) {
+      activeBySurface.set(surface, (activeBySurface.get(surface) ?? 0) + 1);
+    }
+    if (
+      typeof frame.route !== 'string' ||
+      !frame.route.startsWith('/') ||
+      frame.route.includes('[')
+    ) {
+      errors.push(
+        `${label}: active Golden Path frame must have a concrete route starting with "/"`
+      );
+    } else if (
+      isProtectedGoldenPathRoute(frame.route) &&
+      frame.auth !== 'required'
+    ) {
+      errors.push(
+        `${label}: protected route "${frame.route}" must set auth: "required"`
+      );
+    }
+    if (String(frame.penNodeId).startsWith('pending')) {
+      const briefPath = join(root, BRIEF_DIR, `${screen}.md`);
+      if (!existsSync(briefPath)) {
+        errors.push(
+          `${label}: pending Pen frame requires brief ${BRIEF_DIR}/${screen}.md`
+        );
+      }
+    }
+  }
+
+  for (const surface of surfaceIds) {
+    if ((activeBySurface.get(surface) ?? 0) === 0) {
+      errors.push(
+        `Golden Path surface "${surface}" has no active Pen frame in ${MANIFEST}`
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Invalid Golden Path Pen manifest:\n${errors.join('\n')}`);
+  }
+  return manifest;
+}
 
 /** Frames that have a Pen design (a real node id), in manifest order. */
 export function designedFrames(manifest) {
@@ -149,13 +247,43 @@ async function fetchPenSource({ out, env, run, fetchImpl }) {
 }
 
 /**
+ * Install the Playwright Chromium browser pen-still-diff captures with.
+ * `--with-deps` shells out to apt, which 503s during Ubuntu mirror outages
+ * (2026-11-19, run 44519990567). Each retry re-runs apt's own internal
+ * fetch retries, so the attempts are naturally spaced; after the last one
+ * the error still propagates and the probe fails red.
+ */
+export async function installPlaywrightBrowser({ root, run, log }) {
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      run(
+        'pnpm',
+        ['exec', 'playwright', 'install', '--with-deps', 'chromium'],
+        { cwd: root, stdio: 'inherit' }
+      );
+      return;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      log(
+        `playwright install failed (attempt ${attempt}/${attempts}): ${
+          error?.message ?? error
+        }; retrying`
+      );
+    }
+  }
+}
+
+/**
  * `report` gets each workflow output as soon as it is known, so an export
  * that finished still reports itself when the diff after it throws.
- * @param {{ out: string, baseUrl?: string, env?: NodeJS.ProcessEnv, root?: string, run?: typeof defaultRun, fetchImpl?: typeof fetch, log?: (line: string) => void, fetchOnly?: boolean, report?: (name: string, value: string) => void }} options
+ * @param {{ out: string, baseUrl?: string, storageState?: string, surfaceIds?: readonly string[], env?: NodeJS.ProcessEnv, root?: string, run?: typeof defaultRun, fetchImpl?: typeof fetch, log?: (line: string) => void, fetchOnly?: boolean, report?: (name: string, value: string) => void }} options
  */
 export async function runGoldenPathPen({
   out,
   baseUrl = 'https://jov.ie',
+  storageState,
+  surfaceIds = GOLDEN_PATH_SURFACES,
   env = process.env,
   root = REPO_ROOT,
   run = defaultRun,
@@ -166,8 +294,11 @@ export async function runGoldenPathPen({
 }) {
   mkdirSync(out, { recursive: true });
   const manifest = JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'));
+  validateGoldenPathManifest(manifest, { root, surfaceIds });
   const frames = designedFrames(manifest);
-  const undesigned = manifest.frames.filter(f => !frames.includes(f));
+  const undesigned = manifest.frames.filter(
+    f => f.status === 'active' && !frames.includes(f)
+  );
   for (const f of undesigned)
     log(`no Pen design: ${f.sectionId} ${f.route ?? ''}`);
   const missing = ['PEN_CLI_KEY', 'PEN_GOLDEN_PATH_FILE_URL'].filter(
@@ -249,10 +380,11 @@ export async function runGoldenPathPen({
   report('export_cacheable', String(cacheable));
   if (exported.length) {
     // pen-still-diff captures production with Playwright's Chromium.
-    run('pnpm', ['exec', 'playwright', 'install', '--with-deps', 'chromium'], {
-      cwd: root,
-      stdio: 'inherit',
-    });
+    // --with-deps shells out to apt, which fails with 503s during Ubuntu
+    // mirror outages (2026-11-19, run 44519990567). Retry a bounded number
+    // of times — each attempt re-runs apt's own fetch retries — and still
+    // fail red if the browser never installs.
+    await installPlaywrightBrowser({ root, run, log });
     run(
       'node',
       [
@@ -263,6 +395,7 @@ export async function runGoldenPathPen({
         out,
         '--base-url',
         baseUrl,
+        ...(storageState ? ['--storage-state', storageState] : []),
         '--strict',
       ],
       { cwd: root, stdio: 'inherit' }
@@ -284,18 +417,30 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const i = argv.indexOf(`--${name}`);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  if (argv.includes('--validate-only')) {
+    const manifest = JSON.parse(
+      readFileSync(join(REPO_ROOT, MANIFEST), 'utf8')
+    );
+    validateGoldenPathManifest(manifest, { root: REPO_ROOT });
+    process.stdout.write(
+      `Golden Path Pen manifest valid (${manifest.frames.length} frames).\n`
+    );
+    process.exit(0);
+  }
   const out = arg('out');
   if (!out) {
     process.stderr.write(
-      'usage: pen-golden-path.mjs --out DIR [--base-url URL] [--fetch-only] [--github-output FILE]\n'
+      'usage: pen-golden-path.mjs --out DIR [--base-url URL] [--storage-state FILE] [--fetch-only] [--validate-only] [--github-output FILE]\n'
     );
     process.exit(64);
   }
   const githubOutput = arg('github-output');
+  const storageState = arg('storage-state');
   try {
     await runGoldenPathPen({
       out: resolve(out),
       baseUrl: arg('base-url'),
+      storageState: storageState ? resolve(storageState) : undefined,
       fetchOnly: argv.includes('--fetch-only'),
       report: (name, value) => {
         if (githubOutput) appendFileSync(githubOutput, `${name}=${value}\n`);
