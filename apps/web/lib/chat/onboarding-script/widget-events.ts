@@ -89,6 +89,24 @@ export function isIncompleteAdvanceMessage(text: string): boolean {
   return INCOMPLETE_ACK_PATTERN.test(trimmed);
 }
 
+/**
+ * Free-text that means “lock in the shown handle” while Confirm Handle is
+ * visible. Live walk (2026-11-20): visitors type claim / sign me up and miss
+ * the primary button; the engine re-ran handle-checking copy.
+ *
+ * Acks (“ok” / “k”) stay non-advancing. Bare typed handles still swap/check.
+ */
+const HANDLE_CONFIRM_INTENT_PATTERN =
+  /^(?:i\s+(?:want\s+to|wanna)\s+)?(?:claim(?:\s+(?:it|this|my(?:\s+(?:handle|profile|page))?))?|sign(?:\s+me)?\s*[-]?\s*up|confirm(?:\s+(?:it|handle|this))?|lock(?:\s+it(?:\s+in)?)?|take\s+it|use\s+(?:this|it)|that'?s\s+(?:me|fine)|this\s+(?:one|is\s+(?:fine|good)))(?:\s+please)?$/i;
+
+export function isHandleConfirmIntent(text: string): boolean {
+  const trimmed = text.replaceAll(/\s+/g, ' ').trim();
+  if (!trimmed || isIncompleteAdvanceMessage(trimmed)) return false;
+  const core = trimmed.replace(/[.!]+$/g, '').trim();
+  if (!core) return false;
+  return HANDLE_CONFIRM_INTENT_PATTERN.test(core);
+}
+
 /** Minimum length for free-text waitlist intake answers on required steps. */
 export const MIN_MEANINGFUL_INTAKE_ANSWER_LENGTH = 2;
 
