@@ -930,8 +930,18 @@ jobs:
             # Keep the tools outside its checkout so the merged guard transaction
             # can add the same paths without an untracked-file merge conflict.
             tool_root="$(mktemp -d "$RUNNER_TEMP/mq-parity-tools.XXXXXX")"
-            git archive "origin/$BASE_REF" scripts/ci/mq-parity-scope.mjs \
-              scripts/lib/ci-repo-lanes.mjs | tar -x -C "$tool_root"
+            if git cat-file -e "origin/$BASE_REF:scripts/ci/mq-parity-scope.mjs" \
+              && git cat-file -e "origin/$BASE_REF:scripts/lib/ci-repo-lanes.mjs"; then
+              git archive "origin/$BASE_REF" scripts/ci/mq-parity-scope.mjs \
+                scripts/lib/ci-repo-lanes.mjs | tar -x -C "$tool_root"
+            else
+              # Base predates the tools (or paths were removed). Do not hard-fail
+              # the unit job — skip the twin until base carries the policy.
+              echo "::warning::MQ parity tools absent on origin/$BASE_REF; typecheck twin skipped."
+              mkdir -p "$tool_root/scripts/ci"
+              printf '%s\n' "console.log('typecheck=false')" \
+                >"$tool_root/scripts/ci/mq-parity-scope.mjs"
+            fi
           fi
           echo "root=$tool_root" >> "$GITHUB_OUTPUT"
           echo "MQ_PARITY_TOOLS_ROOT=$tool_root" >> "$GITHUB_ENV"

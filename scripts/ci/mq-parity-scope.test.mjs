@@ -118,6 +118,58 @@ test('older PR heads load new parity tools from trusted base without dirtying th
   }
 });
 
+test('older PR heads skip the twin when base also lacks MQ parity tools', () => {
+  const root = resolve(import.meta.dirname, '../..');
+  const workflow = load(
+    readFileSync(join(root, '.github/workflows/source-validation.yml'), 'utf8')
+  );
+  const command = workflow.jobs.unit.steps.find(
+    step => step.name === 'Resolve MQ parity tools for older source heads'
+  ).run;
+  const dir = mkdtempSync(join(tmpdir(), 'mq-parity-missing-base-'));
+  const repo = join(dir, 'source');
+  mkdirSync(repo);
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    git('init', '-q');
+    git('config', 'user.name', 'CI Fixture');
+    git('config', 'user.email', 'ci@example.invalid');
+    writeFileSync(join(repo, 'old.txt'), 'old source');
+    git('add', '.');
+    git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'old source');
+    const old = git('rev-parse', 'HEAD');
+    git('update-ref', 'refs/remotes/origin/main', old);
+    git('checkout', '-q', '--detach', old);
+    const output = join(dir, 'outputs');
+    const result = spawnSync('/bin/bash', ['-c', command], {
+      cwd: repo,
+      encoding: 'utf8',
+      timeout: 5_000,
+      env: {
+        ...process.env,
+        GITHUB_WORKSPACE: repo,
+        RUNNER_TEMP: dir,
+        GITHUB_OUTPUT: output,
+        GITHUB_ENV: join(dir, 'env'),
+        BASE_REF: 'main',
+      },
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr + result.stdout, /MQ parity tools absent/);
+    const toolRoot = readFileSync(output, 'utf8').trim().slice('root='.length);
+    const scope = spawnSync(
+      process.execPath,
+      [join(toolRoot, 'scripts/ci/mq-parity-scope.mjs'), old],
+      { cwd: repo, encoding: 'utf8', timeout: 5_000 }
+    );
+    assert.equal(scope.status, 0, scope.stdout + scope.stderr);
+    assert.match(scope.stdout, /typecheck=false/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('queue parity policy maps ci-fast-typecheck to the source twin', () => {
   const policy = JSON.parse(
     readFileSync(
