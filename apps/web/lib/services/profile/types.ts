@@ -83,6 +83,7 @@ export type ProfileWithUser = ProfileData & {
   userClerkId: string | null;
   userEmail: string | null;
   userPlan: string | null;
+  userTrialEndsAt?: Date | null;
 };
 
 /**

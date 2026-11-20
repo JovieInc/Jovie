@@ -7579,6 +7579,7 @@ jobs:
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/canonical-artist-site/m2-receipt.json
@@ -7586,16 +7587,19 @@ jobs:
 
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
 
       - name: Verify waitlist admission
         id: canonical_waitlist
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
@@ -7604,6 +7608,7 @@ jobs:
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie

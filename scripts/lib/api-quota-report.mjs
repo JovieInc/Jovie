@@ -19,6 +19,10 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
+import { collectTally, summarizeTally } from './api-quota-tally.mjs';
+
+export { parseTallyNotice, summarizeTally } from './api-quota-tally.mjs';
+
 const REPOSITORY = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const NOTICE =
   /bucket=(github-token|jovie-bot) remaining=(\d+) limit=(\d+) used=(\d+) reset=(\d+) at=(\d+)/;
@@ -297,6 +301,62 @@ function drain(argv) {
   if (alerts.length) process.exitCode = 3;
 }
 
+function tallyJson(path) {
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        'packages/api-client/cli.ts',
+        'gh',
+        '--priority',
+        'report',
+        '--once',
+        '--',
+        'api',
+        path,
+      ],
+      {
+        cwd: new URL('../../', import.meta.url),
+        encoding: 'utf8',
+        timeout: 15_000,
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    )
+  );
+}
+
+function tally(argv) {
+  const { hours, records, complete, reason, reads } = collectTally(
+    argv,
+    tallyJson
+  );
+  const rows = complete ? summarizeTally(records, hours) : [];
+  if (argv.includes('--json')) {
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-gh-call-tally/v1',
+        complete,
+        reason,
+        reads,
+        generatedAt: new Date().toISOString(),
+        hours,
+        rows,
+      })
+    );
+    return;
+  }
+  if (!complete) {
+    console.log(`gh tally incomplete: ${reason}; reads=${reads}`);
+    return;
+  }
+  for (const row of rows)
+    console.log(
+      `${row.key.padEnd(52)} runs=${row.runs} calls=${row.calls} github.token=${row.githubToken} (${row.githubTokenPerRun}/run, ${row.githubTokenPerHour}/h) other=${row.other}`
+    );
+  if (rows.length === 0) console.log('no gh-tally notices in window');
+}
+
 function admission(argv) {
   const count = flag(argv, 'runs', 40);
   const runs = ghJson(
@@ -322,9 +382,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   else if (command === 'headroom') headroom(rest);
   else if (command === 'admission') admission(rest);
   else if (command === 'drain') drain(rest);
+  else if (command === 'tally') tally(rest);
   else {
     console.error(
-      'usage: api-quota-report.mjs quota|headroom|drain|admission [--hours N] [--runs N]'
+      'usage: api-quota-report.mjs quota|headroom|drain|tally|admission [--hours N] [--runs N]'
     );
     process.exit(2);
   }

@@ -248,6 +248,7 @@ export function missingBrowserChecks({
   now,
   capabilities = null,
   producerSourceSha = null,
+  servedSha = null,
 }) {
   const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
   const at = now();
@@ -257,6 +258,9 @@ export function missingBrowserChecks({
       : capabilities
         ? new Set(capabilities)
         : null;
+  const sameBuild = Boolean(
+    servedSha && producerSourceSha && servedSha === producerSourceSha
+  );
   return expected
     .filter(id => !present.some(c => c.id === id))
     .map(id => ({
@@ -266,11 +270,13 @@ export function missingBrowserChecks({
       endedAt: at,
       summary:
         declared && !declared.has(id)
-          ? `served build predates browser check ${id} (its auth smoke does not implement it${
-              producerSourceSha
-                ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
-                : ''
-            }); certifies once production is promoted past it`
+          ? sameBuild
+            ? `auth smoke at ${servedSha.slice(0, 8)} does not declare browser check ${id} (missing producer implementation, not deploy skew)`
+            : `served build predates browser check ${id} (its auth smoke does not implement it${
+                producerSourceSha
+                  ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
+                  : ''
+              }); certifies once production is promoted past it`
           : authStatus === 'not-configured'
             ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
             : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,

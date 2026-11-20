@@ -1194,6 +1194,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/release-lag-check.test.mjs',
   'scripts/production-controller-read-token.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
+  'scripts/lib/__tests__/gh-call-tally.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
   'scripts/lib/__tests__/fleet-rules-verdict-retry.test.mjs',

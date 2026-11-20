@@ -49,6 +49,20 @@ test('injected and stubbed transports produce no hits', () => {
   );
 });
 
+test('a new gh subprocess names its fix; a path shim is hermetic', () => {
+  const live = "spawnSync('gh', ['api', 'repos/x/y']);\n";
+  const path = 'scripts/lib/__tests__/new-live.test.mjs';
+  const errors = checkGuard({ [path]: scanSource(path, live) }, {});
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /inject a fake execute\/api function/);
+  assert.doesNotMatch(errors[0], /Fix: undefined/);
+  const hermetic = "spawnSync(join(bin, 'gh'), ['pr', 'view', '1']);\n";
+  assert.deepEqual(
+    scanSource('scripts/lib/__tests__/hermetic-shim.test.mjs', hermetic),
+    {}
+  );
+});
+
 test('growth fails, equal passes, shrink never fails', () => {
   const found = { 'a.test.mjs': { 'provider-host': { count: 2, lines: [1] } } };
   assert.equal(
