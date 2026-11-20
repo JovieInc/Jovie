@@ -106,7 +106,7 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
         },
       } as unknown as Stripe.Event,
       stripeEventId: 'evt_dup',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: new Date('2026-11-20T05:00:00Z'),
     });
 
     expect(res.skipped).toBe(true);
