@@ -534,13 +534,25 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
     `${GITHUB_API}/repos/${GITHUB_REPO}/releases/latest`,
     fetchImpl
   );
-  const staging = await githubJson(
-    `${GITHUB_API}/repos/${GITHUB_REPO}/releases/tags/${STAGING_DESKTOP_RELEASE_TAG}`,
-    fetchImpl
-  ).catch(() => null);
+  let staging = null;
+  /** @type {string | null} */
+  let stagingObservationError = null;
+  try {
+    staging = await githubJson(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/releases/tags/${STAGING_DESKTOP_RELEASE_TAG}`,
+      fetchImpl
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // 404 = release absent (missing). Anything else is incomplete observation.
+    if (!/\b404\b/.test(message)) {
+      stagingObservationError = message;
+    }
+  }
   return {
     production: await shippedVersion(production, 'production', fetchImpl),
     staging: await shippedVersion(staging, 'staging', fetchImpl),
+    stagingObservationError,
   };
 }
 

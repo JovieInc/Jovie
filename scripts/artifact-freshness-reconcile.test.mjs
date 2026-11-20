@@ -248,6 +248,112 @@ test('known verified production certified allows Summer resolve when receipt is 
   assert.equal(canResolveSummerForFreshness(receipt), true);
 });
 
+test('staging observation error is unknown, not published-missing', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+      staging: {
+        version: null,
+        publishedAt: null,
+        sourceRevision: null,
+        publicationIdentityVerified: false,
+        publicationError: null,
+      },
+      stagingObservationError: 'GitHub 503 for staging release',
+    },
+    certified: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      verified: true,
+      at: '2026-11-20T00:00:00Z',
+    },
+    desktopRelevant: false,
+  });
+  const staging = receipt.channels.find(c => c.channel === 'staging');
+  assert.equal(staging?.stages.published.status, 'unknown');
+  assert.equal(
+    staging?.mismatches.some(m => m.code === 'published-missing'),
+    false
+  );
+  assert.equal(
+    receipt.pageSummer.some(
+      m => m.channel === 'staging' && m.code === 'published-missing'
+    ),
+    false
+  );
+});
+
+test('staging 404-style missing still pages published-missing', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+      staging: {
+        version: null,
+        publishedAt: null,
+        sourceRevision: null,
+        publicationIdentityVerified: false,
+        publicationError: null,
+      },
+      stagingObservationError: null,
+    },
+    certified: { status: 'unknown', reason: 'staging uses rolling tag' },
+    desktopRelevant: false,
+  });
+  assert.equal(
+    receipt.pageSummer.some(
+      m => m.channel === 'staging' && m.code === 'published-missing'
+    ),
+    true
+  );
+});
+
+test('pageSummerForFreshness keeps empty-string spacers in the Linear description', async () => {
+  const calls = [];
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: false,
+        publicationError: 'feed digest mismatch',
+      },
+      staging: {
+        version: null,
+        publishedAt: null,
+        sourceRevision: null,
+        publicationIdentityVerified: false,
+        publicationError: null,
+      },
+    },
+    certified: { status: 'unknown', reason: 'skipped' },
+    desktopRelevant: false,
+  });
+  await pageSummerForFreshness({
+    receipt,
+    sourceUrl: 'https://example.test/run',
+    apiKey: 'test-key',
+    upsert: async args => {
+      calls.push(args);
+      return { ok: true, action: 'created', identifier: 'JOV-1' };
+    },
+  });
+  assert.match(calls[0].description, /\n\n## Done when\n/);
+  assert.doesNotMatch(calls[0].description, /heartbeat\.## Done when/);
+});
+
 test('null desktop relevance with differing SHAs blocks Summer resolve without paging', async () => {
   const receipt = await collectArtifactFreshness({
     shipped: {

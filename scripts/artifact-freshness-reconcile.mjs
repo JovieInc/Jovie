@@ -204,6 +204,27 @@ export async function collectArtifactFreshness(input = {}) {
   const channels = [];
   for (const channel of /** @type {const} */ (['production', 'staging'])) {
     const published = shipped[channel];
+    const stagingObservationError =
+      channel === 'staging' ? (shipped.stagingObservationError ?? null) : null;
+    // Transient staging fetch failures must not look like published-missing.
+    if (stagingObservationError && !published?.version) {
+      channels.push(
+        reconcileArtifactFreshness({
+          channel,
+          certified: { status: 'unknown', reason: 'staging uses rolling tag' },
+          published: {
+            status: 'unknown',
+            reason: `${channel}: ${stagingObservationError}`,
+          },
+          feed: {
+            status: 'unknown',
+            reason: `${channel}: ${stagingObservationError}`,
+          },
+          desktopRelevantSincePublished: false,
+        })
+      );
+      continue;
+    }
     const publishedStage = published?.version
       ? {
           status: 'known',
@@ -305,7 +326,7 @@ export async function pageSummerForFreshness(input) {
       '',
       `Fingerprint: ${ARTIFACT_FRESHNESS_KEY}`,
     ]
-      .filter(Boolean)
+      .filter(line => line != null)
       .join('\n'),
     priority: 2,
     createStateName: 'Todo',
