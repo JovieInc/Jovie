@@ -194,6 +194,7 @@ nodes:
       - iOS CI
       - Mac CI
       - Component Certificate
+      - desktop-dogfood
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Main Red Eject
@@ -401,6 +402,18 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
+    jobCount: 2
+  - name: desktop-dogfood
+    path: .github/workflows/desktop-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:publish
     jobCount: 2
   - name: desktop-release
     path: .github/workflows/desktop-release.yml
@@ -1741,6 +1754,9 @@ edges:
     type: workflow_run
   - from: Source Validation
     to: Dependabot Pin Sync
+    type: workflow_run
+  - from: CI
+    to: desktop-dogfood
     type: workflow_run
   - from: Production Controller
     to: desktop-release
