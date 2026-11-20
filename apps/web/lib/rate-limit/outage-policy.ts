@@ -145,6 +145,8 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   inspectPressSourceHourly: advisoryDeny,
 
   navigationTelemetry: optionalDrop,
+  // Durable Redis (requireRedis) + caller drop on outage — never memory
+  // fallback and never mislabel an outage as quota 429 (SEC-04).
   trackingClicks: optionalDrop,
   trackingVisits: optionalDrop,
   trackingIpClicks: optionalDrop,
