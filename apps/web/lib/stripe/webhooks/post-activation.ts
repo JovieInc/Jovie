@@ -28,6 +28,24 @@ export function canCompleteIdempotentPostEffects(result: {
   );
 }
 
+/**
+ * Invoice-keyed referral commission is unique on `stripeInvoiceId`, so it is
+ * safe when billing sync loses an out-of-order race (`stale_event`). A newer
+ * subscription event already won entitlements; this invoice still needs its
+ * commission row. Do not broaden canCompleteIdempotentPostEffects for stale
+ * events — analytics and non-idempotent notifications stay gated there.
+ */
+export function canRecordInvoiceKeyedCommission(result: {
+  readonly success: boolean;
+  readonly skipped?: boolean;
+  readonly skipReason?: BillingSkipReason;
+}): boolean {
+  return (
+    canCompleteIdempotentPostEffects(result) ||
+    (result.success && result.skipReason === 'stale_event')
+  );
+}
+
 async function tryActivateReferral(appUserId: string): Promise<void> {
   try {
     await activateReferral(appUserId);

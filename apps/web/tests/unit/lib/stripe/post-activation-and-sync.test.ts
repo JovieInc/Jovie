@@ -114,6 +114,24 @@ describe('post-activation side effects & subscription replacement guard', () => 
       })
     ).toBe(false);
 
+    const { canRecordInvoiceKeyedCommission } = await import(
+      '@/lib/stripe/webhooks/post-activation'
+    );
+    expect(
+      canRecordInvoiceKeyedCommission({
+        success: true,
+        skipped: true,
+        skipReason: 'stale_event',
+      })
+    ).toBe(true);
+    expect(
+      canRecordInvoiceKeyedCommission({
+        success: true,
+        skipped: true,
+        skipReason: 'subscription_mismatch',
+      })
+    ).toBe(false);
+
     await runActiveSubscriptionPostEffects({
       appUserId: 'ba-user-uuid-retry',
       userId: 'ba-user-uuid-retry',

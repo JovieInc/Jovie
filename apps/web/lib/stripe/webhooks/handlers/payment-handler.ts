@@ -1,19 +1,4 @@
-/**
- * Payment/Invoice Handler
- *
- * Handles Stripe invoice webhook events for payment processing:
- * - invoice.payment_succeeded: Subscription payment collected successfully
- * - invoice.payment_failed: Subscription payment failed
- *
- * Processing flow:
- * 1. Extract subscription ID from invoice
- * 2. Retrieve subscription from Stripe API
- * 3. Extract user ID from subscription metadata (with fallback to customer lookup)
- * 4. Update user billing status based on payment result
- * 5. Invalidate billing cache
- *
- * Payment Failure Handling — downgrades on past_due, unpaid, incomplete, or incomplete_expired.
- */
+/** Stripe invoice.payment_succeeded / invoice.payment_failed webhook handler. */
 
 import type Stripe from 'stripe';
 
@@ -34,7 +19,10 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
-import { canCompleteIdempotentPostEffects } from '../post-activation';
+import {
+  canCompleteIdempotentPostEffects,
+  canRecordInvoiceKeyedCommission,
+} from '../post-activation';
 import {
   isStripeReconciliationRequiredError,
   StripeReconciliationRequiredError,
@@ -50,10 +38,6 @@ import {
   invalidateBillingCache,
 } from '../utils';
 
-/**
- * Subscription statuses that indicate payment failure.
- * When a subscription enters any of these states, we should revoke pro access.
- */
 const FAILURE_STATUSES = [
   'past_due',
   'unpaid',
@@ -63,34 +47,7 @@ const FAILURE_STATUSES = [
 
 type FailureStatus = (typeof FAILURE_STATUSES)[number];
 
-/**
- * Handler for invoice payment events.
- *
- * This handler manages payment lifecycle:
- *
- * **Payment Succeeded**: When a subscription invoice is paid
- * - Confirms/restores pro access for the user
- * - Useful for recovering from past_due states
- *
- * **Payment Failed**: When a subscription invoice payment fails
- * - Logs the failure for monitoring
- * - Downgrades user if subscription enters failure status
- * - Handles multiple failure statuses (past_due, unpaid, incomplete, incomplete_expired)
- *
- * @example
- * ```ts
- * const handler = new PaymentHandler();
- * const result = await handler.handle({
- *   event: stripeEvent,
- *   stripeEventId: 'evt_123',
- *   stripeEventTimestamp: new Date()
- * });
- * ```
- */
 export class PaymentHandler extends BaseSubscriptionHandler {
-  /**
-   * Event types handled by this handler.
-   */
   readonly eventTypes: readonly SupportedEventType[] = [
     'invoice.payment_succeeded',
     'invoice.payment_failed',
@@ -260,6 +217,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       }
 
       await invalidateBillingCache(result.appUserId);
+
       if (canCompleteIdempotentPostEffects(result)) {
         const paymentDelivery = await trackServerEvent(
           invoice.billing_reason === 'subscription_cycle'
@@ -281,7 +239,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
           );
         }
 
-        await this.tryRecordReferralCommission(result.appUserId, invoice);
         if (!result.skipped) {
           this.sendRecoveryEmailIfNeeded(
             invoice,
@@ -289,6 +246,10 @@ export class PaymentHandler extends BaseSubscriptionHandler {
             result.appUserId
           );
         }
+      }
+
+      if (canRecordInvoiceKeyedCommission(result)) {
+        await this.tryRecordReferralCommission(result.appUserId, invoice);
       }
 
       return result;
