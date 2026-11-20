@@ -3,6 +3,8 @@
 import { appendFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { readJson as readObservedJson } from '../../scripts/lib/github-json-read.mjs';
+import { readMainArrival } from './production-continuity-arrival.mjs';
 
 export const CONTINUITY_SCHEMA = 'jovie-production-continuity/v1';
 export const DEFAULT_TIMEOUT_MS = 10_000;
@@ -197,15 +199,7 @@ const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
 // Number()/parseInt coercion is deliberately avoided (Number(null) === 0).
 const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
-/**
- * Production freshness: how long has main carried commits that production
- * lacks? Reads the live SHA from build-info and the unshipped range from the
- * GitHub compare API. When either source is unreadable the result is
- * `healthy: null` (unknown) with a reason, never healthy: absence of evidence
- * is not evidence of freshness (JOV-7694, JOV-7674). An unknown does not page
- * or file by itself, but it cannot report healthy or resolve an incident.
- * Runtime outages are reported by the jovie-production target.
- */
+/** Main-arrival evidence only; missing evidence cannot page or resolve. */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
   fetchImpl = fetch,
@@ -215,6 +209,7 @@ export async function observeProductionFreshness({
   staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   token = '',
+  githubClient,
 } = {}) {
   const base = {
     id: FRESHNESS_TARGET_ID,
@@ -227,34 +222,27 @@ export async function observeProductionFreshness({
     mainSha: null,
     unshippedCommits: 0,
     oldestUnshippedAt: null,
+    unshippedArrivedAt: null,
     unshippedAgeSeconds: 0,
+    unshippedAgeIsLowerBound: false,
   };
   const unknownResult = extra => ({ ...base, ...extra, healthy: null });
-  // Not configured is an absent probe (the CLI only passes `freshness` when
-  // GITHUB_REPOSITORY is set), not an unreadable source, so it stays healthy.
+  // An unconfigured repository is an absent probe, not unreadable evidence.
   if (!/^[^/]+\/[^/]+$/.test(repository ?? '')) {
     return { ...base, reason: 'repository-not-configured' };
   }
   const readJson = async (url, headers = {}) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetchImpl(url, {
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-          ...headers,
-        },
-        signal: controller.signal,
-      });
-      if (response.status !== 200) return null;
-      return await response.json();
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timeout);
-    }
+    const result = await readObservedJson(
+      fetchImpl,
+      url,
+      {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        ...headers,
+      },
+      timeoutMs
+    );
+    return result.ok ? result.body : null;
   };
   const buildInfo = await readJson(buildInfoUrl);
   const liveSha = buildInfo?.commitSha;
@@ -278,7 +266,6 @@ export async function observeProductionFreshness({
     githubHeaders
   );
   const unshippedCommits = compare?.ahead_by;
-  const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
   if (!isCommitCount(unshippedCommits)) {
     return unknownResult({
       liveSha,
@@ -289,35 +276,44 @@ export async function observeProductionFreshness({
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
-  const oldestEpoch =
-    typeof oldestUnshippedAt === 'string' ? Date.parse(oldestUnshippedAt) : NaN;
-  if (!Number.isFinite(oldestEpoch)) {
+  const arrival = await readMainArrival({
+    compare,
+    liveSha,
+    mainSha,
+    repository,
+    token,
+    fetchImpl,
+    githubApiUrl,
+    now,
+    timeoutMs,
+    githubClient,
+    staleAfterSeconds,
+  });
+  if (!arrival.ok) {
     return unknownResult({
       liveSha,
       mainSha,
       unshippedCommits,
-      reason: 'unshipped-age-unreadable',
+      reason: arrival.reason,
     });
   }
-  const unshippedAgeSeconds = Math.max(
-    0,
-    Math.floor((new Date(now).getTime() - oldestEpoch) / 1000)
-  );
+  const { oldestUnshippedAt, unshippedArrivedAt, unshippedAgeSeconds } =
+    arrival;
   const stale = unshippedAgeSeconds >= staleAfterSeconds;
   return {
     ...base,
     healthy: !stale,
     incidentClass: stale ? FRESHNESS_INCIDENT_CLASS : null,
     reason: stale
-      ? `unshipped-for-${unshippedAgeSeconds}s`
+      ? `unshipped-for-${arrival.unshippedAgeIsLowerBound ? 'at-least-' : ''}${unshippedAgeSeconds}s`
       : `unshipped-for-${unshippedAgeSeconds}s-within-${staleAfterSeconds}s`,
     liveSha,
     mainSha,
     unshippedCommits,
     oldestUnshippedAt,
+    unshippedArrivedAt,
     unshippedAgeSeconds,
-    // Production serves an ancestor of main and is within its freshness bound:
-    // the release FIFO is catching up, not stalled.
+    unshippedAgeIsLowerBound: arrival.unshippedAgeIsLowerBound,
     catchingUp: !stale,
     summary: stale
       ? `behind by ${unshippedCommits}, stale`
@@ -612,6 +608,7 @@ export async function runCli({
   now = new Date(),
   stdout = process.stdout,
   writeFileImpl = writeFile,
+  githubClient,
 } = {}) {
   const args = parseCliArgs(argv);
   const repository = env.GITHUB_REPOSITORY?.trim() ?? '';
@@ -620,6 +617,7 @@ export async function runCli({
     freshness: repository
       ? {
           repository,
+          githubClient,
           token: env.GH_TOKEN?.trim() ?? '',
           staleAfterSeconds: await resolveStaleAfterSeconds({
             fetchImpl,
