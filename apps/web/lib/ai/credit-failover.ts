@@ -5,7 +5,8 @@
  * The wrapped model keeps every property of the primary (spec version, id,
  * supported URLs) and only overrides `doGenerate` / `doStream`: when the
  * primary rejects with a failover-worthy error before producing output, the
- * same call is replayed once on the secondary. A credit/quota error also opens
+ * same call is replayed once on the secondary. Credit/quota exhaustion and
+ * model-unavailability (a retired or disallowed model id) both open
  * a short per-provider breaker so the next calls skip the dead provider
  * instead of paying a failed round trip each time.
  */
@@ -79,6 +80,34 @@ export function isProviderCreditError(error: unknown): boolean {
     if (record.statusCode === 402 || record.status === 402) return true;
     const message = record.message;
     if (typeof message === 'string' && CREDIT_MESSAGE.test(message)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * True for "this provider cannot serve this model at all": a retired model
+ * (Cloudflare 410 Gone / error 5028), a relay allowlist rejection ("model
+ * not allowed"), or a Gateway model-not-found. Unlike credit errors this
+ * means the MODEL is gone on that provider, not the money: the other
+ * provider runs its own model fleet, so replaying the identical call there
+ * is the only recovery (JOV-10063: the 2026-11-20 Workers AI glm-5.3-flash
+ * retirement took chat down whenever the live relay and the caller's model
+ * map disagreed, because this class never reached the fallback).
+ */
+const MODEL_UNAVAILABLE_MESSAGE =
+  /model not allowed|model not found|unsupported model|unknown model|no longer (?:available|supported)|has been (?:retired|deprecated|removed)|410 gone|is deprecated/iu;
+
+export function isModelUnavailableError(error: unknown): boolean {
+  for (const record of walkErrors(error)) {
+    if (record.statusCode === 410 || record.status === 410) return true;
+    if (record.code === 5028) return true;
+    const message = record.message;
+    if (
+      typeof message === 'string' &&
+      MODEL_UNAVAILABLE_MESSAGE.test(message)
+    ) {
       return true;
     }
   }
@@ -268,7 +297,9 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
   const shouldFailover =
     input.shouldFailover ??
     ((error: unknown) =>
-      (isProviderCreditError(error) || isStreamStallError(error)) &&
+      (isProviderCreditError(error) ||
+        isStreamStallError(error) ||
+        isModelUnavailableError(error)) &&
       !isAbortError(error));
   const emit = input.onFailover ?? logFailover;
 
@@ -300,7 +331,9 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
       signal?.throwIfAborted();
       if (!fallbackModel || !shouldFailover(error)) throw error;
       const credit = isProviderCreditError(error);
-      if (credit) creditBreaker.set(primary.name, now() + BREAKER_MS);
+      if (credit || isModelUnavailableError(error)) {
+        creditBreaker.set(primary.name, now() + BREAKER_MS);
+      }
       emit({
         kind: 'ai-failover',
         label: input.label,

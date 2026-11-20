@@ -5,12 +5,12 @@ export interface ObservabilityReport {
   readonly platform: ObservabilityPlatform;
   readonly kind: ObservabilityKind;
   readonly title: string;
-  readonly message?: string;
+  readonly message?: string | undefined;
   readonly release: string;
-  readonly environment?: string;
-  readonly stacktrace?: string;
-  readonly occurred_at?: string;
-  readonly metadata?: Record<string, string>;
+  readonly environment?: string | undefined;
+  readonly stacktrace?: string | undefined;
+  readonly occurred_at?: string | undefined;
+  readonly metadata?: Record<string, string> | undefined;
 }
 
 const PLATFORMS = new Set<ObservabilityPlatform>(['ios', 'web', 'electron']);

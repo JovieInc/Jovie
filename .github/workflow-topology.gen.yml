@@ -6,7 +6,7 @@ measuredBaseline:
   checkRecords: 487
 budgets:
   blockingPrChecks: 12
-  normalPrCheckRecords: 25
+  normalPrCheckRecords: 26
   normalPrExternalAllowance: 8
   mainShaWorkflowRuns: 72
 authoritativeOwners:
@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 25
+normalPrCheckRecords: 26
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -453,6 +453,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Flake Ledger
+    path: .github/workflows/flake-ledger.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:retry-infra
+    jobCount: 2
   - name: Fleet Gate Refresh
     path: .github/workflows/fleet-gate-refresh.yml
     active: true
@@ -840,8 +851,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:warm
-    jobCount: 1
+    terminalReceipt: job:warm-ovie
+    jobCount: 2
   - name: Nightly Testing Agent
     path: .github/workflows/nightly-testing-agent.yml
     active: true
@@ -1450,13 +1461,14 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Dependabot Pin Sync
+      - Flake Ledger
       - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 7
+    jobCount: 8
   - name: Spend Guard
     path: .github/workflows/spend-guard.yml
     active: true
@@ -1721,6 +1733,9 @@ edges:
     type: workflow_run
   - from: Production Controller
     to: desktop-release
+    type: workflow_run
+  - from: Source Validation
+    to: Flake Ledger
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh

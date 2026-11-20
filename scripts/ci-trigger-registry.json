@@ -44,6 +44,7 @@
     "e2e-full-matrix.yml": {"runsPerMergedPr":0.1,"triggers":["repository_dispatch:clock_e2e_full_matrix","workflow_dispatch"]},
     "eve-pilot.yml": {"runsPerMergedPr":0,"triggers":["pull_request","push","workflow_dispatch"]},
     "fixed-runner-canary.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
+    "flake-ledger.yml": {"runsPerMergedPr":3.7,"triggers":["workflow_run:Source Validation"]},
     "fleet-gate-refresh.yml": {"runsPerMergedPr":1.7,"triggers":["push","repository_dispatch:linear_triage_assess","workflow_dispatch","workflow_run:CI"]},
     "fleet-rules-evidence.yml": {"runsPerMergedPr":13.6,"triggers":["pull_request_target:edited","pull_request_target:labeled","pull_request_target:opened","pull_request_target:reopened","pull_request_target:synchronize","pull_request_target:unlabeled","workflow_run:Source Validation"]},
     "fleet-rules-ready-rerun.yml": {"runsPerMergedPr":14.1,"triggers":["workflow_run:Fleet Rules Evidence"]},

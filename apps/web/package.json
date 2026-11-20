@@ -48,6 +48,7 @@
     "lint:contrast-ratchet": "node scripts/lint-contrast-ratchet.mjs && tsx scripts/lint-contrast-computed.ts",
     "lint:contrast-computed": "tsx scripts/lint-contrast-computed.ts",
     "lint:motion-css": "node scripts/lint-motion-css.mjs",
+    "lint:review-findings": "node scripts/lint-review-findings.mjs",
     "lint:touch-target": "tsx scripts/lint-touch-target.ts",
     "lint:ui-feel": "node scripts/lint-ui-feel.mjs",
     "lint:composite-field": "node scripts/lint-composite-field.mjs",
@@ -247,7 +248,10 @@
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts",
-    "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
+    "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts",
+    "lint:marketing-tokens": "node scripts/lint-marketing-tokens.mjs",
+    "check:pen-citation": "node scripts/check-pen-citation.mjs",
+    "lint:sample-labels": "node scripts/lint-sample-labels.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.146",

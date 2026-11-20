@@ -40,7 +40,7 @@ class WinEnvelopeTest(unittest.TestCase):
         self.assertEqual((route["cls"], route["action"]), ("win-envelope", envelope.ACTION))
         measured = classes.classify(pr("Fleet Rules Evidence"), {
             "Fleet Rules Evidence": "##[error]win: this PR needs a measured win (metric, before, after, method, evidence)."})
-        self.assertEqual((measured["cls"], measured["action"]), ("fleet-body", "agent"))
+        self.assertEqual((measured["cls"], measured["action"]), ("measured-win", "repair-win"))
 
     def test_mixed_head_still_carries_the_envelope_repair(self):
         route = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
