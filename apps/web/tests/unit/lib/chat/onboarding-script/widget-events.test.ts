@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
   CONFIRM_HANDLE_CTA_LABEL,
+  isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   isMeaningfulIntakeAnswer,
   isOnboardingWidgetEventType,
@@ -69,6 +70,28 @@ describe('onboarding widget events', () => {
     expect(isIncompleteAdvanceMessage('  OK  ')).toBe(true);
     expect(isIncompleteAdvanceMessage('like 300 people')).toBe(false);
     expect(isIncompleteAdvanceMessage('planning a single')).toBe(false);
+  });
+
+  it('recognizes free-text claim/confirm intent for Confirm Handle', () => {
+    for (const text of [
+      'claim',
+      'Claim!',
+      'claim it',
+      'claim my profile',
+      'sign me up',
+      'sign up',
+      'confirm',
+      'confirm handle',
+      'lock it in',
+      'I want to claim my profile',
+    ]) {
+      expect(isHandleConfirmIntent(text)).toBe(true);
+    }
+    expect(isHandleConfirmIntent('ok')).toBe(false);
+    expect(isHandleConfirmIntent('k')).toBe(false);
+    expect(isHandleConfirmIntent('newname')).toBe(false);
+    expect(isHandleConfirmIntent('@newname')).toBe(false);
+    expect(isHandleConfirmIntent('what does a handle do here?')).toBe(false);
   });
 
   it('requires meaningful intake answers', () => {

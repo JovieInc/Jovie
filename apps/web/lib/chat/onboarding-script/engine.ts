@@ -21,6 +21,10 @@ import {
   onboardingDraftQuestion,
 } from '@/lib/onboarding/profile-draft';
 import { validateUsername } from '@/lib/validation/username';
+import {
+  resolveAwaitingHandleConfirm,
+  socialTurnAfterHandleConfirmed,
+} from './handle-confirm-turn';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -792,69 +796,26 @@ export async function decideFallbackTurn(
       (typeof existingHandleCheck.handle === 'string'
         ? String(existingHandleCheck.handle)
         : handleFromArtistName(state.spotifyArtistName ?? ''));
-    // The social-link card ships with this turn, so the line asks for the
-    // link; the audience question waits until the link is attached.
-    const line = pick('attach_social');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [
-        {
-          toolName: 'checkHandle',
-          input: { handle },
-          output: {
-            action: WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED,
-            handle,
-            summary: `Handle @${handle} confirmed.`,
-          },
-        },
-        {
-          toolName: 'proposeSocialLink',
-          input: { url: '' },
-          output: {
-            action: 'propose_social_link',
-            url: null,
-            summary: 'Attach a public social account.',
-          },
-        },
-      ],
-      guardedStep: 'social',
-    };
+    // Social-link card ships with this turn; audience waits until attach.
+    return socialTurnAfterHandleConfirmed(handle, pick);
   }
 
-  // Handle shown but not confirmed via widget event — stay on handle.
-  // Free-text "ok" / "k" does not advance.
+  // Handle shown but not confirmed — free-text claim/sign-up can lock it;
+  // acks ("ok" / "k") still do not advance.
   if (!hasHandleConfirmed(uiMessages)) {
     const shownHandle =
       typeof existingHandleCheck.handle === 'string'
         ? existingHandleCheck.handle
         : handleFromArtistName(state.spotifyArtistName ?? '');
-    // A handle typed in chat replaces the suggested one: check it instead of
-    // repeating the old line (2026-10-29 canary walk: typed handles were
-    // ignored and the only way forward was editing the card's field).
+    // Typed handle replaces the suggestion (2026-10-29 canary walk).
     const typedHandle = latestEvent ? null : typedHandleFrom(latest);
-    const handle =
-      typedHandle && typedHandle !== shownHandle ? typedHandle : shownHandle;
-    const line = pick('handle');
-    return {
-      line,
-      text: renderLine(line, { handle }),
-      toolEvents:
-        handle === shownHandle
-          ? []
-          : [
-              {
-                toolName: 'checkHandle',
-                input: { handle },
-                output: {
-                  action: 'check_handle',
-                  handle,
-                  summary: `Checking @${handle}.`,
-                },
-              },
-            ],
-      guardedStep: 'handle',
-    };
+    return resolveAwaitingHandleConfirm({
+      shownHandle,
+      latest,
+      latestIsWidgetEvent: Boolean(latestEvent),
+      typedHandle,
+      pick,
+    });
   }
 
   const attachedNow = socialAttachedEventFromLatest(latest);
