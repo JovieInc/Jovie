@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { RateLimitResult } from './types';
 import { trackingLimiterResponse } from './tracking-outage';
+import type { RateLimitResult } from './types';
 
-const denied = (
-  overrides: Partial<RateLimitResult> = {}
-): RateLimitResult => ({
+const denied = (overrides: Partial<RateLimitResult> = {}): RateLimitResult => ({
   success: false,
   limit: 60,
   remaining: 0,

@@ -5,10 +5,9 @@ import { createRateLimiter } from './rate-limiter';
  * Handle availability checks: 30/minute per IP. Fail-closed without Redis so
  * cold starts cannot reset the enumeration budget.
  */
-export const handleCheckLimiter = createRateLimiter(
-  RATE_LIMITERS.handleCheck,
-  { requireRedis: true }
-);
+export const handleCheckLimiter = createRateLimiter(RATE_LIMITERS.handleCheck, {
+  requireRedis: true,
+});
 
 /**
  * Public profile capture dismissal. Fail-closed without Redis (no per-instance
