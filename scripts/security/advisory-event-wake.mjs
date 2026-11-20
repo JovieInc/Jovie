@@ -4,12 +4,15 @@
 // receives dependabot_alert, or an operator with a token that can create
 // repository dispatches.
 //
+// api-budget: github-app-core 60/hr - one repository_dispatch POST per Dependabot alert created/reopened/reintroduced (webhook or operator; not timer-driven)
+//
 //   node scripts/security/advisory-event-wake.mjs [--dry-run] <<JSON
 //   {"action":"created","alert":{...}}
 //
 // Env: GH_TOKEN or GH_DISPATCH_TOKEN, GITHUB_REPOSITORY (default JovieInc/Jovie).
 
 import { readFileSync } from 'node:fs';
+import { createGitHubClient } from '../../packages/api-client/github.ts';
 import {
   dependabotAlertDispatchBody,
   planDependabotAlertWake,
@@ -36,21 +39,21 @@ async function main() {
   const token = process.env.GH_DISPATCH_TOKEN || process.env.GH_TOKEN;
   if (!token) throw new Error('GH_DISPATCH_TOKEN or GH_TOKEN is required');
   const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
-  const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    body: JSON.stringify(body),
+  const github = createGitHubClient({ token });
+  const res = await github.rest('POST', `/repos/${repo}/dispatches`, body, {
+    priority: 'default',
+    write: true,
+    idempotent: false,
+    conditional: false,
+    coalesce: false,
+    maxAttempts: 1,
+    maxWaitMs: 0,
+    timeoutMs: 15_000,
   });
-  if (!res.ok) {
-    const text = await res.text();
+  if (res.status < 200 || res.status >= 300) {
     throw Object.assign(
       new Error(
-        `repository_dispatch failed (${res.status}): ${text.slice(0, 200)}`
+        `repository_dispatch failed (${res.status}): ${String(res.text).slice(0, 200)}`
       ),
       { exitCode: 1 }
     );
