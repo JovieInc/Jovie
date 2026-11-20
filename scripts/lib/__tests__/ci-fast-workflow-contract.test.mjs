@@ -151,18 +151,18 @@ describe('ci-fast bounded parallel workflow', () => {
           line.includes('pnpm turbo test:fast --affected --') &&
           /--passWithNoTests(?:\s|$)/u.test(line)
       );
-    const selectors = command?.match(
-      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
-    )?.[1];
-    expect(selectors, 'manual unit filename selectors').toBeTruthy();
-    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+    const tail = command?.split('unit_excludes }}')[1]?.trim();
+    expect(tail, 'manual unit filename selectors and report flag').toBeTruthy();
+    const reportFlag = '--outputFile=manual units.junit.xml';
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${tail}`], {
       encoding: 'utf8',
+      env: { ...process.env, OUTPUT_FLAG: reportFlag },
       timeout: 1000,
     });
     expect(parsed.status, parsed.stderr).toBe(0);
-    const [, ...runnerArgs] = buildWebVitestFastArgs(
-      parsed.stdout.split('\0').filter(Boolean)
-    );
+    const selectors = parsed.stdout.split('\0').filter(Boolean);
+    expect(selectors.pop()).toBe(reportFlag);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(selectors);
     const webRoot = resolve(REPO_ROOT, 'apps/web');
     const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
     try {
@@ -372,7 +372,10 @@ describe('ci-fast bounded parallel workflow', () => {
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
       'scripts/prod-errors/test_prod_errors.py',
+      'scripts/tests/test_noabandon_route.py',
       'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_noabandon_invariant.py',
+      'scripts/tests/test_noabandon_adapters.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
@@ -383,6 +386,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_pr_remediation_swarm.py',
       'scripts/tests/test_codex_launcher.py',
       'scripts/tests/test_loose_exec_guard.py',
+      'scripts/tests/test_noabandon_ledger.py',
+      'scripts/tests/test_poll_loop_guard.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -449,7 +454,13 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(49);
+    expect(new Set(LANES_PYTEST_FILES).size).toBe(LANES_PYTEST_FILES.length);
+    expect(whole).toContain('scripts/tests/test_intake_linear_relay.py');
+    expect(whole).toContain('scripts/tests/test_revert_first.py');
+    expect(whole).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(whole).toContain('scripts/tests/test_reason_events.py');
+    expect(whole).toContain('scripts/tests/test_incident_stage_events.py');
+    expect(whole).toContain('scripts/tests/test_reason_publication.py');
     expect(whole).toContain('scripts/tests/test_pr_events_blast_radius.py');
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_pr_events_red_repair.py');
@@ -2026,6 +2037,43 @@ describe('ci-fast bounded parallel workflow', () => {
         runtimeFiles: [],
       })
     ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+  });
+
+  it('selects the runtime lane for changes confined to either runner setup support file', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'runner-setup-selection-'));
+    const git = (...args) => execFileSync('git', args, { cwd: directory });
+    try {
+      git('init', '--quiet');
+      git('config', 'user.name', 'CI test');
+      git('config', 'user.email', 'ci-test@example.invalid');
+      git('commit', '--quiet', '--allow-empty', '-m', 'base');
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      vi.stubEnv('TURBO_SCM_BASE', 'HEAD^1');
+      for (const path of [
+        'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+        'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
+      ]) {
+        const filename = join(directory, path);
+        mkdirSync(dirname(filename), { recursive: true });
+        writeFileSync(filename, 'export {};\n');
+        git('add', '--', path);
+        git('commit', '--quiet', '-m', 'change one support file');
+        const runtimeFiles = changedFiles(
+          NODE_RUNTIME_CONTRACT_PATHS,
+          directory
+        );
+        expect(runtimeFiles).toEqual([path]);
+        expect(
+          selectNodeRuntimeContractCommands({
+            event: 'pull_request',
+            runtimeFiles,
+          })
+        ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('uses the maintained Node-only config for the complete runtime contract lane', () => {

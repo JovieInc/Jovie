@@ -93,7 +93,7 @@ describe('DesktopQrOverlayClient', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open On Phone' }));
     expect(showPopover).toHaveBeenCalledTimes(1);
-    const image = screen.getByRole('img', { name: QR_LABEL });
+    const image = await screen.findByRole('img', { name: QR_LABEL });
     // The profile URL is encoded into the PNG. The src is that local data
     // URL, not a third-party request that contains the profile URL as text.
     expect(image.getAttribute('src') ?? '').toMatch(/^data:image\/png;base64,/);
@@ -113,7 +113,7 @@ describe('DesktopQrOverlayClient', () => {
     const { container } = render(<DesktopQrOverlayClient handle='tim' />);
 
     await user.click(screen.getByRole('button', { name: 'Open On Phone' }));
-    fireEvent.error(screen.getByRole('img', { name: QR_LABEL }));
+    fireEvent.error(await screen.findByRole('img', { name: QR_LABEL }));
 
     expect(screen.getByText('QR code unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();

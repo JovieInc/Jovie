@@ -38,6 +38,11 @@ export const MAX_RETAINED_DRIZZLE_SNAPSHOTS = 3;
 // budget, so surface shrinking headroom before it becomes a queue outage.
 export const TRACKED_BYTES_WARNING_RATIO = 0.95;
 
+// Planning-level threshold, one band earlier: fires while there is still time
+// to schedule the next prune through the census (dead or regenerable bytes)
+// before the 95% shrink-now line turns the signal urgent.
+export const TRACKED_BYTES_PLAN_RATIO = 0.9;
+
 export function trackedBytesBudgetWarning(
   bytes,
   maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes
@@ -50,4 +55,37 @@ export function trackedBytesBudgetWarning(
       ? `${(headroom / 1_000_000).toFixed(2)} MB headroom`
       : `${(-headroom / 1_000_000).toFixed(2)} MB over budget`;
   return `tracked regular files total ${bytes} bytes (${percent}% of the ${maxTrackedBytes}-byte combined-tree budget; ${headroomText}); shrink tracked bytes before the merge queue starts ejecting PRs`;
+}
+
+// Non-failing plan warning for the 90%-to-95% band. Above 95% the shrink-now
+// warning owns the signal; below 90% there is nothing to plan yet.
+export function trackedBytesBudgetPlanWarning(
+  bytes,
+  maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes
+) {
+  if (bytes <= maxTrackedBytes * TRACKED_BYTES_PLAN_RATIO) return null;
+  if (bytes > maxTrackedBytes * TRACKED_BYTES_WARNING_RATIO) return null;
+  const headroom = maxTrackedBytes - bytes;
+  const percent = ((bytes / maxTrackedBytes) * 100).toFixed(2);
+  return `tracked regular files total ${bytes} bytes (${percent}% of the ${maxTrackedBytes}-byte combined-tree budget; ${(headroom / 1_000_000).toFixed(2)} MB headroom); past the 90% plan line — schedule the next prune of dead or regenerable bytes before queued PRs start ejecting`;
+}
+
+// Every warning level for `bytes`, shrink-now first, so an emitter that logs
+// the entries in order keeps the most urgent annotation first.
+export function trackedBytesBudgetWarnings(
+  bytes,
+  maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes
+) {
+  return [
+    trackedBytesBudgetWarning(bytes, maxTrackedBytes),
+    trackedBytesBudgetPlanWarning(bytes, maxTrackedBytes),
+  ].filter(Boolean);
+}
+
+// Emits each warning level as its own non-failing ::warning annotation under
+// `prefix` (e.g. 'Combined tree: ').
+export function logTrackedBytesBudgetWarnings(bytes, log, prefix) {
+  for (const warning of trackedBytesBudgetWarnings(bytes)) {
+    log(`::warning::${prefix}${warning}`);
+  }
 }

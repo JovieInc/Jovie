@@ -318,6 +318,34 @@
         }
       ]
     },
+    "packages/ui/atoms/host-drawn-field.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "776109154de108715a14bf1a5cdf21aca2d4d7fa122722d9d43b5cfbd190914a",
+      "reference": "WHATWG native input and select, WAI Forms Labeling Controls, and shadcn/ui Input and Native Select",
+      "references": [
+        "https://html.spec.whatwg.org/multipage/input.html#the-input-element",
+        "https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element",
+        "https://www.w3.org/WAI/tutorials/forms/labels/",
+        "https://ui.shadcn.com/docs/components/input",
+        "https://ui.shadcn.com/docs/components/native-select"
+      ],
+      "checked": "Native text input, radio, combobox and listbox roles and names, label activation, text and focus retention, select change events, ref forwarding, host classes, disabled fixture and RTL axe coverage.",
+      "gaps": [
+        {
+          "item": "Keep native controls accessible inside host-painted input shells, chip labels and custom result lists",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WHATWG native input and select, WAI Forms Labeling Controls, and shadcn/ui Input and Native Select",
+          "resolution": "The atoms render native input and select elements and forward native props and refs. The current tests cover label activation of the visually hidden radio, controlled input value and focus across rerender and Escape, change handling on the named select, and the named visually hidden listbox with its forwarded ref. Six hosted stories cover the host field, chip and styled select, including RTL."
+        },
+        {
+          "item": "Apply the reference input surface or select chevron in the atom",
+          "decision": "skip",
+          "reference": "shadcn/ui Input and Native Select",
+          "reason": "The pricing selector and waitlist hosts own their own paint and focus styling. The atom forwards host classes and native select size when the host exposes a listbox."
+        }
+      ]
+    },
     "packages/ui/atoms/icon-button.tsx": {
       "libraryVersion": 1,
       "sourceHash": "1598c93b73d57dc48a68f84707c0d71ce8e30ab3a72c7e93d0573e0e5db1b508",

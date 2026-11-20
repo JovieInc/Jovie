@@ -8,6 +8,7 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 function failureRows(receipt) {
   return receipt.results.filter(result => result.ok === false);
@@ -103,9 +104,17 @@ export async function fileWebAiHealthLinearIssue({
 
 const WEB_AI_KEY = 'web-ai-health';
 
-async function main() {
-  const statusOverride = process.env.WEB_AI_HEALTH_STATUS;
-  const receiptPath = process.env.WEB_AI_HEALTH_RECEIPT_PATH;
+/**
+ * Linear rate limits defer the signal (visible warning + job summary) instead
+ * of failing the probe verdict; every other failure still throws.
+ * @param {{ env?: typeof process.env, fetchImpl?: typeof fetch }} [options]
+ */
+export async function runWebAiHealthIntake({
+  env = process.env,
+  fetchImpl,
+} = {}) {
+  const statusOverride = env.WEB_AI_HEALTH_STATUS;
+  const receiptPath = env.WEB_AI_HEALTH_RECEIPT_PATH;
   const receipt = receiptPath
     ? JSON.parse(await readFile(receiptPath, 'utf8'))
     : { status: statusOverride };
@@ -116,33 +125,45 @@ async function main() {
       key: WEB_AI_KEY,
       fingerprint: passed
         ? WEB_AI_KEY
-        : buildWebAiHealthSignalPayload(receipt, process.env.RUN_URL)
-            .fingerprint,
+        : buildWebAiHealthSignalPayload(receipt, env.RUN_URL).fingerprint,
     });
     console.log(JSON.stringify(dry));
-    return;
+    return dry;
   }
   if (passed) {
-    const result = await closeLinearIssueByFingerprint({
-      fingerprint: WEB_AI_KEY,
-      labelKey: WEB_AI_KEY,
-      comment: 'Web AI health receipt passed.',
-      runId: process.env.GITHUB_RUN_ID,
-    });
+    const result = await withLinearRateLimitRetry(
+      () =>
+        closeLinearIssueByFingerprint({
+          fingerprint: WEB_AI_KEY,
+          labelKey: WEB_AI_KEY,
+          comment: 'Web AI health receipt passed.',
+          runId: env.GITHUB_RUN_ID,
+          fetchImpl,
+        }),
+      { label: 'Web AI health resolve' }
+    );
     if (!result.ok) {
       throw new Error(`Web AI health Linear resolve failed: ${result.reason}`);
     }
-    console.log(JSON.stringify(result));
-    return;
+    return result;
   }
-  const result = await fileWebAiHealthLinearIssue({
-    receipt,
-    runUrl: process.env.RUN_URL,
-  });
+  const result = await withLinearRateLimitRetry(
+    () =>
+      fileWebAiHealthLinearIssue({
+        receipt,
+        runUrl: env.RUN_URL,
+        fetchImpl,
+      }),
+    { label: 'Web AI health intake' }
+  );
   if (!result.ok) {
     throw new Error(`Web AI health Linear intake failed: ${result.reason}`);
   }
-  console.log(JSON.stringify(result));
+  return result;
+}
+
+async function main() {
+  console.log(JSON.stringify(await runWebAiHealthIntake()));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -43,6 +43,14 @@ To keep a WIP draft parked, pass `--park`: it writes
 `<!-- jovie-auto-ready: park -->`, and a refreshed body keeps it until
 `--on-green` replaces it. Holds, parks and controlled-proof markers still win.
 
+A draft that must wait on a designated outside review — or must not be readied
+at all — pins itself deterministically (JOV-13139): the writer or an agent adds
+the `needs-outside-review` (or `do-not-ready`) label, or writes the park
+marker; prose like "stays DRAFT" in the body is not machine-readable and never
+holds the flip. Both undraft controllers also refuse the flip while GitHub's
+`reviewDecision` is `CHANGES_REQUESTED` (an unresolved must-fix review); an
+approving review or a re-read clears it without a label.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
@@ -496,3 +504,28 @@ Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),
 [`ci-branching.md`](../.claude/rules/ci-branching.md),
 [`release.md`](../.claude/rules/release.md),
 [`docs/company/autonomous-shipping-doctrine.md`](company/autonomous-shipping-doctrine.md).
+
+## Local AI review (Sentry Warden)
+
+AI code review runs LOCALLY through Sentry Warden (`warden.toml`), never as a
+remote gate. The husky hooks run it for you:
+`warden --staged` on pre-commit (staged diff), `warden` on pre-push (branch vs
+`main`), via `scripts/hooks/warden-local-review.sh` (advisory rung
+`warden-local-review` in the gate ladder). A missing `warden` CLI or model
+credentials only warns — commits and pushes proceed, and Warden must never be
+wired as a status check, branch-protection rule, or merge gate (no
+`.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW` switches
+behavior: `off` skips, `warn` (default) reports findings and proceeds, `strict`
+fails the hook on a non-zero Warden exit.
+
+One-time local setup (not committed):
+
+```sh
+pnpm add -g @sentry/warden
+export WARDEN_MODEL=openai/gpt-5.5        # or anthropic/claude-sonnet-4-6
+export WARDEN_OPENAI_API_KEY=sk-...       # or WARDEN_ANTHROPIC_API_KEY=...
+warden                                    # review the current branch
+```
+
+Without a provider key, Warden falls back to local Claude Code auth when
+available. Never commit keys.

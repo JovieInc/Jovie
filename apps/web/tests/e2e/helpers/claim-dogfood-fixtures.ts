@@ -262,14 +262,27 @@ export async function grantDogfoodAdminStepUp(
 /**
  * Repair a persona whose stored subscription no longer exists in Stripe test
  * mode (an interrupted earlier run). Test database only.
+ *
+ * Also clears the derived price-lock state (price_locks, stripe_price_id):
+ * since the price lock landed (JOV-INV-048), a stale lock or a stale
+ * subscription price row makes every later checkout for the persona fail
+ * closed, and the route's price-error mapping masks it as a 400
+ * "Invalid pricing configuration" — the red JOV-8805 dogfood class of
+ * 2026-11-17..19. Derived state only; the persona's profile, posts and
+ * claim-verification rows are untouched.
  */
 export async function resetDogfoodBilling(email: string): Promise<void> {
   const sql = dogfoodSql();
   await sql`
     UPDATE users
     SET is_pro = false, plan = 'free', stripe_subscription_id = NULL,
+        stripe_price_id = NULL,
         billing_version = billing_version + 1, updated_at = now()
     WHERE email = ${email}
+  `;
+  await sql`
+    DELETE FROM price_locks
+    WHERE user_id IN (SELECT id FROM users WHERE email = ${email})
   `;
 }
 

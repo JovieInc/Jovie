@@ -21,6 +21,13 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
+import {
+  bootstrapProtection,
+  createContextFactory,
+  launchIdentifiedBrowser,
+} from './browser-context.mjs';
+import { createDirectFetch } from './direct-fetch.mjs';
+import { createColdVisit, loadSitemap } from './load-reuse.mjs';
 import { MEASURE, OBSERVE } from './observe.mjs';
 import { MAX_WALKS_PER_IDENTITY, runOverlayWalks } from './overlay-walk.mjs';
 import {
@@ -41,11 +48,11 @@ import {
   pickSamples,
   repoSamples,
   SIGNED_IN_DISCOVERY,
-  sitemapPaths,
   strangerDiscovery,
 } from './sample-params.mjs';
 import { inShard, parseShard, summaryLines } from './shard.mjs';
 import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
+import { createTrafficEvidence } from './traffic-evidence.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -60,6 +67,14 @@ const { values: args } = parseArgs({
       default: process.env.CRAWL_DEADLINE_EPOCH_MS || '',
     },
     shard: { type: 'string', default: process.env.CRAWL_SHARD || '' },
+    'max-intercepted-requests': {
+      type: 'string',
+      default: process.env.CRAWL_MAX_INTERCEPTED_REQUESTS || '20000',
+    },
+    'page-interval-ms': {
+      type: 'string',
+      default: process.env.CRAWL_PAGE_INTERVAL_MS || '1000',
+    },
   },
 });
 const shard = parseShard(args.shard);
@@ -101,31 +116,56 @@ function concrete(route) {
   return simple.includes('[') ? null : simple;
 }
 
-const browser = await chromium.launch();
+// One invocation owns admission; worker/internal request planes remain unknown.
+const traffic = createTrafficEvidence({
+  origin: args.origin,
+  maxInterceptedRequests: Number(args['max-intercepted-requests']),
+  pageIntervalMs: Number(args['page-interval-ms']),
+  deadlineEpochMs: DEADLINE,
+});
+const metadata = {
+  run: process.env.GITHUB_RUN_ID || '',
+  deployment: process.env.CRAWL_DEPLOYMENT_ID || '',
+  invocation: process.env.CRAWL_INVOCATION_ID || '',
+};
+const directFetch = createDirectFetch({
+  origin: args.origin,
+  evidence: traffic,
+  metadata,
+  deadlineEpochMs: DEADLINE,
+});
+let browser,
+  protection = { cookies: [], cookieHeader: '' },
+  startupProblem;
+try {
+  if (pastDeadline()) throw new Error('crawl deadline before browser setup');
+  protection = await bootstrapProtection({
+    origin: args.origin,
+    sha: args.sha,
+    bypass: BYPASS,
+    fetchImpl: directFetch,
+    deadlineEpochMs: DEADLINE,
+  });
+  ({ browser } = await launchIdentifiedBrowser(chromium));
+} catch (error) {
+  startupProblem = String(error.message || error);
+}
 const pages = [];
 const uncovered = [];
 const host = new URL(args.origin).host;
-
-async function openContext({ viewport, identity }) {
-  const ctx = await browser.newContext({
-    viewport: VIEWPORTS[viewport],
-    ...(identity === 'signed-in'
-      ? { storageState: args['storage-state'] }
-      : {}),
-  });
-  if (BYPASS)
-    await ctx.route(
-      u => u.host === host,
-      r =>
-        r.continue({
-          headers: {
-            ...r.request().headers(),
-            'x-vercel-protection-bypass': BYPASS,
-          },
-        })
-    );
-  return ctx;
-}
+const freshContext = createContextFactory({
+  browser,
+  origin: args.origin,
+  viewports: VIEWPORTS,
+  storageState: args['storage-state'],
+  evidence: traffic,
+  metadata,
+  protectionCookies: protection.cookies,
+});
+const openContext = job => {
+  if (startupProblem) throw new Error(startupProblem);
+  return freshContext(job);
+};
 
 async function visit({ route, target, viewport, identity, fixture, collect }) {
   const ctx = await openContext({ viewport, identity });
@@ -230,6 +270,10 @@ const safeVisit = job =>
     return { route, url: target, identity, viewport, error };
   });
 
+// Rechecks call safeVisit directly, retaining independent cold contexts.
+const measurements = createColdVisit(safeVisit, args.origin);
+const coldVisit = measurements.visit;
+
 // Real values for dynamic routes (sample-params.mjs): repo constants, the
 // deployed sitemap, and links on pages read first (they are crawled too).
 const signedIn = Boolean(args['storage-state']);
@@ -240,28 +284,20 @@ const repo = repoSamples({
   exists: existsSync,
   handle: args.handle,
 });
-// One retry; a sitemap that still can't be read is named in the receipt and
-// on every route it would have sampled (coverRoute), never read as empty.
-let sitemapProblem = null;
-let sitemap = [];
-for (let attempt = 1; attempt <= 2; attempt++) {
-  try {
-    const res = await fetch(new URL('/sitemap.xml', args.origin), {
-      headers: BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {},
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    sitemap = sitemapPaths(await res.text(), hosts);
-    sitemapProblem = null;
-    break;
-  } catch (error) {
-    sitemapProblem = error instanceof Error ? error.message : String(error);
+const { paths: sitemap, problem: sitemapProblem } = await loadSitemap(
+  directFetch,
+  {
+    origin: args.origin,
+    cookieHeader: protection.cookieHeader,
+    hosts,
+    retry: () => traffic.retry(),
+    startupProblem,
   }
-}
+);
 if (sitemapProblem) console.warn(`[crawl] /sitemap.xml: ${sitemapProblem}`);
 const seen = [];
 const look = (target, identity) =>
-  safeVisit({
+  coldVisit({
     route: target,
     target,
     viewport: 'desktop',
@@ -333,7 +369,7 @@ for (let i = 0; i < todo.length; i += 4) {
     break;
   }
   const batch = todo.slice(i, i + 4);
-  const rows = await Promise.all(batch.map(safeVisit));
+  const rows = await Promise.all(batch.map(coldVisit));
   rows.forEach((row, k) => jobs.set(row, batch[k]));
   pages.push(...rows);
   if ((i / 4) % 25 === 24)
@@ -358,6 +394,7 @@ for (const [k, row] of suspects.entries()) {
   }
   const again = [];
   for (let n = 1; n < TIMING_SAMPLES; n += 1) {
+    traffic.retry();
     const r = await safeVisit(jobs.get(row));
     if (!r.error) again.push(r);
   }
@@ -377,7 +414,11 @@ for (const [k, row] of suspects.entries()) {
 // A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
 const throttled = pages.filter(wasThrottled);
 let throttleRechecksLeft = 0;
-if (throttled.length && Date.now() + 61_000 < DEADLINE) {
+if (
+  throttled.length &&
+  !traffic.exhausted() &&
+  Date.now() + 61_000 < DEADLINE
+) {
   console.log(
     `[crawl] re-loading ${throttled.length} rate-limited pages after a quiet minute, ${minutes()}m`
   );
@@ -387,6 +428,7 @@ if (throttled.length && Date.now() + 61_000 < DEADLINE) {
       throttleRechecksLeft = throttled.length - k;
       break;
     }
+    traffic.retry();
     const again = await safeVisit(jobs.get(row));
     if (!again.error) judgeOnQuietReload(row, again);
   }
@@ -402,11 +444,13 @@ const overlayWalks = await runOverlayWalks({
   out: args.out,
   openContext,
   pastDeadline,
+  deadlineEpochMs: DEADLINE,
   skip: skipSignedIn,
   // Each shard walks its own pages; together they walk about one crawl's worth.
   max: Math.max(1, Math.ceil(MAX_WALKS_PER_IDENTITY / shard.count)),
 });
-await browser.close();
+await browser?.close();
+await traffic.settle();
 
 const receipt = {
   schema: 'product-crawl/v1',
@@ -423,6 +467,8 @@ const receipt = {
   closedInProduction,
   outOfTime: loadsLeft || resamplesLeft ? { loadsLeft, resamplesLeft } : null,
   overlayWalks,
+  measurementReuses: measurements.reuses(),
+  traffic: traffic.snapshot(),
   pages,
 };
 const verdict = productReady(receipt);

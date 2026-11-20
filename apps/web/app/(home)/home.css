@@ -2339,7 +2339,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
    flex + gap-x-8 + lg nowrap / space-between. The shared trust-strip
    primitive stays a 5-track grid for other mounts. */
 .homepage-certified-proof
-.system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
   overflow: visible;
 }
 
@@ -2556,7 +2556,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   /* Trio phones share a ~half-rail column here, so bezel tokens follow
      the squeezed width. Notch already uses cqi. */
   .homepage-certified-section__phones[data-count="3"]
-  .homepage-certified-section__device {
+    .homepage-certified-section__device {
     --ap-phone-scale: 0.367;
   }
 }
@@ -4268,7 +4268,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* Quiet feature-accent rotation on the step numerals — color lives on small
    text only, matching the outcome-card title rules. */
 .system-b-mounted-home-workspace-callout:nth-child(1)
-.system-b-mounted-home-workspace-callout-label {
+  .system-b-mounted-home-workspace-callout-label {
   color: var(--color-accent-blue);
 }
 
@@ -5798,7 +5798,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Same quiet accent rotation as the workspace numerals, on title text only. */
 .homepage-opportunity-section__item:nth-child(1)
-.homepage-opportunity-section__item-title {
+  .homepage-opportunity-section__item-title {
   color: var(--color-accent-blue);
 }
 

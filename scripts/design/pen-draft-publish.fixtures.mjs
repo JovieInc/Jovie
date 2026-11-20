@@ -67,7 +67,7 @@ export function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
       return json({
         data: {
           team: {
-            states: { nodes: [{ id: 'state-backlog', name: 'Backlog' }] },
+            states: { nodes: [{ id: 'state-triage', name: 'Triage' }] },
           },
           issueLabels: {
             nodes: [
@@ -103,7 +103,7 @@ export function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
         id: `new-${created.length}`,
         identifier: `JOV-90${created.length}`,
         title: variables.input.title,
-        state: { type: 'backlog' },
+        state: { type: 'triage' },
         labels: { nodes: variables.input.labelIds.map(id => ({ id })) },
       };
       created.push(issue);

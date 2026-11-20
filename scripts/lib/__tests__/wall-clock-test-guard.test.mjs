@@ -1,9 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   countIn,
   language,
+  main,
   RATCHET_PATH,
   RATCHET_SCHEMA,
   scan,
@@ -151,6 +154,86 @@ describe('wall-clock-test-guard', () => {
       { file: 'b', found: 1, allowed: 0 },
     ]);
     expect(tighten({ a: 1 }, { a: 3, b: 1 })).toEqual({ a: 1 });
+  });
+
+  it('names the file when an elapsed assertion exceeds the duration baseline', async () => {
+    const errors = [];
+    const code = await main(['--check'], {
+      trackedFiles: [],
+      durationHits: { 'apps/ios/scripts/capture-budget.test.mjs': 1 },
+      durationBaseline: {},
+      error: line => errors.push(line),
+    });
+    expect(code).toBe(1);
+    expect(errors.join('\n')).toContain(
+      'apps/ios/scripts/capture-budget.test.mjs: 1 assertion(s), 0 allowed'
+    );
+  });
+
+  it('accepts elapsed counts that stay inside the duration baseline', async () => {
+    const code = await main(['--check'], {
+      trackedFiles: [],
+      durationHits: { 'apps/web/lib/dial/dial-physics.test.ts': 4 },
+      durationBaseline: { 'apps/web/lib/dial/dial-physics.test.ts': 4 },
+      error: () => {
+        throw new Error('duration check should not report');
+      },
+    });
+    expect(code).toBe(0);
+  });
+
+  it('scans the working tree for new elapsed assertions', async () => {
+    expect(await main(['--check'])).toBe(0);
+  });
+
+  it('skips the elapsed scan in a scripts-only checkout with no typescript', async () => {
+    const errors = [];
+    const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-source-'));
+    const missing = Object.assign(
+      new Error(
+        "Cannot find module 'typescript'\nRequire stack:\n- scripts/lib/wall-clock-assertions.mjs"
+      ),
+      { code: 'MODULE_NOT_FOUND' }
+    );
+    try {
+      const code = await main(['--check'], {
+        cwd,
+        trackedFiles: [],
+        durationScan: () => {
+          throw missing;
+        },
+        error: line => errors.push(line),
+      });
+      expect(code).toBe(0);
+      expect(errors.join('\n')).toContain('no node_modules');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when an installed checkout cannot load typescript', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-installed-'));
+    mkdirSync(join(cwd, 'node_modules'));
+    const missing = Object.assign(
+      new Error("Cannot find package 'typescript'"),
+      { code: 'ERR_MODULE_NOT_FOUND' }
+    );
+    try {
+      await expect(
+        main(['--check'], {
+          cwd,
+          trackedFiles: [],
+          durationScan: () => {
+            throw missing;
+          },
+          error: () => {
+            throw new Error('calendar check should not report');
+          },
+        })
+      ).rejects.toThrow(/typescript/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it('keeps the committed ratchet at or above what the tree holds today', () => {

@@ -328,14 +328,12 @@ async function ArtistPageContent({
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
-  const isClaimed = creatorClerkId !== null;
+  const isClaimed = Boolean(profile.is_claimed);
   const isProofProfile = isProofProfileHandle(artist.handle);
   const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
-  // Structured-credit profiles still expose a claim path when an exact
-  // Spotify identity exists. The route only seeds a pending flow; the
-  // onboarding Spotify action must match that exact ID before claiming.
+  // Exact Spotify identity seeds a pending flow; onboarding action verifies match.
   const directClaimSupported = supportsDirectProfileClaim({
     spotifyId: profile.spotify_id,
   });
@@ -344,6 +342,7 @@ async function ArtistPageContent({
       id: profile.id,
       username: artist.handle,
       isClaimed,
+      userId: profile.user_id,
       userClerkId: creatorClerkId,
       spotifyId: profile.spotify_id,
     },
@@ -651,8 +650,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status, creatorClerkId, latestRelease } =
-    profileResult;
+  const { profile, genres, status, latestRelease } = profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -665,7 +663,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildPublicProfileMetadata({
     profile,
     genres,
-    isClaimed: creatorClerkId !== null,
+    isClaimed: Boolean(profile.is_claimed),
     // latestRelease uses the public release-eligibility predicate, so null
     // means the profile has no publicly eligible release.
     hasPublicRelease: latestRelease !== null,

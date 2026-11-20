@@ -18,7 +18,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     import fix_red_render_modes
 
     order = (
-        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
+        classes.SYNC_MAIN, classes.STAMP_REPAIR, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.DROP_MISSING_CONTRACT, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
         fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
@@ -57,10 +57,13 @@ def deterministic_fixer(lane, action: str):
         "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
     })
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
+    table[classes.SPLIT_SIZE] = lane.split_size_fix
     import fix_red_size_500
-    table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
+    table[fix_red_size_500.ACTION_EXTRACT] = fix_red_size_500.bind_self_growth(lane.sh, lane.failed_logs)
     import fix_red_biome
     table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
+    import fix_red_missing_contract
+    table[classes.DROP_MISSING_CONTRACT] = fix_red_missing_contract.bind(lane.sh)
     return table.get(action)
 
 
@@ -74,7 +77,10 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     agent = None
     done = []
     for action in actions:
-        if action == classes.STAMP_CHANGELOG:
+        if action == classes.STAMP_REPAIR:
+            if lane.stamp_fleet_body(host, pr) is None:
+                return None
+        elif action == classes.STAMP_CHANGELOG:
             if not lane.pr_events.ensure_red_before_green(
                     pr, customer_decision={"releaseWorthy": False},
                     sh=lambda args: lane.gh_call(args, priority="repair")):
@@ -98,6 +104,7 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
 
 def repair_files(cls, action, names, logs, per_check):
     """Keep each deterministic class's input paths when composing its route."""
+    import cert_stub_sync
     import fix_red_classes as classes
     import detached_native_sync
 
@@ -105,17 +112,26 @@ def repair_files(cls, action, names, logs, per_check):
     wanted = {item_cls for item_cls, _ in per_check}
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in classes.COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
+    if "design-source-cli" in wanted and action == classes.SYNC_MAIN:
+        from fix_red_failure_routing import design_source_paths
+        files = sorted({path for name in names for path in design_source_paths(logs.get(name) or "")})
     if "ci-fast-wiring" in wanted and action in {classes.WIRE_CI_FAST, classes.COMPOSE}:
         for name in names:
             found = classes.UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
         files = sorted(set(files))
+    if "missing-contract-test" in wanted and action in {classes.DROP_MISSING_CONTRACT, classes.COMPOSE}:
+        from fix_red_missing_contract import paths as missing_contract_paths
+        files = sorted(set(files) | set(missing_contract_paths("\n".join(logs.get(name) or "" for name in names))))
     if "screen-certificate" in wanted and action in {classes.REPAIR_SCREEN_CERT, classes.COMPOSE}:
         files = sorted(set(files) | set(classes.screen_cert_paths("\n".join(logs.get(name) or "" for name in names))))
     if "domain-write" in wanted and action in {classes.REGISTER_DOMAIN, classes.COMPOSE}:
         files = sorted(set(files) | set(classes._domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
     if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == classes.COMPOSE):
         files = sorted(set(files) | set(detached_native_sync.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "cert-todo-stub" in wanted and (cls == "cert-todo-stub" or action == classes.COMPOSE):
+        files = sorted(set(files) | set(cert_stub_sync.config_paths(
             "\n".join(logs.get(name) or "" for name in names))))
     if "render-mode-admission" in wanted and action in {"admit-render-mode", classes.COMPOSE}:
         import fix_red_render_modes
@@ -125,6 +141,13 @@ def repair_files(cls, action, names, logs, per_check):
         import fix_red_size_500
         files = sorted(set(files) | set(fix_red_size_500.paths(
             "\n".join(logs.get(name) or "" for name in names))))
+    if "size-500-new" in wanted and action in {classes.SPLIT_SIZE, classes.COMPOSE}:
+        files = sorted(set(files) | set(classes.fix_red_size_split.paths_from_log(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if cls == "size-500-self-growth":
+        from fix_red_source_edits import size_500_grew
+        grew = size_500_grew("\n".join(logs.get(name) or "" for name in names)) or []
+        files = sorted(set(files) | {path for path, _baseline in grew})
     if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
         from fix_red_biome import cited_paths
         files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))

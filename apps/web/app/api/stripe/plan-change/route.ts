@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { resolveCheckoutPriceForUser } from '@/lib/billing/price-lock.server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
@@ -89,16 +90,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Price lock: moving to the locked plan lands on the person's locked
+    // price, never the current list price.
+    const { decision } = await resolveCheckoutPriceForUser(userId, priceId);
+
     logger.info('Processing plan change request', {
       userId,
       subscriptionId: subscription.id,
-      newPriceId: priceId,
+      newPriceId: decision.priceId,
+      requestedPriceId: priceId,
     });
 
     // Execute the plan change
     const result = await executePlanChange({
       subscriptionId: subscription.id,
-      newPriceId: priceId,
+      newPriceId: decision.priceId,
+      ...(decision.kind === 'locked'
+        ? { lockedPrice: decision.expectation }
+        : {}),
     });
 
     if (!result.success) {

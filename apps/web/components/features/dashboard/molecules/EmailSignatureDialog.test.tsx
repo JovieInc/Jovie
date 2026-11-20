@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@/components/feedback';
@@ -165,6 +165,65 @@ describe('EmailSignatureDialog', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('ignores copy feedback from a dialog that closed before copying finished', async () => {
+    let finishCopy!: (ok: boolean) => void;
+    vi.mocked(copyToClipboard).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishCopy = resolve;
+        })
+    );
+    const user = userEvent.setup();
+    const props = { input, onClose: vi.fn() };
+    const { rerender } = render(<EmailSignatureDialog {...props} open />);
+    await user.click(screen.getByRole('button', { name: 'Copy HTML' }));
+    rerender(<EmailSignatureDialog {...props} open={false} />);
+    rerender(<EmailSignatureDialog {...props} open />);
+
+    await act(async () => finishCopy(true));
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByRole('button', { name: 'Copy HTML' })
+        .querySelector('.lucide-check')
+    ).not.toBeInTheDocument();
+    await auditDialog();
+  });
+
+  it('keeps the latest copy feedback when earlier clipboard work finishes last', async () => {
+    let finishHtml!: (ok: boolean) => void;
+    let finishText!: (ok: boolean) => void;
+    vi.mocked(copyToClipboard)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishHtml = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishText = resolve;
+          })
+      );
+    const user = userEvent.setup();
+    render(<EmailSignatureDialog open onClose={vi.fn()} input={input} />);
+    const html = screen.getByRole('button', { name: 'Copy HTML' });
+    const text = screen.getByRole('button', { name: 'Copy As Plain Text' });
+    await user.click(html);
+    await user.click(text);
+    await act(async () => finishText(true));
+    await act(async () => finishHtml(true));
+
+    expect(text.querySelector('.lucide-check')).toBeInTheDocument();
+    expect(html.querySelector('.lucide-check')).not.toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledExactlyOnceWith(
+      'Plain text signature copied'
+    );
+    await auditDialog();
+  });
+
   it.each([
     { state: 'default', profile: input, dir: 'ltr' },
     { state: 'long content', profile: longInput, dir: 'ltr' },
@@ -180,5 +239,28 @@ describe('EmailSignatureDialog', () => {
       expect.stringContaining(buildEmailSignature(profile).html)
     );
     await auditDialog();
+  });
+
+  it('leaves preview text colour to the signature markup', () => {
+    render(<EmailSignatureDialog open onClose={vi.fn()} input={input} />);
+    const srcDoc =
+      screen.getByTitle('Email Signature preview').getAttribute('srcDoc') ?? '';
+    expect(srcDoc).toContain(
+      'html,body{margin:0;padding:16px;background:transparent;}'
+    );
+    expect(srcDoc).toContain(buildEmailSignature(input).html);
+  });
+
+  it('keeps copied feedback while the open dialog re-renders', async () => {
+    const user = userEvent.setup();
+    const props = { input, onClose: vi.fn() };
+    const { rerender } = render(<EmailSignatureDialog {...props} open />);
+    await user.click(screen.getByRole('button', { name: 'Copy HTML' }));
+    rerender(<EmailSignatureDialog {...props} open />);
+    expect(
+      screen
+        .getByRole('button', { name: 'Copy HTML' })
+        .querySelector('.lucide-check')
+    ).toBeInTheDocument();
   });
 });

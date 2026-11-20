@@ -456,11 +456,13 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   });
 }
 
-/** Issued invitation, then visible email-OTP sign-in. E2E mode supplies 424242 for +e2e addresses. */
+/** Visible email-OTP sign-in; seeds invitation only when closed-signup kill switch is on. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
-  const sql = neon(process.env.DATABASE_URL!);
-  await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
+  if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
+    const sql = neon(process.env.DATABASE_URL!);
+    await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
+  }
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
     entryPath: `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(APP_ROUTES.START)}`,

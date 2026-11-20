@@ -259,3 +259,41 @@ it('judges the sharded crawl once, from every shard, under the same admission', 
   const run = crawl.steps.find(s => s.run?.includes('crawl.mjs --origin'));
   expect(run?.env?.CRAWL_SHARD).toBe('${{ matrix.shard }}/4');
 });
+
+it('sets both existing crawl deadlines before setup while preserving manual-only admission', () => {
+  const jobs = [standalone.jobs.crawl, workflow.jobs['product-crawl']];
+  for (const [index, job] of jobs.entries()) {
+    const deadline = job.steps.find(
+      step => step.name === 'Establish crawl deadline'
+    );
+    expect(deadline?.run).toBeTypeOf('string');
+    if (!deadline?.run) throw new Error('missing crawl deadline');
+    expect(job.steps.indexOf(deadline)).toBe(1);
+    const root = mkdtempSync(join(tmpdir(), 'crawl-deadline-'));
+    try {
+      const envFile = join(root, 'environment');
+      const result = spawnSync(
+        'bash',
+        [
+          '-e',
+          '-o',
+          'pipefail',
+          '-c',
+          `date() { printf '%s\\n' 1000; }\n${deadline.run}`,
+        ],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: { ...process.env, GITHUB_ENV: envFile },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const minutes = index === 0 ? 30 : 40;
+      expect(readFileSync(envFile, 'utf8')).toBe(
+        `CRAWL_DEADLINE_EPOCH_MS=${(1000 + minutes * 60 - 240) * 1000}\n`
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});

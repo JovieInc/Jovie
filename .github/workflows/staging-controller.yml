@@ -25,6 +25,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/resolve-main-sha.sh
             .github/scripts/gh-api-hold.sh
+            .github/scripts/staging-identity-read.sh
             .github/scripts/staging-supersession-policy.mjs
           sparse-checkout-cone-mode: false
       - name: Fetch sealed product-lane release receipt
@@ -127,6 +128,7 @@ jobs:
           # import closure the routing step actually loads.
           sparse-checkout: |
             .github/scripts/staging-lane-carryover.mjs
+            .github/scripts/staging-identity-read.sh
             scripts/lib/production-lane-range.mjs
             scripts/lib/product-lane-classifier.mjs
           sparse-checkout-cone-mode: false
@@ -162,7 +164,7 @@ jobs:
               fi
             fi
             if [ "$outcome" = not_applicable ]; then
-              CANONICAL_STAGING_IDENTITY="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+              CANONICAL_STAGING_IDENTITY="$(bash .github/scripts/staging-identity-read.sh)"
               export CANONICAL_STAGING_IDENTITY
               node --input-type=module <<'NODE' > "$RUNNER_TEMP/staging-carryover.json"
           import { readFileSync } from 'node:fs';

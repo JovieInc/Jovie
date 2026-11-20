@@ -61,6 +61,7 @@ export function useRailPreview({
   const pointerInside = useRef(false);
   const pointerTarget = useRef<EventTarget | null>(null);
   const pointerPoint = useRef<{ x: number; y: number } | null>(null);
+  const pressedToggle = useRef<Element | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelIntent = useCallback(() => {
@@ -123,7 +124,12 @@ export function useRailPreview({
       }, SHELL_RAIL_PREVIEW_GRACE_MS);
     };
     const enter = (event: Event) => {
-      if (event.type === 'pointerover') {
+      // Re-entry can arrive from move() after an explicit close. It is still
+      // pointer intent: keep the dwell and touch guard instead of treating
+      // movement as immediate keyboard focus and moving the toggle mid-click.
+      const pointer =
+        event.type === 'pointerover' || event.type === 'pointermove';
+      if (pointer) {
         pointerTarget.current = event.target;
         pointerInside.current = inside(event.target);
       }
@@ -139,10 +145,19 @@ export function useRailPreview({
           blocked.current = false;
         return;
       }
-      if (event.type === 'pointerover') {
+      if (pointer) {
         pointerInside.current = true;
       }
       if (pinned) return;
+      // A pointer-down focuses a button before its click. Expanding here can
+      // move the same toggle away before pointer-up, losing the activation.
+      // Keyboard focus still previews immediately; pointer activation pins it.
+      if (
+        pressedToggle.current &&
+        event.target instanceof Element &&
+        pressedToggle.current.contains(event.target)
+      )
+        return;
       // An entity inspector already owns the right surface. Hover must not
       // reinterpret it as an unsolicited artist-profile preview.
       if (
@@ -159,7 +174,6 @@ export function useRailPreview({
         setPresentationMode('preview');
         setIsPreview(true);
       };
-      const pointer = event.type === 'pointerover';
       if (pointer && (event as PointerEvent).pointerType === 'touch') return;
       if (!pointer || enterIntentMs <= 0 || isPreview) {
         cancelIntent();
@@ -214,10 +228,18 @@ export function useRailPreview({
       }
     };
     const outside = (event: PointerEvent) => {
+      pressedToggle.current =
+        event.target instanceof Element
+          ? event.target.closest(`[data-rail-toggle="${side}"]`)
+          : null;
+      if (pressedToggle.current) cancelIntent();
       if (isPreview && !inside(event.target)) {
         dismissPreview();
         if (!inside(document.activeElement)) blocked.current = false;
       }
+    };
+    const release = () => {
+      pressedToggle.current = null;
     };
     const escape = (event: KeyboardEvent) => {
       // A dialog/menu that consumed Escape in capture owns this dismissal.
@@ -262,6 +284,8 @@ export function useRailPreview({
     document.addEventListener('focusin', enter);
     document.addEventListener('focusout', leave);
     document.addEventListener('pointerdown', outside);
+    document.addEventListener('pointerup', release);
+    document.addEventListener('pointercancel', release);
     document.addEventListener('keydown', escape);
     return () => {
       observer.disconnect();
@@ -273,6 +297,8 @@ export function useRailPreview({
       document.removeEventListener('focusin', enter);
       document.removeEventListener('focusout', leave);
       document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('pointerup', release);
+      document.removeEventListener('pointercancel', release);
       document.removeEventListener('keydown', escape);
     };
   }, [

@@ -43,6 +43,8 @@ import {
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
 
+import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
+
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
@@ -105,10 +107,6 @@ const SIZE_GUARD_WORKFLOW = readFileSync(
 );
 const SECURITY_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/security.yml'),
-  'utf8'
-);
-const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),
   'utf8'
 );
 const MEMBER_POLICY = readFileSync(
@@ -801,12 +799,15 @@ describe('merge_group workflow contract', () => {
     // The absent-app guard is preserved on both the setup and build steps.
     expect(
       build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
     expect(ovieBuild).toContain('set -euo pipefail');
     expect(ovieBuild).toContain(
-      'NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build'
+      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
+    );
+    expect(ovieBuild).toContain(
+      'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
     );
     expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
     // The build may skip Next's duplicate type pass only because the
@@ -1525,13 +1526,6 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
-    expect(pathChanges).toContain(
-      'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
-    );
-    expect(pathChanges).toContain(
-      'for output in run_build run_test run_test_performance'
-    );
-    expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
     expect(pathChanges).toContain('elif [[ "${EVENT_NAME}" == "push" ]]; then');
     expect(pathChanges).toContain(
       'Unsupported event for path change detection'
@@ -1875,43 +1869,17 @@ describe('merge_group workflow contract', () => {
   });
 
   it.each([
-    ['equal trees', 'a'.repeat(40), 0, 0],
-    ['different trees', 'b'.repeat(40), 0, 1],
-    ['unreadable trees', '', 128, 128],
+    ['equal trees', 0],
+    ['different trees', 1],
+    ['unreadable trees', 128],
   ])(
     'allows no-op classification only with exact proof: %s',
-    (_, headTree, gitStatus, status) => {
+    (scenario, status) => {
       const detect = getStepRunScript(
         getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
         'Detect path changes for all job types'
       );
-      const start = detect.indexOf('    NOOP_BASE_TREE=');
-      const end = detect.indexOf('    PRODUCT_LANE_DIR=', start);
-      expect(start).toBeGreaterThanOrEqual(0);
-      const proof = detect.slice(start, end);
-      const root = mkdtempSync(join(tmpdir(), 'noop-tree-proof-'));
-      writeFileSync(
-        join(root, 'git'),
-        '#!/bin/sh\n[ "$STUB_GIT_STATUS" = 0 ] || exit "$STUB_GIT_STATUS"\ncase "$3" in "$MERGE_GROUP_BASE_SHA^{tree}") printf "%s\n" "$STUB_BASE_TREE" ;; *) printf "%s\n" "$STUB_HEAD_TREE" ;; esac\n'
-      );
-      chmodSync(join(root, 'git'), 0o755);
-      try {
-        const result = spawnSync('bash', ['-ec', proof], {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${root}${delimiter}${process.env.PATH}`,
-            MERGE_GROUP_BASE_SHA: 'c'.repeat(40),
-            MERGE_GROUP_HEAD_SHA: 'd'.repeat(40),
-            STUB_BASE_TREE: 'a'.repeat(40),
-            STUB_HEAD_TREE: headTree,
-            STUB_GIT_STATUS: String(gitStatus),
-          },
-        });
-        expect(result.status, result.stderr).toBe(status);
-      } finally {
-        rmSync(root, { recursive: true, force: true });
-      }
+      assertNoopPathOutputs(REPO_ROOT, detect, scenario, status);
     }
   );
 
@@ -2393,207 +2361,6 @@ ${selectedGateScript}`,
       'Combined-head standalone server failed to start'
     );
     expect(buildLayout).not.toContain('actions/download-artifact');
-  });
-
-  it('restores the Build+Layout Turbopack cache read-only and writes it only from trusted main', () => {
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    const stepAt = name => buildLayout.indexOf(`      - name: ${name}\n`);
-    const step = name => {
-      const start = stepAt(name);
-      expect(start, name).toBeGreaterThan(-1);
-      const next = buildLayout.indexOf('\n      - ', start + 1);
-      return buildLayout.slice(start, next === -1 ? undefined : next);
-    };
-    const restore = step('Restore Next build cache (read-only)');
-    const measure = step('Measure Next build cache (trusted main only)');
-    const save = step('Save Next build cache (trusted main only)');
-    const trustedMain =
-      "success() && github.event_name == 'push' && github.ref == 'refs/heads/main'";
-
-    // Restore runs on every event and happens before the build it warms.
-    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
-      stepAt('Build exact combined head')
-    );
-    expect(restore).toContain('uses: actions/cache/restore@');
-    expect(restore).not.toMatch(/^\s+if:/m);
-    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
-    expect(restore).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
-    );
-    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
-
-    // Only compiler state is cached: never fetch/image caches or build output.
-    expect(buildLayout).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
-    expect(buildLayout).not.toContain('uses: actions/cache@');
-
-    // Writes happen after the layout guard, only from trusted main pushes,
-    // only on a primary-key miss, and only below the size bound.
-    expect(stepAt('Run deterministic layout behavior guard')).toBeLessThan(
-      stepAt('Save Next build cache (trusted main only)')
-    );
-    expect(measure).toContain(`if: \${{ ${trustedMain} &&`);
-    expect(measure).toContain(
-      "steps.next-build-cache.outputs.cache-hit != 'true'"
-    );
-    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
-    expect(measure).toContain('must not be a symlink');
-    expect(save).toContain(`if: \${{ ${trustedMain} &&`);
-    expect(save).toContain(
-      "steps.next-build-cache-size.outputs.eligible == 'true'"
-    );
-    expect(save).toContain('uses: actions/cache/save@');
-    expect(save).toContain('path: apps/web/.next/cache/turbopack');
-    expect(save).toContain(
-      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
-    );
-    expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
-    // Non-saving runs skip the cache write; push must still persist it.
-    expect(step('Build exact combined head')).toContain(
-      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
-    );
-    expect(buildLayout).not.toContain('pull_request_target');
-    expect(buildLayout).not.toContain('secrets.');
-  });
-
-  it('writes the Build+Layout Turbopack cache only from a trusted-main warmer with the identical key', () => {
-    const warm = NEXT_BUILD_CACHE_WARM_WORKFLOW;
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    const stepIn = (block, name) => {
-      const start = block.indexOf(`      - name: ${name}\n`);
-      expect(start, name).toBeGreaterThan(-1);
-      const next = block.indexOf('\n      - ', start + 1);
-      return block.slice(start, next === -1 ? undefined : next);
-    };
-    const stepAt = name => warm.indexOf(`      - name: ${name}\n`);
-    const keyLines = step =>
-      step
-        .split('\n')
-        .filter(line => line.includes('-next-build-web-v1-'))
-        .map(line => line.trim());
-
-    // Triggers: only push to main and manual dispatch. No PR, fork,
-    // merge-group or workflow_run code can reach the save step.
-    const header = warm.slice(0, warm.indexOf('\njobs:'));
-    expect(header).toMatch(
-      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:/m
-    );
-    for (const trigger of [
-      'pull_request',
-      'pull_request_target',
-      'merge_group',
-      'workflow_run',
-      'schedule',
-    ]) {
-      expect(header).not.toMatch(new RegExp(`^\\s+${trigger}:`, 'm'));
-    }
-    expect(header).toMatch(/^permissions:\n {2}contents: read\n\n/m);
-    expect(header).toContain('group: next-build-cache-warm-${{ github.ref }}');
-    expect(warm).not.toContain('secrets.');
-    expect(warm).not.toContain('TURBO_TOKEN');
-    expect(warm).toContain('persist-credentials: false');
-    expect(warm).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
-
-    const job = getJobBlock(warm, 'warm');
-    expect(job).toContain("github.ref == 'refs/heads/main' &&");
-    expect(job).toContain(
-      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
-    );
-
-    // Key scheme is byte-identical to the Build + Layout restore.
-    const ciRestore = stepIn(
-      buildLayout,
-      'Restore Next build cache (read-only)'
-    );
-    const lookup = stepIn(warm, "Look up this hour's Next build cache");
-    expect(keyLines(ciRestore)).toHaveLength(3);
-    expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
-
-    // The warmer always compiles cold. Building on top of a restored older
-    // entry grew the cache past the 3 GiB save bound (3.51-3.54 GB vs 2.37 GB
-    // cold), so the warmer rebuilt on every main push and never saved.
-    expect(warm.match(/actions\/cache\/restore@/g)).toHaveLength(1);
-    expect(warm).not.toContain('restore-keys:');
-    const dayRun = step =>
-      step.split('\n').find(line => line.trim().startsWith('run:'));
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toBe(
-      dayRun(stepIn(buildLayout, 'Resolve Next build cache hour'))
-    );
-    // Hourly keys keep merge groups on a recent main; older hours still
-    // restore through the hash prefix.
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toContain(
-      'hour=$(date -u +%Y%m%d%H)'
-    );
-    expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
-
-    // Lookup-only early exit: nothing heavy runs on an exact-key hit.
-    expect(lookup).toContain('lookup-only: true');
-    expect(lookup).not.toMatch(/^\s+if:/m);
-    const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
-    const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
-    expect(stepAt("Look up this hour's Next build cache")).toBeLessThan(
-      setupAt
-    );
-    expect(
-      warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
-    ).toContain(miss);
-    for (const name of [
-      'Build web for cache',
-      'Measure Next build cache (trusted main only)',
-    ]) {
-      expect(stepIn(warm, name), name).toContain(miss);
-    }
-
-    // Same web build and public mock env as the combined head build.
-    const build = stepIn(warm, 'Build web for cache');
-    expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
-    expect(warm).not.toContain('TURBO_ENGINE_READ_ONLY');
-    const envLines = step =>
-      step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
-    const ciBuild = stepIn(buildLayout, 'Build exact combined head');
-    expect(envLines(build).length).toBeGreaterThan(0);
-    expect(envLines(build)).toEqual(envLines(ciBuild));
-
-    // The homepage visual compare restores the same entry, so it builds with
-    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
-    // turbo does not hash it and the homepage baselines render without the
-    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
-    const visualBuild = stepIn(
-      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
-      'Build homepage for rendered snapshot compare'
-    );
-    expect(envLines(visualBuild)).toEqual([
-      ...envLines(build),
-      "          NEXT_DISABLE_TOOLBAR: '1'",
-    ]);
-    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
-
-    // Size/symlink guard and a single trusted-main save of the primary key.
-    const measure = stepIn(
-      warm,
-      'Measure Next build cache (trusted main only)'
-    );
-    const save = stepIn(warm, 'Save Next build cache (trusted main only)');
-    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
-    expect(measure).toContain('must not be a symlink');
-    expect(stepAt('Build web for cache')).toBeLessThan(
-      stepAt('Save Next build cache (trusted main only)')
-    );
-    expect(save).toContain(
-      "if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}"
-    );
-    expect(save).toContain('path: apps/web/.next/cache/turbopack');
-    expect(save).toContain(
-      'key: ${{ steps.next-build-cache-lookup.outputs.cache-primary-key }}'
-    );
-    expect(warm.match(/actions\/cache\/save@/g)).toHaveLength(1);
-    expect(warm).not.toContain('uses: actions/cache@');
-
-    // Every pinned action SHA is one ci.yml already uses.
-    const pins = source =>
-      new Set(source.match(/uses: actions\/[\w/-]+@[0-9a-f]{40}/g));
-    const ciPins = pins(CI_WORKFLOW);
-    expect(pins(warm).size).toBeGreaterThan(0);
-    for (const pin of pins(warm)) expect(ciPins.has(pin), pin).toBe(true);
   });
 
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {

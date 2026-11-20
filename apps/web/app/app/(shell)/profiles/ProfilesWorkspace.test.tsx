@@ -60,9 +60,11 @@ function createQueryClient() {
   });
   const offer = ARTIST_VISIBILITY_OFFER.pro;
   client.setQueryData(queryKeys.billing.pricingOptions(), {
+    priceLock: null,
     options: [
       {
         priceId: 'price_profiles',
+        plan: 'pro',
         amount: toCents(offer.monthlyUsd),
         currency: offer.currency,
         interval: offer.interval,

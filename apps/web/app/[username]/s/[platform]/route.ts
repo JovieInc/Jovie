@@ -17,10 +17,12 @@ import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { recordClickEvent } from '@/lib/db/queries/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
+import { isCreatorRowPubliclyVisible } from '@/lib/profile/public-creator-visibility.server';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
@@ -120,12 +122,24 @@ export async function GET(
         id: creatorProfiles.id,
         username: creatorProfiles.username,
         usernameNormalized: creatorProfiles.usernameNormalized,
+        isPublic: creatorProfiles.isPublic,
+        settings: creatorProfiles.settings,
+        ownerEmail: users.email,
       })
       .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
       .limit(1);
 
-    if (!profile) {
+    if (
+      !profile ||
+      !isCreatorRowPubliclyVisible({
+        handle: profile.usernameNormalized,
+        isPublic: profile.isPublic,
+        ownerEmail: profile.ownerEmail,
+        settings: profile.settings,
+      })
+    ) {
       return notFoundResponse();
     }
 

@@ -3039,7 +3039,7 @@ class RunIssueTest(unittest.TestCase):
 
         def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
             if args[:3] == ["git", "worktree", "add"]:
-                Path(args[-2]).mkdir(parents=True)
+                make_synthetic_worktree(args[-2])
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.sh = fake_sh
 
@@ -3053,8 +3053,10 @@ class RunIssueTest(unittest.TestCase):
 
     def test_success_writes_prompt_log_and_receipt(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
-        receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
-                                 FakeLinear([]), issue("JOV-8"))
+        with patch.object(lane.worktree_pool, "install_git_hooks", wraps=lane.worktree_pool.install_git_hooks) as install:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
+                                     FakeLinear([]), issue("JOV-8"))
+        install.assert_called_once()
         self.assertEqual((receipt["verdict"], receipt["agentExit"], receipt["pr"]), ("landing", 0, 9))
         self.assertEqual(self.ledger()[0]["runId"], receipt["runId"])
         prompt = next((self.host.state / "runs").glob("*.prompt.md")).read_text()
@@ -5411,7 +5413,7 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane.pr_events, "tick", return_value={}), \
-                patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
+                patch.object(lane.reason_lane, "schedule_tick", side_effect=RuntimeError("reason launcher unavailable")), \
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane, "HOST", "gem"), \
                 patch.dict(os.environ, {"YC_CORPUS_OWNER": "gem"}), \
@@ -5549,7 +5551,7 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane, "ensure_full_history") as history, \
                     patch.object(lane.subprocess, "Popen") as spawn, \
                     patch.object(lane.pr_events, "tick") as events, \
-                    patch.object(lane.reason_lane, "tick") as reasoning, \
+                    patch.object(lane.reason_lane, "schedule_tick") as reasoning, \
                     patch.object(lane.doctor, "run") as doctor, \
                     patch.object(lane, "sh") as shell:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
@@ -8412,6 +8414,7 @@ class FixRedTest(unittest.TestCase):
         self.assertIn("conflicts with main", prompt)
         self.assertIn("renumber yours", prompt)
         self.assertIn("merge_additive_identifier_list", prompt)
+        self.assertIn("resolve_complementary_destructure_text", prompt)
 
     def test_a_pushed_fix_records_pending_intent_without_publishing_unverified_head(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
@@ -9520,6 +9523,8 @@ class UpdateTest(unittest.TestCase):
             calls = []
 
             def run(argv, **kwargs):
+                if argv[0] == "bash":
+                    return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
                 calls.append(argv)
                 if argv[0] == "node":
                     # A real maintained take must skip the leased slot and use
@@ -9527,8 +9532,12 @@ class UpdateTest(unittest.TestCase):
                     with patch.object(lane.worktree_pool, "enabled", return_value=True), \
                             patch.object(lane.worktree_pool, "same_volume", return_value=True), \
                             patch.object(lane.worktree_pool, "claim") as claim:
-                        fresh = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0))
-                        self.assertEqual(lane.worktree_pool.take(host.repo, Path(tmp) / "other", None,
+                        dest = Path(tmp) / "other"
+                        def fresh(argv, **kwargs):
+                            make_synthetic_worktree(dest)
+                            return subprocess.CompletedProcess(argv, 0)
+                        fresh = unittest.mock.Mock(side_effect=fresh)
+                        self.assertEqual(lane.worktree_pool.take(host.repo, dest, None,
                                                                sh=fresh), "fresh")
                         claim.assert_not_called()
                         fresh.assert_called_once()
@@ -17807,7 +17816,7 @@ class MixedBodyRepairTest(unittest.TestCase):
         stamp.assert_called_once_with(self.host, self.pr)
 
 
-from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin, make_synthetic_worktree
 
 
 class CloudLaneGateTest(CloudLaneGateMixin, unittest.TestCase):

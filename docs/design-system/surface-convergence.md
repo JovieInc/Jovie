@@ -14,6 +14,21 @@ completions, introduced holdouts, regressions and an evidence-based ETA.
 Add `--rows` for each surface's URL, source identity and inherited family metadata.
 An optional positional base ref replaces `origin/main` for the ratchet comparison.
 
+For retained historical pricing records, run
+`node scripts/design-surface-census.mjs --retained pricing` in a full-history
+checkout containing the recorded archive revision. This reads the existing
+census's immutable revision/path/blob records from local Git, verifies byte
+counts and SHA-256, and checks original capture-manifest image digests when
+present. Missing objects fail explicitly without fetching. The report contains
+metadata only; it grants no permission to publish screenshots.
+
+Retained records are `historical-source-local`, with `currentQualification: false`.
+Recorded capture source hashes are preserved, not requalified. Older README-only
+bundles remain legacy records without equivalent capture bindings. The historical
+reader works independently of current-file certification; ordinary census and
+authority checks still require current source hashes and unchanged transition
+history.
+
 The unit is a route entrypoint, including dynamic patterns, compatibility routes
 and intercepted auth presentations. It is not a visitor count: a redirect needs
 destination verification, and a dynamic pattern represents its state family.

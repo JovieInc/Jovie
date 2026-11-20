@@ -1,5 +1,11 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -26,6 +32,12 @@ vi.mock('@/contexts/TableMetaContext', () => ({
     },
     setTableMeta,
   }),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/components/organisms/table', async importOriginal => {
@@ -162,6 +174,13 @@ describe('ContactsTable', () => {
     expect(screen.getByTestId('contacts-table')).not.toContainElement(sidebar);
 
     expect(screen.getByText('1 contact')).toBeInTheDocument();
+    const workspace = within(screen.getByTestId('contacts-toolbar')).getByRole(
+      'tablist',
+      { name: 'Audience Workspace' }
+    );
+    expect(
+      within(workspace).getByRole('tab', { name: 'Contacts' })
+    ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
       'data-first-row-selected',
       'false'
