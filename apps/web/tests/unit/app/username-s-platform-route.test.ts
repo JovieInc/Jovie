@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => {
     id: 'profile_123',
     username: 'tim',
     usernameNormalized: 'tim',
+    isPublic: true,
+    isClaimed: true,
+    settings: null,
+    userEmail: null,
   };
   const link = {
     id: 'link_ig',
@@ -15,7 +19,10 @@ const mocks = vi.hoisted(() => {
 
   const profileLimit = vi.fn().mockResolvedValue([profile]);
   const profileWhere = vi.fn().mockReturnValue({ limit: profileLimit });
-  const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+  const profileFrom = vi.fn().mockReturnValue({
+    leftJoin: vi.fn().mockReturnValue({ where: profileWhere }),
+    where: profileWhere,
+  });
 
   const linkLimit = vi.fn().mockResolvedValue([link]);
   const linkWhere = vi.fn().mockReturnValue({ limit: linkLimit });
@@ -167,6 +174,11 @@ describe('GET /[username]/s/[platform]', () => {
   it('302s to the profile for unknown platform slugs (never 404 a fan)', async () => {
     mocks.selectMock.mockImplementationOnce(() => ({
       from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: mocks.profileLimit,
+          }),
+        }),
         where: vi.fn().mockReturnValue({
           limit: mocks.profileLimit,
         }),
