@@ -73,8 +73,9 @@ export async function fetchDesktopPublishInFlight(input = {}) {
         signal: AbortSignal.timeout(30_000),
       });
       if (!listResponse.ok) {
+        // null = observation incomplete — not confirmed absence of a stamp.
         return {
-          inFlight: false,
+          inFlight: null,
           reason: `stamp list returned ${listResponse.status}`,
         };
       }
@@ -96,7 +97,7 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       listUrl = next;
     }
     if (truncated) {
-      return { inFlight: false, reason: 'stamp list truncated' };
+      return { inFlight: null, reason: 'stamp list truncated' };
     }
 
     // findOpenDesktopStampPr expects page(s); GitHub list bodies are pages.
@@ -110,9 +111,10 @@ export async function fetchDesktopPublishInFlight(input = {}) {
     const listed = matches[0];
     // List payloads omit mergeable_state (JOV-13856). Without a successful
     // detail GET we must not treat the stamp as keep/in-flight — that would
-    // suppress Summer for dirty/behind stamps.
+    // suppress Summer for dirty/behind stamps. Transient detail failures are
+    // incomplete observation (null), not confirmed absence.
     if (listed?.number == null) {
-      return { inFlight: false, reason: 'stamp detail unavailable' };
+      return { inFlight: null, reason: 'stamp detail unavailable' };
     }
     const detailResponse = await fetchImpl(
       `${GITHUB_API}/repos/${repo}/pulls/${listed.number}`,
@@ -120,7 +122,7 @@ export async function fetchDesktopPublishInFlight(input = {}) {
     );
     if (!detailResponse.ok) {
       return {
-        inFlight: false,
+        inFlight: null,
         reason: `stamp detail returned ${detailResponse.status}`,
         number: listed.number,
         url: listed.html_url ?? null,
@@ -156,7 +158,7 @@ export async function fetchDesktopPublishInFlight(input = {}) {
     };
   } catch (error) {
     return {
-      inFlight: false,
+      inFlight: null,
       reason: `stamp lookup failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }

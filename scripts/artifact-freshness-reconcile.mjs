@@ -92,13 +92,15 @@ export async function collectArtifactFreshness(input = {}) {
     });
   }
 
-  let publishInFlight = input.publishInFlight;
-  if (publishInFlight == null) {
+  /** @type {boolean | null} */
+  let publishInFlight = input.publishInFlight ?? null;
+  if (!Object.hasOwn(input, 'publishInFlight')) {
     const stamp = await fetchDesktopPublishInFlight({
       fetchImpl,
       token: input.token,
     });
-    publishInFlight = stamp.inFlight === true;
+    // true / false / null (null = stamp observation incomplete).
+    publishInFlight = stamp.inFlight;
   }
 
   const channels = [];
@@ -188,7 +190,7 @@ export async function collectArtifactFreshness(input = {}) {
         feed: feedStage,
         desktopRelevantSincePublished: desktopRelevant,
         publishInFlight:
-          channel === 'production' ? publishInFlight === true : false,
+          channel === 'production' ? publishInFlight : false,
       })
     );
   }
@@ -269,6 +271,7 @@ export function canResolveSummerForFreshness(receipt) {
         [
           'certified-relevance-unknown',
           'certified-unpublished-inflight',
+          'certified-unpublished-stamp-unknown',
         ].includes(mismatch.code)
       )
     ) {

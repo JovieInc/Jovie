@@ -53,10 +53,35 @@ test('certified desktop-relevant ahead of published pages Summer', () => {
       verified: true,
     },
     desktopRelevantSincePublished: true,
+    // Verified absence of stamp (not observation failure).
+    publishInFlight: false,
   });
   assert.equal(graph.mismatches.length, 1);
   assert.equal(graph.mismatches[0].code, 'certified-unpublished');
   assert.equal(graph.mismatches[0].pagesSummer, true);
+});
+
+test('stamp observation unknown records non-paging certified-unpublished-stamp-unknown', () => {
+  const graph = reconcileArtifactFreshness({
+    channel: 'production',
+    certified: { status: 'known', sourceRevision: SHA_B, verified: true },
+    published: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      version: '26.11.4',
+      verified: true,
+    },
+    feed: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      version: '26.11.4',
+      verified: true,
+    },
+    desktopRelevantSincePublished: true,
+    publishInFlight: null,
+  });
+  assert.equal(graph.mismatches[0].code, 'certified-unpublished-stamp-unknown');
+  assert.equal(graph.mismatches[0].pagesSummer, false);
 });
 
 test('stamp publish-in-flight records non-paging certified-unpublished-inflight', () => {

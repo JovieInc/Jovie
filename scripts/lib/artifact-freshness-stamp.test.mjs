@@ -38,7 +38,7 @@ test('nextLinkUrl reads rel=next from Link header', () => {
   assert.equal(nextLinkUrl(null), null);
 });
 
-test('non-OK stamp detail GET fails closed (does not suppress Summer)', async () => {
+test('non-OK stamp detail GET is incomplete observation (not confirmed absence)', async () => {
   const result = await fetchDesktopPublishInFlight({
     repo: REPO,
     token: 't',
@@ -49,8 +49,18 @@ test('non-OK stamp detail GET fails closed (does not suppress Summer)', async ()
       return { ok: false, status: 502, json: async () => ({}) };
     },
   });
-  assert.equal(result.inFlight, false);
+  assert.equal(result.inFlight, null);
   assert.match(result.reason, /stamp detail returned 502/);
+});
+
+test('non-OK stamp list is incomplete observation', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(result.reason, /stamp list returned 503/);
 });
 
 test('enriched dirty stamp is not in-flight', async () => {

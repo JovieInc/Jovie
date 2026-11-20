@@ -152,12 +152,21 @@ export function reconcileArtifactFreshness(input) {
   ) {
     if (desktopRelevantSincePublished === true) {
       // Stamp PR keep-owned = normal publish path; record without paging Summer.
+      // null publishInFlight = stamp lookup incomplete — never false-page.
       if (input.publishInFlight === true) {
         mismatches.push({
           from: 'certified',
           to: 'published',
           code: 'certified-unpublished-inflight',
           reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}; desktop stamp PR is in flight.`,
+          pagesSummer: false,
+        });
+      } else if (input.publishInFlight == null) {
+        mismatches.push({
+          from: 'certified',
+          to: 'published',
+          code: 'certified-unpublished-stamp-unknown',
+          reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}; stamp in-flight state was not observed.`,
           pagesSummer: false,
         });
       } else {
