@@ -2406,6 +2406,8 @@ ${selectedGateScript}`,
     expect(apple).toContain("queue_proven == 'true'");
     expect(apple).toContain('apple-post-queue-selection.mjs');
     expect(apple).toContain('product-lane-classifier.mjs');
+    expect(apple).toContain('actions/setup-node@');
+    expect(apple).toContain("node-version-file: '.nvmrc'");
     expect(apple).toContain(
       "run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}"
     );
