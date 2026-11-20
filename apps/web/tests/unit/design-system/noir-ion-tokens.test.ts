@@ -95,7 +95,9 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark).toContain('--color-bg-surface-2: var(--noir-ion-elevated);');
     expect(dsDark).toContain('--color-bg-surface-3: var(--noir-ion-floating);');
     expect(dsDark).toContain('--color-bg-elevated: var(--noir-ion-elevated);');
-    expect(dsDark).toContain('--app-shell-content-surface: #131417;');
+    expect(dsDark).toContain(
+      '--app-shell-content-surface: var(--noir-ion-card);'
+    );
   });
 
   it('locks the light five-step ladder', () => {
