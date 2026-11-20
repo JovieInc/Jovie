@@ -44,7 +44,7 @@ function ProviderActionButtons({
       )}
     >
       <IconButton
-        size='lg'
+        size='sm'
         variant='inline'
         title='Open'
         aria-label='Open'
@@ -57,7 +57,7 @@ function ProviderActionButtons({
         <span className='sr-only'>Open</span>
       </IconButton>
       <IconButton
-        size='lg'
+        size='sm'
         variant='inline'
         title={isCopied ? 'Copied' : 'Copy'}
         aria-label={isCopied ? 'Copied' : 'Copy'}
@@ -75,9 +75,10 @@ function ProviderActionButtons({
           />
           <Icon
             name='Check'
-            className={`absolute h-3.5 w-3.5 transition-opacity duration-subtle ${
-              isCopied ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={cn(
+              'absolute h-3.5 w-3.5 transition-opacity duration-subtle',
+              isCopied ? 'opacity-100 text-success' : 'opacity-0'
+            )}
             aria-hidden='true'
           />
         </span>
