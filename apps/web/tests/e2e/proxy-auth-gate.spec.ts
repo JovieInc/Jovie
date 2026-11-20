@@ -37,7 +37,7 @@ test.describe('proxy auth gate (anonymous)', () => {
     });
   });
 
-  test('GET /app sends anonymous users to sign-in (or start)', async ({
+  test('GET /app sends anonymous users to sign-in (followed navigation)', async ({
     page,
   }) => {
     await page.goto('/app', {
@@ -45,16 +45,12 @@ test.describe('proxy auth gate (anonymous)', () => {
       timeout: NAV_TIMEOUT,
     });
 
-    await expect(page).toHaveURL(/\/(signin|sign-in|start)(?:\?|$)/i, {
+    await expect(page).toHaveURL(/\/signin(?:\?|$)/i, {
       timeout: NAV_TIMEOUT,
     });
     await expect(page).not.toHaveURL(/\/app(?:\/|$)/);
-
-    const response = await page.request.get('/app', { maxRedirects: 0 });
-    expect(response.status()).toBeGreaterThanOrEqual(300);
-    expect(response.status()).toBeLessThan(400);
-    const location = response.headers().location ?? '';
-    expect(location).toMatch(/signin|sign-in|start/i);
+    // First-hop Location + redirect_url are asserted in
+    // proxy-protected-path-fail-closed.spec.ts (maxRedirects: 0).
   });
 
   test('retired /investors stays a neutral noindex 404 via proxy', async ({
