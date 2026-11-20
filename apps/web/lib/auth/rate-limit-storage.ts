@@ -106,7 +106,9 @@ function maybeCleanupMemoryCounters(now: number): void {
     (a, b) => a[1].resetAtMs - b[1].resetAtMs
   );
   for (let i = 0; i < overflow; i += 1) {
-    memoryCounters.delete(byReset[i]![0]);
+    const entry = byReset[i];
+    if (!entry) break;
+    memoryCounters.delete(entry[0]);
   }
 }
 
