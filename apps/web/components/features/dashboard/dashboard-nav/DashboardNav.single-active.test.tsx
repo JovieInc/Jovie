@@ -95,21 +95,23 @@ describe('DashboardNav selection', () => {
   it('moves the selected paint to a pending destination instead of doubling it', () => {
     setRoute(APP_ROUTES.DASHBOARD);
     renderDashboardNav({ renderFn: render });
-    const inbox = document.querySelector<HTMLElement>(
-      '[data-navigation-item-id="home"]'
+    // Rail Home owns aria-current; the command-slot bell shares id `home`
+    // without page ownership when the header does not own the bell.
+    const home = document.querySelector<HTMLElement>(
+      '[data-navigation-item-id="home"][aria-current="page"]'
     );
-    expect(inbox).toHaveAttribute('aria-current', 'page');
-    expect(inbox).toHaveAttribute('data-nav-highlighted', 'true');
+    expect(home).toBeInstanceOf(HTMLElement);
+    expect(home).toHaveAttribute('data-nav-highlighted', 'true');
 
     const audience = screen.getByRole('link', { name: 'Audience' });
     audience.addEventListener('click', event => event.preventDefault());
     fireEvent.click(audience);
 
     // The route has not committed yet: `/app` is still the page...
-    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(home).toHaveAttribute('aria-current', 'page');
     // ...but only the destination paints selected while it loads.
-    expect(inbox).not.toHaveAttribute('data-nav-highlighted');
-    expect(inbox?.className).not.toContain(SELECTED_PAINT);
+    expect(home).not.toHaveAttribute('data-nav-highlighted');
+    expect(home?.className).not.toContain(SELECTED_PAINT);
     expect(audience).toHaveAttribute('data-nav-highlighted', 'true');
     expectAtMostOneSelected(`${APP_ROUTES.DASHBOARD} -> Audience pending`);
   });
