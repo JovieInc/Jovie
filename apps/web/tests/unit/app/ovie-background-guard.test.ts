@@ -37,8 +37,7 @@ const read = (file: string) => {
   return source;
 };
 const shellFrameSelector = '.dark [data-app-shell-frame="true"]';
-const shellFrameMarker =
-  'NOIR ION D — workspace state surfaces (shell-scoped)';
+const shellFrameMarker = 'NOIR ION D — workspace state surfaces (shell-scoped)';
 
 function extractShellFrameBlock(css: string): string {
   const markerIndex = css.indexOf(shellFrameMarker);
@@ -93,9 +92,7 @@ describe('Ovie Home and dashboard background contract', () => {
   it('shares the dark shell-frame ZiaWI ladder (no Ovie-only carbon override)', () => {
     // Drift T1.1: Ovie no longer needs a parallel workspace palette; the
     // authenticated shell frame binds every workspace to --noir-ion-*.
-    expect(workspaceCss).not.toContain(
-      '.dark [data-app-shell-workspace="ov"]'
-    );
+    expect(workspaceCss).not.toContain('.dark [data-app-shell-workspace="ov"]');
     const block = extractShellFrameBlock(workspaceCss);
     const selectors = block.slice(0, block.indexOf('{')).trim();
     expect(selectors).toContain(shellFrameSelector);
