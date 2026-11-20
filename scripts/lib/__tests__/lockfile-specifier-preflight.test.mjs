@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   compareWorkspaceSpecifiers,
+  findMissingImporterSnapshots,
   formatMismatches,
 } from '../../lockfile-specifier-preflight.mjs';
 
@@ -80,7 +81,7 @@ describe('lockfile importer specifier preflight', () => {
     const { root, lockfile } = fixture(
       `lockfileVersion: '9.0'\n\nimporters:\n  .:\n  packages/audio-contracts:\n    devDependencies:\n      typescript:\n        specifier: ^5.9.0\n      vitest:\n        specifier: 4.1.8\n`
     );
-    writeFileSync(join(root, 'pnpm-lock.yaml'), lockfile);
+    writeFileSync(join(root, 'pnpm-lock.yaml'), `${lockfile}\nsnapshots:\n`);
     const result = spawnSync(
       process.execPath,
       [join(process.cwd(), 'scripts', 'lockfile-specifier-preflight.mjs')],
@@ -146,5 +147,37 @@ describe('lockfile importer specifier preflight', () => {
     });
     const lockfile = `lockfileVersion: '9.0'\n\nimporters:\n  .:\n  apps/web:\n    dependencies:\n      next:\n        specifier: 15.0.0\n  packages/audio-contracts:\n    devDependencies:\n      typescript:\n        specifier: ^6.0.3\n`;
     expect(compareWorkspaceSpecifiers({ root, lockfile })).toEqual([]);
+  });
+});
+
+describe('lockfile importer snapshot integrity', () => {
+  it('reports a missing peer-qualified snapshot while accepting links and present snapshots', () => {
+    const lockfile = `importers:
+  packages/one:
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(peer@1.0.0)
+      other:
+        specifier: 1.0.0
+        version: 1.0.0
+      local:
+        specifier: workspace:*
+        version: link:../local
+snapshots:
+  other@1.0.0: {}
+`;
+    expect(findMissingImporterSnapshots(lockfile)).toEqual([
+      {
+        packagePath: 'packages/one',
+        dependency: 'vitest',
+        snapshot: 'vitest@5.0.5(peer@1.0.0)',
+      },
+    ]);
+    expect(
+      findMissingImporterSnapshots(
+        `${lockfile}  vitest@5.0.5(peer@1.0.0): {}\n`
+      )
+    ).toEqual([]);
   });
 });

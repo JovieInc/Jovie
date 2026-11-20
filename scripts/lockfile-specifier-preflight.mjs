@@ -61,6 +61,51 @@ export function parseImporterSpecifiers(lockfile) {
   return importers;
 }
 
+// A frozen install also needs every resolved importer to have a snapshot. A
+// merge can preserve a new importer while deleting its old shared snapshot.
+export function findMissingImporterSnapshots(lockfile) {
+  const lines = lockfile.split(/\r?\n/);
+  const snapshots = new Set();
+  const snapshotIndex = lines.indexOf('snapshots:');
+  if (snapshotIndex === -1)
+    throw new Error('pnpm-lock.yaml is missing snapshots:');
+  for (const line of lines.slice(snapshotIndex + 1)) {
+    if (line && !/^\s/.test(line)) break;
+    const match = line.match(/^  (?! )(.+):(?:\s*\{\})?\s*$/);
+    if (match) snapshots.add(yamlScalar(match[1]));
+  }
+  const importerIndex = lines.indexOf('importers:');
+  if (importerIndex === -1)
+    throw new Error('pnpm-lock.yaml is missing importers:');
+  const missing = [];
+  let packagePath;
+  let dependency;
+  for (const line of lines.slice(importerIndex + 1)) {
+    if (line && !/^\s/.test(line)) break;
+    const importer = line.match(/^  (?! )(.+):(?:\s*\{\})?\s*$/);
+    if (importer) {
+      packagePath = yamlScalar(importer[1]);
+      dependency = undefined;
+      continue;
+    }
+    const entry = line.match(/^      (.+):\s*$/);
+    if (entry) {
+      dependency = yamlScalar(entry[1]);
+      continue;
+    }
+    const version = line.match(/^        version:\s*(.+)$/);
+    if (!version || !packagePath || !dependency) continue;
+    const resolved = yamlScalar(version[1]);
+    if (/^(?:link|file|workspace):/.test(resolved)) continue;
+    const snapshot = /^\d/.test(resolved)
+      ? `${dependency}@${resolved}`
+      : resolved;
+    if (!snapshots.has(snapshot))
+      missing.push({ packagePath, dependency, snapshot });
+  }
+  return missing;
+}
+
 function workspacePackagePaths(root) {
   const included = new Set(['.']);
   const excluded = new Set();
@@ -170,10 +215,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     root,
     lockfile: readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'),
   });
+  const missingSnapshots = findMissingImporterSnapshots(
+    readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
+  );
+  if (missingSnapshots.length) {
+    console.error('Lockfile importer snapshot preflight failed:');
+    for (const { packagePath, dependency, snapshot } of missingSnapshots)
+      console.error(
+        `- ${packagePath}: ${dependency} references missing snapshot ${snapshot}`
+      );
+    process.exitCode = 1;
+  }
   if (mismatches.length) {
     console.error(formatMismatches(mismatches));
     process.exitCode = 1;
-  } else {
+  } else if (!missingSnapshots.length) {
     console.log('Lockfile importer specifier preflight passed.');
   }
 }
