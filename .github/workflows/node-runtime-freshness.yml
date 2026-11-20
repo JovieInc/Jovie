@@ -1,8 +1,8 @@
 name: Node Runtime Freshness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
-# necessary-trust-boundary: Node.js publishes releases outside the repo, so this daily job is the only hop that reads nodejs.org and Docker Hub, rewrites the exact pin files and opens one jovie-bot PR; that PR merges only through the normal required checks and never deploys or publishes.
-# removal-trigger: Remove the bump job when Renovate or Dependabot can move every exact pin file, tarball checksum and image digest in one PR that passes the pin contract tests.
+# necessary-trust-boundary: Node.js publishes releases outside the repo, so this daily job is the only hop that reads nodejs.org and Docker Hub, rewrites the exact pin files and opens one jovie-bot PR; that PR merges only through the normal required checks and never deploys or publishes. The same upstream-advisory clock also runs the read-only Apple developer RSS classifier (scripts/apple-change-ingest) because Apple offers no verified push webhook and the cron allowlist cannot grow a second timer.
+# removal-trigger: Remove the bump job when Renovate or Dependabot can move every exact pin file, tarball checksum and image digest in one PR that passes the pin contract tests. Remove the apple-change job when Summer heartbeat or cron-hub owns scripts/apple-change-ingest with the same receipt contract.
 # clock-class: upstream-advisory
 on:
   schedule:
@@ -14,6 +14,38 @@ concurrency:
   group: node-runtime-freshness
   cancel-in-progress: true
 jobs:
+  apple-change:
+    name: Classify Apple developer changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Ingest and classify
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/apple-change-receipt.json"
+          node scripts/apple-change-ingest/apple-change-ingest.mjs --out "$out" \
+            | tee "$RUNNER_TEMP/apple-change-summary.json"
+          {
+            echo "## Apple change ingest"
+            echo '```json'
+            cat "$RUNNER_TEMP/apple-change-summary.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: apple-change-receipt-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/apple-change-receipt.json
+            ${{ runner.temp }}/apple-change-summary.json
+          retention-days: 90
   policy:
     name: Enforce official Node lifecycle and patch SLA
     runs-on: ubuntu-24.04
