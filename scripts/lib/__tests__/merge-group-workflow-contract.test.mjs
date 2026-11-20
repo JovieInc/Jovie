@@ -590,7 +590,11 @@ describe('merge_group workflow contract', () => {
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
+    expect(remaining).toContain('github.event_name }}" == "pull_request"');
+    expect(remaining).toContain(
+      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+    );
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
     expect(remaining).toContain('apps/web/package\\.json$');
