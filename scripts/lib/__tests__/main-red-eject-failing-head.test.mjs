@@ -138,9 +138,7 @@ describe('decideFailingHead', () => {
       ghCalls.push(line);
       // Path is repos/.../statuses/<sha>, not a bare statuses/<sha> argv.
       if (line.includes(`statuses/${PR_HEAD_SHA}`)) {
-        throw new Error(
-          'gh api -X POST: HTTP 403: Resource not accessible by integration'
-        );
+        throw new Error('HTTP 403: Resource not accessible by integration');
       }
     };
     const out = await applyFailingHeadEpisode({
