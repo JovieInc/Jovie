@@ -5,45 +5,39 @@ CI validates contracts and ratchets only.
 
 ## Required evidence
 
-1. **Live persist receipt** — attach to Tim’s open canvas, `save()` with no
-   path, then prove mtime moved via
-   [`scripts/agent/pen-live-canvas-persist.mjs`](../../scripts/agent/PEN_LIVE_CANVAS.md)
-   (`disk_persist_verified`). `Saved` alone is not persist.
-2. **Lease save** — acquire
-   `node scripts/pen-review/run.mjs lease acquire …`, mutate under the lease,
-   then `… save --holder … --token … --touched …` so foreign unsaved work is
-   not published.
+1. **Live persist receipt** — `save()` with no path on Tim’s open canvas, then
+   prove mtime moved
+   ([`PEN_LIVE_CANVAS.md`](../../scripts/agent/PEN_LIVE_CANVAS.md);
+   `disk_persist_verified`). `Saved` alone is not persist.
+2. **Lease save** —
+   `node scripts/pen-review/run.mjs lease acquire` → mutate →
+   `save --holder … --token … --touched …`.
 3. **Registry identity map** — code registry ids
-   (`apps/web/data/marketing/componentRegistry.ts` via
-   `scripts/agent/pen-code-registry.mjs`, plus
-   `docs/design-system/pen-bindings.json` for route↔frame bindings). Pen
-   roots that are not code identities are not ship denominators.
+   (`componentRegistry.ts` / `pen-code-registry.mjs`) plus
+   `pen-bindings.json` for route↔frame. Pen-only roots are not denominators.
 4. **Small code sync PR** — tokens / `packages/ui` / consumers / stills /
-   bindings. Atomic: ≤10 files / ≤400 lines unless widened with a reason.
-5. **Optional prod/Pen parity probe** — still diff / pen-diff / certification
-   probe after land. Never a reason to dump the canvas into git.
+   bindings (atomic slice).
+5. **Optional prod/Pen parity probe** after land — never a reason to dump the
+   canvas into git.
 
 ## Forbidden
 
-- Adding or modifying `*.pen` in a PR destined for the merge queue
-- Treating Pen-through-CI, cold `.pen` readback, or backup overlays as the
-  validation gate
-- Inventing a second file (`--out`, `save({path})`) to fake persist
+Adding/modifying `*.pen` for the merge queue; treating Pen-through-CI, cold
+`.pen` readback, or backup overlays as the validation gate; inventing a second
+file (`--out`, `save({path})`) to fake persist.
 
 ## Machine gate
 
 ```bash
-# Fail closed if this branch introduces .pen blobs
-pnpm design:pen-ship:check
-
-# Validate a handback receipt (mtime + lease + registry + code paths)
+pnpm design:pen-ship:check              # fail closed on .pen blobs
 pnpm design:pen-ship:validate --receipt path/to/receipt.json
+pnpm design:pen-ship:pilot              # docs/guard pilot receipt
 ```
 
-Schema: `jovie.pen-data-backed-ship/v1` in
+Schema `jovie.pen-data-backed-ship/v1` —
 `scripts/design/pen-data-backed-ship-lib.mjs`.
 
 ## Pilot
 
-This document and the `design:pen-ship:*` scripts are the first ship on the
-path: no `.pen` blob enters the queue; CI only checks the contract guard.
+This doc + `design:pen-ship:*` are the first ship on the path: no `.pen` enters
+the queue; CI only checks the contract guard.
