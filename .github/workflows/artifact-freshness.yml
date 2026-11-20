@@ -1,0 +1,63 @@
+name: Artifact Freshness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: GitHub Actions observes desktop release/feed identity
+# outside the founder device; Linear upsert pages Summer when certified →
+# published → feed diverge. Installed/running stay unknown without a heartbeat.
+# removal-trigger: Remove after Ovi Shipping owns the same stage graph end-to-end
+# with device heartbeats and no longer needs this safety-net hop.
+
+on:
+  workflow_run:
+    workflows: ['desktop-release']
+    types: [completed]
+  # No cron: JOV-INV-042 cron allowlist is frozen; desktop-release completion
+  # is the primary event. workflow_dispatch covers manual reconcile.
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: artifact-freshness
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Reconcile desktop stage graph
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Reconcile certified → published → feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: >
+          node scripts/artifact-freshness-reconcile.mjs
+          --output "$RUNNER_TEMP/artifact-freshness.json"
+      - name: Upload freshness receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: artifact-freshness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/artifact-freshness.json
+          retention-days: 14
+          if-no-files-found: warn

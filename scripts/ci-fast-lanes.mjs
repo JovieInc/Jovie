@@ -2294,6 +2294,8 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/cleanup-stale-dev.test.mjs',
   'scripts/desktop-release-guard.test.mjs',
   'scripts/desktop-installed-apps-audit.test.mjs',
+  'scripts/artifact-freshness-reconcile.test.mjs',
+  'scripts/lib/artifact-freshness-graph.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
   'scripts/swift-arch/guard.test.mjs',
