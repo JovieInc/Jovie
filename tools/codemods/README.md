@@ -4,17 +4,14 @@ Automated code transformation scripts for migrating to shadcn/ui primitives.
 
 ## Available Codemods
 
-### 1. `migrate-frosted-button.ts` (historical — Drift T2.3)
+### 1. `migrate-frosted-button.ts`
 
-FrostedButton is retired. Glass material is first-class on `@jovie/ui`
-`Button` via `variant="frosted" | "frosted-ghost" | "frosted-outline"`. Prefer
-editing callsites to those variants directly; keep this codemod only for
-recovering older branches that still import the twin.
+Migrates `FrostedButton` to `Button` with `variant` prop.
 
-**Transformations (legacy):**
+**Transformations:**
 - `<FrostedButton>` → `<Button variant="frosted">`
-- `frostedStyle="ghost"` / `tone="ghost"` → `variant="frosted-ghost"`
-- `frostedStyle="outline"` / `tone="outline"` → `variant="frosted-outline"`
+- `frostedStyle="ghost"` → `variant="frosted-ghost"`
+- `frostedStyle="outline"` → `variant="frosted-outline"`
 - `shape="circle"` → `className="rounded-full"`
 - `shape="square"` → `className="rounded-none"`
 - Import paths updated to `@jovie/ui`
