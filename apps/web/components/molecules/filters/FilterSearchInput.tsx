@@ -74,7 +74,7 @@ export function FilterSearchInput({
         />
         {value && (
           <IconButton
-            size='lg'
+            size='xs'
             variant='inline'
             onClick={onClear}
             aria-label='Clear Search'
