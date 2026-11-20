@@ -1,4 +1,4 @@
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
 import { cn } from '@/lib/utils';
 
 /** Shared page-toolbar action styling, usable by molecules and organisms. */

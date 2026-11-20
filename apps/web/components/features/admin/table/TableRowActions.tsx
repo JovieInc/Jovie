@@ -1,7 +1,7 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { BadgeCheck, RefreshCw, Star } from 'lucide-react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export interface TableRowActionsProps {
@@ -23,15 +23,13 @@ export function TableRowActions({
 }: Readonly<TableRowActionsProps>) {
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
-  const rowActionClassName =
-    'h-8 w-8 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token active:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
   return (
     <div className='flex items-center justify-end gap-1'>
-      {/* Refresh button */}
-      <AppIconButton
+      <IconButton
+        size='sm'
+        variant='control'
         ariaLabel='Refresh creator music data'
-        className={rowActionClassName}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           await onRefreshIngest();
@@ -42,37 +40,32 @@ export function TableRowActions({
         <RefreshCw
           className={cn('h-3.5 w-3.5', isRefreshLoading && 'animate-spin')}
         />
-      </AppIconButton>
+      </IconButton>
 
-      {/* Claimed icon - read-only indicator */}
-      <AppIconButton
+      <IconButton
+        size='sm'
+        variant='control'
         ariaLabel={isClaimed ? 'Claimed' : 'Not claimed'}
-        className={cn(
-          rowActionClassName,
-          'cursor-default',
-          isClaimed
-            ? 'text-yellow-500 hover:bg-transparent hover:text-yellow-500'
-            : 'text-quaternary-token/40 hover:bg-transparent hover:text-quaternary-token/40'
-        )}
         disabled
         title={isClaimed ? 'Claimed' : 'Not claimed'}
+        className='cursor-default'
       >
-        <Star className={cn('h-3.5 w-3.5', isClaimed && 'fill-current')} />
-      </AppIconButton>
+        <Star
+          className={cn(
+            'h-3.5 w-3.5',
+            isClaimed ? 'fill-current text-yellow-500' : 'opacity-40'
+          )}
+        />
+      </IconButton>
 
-      {/* Verified toggle button */}
-      <AppIconButton
+      <IconButton
+        size='sm'
+        variant='control'
         ariaLabel={
           isVerified
             ? 'Verified - click to unverify'
             : 'Not verified - click to verify'
         }
-        className={cn(
-          rowActionClassName,
-          isVerified
-            ? 'text-info hover:text-info [&_svg]:fill-info [&_svg]:stroke-white'
-            : 'text-quaternary-token/40'
-        )}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           try {
@@ -92,10 +85,11 @@ export function TableRowActions({
         <BadgeCheck
           className={cn(
             'h-3.5 w-3.5',
-            isVerificationLoading && 'animate-pulse'
+            isVerificationLoading && 'animate-pulse',
+            isVerified && 'fill-info text-info'
           )}
         />
-      </AppIconButton>
+      </IconButton>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
+
 // @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
+import { IconButton } from '@jovie/ui';
 import { Smartphone, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getQrCodeDataUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
@@ -191,14 +192,14 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
           key='reopen'
           className={`fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} animate-in fade-in slide-in-from-bottom-3 duration-cinematic ease-out motion-reduce:animate-none`}
         >
-          <CircleIconButton
-            size='lg'
+          <IconButton
+            size='xl'
             variant='surface'
             onClick={reopen}
             ariaLabel='Open On Phone'
           >
             <Smartphone className='relative h-5 w-5' aria-hidden='true' />
-          </CircleIconButton>
+          </IconButton>
         </div>
       )}
     </>

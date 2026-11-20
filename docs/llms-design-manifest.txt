@@ -407,7 +407,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ease-subtle`: var(--ds-motion-subtle-easing)
 - `--page-pad`: clamp(16px, 4vw, 32px)
 
-## Shared UI Components (46 atom primitives)
+## Shared UI Components (47 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -437,6 +437,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **Label** — `packages/ui/atoms/label.tsx`
 - **Link** — `packages/ui/atoms/link.tsx`
 - **NativeSelect** — `packages/ui/atoms/native-select.tsx`
+- **OtpDigitInput** — `packages/ui/atoms/otp-digit-input.tsx`
 - **OverflowMenuTrigger** — `packages/ui/atoms/overflow-menu-trigger.tsx`
 - **PlainButton** — `packages/ui/atoms/plain-button.tsx`
 - **Popover** — `packages/ui/atoms/popover.tsx`

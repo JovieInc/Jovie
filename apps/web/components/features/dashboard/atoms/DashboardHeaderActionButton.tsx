@@ -1,11 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, IconButton, TooltipShortcut } from '@jovie/ui';
 import type { ReactNode } from 'react';
-import {
-  APP_CONTROL_BUTTON_CLASS,
-  AppIconButton,
-} from '@/components/atoms/AppIconButton';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
 import { cn } from '@/lib/utils';
 
 // JOV-5063: 32px visible surface-header actions. The canonical 44px pseudo hit
@@ -78,14 +75,13 @@ export function DashboardHeaderActionButton({
     );
   }
 
-  return (
-    <AppIconButton
+  const button = (
+    <IconButton
+      variant='control'
       onClick={onClick}
       ariaLabel={ariaLabel}
       aria-pressed={pressed}
       disabled={disabled}
-      tooltipLabel={tooltipLabel}
-      tooltipShortcut={tooltipShortcut}
       size='md'
       data-testid={dataTestId}
       className={cn(
@@ -95,6 +91,18 @@ export function DashboardHeaderActionButton({
       )}
     >
       {icon}
-    </AppIconButton>
+    </IconButton>
+  );
+
+  if (!tooltipLabel) return button;
+
+  return (
+    <TooltipShortcut
+      label={tooltipLabel}
+      shortcut={tooltipShortcut}
+      side='bottom'
+    >
+      {button}
+    </TooltipShortcut>
   );
 }

@@ -4,6 +4,7 @@
 
 import {
   Button,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -15,7 +16,6 @@ import { CheckCircle2, ExternalLink, Music, Plus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { useCallback, useMemo, useState } from 'react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -24,6 +24,7 @@ import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
+import { DSP_PLACEHOLDERS, getPlaceholder } from './listen-now-placeholders';
 import type { ConnectedDspInfo } from './useMusicLinksForm';
 import { useMusicLinksForm } from './useMusicLinksForm';
 
@@ -36,25 +37,6 @@ interface ListenNowFormProps {
 const ADDITIONAL_DSP_OPTIONS = ALL_PLATFORMS.filter(
   p => p.category === 'music' && !['spotify', 'apple_music'].includes(p.id)
 );
-
-/** Placeholder URLs for music platforms. */
-const DSP_PLACEHOLDERS: Record<string, string> = {
-  spotify: 'https://open.spotify.com/artist/...',
-  apple_music: 'https://music.apple.com/artist/...',
-  youtube: 'https://youtube.com/@yourchannel',
-  youtube_music: 'https://music.youtube.com/channel/...',
-  soundcloud: 'https://soundcloud.com/yourprofile',
-  bandcamp: 'https://yourname.bandcamp.com',
-  tidal: 'https://tidal.com/artist/...',
-  deezer: 'https://deezer.com/artist/...',
-  amazon_music: 'https://music.amazon.com/artists/...',
-  pandora: 'https://pandora.com/artist/...',
-  beatport: 'https://beatport.com/artist/...',
-};
-
-function getPlaceholder(platform: string): string {
-  return DSP_PLACEHOLDERS[platform] || 'https://...';
-}
 
 const LOADING_KEYS = ['dsp-skeleton-1', 'dsp-skeleton-2', 'dsp-skeleton-3'];
 
@@ -92,17 +74,19 @@ function ConnectedArtistBadge({
         {info.artistName}
       </span>
       <CheckCircle2 className='h-3.5 w-3.5 text-green-500 shrink-0' />
-      {info.externalUrl && (
-        <InlineIconButton
-          href={info.externalUrl}
-          target='_blank'
-          rel='noopener noreferrer'
-          className='rounded-full p-1 text-tertiary-token'
+      {info.externalUrl ? (
+        <IconButton
+          asChild
+          size='xs'
+          variant='inline'
+          className='rounded-full text-tertiary-token'
           aria-label='Open Profile'
         >
-          <ExternalLink className='h-3 w-3' />
-        </InlineIconButton>
-      )}
+          <a href={info.externalUrl} target='_blank' rel='noopener noreferrer'>
+            <ExternalLink className='h-3 w-3' />
+          </a>
+        </IconButton>
+      ) : null}
     </div>
   );
 }
@@ -468,13 +452,15 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                       aria-label={`${meta?.name || link.platform} URL`}
                     />
 
-                    <InlineIconButton
+                    <IconButton
+                      size='sm'
+                      variant='inline'
                       onClick={() => removeAdditionalLink(index)}
-                      className='shrink-0 rounded-full p-1 text-tertiary-token hover:text-error'
+                      className='shrink-0 rounded-full text-tertiary-token hover:text-error'
                       aria-label={`Remove ${meta?.name || link.platform}`}
                     >
                       <Trash2 className='h-4 w-4' />
-                    </InlineIconButton>
+                    </IconButton>
                   </div>
                 );
               })}

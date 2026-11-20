@@ -1,11 +1,11 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 // @coverage-via apps/web/tests/components/releases/ReleaseCell.test.tsx
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   formatCompactReleaseArtistLine,
@@ -97,14 +97,10 @@ export const ReleaseCell = memo(function ReleaseCell({
       {/* Play/status indicator — 16px column */}
       <div className='flex w-4 shrink-0 items-center justify-center'>
         {hasPreview && (
-          <DrawerInlineIconButton
+          <IconButton
+            size='lg'
+            variant='inline'
             onClick={handleTogglePlayback}
-            className={cn(
-              'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
-              isPlaying
-                ? 'text-(--color-accent-purple-text) opacity-100'
-                : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
-            )}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -115,7 +111,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             ) : (
               <Play className='h-2.5 w-2.5' />
             )}
-          </DrawerInlineIconButton>
+          </IconButton>
         )}
         {!hasPreview && showType && typeStyle && (
           <span

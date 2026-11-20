@@ -265,7 +265,6 @@ describe('marketing route source invariants (manifest-driven)', () => {
     for (const file of [
       'components/features/auth/AuthLayout.tsx',
       'components/features/auth/AuthBrandPanel.tsx',
-      'components/atoms/AppIconButton.tsx',
     ]) {
       expect(files).toContain(file);
     }

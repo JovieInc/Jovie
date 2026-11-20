@@ -1,9 +1,9 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { DrawerInlineIconButton } from './DrawerInlineIconButton';
 
 export interface ShareableLinkRowProps {
   readonly url: string;
@@ -161,29 +161,29 @@ export function ShareableLinkRow({
             'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
         )}
       >
-        <DrawerInlineIconButton
+        <IconButton
+          size='lg'
+          variant='inline'
           onClick={handleCopy}
           title={isCopied ? 'Copied!' : copyButtonTitle}
           aria-label={isCopied ? 'Copied' : copyButtonTitle}
-          className={cn(
-            'shrink-0 text-tertiary-token',
-            styles.button,
-            isCopied && 'text-success'
-          )}
+          className='shrink-0'
         >
-          <Copy className={styles.glyph} />
+          <Copy className={cn(styles.glyph, isCopied && 'text-success')} />
           <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-        </DrawerInlineIconButton>
+        </IconButton>
         {showOpen ? (
-          <DrawerInlineIconButton
+          <IconButton
+            size='lg'
+            variant='inline'
             onClick={handleOpen}
             title={openButtonTitle}
             aria-label={openButtonTitle}
-            className={cn('shrink-0 text-tertiary-token', styles.button)}
+            className='shrink-0'
           >
             <ExternalLink className={styles.glyph} />
             <span className='sr-only'>Open</span>
-          </DrawerInlineIconButton>
+          </IconButton>
         ) : null}
       </span>
     </div>
