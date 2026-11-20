@@ -371,6 +371,29 @@ async function githubJson(url, fetchImpl = fetch) {
   if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
   return response.json();
 }
+
+/**
+ * Transient fetch/API failures are incomplete observation — not a bad publish.
+ * Digest/content mismatches stay verification failures.
+ * @param {unknown} error
+ */
+export function isPublicationObservationError(error) {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    name === 'AbortError' ||
+    /timeout|network|ECONNRESET|ENOTFOUND|fetch failed/i.test(message)
+  ) {
+    return true;
+  }
+  const statusMatch =
+    /\bGitHub (\d{3})\b/.exec(message) ??
+    /Published feed returned (\d{3})\./.exec(message);
+  if (!statusMatch) return false;
+  const status = Number(statusMatch[1]);
+  return status === 429 || status >= 500;
+}
+
 async function shippedVersion(release, channel, fetchImpl) {
   const rolling = channel === 'staging';
   const name = typeof release?.name === 'string' ? release.name : null;
@@ -385,6 +408,7 @@ async function shippedVersion(release, channel, fetchImpl) {
     sourceRevision: release?.target_commitish ?? null,
     publicationIdentityVerified: false,
     publicationError: null,
+    publicationObservationError: null,
   };
   try {
     if (
@@ -502,8 +526,12 @@ async function shippedVersion(release, channel, fetchImpl) {
     }
     result.publicationIdentityVerified = true;
   } catch (error) {
-    result.publicationError =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (isPublicationObservationError(error)) {
+      result.publicationObservationError = message;
+    } else {
+      result.publicationError = message;
+    }
   }
   return result;
 }

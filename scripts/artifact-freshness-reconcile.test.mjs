@@ -51,9 +51,7 @@ test('fetchLatestProductionVerifiedSha queries production-controller.yml not eve
         return {
           ok: true,
           json: async () => ({
-            jobs: [
-              { name: 'Production Verified', conclusion: 'success' },
-            ],
+            jobs: [{ name: 'Production Verified', conclusion: 'success' }],
           }),
         };
       }
@@ -101,6 +99,7 @@ test('collectArtifactFreshness keeps installed/running unknown and pages on cert
       at: '2026-11-20T00:00:00Z',
     },
     desktopRelevant: true,
+    publishInFlight: false,
   });
   assert.equal(receipt.red, true);
   assert.equal(
@@ -120,10 +119,7 @@ test('collectArtifactFreshness returns red observation receipt when shipped fetc
     },
   });
   assert.equal(receipt.red, true);
-  assert.match(
-    receipt.pageSummer.map(m => m.reason).join(' '),
-    /GitHub 503/
-  );
+  assert.match(receipt.pageSummer.map(m => m.reason).join(' '), /GitHub 503/);
 });
 
 test('observationFailureReceipt is red and pageable', () => {
@@ -356,6 +352,49 @@ test('pageSummerForFreshness keeps empty-string spacers in the Linear descriptio
   assert.doesNotMatch(calls[0].description, /heartbeat\.## Done when/);
 });
 
+test('publicationObservationError yields unknown published without paging', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: false,
+        publicationError: null,
+        publicationObservationError: 'GitHub 503 for feed',
+      },
+      staging: {
+        version: '26.11.4-staging.1.1',
+        publishedAt: '2026-11-15T01:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+        publicationObservationError: null,
+      },
+      stagingObservationError: null,
+    },
+    certified: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      verified: true,
+      at: '2026-11-15T00:00:00Z',
+    },
+    desktopRelevant: false,
+    publishInFlight: false,
+  });
+  assert.equal(receipt.red, false);
+  assert.equal(
+    receipt.channels.find(c => c.channel === 'production')?.stages.published
+      ?.status,
+    'unknown'
+  );
+  assert.equal(
+    receipt.pageSummer.some(m => m.code === 'publication-unverified'),
+    false
+  );
+  assert.equal(canResolveSummerForFreshness(receipt), false);
+});
+
 test('keep-owned stamp suppresses Summer page but still blocks resolve', async () => {
   const receipt = await collectArtifactFreshness({
     shipped: {
@@ -418,6 +457,7 @@ test('null desktop relevance with differing SHAs blocks Summer resolve without p
       at: '2026-11-20T00:00:00Z',
     },
     desktopRelevant: null,
+    publishInFlight: false,
   });
   assert.equal(receipt.red, false);
   assert.equal(

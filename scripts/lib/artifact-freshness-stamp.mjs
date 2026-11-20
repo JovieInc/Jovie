@@ -11,6 +11,16 @@ import {
 
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_REPO = 'JovieInc/Jovie';
+const MAX_PULL_PAGES = 10;
+
+/** @param {string | null | undefined} link */
+export function nextLinkUrl(link) {
+  for (const part of String(link ?? '').split(',')) {
+    const match = /<([^>]+)>;\s*rel="next"/i.exec(part);
+    if (match) return match[1];
+  }
+  return null;
+}
 
 /**
  * @param {{
@@ -30,23 +40,44 @@ export async function fetchDesktopPublishInFlight(input = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const listUrl = `${GITHUB_API}/repos/${repo}/pulls?state=open&base=main&per_page=100`;
-    const listResponse = await fetchImpl(listUrl, {
-      headers,
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!listResponse.ok) {
-      return {
-        inFlight: false,
-        reason: `stamp list returned ${listResponse.status}`,
-      };
+    /** @type {unknown[]} */
+    const pages = [];
+    let listUrl = `${GITHUB_API}/repos/${repo}/pulls?state=open&base=main&per_page=100`;
+    let truncated = false;
+    for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
+      const listResponse = await fetchImpl(listUrl, {
+        headers,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!listResponse.ok) {
+        return {
+          inFlight: false,
+          reason: `stamp list returned ${listResponse.status}`,
+        };
+      }
+      const body = await listResponse.json();
+      pages.push(Array.isArray(body) ? body : []);
+      const link =
+        typeof listResponse.headers?.get === 'function'
+          ? listResponse.headers.get('link')
+          : (listResponse.headers?.link ?? null);
+      const next = nextLinkUrl(link);
+      if (!next) {
+        truncated = false;
+        break;
+      }
+      if (page === MAX_PULL_PAGES - 1) {
+        truncated = true;
+        break;
+      }
+      listUrl = next;
     }
-    const body = await listResponse.json();
-    // findOpenDesktopStampPr expects page(s); a GitHub list body is one page.
-    const matches = findOpenDesktopStampPr(
-      Array.isArray(body) ? [body] : body,
-      repo
-    );
+    if (truncated) {
+      return { inFlight: false, reason: 'stamp list truncated' };
+    }
+
+    // findOpenDesktopStampPr expects page(s); GitHub list bodies are pages.
+    const matches = findOpenDesktopStampPr(pages, repo);
     if (matches.length === 0) {
       return { inFlight: false, reason: 'no-open-stamp' };
     }
