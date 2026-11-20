@@ -50,13 +50,20 @@ export function isLocalDevelopmentAutomationHostname(
  * Local-only automation escape hatch for production-built test servers.
  * This intentionally requires an existing E2E opt-in and a loopback host.
  */
+function isHostedOrNonProductionBuiltRuntime(): boolean {
+  return (
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'development'
+  );
+}
+
 export function isLocalDevelopmentAutomationRequest(
   headerReader: HeaderReader
 ): boolean {
   if (
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
-    process.env.VERCEL === '1' ||
-    Boolean(process.env.VERCEL_ENV)
+    isHostedOrNonProductionBuiltRuntime()
   ) {
     return false;
   }
@@ -79,8 +86,7 @@ function isLoopbackE2eAutomationHost(
 ): boolean {
   if (
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
-    process.env.VERCEL === '1' ||
-    Boolean(process.env.VERCEL_ENV)
+    isHostedOrNonProductionBuiltRuntime()
   ) {
     return false;
   }

@@ -14,6 +14,7 @@ const storedPreview: OnboardingCatalogPreview = {
       id: 'stored-1',
       title: 'Stored Release',
       releaseType: 'single',
+      releaseDate: '2026-01-01',
       artworkUrl: null,
       spotifyUrl: 'https://open.spotify.com/album/stored-1',
     },
