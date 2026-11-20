@@ -43,6 +43,168 @@ it('selects, authenticates, begins and finishes using the real sweep evidence fo
   }
 });
 
+it('recovers published fulfillment after cache eviction without claiming again or refreshing a stale score', () => {
+  const f = fixture();
+  try {
+    assert.match(f.run('select').output, /selected=true/u);
+    const claim = f.publishClaim();
+    assert.equal(f.run('verify-claim').status, 0);
+    assert.equal(f.run('begin').status, 0);
+    const history = f.score(claim);
+    assert.equal(f.run('finish').status, 0);
+    const result = read(join(f.stateDir, 'next-target-result.json'));
+    const pred = {
+      runId: '500',
+      runAttempt: '1',
+      sha: f.testedSha,
+      cacheKey: 'mutation-sweep-portable-v2-500-1',
+      artifactName: 'mutation-sweep-500',
+    };
+    f.publication(pred, f.state, history, result);
+    delete f.routes[
+      `${BASE}/actions/caches?key=${pred.cacheKey}&ref=refs%2Fheads%2Fmain&per_page=100`
+    ];
+    const current = structuredClone(f.state);
+    Object.assign(current.modules[f.request.file], {
+      status: 'stale',
+      score: null,
+    });
+    current.modules[f.request.file].evidence.configDigest = 'd'.repeat(64);
+    write(join(f.stateDir, 'sweep-state.json'), current);
+    const preserved = new Map(
+      [
+        'sweep-state.json',
+        'sweep-state.json.runs.jsonl',
+        'next-target-ledger.json',
+        'next-target-result.json',
+      ].map(name => [name, readFileSync(join(f.stateDir, name), 'utf8')])
+    );
+    const oldClaim = readFileSync(
+      join(f.runner, 'mutation-next/claim.json'),
+      'utf8'
+    );
+    const priorCalls = readFileSync(f.callsPath, 'utf8')
+      .trim()
+      .split('\n').length;
+    const replay = f.run('select', { GITHUB_RUN_ID: '501' });
+    assert.equal(replay.status, 0, replay.stderr);
+    assert.match(replay.output, /selected=false/u);
+    assert.doesNotMatch(replay.output, /hold=true/u);
+    for (const [name, bytes] of preserved)
+      assert.equal(readFileSync(join(f.stateDir, name), 'utf8'), bytes);
+    assert.equal(
+      readFileSync(join(f.runner, 'mutation-next/claim.json'), 'utf8'),
+      oldClaim
+    );
+    const calls = readFileSync(f.callsPath, 'utf8')
+      .trim()
+      .split('\n')
+      .slice(priorCalls)
+      .map(line => JSON.parse(line));
+    assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+    assert.equal(
+      calls.filter(([, path]) => path.includes('/actions/caches')).length,
+      0
+    );
+  } finally {
+    f.close();
+  }
+});
+
+it('still requires a live cache for new admission and current publication', () => {
+  for (const mode of ['select', 'published']) {
+    const f = fixture();
+    try {
+      const pred =
+        mode === 'select'
+          ? f.request.predecessor
+          : {
+              runId: '500',
+              runAttempt: '1',
+              sha: f.testedSha,
+              cacheKey: 'mutation-sweep-portable-v2-500-1',
+              artifactName: 'mutation-sweep-500',
+            };
+      if (mode === 'published') f.publication(pred, f.state);
+      f.routes[
+        `${BASE}/actions/caches?key=${pred.cacheKey}&ref=refs%2Fheads%2Fmain&per_page=100`
+      ].json = { total_count: 0, actions_caches: [] };
+      const held = f.run(mode, {
+        ROLLING_ELIGIBLE: 'true',
+        NEXT_PENDING: 'false',
+      });
+      assert.equal(held.status, mode === 'select' ? 0 : 75);
+      assert.match(held.output, /hold=true/u);
+      assert.doesNotMatch(held.output, /selected=true|wake=true/u);
+      assert.equal(
+        existsSync(join(f.runner, 'mutation-next/outbox.json')),
+        false
+      );
+      if (mode === 'published') assert.equal(f.run('dispatch').status, 75);
+      const calls = readFileSync(f.callsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+      assert.equal(
+        calls.filter(([, path]) => path.includes('/actions/caches')).length,
+        1
+      );
+    } finally {
+      f.close();
+    }
+  }
+});
+
+it('does not recover forged or failed historical publication merely because its cache was evicted', () => {
+  for (const fault of ['zip-digest', 'save-failure', 'superseded-attempt']) {
+    const f = fixture();
+    try {
+      assert.match(f.run('select').output, /selected=true/u);
+      const claim = f.publishClaim();
+      assert.equal(f.run('verify-claim').status, 0);
+      assert.equal(f.run('begin').status, 0);
+      const history = f.score(claim);
+      assert.equal(f.run('finish').status, 0);
+      const result = read(join(f.stateDir, 'next-target-result.json'));
+      const artifact = f.publication(
+        {
+          runId: '500',
+          runAttempt: '1',
+          sha: f.testedSha,
+          cacheKey: 'mutation-sweep-portable-v2-500-1',
+          artifactName: 'mutation-sweep-500',
+        },
+        f.state,
+        history,
+        result
+      );
+      delete f.routes[
+        `${BASE}/actions/caches?key=mutation-sweep-portable-v2-500-1&ref=refs%2Fheads%2Fmain&per_page=100`
+      ];
+      if (fault === 'zip-digest') artifact.digest = `sha256:${'0'.repeat(64)}`;
+      else if (fault === 'save-failure')
+        f.routes[
+          `${BASE}/actions/runs/500/attempts/1/jobs?per_page=100`
+        ].json.jobs[0].steps.find(
+          step => step.name === 'Save sweep state'
+        ).conclusion = 'failure';
+      else f.routes[`${BASE}/actions/runs/500`].json.run_attempt = 2;
+      const held = f.run('select', { GITHUB_RUN_ID: '501' });
+      assert.equal(held.status, 0);
+      assert.match(held.output, /hold=true/u);
+      assert.doesNotMatch(held.output, /selected=true/u);
+      const calls = readFileSync(f.callsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+    } finally {
+      f.close();
+    }
+  }
+});
+
 it('refuses altered ZIP bytes and truncated publication inventory before claiming', () => {
   for (const fault of ['digest', 'truncated', 'fork']) {
     const f = fixture();

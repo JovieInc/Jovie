@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => '/app/insights',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -132,7 +133,10 @@ describe('InsightsPanel certificate', () => {
 
     expect(screen.getAllByRole('article')).toHaveLength(3);
     await expectNoA11yViolations(container);
-    await user.click(screen.getByRole('tab', { name: /Tour/i }));
+    await user.click(
+      screen.getByRole('button', { name: 'Category: All Categories' })
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Tour' }));
     expect(handlers.onCategoryChange).toHaveBeenCalledWith('tour');
   });
 

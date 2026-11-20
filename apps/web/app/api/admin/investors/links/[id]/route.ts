@@ -1,10 +1,22 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
 import { db } from '@/lib/db';
-import { investorLinks } from '@/lib/db/schema/investors';
+import { investorLinks, investorStageEnum } from '@/lib/db/schema/investors';
 
 export const runtime = 'nodejs';
+
+/** Schema for the update-investor-link request body. */
+const updateInvestorLinkSchema = z.object({
+  label: z.string().optional(),
+  investorName: z.string().nullish(),
+  email: z.string().nullish(),
+  stage: z.enum(investorStageEnum.enumValues).optional(),
+  notes: z.string().nullish(),
+  isActive: z.boolean().optional(),
+  expiresAt: z.unknown().optional(),
+});
 
 /**
  * PATCH /api/admin/investors/links/[id]
@@ -18,7 +30,14 @@ export async function PATCH(
   if (authError) return authError;
 
   const { id } = await params;
-  const body = await request.json();
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = updateInvestorLinkSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid request body', details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
 
   const allowedFields = [
     'label',
@@ -31,19 +50,19 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   for (const field of allowedFields) {
-    if (field in body) {
-      updates[field] = body[field];
+    if (field in parsed.data) {
+      updates[field] = parsed.data[field];
     }
   }
 
-  if ('expiresAt' in body) {
-    if (body.expiresAt === null) {
+  if ('expiresAt' in parsed.data) {
+    if (parsed.data.expiresAt === null) {
       return NextResponse.json(
         { error: 'Claim links must expire' },
         { status: 400 }
       );
-    } else if (typeof body.expiresAt === 'string') {
-      const expiresAt = new Date(body.expiresAt);
+    } else if (typeof parsed.data.expiresAt === 'string') {
+      const expiresAt = new Date(parsed.data.expiresAt);
       if (Number.isNaN(expiresAt.getTime())) {
         return NextResponse.json(
           { error: 'expiresAt must be a valid date' },

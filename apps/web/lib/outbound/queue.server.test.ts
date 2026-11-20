@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   flag: vi.fn(),
   judgeLedger: vi.fn(),
+  draftContext: vi.fn(),
 }));
 
 function chain(result: unknown[]) {
@@ -16,6 +17,9 @@ function chain(result: unknown[]) {
   return node;
 }
 
+vi.mock('./cold/queue-draft.server', () => ({
+  createColdQueueDraftContextReader: () => mocks.draftContext,
+}));
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => chain(mocks.results.shift() ?? []),
@@ -73,6 +77,7 @@ describe('getOutboundQueue', () => {
   beforeEach(() => {
     mocks.flag.mockReset().mockResolvedValue(false);
     mocks.judgeLedger.mockReset().mockResolvedValue(null);
+    mocks.draftContext.mockReset().mockResolvedValue(null);
     mocks.ledger.mockResolvedValue(new Map());
     mocks.execute.mockReset();
     mocks.execute.mockResolvedValue({ rows: [] });
@@ -220,9 +225,12 @@ function judgeEvidence() {
 
 describe('queue draft visibility', () => {
   beforeEach(() => {
-    mocks.flag.mockReset().mockResolvedValue(true);
+    mocks.flag
+      .mockReset()
+      .mockImplementation(async name => name === 'OUTBOUND_DOGFOOD_GATE');
     mocks.judgeLedger.mockReset().mockResolvedValue(judgeEvidence());
     mocks.results = [[lead], [], []];
+    mocks.draftContext.mockReset().mockResolvedValue(null);
     mocks.ledger.mockResolvedValue(new Map());
     mocks.execute.mockResolvedValue({
       rows: [
@@ -236,6 +244,44 @@ describe('queue draft visibility', () => {
       ],
     });
   });
+
+  it.each(['off', 'no-judge', 'uncertified', 'dm', 'eligible'])(
+    'only reads email composition context after eligibility checks: %s',
+    async state => {
+      mocks.flag.mockImplementation(
+        async name => name === 'OUTBOUND_DOGFOOD_GATE' || state !== 'off'
+      );
+      if (state === 'no-judge') mocks.judgeLedger.mockResolvedValue(null);
+      const selected =
+        state === 'dm'
+          ? {
+              ...lead,
+              outreachRoute: 'dm',
+              instagramHandle: 'synthetic-artist',
+            }
+          : lead;
+      const key = `email:${lead.contactEmail}`;
+      mocks.results = [
+        [selected],
+        state === 'uncertified' ? [] : [{ dedupeKey: key }],
+        [],
+      ];
+      const result = await getOutboundQueue(NOW);
+      expect(mocks.draftContext).toHaveBeenCalledTimes(
+        state === 'eligible' ? 1 : 0
+      );
+      if (state === 'eligible')
+        expect(result.rows[0]).toMatchObject({
+          message: null,
+          view: 'flagged',
+        });
+      if (state === 'no-judge')
+        expect(result.rows[0]).toMatchObject({
+          message: null,
+          view: 'needs_judge',
+        });
+    }
+  );
 
   function saveCopy() {
     const targetRevision = outboundTargetRevision(outboundTargetFromLead(lead));

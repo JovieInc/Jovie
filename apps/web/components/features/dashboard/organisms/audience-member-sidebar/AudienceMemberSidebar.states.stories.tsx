@@ -90,3 +90,21 @@ export const RtlDocument: Story = {
   args: { member: { ...member, displayName: 'سارة المعجبة' } },
   decorators: [withRtl],
 };
+
+/** Anonymous visitors use activity as their single header detail. */
+export const AnonymousVisitor: Story = {
+  args: { member: { ...member, displayName: null, email: null, phone: null } },
+};
+
+/** A member without contact or activity data keeps the same avatar footprint. */
+export const Sparse: Story = {
+  args: {
+    member: {
+      ...member,
+      email: null,
+      phone: null,
+      locationLabel: '',
+      visits: 0,
+    },
+  },
+};

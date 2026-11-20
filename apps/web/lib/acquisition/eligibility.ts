@@ -17,6 +17,15 @@
 export const ACQUISITION_ELIGIBILITY_CONTRACT =
   'jovie.acquisition-eligibility/v1' as const;
 
+/** Workflows whose latest completed main run is cone evidence. */
+export const CONE_WORKFLOWS = {
+  /** Includes the canonical artist profile certificate (JOV-6920). */
+  revenuePath: 'm2-revenue-path-canary.yml',
+  // Golden Path job (signup to refund) of the latest main ci.yml push/dispatch run.
+  goldenPath: 'ci.yml#Golden Path (manual)',
+  buyerEval: 'buyer-eval-gate.yml', // green only when buyer-eval/gate.mjs passes
+} as const;
+
 export type ConeEvidenceStatus = 'green' | 'red' | 'unknown';
 
 export type AcquisitionEligibilityVerdict = 'ELIGIBLE' | 'BLOCKED' | 'UNKNOWN';

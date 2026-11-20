@@ -177,23 +177,26 @@ describe('claim_handle', () => {
     });
     expect(result.status).toBe('unavailable');
     expect(result.reason).toBe('taken');
+    expect(result.next_action).toBe('claim_handle');
     expect(result.suggested_alternatives).toEqual(['radiohead1', 'radiohead2']);
     expect(mocks.dbUpdate).not.toHaveBeenCalled();
   });
 
-  it('routes high-reach artists to the existing verification path', async () => {
+  it('routes high-reach and unknown-reach artists to the existing verification path', async () => {
     mocks.handleAvailability.mockResolvedValue({
       handle: 'signalandartist',
       available: true,
       reason: 'available',
     });
-    mocks.lookupReach.mockResolvedValue({ followers: 50_000, name: 'Big' });
-    const result: Record<string, unknown> = await claimHandle({
-      ...REF,
-      handle: 'signalandartist',
-    });
-    expect(result.requires_verification).toBe(true);
-    expect(result.next_action).toBe('send_user_claim_url_verification');
+    for (const followers of [50_000, null]) {
+      mocks.lookupReach.mockResolvedValue({ followers, name: 'Big' });
+      const result: Record<string, unknown> = await claimHandle({
+        ...REF,
+        handle: 'signalandartist',
+      });
+      expect(result.requires_verification).toBe(true);
+      expect(result.next_action).toBe('send_user_claim_url_verification');
+    }
   });
 
   it('is unavailable without a live draft capability', async () => {
@@ -318,7 +321,7 @@ describe('build_profile', () => {
       releases: [expect.objectContaining({ title: 'First Light' })],
     });
     expect(result.value_enabled).toBe(true);
-    expect(result.next_action).toBe('get_qualification');
+    expect(result.next_action).toBe('publish_profile');
   });
 
   it('stays identity-only when the preview is disabled or unreachable', async () => {
@@ -347,6 +350,15 @@ describe('publish_profile', () => {
     const result: Record<string, unknown> = await publishProfile(REF);
     expect(result.status).toBe('claimed');
     expect(result.next_action).toBe('share_profile');
+  });
+
+  it('rejects a capability minted for another draft_id', async () => {
+    const result: Record<string, unknown> = await publishProfile({
+      draft_id: '00000000-0000-4000-8000-000000000001',
+      draft_token: TOKEN,
+    });
+    expect(result.status).toBe('error');
+    expect(result.code).toBe('DRAFT_UNAVAILABLE');
   });
 });
 

@@ -451,16 +451,9 @@ test('source admission loads the actual changelog guard from trusted base when a
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
-    for (const file of [
-      'scripts/changelog-source-guard.mjs',
-      'scripts/lib/gh-retry.sh',
-      'scripts/lib/github-rate-limit.mjs',
-      'scripts/lib/daily-changelog-publication.mjs',
-      'scripts/lib/daily-changelog.mjs',
-      'scripts/lib/changelog-filter-rules.mjs',
-    ]) {
-      writeFileSync(join(repo, file), readFileSync(file));
-    }
+    // Match the workflow's scripts archive so new guard dependencies arrive
+    // automatically instead of maintaining a second, incomplete file list.
+    cpSync('scripts', join(repo, 'scripts'), { recursive: true });
     git('init', '--quiet');
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');

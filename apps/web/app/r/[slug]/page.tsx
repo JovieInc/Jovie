@@ -20,6 +20,7 @@ import { BASE_URL, UNKNOWN_ARTIST } from '@/constants/app';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getProviderConfidence } from '@/lib/discography/audio-qa';
@@ -28,6 +29,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { isCreatorRowPubliclyVisible } from '@/lib/profile/public-creator-visibility.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
@@ -113,8 +115,12 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
         username: creatorProfiles.username,
         usernameNormalized: creatorProfiles.usernameNormalized,
         avatarUrl: creatorProfiles.avatarUrl,
+        isPublic: creatorProfiles.isPublic,
+        settings: creatorProfiles.settings,
+        ownerEmail: users.email,
       })
       .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
       .limit(1),
   ]);
@@ -122,7 +128,16 @@ const getReleaseData = cache(async (releaseSlug: string, profileId: string) => {
   const [release] = releaseResult;
   const [creator] = creatorResult;
 
-  if (!release) {
+  if (
+    !release ||
+    !creator ||
+    !isCreatorRowPubliclyVisible({
+      handle: creator.usernameNormalized || creator.username.toLowerCase(),
+      isPublic: creator.isPublic,
+      ownerEmail: creator.ownerEmail,
+      settings: creator.settings,
+    })
+  ) {
     return null;
   }
 

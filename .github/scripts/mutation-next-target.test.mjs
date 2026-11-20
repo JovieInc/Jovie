@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { finalizeEvidenceEntry } from '../../scripts/lib/mutation-evidence.mjs';
+import { MIN_RATCHET_VALID } from '../../scripts/lib/mutation-sweep.mjs';
 import {
   claim,
   clone,
@@ -18,6 +20,7 @@ import {
   set,
   validate,
 } from './fixtures/mutation-next-target-fixture.mjs';
+import { verifyHistoricalPublication } from './mutation-next-evidence.mjs';
 import {
   digest,
   finishMeasurement,
@@ -25,6 +28,32 @@ import {
   selectRequest,
   verifyPublication,
 } from './mutation-next-target.mjs';
+
+function smallSample(value = claim(), valid = 9) {
+  const measured = measurement(value);
+  const module = measured.state.modules[FILE];
+  const provenance = module.evidence;
+  Object.assign(module, {
+    valid,
+    killed: valid,
+    survived: 0,
+    score: 100,
+    counts: { Killed: valid },
+  });
+  const { verdict } = finalizeEvidenceEntry({
+    file: FILE,
+    entry: module,
+    baseline: { files: {} },
+    configDigest: provenance.configDigest,
+    runId: provenance.runId,
+  });
+  Object.assign(module.evidence, provenance, {
+    verdict: verdict.status,
+    reason: verdict.reason,
+  });
+  Object.assign(measured.history[0], { valid, ratchet: verdict.status });
+  return measured;
+}
 
 describe('reviewed request identity and scope', () => {
   it('binds payload independent of object ordering, including predecessor attempt', () => {
@@ -61,6 +90,51 @@ describe('reviewed request identity and scope', () => {
 });
 
 describe('predecessor publication fence', () => {
+  it('allows an absent historical cache without relaxing live publication or supplied cache identity', () => {
+    const req = request();
+    const evidence = publication(req);
+    delete evidence.cache;
+    assert.equal(verifyHistoricalPublication(req, evidence).status, 'ready');
+    evidence.historical = true;
+    evidence.requireLiveCache = false;
+    assert.equal(verifyPublication(req, evidence).status, 'hold');
+    for (const cache of [
+      {},
+      { key: req.predecessor.cacheKey, ref: 'refs/pull/1/merge' },
+      { key: 'another-cache', ref: 'refs/heads/main' },
+    ]) {
+      evidence.cache = cache;
+      assert.equal(verifyHistoricalPublication(req, evidence).status, 'hold');
+      assert.equal(verifyPublication(req, evidence).status, 'hold');
+    }
+  });
+
+  for (const [path, bad] of [
+    ['run.status', 'in_progress'],
+    ['latestRun.run_attempt', 2],
+    ['run.head_repository.full_name', 'fork/Jovie'],
+    ['run.head_branch', 'topic'],
+    ['run.path', '.github/workflows/ci.yml'],
+    ['run.head_sha', NEXT_SHA],
+    ['jobs.total_count', 2],
+    ['jobs.jobs.0.steps.0.conclusion', 'skipped'],
+    ['jobs.jobs.0.steps.1.conclusion', 'failure'],
+    ['jobs.jobs.0.steps.2.conclusion', 'failure'],
+    ['artifact.expired', true],
+    ['artifact.workflow_run.id', 43867397574],
+    ['receipt.cacheKey', 'another-cache'],
+    ['receipt.runtime.node', null],
+    ['receipt.stateSha256', '0'.repeat(64)],
+    ['receipt.attemptsSha256', '0'.repeat(64)],
+  ])
+    it(`requires authenticated historical publication after eviction: ${path}`, () => {
+      const req = request();
+      const evidence = publication(req);
+      delete evidence.cache;
+      set(evidence, path, bad);
+      assert.equal(verifyHistoricalPublication(req, evidence).status, 'hold');
+    });
+
   it('rejects corrupt structured payloads even when their byte hashes match', () => {
     for (const field of ['stateText', 'historyText']) {
       const req = request();
@@ -115,6 +189,50 @@ describe('predecessor publication fence', () => {
 });
 
 describe('durable request replay', () => {
+  it('closes a small-sample request only with the same authenticated publication', () => {
+    const evidence = completedEvidence();
+    const value = evidence.claims.entries[0].claim;
+    const measured = smallSample(value);
+    const finished = finishMeasurement(value, measured);
+    assert.equal(finished.status, 'measured', finished.reason);
+    const row = evidence.results.entries[0];
+    row.result = finished.result;
+    row.publication.stateText = JSON.stringify(measured.state);
+    row.publication.historyText = measured.history
+      .map(row => JSON.stringify(row))
+      .join('\n');
+    row.publication.receipt.stateSha256 = hash(row.publication.stateText);
+    row.publication.receipt.attemptsSha256 = hash(row.publication.historyText);
+    const selected = selectRequest([request()], evidence);
+    assert.equal(selected.status, 'complete');
+    assert.equal(selected.result.verdict, 'unknown');
+    assert.equal(selected.result.valid, 9);
+    for (const [path, bad] of [
+      ['result.verdict', 'pass'],
+      ['publication.receipt.runAttempt', '2'],
+      ['publication.stateText', `${row.publication.stateText} `],
+      ['publication.artifact.workflow_run.id', 501],
+    ]) {
+      const altered = clone(evidence);
+      set(altered.results.entries[0], path, bad);
+      assert.equal(selectRequest([request()], altered).status, 'hold', path);
+    }
+    evidence.results.entries = [];
+    assert.equal(
+      selectRequest([request()], evidence).status,
+      'attempted-unknown'
+    );
+  });
+  it('authenticates durable historical completion after its live cache is evicted', () => {
+    const evidence = completedEvidence();
+    delete evidence.results.entries[0].publication.cache;
+    assert.equal(selectRequest([request()], evidence).status, 'complete');
+    evidence.results.entries[0].publication.receipt.stateSha256 = '0'.repeat(
+      64
+    );
+    assert.equal(selectRequest([request()], evidence).status, 'hold');
+  });
+
   it('suppresses replay only for a measured result attested by canonical publication', () => {
     const evidence = completedEvidence();
     assert.equal(selectRequest([request()], evidence).status, 'complete');
@@ -201,6 +319,55 @@ describe('durable request replay', () => {
 });
 
 describe('actual bound measurement', () => {
+  it('retains complete scored small samples without establishing a ratchet anchor', () => {
+    assert.equal(MIN_RATCHET_VALID, 30);
+    for (const valid of [1, 9, MIN_RATCHET_VALID - 1]) {
+      const value = claim();
+      const evidence = smallSample(value, valid);
+      const module = evidence.state.modules[FILE];
+      assert.equal(module.evidence.verdict, 'unknown');
+      assert.equal(module.evidence.reason, 'insufficient mutation sample');
+      const finished = finishMeasurement(value, evidence);
+      assert.equal(finished.status, 'measured', finished.reason);
+      assert.equal(finished.result.valid, valid);
+      assert.equal(finished.result.verdict, 'unknown');
+      assert.equal(module.highWater, undefined);
+    }
+  });
+  it('holds an insufficient-sample claim at the ratchet minimum', () => {
+    const value = claim();
+    const evidence = smallSample(value, MIN_RATCHET_VALID);
+    Object.assign(evidence.state.modules[FILE].evidence, {
+      verdict: 'unknown',
+      reason: 'insufficient mutation sample',
+    });
+    evidence.history[0].ratchet = 'unknown';
+    assert.equal(finishMeasurement(value, evidence).status, 'hold');
+  });
+  for (const [path, bad] of [
+    ['evidence.reason', undefined],
+    [
+      'evidence.reason',
+      'configuration changed; reviewed control evidence required',
+    ],
+    ['sha', SHA],
+    ['complete', false],
+    ['score', null],
+    ['evidence.unresolvedInputs', ['dynamic import']],
+    ['evidence.inputDigest', undefined],
+  ])
+    it(`holds a small sample with invalid ${path}=${bad}`, () => {
+      const value = claim();
+      const evidence = smallSample(value);
+      set(evidence.state.modules[FILE], path, bad);
+      assert.equal(finishMeasurement(value, evidence).status, 'hold');
+    });
+  it('holds small samples without matching current-run history', () => {
+    const value = claim();
+    const evidence = smallSample(value);
+    evidence.history[0].ratchet = 'pass';
+    assert.equal(finishMeasurement(value, evidence).status, 'hold');
+  });
   it('rejects additional current-run module history outside the one-file bound', () => {
     const value = claim();
     const evidence = measurement(value);

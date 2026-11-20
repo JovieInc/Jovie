@@ -2761,10 +2761,11 @@
     },
     "apps/web/components/shell/RuntimeUpdateProvider.tsx": {
       "error": "A failed desktop install (.catch(() => setApplying(false))) clears the busy flag and the pill returns to its ready label, which RuntimeUpdateProvider.certificate.test.tsx asserts.",
-      "long-content": "Its only UI is RuntimeUpdatePill, whose title and description are fixed update copy built here (for example 'Restart Jovie to update'); the pill also truncates its label at max-w-80, so no caller copy can run long.",
-      "rtl-overflow": "Its only UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow.",
       "loading": "Its busy face is RuntimeUpdatePill disabled with the Downloading or Updating label, drawn in RuntimeUpdatePill.stories LoadingUpdating; RuntimeUpdateProvider.certificate.test.tsx asserts the provider passes busy and the pill shows Updating Jovie disabled after apply.",
-      "offline": "The provider never fetches: whether an update exists comes from useVersionMonitor and the desktop updater, and applying reloads the page or restarts the app, so connectivity has no face of its own here."
+      "long-content": "Its visible UI is RuntimeUpdatePill, whose title and description are fixed update copy built here (for example 'Restart Jovie to update'), plus an sr-only status line holding the same title; the pill truncates its label at max-w-80, so no caller copy can run long.",
+      "offline": "The provider never fetches: whether an update exists comes from useVersionMonitor and the desktop updater, and applying reloads the page or restarts the app, so connectivity has no face of its own here.",
+      "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
+      "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
     },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."

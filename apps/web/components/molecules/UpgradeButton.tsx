@@ -49,7 +49,11 @@ export function UpgradeButton({
     enabled: directUpgradeEnabled && !priceId,
   });
   const resolvedPriceId =
-    priceId || getArtistPresenceMonthlyPrice(pricing.data?.options ?? []);
+    priceId ||
+    getArtistPresenceMonthlyPrice(
+      pricing.data?.options ?? [],
+      pricing.data?.priceLock
+    );
   const checkoutStarted = useRef(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const resetCheckout = checkoutMutation.reset;

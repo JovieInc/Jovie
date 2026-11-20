@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url';
 import { parseTrackedRegularTree } from './merge-group-member-policy.mjs';
 import {
   HYGIENE_LIMITS,
-  trackedBytesBudgetWarning,
+  trackedBytesBudgetWarnings,
 } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -129,8 +129,9 @@ export function enforceProjectedTreeBudget({
       `PR head has ${head.bytes} tracked regular-file bytes, exceeding the ${maxTrackedBytes}-byte repository budget, while the merged tree fits at ${bytes} bytes; merge the current base branch into the PR branch to incorporate its cleanup, then rerun the guard`
     );
   }
-  const warning = trackedBytesBudgetWarning(bytes, maxTrackedBytes);
-  if (warning) log(`::warning::Projected combined tree: ${warning}`);
+  for (const warning of trackedBytesBudgetWarnings(bytes, maxTrackedBytes)) {
+    log(`::warning::Projected combined tree: ${warning}`);
+  }
   log(
     `Projected combined tree: PASS — ${bytes} tracked regular-file bytes (${detail}).`
   );

@@ -60,6 +60,22 @@ export interface LeadSignalSnapshot {
   spotifyEnrichmentStatus?: string;
   /** Search results that showed this page, merged across queries. */
   searchEvidence?: LeadSearchEvidence[];
+  /**
+   * A public Linkfire, Feature.fm, Laylo or Linktree page read directly by
+   * the caller. Qualification uses this snapshot and does not fetch the page.
+   */
+  publicPage?: {
+    platform: 'linktree' | 'featurefm' | 'linkfire' | 'laylo';
+    url: string;
+    handle: string;
+    displayName: string | null;
+    bio: string | null;
+    text: string | null;
+    links: Array<{ url: string }>;
+    hasTrackingPixels: boolean;
+    observedAt: string;
+    source: 'direct_public_page';
+  };
 }
 
 export interface LeadGuardrailThresholds {

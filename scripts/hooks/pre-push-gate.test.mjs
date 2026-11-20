@@ -75,9 +75,24 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /git diff --check/);
   assert.match(publication, /scan-secrets\.sh publication origin\/main/);
   assert.match(publication, /policy-gate-liveness\.mjs/);
+  assert.match(publication, /node scripts\/company-guards\/size\.mjs/);
+  assert.match(publication, /node scripts\/hooks\/pr-size-local\.mjs/);
+  assert.match(publication, /bash scripts\/hooks\/company-size-local\.sh/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
   assert.match(publication, /bash scripts\/hooks\/biome-pre-push\.sh/);
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
+});
+
+test('affected pushes run the company size ratchet before heavier checks', () => {
+  const source = readFileSync(gateScript, 'utf8');
+  const affected = source.split('run_affected() {', 2)[1].split('\n}', 1)[0];
+  assert.match(affected, /node scripts\/company-guards\/size\.mjs/);
+  assert.match(affected, /node scripts\/hooks\/pr-size-local\.mjs/);
+  assert.match(affected, /bash scripts\/hooks\/company-size-local\.sh/);
+  assert.match(
+    affected,
+    /node scripts\/company-guards\/size\.mjs[\s\S]*run_lint/
+  );
 });
 
 for (const linkedWorktree of [false, true]) {
@@ -233,9 +248,10 @@ test('publication rejects committed formatter drift and accepts the formatted re
     for (const file of ['.nvmrc', 'biome.json']) {
       write(file, readFileSync(path.join(repoRoot, file)));
     }
-    // Other publication checks are outside this formatting contract. Real Git,
-    // the publication dispatcher and the installed Biome run without mocks.
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
     write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
@@ -310,12 +326,15 @@ test('publication blocks missing component stories and tests before publishing',
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript, 'utf8'));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
     write('scripts/hooks/biome-pre-push.sh', 'exit 0\n');
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
     write(
       'bin/git',
       '#!/bin/sh\nif [ "$*" != "rev-parse --local-env-vars" ]; then echo fixture-base; fi\n',
       true
     );
     write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write(
@@ -328,7 +347,6 @@ test('publication blocks missing component stories and tests before publishing',
     const checker = pathToFileURL(
       path.join(repoRoot, 'scripts/component-ship-gate.mjs')
     ).href;
-    // Exercise the real artifact checker; isolate network/scanners and git range discovery.
     write(
       'scripts/component-ship-gate.mjs',
       `
@@ -356,7 +374,6 @@ process.exit(report.ok ? 0 : 1);
             ...process.env,
             PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
             JOVIE_SKIP_PRE_PUSH_GATE: '',
-            // This spawn is the subject. An inherited hook depth refuses before the checker prints.
             JOVIE_PREFLIGHT_DEPTH: '',
           },
         }
@@ -409,7 +426,10 @@ test('affected qualification rejects stale surface certification before expensiv
   try {
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
     write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('bin/git', '#!/bin/sh\nexit 0\n');
     write(
       'bin/pnpm',

@@ -3,7 +3,17 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 
-export function createWorktreeFixtures(makeTempDir) {
+export function createWorktreeFixtures(makeTempDir, writeExecutable) {
+  function makeToolStubs({
+    nodeVersion = 'v24.21.0',
+    pnpmVersion = '9.15.9',
+  } = {}) {
+    const bin = makeTempDir('jovie-setup-health-bin-');
+    writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
+    writeExecutable(join(bin, 'pnpm'), `#!/bin/sh\necho ${pnpmVersion}\n`);
+    return bin;
+  }
+
   function makeWorktree() {
     const root = makeTempDir('jovie-setup-health-repo-');
     writeFileSync(
@@ -67,5 +77,5 @@ export function createWorktreeFixtures(makeTempDir) {
     return { linked, primary };
   }
 
-  return { makeWorktree, makeLinkedWorktreeWithBarePrimary };
+  return { makeWorktree, makeLinkedWorktreeWithBarePrimary, makeToolStubs };
 }

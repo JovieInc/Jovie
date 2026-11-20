@@ -50,7 +50,16 @@ type FormStory = StoryObj<typeof ListenNowForm>;
 const FormColumnDecorator: NonNullable<FormMeta['decorators']> =
   function FormColumnDecorator(Story, context) {
     const client = new QueryClient({
-      defaultOptions: { mutations: { retry: false } },
+      defaultOptions: {
+        mutations: {
+          retry: false,
+          // useProfileMutation overrides retry with a classified policy that
+          // retries twice; without a zero delay the default backoff (~3s)
+          // outlasts the play functions' find window and the error state
+          // never lands in time.
+          retryDelay: 0,
+        },
+      },
     });
     const rtl = context.parameters.rtl === true;
     return (

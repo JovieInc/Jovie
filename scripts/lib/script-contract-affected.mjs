@@ -14,8 +14,10 @@
  * and other non-JS paths under scripts/ cannot change those inputs, so they
  * use the derived selector (testsAffectedBy), same as any other diff. Package
  * changes also run sparse-checkout closure: its recursive reads cannot be
- * inferred from literal imports, including newly added declaration files. The
- * node and vitest lists run concurrently.
+ * inferred from literal imports, including newly added declaration files.
+ * A scannable route or feature tsx is not an import of the shell IA contract,
+ * so that ratchet is unioned the same way as the copy inventory. The node
+ * and vitest lists run concurrently.
  *
  * Usage: node scripts/lib/script-contract-affected.mjs [--list] [changed paths...]
  * With no paths it reads the PR diff via ci-fast-lanes.mjs.
@@ -50,6 +52,13 @@ const FULL_RUN_INPUT =
 // source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
 // FULL_RUN_INPUT), selects the inventory contract without the full lists.
 export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
+export const SHELL_IA_TEST = 'scripts/invariants/shell-ia.test.mjs';
+// Stay aligned with CHROME_SCAN_ROOTS and isScannable in shell-ia.mjs.
+// Importing that module here would pull the layout walker into every selection.
+export const SHELL_IA_SCAN_ROOTS = Object.freeze([
+  'apps/web/app',
+  'apps/web/components/features',
+]);
 const SPARSE_CLOSURE_TEST =
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
 
@@ -67,6 +76,14 @@ export function copyInventoryScanPath(file) {
     return /copy|content|labels/iu.test(rel);
   }
   return /^(?:app|components|data)\//u.test(rel);
+}
+
+/** @param {string} file */
+export function shellIaScanPath(file) {
+  if (!/\.tsx$/u.test(file) || /\.(?:test|spec|stories)\.tsx$/u.test(file)) {
+    return false;
+  }
+  return SHELL_IA_SCAN_ROOTS.some(root => file.startsWith(`${root}/`));
 }
 
 /**
@@ -139,13 +156,19 @@ export function selectScriptContracts(changed, options = {}) {
   }
   const select = options.derivedOnly ? testsNearChange : testsAffectedBy;
   const changedFiles = changed ?? [];
+  const nodeSelected = unionAffectedContract(
+    node,
+    select(node, changedFiles, root),
+    COPY_INVENTORY_TEST,
+    changedFiles.some(copyInventoryScanPath)
+  );
   return {
     full: false,
     node: unionAffectedContract(
       node,
-      select(node, changedFiles, root),
-      COPY_INVENTORY_TEST,
-      changedFiles.some(copyInventoryScanPath)
+      nodeSelected,
+      SHELL_IA_TEST,
+      changedFiles.some(shellIaScanPath)
     ),
     vitest: unionAffectedContract(
       vitest,

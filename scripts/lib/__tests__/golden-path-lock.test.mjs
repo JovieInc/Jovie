@@ -31,6 +31,7 @@ import {
   executeAutofix,
   findFingerprintPrs,
   findOpenAutofixPr,
+  findOwnedAgentRecords,
   findOwnedAgents,
   GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
   GOLDEN_PATH_LOCK_SCHEMA,
@@ -1285,6 +1286,13 @@ describe('golden-path autofix dedupe (JOV-6832)', () => {
       },
     ];
     expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
+    // Full record lookup matches branch-only Cursor list entries (so 24h launch
+    // accounting sees both RUNNING and FINISHED runs) while findOwnedAgents
+    // excludes FINISHED runs so stale finished agents never block escalation.
+    expect(findOwnedAgentRecords(agents, FINGERPRINT).map(a => a.id)).toEqual([
+      'running',
+      'done',
+    ]);
   });
 
   it('binds Cursor dispatch to a stable boundary phase and stops when that boundary is held', () => {

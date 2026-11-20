@@ -1,0 +1,19 @@
+{
+  "$comment": "JOV-13089 - App Store Connect minimum-SDK requirement table (ITMS-90725). One row per Apple requirement. Dates come from Apple's own pages, never invented. When Apple announces a new minimum, add ONE row with its source URL.",
+  "warnWindowDays": 60,
+  "rows": [
+    {
+      "effectiveDate": "2026-04-28",
+      "minSdkMajor": 26,
+      "sourceUrl": "https://developer.apple.com/news/upcoming-requirements/",
+      "sourceQuote": "Since April 28, 2026 - Apps uploaded to App Store Connect must be built with Xcode 26 or later using an SDK for iOS 26, iPadOS 26, tvOS 26, visionOS 26, or watchOS 26."
+    },
+    {
+      "effectiveDate": "2027-04-01",
+      "effectiveDateNote": "Apple announced 'Starting April 2027' (month only) on 2026-09-09; no day published. First of the announced month used as the conservative effective date.",
+      "minSdkMajor": 27,
+      "sourceUrl": "https://developer.apple.com/news/?id=k1mtkt1k",
+      "sourceQuote": "Starting April 2027, apps and games uploaded to App Store Connect need to meet the following minimum requirements. iOS and iPadOS apps must be built with the iOS & iPadOS 27 SDK or later."
+    }
+  ]
+}

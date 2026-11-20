@@ -1,13 +1,11 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 const {
   loadRouteContextMock,
   contactsPageClientMock,
-  routerPushMock,
   audienceServerDataMock,
   tourDatesMock,
   lazyAudienceMock,
@@ -16,16 +14,11 @@ const {
 } = vi.hoisted(() => ({
   loadRouteContextMock: vi.fn(),
   contactsPageClientMock: vi.fn(),
-  routerPushMock: vi.fn(),
   audienceServerDataMock: vi.fn(),
   tourDatesMock: vi.fn(),
   lazyAudienceMock: vi.fn(),
   dashboardUserIdMock: vi.fn(),
   captureErrorMock: vi.fn(),
-}));
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: routerPushMock }),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
@@ -60,10 +53,6 @@ vi.mock('@/app/app/(shell)/contacts/ContactsPageClient', () => ({
   },
 }));
 
-vi.mock('@/components/organisms/table/molecules/PageToolbar', () => ({
-  PageToolbar: ({ start }: { start: ReactNode }) => <div>{start}</div>,
-}));
-
 import ContactsPage, {
   resolveContactsWorkspaceTab,
 } from '@/app/app/(shell)/contacts/page';
@@ -80,7 +69,6 @@ describe('canonical contacts page', () => {
   beforeEach(() => {
     loadRouteContextMock.mockReset();
     contactsPageClientMock.mockReset();
-    routerPushMock.mockReset();
     audienceServerDataMock.mockReset();
     tourDatesMock.mockReset();
     lazyAudienceMock.mockReset();
@@ -95,7 +83,6 @@ describe('canonical contacts page', () => {
   });
 
   it('renders without blocking on the contacts query', async () => {
-    const user = userEvent.setup();
     render(await ContactsPage());
 
     expect(loadRouteContextMock).toHaveBeenCalledWith({
@@ -110,20 +97,9 @@ describe('canonical contacts page', () => {
       artistHandle: profile.usernameNormalized,
     });
     expect(screen.getByText('Contacts workspace')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Contacts' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    await user.click(screen.getByRole('tab', { name: 'Audience' }));
-    expect(routerPushMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.CONTACTS}?tab=audience`
-    );
-    await user.click(screen.getByRole('tab', { name: 'Insights' }));
-    expect(routerPushMock).toHaveBeenCalledWith(APP_ROUTES.INSIGHTS);
   });
 
-  it('normalizes workspace state and preserves audience filters in the tab URL', async () => {
-    const user = userEvent.setup();
+  it('normalizes the contacts and audience workspace tabs', async () => {
     expect(resolveContactsWorkspaceTab('audience')).toBe('audience');
     expect(resolveContactsWorkspaceTab('other')).toBe('contacts');
 
@@ -133,10 +109,7 @@ describe('canonical contacts page', () => {
       })
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Audience' }));
-    expect(routerPushMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.CONTACTS}?q=berlin&page=2&tab=audience`
-    );
+    expect(screen.getByText('Contacts workspace')).toBeInTheDocument();
   });
 
   it('renders the shared route-context error', async () => {

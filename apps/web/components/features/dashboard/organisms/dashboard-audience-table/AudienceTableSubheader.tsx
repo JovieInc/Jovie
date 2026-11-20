@@ -2,7 +2,13 @@
 
 import { memo } from 'react';
 import { z } from 'zod';
-import { ExportCSVButton, PageToolbar } from '@/components/organisms/table';
+import {
+  ExportCSVButton,
+  PageToolbar,
+  PageToolbarSelect,
+  type PageToolbarSelectOption,
+} from '@/components/organisms/table';
+import { AudienceWorkspaceSwitch } from '@/features/dashboard/molecules/AudienceWorkspaceSwitch';
 import {
   type SubscriberExportRow,
   subscriberExportRowSchema,
@@ -10,7 +16,6 @@ import {
 import type { CSVColumn } from '@/lib/utils/csv';
 import type { AudienceMember } from '@/types';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
-import { AudienceHeaderBadge } from './AudienceHeaderBadge';
 import type { AudienceFilters, AudienceView } from './types';
 import {
   AUDIENCE_CSV_COLUMNS,
@@ -40,8 +45,40 @@ interface AudienceTableSubheaderProps {
   readonly totalAudienceCount?: number | null;
 }
 
+function identityMenuLabel(
+  name: string,
+  count: number | null
+): string | undefined {
+  if (count === null) return undefined;
+  return `${name} (${count.toLocaleString('en-US')})`;
+}
+
+function identityOptions(
+  allCount: number | null,
+  identifiedCount: number | null,
+  anonymousCount: number | null
+): readonly PageToolbarSelectOption<AudienceView>[] {
+  return [
+    {
+      value: 'all',
+      label: 'All People',
+      menuLabel: identityMenuLabel('All People', allCount),
+    },
+    {
+      value: 'identified',
+      label: 'Identified',
+      menuLabel: identityMenuLabel('Identified', identifiedCount),
+    },
+    {
+      value: 'anonymous',
+      label: 'Anonymous',
+      menuLabel: identityMenuLabel('Anonymous', anonymousCount),
+    },
+  ];
+}
+
 /**
- * AudienceTableSubheader - Subheader with audience view selector and table actions.
+ * AudienceTableSubheader - One workspace tab row, then identity, filter and export.
  */
 export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   mode = 'members',
@@ -56,6 +93,11 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   total,
   totalAudienceCount,
 }: AudienceTableSubheaderProps) {
+  const allCount = totalAudienceCount ?? null;
+  const anonymousCount =
+    allCount !== null && subscriberCount !== null
+      ? Math.max(allCount - subscriberCount, 0)
+      : null;
   const hasData = rows.length > 0;
   const exportTooltipLabel =
     selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export';
@@ -87,16 +129,17 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
 
   return (
     <PageToolbar
-      start={
-        <AudienceHeaderBadge
-          view={view}
-          onViewChange={onViewChange}
-          totalAudienceCount={totalAudienceCount ?? total}
-          subscriberCount={subscriberCount}
-        />
-      }
+      start={<AudienceWorkspaceSwitch value='audience' />}
       end={
         <>
+          <PageToolbarSelect
+            label='Identity'
+            value={view}
+            defaultValue='all'
+            onValueChange={onViewChange}
+            options={identityOptions(allCount, subscriberCount, anonymousCount)}
+            data-testid='audience-identity-select'
+          />
           <AudienceFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}

@@ -20,7 +20,19 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 .\scripts\setup.ps1
 ```
 
-`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+`setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs the offline-first frozen install, and verifies Doppler auth.
+
+## Dependency installs (offline-first)
+
+Routine agent jobs run against a warm pnpm store. The default install is:
+
+```bash
+pnpm install --offline --frozen-lockfile
+```
+
+If that fails because the store is cold or incomplete, fall back once to `pnpm install --prefer-offline --frozen-lockfile`. If network is also unavailable and the fallback fails, say so and let CI verify — no retry loops, no sleeps, no registry access requests for a routine job. This is what `node scripts/codex-cloud-setup.mjs install` (used by `setup.sh` and the SessionStart hook) does automatically.
+
+**Exception — dependency jobs:** work that adds/bumps/removes dependencies (changes `pnpm-lock.yaml`) needs normal registry access: run a plain `pnpm install --frozen-lockfile` there.
 
 Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it hands out a pre-installed, typecheck-warm worktree from the pool in `~/.cache/jovie` (~35s instead of ~5 min) and falls back to `git worktree add` + install when the pool is empty. A worktree made any other way needs `./scripts/setup.sh` before anything else, because worktrees do not share `node_modules`.
 
@@ -315,7 +327,7 @@ The web app already uses `NODE_OPTIONS=--max-old-space-size=4096` and `--pool=fo
 
 ### "Type errors after pull"
 ```bash
-pnpm install
+pnpm install --offline --frozen-lockfile   # --prefer-offline --frozen-lockfile if the store is cold
 pnpm typecheck
 ```
 

@@ -1,5 +1,4 @@
 import {
-  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -7,11 +6,11 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  appendCollectionSummary,
   decide,
   readBuildId,
   resolveSuites,
@@ -106,6 +105,101 @@ describe('relative Lighthouse gate flow', () => {
       'chat:strict',
       'onboarding:relative',
     ]);
+  });
+
+  it('accounts separately for initial collections and paired rechecks, including unsuccessful attempts', async () => {
+    const { options } = harness({
+      verdicts: { onboarding: [{ passed: false, retryable: true }] },
+      failCollect: (side, _suite, runs) => side === 'base' && runs === 2,
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => elapsed,
+      collect: (
+        side: string,
+        suite: { name: string },
+        count: number | null
+      ) => {
+        elapsed += count === null ? 100 : 200;
+        return options.collect(side, suite, count);
+      },
+      hasBaseline: true,
+      extraRuns: 2,
+    });
+    expect(result.passed).toBe(false);
+    const initial = result.collections.filter(row => row.phase === 'initial');
+    expect(initial.map(row => [row.side, row.suite])).toEqual([
+      ['head', 'dashboard'],
+      ['head', 'chat'],
+      ['head', 'onboarding'],
+      ['base', 'dashboard'],
+      ['base', 'onboarding'],
+    ]);
+    expect(initial.every(row => row.elapsedMs === 100 && row.completed)).toBe(
+      true
+    );
+    expect(result.collections.filter(row => row.phase === 'recheck')).toEqual([
+      {
+        suite: 'onboarding',
+        side: 'head',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: true,
+      },
+      {
+        suite: 'onboarding',
+        side: 'base',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: false,
+      },
+    ]);
+  });
+
+  it('appends readable timings without replacing earlier job notes or hiding a failed collection', async () => {
+    const { options } = harness({
+      verdicts: {},
+      failCollect: (_side, suite) => suite === 'chat',
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => (elapsed += 1250),
+      hasBaseline: false,
+      extraRuns: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const summary = join(dir, 'job.md');
+    try {
+      writeFileSync(summary, 'Previous step\n');
+      appendCollectionSummary(summary, result.collections);
+      const markdown = readFileSync(summary, 'utf8');
+      expect(markdown).toMatch(/^Previous step\n### Signed-in Lighthouse/);
+      expect(markdown).toContain(
+        '| dashboard | head | initial | 1.3s | Complete |'
+      );
+      expect(markdown).toContain('| chat | head | initial | 1.3s | Failed |');
+      expect(result.passed).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing or unwritable job summary as optional reporting', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-summary-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      appendCollectionSummary(undefined, []);
+      expect(warn).not.toHaveBeenCalled();
+      appendCollectionSummary(dir, []);
+      expect(warn).toHaveBeenCalledWith(
+        'Lighthouse collection times remain available in verdict.json.'
+      );
+    } finally {
+      warn.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('without a baseline enforces the configured budgets and never rechecks', async () => {
@@ -242,64 +336,6 @@ describe('relative Lighthouse gate flow', () => {
     });
     expect(blocked.passed).toBe(false);
     expect(unmeasured.evaluated).toEqual([]);
-  });
-});
-
-describe('collect-only report hand-off', () => {
-  const { collectOnly } = createRequire(import.meta.url)(
-    './lighthouse-dashboard-auth.cjs'
-  ) as {
-    collectOnly: (options: {
-      collectDir: string;
-      config: string;
-      chromePath: string;
-      collectUrls: string[];
-      env: NodeJS.ProcessEnv;
-      lhciDir: string;
-    }) => number;
-  };
-
-  it("hands over only the reports this collection wrote, never an earlier side's", () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-collect-'));
-    try {
-      const lhciDir = join(dir, '.lighthouseci');
-      const bin = join(dir, 'bin');
-      mkdirSync(lhciDir);
-      mkdirSync(bin);
-      // A collector that, unlike lhci today, does not clear old reports.
-      writeFileSync(
-        join(bin, 'pnpm'),
-        '#!/usr/bin/env bash\necho \'{"side":"head"}\' > "$STUB_LHCI_DIR/lhr-2.json"\n'
-      );
-      chmodSync(join(bin, 'pnpm'), 0o755);
-      // Left behind by the base collection that ran just before.
-      writeFileSync(join(lhciDir, 'lhr-1.json'), '{"side":"base"}');
-      writeFileSync(join(lhciDir, 'keep.txt'), 'not a report');
-
-      const collectDir = join(dir, 'head');
-      const status = collectOnly({
-        collectDir,
-        config: '.lighthouserc.dashboard.pr.json',
-        chromePath: '/bin/true',
-        collectUrls: ['http://localhost:3000/app'],
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          STUB_LHCI_DIR: lhciDir,
-          LIGHTHOUSE_COLLECT_UPLOAD: '',
-        },
-        lhciDir,
-      });
-
-      expect(status).toBe(0);
-      expect(readdirSync(collectDir)).toEqual(['lhr-2.json']);
-      expect(readFileSync(join(collectDir, 'lhr-2.json'), 'utf8')).toContain(
-        'head'
-      );
-      expect(readdirSync(lhciDir).sort()).toEqual(['keep.txt', 'lhr-2.json']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });
 

@@ -69,8 +69,6 @@ describe('RightDrawer', () => {
 
     const aside = screen.getByLabelText('Details drawer');
     expect(aside).toHaveAttribute('aria-hidden', 'true');
-    // Pre-hydration on small screens the closed rail must not hold layout
-    // space that the mobile overlay later releases (CLS on /hud?fs=1).
     expect(aside).toHaveClass('max-lg:hidden');
 
     rerender(
@@ -88,8 +86,9 @@ describe('RightDrawer', () => {
       'rounded-(--app-shell-radius)',
       'border-(--app-shell-frame-seam)',
       'bg-surface-1',
-      'shadow-(--app-shell-drawer-shadow)'
+      'shadow-(--app-shell-shadow)'
     );
+    expect(aside).not.toHaveClass('shadow-(--app-shell-drawer-shadow)');
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 

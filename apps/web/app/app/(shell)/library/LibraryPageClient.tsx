@@ -96,7 +96,7 @@ export function LibraryPageClient({
   const stage = parseLibraryStageParam(
     searchParams.get('stage') ?? searchParams.get('section')
   );
-  const documentId = searchParams.get('document');
+  const documentId = searchParams.get('document')?.toLowerCase();
   const applyMode = (nextMode: (typeof STAGE_TABS)[number]) => {
     if (documentId && hasUnsavedDocumentDraft) {
       discardDocumentDraftsRef.current?.();
@@ -254,6 +254,7 @@ export function LibraryPageClient({
           <CreatorDocumentsWorkspace
             key={creatorProfileId}
             creatorProfileId={creatorProfileId}
+            initialDocumentId={documentId}
             initialDocuments={creatorDocuments}
             initialNextCursor={creatorDocumentsNextCursor}
             initialLoadFailed={creatorDocumentsLoadFailed}

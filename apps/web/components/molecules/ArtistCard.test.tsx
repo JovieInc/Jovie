@@ -79,8 +79,12 @@ describe('ArtistCard', () => {
     );
 
     expect(
-      screen.getByRole('link', { name: "View Rising Star's profile" })
+      // The no-photo fallback renders the initials before the name, so the
+      // accessible name carries them in the same order (axe
+      // label-content-name-mismatch: rendered text must appear contiguously).
+      screen.getByRole('link', { name: "View RS Rising Star's profile" })
     ).toHaveAttribute('href', '/risingstar');
+    // The image path keeps the base label without initials.
     expect(
       screen.getByRole('link', { name: `View ${longName}'s profile` })
     ).toBeInTheDocument();

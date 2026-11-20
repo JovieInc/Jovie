@@ -11,8 +11,9 @@
  * `--dir` holds one folder per artifact, as actions/download-artifact writes
  * them. For every frame with a png it uploads the png to Linear, then creates
  * or updates the issue titled `Pen draft for approval: <frame>`. One issue per
- * frame, never a second one. It never changes an issue's state: moving the
- * issue is Tim's answer. Any failed upload or issue write exits 1.
+ * frame, never a second one. Undecided Backlog issues move to Triage for the
+ * Ovie inbox; Todo and canceled decisions remain untouched. Any failed upload
+ * or issue write exits 1.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -24,12 +25,10 @@ import { withLinearRetry } from '../lib/linear-retry.mjs';
 import { collectFrames, pictureFor } from './pen-draft-frames.mjs';
 
 export const TITLE_PREFIX = 'Pen draft for approval: ';
-// A label of its own for design approvals. `quality-gap:needs-tim` is a gate
-// in scripts/lanes/fleet_ledger.py that accepts on silence, and it counts
-// toward the quality-gap finder's daily cap; this one does neither.
-export const APPROVAL_LABEL = 'pen-draft:needs-tim';
+// The existing Ovie Linear inbox reads this label on active issues.
+export const APPROVAL_LABEL = 'tim-action-required';
 export const APPROVAL_LINE = 'Move to Todo to accept, cancel to reject.';
-export const CREATE_STATE_NAME = 'Backlog';
+export const CREATE_STATE_NAME = 'Triage';
 
 /**
  * @typedef {{ok: false, reason: string, detail?: string}} Failure
@@ -176,6 +175,7 @@ export async function resolveTeamRefs(ctx) {
     (found.data?.team?.states?.nodes ?? []).find(
       state => state?.name === CREATE_STATE_NAME
     )?.id ?? null;
+  if (!stateId) return { ok: false, reason: 'pen_publish_triage_missing' };
   return { ok: true, labelId: label.id, stateId };
 }
 
@@ -282,6 +282,9 @@ export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
           id: found.issue.id,
           input: {
             description,
+            ...(found.issue.state?.type === 'backlog'
+              ? { stateId: refs.stateId }
+              : {}),
             ...(labelled ? {} : { addedLabelIds: [refs.labelId] }),
           },
         }

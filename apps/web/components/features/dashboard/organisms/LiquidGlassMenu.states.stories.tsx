@@ -28,9 +28,13 @@ const openMoreMenu: MenuStory['play'] = async function openMoreMenu({
 }) {
   const canvas = within(canvasElement);
   await userEvent.click(canvas.getByRole('button', { name: 'More options' }));
-  await expect(
-    await canvas.findByRole('button', { name: 'Close menu' })
-  ).toHaveAttribute('aria-expanded', 'true');
+  // While the expanded menu is open the background bar is inert +
+  // aria-hidden (useModalFocusBoundary), so the toggle leaves the
+  // accessibility tree under its old name; assert the open dialog itself.
+  await expect(await canvas.findByRole('dialog')).toHaveAttribute(
+    'aria-modal',
+    'true'
+  );
 };
 
 /**
@@ -60,6 +64,12 @@ const meta = {
         lang={rtl ? 'ar' : undefined}
         className='relative h-96 bg-base'
       >
+        {/* The runner's viewport is desktop-width, where this mobile-only bar
+            is correctly lg:hidden — its play functions could never reach it.
+            Pin the mobile presentation here so the bar's interactive states
+            are exercisable (same story-scoped override pattern as
+            NumberedSection's scroll-animation settle). */}
+        <style>{`[data-mobile-navigation='true'] { display: block !important; }`}</style>
         <LiquidGlassMenu {...args} />
       </div>
     );

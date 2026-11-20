@@ -1,0 +1,40 @@
+# Warden Configuration — LOCAL ONLY in this repo.
+#
+# Sentry Warden runs AI code review on the developer machine: the husky hooks
+# (scripts/hooks/warden-local-review.sh) run `warden --staged` before commit
+# and `warden` (branch vs default branch) before push.
+#
+# Triggers are typed `local` on purpose: they match local CLI runs only and
+# NEVER match GitHub events, so Warden cannot become a PR status check,
+# branch-protection rule, or merge gate here. Do not add a `pull_request`
+# trigger or a `.github/workflows/warden.yml` in this repo.
+#
+# Local auth: set WARDEN_MODEL plus the matching provider key (e.g.
+# WARDEN_OPENAI_API_KEY or WARDEN_ANTHROPIC_API_KEY) in your environment —
+# never commit keys. Without a key, Warden can fall back to local Claude
+# Code auth when available.
+
+version = 1
+
+# Default settings inherited by all skills
+[defaults]
+runtime = "pi"
+# Severity levels: critical, high, medium, low, info
+# failOn: minimum severity that fails the check
+failOn = "high"
+# reportOn: minimum severity that is reported
+reportOn = "medium"
+# Local review compares this branch to the default branch
+defaultBranch = "main"
+
+[[skills]]
+name = "security-review"
+
+[[skills.triggers]]
+type = "local"
+
+[[skills]]
+name = "code-review"
+
+[[skills.triggers]]
+type = "local"

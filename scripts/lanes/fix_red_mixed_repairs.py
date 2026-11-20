@@ -20,6 +20,15 @@ def publish_pr_body(lane, host, pr: dict, name: str, text: str) -> bool:
     return edited.returncode == 0
 
 
+def stamp_changelog_decision(lane, host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = lane.fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    return lane._publish_pr_body(host, pr, "changelog", stamped)
+
+
 def stamp_fleet_body(lane, host, pr: dict) -> str | None:
     """Stamp missing repair evidence once per head; a measured win stays with the model."""
     body = pr.get("body")
@@ -62,6 +71,8 @@ def mixed_repairs(pr: dict, per_check: list) -> list[str]:
         repairs.append("red-before-green")
     if any(action == classes.REPAIR_WIN for _, action in per_check):
         repairs.append(classes.REPAIR_WIN)
+    if any(item_cls == "win-envelope" for item_cls, _ in per_check):
+        repairs.append("repair-win-envelope")
     return repairs
 
 
@@ -74,6 +85,9 @@ def first_route_reason(host, pr, route, claim_route):
     if isinstance(route, dict) and route.get("action") == "repair-win":
         import fix_red_measured_win
         return fix_red_measured_win.apply(host, pr, claim_route)
+    if isinstance(route, dict) and route.get("action") == "repair-win-envelope":
+        import fix_red_win_envelope
+        return fix_red_win_envelope.apply(host, pr, claim_route)
     return apply_mixed_body_repairs(host, pr, route, claim_route)
 
 
@@ -86,12 +100,19 @@ def apply_mixed_body_repairs(host, pr, route, claim_route):
     stamp = classes.STAMP_CHANGELOG in repairs
     red = "red-before-green" in repairs
     win = classes.REPAIR_WIN in repairs
-    if not (stamp or red or win):
+    envelope = "repair-win-envelope" in repairs
+    if not (stamp or red or win or envelope):
         return None
     win_section = None
+    previous_win = None
     if win:
         import fix_red_measured_win
         win_section = fix_red_measured_win.optional_section(pr)
+    if envelope and win_section is None:
+        import fix_red_win_envelope
+        completed = fix_red_win_envelope.optional_completion(pr)
+        if completed:
+            win_section, previous_win = completed
     if win_section is None and not stamp and not red:
         return None
     if not claim_route(host, pr, "mixed-body-repairs"):
@@ -101,5 +122,6 @@ def apply_mixed_body_repairs(host, pr, route, claim_route):
 
     edited = pr_events.ensure_red_before_green(
         pr, "", customer_decision=decision,
-        **({} if win_section is None else {"win_section": win_section}))
+        **({} if win_section is None else {"win_section": win_section}),
+        **({} if previous_win is None else {"previous_win_section": previous_win}))
     return "infra-rerun:mixed-body-repairs" if edited else None

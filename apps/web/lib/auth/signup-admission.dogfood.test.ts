@@ -27,10 +27,14 @@ const founder = (local: string) => `${local}@${FOUNDER_EMAIL_DOMAIN}`;
 
 let info: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
+  vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
   dbCalls.selects = 0;
   info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 });
-afterEach(() => info.mockRestore());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  info.mockRestore();
+});
 
 describe('assertNewAccountAdmission: founder dogfood accounts', () => {
   it.each([

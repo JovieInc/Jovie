@@ -558,7 +558,7 @@ describe('Golden Path workflow evidence', () => {
       status: 'observed',
     });
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      '/actions/workflows/ci.yml/runs?branch=main&status=completed&event=workflow_dispatch&per_page=1'
+      '/actions/workflows/ci.yml/runs?branch=main&status=completed&per_page=10'
     );
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
       '/actions/runs/9/jobs?filter=latest&per_page=100'
