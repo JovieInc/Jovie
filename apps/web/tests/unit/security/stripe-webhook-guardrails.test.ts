@@ -61,4 +61,19 @@ describe('closed-loop guardrail: Stripe webhook Better Auth, customer extraction
     expect(routeSource).toContain('isSettledCheckoutPaymentStatus');
     expect(routeSource).toContain('session.payment_status');
   });
+
+  it('forbids stubbing /api/billing/checkout-session or /api/billing/status in Golden Path E2E specs', () => {
+    for (const relPath of [
+      'tests/e2e/claim-checkout.spec.ts',
+      'tests/e2e/golden-path.spec.ts',
+    ]) {
+      const specSource = readFileSync(join(WEB_ROOT, relPath), 'utf8');
+      expect(
+        specSource,
+        `${relPath} must not route-stub /api/billing/checkout-session or /api/billing/status`
+      ).not.toMatch(
+        /(?:page|context)\.route\([^)]*\/api\/billing\/(?:checkout-session|status)/u
+      );
+    }
+  });
 });

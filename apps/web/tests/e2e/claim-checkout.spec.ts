@@ -138,25 +138,21 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
-      // Paid value (golden-path step): the buyer lands on the unlock screen,
-      // not a bare receipt. This is the only run that can pay, so it asserts it.
-      // ponytail: Stripe forbids automating hosted Checkout, so this session
-      // never reaches status 'complete' and /api/billing/checkout-session
-      // answers { plan: null }. The paid entitlement is already proven by the
-      // signed webhook above; stub only that read to render the paid screen.
-      await page.route('**/api/billing/checkout-session**', route =>
-        route.fulfill({
-          json: {
-            plan: 'pro',
-            priceId,
-            needsProfile: false,
-            proofPending: false,
-            profileShareUrl: null,
-          },
-        })
-      );
+      // Open Stripe session (`status === 'open'`) lands on honest recovery
+      // (never a stubbed false-green celebration), then unstubbed /billing/success
+      // renders the live Pro unlock screen from real entitlement + profile state.
       await page.goto(`/billing/success?session_id=${sessionId}`, {
         waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
+        timeout: 30_000,
+      });
+
+      await page.goto('/billing/success', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+        timeout: 30_000,
       });
       await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
         timeout: 30_000,
@@ -377,6 +373,20 @@ test.describe('Claim checkout dogfood', () => {
       expect(pending.spotifyId).not.toBe(artist.id);
       expect(pending.record?.paidAt).toBeTruthy();
       expect((await getBillingStatus(page)).isPro).toBe(true);
+
+      // Proof-pending paid buyer: /billing/success?source=onboarding keeps the
+      // page private (`shareUrl: null`) and never claims the profile is live.
+      await page.goto('/billing/success?source=onboarding', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(
+        page.getByRole('heading', { name: 'Your plan is active' })
+      ).toBeVisible();
+      await expect(page.getByTestId('paid-share-prompt')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: /live/i })).toHaveCount(0);
 
       // Ovie inbox card for Tim's queue.
       await expect

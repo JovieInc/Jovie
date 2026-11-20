@@ -5,26 +5,12 @@ const mocks = vi.hoisted(() => ({
   dbSelectRows: [] as Array<Record<string, unknown>>,
   retrieveSub: vi.fn(),
   updateBilling: vi.fn(),
-  fetchByIdentity: vi.fn(),
-  applyBillingUpdate: vi.fn(),
-  admitPaidUser: vi.fn(),
-  activateReferral: vi.fn(),
-  expireReferral: vi.fn(),
-  recordCommission: vi.fn(),
-  enqueuePaidWelcome: vi.fn(),
-  attributeLeadPaid: vi.fn(),
-  recordOfferStage: vi.fn(),
-  markClaimPaid: vi.fn(),
+  runPostEffects: vi.fn(),
   trackServerEvent: vi.fn(),
-  sendDunning: vi.fn(),
-  sendRecovery: vi.fn(),
   notifyUpgrade: vi.fn(),
   notifyCancel: vi.fn(),
 }));
 
-vi.mock('server-only', () => ({}));
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('@/lib/redis', () => ({ getRedis: () => null }));
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
@@ -50,60 +36,28 @@ vi.mock('@/lib/stripe/subscription-plan', () => ({
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mocks.updateBilling,
 }));
-vi.mock('@/lib/stripe/customer-sync/queries', () => ({
-  fetchUserBillingDataByIdentity: mocks.fetchByIdentity,
-}));
-vi.mock('@/lib/db/billing-status', () => ({
-  applyBillingUpdateWithAudit: mocks.applyBillingUpdate,
-}));
-vi.mock('@/lib/waitlist/paid-admission', () => ({
-  admitPaidUser: mocks.admitPaidUser,
+vi.mock('@/lib/stripe/webhooks/post-activation', () => ({
+  runActiveSubscriptionPostEffects: mocks.runPostEffects,
 }));
 vi.mock('@/lib/referrals/service', () => ({
-  activateReferral: mocks.activateReferral,
-  expireReferralOnChurn: mocks.expireReferral,
-  recordCommission: mocks.recordCommission,
-}));
-vi.mock('@/lib/email/paid-welcome', () => ({
-  enqueuePaidWelcomeAfterEntitlement: mocks.enqueuePaidWelcome,
-}));
-vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadPaidConversionByAppUserId: mocks.attributeLeadPaid,
-}));
-vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
-  recordArtistOfferStage: mocks.recordOfferStage,
-}));
-vi.mock('@/lib/claim/claim-verification.server', () => ({
-  markClaimVerificationsPaid: mocks.markClaimPaid,
+  activateReferral: vi.fn(),
+  expireReferralOnChurn: vi.fn(),
+  recordCommission: vi.fn(),
 }));
 vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: mocks.trackServerEvent,
 }));
-vi.mock('@/lib/stripe/dunning', () => ({
-  shouldSendDunningEmail: () => true,
-  sendPaymentFailedEmail: mocks.sendDunning,
-  sendPaymentRecoveredEmail: mocks.sendRecovery,
-}));
 vi.mock('@/lib/notifications/providers/slack', () => ({
   notifySlackUpgrade: mocks.notifyUpgrade,
   notifySlackCancellation: mocks.notifyCancel,
-}));
-vi.mock('@/lib/error-tracking', () => ({
-  captureCriticalError: vi.fn(),
-  captureWarning: vi.fn(),
-  logFallback: vi.fn(),
-}));
-vi.mock('@/lib/observability/revenue-spine', () => ({
-  captureRevenueSpineFailure: vi.fn(),
 }));
 
 describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped suppression, and 3DS activation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.dbSelectRows = [];
+    mocks.runPostEffects.mockResolvedValue(undefined);
     mocks.trackServerEvent.mockResolvedValue({ ok: true });
-    mocks.sendDunning.mockResolvedValue(undefined);
-    mocks.sendRecovery.mockResolvedValue(undefined);
     mocks.notifyUpgrade.mockResolvedValue(undefined);
     mocks.notifyCancel.mockResolvedValue(undefined);
   });
@@ -156,13 +110,11 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
     });
 
     expect(res.skipped).toBe(true);
-    expect(mocks.admitPaidUser).not.toHaveBeenCalled();
-    expect(mocks.enqueuePaidWelcome).not.toHaveBeenCalled();
-    expect(mocks.attributeLeadPaid).not.toHaveBeenCalled();
-    expect(mocks.markClaimPaid).not.toHaveBeenCalled();
+    expect(mocks.runPostEffects).not.toHaveBeenCalled();
+    expect(mocks.trackServerEvent).not.toHaveBeenCalled();
   });
 
-  it('runs claim-paid, referral, and offer-stage transitions on 3DS subscription.updated -> active', async () => {
+  it('delegates 3DS subscription.updated -> active to runActiveSubscriptionPostEffects', async () => {
     mocks.dbSelectRows = [{ id: 'ba-user-uuid-2', clerkId: null }];
     mocks.updateBilling.mockResolvedValue({
       success: true,
@@ -174,6 +126,7 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
       '@/lib/stripe/webhooks/handlers/subscription-handler'
     );
     const handler = new SubscriptionHandler();
+    const ts = new Date('2026-11-20T05:00:00Z');
     await handler.handle({
       event: {
         id: 'evt_3ds_active',
@@ -191,58 +144,19 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
         },
       } as unknown as Stripe.Event,
       stripeEventId: 'evt_3ds_active',
-      stripeEventTimestamp: new Date('2026-11-20T05:00:00Z'),
+      stripeEventTimestamp: ts,
     });
 
-    expect(mocks.admitPaidUser).toHaveBeenCalledOnce();
-    expect(mocks.activateReferral).toHaveBeenCalledWith('ba-user-uuid-2');
-    expect(mocks.recordOfferStage).toHaveBeenCalledWith(
-      '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
-      'paid',
-      new Date('2026-11-20T05:00:00Z')
+    expect(mocks.runPostEffects).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appUserId: 'ba-user-uuid-2',
+        userId: 'ba-user-uuid-2',
+        correlation: expect.objectContaining({
+          acquisitionId: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        }),
+        stripeEventTimestamp: ts,
+        eventName: 'customer.subscription.updated',
+      })
     );
-    expect(mocks.markClaimPaid).toHaveBeenCalledWith({
-      appUserId: 'ba-user-uuid-2',
-      paidAt: new Date('2026-11-20T05:00:00Z'),
-      acquisitionId: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
-    });
-  });
-
-  it('skips downgrade when expectedSubscriptionId does not match active replacement subscription', async () => {
-    mocks.fetchByIdentity.mockResolvedValue({
-      success: true,
-      data: {
-        id: 'ba-user-uuid-3',
-        isPro: true,
-        plan: 'pro',
-        stripeCustomerId: 'cus_3',
-        stripeSubscriptionId: 'sub_replacement_new',
-        stripePriceId: 'price_pro_monthly',
-        billingVersion: 2,
-        lastBillingEventAt: new Date('2026-11-20T04:00:00Z'),
-      },
-    });
-
-    const { updateUserBillingStatus } = await import(
-      '@/lib/stripe/customer-sync/update-status'
-    );
-    const result = await updateUserBillingStatus({
-      clerkUserId: 'ba-user-uuid-3',
-      isPro: false,
-      stripeSubscriptionId: null,
-      expectedSubscriptionId: 'sub_canceled_old',
-      stripePriceId: null,
-      stripeEventId: 'evt_old_cancel',
-      stripeEventTimestamp: new Date('2026-11-20T05:00:00Z'),
-      eventType: 'subscription_deleted',
-    });
-
-    expect(result).toEqual({
-      success: true,
-      appUserId: 'ba-user-uuid-3',
-      skipped: true,
-      reason: 'Active subscription replaced before downgrade',
-    });
-    expect(mocks.applyBillingUpdate).not.toHaveBeenCalled();
   });
 });

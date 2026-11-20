@@ -84,8 +84,8 @@ const reportSchema = z.object({
   }),
 });
 
-// Must exceed /api/cron/frequent cadence (30m in vercel.json) with margin.
-export const LIVE_MAX_AGE_MS = 45 * 60_000;
+// These are the existing producer budgets, shared with the live composer.
+export const LIVE_MAX_AGE_MS = 15 * 60_000;
 export const DAILY_CANARY_MAX_AGE_MS = 30 * 60 * 60_000;
 export const DAILY_WORKFLOW_MAX_AGE_MS = 48 * 60 * 60_000;
 
