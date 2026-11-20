@@ -659,19 +659,24 @@ async function failingHead(head, doApply) {
   await dequeue(head.number);
   // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py): the
   // Lane Fix Relay will not clear it on source-green alone, so the PR cannot
-  // look healthy while JOV-6620 blocks same-head re-enroll.
-  await gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${REPO}/issues/${head.number}/labels`,
-    '-f',
-    `labels[]=${FIX_RED_LABEL}`,
-  ]).catch(error =>
+  // look healthy while JOV-6620 blocks same-head re-enroll. Eject job mints
+  // the Jovie Bot app token, so this POST is a jovie-bot episode.
+  let labeled = false;
+  try {
+    await gh([
+      'api',
+      '-X',
+      'POST',
+      `repos/${REPO}/issues/${head.number}/labels`,
+      '-f',
+      `labels[]=${FIX_RED_LABEL}`,
+    ]);
+    labeled = true;
+  } catch (error) {
     console.error(
       `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
-    )
-  );
+    );
+  }
   // The dequeue is the fix; a failed comment must not undo or retry it.
   await gh([
     'api',
@@ -679,11 +684,11 @@ async function failingHead(head, doApply) {
     'POST',
     `repos/${REPO}/issues/${head.number}/comments`,
     '-f',
-    `body=${failingHeadComment(head, failing)}`,
+    `body=${failingHeadComment(head, failing, { labeled })}`,
   ]).catch(error =>
     console.error(`::warning::failing-head comment failed: ${error.message}`)
   );
-  return { failingHead: true, ...decision, dequeued: true };
+  return { failingHead: true, ...decision, dequeued: true, labeled };
 }
 
 // ---- stuck head ------------------------------------------------------------

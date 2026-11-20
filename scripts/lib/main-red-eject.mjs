@@ -494,5 +494,5 @@ export function decideFailingHead({ head, failing, mainGreen }) {
   return { dequeue: true, reason: 'required-check-failed', failing };
 }
 
-export const failingHeadComment = (head, failing) =>
-  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). Push a new commit that fixes the merge-group failure; \`lane-fix-red\` keeps the repair lane owning it until that new head is green.`;
+export const failingHeadComment = (head, failing, { labeled = true } = {}) =>
+  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). ${labeled ? 'Push a new commit that fixes the merge-group failure; `lane-fix-red` keeps the repair lane owning it until that new head is green.' : 'Push a new commit that fixes the merge-group failure (repair-label apply failed on this wake — still blocked from same-head re-enroll by JOV-6620).'}`;
