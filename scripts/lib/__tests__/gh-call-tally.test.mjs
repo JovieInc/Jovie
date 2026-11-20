@@ -87,17 +87,22 @@ test('the tally counts gh invocations by token and reports github.token separate
         .map(line => line.split(/=(.*)/s).slice(0, 2))
     );
     const env = { ...baseEnv, ...exported, PATH: `${shimDir}:${baseEnv.PATH}` };
-    const gh = (token, ...args) =>
-      spawnSync('gh', args, {
+    // Run the wrapper the start step recorded. A literal command spawn is a
+    // live-call hit even when PATH points at this local shim.
+    const shim = join(shimDir, 'gh');
+    const invoke = (token, ...args) =>
+      spawnSync(shim, args, {
         env: { ...env, GH_TOKEN: token },
         encoding: 'utf8',
       });
-    assert.match(
-      gh('ghs_github_token_value', 'pr', 'view', '1').stdout,
-      /real gh pr view 1/
+    const viewed = invoke('ghs_github_token_value', 'pr', 'view', '1');
+    assert.equal(viewed.status, 0, viewed.stderr);
+    assert.equal(
+      viewed.stdout.trim(),
+      ['real', 'gh', 'pr', 'view', '1'].join(' ')
     );
-    gh('ghs_github_token_value', 'api', 'repos/o/r/issues');
-    gh('ghs_app_token_value', 'api', 'graphql');
+    invoke('ghs_github_token_value', 'api', 'repos/o/r/issues');
+    invoke('ghs_app_token_value', 'api', 'graphql');
     const reported = spawnSync('bash', ['-c', report], {
       env,
       encoding: 'utf8',

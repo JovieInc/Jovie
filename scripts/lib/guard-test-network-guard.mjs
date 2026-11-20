@@ -100,16 +100,19 @@ export function countsOf(found) {
  * through --write, never by blocking an unrelated PR.
  * @returns {string[]} errors; empty means the tree honors the contract.
  */
-export function checkGuard(found, ratchet) {
+export function checkGuard(found, ratchet, rules = buildRules()) {
+  const fixFor = new Map(rules.map(rule => [rule.id, rule.fix]));
   const errors = [];
   for (const [path, hits] of Object.entries(found)) {
     for (const [rule, row] of Object.entries(hits)) {
       const ceiling = ratchet[path]?.[rule] ?? 0;
-      if (row.count > ceiling)
+      if (row.count > ceiling) {
+        const fix = fixFor.get(rule) ?? 'remove the live call';
         errors.push(
           `${path}:${row.lines.join(',')} ${rule}: ${row.count} live call(s), ${ceiling} grandfathered. ` +
-            `Fix: ${row.fix}`
+            `Fix: ${fix}`
         );
+      }
     }
   }
   return errors;
