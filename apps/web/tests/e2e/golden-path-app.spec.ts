@@ -1,12 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES, buildArtistProfilePayRoute } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/auth';
+import { hasRealAuthE2eEnv } from './helpers/e2e-auth-env';
 import {
   buildValidOnboardingHandle,
   createFreshUser,
   ensureDbUser,
   ensureServerAuthenticated,
-  hasRealEnv,
   interceptTrackingCalls,
   purgeStaleClerkTestUsers,
   seedOnboardedCreatorProfile,
@@ -57,17 +57,8 @@ test.describe('Golden Path: Welcome Message', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    if (!hasRealEnv()) {
-      test.skip(true, 'Better Auth/DB env vars not configured');
-    }
-    if (
-      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
-      process.env.E2E_TEST_MODE !== '1'
-    ) {
-      test.skip(
-        true,
-        'Better Auth E2E requires E2E_USE_TEST_AUTH_BYPASS=1 or E2E_TEST_MODE=1'
-      );
+    if (!hasRealAuthE2eEnv()) {
+      test.skip(true, 'Real Clerk/DB env vars not configured');
     }
     await purgeStaleClerkTestUsers();
     await interceptTrackingCalls(page);

@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { ensureSignedInUser } from '../helpers/auth';
+import { hasRealAuthE2eEnv } from './helpers/e2e-auth-env';
 
 /**
  * Billing Checkout E2E — Money-path regression coverage
@@ -21,19 +22,9 @@ import { ensureSignedInUser } from '../helpers/auth';
 /*  Environment gates                                                   */
 /* ------------------------------------------------------------------ */
 
-const REQUIRED_ENV = {
-  DATABASE_URL: process.env.DATABASE_URL,
-} as const;
-
-const IS_AUTH_MOCKED =
+const IS_LOCAL_AUTH_BYPASS =
   process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
   process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
-
-function hasRealEnv(): boolean {
-  return Object.values(REQUIRED_ENV).every(
-    v => v && !v.includes('mock') && !v.includes('dummy')
-  );
-}
 
 /** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
 async function interceptTrackingCalls(page: Page) {
@@ -99,20 +90,11 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    if (IS_AUTH_MOCKED) {
-      test.skip(true, 'Billing checkout requires unmocked Better Auth');
+    if (IS_LOCAL_AUTH_BYPASS) {
+      test.skip(true, 'Billing checkout requires real Clerk auth');
     }
-    if (!hasRealEnv()) {
-      test.skip(true, 'Better Auth/DB env vars not configured');
-    }
-    if (
-      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
-      process.env.E2E_USE_STORED_AUTH !== '1'
-    ) {
-      test.skip(
-        true,
-        'Better Auth checkout E2E requires E2E_USE_TEST_AUTH_BYPASS=1 or E2E_USE_STORED_AUTH=1'
-      );
+    if (!hasRealAuthE2eEnv()) {
+      test.skip(true, 'Real Clerk/DB env vars not configured');
     }
 
     await interceptTrackingCalls(page);
