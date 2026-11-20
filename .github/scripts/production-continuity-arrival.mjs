@@ -103,6 +103,11 @@ export async function readMainArrival({
     runs.some(
       run => run.head_sha === commits[0].sha || run.head_sha === liveSha
     );
+  // A bounded run page is not a complete push inventory: skipped CI can omit
+  // an earlier push. Without a receipt for every unshipped SHA, even a batch
+  // tip's age is only a lower bound and cannot certify a healthy release.
+  const receipted = new Set(runs.map(run => run.head_sha));
+  const receiptsComplete = [...shas].every(sha => receipted.has(sha));
   const arrivals = runs
     .filter(run => shas.has(run.head_sha))
     .map(run => timestamp(run.created_at));
@@ -112,7 +117,11 @@ export async function readMainArrival({
     0,
     Math.floor((nowMs - arrivedMs) / 1000)
   );
-  const unshippedAgeIsLowerBound = !(rangeComplete && complete);
+  const unshippedAgeIsLowerBound = !(
+    rangeComplete &&
+    complete &&
+    receiptsComplete
+  );
   if (
     unshippedAgeIsLowerBound &&
     !(

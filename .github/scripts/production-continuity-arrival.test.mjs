@@ -63,6 +63,61 @@ function fixture({
 }
 
 describe('production continuity main-arrival evidence', () => {
+  it('cannot certify freshness when an earlier unshipped push lacks a receipt', async () => {
+    const f = fixture({
+      commits: [OLDEST, MAIN].map(sha => ({
+        sha,
+        commit: { committer: { date: CREATED } },
+      })),
+    });
+    assert.equal((await observeProductionFreshness(f.options)).healthy, null);
+  });
+
+  it('cannot certify a missing intermediate receipt even when the oldest head is present', async () => {
+    const f = fixture({
+      commits: [OLDEST, 'd'.repeat(40), MAIN].map(sha => ({
+        sha,
+        commit: { committer: { date: CREATED } },
+      })),
+      ledger: { total_count: 2, workflow_runs: [run(), run(OLDEST)] },
+    });
+    assert.equal((await observeProductionFreshness(f.options)).healthy, null);
+  });
+
+  it('marks a proven stale arrival as a lower bound when another push lacks a receipt', async () => {
+    const f = fixture({
+      commits: [OLDEST, MAIN].map(sha => ({
+        sha,
+        commit: { committer: { date: CREATED } },
+      })),
+      ledger: {
+        total_count: 1,
+        workflow_runs: [run(MAIN, '2026-11-20T09:00:00Z')],
+      },
+    });
+    const result = await observeProductionFreshness(f.options);
+    assert.equal(result.healthy, false);
+    assert.equal(result.unshippedAgeIsLowerBound, true);
+    assert.equal(result.reason, 'unshipped-for-at-least-19800s');
+  });
+
+  it('certifies a complete fresh receipt inventory despite old committer dates', async () => {
+    const f = fixture({
+      commits: [OLDEST, MAIN].map(sha => ({
+        sha,
+        commit: { committer: { date: CREATED } },
+      })),
+      ledger: {
+        total_count: 2,
+        workflow_runs: [run(), run(OLDEST, '2026-11-20T14:00:00Z')],
+      },
+    });
+    const result = await observeProductionFreshness(f.options);
+    assert.equal(result.healthy, true);
+    assert.equal(result.unshippedAgeSeconds, 1800);
+    assert.equal(result.unshippedAgeIsLowerBound, false);
+  });
+
   it('does not count queue residence against the measured production bound', async () => {
     const f = fixture();
     const result = await observeProductionFreshness(f.options);
@@ -88,7 +143,7 @@ describe('production continuity main-arrival evidence', () => {
     assert.equal(result.catchingUp, false);
   });
 
-  it('uses the main push tip to observe a complete batch range', async () => {
+  it('keeps a recent batch tip unknown without receipts for the rest of the range', async () => {
     const f = fixture({
       commits: [OLDEST, MAIN].map(sha => ({
         sha,
@@ -96,9 +151,9 @@ describe('production continuity main-arrival evidence', () => {
       })),
     });
     const result = await observeProductionFreshness(f.options);
-    assert.equal(result.healthy, true);
+    assert.equal(result.healthy, null);
     assert.equal(result.unshippedCommits, 2);
-    assert.equal(result.unshippedAgeSeconds, 1260);
+    assert.equal(result.reason, 'unshipped-arrival-unreadable');
   });
 
   it('keeps missing, malformed, failed and future landing evidence unknown', async () => {
@@ -243,7 +298,7 @@ it('uses the real shared client and an isolated ledger in the standalone workflo
   }
 });
 
-it('bounds a partial ledger with the known live ancestor when a batch has no oldest-head run', async () => {
+it('does not let a live-ancestor window certify missing unshipped receipts', async () => {
   const runs = [
     run(),
     run(LIVE, '2026-11-20T12:00:00Z'),
@@ -259,8 +314,8 @@ it('bounds a partial ledger with the known live ancestor when a batch has no old
     ledger: { total_count: 101, workflow_runs: runs },
   });
   const result = await observeProductionFreshness(f.options);
-  assert.equal(result.healthy, true);
-  assert.equal(result.unshippedAgeSeconds, 1260);
+  assert.equal(result.healthy, null);
+  assert.equal(result.reason, 'unshipped-arrival-unreadable');
   assert.equal(f.requests.length, 1);
 });
 

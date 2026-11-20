@@ -383,6 +383,9 @@ describe('production freshness', () => {
     failCompare = false,
   } = {}) => {
     const calls = [];
+    const shas = Array.from({ length: aheadBy }, (_, index) =>
+      index === aheadBy - 1 ? mainSha : index.toString(16).padStart(40, '0')
+    );
     const json = (body, status = 200) => ({
       status,
       json: async () => body,
@@ -395,15 +398,13 @@ describe('production freshness', () => {
       if (url.endsWith('/commits/main')) return json({ sha: mainSha });
       if (url.includes('/actions/workflows/ci.yml/runs'))
         return json({
-          total_count: 1,
-          workflow_runs: [
-            {
-              head_sha: mainSha,
-              created_at: oldestAt,
-              event: 'push',
-              head_branch: 'main',
-            },
-          ],
+          total_count: shas.length,
+          workflow_runs: shas.map(head_sha => ({
+            head_sha,
+            created_at: oldestAt,
+            event: 'push',
+            head_branch: 'main',
+          })),
         });
       if (url.includes('/compare/')) {
         if (failCompare) return json({ message: 'boom' }, 500);
@@ -412,11 +413,8 @@ describe('production freshness', () => {
           ahead_by: aheadBy,
           commits:
             aheadBy > 0
-              ? Array.from({ length: aheadBy }, (_, index) => ({
-                  sha:
-                    index === aheadBy - 1
-                      ? mainSha
-                      : index.toString(16).padStart(40, '0'),
+              ? shas.map(sha => ({
+                  sha,
                   commit: { committer: oldestAt ? { date: oldestAt } : {} },
                 }))
               : [],
