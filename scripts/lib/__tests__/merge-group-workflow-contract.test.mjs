@@ -1108,9 +1108,10 @@ describe('merge_group workflow contract', () => {
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
-    // and the MenuMonitor artifact stay macOS-only.
+    // and the MenuMonitor artifact stay macOS-only. Queue-proven main recovers
+    // native via ci-apple-post-queue when Path Changes was skipped.
     expect(macosCaller).toContain(
-      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+      "native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}"
     );
     expect(CI_WORKFLOW).toContain(
       "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
