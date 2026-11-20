@@ -1,0 +1,89 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: GitHub emits no "Cursor agent went IDLE" event; green heads can sit forever behind a jovie-bot lane-fix-red hold because enroll cannot clear it and breaker release needs a new head.
+# removal-trigger: Remove when Summer's shipping read proves 30 consecutive days of zero admission-deadlock orphans without this hop, and green-to-enqueue dwell stays inside SLO.
+name: Summer PR No-Stall
+
+# Summer standing reclaim for orphaned open PRs. Classifies admission deadlocks
+# (ready + lane-fix-red + idle) and empty-bumps a bounded set so queue-breaker
+# can release and Merge Queue Green Enroll can reconsider. Never pushes main.
+# Event path: main push (backstop for missed owner-IDLE). Manual dispatch for
+# Summer/operator. Not a Cursor Project.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Empty-bump admission-deadlock heads (true/false)'
+        required: false
+        default: 'true'
+      limit:
+        description: 'Max empty-bumps this run'
+        required: false
+        default: '5'
+      idle_hours:
+        description: 'Idle hours before a head is stall-classified'
+        required: false
+        default: '6'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+  actions: read
+
+concurrency:
+  group: summer-pr-no-stall
+  cancel-in-progress: false
+
+jobs:
+  reclaim:
+    name: Classify and reclaim orphans
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # github-token-budget: 8 calls/run - one open-PR inventory (gh pr list), then
+      # at most five empty-head pushes via git (no extra REST) plus optional re-read
+      - name: Inventory (report)
+        id: inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          IDLE="${{ github.event.inputs.idle_hours || '6' }}"
+          node scripts/summer/pr-no-stall.mjs --json --idle-hours="$IDLE" | tee "$RUNNER_TEMP/no-stall.json"
+          deadlocks="$(jq '[.actionable[] | select(.class=="admission-deadlock")] | length' "$RUNNER_TEMP/no-stall.json")"
+          echo "deadlocks=$deadlocks" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Summer no-stall::open=$(jq -r .openCount "$RUNNER_TEMP/no-stall.json") actionable=$(jq -r '.actionable|length' "$RUNNER_TEMP/no-stall.json") deadlocks=$deadlocks"
+
+      - name: Apply empty-head bumps (bounded)
+        if: >-
+          (github.event_name == 'push' || github.event.inputs.apply != 'false') &&
+          steps.inventory.outputs.deadlocks != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git config user.name "jovie-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          LIMIT="${{ github.event.inputs.limit || '5' }}"
+          IDLE="${{ github.event.inputs.idle_hours || '6' }}"
+          node scripts/summer/pr-no-stall.mjs --apply --limit="$LIMIT" --idle-hours="$IDLE" --json | tee "$RUNNER_TEMP/no-stall-apply.json"
+          jq -e '.applied | length >= 0' "$RUNNER_TEMP/no-stall-apply.json" >/dev/null
