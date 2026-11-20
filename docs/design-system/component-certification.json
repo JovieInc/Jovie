@@ -1996,9 +1996,6 @@
       "partial": "Its one required score is its only data; size, showLabel and className are presentation switches shown in the Small and WithLabel stories, so nothing can be partially present.",
       "long-content": "Its text is a whole percentage of a 0 to 1 score and one of three fixed level labels, so the longest it can read is '100% Medium', and DotBadge keeps it on one line (AllLevels shows every label)."
     },
-    "apps/web/components/features/dashboard/atoms/DashboardHeaderActionButton.tsx": {
-      "permission-denied": "The header action has no permission input or gated face: parents decide whether to render it, and its only inert branch is disabled (Disabled story + DashboardHeaderActionButton.test.tsx). The detector matched aria-label / role on the control."
-    },
     "apps/web/components/features/dashboard/atoms/DspProviderIcon.tsx": {
       "empty": "It draws one provider's icon and owns no collection that could be empty. The detector matched the items-center class.",
       "partial": "Its one required provider is its only data and every DSP_PROVIDER_IDS entry has a registry name and colour (DspProviderIcon.test.tsx checks this); a provider without a dedicated logo falls back to SocialIcon, the NonStreamingProvider story.",
