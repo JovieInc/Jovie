@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lanes'))
 import fix_red_classes as classes
-import fix_red_failure_routing as routing
 import lane_runner as lane
+import sync_main_claim_cases as claim_cases
 
 HEAD = '99320365a5ba5f03eb7cfd48c1a10137bd3d4031'
 RUN = 42922034233
@@ -279,33 +279,8 @@ class TreeByteBudgetTest(unittest.TestCase):
                     route = classes.classify(red('PR Size Guard'), {'PR Size Guard': prefixed})
                     self.assertEqual(route['action'], 'agent')
 
-class SyncClaimTest(unittest.TestCase):
-    def test_sync_claim_qualifies_only_sync_main(self):
-        tip, other = 'ab' * 20, 'cd' * 20
-        for pr, action, want in (
-            ({'baseRef': {'target': {'oid': tip}}}, 'sync-main', f'sync-main:{tip}'),
-            ({'baseRefOid': tip}, 'sync-main', f'sync-main:{tip}'),
-            ({}, 'sync-main', 'sync-main'),
-            ({'baseRefOid': 'not-a-sha'}, 'sync-main', 'sync-main'),
-            ({'baseRefOid': tip}, 'rerun', 'rerun'),
-        ):
-            self.assertEqual(routing.sync_claim(pr, action), want)
-        self.assertEqual((routing.base_tip({'baseRef': {'target': {'oid': other}}, 'baseRefOid': tip}), routing.base_tip(None)), (other, ''))
-
-    def test_burned_claim_syncs_again_when_the_base_tip_changes(self):
-        with tempfile.TemporaryDirectory() as name:
-            host = lane.Host(state=Path(name))
-            head, tip_a, tip_b = 'c' * 40, 'd' * 40, 'e' * 40
-            (host.state / 'class-routes.json').write_text(json.dumps({'25910': {'sync-main': head}}))
-            pr = {'number': 25910, 'headRefOid': head, 'baseRefOid': tip_a, 'body': ''}
-            route = {'action': 'sync-main', 'cls': 'tracked-byte-stale'}
-            with patch.object(lane.pr_events, 'sync_main', return_value='synced') as sync:
-                self.assertEqual(lane.deterministic_route_taken(host, pr, route), 'infra-rerun:tracked-byte-stale')
-                self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
-                pr['baseRefOid'] = tip_b
-                self.assertEqual(lane.deterministic_route_taken(host, pr, route), 'infra-rerun:tracked-byte-stale')
-            saved = json.loads((host.state / 'class-routes.json').read_text())['25910']
-            self.assertEqual((sync.call_count, saved['sync-main'], saved[f'sync-main:{tip_b}']), (2, head, head))
+class SyncClaimTest(claim_cases.SyncClaimTest):
+    """Once per head and base tip. Bodies live in sync_main_claim_cases."""
 
 
 class AliasClassificationTest(unittest.TestCase):
@@ -494,6 +469,10 @@ class RouteBudgetRoutingTest(unittest.TestCase):
                      "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:
             got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": text})
             self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
+
+
+class StuckSyncRetryTest(claim_cases.StuckSyncRetryTest):
+    """Receipt-less sync retries once when main merges clean."""
 
 
 if __name__ == '__main__':

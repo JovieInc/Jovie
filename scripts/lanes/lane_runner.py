@@ -1509,7 +1509,7 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
 # (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
 # (infrastructure red or a failure main already has), 17 found the head already green. A
 # specific reason lets the budget, the backoff and the ledger treat each differently.
-from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason, sync_claim  # noqa: E402
+from fix_red_failure_routing import classify_unpushed_repair, not_shippable_reason  # noqa: E402
 
 
 def parse_numstat(text: str) -> list[Change]:
@@ -7197,8 +7197,8 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
         import quota_rerun
         return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
-    # One rerun per head. Sync once per head against the current base tip.
-    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, sync_claim(pr, route["action"]))):
+    # One rerun per head. Sync once per base tip; retry a receipt-less claim when main merges clean.
+    if not fix_red_failure_routing.sync_claim_or_retry(route, claim_infra_rerun, claim_route, host, pr, read_json, conflict_files):
         return None
     if route["action"] == fix_red_classes.RERUN:
         return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None

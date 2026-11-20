@@ -21,10 +21,12 @@ import {
   measureRouteJs,
   readBudgetAncestor,
   routeFromManifestKey,
+  routeJsContributors,
   validateBudgetShape,
 } from './route-js-budget.mjs';
 import {
   buildFirstLoadFixture,
+  buildFixture,
   cleanupFixtures,
   firstLoadBudgets,
   fixtureRoots,
@@ -33,47 +35,11 @@ import {
   NOW,
   validRaise,
   writeChunk,
+  writeManifest,
 } from './route-js-budget-fixtures';
 import { chunkContributions } from './route-js-diagnostics.mjs';
 
 afterEach(cleanupFixtures);
-
-function writeManifest(
-  nextDir: string,
-  segmentDir: string,
-  key: string,
-  entryJSFiles: Record<string, string[]>
-) {
-  const dir = join(nextDir, 'server', 'app', 'app', segmentDir);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, 'page_client-reference-manifest.js'),
-    `globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};\n` +
-      `globalThis.__RSC_MANIFEST[${JSON.stringify(key)}] = ${JSON.stringify({ entryJSFiles })};\n`
-  );
-}
-
-function buildFixture() {
-  const nextDir = mkdtempSync(join(tmpdir(), 'route-js-budget-'));
-  fixtureRoots.push(nextDir);
-  const main = writeChunk(nextDir, 'main.js', 20 * 1024);
-  const shell = writeChunk(nextDir, 'shell.js', 40 * 1024);
-  const heavy = writeChunk(nextDir, 'heavy.js', 100 * 1024);
-  writeFileSync(
-    join(nextDir, 'build-manifest.json'),
-    JSON.stringify({ rootMainFiles: [main], polyfillFiles: [] })
-  );
-  writeManifest(nextDir, '(shell)/settings', '/app/(shell)/settings/page', {
-    '[project]/app/layout': [main],
-    '[project]/app/app/(shell)/layout': [shell],
-    '[project]/app/app/(shell)/settings/page': [shell],
-  });
-  writeManifest(nextDir, '(shell)/chat', '/app/(shell)/chat/page', {
-    '[project]/app/app/(shell)/layout': [shell],
-    '[project]/app/app/(shell)/chat/page': [heavy],
-  });
-  return nextDir;
-}
 
 describe('route-js-budget', () => {
   it('normalizes route groups and page suffixes', () => {
@@ -180,6 +146,46 @@ describe('route-js-budget', () => {
     expect(findForbiddenClientCode(nextDir).map(hit => hit.file)).toEqual([
       'static/chunks/modal.js',
     ]);
+  });
+
+  it('explains emitted route bytes once per chunk, largest first', () => {
+    const nextDir = buildFixture();
+    const [row] = routeJsContributors(nextDir, ['/app/settings']);
+    expect(row.route).toBe('/app/settings');
+    expect(row.files.map(chunk => chunk.file)).toEqual([
+      'static/chunks/shell.js',
+      'static/chunks/main.js',
+    ]);
+    const expectedBytes = row.files.reduce((sum, chunk) => {
+      const bytes = readFileSync(join(nextDir, chunk.file));
+      expect(chunk.gzipBytes).toBe(
+        gzipSync(budgetJsBytes(bytes), { level: 9 }).length
+      );
+      return sum + chunk.gzipBytes;
+    }, 0);
+    expect(row.gzipBytes).toBe(expectedBytes);
+    expect(Math.round(row.gzipBytes / 1024)).toBe(
+      measureRouteJs(nextDir).find(route => route.route === row.route)?.gzipKb
+    );
+  });
+
+  it('explains the worst parallel app entry instead of unioning separate entries', () => {
+    const nextDir = buildFixture();
+    writeManifest(nextDir, '@dialog/settings', '/app/@dialog/settings/page', {
+      page: ['static/chunks/heavy.js'],
+    });
+    const [row] = routeJsContributors(nextDir, ['/app/settings']);
+    expect(row.files.map(chunk => chunk.file)).toEqual([
+      'static/chunks/heavy.js',
+      'static/chunks/main.js',
+    ]);
+    expect(Math.round(row.gzipBytes / 1024)).toBe(
+      Math.max(
+        ...measureRouteJs(nextDir)
+          .filter(route => route.route === row.route)
+          .map(route => route.gzipKb)
+      )
+    );
   });
 
   it('ships a per-route baseline for every route, none above its section ceiling', () => {

@@ -18,7 +18,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { CheckoutUnlockCards } from '@/components/organisms/billing/CheckoutUnlockCards';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
@@ -34,12 +33,9 @@ import {
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   isArtistVisibilityPlan,
-  type PaidPlanId,
-  resolveCanonicalPlan,
   resolveCheckoutSuccessView,
-  resolvePaidPlan,
-  shouldCelebratePaidSuccess,
 } from './checkout-success-state';
+import { useCheckoutConfirmation } from './use-checkout-confirmation';
 
 const MAX_UNLOCK_TILES = [
   {
@@ -65,42 +61,6 @@ const ARTIST_VISIBILITY_STEP_ICONS = {
   analytics: BarChart3,
   verify: BadgeCheck,
 } as const;
-
-async function fetchValidatedSession(
-  sessionId: string,
-  signal: AbortSignal
-): Promise<{
-  plan: PaidPlanId | null;
-  needsProfile: boolean;
-  proofPending: boolean;
-  shareUrl: string | null;
-}> {
-  const response = await fetch(
-    `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
-    { cache: 'no-store', signal }
-  );
-  if (!response.ok) {
-    return {
-      plan: null,
-      needsProfile: false,
-      proofPending: false,
-      shareUrl: null,
-    };
-  }
-  const body = (await response.json()) as {
-    plan?: string | null;
-    needsProfile?: boolean;
-    proofPending?: boolean;
-    profileShareUrl?: string | null;
-  };
-  return {
-    plan: resolvePaidPlan(body.plan ?? null),
-    needsProfile: body.needsProfile === true,
-    proofPending: body.proofPending === true,
-    shareUrl:
-      typeof body.profileShareUrl === 'string' ? body.profileShareUrl : null,
-  };
-}
 
 function FeatureCard({
   icon: Icon,
@@ -132,137 +92,60 @@ function getVerificationButtonLabel(state: string): string {
 }
 
 export default function CheckoutSuccessPage() {
+  const sessionId = useSearchParams().get('session_id');
+  return <CheckoutSuccessContent key={sessionId ?? 'no-session'} />;
+}
+
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
   const checkoutSessionId = searchParams.get('session_id');
-  const rawPlanIdParam = searchParams.get('plan_id');
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
-  const {
-    data: billingData,
-    isLoading: isBillingLoading,
-    isFetched: isBillingFetched,
-    error: billingError,
-  } = useBillingStatusQuery();
+  const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [isSessionPlanPending, setIsSessionPlanPending] = useState(
-    Boolean(checkoutSessionId)
-  );
-  const [validatedSessionPlan, setValidatedSessionPlan] =
-    useState<PaidPlanId | null>(null);
-  const [needsProfile, setNeedsProfile] = useState(false);
-  // Private until we confirm it is the artist's: never say "live".
-  const [proofPending, setProofPending] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const isBillingPending =
-    !checkoutSessionId &&
-    isBillingLoading === true &&
-    billingData === undefined &&
-    isBillingFetched !== true &&
-    billingError == null;
-  const conversionTrackedRef = useRef(false);
-  const onboardingTrackedRef = useRef(false);
-  const celebrationTrackedRef = useRef(false);
+  const {
+    receipt,
+    pending: isSessionPlanPending,
+    retry,
+  } = useCheckoutConfirmation(checkoutSessionId);
+  const { needsProfile, proofPending, shareUrl } = receipt;
+  const viewedSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHasHydrated(true);
   }, []);
-
-  useEffect(() => {
-    if (!checkoutSessionId) {
-      setIsSessionPlanPending(false);
-      setValidatedSessionPlan(null);
-      return;
-    }
-
-    const sessionId = checkoutSessionId;
-    const controller = new AbortController();
-    setIsSessionPlanPending(true);
-
-    void fetchValidatedSession(sessionId, controller.signal)
-      .then(session => {
-        if (controller.signal.aborted) return;
-        setValidatedSessionPlan(session.plan);
-        setNeedsProfile(session.needsProfile);
-        setProofPending(session.proofPending);
-        setShareUrl(session.shareUrl);
-      })
-      .catch(error => {
-        if (controller.signal.aborted) return;
-        console.error(
-          '[billing/success] checkout session validation failed',
-          error
-        );
-        setValidatedSessionPlan(null);
-      })
-      .finally(() => {
-        if (controller.signal.aborted) return;
-        setIsSessionPlanPending(false);
-      });
-
-    return () => controller.abort();
-  }, [checkoutSessionId]);
 
   const view = useMemo(
     () =>
       resolveCheckoutSuccessView({
         checkoutSessionId,
         isSessionPlanPending,
-        validatedSessionPlan,
-        billingPlan: billingData?.plan,
-        isBillingPending,
+        validatedSessionPlan: receipt.plan,
+        confirmationStatus: receipt.status,
+        paymentStatus: receipt.paymentStatus,
       }),
-    [
-      billingData?.plan,
-      checkoutSessionId,
-      isBillingPending,
-      isSessionPlanPending,
-      validatedSessionPlan,
-    ]
-  );
-
-  const resolvedPlan = useMemo(
-    () =>
-      view.kind === 'success'
-        ? resolveCanonicalPlan(
-            billingData?.plan,
-            rawPlanIdParam,
-            validatedSessionPlan
-          )
-        : { canonical: null, displayName: null },
-    [billingData?.plan, rawPlanIdParam, validatedSessionPlan, view.kind]
+    [checkoutSessionId, isSessionPlanPending, receipt]
   );
 
   useEffect(() => {
-    if (!shouldCelebratePaidSuccess(view) || conversionTrackedRef.current) {
+    if (
+      view.kind !== 'success' ||
+      !checkoutSessionId ||
+      viewedSessionRef.current === checkoutSessionId
+    )
       return;
-    }
-    conversionTrackedRef.current = true;
-    track('subscription_success', {
-      flow_type: 'checkout',
-      page: 'success',
-    });
+    viewedSessionRef.current = checkoutSessionId;
+    // This is a page view, never a new purchase. Verified webhook receipts
+    // already own durable conversion analytics, including retries/replays.
     page('checkout_success', {
       page_type: 'billing',
       section: 'success',
-      conversion: true,
+      conversion: false,
     });
-  }, [view]);
-
-  useEffect(() => {
-    if (!shouldCelebratePaidSuccess(view)) return;
-    if (checkoutSessionId && isSessionPlanPending) return;
-    if (!celebrationTrackedRef.current) {
-      celebrationTrackedRef.current = true;
-      track('checkout_celebration_shown', { planType: view.plan });
-    }
-    if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
-      onboardingTrackedRef.current = true;
-      track('onboarding_upgrade_success', { plan: view.plan });
-    }
-  }, [checkoutSessionId, isOnboardingUpgrade, isSessionPlanPending, view]);
+  }, [checkoutSessionId, view]);
 
   const canNativeShare =
     hasHydrated &&
@@ -310,9 +193,7 @@ export default function CheckoutSuccessPage() {
     }
   };
 
-  const paidDisplayName =
-    resolvedPlan.displayName ??
-    (view.kind === 'success' ? view.displayName : null);
+  const paidDisplayName = view.kind === 'success' ? view.displayName : null;
   const isArtistVisibilitySuccess =
     view.kind === 'success' && isArtistVisibilityPlan(view.plan);
   let successTitle: string;
@@ -324,9 +205,9 @@ export default function CheckoutSuccessPage() {
   } else if (isOnboardingUpgrade && proofPending) {
     successTitle = 'Your plan is active';
   } else if (isOnboardingUpgrade) {
-    successTitle = 'Your profile is live and upgraded';
+    successTitle = shareUrl ? 'Your profile is live' : 'Your plan is active';
   } else if (paidDisplayName) {
-    successTitle = `Welcome to ${paidDisplayName}!`;
+    successTitle = `${paidDisplayName} plan confirmed`;
   } else {
     successTitle = CHECKOUT_RECOVERY_COPY.title;
   }
@@ -341,11 +222,11 @@ export default function CheckoutSuccessPage() {
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
       ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
-      : "You're all set. Here's what you just unlocked.";
+      : "Here's what's included with your plan.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
   } else {
-    successSubtitle = "Your plan is active. Here's what you just unlocked.";
+    successSubtitle = "Your plan is active. Here's what's included.";
   }
 
   // The page settles in place: no confetti, no entrance slide and no vertical
@@ -383,7 +264,9 @@ export default function CheckoutSuccessPage() {
               data-testid='checkout-success-status'
             >
               <CircleCheck className='h-3.5 w-3.5' aria-hidden='true' />
-              Payment confirmed
+              {view.paymentStatus === 'paid'
+                ? 'Payment confirmed'
+                : 'Checkout confirmed — no payment due'}
             </p>
           ) : (
             <div
@@ -444,12 +327,14 @@ export default function CheckoutSuccessPage() {
           <div className='flex flex-col items-center gap-3'>
             {view.kind === 'recovery' ? (
               <>
-                <UpgradeButton
-                  className='w-full sm:w-auto [&_button]:w-full'
-                  size='lg'
-                >
-                  Retry checkout
-                </UpgradeButton>
+                {checkoutSessionId ? (
+                  <Button type='button' size='lg' onClick={retry}>
+                    Check Again
+                  </Button>
+                ) : null}
+                <Button asChild variant='secondary' size='lg'>
+                  <Link href={APP_ROUTES.BILLING}>View Billing</Link>
+                </Button>
                 <Button asChild variant='secondary' size='lg'>
                   <Link href={APP_ROUTES.SUPPORT}>Contact support</Link>
                 </Button>

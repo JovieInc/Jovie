@@ -9,7 +9,7 @@ import {
 
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 export type CheckoutSuccessView =
-  | { readonly kind: 'pending'; readonly reason: 'session' | 'billing' }
+  | { readonly kind: 'pending'; readonly reason: 'session' }
   | {
       readonly kind: 'recovery';
       readonly reason: 'session_unconfirmed' | 'not_entitled';
@@ -18,17 +18,19 @@ export type CheckoutSuccessView =
       readonly kind: 'success';
       readonly plan: PaidPlanId;
       readonly displayName: string;
+      readonly paymentStatus: 'paid' | 'no_payment_required';
     };
 
 export const CHECKOUT_PENDING_COPY = {
   title: 'Confirming checkout',
-  subtitle: 'We are verifying this payment before we mark a plan as active.',
+  subtitle:
+    'We are checking your checkout and plan. Please do not start another payment.',
 } as const;
 
 export const CHECKOUT_RECOVERY_COPY = {
   title: 'Checkout not confirmed',
   subtitle:
-    'This session is missing, expired, or still processing. We have not marked a paid plan as active.',
+    'We could not confirm this checkout and active plan yet. Check again or view Billing before making another payment.',
 } as const;
 
 /**
@@ -102,60 +104,30 @@ export function resolvePaidPlan(
   return canonical && canonical !== 'free' ? canonical : null;
 }
 
-export function resolveCanonicalPlan(
-  billingPlan: string | null | undefined,
-  rawPlanIdParam: string | null,
-  validatedSessionPlan: PaidPlanId | null
-): {
-  readonly canonical: PaidPlanId | null;
-  readonly displayName: string | null;
-} {
-  const fromBilling = resolvePaidPlan(billingPlan ?? null);
-  const fromParam = resolvePaidPlan(rawPlanIdParam);
-  const validatedParam =
-    fromParam &&
-    (fromParam === validatedSessionPlan ||
-      (!validatedSessionPlan && fromParam === fromBilling))
-      ? fromParam
-      : null;
-  const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
-  return canonicalPlan
-    ? {
-        canonical: canonicalPlan,
-        displayName: getPlanDisplayName(canonicalPlan),
-      }
-    : { canonical: null, displayName: null };
-}
-
 export function resolveCheckoutSuccessView(input: {
   readonly checkoutSessionId: string | null;
   readonly isSessionPlanPending: boolean;
   readonly validatedSessionPlan: PaidPlanId | null;
-  readonly billingPlan: string | null | undefined;
-  readonly isBillingPending: boolean;
+  readonly confirmationStatus: string;
+  readonly paymentStatus: 'paid' | 'no_payment_required' | null;
 }): CheckoutSuccessView {
-  const billingEntitlement = resolvePaidPlan(input.billingPlan);
-  if (input.checkoutSessionId) {
-    if (input.isSessionPlanPending)
-      return { kind: 'pending', reason: 'session' };
-    if (!input.validatedSessionPlan) {
-      return { kind: 'recovery', reason: 'session_unconfirmed' };
-    }
+  if (input.checkoutSessionId && input.isSessionPlanPending) {
+    return { kind: 'pending', reason: 'session' };
+  }
+  if (
+    input.checkoutSessionId &&
+    input.confirmationStatus === 'confirmed' &&
+    input.validatedSessionPlan &&
+    input.paymentStatus
+  ) {
     return {
       kind: 'success',
       plan: input.validatedSessionPlan,
       displayName: getPlanDisplayName(input.validatedSessionPlan),
+      paymentStatus: input.paymentStatus,
     };
   }
-  if (input.isBillingPending) return { kind: 'pending', reason: 'billing' };
-  if (billingEntitlement) {
-    return {
-      kind: 'success',
-      plan: billingEntitlement,
-      displayName: getPlanDisplayName(billingEntitlement),
-    };
-  }
-  return { kind: 'recovery', reason: 'not_entitled' };
+  return { kind: 'recovery', reason: 'session_unconfirmed' };
 }
 
 export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {
@@ -183,10 +155,4 @@ export function getPaidSuccessPrimaryLabel(input: {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
   return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
-}
-
-export function shouldCelebratePaidSuccess(
-  view: CheckoutSuccessView
-): view is Extract<CheckoutSuccessView, { kind: 'success' }> {
-  return view.kind === 'success';
 }
