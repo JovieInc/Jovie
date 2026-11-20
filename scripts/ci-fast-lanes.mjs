@@ -1525,6 +1525,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
   'scripts/lib/__tests__/product-lane-docs-only.test.mjs',
+  'scripts/lib/__tests__/structural-asserted-docs.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/(^| )scripts\//gu, '$1')

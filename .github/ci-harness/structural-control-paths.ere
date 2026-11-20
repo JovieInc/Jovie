@@ -10,9 +10,14 @@
 ^packages/agent-transport-contracts/
 ^scripts/lib/__tests__/(provider-attempt-receipt|provider-incident-contract|symphony-health-contract)\.test\.mjs$
 ^\.github/
-^\.claude/rules/(ci-branching|release|testing|gstack)\.md
+# Any agent rule can be asserted by structural hygiene; keep the whole tree.
+^\.claude/rules/[^/]+\.md$
 ^AGENTS\.md
+^CLAUDE\.md
 ^CODEX\.md
+^CHANGELOG\.md
+^LESSONS\.md
+^canon/README\.md
 ^canon/invariants\.jsonl
 ^apps/web/scripts/optical-grid-scanners\.ts$
 ^scripts/invariants/
@@ -24,7 +29,8 @@
 ^scripts/doc-freshness-lint
 ^scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)
 ^scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)
-^scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|product-lane-docs-only|production-lane-range)\.test\.mjs
+^scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|product-lane-docs-only|production-lane-range|structural-asserted-docs)\.test\.mjs
+^scripts/lib/structural-asserted-doc-paths\.mjs$
 ^scripts/ci-
 ^scripts/brand-scrub\.py
 ^scripts/lanes/
@@ -58,12 +64,12 @@
 
 # Inputs apps/web/tests/unit/ci and structural pytest/lanes read beyond
 # .github/: web Unit Tests skip PRs, so these contracts run here (#18718).
-# Named docs stay docs_only for product lanes but must still select structural
-# so content assertions cannot skip on a docs-only merge group. Add new
-# structural-asserted docs here (do not rely on DOC_PATH alone).
-# (docs/ops/openai-symphony-burrito.md is NOT listed: its pytest file is not
-# wired into structural CI today.)
-^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/((REPO-POLICY|SYNTHETIC_MONITORING|COST_MONITORING|AUTOMATION_AUDIT|CHANGELOG_PUBLICATION|TEST_COVERAGE_HEATMAP|NIGHTLY_TESTING_AGENT_REPORT|ordinary-reference)\.md|launch/LAUNCH_GATES\.md|design/design-brief-template\.md)|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$|README\.md$|CONTRIBUTING\.md$)
+# Tracked markdown asserted by those suites must select structural so a
+# docs-only merge group cannot skip the assertions (JOV-12618). The ratchet
+# scripts/lib/__tests__/structural-asserted-docs.test.mjs fails when a new
+# tracked asserted path is missing here (or from STRUCTURAL_UI_PATTERN).
+# Intentional exclusions live in structural-asserted-doc-paths.mjs.
+^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/((REPO-POLICY|SYNTHETIC_MONITORING|COST_MONITORING|AUTOMATION_AUDIT|CHANGELOG_PUBLICATION|TEST_COVERAGE_HEATMAP|NIGHTLY_TESTING_AGENT_REPORT|FEATURE_REGISTRY|README)\.md|launch/LAUNCH_GATES\.md|design/(design-brief-template|app-ui-brief-template)\.md)|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$|README\.md$|CONTRIBUTING\.md$)
 ^scripts/(lib/)?publish-coverage-report(\.test)?\.mjs$
 
 # Codecov and Chromatic config must match the workflows that produce them.

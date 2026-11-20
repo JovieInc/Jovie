@@ -320,16 +320,23 @@ describe('merge-group docs-only structural decision', () => {
     for (const path of [
       'README.md',
       'CONTRIBUTING.md',
+      'CHANGELOG.md',
+      'CLAUDE.md',
+      'LESSONS.md',
+      'canon/README.md',
+      '.claude/rules/swarm.md',
+      '.claude/rules/auth.md',
       'docs/REPO-POLICY.md',
       'docs/SYNTHETIC_MONITORING.md',
       'docs/COST_MONITORING.md',
       'docs/AUTOMATION_AUDIT.md',
       'docs/design/design-brief-template.md',
+      'docs/design/app-ui-brief-template.md',
       'docs/CHANGELOG_PUBLICATION.md',
       'docs/TEST_COVERAGE_HEATMAP.md',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
-      'docs/ordinary-reference.md',
       'docs/launch/LAUNCH_GATES.md',
+      'docs/README.md',
     ]) {
       expect(decide({ docsOnly: 'true', changes: [path] }), path).toBe(
         'skip=false'

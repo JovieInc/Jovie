@@ -3159,7 +3159,10 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(selectsStructural.test(nonUiPath)).toBe(false);
     }
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
-    expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
+    // Hygiene asserts rule markdown; the whole .claude/rules tree selects
+    // structural so docs-only MQ cannot skip (JOV-12618 / swarm.md).
+    expect(selectsStructural.test('.claude/rules/auth.md')).toBe(true);
+    expect(selectsStructural.test('.claude/rules/swarm.md')).toBe(true);
   });
 
   it('runs hosted structural CI for Storybook and token-guard inputs', () => {
@@ -3350,11 +3353,13 @@ it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
     // Structural suites assert these docs; docs_only must not skip (JOV-12618).
     'README.md',
     'CONTRIBUTING.md',
+    '.claude/rules/swarm.md',
     'docs/REPO-POLICY.md',
     'docs/SYNTHETIC_MONITORING.md',
     'docs/COST_MONITORING.md',
     'docs/AUTOMATION_AUDIT.md',
     'docs/design/design-brief-template.md',
+    'docs/design/app-ui-brief-template.md',
   ]) {
     expect(selects(path), path).toBe(true);
   }
