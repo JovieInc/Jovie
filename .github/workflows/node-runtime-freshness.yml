@@ -27,23 +27,29 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
-      # github-token-budget: 2 calls/run - list + download the prior apple-change-receipt for revision detection
+      # github-token-budget: 2 calls/run - list (api-client) + binary zip download (native gh)
       - name: Restore previous Apple change receipt
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/apple-prior"
+          # JSON list is fine through api-client. The zip must use native gh:
+          # packages/api-client defaultRun UTF-8-decodes stdout and corrupts binaries.
           id="$(node packages/api-client/cli.ts gh --priority poll -- api \
             "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=apple-change-receipt&per_page=100" \
             --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
-          if [ -n "${id}" ]; then
-            node packages/api-client/cli.ts gh --priority poll -- api \
-              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" \
-              > "$RUNNER_TEMP/apple-prior/prior.zip" || true
-            unzip -p "$RUNNER_TEMP/apple-prior/prior.zip" apple-change-receipt.json \
-              > "$RUNNER_TEMP/apple-prior/apple-change-receipt.json" 2>/dev/null || true
+          if [ -z "${id}" ]; then
+            echo "No prior apple-change-receipt artifact yet; revision detection starts next run."
+            exit 0
           fi
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" \
+            > "$RUNNER_TEMP/apple-prior/prior.zip"
+          unzip -p "$RUNNER_TEMP/apple-prior/prior.zip" apple-change-receipt.json \
+            > "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+          python3 -c 'import json,sys; json.load(open(sys.argv[1])); print("prior receipt ok")' \
+            "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+
       - name: Ingest and classify
         run: |
           set -euo pipefail
