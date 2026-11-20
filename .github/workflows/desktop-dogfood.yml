@@ -1,4 +1,8 @@
 name: desktop-dogfood
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# necessary-trust-boundary: Signs and notarizes the founder Staging desktop feed with Apple Developer ID and App Store Connect API secrets that GITHUB_TOKEN cannot hold; runs only after green CI on main and publishes the rolling desktop-staging tag without writing production VERSION stamps.
+# removal-trigger: Remove when Tim's daily-driver Mac runs a native signed auto-update channel from main with the same continuous feed, or when production stamps themselves land every green main tip.
 # clock-class: event-driven
 # github-token-budget: 12 calls/run - authorize selects/decides dogfood SHA against main+CI+last staging feed; package re-checks main ancestry before and after publish
 run-name: Desktop dogfood ${{ github.event.workflow_run.head_sha || github.sha }}
