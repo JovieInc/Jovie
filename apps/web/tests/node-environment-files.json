@@ -840,6 +840,7 @@
   "tests/unit/demo-video.test.ts",
   "tests/unit/demo/",
   "tests/unit/deps/zod-locales-patch.test.ts",
+  "tests/unit/design-system/action-button-geometry-contract.test.ts",
   "tests/unit/design-system/ambiguous-text-base.test.ts",
   "tests/unit/design-system/arbitrary-values-ratchet.test.ts",
   "tests/unit/design-system/banned-icons.test.ts",

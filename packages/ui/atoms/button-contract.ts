@@ -115,12 +115,13 @@ export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
 
 /**
- * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT).
- * Visible pill is 28px. Mobile tap target is 44px wrapping that pill.
- * Not 32-in-44 and not density-32 on every size.
- *
- * Native iOS still documents 32 visible (`JovieActionButtonMetrics`) — Tim
- * decision pending. Do not sync native from this web preset.
+ * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT;
+ * native sync-28 2026-11-20). Visible pill is 28px. Mobile tap target is
+ * 44px wrapping that pill. Not 32-in-44 and not density-32 on every size.
+ * Native `JovieActionButtonMetrics` projects `VISIBLE`/`MOBILE_HIT` via
+ * `apps/ios/scripts/native-design-system` actionButtonBindings. Founder-
+ * locked Chat composer controls stay an independent 32pt face.
+ * Web chrome consumes `ACTION_BUTTON_PRESET` / `ACTION_BUTTON_FACE_CLASSNAME`.
  */
 export const ACTION_BUTTON_VISIBLE_HEIGHT_PX = 28;
 export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;
