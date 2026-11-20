@@ -23,6 +23,13 @@ Codex requires review and trust of each new or changed hook definition through
 Do not fabricate trust hashes or bypass hook review. Manual setup remains
 available before trust.
 
+`scripts/setup.sh` and `scripts/agent/worktree-new` (the worktree pool) both
+run `pnpm install` (husky / `prepare`) and `scripts/hooks/configure-git-hooks.sh`,
+which then runs `scripts/hooks/verify-git-hooks.sh`. The verifier fails if
+`core.hooksPath` is not `.husky` or if `.husky/pre-commit` or `.husky/pre-push`
+is missing or not executable, so a fresh agent worktree cannot silently
+commit or push around the hooks.
+
 The normal setup path also attempts bounded GBrain health/index maintenance.
 That is best effort and does not retrieve prior decisions or prove durable
 writeback. Query GBrain explicitly before exploration; write durable findings

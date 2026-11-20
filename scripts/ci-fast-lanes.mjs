@@ -323,6 +323,8 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // Worktree setup also runs in the issue runner; catch fixture and dispatch regressions before release.
+  'if printf "%s\\n" "$files" | grep -Fxq "scripts/lanes/worktree_pool.py"; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.RunIssueTest";; esac; fi',
   // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
   // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
   // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
@@ -1078,6 +1080,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
+  'scripts/hooks/verify-git-hooks.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
@@ -1406,6 +1409,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lookup-token.test.mjs',
   'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
+  'scripts/lib/__tests__/ci-release-import-closure.test.mjs',
   'scripts/lib/__tests__/public-feed-qualification.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
