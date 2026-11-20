@@ -20,7 +20,10 @@ import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
 
 import { BaseSubscriptionHandler } from '../base-handler';
-import { runActiveSubscriptionPostEffects } from '../post-activation';
+import {
+  canCompleteIdempotentPostEffects,
+  runActiveSubscriptionPostEffects,
+} from '../post-activation';
 import type {
   HandlerResult,
   SupportedEventType,
@@ -127,7 +130,7 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
     // before the required outcome receipt so a retry still sees fresh Pro.
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && !result.skipped && result.isActive) {
+    if (canCompleteIdempotentPostEffects(result) && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
@@ -141,6 +144,7 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
         correlation: result.correlation,
         acquisitionId,
         stripeEventTimestamp,
+        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'checkout.session.completed',
       });
     }

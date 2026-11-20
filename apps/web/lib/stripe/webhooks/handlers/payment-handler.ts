@@ -12,12 +12,7 @@
  * 4. Update user billing status based on payment result
  * 5. Invalidate billing cache
  *
- * Payment Failure Handling:
- * The handler downgrades users when the subscription enters any failure status:
- * - past_due: Payment is late but subscription is still technically active
- * - unpaid: Multiple payment attempts failed
- * - incomplete: Initial payment failed (new subscription)
- * - incomplete_expired: Initial payment failed and grace period expired
+ * Payment Failure Handling — downgrades on past_due, unpaid, incomplete, or incomplete_expired.
  */
 
 import type Stripe from 'stripe';
@@ -39,6 +34,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
+import { canCompleteIdempotentPostEffects } from '../post-activation';
 import {
   isStripeReconciliationRequiredError,
   StripeReconciliationRequiredError,
@@ -264,7 +260,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       }
 
       await invalidateBillingCache(result.appUserId);
-      if (!result.skipped) {
+      if (canCompleteIdempotentPostEffects(result)) {
         const paymentDelivery = await trackServerEvent(
           invoice.billing_reason === 'subscription_cycle'
             ? 'subscription_renewed'
@@ -286,7 +282,13 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         }
 
         await this.tryRecordReferralCommission(result.appUserId, invoice);
-        this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+        if (!result.skipped) {
+          this.sendRecoveryEmailIfNeeded(
+            invoice,
+            subscription,
+            result.appUserId
+          );
+        }
       }
 
       return result;

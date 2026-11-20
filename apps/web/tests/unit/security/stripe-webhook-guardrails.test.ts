@@ -62,6 +62,25 @@ describe('closed-loop guardrail: Stripe webhook Better Auth, customer extraction
     expect(routeSource).toContain('session.payment_status');
   });
 
+  it('distinguishes duplicate_event retries from stale_event and subscription_mismatch in post-effect gating', () => {
+    const updateStatusSource = readFileSync(
+      join(WEB_ROOT, 'lib/stripe/customer-sync/update-status.ts'),
+      'utf8'
+    );
+    expect(updateStatusSource).toContain("'duplicate_event'");
+    expect(updateStatusSource).toContain("skipReason: 'stale_event'");
+    expect(updateStatusSource).toContain("skipReason: 'subscription_mismatch'");
+
+    for (const relPath of [
+      'lib/stripe/webhooks/handlers/checkout-handler.ts',
+      'lib/stripe/webhooks/handlers/subscription-handler.ts',
+      'lib/stripe/webhooks/handlers/payment-handler.ts',
+    ]) {
+      const handlerSource = readFileSync(join(WEB_ROOT, relPath), 'utf8');
+      expect(handlerSource).toContain('canCompleteIdempotentPostEffects');
+    }
+  });
+
   it('forbids stubbing /api/billing/checkout-session or /api/billing/status in Golden Path E2E specs', () => {
     for (const relPath of [
       'tests/e2e/claim-checkout.spec.ts',
