@@ -4,7 +4,13 @@ import { appendFileSync } from 'node:fs';
 import { retryDisposition } from './merge-queue-retry-policy.mjs';
 import { githubIo, reconcileQueueRetry } from './promotion-github.mjs';
 
-export function createEnrollPromotion({ core, env, repository, github, net }) {
+export function createEnrollPromotion({
+  core,
+  env,
+  repository,
+  github = undefined,
+  net,
+}) {
   const repo = `${repository.owner}/${repository.repo}`;
   let transport;
   const io = () => {
