@@ -6,7 +6,9 @@ is not. The binding means no Cloudflare API token exists in Vercel, CI or Dopple
 
 - Auth: one shared bearer, Worker secret `WORKERS_AI_BEARER` (`wrangler secret put`), mirrored as `WORKERS_AI_TOKEN`
   (Vercel `jovie` env, CI secret `GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN`). Never a var in `wrangler.toml`.
-- Allowlist: `@cf/zai-org/glm-5.3-flash` and `@cf/zai-org/glm-5.3` only (the Gateway models, same weights). Output capped
+- Allowlist: `@cf/deepseek-ai/deepseek-v4.1-flash-1017` and `@cf/zai-org/glm-5.3` only. Cloudflare retired the
+  previous `@cf/zai-org/glm-5.3-flash` on 2026-11-20 (410 Gone); the flash tier is now the DeepSeek v4.1 flash
+  successor (JOV-13141), the non-flash GLM stays (not on the retirement list). Output capped
   at 16,384 tokens, body at 8 MiB. 300 requests/minute.
 - Embeddings: `@cf/baai/bge-m3` only (1024 dims, inputs truncated at the model limit, up to 512 inputs per request,
   batched 100 per Workers AI call). Separate 600 requests/minute bucket (`EMBED_LIMITER`). Used by gbrain
