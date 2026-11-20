@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
-import { CONE_WORKFLOWS } from '@/lib/acquisition/eligibility.server';
+import { CONE_WORKFLOWS } from '@/lib/acquisition/eligibility';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
