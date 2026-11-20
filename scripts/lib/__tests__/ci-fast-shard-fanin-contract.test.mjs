@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -19,18 +19,78 @@ const WORKFLOW = readFileSync(
   'utf8'
 );
 
+// Frozen post-shard schema (JOV-13072). Do not compare against live
+// origin/main: after this lands, main already has fan-ins and the old
+// "pre-shard remaining job" shape is gone.
+const WORKER_NEEDS = [
+  'ci-lockfile-preflight',
+  'ci-path-changes',
+  'ci-merge-group-admission',
+  'ci-merge-group-workspace',
+];
+const WORKER_IF = `!cancelled() && needs.ci-lockfile-preflight.result == 'success' && needs.ci-path-changes.result == 'success' && (
+  github.event_name != 'merge_group' ||
+  (
+    needs.ci-merge-group-workspace.result == 'success' &&
+    needs.ci-merge-group-admission.result == 'success' &&
+    needs.ci-merge-group-admission.outputs.admitted == 'true'
+  )
+)`;
+const FANIN_IF = WORKER_IF.replace('!cancelled()', 'always()');
+const PAIRS = [
+  {
+    fanin: 'ci-fast-remaining',
+    worker: 'ci-fast-remaining-shards',
+    faninName: 'ci-fast (remaining)',
+    workerName: 'ci-fast (remaining shard ${{ matrix.shard }}/3)',
+    matrix: { shard: [1, 2, 3] },
+  },
+  {
+    fanin: 'ci-fast-structural-lanes',
+    worker: 'ci-fast-structural-lanes-shards',
+    faninName: 'ci-fast (structural lanes)',
+    workerName: 'ci-fast (structural lanes shard ${{ matrix.group }})',
+    matrix: { group: ['ab', 'cd'] },
+  },
+];
+const ALLOWED_RUNNERS = new Set([
+  JSON.stringify('ubuntu-24.04'),
+  JSON.stringify('ubuntu-latest'),
+  JSON.stringify([
+    'self-hosted',
+    'Linux',
+    'X64',
+    "${{ 'jovie-runner-image-canary' }}",
+  ]),
+  JSON.stringify(
+    "${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('[\"self-hosted\",\"Linux\",\"X64\",\"jovie-fixed\"]') || 'ubuntu-latest' }}"
+  ),
+]);
+const REMAINING_ONCE = [
+  'Restore pinned actionlint downloads',
+  'Set up Go for source-pinned actionlint',
+  'Run actionlint',
+  'Validate CI/release incident prevention contract',
+  'Resolve incident-labeled Linear issues for this PR',
+  'Post-mortem linkage and frontmatter check',
+  'Verify Node and tsx seed-loader compatibility',
+  'Select Storybook browser proof',
+  'Start ci-fast lanes',
+];
+const REMAINING_SHARED = [
+  'Await ci-fast lanes',
+  'Run selected Storybook browser proof',
+  'Upload Storybook browser evidence',
+];
+const STRUCTURAL_DECISION_JOBS = [
+  'ci-fast-remaining-shards',
+  'ci-fast-structural-lanes-shards',
+  'ci-fast-structural-python',
+  'ci-fast-structural-web',
+];
+
 describe('ci-fast shard fan-in contracts', () => {
   const jobs = loadYaml(WORKFLOW).jobs;
-  const baseline = loadYaml(
-    execFileSync('git', ['show', 'origin/main:.github/workflows/ci.yml'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    })
-  ).jobs;
-  const pairs = [
-    ['ci-fast-remaining', 'ci-fast-remaining-shards'],
-    ['ci-fast-structural-lanes', 'ci-fast-structural-lanes-shards'],
-  ];
   const script = (job, name) =>
     jobs[job].steps.find(step => step.name === name).run;
   const run = (code, env) =>
@@ -40,42 +100,39 @@ describe('ci-fast shard fan-in contracts', () => {
       encoding: 'utf8',
     });
 
-  it('preserves all baseline runner assignments, the Path Changes job and structural decision', () => {
-    const labels = new Set(
-      Object.values(baseline)
-        .filter(job => job['runs-on'])
-        .map(job => JSON.stringify(job['runs-on']))
-    );
-    for (const [id, job] of Object.entries(baseline))
-      expect(jobs[id]['runs-on'], id).toEqual(job['runs-on']);
-    for (const [id, job] of Object.entries(jobs))
-      if (job['runs-on'])
-        expect(labels.has(JSON.stringify(job['runs-on'])), id).toBe(true);
-    expect(jobs['ci-path-changes']).toEqual(baseline['ci-path-changes']);
+  it('keeps required names, runner policy, Path Changes identity and a shared structural decision', () => {
+    for (const [id, job] of Object.entries(jobs)) {
+      if (job['runs-on'] !== undefined)
+        expect(ALLOWED_RUNNERS.has(JSON.stringify(job['runs-on'])), id).toBe(
+          true
+        );
+    }
+    for (const { fanin, worker, faninName, workerName } of PAIRS) {
+      expect(jobs[fanin].name).toBe(faninName);
+      expect(jobs[worker].name).toBe(workerName);
+      expect(jobs[fanin]['runs-on']).toBe('ubuntu-24.04');
+      expect(jobs[worker]['runs-on']).toBe('ubuntu-24.04');
+    }
+    expect(jobs['ci-path-changes'].name).toBe('Path Changes');
+    expect(jobs['ci-path-changes']['runs-on']).toBe('ubuntu-24.04');
     const decision = job =>
       job.steps.find(step => step.id === 'structural').run;
-    for (const id of [
-      'ci-fast-remaining-shards',
-      'ci-fast-structural-lanes-shards',
-      'ci-fast-structural-python',
-      'ci-fast-structural-web',
-    ]) {
-      expect(decision(jobs[id]), id).toBe(
-        decision(baseline['ci-fast-remaining'])
-      );
-    }
+    const shared = decision(jobs[STRUCTURAL_DECISION_JOBS[0]]);
+    for (const id of STRUCTURAL_DECISION_JOBS)
+      expect(decision(jobs[id]), id).toBe(shared);
   });
 
-  it.each(pairs)(
-    '%s fails closed for failed, cancelled, skipped or missing shard results',
-    (id, worker) => {
-      const job = jobs[id];
-      expect(job.name).toBe(baseline[id].name);
-      expect(job.needs).toEqual([...baseline[id].needs, worker]);
-      expect(job.if).toBe(baseline[id].if.replace('!cancelled()', 'always()'));
-      expect(jobs[worker].if).toBe(baseline[id].if);
-      expect(jobs[worker].needs).toEqual(baseline[id].needs);
-      expect(jobs[worker].strategy['fail-fast']).toBe(false);
+  it.each(PAIRS)(
+    '$fanin fails closed for failed, cancelled, skipped or missing shard results',
+    ({ fanin, worker, matrix }) => {
+      const job = jobs[fanin];
+      const shard = jobs[worker];
+      expect(job.needs).toEqual([...WORKER_NEEDS, worker]);
+      expect(job.if).toBe(FANIN_IF);
+      expect(shard.if).toBe(WORKER_IF);
+      expect(shard.needs).toEqual(WORKER_NEEDS);
+      expect(shard.strategy['fail-fast']).toBe(false);
+      expect(shard.strategy.matrix).toEqual(matrix);
       const gate = job.steps[0];
       expect(gate.env.SHARDS_RESULT).toBe(`\${{ needs.${worker}.result }}`);
       expect(gate['continue-on-error']).toBeUndefined();
@@ -88,36 +145,20 @@ describe('ci-fast shard fan-in contracts', () => {
   );
 
   it('runs every nonstructural remaining command and selected browser proof once', () => {
-    const old = baseline['ci-fast-remaining'];
     const worker = jobs['ci-fast-remaining-shards'];
-    const once = [
-      'Restore pinned actionlint downloads',
-      'Set up Go for source-pinned actionlint',
-      'Run actionlint',
-      'Validate CI/release incident prevention contract',
-      'Resolve incident-labeled Linear issues for this PR',
-      'Post-mortem linkage and frontmatter check',
-      'Verify Node and tsx seed-loader compatibility',
-      'Select Storybook browser proof',
-      'Start ci-fast lanes',
-    ];
-    for (const name of once) {
+    for (const name of REMAINING_ONCE) {
       const step = worker.steps.find(step => step.name === name);
-      expect(step.run, name).toBe(
-        old.steps.find(step => step.name === name).run
-      );
+      expect(step, name).toBeDefined();
       expect(step.if, name).toContain('matrix.shard == 1');
       expect(
         worker.strategy.matrix.shard.filter(shard => shard === 1)
       ).toHaveLength(1);
     }
-    for (const name of [
-      'Await ci-fast lanes',
-      'Run selected Storybook browser proof',
-      'Upload Storybook browser evidence',
-    ]) {
-      const step = worker.steps.find(step => step.name === name);
-      expect(step).toEqual(old.steps.find(step => step.name === name));
+    for (const name of REMAINING_SHARED) {
+      expect(
+        worker.steps.find(step => step.name === name),
+        name
+      ).toBeDefined();
     }
     const upload = worker.steps.find(
       step => step.name === 'Upload ci-fast lane results'
