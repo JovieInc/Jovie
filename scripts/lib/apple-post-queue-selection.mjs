@@ -11,8 +11,13 @@ import { pathToFileURL } from 'node:url';
 import { macNativeRequired } from './product-lane-classifier.mjs';
 
 /**
- * @param {{ selectedLanes?: string[] }} receipt
- * @param {{ macNativeRequired?: (receipt: object) => boolean }} [deps]
+ * @typedef {{
+ *   selectedLanes?: string[],
+ *   classifications?: readonly Record<string, any>[],
+ * }} ApplePostQueueReceipt
+ *
+ * @param {ApplePostQueueReceipt} receipt
+ * @param {{ macNativeRequired?: (receipt: ApplePostQueueReceipt) => boolean }} [deps]
  */
 export function selectAppleLanesFromReceipt(receipt, deps = {}) {
   const selected = new Set(receipt?.selectedLanes ?? []);
