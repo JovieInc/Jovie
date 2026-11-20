@@ -178,12 +178,18 @@ export function validateWriteSwarmReceipt(receipt) {
           'Writer must not System-1 self-approve (invent-and-rubber-stamp).'
         );
     }
+    // Landing receipts: mutate or code-sync claim require panel pass (not only Tim-ready).
+    const needsPanelPass =
+      mutate?.performed === true ||
+      Boolean(codeSync) ||
+      timReady?.renamed === true;
+    if (needsPanelPass && t(system1?.verdict) !== 'pass') {
+      block(
+        'mutate_without_system1_pass',
+        'mutate/code-sync/Tim-ready require system1.verdict=pass from pen-review.'
+      );
+    }
     if (timReady?.renamed === true) {
-      if (t(system1?.verdict) !== 'pass')
-        block(
-          'tim_ready_without_system1_pass',
-          'Tim-ready rename requires system1.verdict=pass from pen-review.'
-        );
       if (
         !t(timReady.name) ||
         !/ready for Tim r[0-9a-f]{8}/.test(timReady.name)

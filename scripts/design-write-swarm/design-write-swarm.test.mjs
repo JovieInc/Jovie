@@ -105,6 +105,31 @@ describe('design-write-swarm', () => {
     );
   });
 
+  it('rejects mutate/code-sync without system1 pass', () => {
+    const failed = validateWriteSwarmReceipt({
+      ...liveBase,
+      system1: { ...liveBase.system1, verdict: 'fail' },
+      timReady: { renamed: false },
+      codeSync: undefined,
+    });
+    assert.equal(failed.ok, false);
+    assert.ok(
+      failed.blockers.some(b => b.code === 'mutate_without_system1_pass')
+    );
+
+    const syncOnly = validateWriteSwarmReceipt({
+      ...liveBase,
+      mutate: { performed: false, writer: 'write-swarm' },
+      system1: { ...liveBase.system1, verdict: 'pending' },
+      timReady: { renamed: false },
+      codeSync: { includesPenBlob: false, targets: ['packages/ui'] },
+    });
+    assert.equal(syncOnly.ok, false);
+    assert.ok(
+      syncOnly.blockers.some(b => b.code === 'mutate_without_system1_pass')
+    );
+  });
+
   it('accepts live receipt with lease + panel pass + Tim-ready', () => {
     const ok = validateWriteSwarmReceipt(liveBase);
     assert.equal(ok.ok, true, JSON.stringify(ok.blockers));
