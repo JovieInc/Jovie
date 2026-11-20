@@ -23,6 +23,7 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -41,7 +42,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as HandleUploadPresignedBody;
-    const { user, profile } = await getSessionContext({
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isPro) {
+      return NextResponse.json(
+        {
+          error: `${getPlanDisplayName('pro')} plan required for promo downloads`,
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { profile } = await getSessionContext({
       clerkUserId,
       requireUser: true,
       requireProfile: false,
@@ -60,12 +71,6 @@ export async function POST(request: NextRequest) {
           )
         ) {
           throw new Error('Invalid audio upload pathname');
-        }
-
-        if (!user.isPro) {
-          throw new Error(
-            `${getPlanDisplayName('pro')} plan required for promo downloads`
-          );
         }
 
         return issueBlobPutUploadToken({
