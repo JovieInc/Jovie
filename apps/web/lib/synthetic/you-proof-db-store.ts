@@ -11,6 +11,7 @@ import {
   invalidateProfileCache,
   invalidateSocialLinksCache,
 } from '@/lib/cache/profile';
+import type { DbType } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -20,22 +21,8 @@ import { createLink } from '@/lib/services/social-links/mutations';
 import { YOU_PROOF_HANDLE } from './you-proof-fixture';
 import type { YouProofSeedStore, YouProofSeedValue } from './you-proof-seed';
 
-/** Minimal Drizzle read surface (real `db` or a test double). */
-export type YouProofDb = {
-  select: (selection: Record<string, unknown>) => {
-    from: (table: unknown) => {
-      leftJoin: (
-        table: unknown,
-        on: unknown
-      ) => {
-        where: (condition: unknown) => {
-          limit: (count: number) => Promise<Array<Record<string, unknown>>>;
-        };
-      };
-      where: (condition: unknown) => Promise<Array<Record<string, unknown>>>;
-    };
-  };
-};
+/** Real Drizzle client (or a test double shaped like one). */
+export type YouProofDb = DbType;
 
 export function profileSetToUpdateData(
   set: Readonly<Record<string, YouProofSeedValue>>

@@ -10,10 +10,7 @@
  */
 import { parseArgs } from 'node:util';
 import { db } from '@/lib/db';
-import {
-  createYouProofDbStore,
-  type YouProofDb,
-} from '@/lib/synthetic/you-proof-db-store';
+import { createYouProofDbStore } from '@/lib/synthetic/you-proof-db-store';
 import { runYouProofSeed } from '@/lib/synthetic/you-proof-seed';
 
 async function main() {
@@ -28,10 +25,10 @@ async function main() {
   const result = await runYouProofSeed({
     ownerEmail: String(values['owner-email'] ?? ''),
     apply: values.apply === true,
-    store: createYouProofDbStore(db as unknown as YouProofDb),
+    store: createYouProofDbStore(db),
     log: (step, detail) => {
       process.stdout.write(
-        `[you-proof] ${step} ${JSON.stringify(detail, null, 2)}\n`
+        `status=step;${step};${JSON.stringify(detail)}\n`
       );
     },
   });
