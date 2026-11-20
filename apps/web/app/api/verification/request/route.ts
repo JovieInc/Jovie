@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   checkVerificationRequestRateLimit,
@@ -30,13 +31,22 @@ export async function POST() {
         );
       }
 
+      const entitlements = await getCurrentUserEntitlements();
+      if (!entitlements.canBeVerified) {
+        return NextResponse.json(
+          {
+            error: `Verification requests are available to ${getPlanDisplayName('pro')} members.`,
+          },
+          { status: 403 }
+        );
+      }
+
       const [user] = await db
         .select({
           id: users.id,
           clerkId: users.clerkId,
           name: users.name,
           email: users.email,
-          isPro: users.isPro,
         })
         .from(users)
         .where(and(eq(users.id, userId), isNull(users.deletedAt)))
@@ -44,15 +54,6 @@ export async function POST() {
 
       if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      if (!user.isPro) {
-        return NextResponse.json(
-          {
-            error: `Verification requests are available to ${getPlanDisplayName('pro')} members.`,
-          },
-          { status: 403 }
-        );
       }
 
       const [profile] = await db
