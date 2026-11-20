@@ -1545,6 +1545,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:check
     jobCount: 2
+  - name: Summer PR No-Stall
+    path: .github/workflows/summer-pr-no-stall.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:reclaim
+    jobCount: 1
   - name: Surface Recertify
     path: .github/workflows/surface-recertify.yml
     active: true
