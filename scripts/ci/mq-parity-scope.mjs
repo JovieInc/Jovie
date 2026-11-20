@@ -44,7 +44,7 @@ if (
   const files = execFileSync(
     'git',
     ['diff', '--no-renames', '--name-only', '-z', base, 'HEAD'],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 }
   )
     .split('\0')
     .filter(Boolean);
