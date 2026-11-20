@@ -28,7 +28,7 @@ import {
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
-  failingHeadComment,
+  applyFailingHeadEpisode,
   failingRequiredChecks,
   failureSignature,
   HEAD_STUCK_ALERT_MIN,
@@ -657,56 +657,14 @@ async function failingHead(head, doApply) {
   });
   if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
   await dequeue(head.number);
-  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py): the
-  // Lane Fix Relay will not clear it on source-green alone, so the PR cannot
-  // look healthy while JOV-6620 blocks same-head re-enroll. Eject job mints
-  // the Jovie Bot app token, so this POST is a jovie-bot episode.
-  let labeled = false;
-  try {
-    await gh([
-      'api',
-      '-X',
-      'POST',
-      `repos/${REPO}/issues/${head.number}/labels`,
-      '-f',
-      `labels[]=${FIX_RED_LABEL}`,
-    ]);
-    labeled = true;
-  } catch (error) {
-    console.error(
-      `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
-    );
-  }
-  // Durable hold receipt for reconcile (commit status survives without comments).
-  if (labeled && head.sha) {
-    await gh([
-      'api',
-      '-X',
-      'POST',
-      `repos/${REPO}/statuses/${head.sha}`,
-      '-f',
-      'state=success',
-      '-f',
-      'context=jovie-merge-group-eject-hold/v1',
-      '-f',
-      `description=failing-head eject hold on #${head.number}`,
-    ]).catch(error =>
-      console.error(
-        `::warning::failing-head eject-hold status failed: ${error.message}`
-      )
-    );
-  }
-  // The dequeue is the fix; a failed comment must not undo or retry it.
-  await gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${REPO}/issues/${head.number}/comments`,
-    '-f',
-    `body=${failingHeadComment(head, failing, { labeled })}`,
-  ]).catch(error =>
-    console.error(`::warning::failing-head comment failed: ${error.message}`)
-  );
+  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py). Eject
+  // job mints the Jovie Bot app token, so label+status are a jovie-bot episode.
+  const { labeled } = await applyFailingHeadEpisode({
+    gh,
+    repo: REPO,
+    head,
+    failing,
+  });
   return { failingHead: true, ...decision, dequeued: true, labeled };
 }
 

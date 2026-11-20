@@ -496,3 +496,63 @@ export function decideFailingHead({ head, failing, mainGreen }) {
 
 export const failingHeadComment = (head, failing, { labeled = true } = {}) =>
   `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). ${labeled ? 'Push a new commit that fixes the merge-group failure; `lane-fix-red` keeps the repair lane owning it until that new head is green.' : 'Push a new commit that fixes the merge-group failure (repair-label apply failed on this wake — still blocked from same-head re-enroll by JOV-6620).'}`;
+
+/** Commit-status context reconcile reads for a failing-head eject hold (JOV-6620). */
+export const EJECT_HOLD_CONTEXT = 'jovie-merge-group-eject-hold/v1';
+
+/**
+ * After dequeue: label lane-fix-red, stamp eject-hold status, comment.
+ * Status receipt is what reconcile uses to keep merge-group holds (Sentry #26143).
+ * @param {{ gh: (args: string[]) => Promise<unknown>, repo: string, head: {number:number, sha?:string|null}, failing: string[], label?: string }} input
+ */
+export async function applyFailingHeadEpisode({
+  gh,
+  repo,
+  head,
+  failing,
+  label = FIX_RED_LABEL,
+}) {
+  let labeled = false;
+  try {
+    await gh([
+      'api',
+      '-X',
+      'POST',
+      `repos/${repo}/issues/${head.number}/labels`,
+      '-f',
+      `labels[]=${label}`,
+    ]);
+    labeled = true;
+  } catch (error) {
+    console.error(`::warning::failing-head ${label} failed: ${error.message}`);
+  }
+  if (labeled && head.sha) {
+    await gh([
+      'api',
+      '-X',
+      'POST',
+      `repos/${repo}/statuses/${head.sha}`,
+      '-f',
+      'state=success',
+      '-f',
+      `context=${EJECT_HOLD_CONTEXT}`,
+      '-f',
+      `description=failing-head eject hold on #${head.number}`,
+    ]).catch(error =>
+      console.error(
+        `::warning::failing-head eject-hold status failed: ${error.message}`
+      )
+    );
+  }
+  await gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${repo}/issues/${head.number}/comments`,
+    '-f',
+    `body=${failingHeadComment(head, failing, { labeled })}`,
+  ]).catch(error =>
+    console.error(`::warning::failing-head comment failed: ${error.message}`)
+  );
+  return { labeled };
+}
