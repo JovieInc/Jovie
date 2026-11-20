@@ -170,4 +170,53 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
       fixPr: null,
     });
   });
+
+  it('projects real prod-cert check IDs into steps and rejects future/NaN timestamps', () => {
+    const future = '2026-11-01T13:00:00.000Z';
+    const out = goldenPathStatus(
+      ledger({
+        claim: r('claim', 'failed', [
+          ['claim-renders', 'passed'],
+          ['claim-param-renders', 'passed'],
+          ['start-renders', 'passed'],
+          ['start-preserves-handle', 'passed'],
+          ['start-chat-first-reply', 'passed'],
+          ['golden-path-preview-has-release', 'passed'],
+          ['claimed-profile-owned', 'passed'],
+          ['pen.design-exists', 'failed'],
+        ]),
+        onboarding: r('onboarding', 'passed', [
+          ['fresh-user-onboarding-first-value', 'passed'],
+        ]),
+        chat: r('chat', 'passed', [['first-reply', 'passed']]),
+        checkout: r('checkout', 'failed', [
+          ['offer-canonical-pricing', 'passed'],
+          ['checkout-entry-renders', 'passed'],
+          ['fresh-user-checkout-entry', 'blocked'],
+        ]),
+        landing: receipt('landing', 'passed', future),
+        smartlink: receipt('smartlink', 'passed', 'not-a-timestamp'),
+      }),
+      NOW
+    );
+    const stepsById = Object.fromEntries(out.steps.map(s => [s.id, s]));
+    expect(stepsById['claim-landing']?.status).toBe('passed');
+    expect(stepsById.start?.status).toBe('passed');
+    expect(stepsById['qualify-chat']?.status).toBe('passed');
+    expect(stepsById['profile-reveal']?.status).toBe('passed');
+    expect(stepsById['claim-decision']?.status).toBe('passed');
+    expect(stepsById['first-use']?.status).toBe('passed');
+    expect(stepsById.upgrade).toMatchObject({
+      status: 'blocked',
+      surface: 'checkout',
+    });
+    expect(stepsById.outreach?.status).toBe('missing');
+    expect(stepsById['hosted-test-checkout']?.status).toBe('missing');
+    expect(stepsById['paid-value']?.status).toBe('missing');
+    expect(out.stepsPassed).toBe(6);
+
+    const surfacesById = Object.fromEntries(out.surfaces.map(s => [s.id, s]));
+    expect(surfacesById.landing?.status).toBe('expired');
+    expect(surfacesById.smartlink?.status).toBe('expired');
+  });
 });

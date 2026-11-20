@@ -196,6 +196,31 @@ describe('prod golden-path ledger', () => {
     expect(files[1].packet.source).toBeNull();
   });
 
+  it('rejects future-dated passes beyond clock skew in both surface certification and packet projection', async () => {
+    const backend = memoryBackend();
+    const nowMs = Date.parse('2026-10-28T20:00:05.000Z');
+    const futureEndedAt = new Date(nowMs + 15 * 60 * 1000).toISOString();
+    await recordProdGoldenPathRun({
+      backend,
+      receipts: [
+        receipt({
+          surface: 'landing',
+          startedAt: futureEndedAt,
+          endedAt: futureEndedAt,
+        }),
+      ],
+      recordedAt: '2026-10-28T20:00:05.000Z',
+    });
+    const ledger = await readProdGoldenPathLedger(backend);
+    expect(certifiedProdGoldenPathSurfaces(ledger, nowMs)).toEqual([]);
+    const files = prodGoldenPathPacketFiles(ledger!, { nowMs });
+    const landingDogfood = files[0].packet.operational?.runtimeDogfood?.[0];
+    expect(landingDogfood?.status).toBe('pending');
+    expect(landingDogfood?.summary).toContain(
+      'state=expired; Last production pass on cccccccc has a future or unparseable timestamp'
+    );
+  });
+
   it('failed and blocked receipts carry no lifecycle state (JOV-9625)', async () => {
     const backend = memoryBackend();
     await recordProdGoldenPathRun({

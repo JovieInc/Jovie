@@ -116,6 +116,20 @@ describe('certify each served build once (JOV-12639)', () => {
     });
   });
 
+  it('includes both CLI entrypoints and the prod-cert closure in producerFiles', () => {
+    const files = producerFiles(ROOT);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        'scripts/prod-cert.mjs',
+        'scripts/golden-path-cert-reuse.mjs',
+        'scripts/lib/golden-path-cert-reuse.mjs',
+        'scripts/lib/prod-cert.mjs',
+        'scripts/lib/prod-cert-probes.mjs',
+        'scripts/lib/prod-cert-truth.mjs',
+      ])
+    );
+  });
+
   it('never reuses a receipt that is not fully certified or not honest', () => {
     const cases = [
       candidate({ status: 'failed' }),
