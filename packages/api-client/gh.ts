@@ -4,6 +4,14 @@
  * via `gh api --include`, bounded retries, and exit 75 when deferred.
  */
 import { spawn } from 'node:child_process';
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { EX_TEMPFAIL } from './client.ts';
 import {
   CONTRACT,
@@ -30,7 +38,8 @@ import { defaultStore, hashCredential, type LedgerStore } from './store.ts';
 
 export interface GhResult {
   readonly code: number;
-  readonly stdout: string;
+  /** Buffer for artifact `/zip` bodies; UTF-8 string for JSON/text. */
+  readonly stdout: string | Buffer;
   readonly stderr: string;
 }
 
@@ -39,6 +48,12 @@ export type GhRunner = (
   env: NodeJS.ProcessEnv
 ) => Promise<GhResult>;
 
+/** Artifact zip bodies are binary; gh refuses pipes and UTF-8 decode corrupts them. */
+export function ghWantsFileStdout(args: readonly string[]): boolean {
+  return args.some(
+    arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0] ?? '')
+  );
+}
 export interface RunGhOptions {
   readonly priority?: PriorityName;
   readonly credential?: string;
@@ -155,8 +170,11 @@ export function splitIncluded(
   return { headers, body: stdout.slice(end).replace(/^\r?\n\r?\n/, '') };
 }
 
-const defaultRun: GhRunner = (args, env) =>
-  new Promise(resolve => {
+function capturePipe(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): Promise<GhResult> {
+  return new Promise(resolve => {
     const child = spawn('gh', [...args], {
       env,
       stdio: ['inherit', 'pipe', 'pipe'],
@@ -176,7 +194,69 @@ const defaultRun: GhRunner = (args, env) =>
       })
     );
   });
+}
 
+function captureToFile(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): Promise<GhResult> {
+  return new Promise(resolve => {
+    const file = join(
+      tmpdir(),
+      `gh-body-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
+    );
+    let fd: number;
+    try {
+      fd = openSync(file, 'w');
+    } catch (error) {
+      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(error) });
+      return;
+    }
+    let child;
+    try {
+      child = spawn('gh', [...args], {
+        env,
+        stdio: ['inherit', fd, 'pipe'],
+      });
+    } catch (error) {
+      closeSync(fd);
+      try {
+        unlinkSync(file);
+      } catch {
+        // best-effort cleanup
+      }
+      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(error) });
+      return;
+    }
+    closeSync(fd);
+    const err: Buffer[] = [];
+    let settled = false;
+    const finish = (code: number, stderr: string) => {
+      if (settled) return;
+      settled = true;
+      let stdout: Buffer = Buffer.alloc(0);
+      try {
+        stdout = readFileSync(file);
+      } catch {
+        stdout = Buffer.alloc(0);
+      }
+      try {
+        unlinkSync(file);
+      } catch {
+        // The body was already read, or the file was never created.
+      }
+      resolve({ code, stdout, stderr });
+    };
+    child.stderr.on('data', c => err.push(c));
+    child.on('error', e => finish(127, String(e)));
+    child.on('close', code =>
+      finish(code ?? 1, Buffer.concat(err).toString('utf8'))
+    );
+  });
+}
+
+const defaultRun: GhRunner = (args, env) =>
+  ghWantsFileStdout(args) ? captureToFile(args, env) : capturePipe(args, env);
 export function ghCredential(env: NodeJS.ProcessEnv): string {
   if (env.JOVIE_GITHUB_CREDENTIAL) return env.JOVIE_GITHUB_CREDENTIAL;
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
@@ -217,11 +297,15 @@ export async function runGh(
   args: readonly string[],
   options: RunGhOptions = {}
 ): Promise<GhResult & { deferred: boolean }> {
-  const env = {
+  const wantsFile = ghWantsFileStdout(args);
+  const env: NodeJS.ProcessEnv = {
     ...(options.env ?? process.env),
     NO_COLOR: '1',
-    GH_FORCE_TTY: '0',
   };
+  // gh 2.102 treats every GH_FORCE_TTY value as a terminal and refuses
+  // application/zip. JSON calls still force tty off so the body stays text.
+  if (wantsFile) delete env.GH_FORCE_TTY;
+  else env.GH_FORCE_TTY = '0';
   const spec = providerSpec('github');
   const store = options.store ?? defaultStore(env);
   const persistenceFailures = () =>
@@ -243,6 +327,7 @@ export async function runGh(
   const shape = ghShape(args);
   const include =
     args[0] === 'api' &&
+    !wantsFile &&
     !args.some(
       a =>
         a === '--paginate' ||
@@ -296,10 +381,14 @@ export async function runGh(
     }
     attempt += 1;
     const result = await (options.run ?? defaultRun)(argv, env);
-    const included = include ? splitIncluded(result.stdout) : null;
+    const stdoutText =
+      typeof result.stdout === 'string'
+        ? result.stdout
+        : result.stdout.toString('utf8');
+    const included = include ? splitIncluded(stdoutText) : null;
     const headers: HeaderBag = included?.headers ?? null;
     const status = included
-      ? Number(/^HTTP\/[\d.]+ (\d{3})/.exec(result.stdout)?.[1])
+      ? Number(/^HTTP\/[\d.]+ (\d{3})/.exec(stdoutText)?.[1])
       : result.code === 0
         ? 200
         : null;
@@ -311,7 +400,9 @@ export async function runGh(
         : classifyFailure(spec, {
             status,
             headers,
-            text: `${result.stderr}\n${body}`,
+            text: `${result.stderr}\n${
+              typeof body === 'string' ? body : body.toString('utf8')
+            }`,
             nowMs: at,
           });
     // Without HTTP evidence, only gh's known transport wording is transient.
@@ -332,8 +423,10 @@ export async function runGh(
     const observations = parseBudget(spec, headers, at, shape.resource);
     if (result.code === 0 && shape.cost === 0) {
       const headerResources = new Set(observations.map(row => row.resource));
+      const quotaBody =
+        typeof body === 'string' ? body : body.toString('utf8');
       observations.push(
-        ...quotaObservations(body).filter(
+        ...quotaObservations(quotaBody).filter(
           row => !headerResources.has(row.resource)
         )
       );

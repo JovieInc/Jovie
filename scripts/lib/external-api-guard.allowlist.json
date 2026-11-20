@@ -24,12 +24,6 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
-    },
-    {
-      "path": ".github/workflows/node-runtime-freshness.yml",
-      "rule": "gh-shell",
-      "max": 1,
-      "reason": "Binary Actions artifact zip download cannot use packages/api-client (UTF-8 stdout corruption); JSON list stays on api-client, zip uses native gh like automation-liveness."
     }
   ]
 }

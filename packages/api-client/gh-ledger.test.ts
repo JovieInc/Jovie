@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { FakeClock } from './fake-provider.ts';
-import { type GhRunner, ghShape, runGh, splitIncluded } from './gh.ts';
+import {
+  type GhRunner,
+  ghShape,
+  ghWantsFileStdout,
+  runGh,
+  splitIncluded,
+} from './gh.ts';
 
 import { credentialState } from './policy.ts';
 import { MemoryLedgerStore } from './store.ts';
@@ -261,6 +267,47 @@ describe('gh through the ledger', () => {
       splitIncluded('HTTP/2.0 200 OK\nX-Ratelimit-Remaining: 7\n\n{"a":1}')
     ).toEqual({ headers: { 'x-ratelimit-remaining': '7' }, body: '{"a":1}' });
     expect(splitIncluded('{"a":1}')).toBeNull();
+  });
+
+  it('detects artifact zip endpoints that need file stdout', () => {
+    expect(
+      ghWantsFileStdout([
+        'api',
+        'repos/JovieInc/Jovie/actions/artifacts/1/zip',
+      ])
+    ).toBe(true);
+    expect(
+      ghWantsFileStdout(['api', 'repos/JovieInc/Jovie/actions/artifacts/1'])
+    ).toBe(false);
+    expect(ghWantsFileStdout(['api', 'repos/o/r/compare/a...b'])).toBe(false);
+  });
+
+  it('skips --include and GH_FORCE_TTY for artifact zip downloads', async () => {
+    const seen: { args: readonly string[]; env: NodeJS.ProcessEnv }[] = [];
+    const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff]);
+    const run: GhRunner = async (args, env) => {
+      seen.push({ args: [...args], env: { ...env } });
+      return { code: 0, stdout: zip, stderr: '' };
+    };
+    const result = await runGh(
+      ['api', 'repos/o/r/actions/artifacts/9/zip'],
+      {
+        store: new MemoryLedgerStore(),
+        credential: 'zip',
+        run,
+        log: quiet,
+        env: { GH_FORCE_TTY: '0', GH_TOKEN: 't' },
+      }
+    );
+    expect(result.code).toBe(0);
+    expect(Buffer.isBuffer(result.stdout)).toBe(true);
+    expect(result.stdout).toEqual(zip);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.args).toEqual([
+      'api',
+      'repos/o/r/actions/artifacts/9/zip',
+    ]);
+    expect(seen[0]?.env.GH_FORCE_TTY).toBeUndefined();
   });
 
   it('retries a secondary limit, records the budget, then defers polls below the reserve', async () => {
