@@ -329,6 +329,17 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
+      // JOV-8940 measures the title against the route's OWN content column.
+      // Dashboard-header routes (chat/calendar/tasks/library) hang the header
+      // directly off the app-shell content column. Settings routes instead
+      // center a narrower shared column ([data-settings-layout-column], max
+      // --app-shell-content-max-form, asserted below) and put the shared
+      // header inside it — an intended layout older than this assertion — so
+      // their title baseline is the settings column start, not the outer
+      // app-shell column start (which would read the column's centering
+      // offset, 120px at 1440, as a regression).
+      const titleAlignmentColumnLeft =
+        settingsColumnBox?.left ?? contentColumnBox.left;
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
@@ -344,7 +355,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
           title && headerPaddingLeft !== null
             ? Math.abs(
                 title.getBoundingClientRect().left -
-                  (contentColumnBox.left + headerPaddingLeft)
+                  (titleAlignmentColumnLeft + headerPaddingLeft)
               )
             : null,
         mainContentRight: mainContentBox?.right ?? null,
