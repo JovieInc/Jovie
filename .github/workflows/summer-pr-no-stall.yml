@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
-# capability-gap: GitHub emits no "Cursor agent went IDLE" event; green heads can sit forever behind a jovie-bot lane-fix-red hold because enroll cannot clear it and breaker release needs a new head.
+# capability-gap: GitHub emits no "Cursor agent went IDLE" event; green heads can sit forever behind a jovie-bot lane-fix-red hold because enroll cannot clear it and breaker release needs a new head. Empty-head pushes must use the Jovie Bot app token — GITHUB_TOKEN pushes start no PR CI, so a bumped head would never settle green again.
 # removal-trigger: Remove when Summer's shipping read proves 30 consecutive days of zero admission-deadlock orphans without this hop, and green-to-enqueue dwell stays inside SLO.
 name: Summer PR No-Stall
 
@@ -80,16 +80,30 @@ jobs:
           echo "deadlocks=$deadlocks" >> "$GITHUB_OUTPUT"
           echo "::notice title=Summer no-stall::open=$(jq -r .openCount "$RUNNER_TEMP/no-stall.json") actionable=$(jq -r '.actionable|length' "$RUNNER_TEMP/no-stall.json") deadlocks=$deadlocks"
 
+      # App token: GITHUB_TOKEN pushes do not start workflows. Same pattern as
+      # node-runtime-freshness / green-enroll (Jovie Bot installation).
+      - name: Generate Jovie Bot token
+        id: app-token
+        if: >-
+          (github.event_name == 'push' || github.event.inputs.apply != 'false') &&
+          steps.inventory.outputs.deadlocks != '0'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Apply empty-head bumps (bounded)
         if: >-
           (github.event_name == 'push' || github.event.inputs.apply != 'false') &&
           steps.inventory.outputs.deadlocks != '0'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          git config user.name "jovie-bot"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote set-url origin "$remote"
+          git config user.name "jovie-bot[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           LIMIT="${{ github.event.inputs.limit || '5' }}"
           IDLE="${{ github.event.inputs.idle_hours || '6' }}"

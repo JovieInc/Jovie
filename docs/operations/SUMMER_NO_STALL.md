@@ -47,7 +47,7 @@ On every closure-health / bottleneck / catch-up turn that touches shipping:
 
 | Path | Role |
 | --- | --- |
-| `scripts/summer/pr-no-stall.mjs` | Classify open PRs (requires settled-green check rollup for deadlock; skips forks; safe branch allowlist + argv `git`); optional `--apply` empty-head bumps (cap default 5) |
+| `scripts/summer/pr-no-stall.mjs` | Classify open PRs (requires settled-green check rollup for deadlock; skips forks; safe branch allowlist + argv `git`); optional `--apply` empty-head bumps (cap default 5). Apply pushes with the Jovie Bot app token (not `GITHUB_TOKEN`) so PR CI starts on the new head; failed bumps exit non-zero. |
 | `.github/workflows/summer-pr-no-stall.yml` | Push-to-main backstop + dispatch; Summer-accountable apply |
 | `.github/workflows/agent-harness-health-report.yml` | Report includes `cursor/` and sibling agent prefixes |
 | Merge Queue Green Enroll | Existing Summer enroll after hold release |

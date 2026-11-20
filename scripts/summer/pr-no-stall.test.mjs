@@ -225,6 +225,33 @@ describe('pr-no-stall classifier', () => {
     assert.equal(code, 0);
   });
 
+  it('apply exits non-zero when any empty-head bump fails', async () => {
+    const { main } = await import('./pr-no-stall.mjs');
+    const run = (cmd, args) => {
+      if (cmd === 'git' && args[0] === 'push') {
+        return { status: 1, stdout: '', stderr: 'push rejected' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const code = main(['--apply', '--json', '--limit', '1'], {
+      run,
+      nowMs: NOW,
+      listPrs: () => [
+        {
+          number: 7,
+          isDraft: false,
+          mergeable: 'MERGEABLE',
+          mergeStateStatus: 'BLOCKED',
+          headRefName: 'cursor/bump-fail',
+          updatedAt: '2026-11-11T20:00:00Z',
+          labels: ['lane-fix-red'],
+          statusCheckRollup: GREEN_ROLLUP,
+        },
+      ],
+    });
+    assert.equal(code, 1);
+  });
+
   it('emptyHeadBump uses git argv arrays and refuses shell-meta branches', () => {
     const calls = [];
     const run = (cmd, args) => {

@@ -470,8 +470,9 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       );
     }
   }
-  // Inventory must exit 0 so CI can read deadlocks=N and run Apply. Deadlocks
-  // are surfaced in JSON / stdout counts, not via a failing exit code.
+  // Inventory exits 0 so CI can read deadlocks=N and run Apply. Apply fails
+  // the process when any empty-head bump returns ok:false (do not mask).
+  if (args.apply && applied.some(row => row.ok !== true)) return 1;
   return 0;
 }
 
