@@ -39,7 +39,11 @@ export type {
   HostDrawnSelectProps,
 } from './host-drawn-field';
 export { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
-export type { IconButtonName, IconButtonProps } from './icon-button';
+export type {
+  IconButtonFade,
+  IconButtonName,
+  IconButtonProps,
+} from './icon-button';
 export { IconButton, iconButtonVariants } from './icon-button';
 export {
   ICON_BUTTON_FADE_CLASSNAME,
