@@ -66,8 +66,10 @@ export { Badge, badgeVariants } from './atoms/badge';
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
 export {
+  ACTION_BUTTON_FACE_CLASSNAME,
   ACTION_BUTTON_LABEL_WEIGHT,
   ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  ACTION_BUTTON_PRESET,
   ACTION_BUTTON_RADIUS_PX,
   ACTION_BUTTON_VISIBLE_HEIGHT_PX,
   BUTTON_PEN_CONTRACT,
