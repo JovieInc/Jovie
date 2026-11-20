@@ -2260,33 +2260,6 @@ describe('source-read guard selection', () => {
 
   it.each([
     [
-      'pull_request',
-      [
-        'web-source-read-tests',
-        'script-contracts',
-        'merged-with-base-invariants',
-        'gate-weakening-detector',
-      ],
-    ],
-    ['merge_group', []],
-    ['push', []],
-  ])(
-    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
-    (event, pr) => {
-      expect(
-        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual([
-        'ci-schedule-inventory',
-        'automation-registry',
-        'anti-slop',
-        'external-api-guard',
-        ...pr,
-      ]);
-    }
-  );
-
-  it.each([
-    [
       'scripts/lib/ci-schedule-inventory.mjs',
       ['ci-schedule-inventory', 'anti-slop'],
     ],

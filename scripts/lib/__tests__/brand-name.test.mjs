@@ -1,18 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { test, vi } from 'vitest';
 import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { load as yamlLoad } from 'js-yaml';
-import { afterEach, test, vi } from 'vitest';
-import {
+  BRAND_NAME_COVERAGE_COMMAND,
   EXCEPTIONS,
   readScanFile,
   main as runBrandName,
@@ -20,319 +12,26 @@ import {
   scanFiles,
   scanRepo,
   scanText,
-  stripCommitScopes,
 } from '../../anti-slop/brand-name.mjs';
-import {
-  main as runMessages,
-  scanPullRequestText,
-} from '../../anti-slop/brand-name-messages.mjs';
 import { runMatchers } from '../../anti-slop/run.mjs';
 import {
-  BRAND_NAME_COVERAGE_COMMAND,
   SCRIPT_CONTRACT_VITEST_TESTS,
   selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
+import {
+  cli,
+  cliRepo,
+  commit,
+  git,
+  put,
+  repo,
+} from './brand-name-test-fixtures.mjs';
 
 const kinds = (text, file = 'a.md') =>
   scanText(text, { file }).map(h => `${h.kind}:${h.text}`);
 const locations = (text, file) =>
   scanText(text, { file }).map(h => `${h.line}:${h.kind}:${h.text}`);
-test('existing identifier diagnostics and JSON protocol prompts remain truthful', () => {
-  const diagnostic = readFileSync(
-    resolve('scripts/public-benchmark/public-benchmark.mjs'),
-    'utf8'
-  ).match(
-    /`platform id "\$\{platform\.id\}" must be "jovie" or "platform-<letter>"`/u
-  )?.[0];
-  const prompt = readFileSync(
-    resolve('scripts/screenshot-loop/screenshot-bug-loop.mjs'),
-    'utf8'
-  ).match(/const CLASSIFY_PROMPT = `[\s\S]*?`;/u)?.[0];
-  assert.ok(diagnostic);
-  assert.ok(prompt && prompt.includes('"product":"jovie"'));
-  for (const source of [
-    `throw new TypeError(${diagnostic});`,
-    `throw new TypeError(${diagnostic.slice(0, -1)}; welcome to jovie and JOVIE\`);`,
-    prompt,
-    prompt.replace('Personal photos', 'jovie and JOVIE. Personal photos'),
-  ]) {
-    assert.deepEqual(scanText(source, { file: 'copy.mjs' }), []);
-    const line = source.split('\n').length + 1;
-    assert.deepEqual(
-      locations(
-        source + '\nconst title = "Welcome to jovie and JOVIE";',
-        'copy.mjs'
-      ),
-      [`${line}:casing:jovie`, `${line}:casing:JOVIE`]
-    );
-  }
-});
-test('technical spans inside copy preserve neighboring casing errors and lines', () => {
-  const source = [
-    'const message = \'Use "jovie" or "pnpm jovie login"; welcome to jovie and JOVIE\';',
-    'const json = "Use \\"product\\":\\"jovie\\"; welcome to jovie";',
-    'const template = `Use \\`jovie login\\` and \\`JOVIE\\`; welcome to JOVIE`;',
-    '<p>Use `jovie login` and "jovie"; welcome to jovie and JOVIE</p>;',
-    'const quote = \'Say "Welcome to jovie" and "JOVIE welcomes you"\';',
-  ].join('\n');
-  assert.deepEqual(
-    scanText(source, { file: 'copy.tsx' }).map(h => `${h.line}:${h.text}`),
-    ['4:jovie', '4:jovie', '4:JOVIE']
-  );
-  const copy =
-    source +
-    '\nconst headline = \'Use "pnpm jovie login"; welcome to jovie and JOVIE\';';
-  assert.deepEqual(
-    scanText(copy, { file: 'copy.tsx' }).map(h => `${h.line}:${h.text}`),
-    ['4:jovie', '4:jovie', '4:JOVIE', '6:jovie', '6:JOVIE']
-  );
-});
-test('commit scopes are identifiers; PR and commit text is still checked', () => {
-  assert.equal(stripCommitScopes('chore(jovie): fix Jovy'), 'chore: fix Jovy');
-  assert.deepEqual(
-    kinds(stripCommitScopes('feat(jovie): welcome to Jovy'), 'm.md'),
-    ['misspelling:Jovy']
-  );
-});
-test('real names and agent exemptions are occurrence-specific', () => {
-  assert.deepEqual(kinds('Jovan, Joves and Bon Jovi'), []);
-  assert.deepEqual(kinds('Summer Jovi meets Jovi. Jovi coach meets Jovi.'), [
-    'jovi-outside-agent-context:Jovi',
-    'jovi-outside-agent-context:Jovi',
-  ]);
-  assert.deepEqual(
-    kinds('AI Agent welcomes Jovi. Jovi Technology meets Jovi.'),
-    [
-      'jovi-outside-agent-context:Jovi',
-      'jovi-outside-agent-context:Jovi',
-      'jovi-outside-agent-context:Jovi',
-    ]
-  );
-});
-test('domains share prose filtering; URLs and code identifiers remain literal', () => {
-  assert.deepEqual(
-    kinds('Use `jovie.com` and ``jovie.io``; https://jovie.com/path'),
-    []
-  );
-  assert.deepEqual(kinds('Visit jovie.com and jovie.io'), [
-    'domain:jovie.com',
-    'domain:jovie.io',
-  ]);
-  assert.deepEqual(kinds('ci@jovie.com, app.jovie.com and test.jovie.com'), []);
-});
-test('external-company domain exceptions attach to each occurrence', () => {
-  assert.deepEqual(
-    kinds('The childcare franchise is at jovie.com, but Jovie is at jovie.io.'),
-    ['domain:jovie.io']
-  );
-  assert.deepEqual(
-    kinds(
-      'Jovie is at jovie.com, but the childcare franchise is at jovie.com.'
-    ),
-    ['domain:jovie.com']
-  );
-  assert.deepEqual(
-    kinds(
-      'The childcare franchise is at jovie.com, but Jovie is at jovie.com.'
-    ),
-    ['domain:jovie.com']
-  );
-  assert.deepEqual(kinds('Unrelated product updates are at jovie.io.'), [
-    'domain:jovie.io',
-  ]);
-  assert.deepEqual(kinds('Unrelated product updates are at jovie.com.'), [
-    'domain:jovie.com',
-  ]);
-  assert.deepEqual(
-    kinds('jovie.com is the childcare franchise; Jovie uses jovie.io.'),
-    ['domain:jovie.io']
-  );
-  assert.deepEqual(kinds('Bright Horizons uses jovie.com.'), []);
-  assert.deepEqual(kinds('The childcare franchise is at jovie.io.'), [
-    'domain:jovie.io',
-  ]);
-});
-test('source-backed childcare references preserve neighboring wrong domains', () => {
-  for (const file of [
-    'apps/web/app/llms-full.txt/route.ts',
-    'apps/web/app/llms.txt/route.ts',
-    'apps/web/content/published-claims.ts',
-    'apps/web/lib/agent/site-llms-guidance.ts',
-  ]) {
-    const line = readFileSync(resolve(file), 'utf8')
-      .split('\n')
-      .find(line => /jovie\.com\b/u.test(line));
-    assert.ok(line, file);
-    assert.deepEqual(kinds(line), [], file);
-    for (const domain of ['jovie.com', 'jovie.io']) {
-      assert.deepEqual(
-        kinds(`${line} Visit ${domain} for Jovie.`),
-        [`domain:${domain}`],
-        file
-      );
-      assert.deepEqual(
-        kinds(`Jovie uses ${domain}. ${line}`),
-        [`domain:${domain}`],
-        file
-      );
-    }
-    assert.deepEqual(
-      kinds(line.replace('jovie.com', 'jovie.io')),
-      ['domain:jovie.io'],
-      file
-    );
-  }
-  assert.deepEqual(
-    kinds('jovie.com belongs to Bright Horizons; Jovie uses jovie.com.'),
-    ['domain:jovie.com']
-  );
-  assert.deepEqual(
-    kinds('Visit jovie.com. Bright Horizons childcare business is unrelated.'),
-    ['domain:jovie.com']
-  );
-});
-
-test('exact wordmark and machine identifiers preserve same-line and neighboring copy checks', () => {
-  /** @type {Array<[string, (span: string) => string]>} */
-  const cases = [
-    [
-      'apps/web/app/brand/page.tsx',
-      span => `<section>${span}<h1>Welcome to jovie and JOVIE</h1></section>;`,
-    ],
-    [
-      'apps/web/components/organisms/home-loop/fixtures.ts',
-      span =>
-        `const copy = { summary: '${span}', title: 'Welcome to jovie and JOVIE' };`,
-    ],
-    [
-      'apps/web/lib/tracking/fire-subscribe-event.ts',
-      span =>
-        `const pixels = [{ ${span}, title: 'Welcome to jovie and JOVIE' }];`,
-    ],
-  ];
-  for (const [file, wrap] of cases) {
-    const exception = EXCEPTIONS.find(e => e.file === file);
-    assert.ok(exception && exception.reason.trim(), file);
-    const source = readFileSync(resolve(file), 'utf8');
-    assert.ok(source.includes(exception.match), file);
-    assert.deepEqual(scanText(source, { file }), [], file);
-    const fixture = wrap(exception.match);
-    assert.deepEqual(
-      locations(fixture + '\nconst title = "Welcome to jovie";', file),
-      ['1:casing:jovie', '1:casing:JOVIE', '2:casing:jovie'],
-      file
-    );
-    assert.ok(scanText(fixture, { file: 'other.tsx' }).length > 2, file);
-    assert.ok(
-      scanText(fixture.replace(/JOVIE|jovie/u, 'Jovee'), { file }).some(
-        h => h.text === 'Jovee'
-      ),
-      file
-    );
-  }
-});
-
-test('the real landing-page CLI command stays literal with adjacent brand checks', () => {
-  const file = 'apps/web/components/marketing/CliLandingPage.tsx';
-  const line = readFileSync(resolve(file), 'utf8')
-    .split('\n')
-    .find(line => line.includes('or run jovie init'));
-  assert.ok(line);
-  assert.deepEqual(kinds(`const copy = { ${line} };`, 'copy.ts'), []);
-  assert.deepEqual(
-    kinds(
-      `const copy = { ${line} title: 'Welcome to jovie and JOVIE' };`,
-      'copy.ts'
-    ),
-    ['casing:jovie', 'casing:JOVIE']
-  );
-});
-
-test('YAML names are checked as titles, while identifier casing stays valid', () => {
-  assert.deepEqual(kinds('name: Jovy', 'a.yml'), ['misspelling:Jovy']);
-  assert.deepEqual(kinds('name: Welcome to Jovies', 'a.yml'), [
-    'misspelling:Jovies',
-  ]);
-  assert.deepEqual(kinds('name: @jovie/web', 'a.yml'), []);
-});
-test('frozen exceptions excuse only the exact text and validate reasons', () => {
-  const options = {
-    file: 'a.md',
-    exceptions: [
-      {
-        file: 'a.md',
-        match: 'A frozen jovie quote',
-        reason: 'Verbatim source quotation',
-      },
-    ],
-  };
-  assert.deepEqual(
-    scanText('A frozen jovie quote and jovie typo', options).map(h => h.text),
-    ['jovie']
-  );
-  assert.equal(
-    scanText('A frozen jovie quote and jovie typo', options)[0].context,
-    'A frozen jovie quote and jovie typo'
-  );
-  assert.deepEqual(
-    scanText('An edited jovie quote', options).map(h => h.text),
-    ['jovie']
-  );
-  assert.throws(
-    () =>
-      scanText('jovie', {
-        exceptions: [{ file: 'a.md', match: 'jovie', reason: '  ' }],
-      }),
-    /reason/
-  );
-});
-
-const roots = [];
-afterEach(() => {
-  for (const root of roots.splice(0))
-    rmSync(root, { recursive: true, force: true });
-});
-const repo = () => {
-  const root = mkdtempSync(join(tmpdir(), 'brand-name-test-'));
-  roots.push(root);
-  execFileSync('git', ['init', '-q', '--initial-branch=main'], { cwd: root });
-  execFileSync('git', ['config', 'user.email', 'fixture@example.test'], {
-    cwd: root,
-  });
-  execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
-  return root;
-};
-const git = (root, ...args) =>
-  execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const put = (root, file, text) => {
-  mkdirSync(dirname(join(root, file)), { recursive: true });
-  writeFileSync(join(root, file), text);
-};
-const commit = root => {
-  git(root, 'add', '.');
-  git(root, 'commit', '-qm', 'fixture');
-};
-
-// Run the real CLI in an isolated checkout with no origin/main fallback.
-const cliRepo = () => {
-  const root = repo();
-  for (const file of [
-    'scripts/anti-slop/brand-name.mjs',
-    'scripts/anti-slop/brand-name.exceptions.json',
-    'scripts/anti-slop/lib.mjs',
-    'scripts/anti-slop/run.mjs',
-    'scripts/design-frontend-skill-check.mjs',
-  ])
-    put(root, file, readFileSync(resolve(file)));
-  put(root, 'docs/design-system/anti-slop-rules.json', '{"rules":[]}');
-  return root;
-};
-const cli = (root, entry, args) =>
-  spawnSync(process.execPath, [join(root, entry), ...args], {
-    cwd: root,
-    encoding: 'utf8',
-  });
 test('only root historical files are excluded in explicit and diff CLI modes', () => {
   const root = cliRepo();
   put(root, 'CHANGELOG.md', 'Jovy historical');
@@ -525,106 +224,6 @@ test('file CLI and integrated check safely ignore deliberate registry text and d
   }
 });
 
-function metadataStep() {
-  const workflow =
-    /** @type {{jobs: {deterministic: {steps: Array<{name?: string, run?: string}>}}}} */ (
-      yamlLoad(
-        readFileSync(resolve('.github/workflows/source-validation.yml'), 'utf8')
-      )
-    );
-  const step = workflow.jobs.deterministic.steps.find(
-    s => s.name === 'Check brand spelling in PR text and commit messages'
-  );
-  assert.ok(step && typeof step.run === 'string');
-  return step;
-}
-
-function putGuardSources(root) {
-  const source = resolve('scripts/anti-slop');
-  for (const name of readdirSync(source).filter(n =>
-    /\.(?:mjs|json)$/u.test(n)
-  ))
-    put(root, `scripts/anti-slop/${name}`, readFileSync(join(source, name)));
-}
-
-function runMetadata(root, title, body, head) {
-  const step = metadataStep();
-  assert.ok(!step.run.includes('${{'));
-  const temp = join(root, 'runner-temp');
-  mkdirSync(temp);
-  const result = spawnSync('bash', ['-c', step.run], {
-    cwd: root,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      RUNNER_TEMP: temp,
-      BASE_BRANCH: 'main',
-      HEAD_SHA: head,
-      PR_TITLE: title,
-      PR_BODY: body,
-    },
-  });
-  return { temp, result };
-}
-
-test('Source Validation isolates title, body and each commit using only the trusted guard', () => {
-  const root = repo();
-  putGuardSources(root);
-  commit(root);
-  git(root, 'remote', 'add', 'origin', root);
-  git(root, 'checkout', '-qb', 'feature');
-  git(root, 'commit', '--allow-empty', '-qm', 'feat: fix Jovy');
-  const head = git(root, 'rev-parse', 'HEAD');
-  // A PR-controlled guard must never be executed by this workflow.
-  put(
-    root,
-    'scripts/anti-slop/brand-name-messages.mjs',
-    'throw new Error("PR CONTROLLED CODE EXECUTED");'
-  );
-  const { temp, result } = runMetadata(
-    root,
-    'Safe title',
-    '```\nunclosed body fence',
-    head
-  );
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stderr, /Jovy/u);
-  assert.doesNotMatch(result.stderr, /PR CONTROLLED CODE EXECUTED/u);
-  assert.deepEqual(readdirSync(temp), []);
-});
-
-test('metadata scans isolate fence state and attribute each section and commit', async () => {
-  const { scanPullRequestText } = await import(
-    '../../anti-slop/brand-name-messages.mjs'
-  );
-  const root = repo();
-  put(root, 'a.md', 'Jovie');
-  commit(root);
-  const base = git(root, 'rev-parse', 'HEAD');
-  git(
-    root,
-    'commit',
-    '--allow-empty',
-    '-qm',
-    '```\nfirst commit with an unclosed fence'
-  );
-  git(root, 'commit', '--allow-empty', '-qm', 'feat(jovie): repair Jovy');
-  const head = git(root, 'rev-parse', 'HEAD');
-  const hits = scanPullRequestText({
-    root,
-    base,
-    head,
-    title: '```',
-    body: 'Jovee in body',
-  });
-  assert.deepEqual(
-    hits.map(h => h.text),
-    ['Jovee', 'Jovy']
-  );
-  assert.equal(hits[0].file, 'PR body');
-  assert.equal(hits[1].file, `commit ${head}`);
-});
-
 test('CLI modes return failures with exact locations and clean scans return success', () => {
   const root = repo();
   put(root, 'copy.md', 'Jovie');
@@ -649,30 +248,6 @@ test('CLI modes return failures with exact locations and clean scans return succ
     assert.equal(runBrandName(['--text-file', join(root, 'copy.md')], root), 0);
   } finally {
     out.mockRestore();
-    err.mockRestore();
-  }
-});
-
-test('metadata CLI returns a failing verdict for prose and a clean verdict for empty sections', () => {
-  const root = repo();
-  put(root, 'copy.md', 'Jovie');
-  commit(root);
-  const base = git(root, 'rev-parse', 'HEAD');
-  const err = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-  try {
-    assert.equal(
-      runMessages([base, base], { root, title: 'Jovy', body: 'Safe' }),
-      1
-    );
-    assert.match(err.mock.calls.flat().join(''), /PR title:1.*Jovy/u);
-    assert.equal(
-      runMessages([base, base], { root, title: 'Jovie', body: '' }),
-      0
-    );
-    assert.deepEqual(scanPullRequestText({ root, base, head: base }), []);
-    assert.throws(() => runMessages([]), /full head SHA/u);
-    assert.throws(() => runMessages([base, 'bad']), /full head SHA/u);
-  } finally {
     err.mockRestore();
   }
 });
@@ -775,36 +350,6 @@ test('guard source exclusions apply only to exact owned paths and leave other ma
   );
 });
 
-test('Source Validation skips adoption only while the helper is absent on the trusted base', () => {
-  const root = repo();
-  put(root, 'readme.md', 'Jovie');
-  commit(root);
-  git(root, 'remote', 'add', 'origin', root);
-  const head = git(root, 'rev-parse', 'HEAD');
-  const { temp, result } = runMetadata(root, 'Jovy', 'Jovy', head);
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /guard not on main yet; skipping/u);
-  assert.deepEqual(readdirSync(temp), []);
-});
-
-test('Source Validation treats shell metacharacters in PR text as data and cleans up on success', () => {
-  const root = repo();
-  putGuardSources(root);
-  commit(root);
-  git(root, 'remote', 'add', 'origin', root);
-  const head = git(root, 'rev-parse', 'HEAD');
-  const sentinel = join(root, 'must-not-exist');
-  const { temp, result } = runMetadata(
-    root,
-    `Jovie $(touch '${sentinel}')`,
-    `Jovie \`touch '${sentinel}'\``,
-    head
-  );
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.equal(readScanFile(sentinel, root), null);
-  assert.deepEqual(readdirSync(temp), []);
-});
-
 test('all prose capitalization variants are checked while the canonical spelling passes', () => {
   for (let bits = 0; bits < 32; bits += 1) {
     const variant = [...'jovie']
@@ -827,59 +372,6 @@ test('bare public subdomains are checked while emails, fixture domains and URLs 
       'ci@www.jovie.com app.jovie.com test.jovie.com https://www.jovie.com/a'
     ),
     []
-  );
-});
-
-test('immutable commit exceptions apply only to the exact evidenced span and commit identity', () => {
-  const root = repo();
-  put(root, 'copy.md', 'Jovie');
-  commit(root);
-  const base = git(root, 'rev-parse', 'HEAD');
-  const quoted = 'Negative spelling examples: Jovy and Jovies.';
-  git(root, 'commit', '--allow-empty', '-qm', quoted);
-  const head = git(root, 'rev-parse', 'HEAD');
-  const exceptions = [
-    {
-      file: `commit ${head}`,
-      match: quoted,
-      reason: 'Exact negative examples in this immutable fixture commit.',
-    },
-  ];
-  assert.deepEqual(scanPullRequestText({ root, base, head, exceptions }), []);
-  assert.deepEqual(
-    scanPullRequestText({
-      root,
-      base,
-      head,
-      exceptions,
-      title: 'Jovy',
-      body: 'Jovies',
-    }).map(h => h.file),
-    ['PR title', 'PR body']
-  );
-  git(root, 'commit', '--allow-empty', '-qm', quoted);
-  const next = git(root, 'rev-parse', 'HEAD');
-  assert.deepEqual(
-    scanPullRequestText({ root, base: head, head: next, exceptions }).map(
-      h => h.text
-    ),
-    ['Jovy', 'Jovies']
-  );
-});
-
-test('the published implementation commit freezes only its original negative examples', () => {
-  const file = 'commit 3ce9dca0e29780a21a36e524aa251c8092abdb51';
-  const exception = EXCEPTIONS.find(e => e.file === file);
-  assert.ok(exception && exception.reason.trim());
-  assert.deepEqual(scanText(exception.match, { file, prose: true }), []);
-  assert.deepEqual(
-    scanText(exception.match + '\nJovy', { file, prose: true }).map(
-      h => h.text
-    ),
-    ['Jovy']
-  );
-  assert.ok(
-    scanText(exception.match, { file: 'PR body', prose: true }).length > 0
   );
 });
 

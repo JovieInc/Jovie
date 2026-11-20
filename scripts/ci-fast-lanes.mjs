@@ -136,9 +136,6 @@ export const MARKETING_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/landing-page-grammar.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/landingPageGrammar.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
-export const BRAND_NAME_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/brand-name.test.mjs lib/__tests__/brand-name-copy.test.mjs --maxWorkers=1 --coverage --coverage.provider=v8 --coverage.include=anti-slop/brand-name.mjs --coverage.include=anti-slop/brand-name-messages.mjs --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-brand-name-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.statements=90 --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
-
 export const ACQUISITION_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts lib/acquisition/learning-feedback.test.ts lib/acquisition/learning-feedback-safety.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/learning-feedback.ts --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
 export const CODEX_BOOTSTRAP_COVERAGE_COMMAND =
@@ -526,12 +523,10 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Anti-slop registry (docs/design-system/anti-slop-rules.json): schema,
-    // evidence and wiring of every enforced rule, and prose copies of the
-    // anti-slop list that drifted from the registry (Tim, 2026-10-26).
+    // Registry integrity, prose drift and whole-repository spelling share this
+    // existing guard; policy is docs/design-system/anti-slop-rules.json.
     id: 'anti-slop',
     command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs`,
-    // Brand spelling scans tracked text regardless of directory or extension.
     inputs: /./u,
     prOnly: false,
   }),
@@ -1525,6 +1520,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/brand-name.test.mjs',
   'scripts/lib/__tests__/brand-name-copy.test.mjs',
+  'scripts/lib/__tests__/brand-name-metadata.test.mjs',
+  'scripts/lib/__tests__/source-guard-pr-metadata.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
   'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',

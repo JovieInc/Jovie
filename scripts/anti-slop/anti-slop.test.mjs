@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { stripVTControlCharacters } from 'node:util';
-import { BRAND_NAME_COVERAGE_COMMAND } from '../ci-fast-lanes.mjs';
+import { BRAND_NAME_COVERAGE_COMMAND } from './brand-name.mjs';
 import {
   checkDrift,
   checkTitleCaseHeadings,

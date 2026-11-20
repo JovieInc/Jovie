@@ -14,6 +14,9 @@ import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './lib.mjs';
 
+export const BRAND_NAME_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/brand-name.test.mjs lib/__tests__/brand-name-copy.test.mjs lib/__tests__/brand-name-metadata.test.mjs --maxWorkers=1 --coverage --coverage.provider=v8 --coverage.include=anti-slop/brand-name.mjs --coverage.include=anti-slop/brand-name-messages.mjs --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-brand-name-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.statements=90 --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+
 /** Frozen verbatim or historical text. Each entry needs a reason. */
 export const EXCEPTIONS = JSON.parse(
   readFileSync(new URL('./brand-name.exceptions.json', import.meta.url), 'utf8')
@@ -48,6 +51,7 @@ const GUARD_SOURCES = new Set([
   'scripts/anti-slop/brand-name.exceptions.json',
   'scripts/lib/__tests__/brand-name.test.mjs',
   'scripts/lib/__tests__/brand-name-copy.test.mjs',
+  'scripts/lib/__tests__/brand-name-metadata.test.mjs',
   'docs/design-system/anti-slop-rules.json',
 ]);
 const BINARY_LIKE =
