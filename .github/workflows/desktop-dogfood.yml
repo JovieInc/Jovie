@@ -220,14 +220,16 @@ jobs:
             echo "Exact dogfood generation $RELEASE_SHA is already published."
             exit 0
           fi
-          git merge-base --is-ancestor "$staging_baseline" "$RELEASE_SHA" || {
-            echo "::error::Signed dogfood baseline is not an ancestor of the candidate."
-            exit 1
-          }
+          # Forward-only: a stale CI SHA that finishes after a newer feed
+          # publish is covered — exit clean, never hard-fail before that check.
           if git merge-base --is-ancestor "$RELEASE_SHA" "$staging_baseline"; then
             echo "Candidate $RELEASE_SHA is already covered by newer dogfood publish $staging_baseline."
             exit 0
           fi
+          git merge-base --is-ancestor "$staging_baseline" "$RELEASE_SHA" || {
+            echo "::error::Signed dogfood baseline is not an ancestor of the candidate."
+            exit 1
+          }
           desktop_changes="$(git diff --name-status --find-renames \
             "$staging_baseline" "$RELEASE_SHA" -- \
             .github/workflows/desktop-dogfood.yml \
