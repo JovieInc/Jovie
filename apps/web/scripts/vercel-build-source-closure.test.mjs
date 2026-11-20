@@ -204,4 +204,19 @@ describe('Vercel build source closure', () => {
     );
     expect(ignored).toEqual(['scripts/analyze.mjs', 'scripts/strict.mjs']);
   });
+
+  it('ships the build-info deployedAt stamp writer (JOV-8658)', () => {
+    const vercelIgnore = readFileSync(
+      path.resolve(appRoot, '..', '..', '.vercelignore'),
+      'utf8'
+    );
+    const probeRoot = createVercelIgnoreProbe(vercelIgnore);
+    expect(
+      isIgnoredByVercelIgnore(
+        'apps/web/scripts/write-build-deployed-at.cjs',
+        probeRoot
+      ),
+      'next.config.js requires this writer during next build'
+    ).toBe(false);
+  });
 });
