@@ -20,6 +20,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const read = file => readFileSync(join(root, file), 'utf8');
 /**
  * @typedef {{name?: string, id?: string, if?: string, run?: string, uses?: string,
+ *   shell?: string,
  *   'continue-on-error'?: boolean, env?: Record<string, string>,
  *   with?: {ref?: string, path?: string, 'persist-credentials'?: boolean,
  *     'sparse-checkout'?: string, 'node-version-file'?: string}}} Step
