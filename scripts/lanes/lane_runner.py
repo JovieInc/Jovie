@@ -2051,7 +2051,8 @@ def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
 
 
 def _emit_cooldown_unwritable_event(root: Path, error: Exception) -> None:
-    """One remediation intake per process; Linear is cooled down, so file via gh."""
+    """One remediation intake per process; a cooled-down or unreachable Linear defers visibly
+    (JOV-13077: intake never falls back to a GitHub issue)."""
     global _COOLDOWN_UNWRITABLE_EVENT_FIRED
     if _COOLDOWN_UNWRITABLE_EVENT_FIRED:
         return
