@@ -214,6 +214,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         hit = fix_red_size_split.legacy_hit(text, hit)
+        if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
+            import fix_red_win_envelope
+            hit = fix_red_win_envelope.route(text)
         hit = fix_red_measured_win.annotated_win_hit(text, hit)
         per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     per_check = fix_red_measured_win.promote_sole_win(per_check, names, logs)

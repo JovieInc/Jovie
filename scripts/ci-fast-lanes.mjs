@@ -1006,6 +1006,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/prepush-offload.test.mjs',
   'scripts/preflight-install.test.mjs',
   'scripts/lib/__tests__/ci-rounds.test.mjs',
+  'scripts/lib/__tests__/linear-reference-requirement.test.mjs', // JOV-13063 observe-mode Linear reference check.
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',

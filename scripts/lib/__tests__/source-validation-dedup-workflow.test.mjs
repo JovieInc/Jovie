@@ -20,6 +20,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const read = file => readFileSync(join(root, file), 'utf8');
 /**
  * @typedef {{name?: string, id?: string, if?: string, run?: string, uses?: string,
+ *   shell?: string,
  *   'continue-on-error'?: boolean, env?: Record<string, string>,
  *   with?: {ref?: string, path?: string, 'persist-credentials'?: boolean,
  *     'sparse-checkout'?: string, 'node-version-file'?: string}}} Step
@@ -454,14 +455,29 @@ test('metadata-only edits and label events still use the exact-head proof path i
 });
 
 test('all original jobs retain origin/main permissions, runners, steps and blocking behavior', () => {
+  const linear = 'Require a Linear issue reference from trusted base';
+  const strip = job => ({
+    ...job,
+    steps: job.steps.filter(step => step.name !== linear),
+  });
   assert.deepEqual(
     Object.keys(workflow.jobs).filter(id => id !== 'cancel-superseded'),
     Object.keys(baseline.jobs).filter(id => id !== 'cancel-superseded')
   );
   for (const [id, job] of Object.entries(baseline.jobs)) {
     if (id === 'cancel-superseded') continue;
-    assert.deepEqual(workflow.jobs[id], job, `${id} differs from origin/main`);
+    const current = workflow.jobs[id];
+    assert.deepEqual(strip(current), strip(job), id);
+    const added = current.steps.filter(step => step.name === linear);
+    const kept = job.steps.filter(step => step.name === linear);
+    const allow = id === 'deterministic' && !kept.length && added.length === 1;
+    assert.ok(kept.length === added.length || allow, id);
   }
+  const step = workflow.jobs.deterministic.steps.find(s => s.name === linear);
+  assert.equal(step.shell, 'bash');
+  assert.match(step.run, /linear-reference-requirement\.mjs/);
+  assert.match(step.env.LINEAR_API_KEY, /secrets\.LINEAR_API_KEY/);
+  assert.equal(step['continue-on-error'], undefined);
   assert.equal(cleanup['runs-on'], baseline.jobs.deterministic['runs-on']);
   assert.deepEqual(workflow.permissions, baseline.permissions);
   assert.deepEqual(workflow.on, baseline.on);
