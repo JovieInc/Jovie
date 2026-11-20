@@ -1900,7 +1900,6 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   }
   return result.output.split('\0').filter(Boolean);
 }
-
 export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
   'apps/web/lib/entitlements/**',
   'apps/web/lib/stripe/customer-sync/**',
@@ -2295,6 +2294,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/desktop-installed-apps-audit.test.mjs',
   'scripts/artifact-freshness-reconcile.test.mjs',
   'scripts/lib/artifact-freshness-graph.test.mjs',
+  'scripts/lib/artifact-freshness-stamp.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
   'scripts/swift-arch/guard.test.mjs',

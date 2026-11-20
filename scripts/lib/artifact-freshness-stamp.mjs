@@ -42,31 +42,45 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       };
     }
     const body = await listResponse.json();
-    const matches = findOpenDesktopStampPr(body, repo);
+    // findOpenDesktopStampPr expects page(s); a GitHub list body is one page.
+    const matches = findOpenDesktopStampPr(
+      Array.isArray(body) ? [body] : body,
+      repo
+    );
     if (matches.length === 0) {
       return { inFlight: false, reason: 'no-open-stamp' };
     }
     if (matches.length > 1) {
       return { inFlight: false, reason: 'multiple-open-stamps' };
     }
-    let pr = matches[0];
-    if (pr?.number != null) {
-      const detailResponse = await fetchImpl(
-        `${GITHUB_API}/repos/${repo}/pulls/${pr.number}`,
-        { headers, signal: AbortSignal.timeout(30_000) }
-      );
-      if (detailResponse.ok) {
-        const detail = await detailResponse.json();
-        pr = {
-          ...pr,
-          mergeable_state: detail.mergeable_state ?? pr.mergeable_state,
-          draft: detail.draft ?? pr.draft,
-          html_url: detail.html_url ?? pr.html_url,
-          head: detail.head ?? pr.head,
-          labels: detail.labels ?? pr.labels,
-        };
-      }
+    const listed = matches[0];
+    // List payloads omit mergeable_state (JOV-13856). Without a successful
+    // detail GET we must not treat the stamp as keep/in-flight — that would
+    // suppress Summer for dirty/behind stamps.
+    if (listed?.number == null) {
+      return { inFlight: false, reason: 'stamp detail unavailable' };
     }
+    const detailResponse = await fetchImpl(
+      `${GITHUB_API}/repos/${repo}/pulls/${listed.number}`,
+      { headers, signal: AbortSignal.timeout(30_000) }
+    );
+    if (!detailResponse.ok) {
+      return {
+        inFlight: false,
+        reason: `stamp detail returned ${detailResponse.status}`,
+        number: listed.number,
+        url: listed.html_url ?? null,
+      };
+    }
+    const detail = await detailResponse.json();
+    const pr = {
+      ...listed,
+      mergeable_state: detail.mergeable_state ?? listed.mergeable_state,
+      draft: detail.draft ?? listed.draft,
+      html_url: detail.html_url ?? listed.html_url,
+      head: detail.head ?? listed.head,
+      labels: detail.labels ?? listed.labels,
+    };
     const decision = stampOwnershipDecision(pr);
     return {
       inFlight: decision.action === 'keep',
