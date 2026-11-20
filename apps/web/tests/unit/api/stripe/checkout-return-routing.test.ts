@@ -20,12 +20,15 @@ const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
 const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
-const mockWithStripeRetry = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
+vi.mock(
+  '@/lib/billing/price-lock.server',
+  () => import('@/tests/fixtures/price-lock-list-mock')
+);
 
 vi.mock('@/lib/error-tracking', async () => {
   // parseJsonBody uses captureError/captureWarning internally — we only want
@@ -70,14 +73,6 @@ vi.mock('@/lib/stripe/config', () => ({
   },
 }));
 
-vi.mock('@/lib/stripe/retry', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/stripe/retry')>();
-  return {
-    ...actual,
-    withStripeRetry: mockWithStripeRetry,
-  };
-});
-
 import { POST } from '@/app/api/stripe/checkout/route';
 
 describe('In-app checkout return routing', () => {
@@ -99,7 +94,6 @@ describe('In-app checkout return routing', () => {
       customerId: 'cus_123',
     });
     mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
-    mockWithStripeRetry.mockImplementation(async (_operation, fn) => fn());
   });
   it('returns in-app upgrades to their screen without claiming entitlement', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
