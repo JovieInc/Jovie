@@ -40,8 +40,10 @@ frequency is a series. Options: `--category <id>`, `--sources
 appstore,hn,exa,trustpilot`, `--days <n>`.
 
 Weekly: `.github/workflows/voc-mine.yml` (Mondays) runs the same collector and
-uploads the anonymized `items.jsonl` and summary as an artifact. It skips until
-the `VOC_TARGETS_JSON` and `EXA_API_KEY` repository secrets exist.
+uploads the anonymized `items.jsonl` and summary as an artifact. It skips only
+when the `VOC_TARGETS_JSON` repository secret is empty. Set `EXA_API_KEY` too:
+without it the job still runs (App Store + HN), but Exa search and Trustpilot
+return empty arrays.
 
 ## Secrets unlock (Tim / ops)
 
@@ -51,7 +53,7 @@ GitHub Actions secrets UI and Doppler dashboard only.
 | Name | Where | Why |
 |---|---|---|
 | `VOC_TARGETS_JSON` | **GitHub repository secret** (Settings → Secrets → Actions) | Workflow reads `secrets.VOC_TARGETS_JSON` directly; empty → job skips. Not part of Production env sync. |
-| `EXA_API_KEY` | **GitHub repository secret** (same) **and** Doppler `jovie-web` (`dev` / ops lane) | CI Exa + Trustpilot; local miner and `packages/research` |
+| `EXA_API_KEY` | **GitHub repository secret** (same) **and** Doppler `jovie-web` (`dev` / ops lane) | Exa + Trustpilot in CI/local; missing key does **not** skip the workflow — those sources just yield nothing. Also used by `packages/research`. |
 
 Canonical private targets live in gbrain `ops/voc/targets`. For CI, copy that
 `json voc-targets` block into the repository secret as:
