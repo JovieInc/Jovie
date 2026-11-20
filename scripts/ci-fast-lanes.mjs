@@ -30,7 +30,6 @@
  *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
  *     non-zero stops starting structural commands (fail-fast)
  */
-
 import {
   LANES_COVERAGE_FLOORS,
   LANES_PYTEST_SHARDS,
@@ -1034,7 +1033,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-publish.test.mjs',
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
-  'scripts/design/pen-data-backed-ship.test.mjs', // JOV-13853 data-backed ship path
+  'scripts/design/pen-data-backed-ship.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
