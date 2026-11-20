@@ -181,11 +181,15 @@ describe('docs-only product-lane classification', () => {
 });
 
 describe('merge-group docs-only structural decision', () => {
+  // JOV-13072: same-name fan-ins (`ci-fast-remaining`, `ci-fast-structural-lanes`)
+  // no longer own the decision step. The anchor lives on remaining-shards;
+  // python/web/lanes-shards reuse it via `run: *structural-decision`.
+  const STRUCTURAL_DECISION_JOB = 'ci-fast-remaining-shards';
   const STRUCTURAL_JOBS = [
-    'ci-fast-remaining',
+    STRUCTURAL_DECISION_JOB,
     'ci-fast-structural-python',
     'ci-fast-structural-web',
-    'ci-fast-structural-lanes',
+    'ci-fast-structural-lanes-shards',
   ];
   const scannedEre = spawnSync(
     process.execPath,
@@ -233,7 +237,7 @@ describe('merge-group docs-only structural decision', () => {
       const output = join(repo, 'github-output');
       writeFileSync(output, '');
       const script = getStepRunScript(
-        getJobBlock(CI_WORKFLOW, 'ci-fast-remaining'),
+        getJobBlock(CI_WORKFLOW, STRUCTURAL_DECISION_JOB),
         'Decide structural lane'
       )
         .replaceAll('${{ github.event_name }}', event)
