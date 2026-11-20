@@ -186,9 +186,7 @@ private struct AppContentView: View {
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: appState.isOffline,
-          initialTab: appState.launchMode.opensAudienceOnLaunch
-            ? .audience
-            : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
+          initialTab: appState.readyShellInitialTab,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           webBaseURL: appState.configuration.webBaseURL,
           accountURL: appState.accountURL,

@@ -18,7 +18,7 @@ enum WhatsNewCatalog {
         WhatsNewItem(
           id: "chat-home",
           title: "Chat is home",
-          testHint: "Open a signed-in session and confirm Ask Jovie is the first ready surface."
+          testHint: "After the first Identity land, confirm Ask Jovie remains the permanent ready home."
         ),
         WhatsNewItem(
           id: "swipe-shell",
