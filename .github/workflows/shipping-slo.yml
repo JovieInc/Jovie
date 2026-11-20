@@ -2,7 +2,7 @@ name: Shipping SLO Ratchet
 # clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
-# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots and baseline ratchet PRs under the Jovie Bot app token, plus deduped Linear findings under JOV-6783; it never merges, deploys, or records founder decisions.
+# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots and baseline ratchet PRs under the Jovie Bot app token, plus deduped Linear findings under JOV-6783; the same run then auto-measures due wins with v1 adapters (committed metrics JSON + Gateway report) and writes receipts to the runtime store only. It never merges, deploys, scrapes HTML, or records founder decisions.
 # removal-trigger: Remove the schedule when the Symphony control plane emits these SLO measurements natively and the daily GitHub-Actions sweep becomes redundant.
 
 # JOV-6783: deterministic, zero-token shipping-SLO ratchet.
@@ -277,6 +277,21 @@ jobs:
           path: ${{ runner.temp }}/shipping-origin/*.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Measure due wins into the runtime store
+        # After the SLO snapshot so JSON field-path adapters see fresh numbers.
+        # Receipts + measure report stay in the runtime store (data vs behaviour);
+        # never commit receipts into canon/wins/wins.jsonl. Unqueryable dues are
+        # explicit needs-probe skips — no fragile scrapers in v1.
+        if: ${{ !cancelled() }}
+        env:
+          SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
+          SUMMER_STORE_TOKEN: ${{ secrets.SUMMER_STORE_TOKEN }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Slack alert on regressions
         if: ${{ steps.slo.outputs.regressions != '0' && env.SLACK_WEBHOOK_URL != '' }}

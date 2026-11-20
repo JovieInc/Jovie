@@ -229,6 +229,11 @@ test('an empty after-value needs Pending: yes and becomes pending-measure', () =
     dueMeasurements([win], Date.parse(merged) + 3_600_000).length,
     0
   );
+  // Prose sources stay needs-probe in the summary split (no silent stuck).
+  const metrics = weeklyMetrics([win]);
+  assert.equal(metrics.winsPendingMeasure, 1);
+  assert.equal(metrics.winsNeedsProbe, 1);
+  assert.equal(metrics.winsPendingMeasureQueryable, 0);
 });
 
 test('delta, notification and weekly rollup', () => {

@@ -6,8 +6,9 @@
 //   sync                     refresh PR mergedAt from GitHub
 //   rollup [--write]         weekly investor rollup (docs/metrics/wins-weekly.json)
 //   due                      merged wins still waiting on their after-value
+//   measure-due [--store]    auto-measure queryable dues; skip needs-probe
 //   notify                   one-line messages for verified, meaningful wins
-//   receipt --id --metric --value --evidence [--sha]  record a post-deploy re-measurement
+//   receipt --id --metric --value --evidence [--sha] [--store]  post-deploy re-measure
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
@@ -26,7 +27,15 @@ import {
   winFromPr,
   winStatus,
 } from './lib/wins-ledger.mjs';
-import { putWinToStore } from './lib/wins-store.mjs';
+import { dueMeasurePlan, measureDueWins } from './lib/wins-measure/index.mjs';
+import {
+  listWinsFromStore,
+  mergeWins,
+  overwriteWinInStore,
+  putMeasureReportToStore,
+  putWinsMetricsToStore,
+  putWinToStore,
+} from './lib/wins-store.mjs';
 
 const HEADER = readFileSync(WINS_PATH, 'utf8').split('\n')[0];
 const arg = (argv, k) => {
@@ -45,9 +54,36 @@ const save = wins =>
     `${HEADER}\n${wins.map(w => JSON.stringify(w)).join('\n')}\n`
   );
 
+async function loadWins(argv) {
+  const ledger = readLedger();
+  if (!argv.includes('--store') && !argv.includes('--from-store'))
+    return ledger;
+  const storeWins = await listWinsFromStore();
+  return mergeWins(ledger, storeWins);
+}
+
+function writeSummary(wins, argv, io) {
+  const out = {
+    ...weeklyMetrics(wins),
+    clusters: clusters(wins).map(({ wins: _w, ...c }) => c),
+    wins: wins.map(w => ({ id: w.id, status: winStatus(w) })),
+  };
+  if (argv.includes('--write'))
+    writeFileSync(
+      'docs/metrics/wins-latest.json',
+      formatBiomeJson({
+        schema: 'jovie.wins-metrics/v1',
+        at: new Date().toISOString(),
+        ...out,
+      })
+    );
+  io.log(JSON.stringify(out, null, argv.includes('--json') ? 0 : 2));
+  return out;
+}
+
 export async function main(argv, io = console) {
   const [cmd] = argv;
-  const wins = readLedger();
+  const wins = cmd === 'measure-due' ? await loadWins(argv) : readLedger();
   if (cmd === 'validate') {
     const problems = validateLedger(wins);
     for (const p of problems) io.error(p);
@@ -55,21 +91,7 @@ export async function main(argv, io = console) {
     return problems.length ? 1 : 0;
   }
   if (cmd === 'summary') {
-    const out = {
-      ...weeklyMetrics(wins),
-      clusters: clusters(wins).map(({ wins: _w, ...c }) => c),
-      wins: wins.map(w => ({ id: w.id, status: winStatus(w) })),
-    };
-    if (argv.includes('--write'))
-      writeFileSync(
-        'docs/metrics/wins-latest.json',
-        formatBiomeJson({
-          schema: 'jovie.wins-metrics/v1',
-          at: new Date().toISOString(),
-          ...out,
-        })
-      );
-    io.log(JSON.stringify(out, null, argv.includes('--json') ? 0 : 2));
+    writeSummary(wins, argv, io);
     return 0;
   }
   if (cmd === 'ingest') {
@@ -110,10 +132,62 @@ export async function main(argv, io = console) {
   }
   if (cmd === 'due') {
     const due = dueMeasurements(wins);
-    for (const w of due)
-      io.log(`${w.id}: measure the after-value, then wins-ledger.mjs receipt`);
-    io.log(`${due.length} pending-measure wins due`);
+    const plan = dueMeasurePlan(wins);
+    for (const w of due) {
+      const tag = plan.needsProbe.some(n => n.id === w.id)
+        ? 'needs-probe'
+        : plan.queryable.includes(w.id)
+          ? 'queryable'
+          : 'mixed';
+      io.log(
+        `${w.id}: ${tag} — measure the after-value, then wins-ledger.mjs receipt`
+      );
+    }
+    io.log(
+      `${due.length} pending-measure wins due (${plan.queryable.length} queryable, ${plan.needsProbe.length} needs-probe)`
+    );
     return 0;
+  }
+  if (cmd === 'measure-due') {
+    const toStore = argv.includes('--store');
+    // Receipts are runtime-store data only (same data-vs-behaviour rule as ingest).
+    // Without --store, always dry-run so canon/wins/wins.jsonl is never mirrored.
+    const dryRun = argv.includes('--dry-run') || !toStore;
+    const report = await measureDueWins(wins, {
+      dryRun,
+      sha: arg(argv, 'sha') ?? process.env.GITHUB_SHA ?? null,
+      apiKey: process.env.AI_GATEWAY_API_KEY,
+    });
+    if (!dryRun && toStore) {
+      const touched = new Set(report.measured.map(m => m.id));
+      for (const id of touched) {
+        const win = wins.find(w => w.id === id);
+        if (!win) continue;
+        const problems = validateWin(win);
+        if (problems.length) throw new Error(`${id}: ${problems.join('; ')}`);
+        io.log(`${id}: ${await overwriteWinInStore(win)}`);
+      }
+      const metrics = {
+        schema: 'jovie.wins-metrics/v1',
+        at: report.at,
+        ...weeklyMetrics(wins),
+        clusters: clusters(wins).map(({ wins: _w, ...c }) => c),
+      };
+      io.log(await putWinsMetricsToStore(metrics));
+      io.log(
+        await putMeasureReportToStore({
+          schema: 'jovie.wins-measure/v1',
+          ...report,
+        })
+      );
+    } else if (!toStore) {
+      io.log(
+        'measure-due: dry-run (pass --store to persist receipts in the runtime store)'
+      );
+    }
+    io.log(JSON.stringify(report, null, argv.includes('--json') ? 0 : 2));
+    if (argv.includes('--write')) writeSummary(wins, argv, io);
+    return report.errors.length ? 1 : 0;
   }
   if (cmd === 'notify') {
     for (const line of wins.map(notifyLine).filter(Boolean)) io.log(line);
@@ -162,7 +236,12 @@ export async function main(argv, io = console) {
     return 0;
   }
   if (cmd === 'receipt') {
-    const win = wins.find(w => w.id === arg(argv, 'id'));
+    const id = arg(argv, 'id');
+    let win = wins.find(w => w.id === id);
+    if (!win && argv.includes('--store')) {
+      const loaded = await loadWins(['--store']);
+      win = loaded.find(w => w.id === id);
+    }
     if (!win) throw new Error('unknown win id');
     win.receipts.push({
       metric: arg(argv, 'metric'),
@@ -173,12 +252,21 @@ export async function main(argv, io = console) {
     });
     const problems = validateWin(win);
     if (problems.length) throw new Error(problems.join('; '));
-    save(wins);
+    if (argv.includes('--store')) {
+      io.log(
+        `${win.id}: ${await overwriteWinInStore(win)} (${winStatus(win)})`
+      );
+      return 0;
+    }
+    // Replace the win in the ledger copy and save.
+    const next = wins.map(w => (w.id === win.id ? win : w));
+    if (!wins.some(w => w.id === win.id)) next.push(win);
+    save(next);
     io.log(`${win.id}: ${winStatus(win)}`);
     return 0;
   }
   io.error(
-    'usage: wins-ledger.mjs validate|summary|ingest|sync|rollup|due|notify|receipt'
+    'usage: wins-ledger.mjs validate|summary|ingest|sync|rollup|due|measure-due|notify|receipt'
   );
   return 2;
 }

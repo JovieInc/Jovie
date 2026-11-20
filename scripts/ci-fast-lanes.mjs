@@ -1040,6 +1040,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/orphan-screenshot-guard.test.mjs',
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
+  'scripts/lib/__tests__/wins-measure.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
