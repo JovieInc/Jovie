@@ -1079,17 +1079,12 @@ class ManagedReleaseRestartTest(unittest.TestCase):
 
     def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
         with tempfile.TemporaryDirectory() as directory:
-            state = Path(directory)
-            old, new = state / "scripts/lanes", state / "new"
-            shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
-            shutil.copytree(ROOT / "scripts/apiclient", state / "scripts/apiclient",
-                            ignore=shutil.ignore_patterns("__pycache__"))
+            state = Path(directory); old, new = state / "scripts/lanes", state / "new"
+            for name in ("lanes", "apiclient"):
+                shutil.copytree(ROOT / "scripts" / name, state / "scripts" / name, ignore=shutil.ignore_patterns("__pycache__"))
             shutil.copyfile(ROOT / "scripts/shipping_origin.py", state / "scripts/shipping_origin.py")
-            providers = state / "packages/api-client/providers.json"
-            providers.parent.mkdir(parents=True)
-            shutil.copyfile(ROOT / "packages/api-client/providers.json", providers)
-            new.mkdir()
-            receipt = state / "executed.json"
+            providers = state / "packages/api-client/providers.json"; providers.parent.mkdir(parents=True); shutil.copyfile(ROOT / "packages/api-client/providers.json", providers)
+            new.mkdir(); receipt = state / "executed.json"
             (new / "hud.py").write_text(
                 "import json, sys\nfrom pathlib import Path\n"
                 f"Path({str(receipt)!r}).write_text(json.dumps({{'source': __file__, 'args': sys.argv[1:]}}))\n")
