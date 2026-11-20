@@ -74,8 +74,9 @@ export function checkPenCitation({
 }
 
 export function main(argv = process.argv.slice(2)) {
+  // parseArgs reads `args`. A key named `argv` is ignored.
   const { values } = parseArgs({
-    argv,
+    args: argv,
     options: {
       'files-file': { type: 'string' },
       'body-file': { type: 'string' },
