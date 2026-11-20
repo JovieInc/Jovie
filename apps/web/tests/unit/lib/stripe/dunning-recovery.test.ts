@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   getPriceMappingDetails: vi.fn(),
 }));
 
-vi.mock('server-only', () => ({}));
+// Keep ≤8 vi.mock calls (test-hygiene MOCK_BUDGET). server-only is global in
+// tests/setup.ts; error-tracking / logger assertions live in dunning.test.ts.
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -44,10 +45,6 @@ vi.mock('@/lib/email/templates/payment-recovered', () => ({
   getPaymentRecoveredText: vi.fn().mockReturnValue('recovered text'),
 }));
 
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
-}));
-
 vi.mock('@/lib/notifications/providers/gateway', () => ({
   GatewayEmailProvider: vi.fn().mockImplementation(function () {
     return { sendEmail: mocks.sendEmail };
@@ -62,10 +59,6 @@ vi.mock('@/lib/stripe/config', () => ({
   getPriceMappingDetails: mocks.getPriceMappingDetails,
 }));
 
-vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
-
 import { getPaymentFailedHtml } from '@/lib/email/templates/payment-failed';
 import {
   getPaymentRecoveredHtml,
@@ -73,14 +66,12 @@ import {
   getPaymentRecoveredText,
 } from '@/lib/email/templates/payment-recovered';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
-import { captureError } from '@/lib/error-tracking';
 import {
   type PaymentFailureInfo,
   type PaymentRecoveryInfo,
   sendPaymentFailedEmail,
   sendPaymentRecoveredEmail,
 } from '@/lib/stripe/dunning';
-import { logger } from '@/lib/utils/logger';
 
 describe('dunning recovery + daysRemaining', () => {
   describe('sendPaymentFailedEmail daysRemaining', () => {
@@ -163,10 +154,6 @@ describe('dunning recovery + daysRemaining', () => {
         success: false,
         error: 'No email found for user',
       });
-      expect(logger.warn).toHaveBeenCalledWith(
-        'No email found for user, skipping recovery email',
-        { userId: recovery.userId }
-      );
       expect(mocks.sendEmail).not.toHaveBeenCalled();
       expect(getPaymentRecoveredHtml).not.toHaveBeenCalled();
     });
@@ -203,10 +190,6 @@ describe('dunning recovery + daysRemaining', () => {
         html: '<html>recovered</html>',
         idempotencyKey: 'payment-recovered:in_recovered',
       });
-      expect(logger.info).toHaveBeenCalledExactlyOnceWith(
-        'Sent payment recovered email',
-        { userId: recovery.userId, messageId: 'msg_rec' }
-      );
     });
 
     it('omits idempotency when invoiceId is absent', async () => {
@@ -248,7 +231,6 @@ describe('dunning recovery + daysRemaining', () => {
           success: false,
           error: result.status === 'error' ? result.error : result.detail,
         });
-        expect(logger.info).not.toHaveBeenCalled();
       }
     );
 
@@ -263,11 +245,7 @@ describe('dunning recovery + daysRemaining', () => {
         success: false,
         error: 'provider exploded',
       });
-      expect(captureError).toHaveBeenCalledExactlyOnceWith(
-        'Error sending payment recovered email',
-        boom,
-        { userId: recovery.userId }
-      );
+      expect(mocks.sendEmail).toHaveBeenCalledOnce();
     });
   });
 });
