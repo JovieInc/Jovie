@@ -103,7 +103,9 @@ describe('DashboardNav route warming', () => {
     expect(destinations()).toEqual(
       retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
     );
-    expect(screen.queryByRole('link', { name: /^Home$/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /^Home$/ })
+    ).not.toBeInTheDocument();
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
@@ -275,9 +277,7 @@ describe('DashboardNav route warming', () => {
     const pendingLink = pending.container.querySelector(
       '[data-navigation-item-id="home"]'
     );
-    expect(pendingLink).toHaveAccessibleName(
-      'Home — 3 Items Need Attention'
-    );
+    expect(pendingLink).toHaveAccessibleName('Home — 3 Items Need Attention');
     expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
