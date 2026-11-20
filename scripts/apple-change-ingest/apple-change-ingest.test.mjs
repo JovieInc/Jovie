@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { normalizeObservation } from '../idea-radar/idea-radar.mjs';
 import {
+  acceptPriorReceipt,
   assessItems,
   classifyItem,
   contentHash,
@@ -209,6 +210,22 @@ test('action items normalize through idea-radar without a separate ledger', () =
   const evidence = normalizeObservation(observation);
   assert.equal(evidence.provenance.sourceType, 'apple-developer-rss');
   assert.ok(evidence.id.startsWith('evidence:'));
+});
+
+test('acceptPriorReceipt refuses failed or itemless receipts', () => {
+  assert.equal(acceptPriorReceipt(null), null);
+  assert.equal(
+    acceptPriorReceipt({ ok: false, items: [{ sourceItemId: 'a' }] }),
+    null
+  );
+  assert.equal(acceptPriorReceipt({ ok: true }), null);
+  assert.equal(
+    acceptPriorReceipt({
+      ok: true,
+      items: [{ sourceItemId: 'a', contentHash: 'h' }],
+    })?.ok,
+    true
+  );
 });
 
 test('runIngest fails closed when a source errors and writes a full receipt', async () => {

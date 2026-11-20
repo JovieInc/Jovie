@@ -58,8 +58,18 @@ jobs:
           unzip -p "$RUNNER_TEMP/apple-prior/prior.zip" apple-change-receipt.json \
             > "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
           # Node is provisioned in this job; avoid unprovisioned python3 (hermetic-ci).
-          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); console.log("prior receipt ok")' \
-            "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+          # Refuse failed/partial priors (ok!==true) so they cannot undercount revisions.
+          node -e '
+            const fs = require("node:fs");
+            const path = process.argv[1];
+            const receipt = JSON.parse(fs.readFileSync(path, "utf8"));
+            if (receipt.ok !== true) {
+              console.log("Prior receipt ok!==true; discarding (treat as no prior)");
+              fs.unlinkSync(path);
+              process.exit(0);
+            }
+            console.log("prior receipt ok");
+          ' "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
 
       - name: Ingest and classify
         run: |
@@ -76,8 +86,9 @@ jobs:
             cat "$RUNNER_TEMP/apple-change-summary.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # Only successful receipts may become the next run's --prior baseline.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+        if: success()
         with:
           name: apple-change-receipt
           path: |
@@ -85,6 +96,13 @@ jobs:
             ${{ runner.temp }}/apple-change-summary.json
           if-no-files-found: ignore
           retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: apple-change-failure-summary
+          path: ${{ runner.temp }}/apple-change-summary.json
+          if-no-files-found: ignore
+          retention-days: 14
   policy:
     name: Enforce official Node lifecycle and patch SLA
     runs-on: ubuntu-24.04

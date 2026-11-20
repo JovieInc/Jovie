@@ -147,6 +147,20 @@ export function toIdeaRadarObservation(assessed, observedAt) {
 }
 
 /**
+ * Prior baselines must come from a successful ingest. Failed/partial receipts
+ * omit items and would undercount meaningfulRevisions on the next run.
+ * @param {unknown} receipt
+ * @returns {object | null}
+ */
+export function acceptPriorReceipt(receipt) {
+  if (!receipt || typeof receipt !== 'object') return null;
+  if (/** @type {{ok?: unknown}} */ (receipt).ok !== true) return null;
+  if (!Array.isArray(/** @type {{items?: unknown}} */ (receipt).items))
+    return null;
+  return /** @type {object} */ (receipt);
+}
+
+/**
  * @param {object[]} priorItems
  * @returns {Map<string, string>}
  */
@@ -298,9 +312,16 @@ async function main(argv = process.argv.slice(2)) {
     );
     return 0;
   }
-  const priorReceipt = args.prior
-    ? JSON.parse(readFileSync(args.prior, 'utf8'))
-    : null;
+  let priorReceipt = null;
+  if (args.prior) {
+    const raw = JSON.parse(readFileSync(args.prior, 'utf8'));
+    priorReceipt = acceptPriorReceipt(raw);
+    if (!priorReceipt) {
+      process.stderr.write(
+        'apple-change-ingest: refusing prior with ok!==true; treating as no prior\n'
+      );
+    }
+  }
   const receipt = await runIngest({ priorReceipt });
   const summary = {
     schema: receipt.schema,
