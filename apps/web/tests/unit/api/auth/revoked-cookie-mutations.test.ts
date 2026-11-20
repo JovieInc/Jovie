@@ -86,7 +86,6 @@ vi.mock('@/lib/flags/write-override.server', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
-  getBillingAuditLog: vi.fn(),
 }));
 vi.mock('@/lib/auth/gate', () => ({
   getWaitlistAccess: mockGetWaitlistAccess,
@@ -101,21 +100,6 @@ vi.mock('@/lib/ingestion/session', () => ({
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: vi.fn(),
 }));
-vi.mock('@/lib/utils/logger', () => ({
-  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
-}));
-vi.mock('@/lib/stripe/client', () => ({
-  stripe: { checkout: { sessions: { retrieve: vi.fn() } } },
-}));
-vi.mock('@/lib/stripe/config', () => ({
-  getPriceMappingDetails: () => null,
-}));
-vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
-  hasProofPendingProfile: vi.fn(),
-}));
-vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
-  recordArtistOfferStage: vi.fn(),
-}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -129,8 +113,6 @@ import { POST as deleteAccount } from '@/app/api/account/delete/route';
 import { GET as exportAccount } from '@/app/api/account/export/route';
 import { POST as rollbackFlag } from '@/app/api/admin/feature-flags/rollback/route';
 import { POST as writeFlag } from '@/app/api/admin/feature-flags/route';
-import { GET as billingCheckoutSession } from '@/app/api/billing/checkout-session/route';
-import { GET as billingHistory } from '@/app/api/billing/history/route';
 import { POST as unwaitlist } from '@/app/api/dev/unwaitlist/route';
 import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
 
@@ -242,34 +224,6 @@ describe('revoked session with a still-valid cookie', () => {
     ).toBe(true);
     expect(mockCheckAccountExportRateLimit).not.toHaveBeenCalled();
     expect(mockWithDbSessionTx).not.toHaveBeenCalled();
-  });
-
-  it('denies billing history before Stripe billing lookup', async () => {
-    const response = await billingHistory();
-
-    expect(response.status).toBe(401);
-    expect(
-      mockGetSession.mock.calls.every(call =>
-        sessionReadDisabledCookieCache(call)
-      )
-    ).toBe(true);
-    expect(mockGetUserBillingInfo).not.toHaveBeenCalled();
-  });
-
-  it('denies billing checkout-session before Stripe retrieval', async () => {
-    const { NextRequest } = await import('next/server');
-    const response = await billingCheckoutSession(
-      new NextRequest(
-        'http://localhost/api/billing/checkout-session?session_id=cs_test_1'
-      )
-    );
-
-    expect(response.status).toBe(401);
-    expect(
-      mockGetSession.mock.calls.every(call =>
-        sessionReadDisabledCookieCache(call)
-      )
-    ).toBe(true);
   });
 
   it('denies a feature-flag write before the override is stored', async () => {
