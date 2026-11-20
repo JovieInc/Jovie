@@ -70,6 +70,19 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  runSourceGuardPoolCli,
+  runSourceGuards,
+} from './lib/ci-source-guard-pool.mjs';
+
+export {
+  expandSourcePoolEntries,
+  runSourceGuardPool,
+  runSourceGuards,
+  sourceGuardConcurrency,
+  sourceGuardLocks,
+} from './lib/ci-source-guard-pool.mjs';
+
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
@@ -196,6 +209,92 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
 });
 
 /**
+ * The merged-with-base guard runs its scans as one bounded pool instead of a
+ * serial `;` chain. Same commands, same fail-closed outcome (any failure fails
+ * the guard); run-all means a failure no longer hides later failures.
+ */
+export const MERGED_WITH_BASE_POOL_CONCURRENCY = 4;
+
+/** Measured long poles inside the merged-with-base pool (ordering only). */
+export const MERGED_WITH_BASE_POOL_LONG_POLES = Object.freeze([
+  // The node --test invariants batch (~120s) and the web vitest run.
+  'scripts/invariants/registry.test.mjs',
+  'tests/unit/api/webhooks/linear.test.ts',
+]);
+
+/** Short, stable pool id for a scan command. */
+function mergedBasePoolId(command) {
+  return command
+    .replace(/^pnpm (?:--filter(?:=| )\S+ )?/u, '')
+    .replace(/^run /u, '')
+    .replace(/^node \.github\/scripts\//u, '.github/scripts/')
+    .trim();
+}
+
+/**
+ * Pool spec for the merged-with-base guard: the design-surface scans, every
+ * PR_CHEAP_SCAN_COMMANDS entry, and the `pnpm invariants:check` chain. The
+ * chain entry is split into one pool entry per top-level `&&` segment at run
+ * time (expandSourcePoolEntries) so the real long pole parallizes too.
+ */
+export const MERGED_WITH_BASE_POOL_SPEC = Object.freeze({
+  concurrency: MERGED_WITH_BASE_POOL_CONCURRENCY,
+  commands: Object.freeze([
+    Object.freeze({
+      id: 'design-surfaces',
+      command: 'node scripts/invariants/design-surfaces.mjs',
+    }),
+    Object.freeze({
+      id: 'stack-pattern-ratchet',
+      command:
+        'if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi',
+    }),
+    ...PR_CHEAP_SCAN_COMMANDS.map(command =>
+      Object.freeze({ id: mergedBasePoolId(command), command })
+    ),
+    Object.freeze({
+      id: 'invariants-check',
+      command: 'pnpm invariants:check',
+      splitChain: true,
+    }),
+  ]),
+});
+
+/** Serial setup of the merged-with-base guard (unchanged from the old chain). */
+const MERGED_WITH_BASE_SETUP = Object.freeze([
+  'set -euo pipefail',
+  't="$(mktemp -d)"',
+  'root="$PWD"',
+  'git worktree add -q --detach "$t" HEAD',
+  'for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done',
+  'trap \'git worktree remove --force "$t"\' EXIT',
+  'cd "$t"',
+  'git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true',
+  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
+  '[ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }',
+]);
+
+const MERGED_WITH_BASE_RUNNER_PATH = fileURLToPath(
+  new URL('./ci-fast-lanes.mjs', import.meta.url)
+);
+
+/**
+ * The merged-with-base guard command: identical setup, then the pool runner.
+ * The spec is embedded as a quoted heredoc so the exact scan commands stay
+ * readable in the guard command (the structural inventory test reads them).
+ * @returns {string}
+ */
+function mergedWithBaseCommand() {
+  const pool = [
+    `cat > "$t/subpool.json" <<'JOVIE_SOURCE_GUARD_POOL'`,
+    JSON.stringify(MERGED_WITH_BASE_POOL_SPEC),
+    'JOVIE_SOURCE_GUARD_POOL',
+    `node ${shellQuote(MERGED_WITH_BASE_RUNNER_PATH)} --run-source-guard-pool "$t/subpool.json"`,
+  ].join('\n');
+  return `bash -c ${shellQuote(`${MERGED_WITH_BASE_SETUP.join('; ')};\n${pool}`)}`;
+}
+
+/**
  * Body of the lanes-selftest-changed-tests guard (run under bash -c). Exported
  * so the test can assert the env and the file selection.
  */
@@ -224,6 +323,8 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // Worktree setup also runs in the issue runner; catch fixture and dispatch regressions before release.
+  'if printf "%s\\n" "$files" | grep -Fxq "scripts/lanes/worktree_pool.py"; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.RunIssueTest";; esac; fi',
   // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
   // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
   // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
@@ -551,8 +652,12 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     // Merged-with-base invariants. Textual merge conflicts stay on their gates.
+    // Setup is unchanged (worktree, node_modules links, fetch, merge with base,
+    // conflict and registry skip-outs); the scans and the invariants chain run
+    // as one bounded pool with run-all semantics — same commands, same
+    // fail-closed outcome, and a failure no longer hides later failures.
     id: 'merged-with-base-invariants',
-    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; [ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
+    command: mergedWithBaseCommand(),
     inputs: /./u,
     prOnly: true,
   }),
@@ -630,27 +735,6 @@ export function selectSourceGuards(event, changed) {
     }
     return changed.some(file => guard.inputs.test(file));
   });
-}
-
-export function runSourceGuards() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  const guards = selectSourceGuards(event, listAllChangedFiles());
-  if (guards.length === 0) {
-    return {
-      code: 0,
-      output: 'Source-read guards skipped (no guard input changed)\n',
-      skipped: true,
-    };
-  }
-  // Independent guards: report every failure in one run.
-  let combined = '';
-  let code = 0;
-  for (const guard of guards) {
-    const result = shell(guard.command);
-    combined += `[source-guards] ${guard.id}: exit ${result.code}\n${result.output}`;
-    if (result.code !== 0 && code === 0) code = result.code;
-  }
-  return { code, output: combined };
 }
 
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
@@ -769,7 +853,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
@@ -896,6 +980,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
+  'scripts/pr-body-lint.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -995,7 +1080,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
+  'scripts/hooks/verify-git-hooks.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
   'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
@@ -1045,6 +1132,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
+  'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
+  'scripts/linear-team-drift.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
@@ -1104,7 +1193,7 @@ export const DEPRECATION_COVERAGE_COMMAND =
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
-  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs';
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs scripts/pr-body-lint.test.mjs';
 
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
@@ -1131,6 +1220,7 @@ export const RELEASE_LINEAGE_CONTRACT_COMMAND =
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
   'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
@@ -1177,11 +1267,13 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/next-build-cache-contract.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
   'scripts/lib/__tests__/performance-gate-lanes.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
+  'scripts/lib/__tests__/undraft-hold-signals.test.mjs',
   'scripts/lib/__tests__/workflow-expression-budget.test.mjs',
   'scripts/lib/__tests__/stale-branch-sweep.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
@@ -1319,6 +1411,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lookup-token.test.mjs',
   'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
+  'scripts/lib/__tests__/ci-release-import-closure.test.mjs',
   'scripts/lib/__tests__/public-feed-qualification.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
@@ -1353,6 +1446,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-capacity.test.mjs',
   'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
+  'scripts/lib/__tests__/merge-queue-cancel-causes.test.mjs', // JOV-13109 MQ cancel causes.
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
@@ -2435,7 +2529,7 @@ function shellQuote(value) {
 }
 
 /** Async twin of shell() so structural commands can overlap. */
-function shellAsync(command, env = process.env) {
+export function shellAsync(command, env = process.env) {
   return new Promise(resolveResult => {
     const stdout = [];
     const stderr = [];
@@ -2498,7 +2592,7 @@ const OPAQUE_ENTRY_LOCKS = Object.freeze([
   [PLAYWRIGHT_RECEIPT_CI_TEST, 'coverage:apps/web'],
 ]);
 
-function packageScripts(dir) {
+export function packageScripts(dir) {
   try {
     const pkg = JSON.parse(
       readFileSync(resolve(REPO_ROOT, dir, 'package.json'), 'utf8')
@@ -2586,13 +2680,18 @@ export function structuralLocks(command) {
  * jump an earlier command that shares one of their locks. `stop` is consulted
  * before each start; once it returns true nothing new starts (in-flight
  * commands still finish) and the unstarted commands stay undefined.
+ * `keepGoing: true` keeps starting commands after a failure (run-all) — the
+ * first failure in list order still decides the exit code.
+ * `onSettle(index, result)` fires when a command finishes, so callers can
+ * stream output while later commands are still in flight.
  * @param {readonly string[]} commands
- * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean}} opts
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean, keepGoing?: boolean, onSettle?: (index: number, result: ExecResult & {durationMs: number}) => void}} opts
  * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
  * @typedef {{code: number, output: string}} ExecResult
  */
 export function runCommandPool(commands, opts) {
   const { execute, concurrency } = opts;
+  const keepGoing = opts.keepGoing === true;
   const locks = opts.locks ?? commands.map(() => []);
   const now = opts.now ?? Date.now;
   const results = new Array(commands.length);
@@ -2623,6 +2722,7 @@ export function runCommandPool(commands, opts) {
         durationMs: Math.max(0, now() - startedAt),
       };
       if (code !== 0) failed = true;
+      opts.onSettle?.(index, results[index]);
       pump();
     };
     const start = index => {
@@ -2658,7 +2758,7 @@ export function runCommandPool(commands, opts) {
       pumping = true;
       do {
         repump = false;
-        while (!failed && !stopped && running < concurrency) {
+        while (!(failed && !keepGoing) && !stopped && running < concurrency) {
           if (pending.length > 0 && opts.stop?.()) {
             stopped = true;
             break;
@@ -2669,7 +2769,10 @@ export function runCommandPool(commands, opts) {
         }
       } while (repump);
       pumping = false;
-      if (running === 0 && (failed || stopped || pending.length === 0)) {
+      if (
+        running === 0 &&
+        (stopped || pending.length === 0 || (failed && !keepGoing))
+      ) {
         resolveAll(results);
       }
     };
@@ -2871,10 +2974,22 @@ export async function runStructural(opts = {}) {
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).
+  // Landing events (push to main, merge groups) validate the exact tree the
+  // PR fleet judges: the PR-time script-contracts source guard runs the FULL
+  // lists on every PR, and its repo-wide ratchets scan the tree dynamically
+  // (git ls-files + whole-repo scans), so the static derived selector can
+  // never pick them. #25864's apps/ios-only landing carried a wall-clock
+  // assertion that kept every open PR's merged-tree guard red for ~53h while
+  // main's own push stayed green (JOV-13095). On landing events run the full
+  // lists too, so the break reds main/merge-group itself instead of
+  // stranding PRs on stale heads.
+  const landingEvent = event === 'push' || event === 'merge_group';
   const dependentScriptTests =
     selected.has('operations') || !changed?.length
       ? []
-      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
+      : landingEvent
+        ? SCRIPT_CONTRACT_NODE_TESTS
+        : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2903,6 +3018,12 @@ export async function runStructural(opts = {}) {
     ...scriptContractNodeArgs(dependentScriptTests).map(
       args => `node ${args.join(' ')}`
     ),
+    // The vitest half of the script contracts (workspace-scripts project:
+    // wall-clock ratchet, copy inventory, ...) is otherwise operations-only.
+    // Reuse the same command operations runs; operations still runs it once.
+    ...(landingEvent && !selected.has('operations')
+      ? [SCRIPT_CONTRACT_VITEST_COMMAND]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
@@ -3313,5 +3434,9 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 ) {
-  await main();
+  if (process.argv[2] === '--run-source-guard-pool') {
+    process.exitCode = await runSourceGuardPoolCli(process.argv[3]);
+  } else {
+    await main();
+  }
 }
