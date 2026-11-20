@@ -42,6 +42,7 @@ export function buildOnboardingSettings(
         state.artist?.id ?? verification?.spotifyArtistId ?? null,
       selectedSpotifyArtistName:
         state.artist?.name ?? verification?.artistName ?? null,
+      ...(state.catalogPreview ? { catalogPreview: state.catalogPreview } : {}),
       socialLinks: [...state.socialLinks],
       interviewSignalCount: state.interviewSignals.length,
       profileDraft: state.profileDraft ?? null,

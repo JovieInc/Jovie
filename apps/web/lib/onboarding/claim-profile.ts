@@ -376,7 +376,14 @@ async function persistClaimedProfileWithHandleRetry({
             handle,
             existingProfile,
             displayName:
-              state.artist?.name ?? existingProfile?.displayName ?? handle,
+              state.artist?.name ??
+              (unproven &&
+              verification &&
+              !requiresClaimVerification(verification.reach)
+                ? verification.artistName
+                : null) ??
+              existingProfile?.displayName ??
+              handle,
             settings: buildOnboardingSettings(
               existingProfile?.settings,
               state,
@@ -573,9 +580,11 @@ async function materializeProfile({
     }
   }
 
+  const resolvedArtistName =
+    state.artist?.name ?? verification?.artistName ?? null;
   const artistLabel = describeArtistProfileForVisitor({
     ownershipVerified: true,
-    artistName: state.artist?.name ?? null,
+    artistName: resolvedArtistName,
   });
 
   await db.insert(chatAuditLog).values({
@@ -591,8 +600,9 @@ async function materializeProfile({
       status,
       visibility: reserved ? 'reserved' : unproven ? 'unproven' : 'public',
       waitlistEntryId,
-      spotifyArtistId: state.artist?.id ?? null,
-      spotifyArtistName: state.artist?.name ?? null,
+      spotifyArtistId:
+        state.artist?.id ?? verification?.spotifyArtistId ?? null,
+      spotifyArtistName: resolvedArtistName,
       // Neutral, ownership-verified label (never pre-verify "you" language).
       artistProfileLabel: artistLabel,
     },

@@ -144,14 +144,13 @@ async function createWaitlistReceipt(params: {
     reach: state.artist?.followers ?? null,
   });
 
-  // Best leads first: the score and every input are stored on the entry. The
-  // catalog is not measurable before the identity is linked, so it is null.
+  // Best leads first: the score and every input are stored on the entry.
   const admissionScore = scoreAdmissionCandidate({
     identityResolved: Boolean(state.artist?.id),
     followers: state.artist?.followers ?? null,
     popularity: state.artist?.popularity ?? null,
-    catalogReleases: null,
-    latestReleaseAt: null,
+    catalogReleases: state.catalogPreview?.total ?? null,
+    latestReleaseAt: state.catalogPreview?.releases[0]?.releaseDate ?? null,
     releaseStage:
       state.interviewSignals.findLast(signal => signal.releaseStage)
         ?.releaseStage ?? null,

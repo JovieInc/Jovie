@@ -6,6 +6,10 @@ import {
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
 import {
+  type OnboardingCatalogPreview,
+  readOnboardingCatalogPreview,
+} from '@/lib/onboarding/catalog-preview';
+import {
   type OnboardingProfileDraft,
   readOnboardingProfileDraft,
 } from '@/lib/onboarding/profile-draft';
@@ -23,6 +27,7 @@ export interface ClaimedOnboardingArtist {
 
 export interface ClaimedOnboardingState {
   readonly profileDraft?: OnboardingProfileDraft | null;
+  readonly catalogPreview?: OnboardingCatalogPreview | null;
   readonly artist: ClaimedOnboardingArtist | null;
   readonly handle: string | null;
   readonly socialLinks: readonly string[];
@@ -117,6 +122,7 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   events: readonly PersistedToolEvent[]
 ): ClaimedOnboardingState {
   let artist: ClaimedOnboardingArtist | null = null;
+  let catalogPreview: OnboardingCatalogPreview | null = null;
   let handle: string | null = null;
   const socialLinks: string[] = [];
   const interviewSignals: InterviewSignal[] = [];
@@ -127,7 +133,11 @@ export function deriveClaimedOnboardingStateFromToolEvents(
 
     if (output) {
       profileDraft = readOnboardingProfileDraft(output) ?? profileDraft;
-      artist = readArtist(output) ?? artist;
+      const nextArtist = readArtist(output);
+      if (nextArtist) {
+        artist = nextArtist;
+        catalogPreview = readOnboardingCatalogPreview(output.catalogPreview);
+      }
 
       if (
         output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED ||
@@ -148,6 +158,7 @@ export function deriveClaimedOnboardingStateFromToolEvents(
 
   return {
     ...(profileDraft ? { profileDraft } : {}),
+    ...(catalogPreview ? { catalogPreview } : {}),
     artist,
     handle,
     socialLinks: Array.from(
