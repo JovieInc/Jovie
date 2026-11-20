@@ -423,4 +423,25 @@ extension ObservabilityTests {
     #expect(ObservabilityRedactor.sanitizedValue(nonce, key: key) as? String == ObservabilityRedactor.filteredValue)
     #expect(ObservabilityRedactor.sanitizedValue("callback \(key)=\(nonce)") as? String == ObservabilityRedactor.filteredValue)
   }
+
+  @Test func authCancelFailAndRetryUseDistinctEventNames() {
+    #expect(ObservabilityEvent.authCancelled.rawValue == "auth_cancelled")
+    #expect(ObservabilityEvent.authFailed.rawValue == "auth_failed")
+    #expect(ObservabilityEvent.authPresentationRetry.rawValue == "auth_presentation_retry")
+    #expect(ObservabilityEvent.authCancelled != ObservabilityEvent.authFailed)
+    #expect(ObservabilityEvent.authFailed != ObservabilityEvent.authPresentationRetry)
+    #expect(ObservabilityEvent.profileUrlCopied.rawValue == "profile_url_copied")
+    #expect(ObservabilityEvent.profileSharePresented.rawValue == "profile_share_presented")
+  }
+
+  @Test func mobileAuthFailureReasonIsStableMachineToken() {
+    #expect(mobileAuthFailureReason(for: MobileAuthCoordinatorError.invalidAuthURL) == "invalid_auth_url")
+    #expect(mobileAuthFailureReason(for: MobileAuthCoordinatorError.sessionStartFailed) == "session_start_failed")
+    #expect(mobileAuthFailureReason(for: MobileAuthCoordinatorError.missingCallbackURL) == "missing_callback_url")
+    #expect(
+      mobileAuthFailureReason(for: MobileAuthCoordinatorError.randomGenerationFailed(errSecNotAvailable))
+        == "random_generation_failed"
+    )
+    #expect(mobileAuthFailureReason(for: NSError(domain: "other", code: 1)) == "browser_auth_failed")
+  }
 }
