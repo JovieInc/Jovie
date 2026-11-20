@@ -917,6 +917,24 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
+      - name: Resolve MQ parity tools for older source heads
+        id: mq-parity-tools
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          tool_root="$GITHUB_WORKSPACE"
+          if [[ ! -f scripts/ci/mq-parity-scope.mjs ]]; then
+            # A PR cut before these tools landed still uses current base policy.
+            # Keep the tools outside its checkout so the merged guard transaction
+            # can add the same paths without an untracked-file merge conflict.
+            tool_root="$(mktemp -d "$RUNNER_TEMP/mq-parity-tools.XXXXXX")"
+            git archive "origin/$BASE_REF" scripts/ci/mq-parity-scope.mjs \
+              scripts/lib/ci-repo-lanes.mjs | tar -x -C "$tool_root"
+          fi
+          echo "root=$tool_root" >> "$GITHUB_OUTPUT"
+          echo "MQ_PARITY_TOOLS_ROOT=$tool_root" >> "$GITHUB_ENV"
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -942,12 +960,28 @@ jobs:
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
+      # JOV-13071 slice: reuse required source runners for the typecheck twin.
+      # Combined-head jobs stay intact; no second matrix or pre-push hook.
+      - name: Select MQ parity scope
+        id: mq-parity
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: |
+          set -euo pipefail
+          node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$BASE_SHA" >> "$GITHUB_OUTPUT"
       - name: Setup Node.js and pnpm
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true'))
+        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true'))
         uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright warm path
         if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
+      - name: Run typecheck lane parity
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        env:
+          CI_FAST_LANE_GROUP: typecheck
+          TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
+        run: node scripts/ci-fast-lanes.mjs
       - name: Load quarantined unit tests
         id: quarantine
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
