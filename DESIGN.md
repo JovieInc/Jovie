@@ -32,21 +32,18 @@ instructions, use this order:
    skills. These are implementation aids or historical evidence, never
    authority over the sources above.
 
-**Pen is the only publishable design SoT** (canvas and art direction). Color
-authority is Pen node **ZiaWI** (`ziawi-color-sot-v1` in
+**Pen is the only publishable design SoT** (canvas and art direction). Color:
+Pen node **ZiaWI** (`ziawi-color-sot-v1` in
 `apps/web/design/ziawi-color-sot.json`). React tokens, OKLCH projections, and
 CSS emitters must match ZiaWI (ion `#11AFFF`, ultra/pulse/mint/orange/red,
-exactly 5 elevations). Do not invent a parallel React-only color root.
+exactly 5 elevations). No parallel React-only color root. Figma/Paper are
+scratch/reference; Figma MCP is an optional bridge, never design authority.
 
-Figma and Paper are scratch or reference only. Figma MCP may bridge Code
-Connect / import-export when Tim’s plan allows it; it is never design
-authority and never a publishable SoT path.
-
-Unmapped Pen components are not source-backed into code registries until their
-identity maps to the current source registry and the required save/readback
-evidence exists. Source identities do not become Pen masters by visual
-resemblance. Keep one canonical master or family per source concept; express
-supported states as variants and consume them as instances.
+Unmapped Pen components are not source-backed until their identity maps to the
+current source registry and the required save/readback evidence exists. Source
+identities do not become Pen masters by visual resemblance. Keep one canonical
+master or family per source concept; express supported states as variants and
+consume them as instances.
 
 Founder-facing review surfaces contain only canonical masters and intentional
 variants. Receipts, mappings, duplicate explorations, status copy, and process
