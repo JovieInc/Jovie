@@ -56,7 +56,8 @@ describe('quota sampling and resource collection', () => {
         queries.push(path);
         if (path.includes('/workflows/')) {
           const range = new URL(
-            `https://api.github.com/${path}`
+            path,
+            'https://quota-fixture.invalid/'
           ).searchParams.get('created');
           const [from, to] = range.split('..').map(value => Date.parse(value));
           expect(to - from).toBe(3600000);
