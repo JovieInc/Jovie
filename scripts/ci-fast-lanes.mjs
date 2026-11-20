@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -901,6 +899,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/typecheck-native-qualification.test.mjs',
   'scripts/lib/native-typecheck-evidence.test.mjs',
   'scripts/lib/native-typecheck-graph.test.mjs',
+  'scripts/lib/native-typecheck-redirect.test.mjs',
+  'scripts/lib/native-typecheck-redirect-worker.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -908,6 +908,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-process-timeout.test.mjs',
   'scripts/lib/preflight-failure-summary.test.mjs',
   'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-changed-format.test.mjs',
@@ -974,6 +975,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/product-crawl/closed-in-production.test.mjs',
+  'scripts/product-crawl/crawl.test.mjs',
   'scripts/product-crawl/orphaned-overlays.test.mjs',
   'scripts/product-crawl/overlay-walk.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
@@ -1342,6 +1344,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
 ]);
@@ -2750,7 +2753,7 @@ export async function runStructural(opts = {}) {
     API_CLIENT_PY_COMMAND,
     RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
-    'node --test .github/scripts/dependency-parity-evidence.test.mjs',
+    'node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-run.test.mjs',

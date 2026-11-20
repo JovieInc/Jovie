@@ -72,9 +72,9 @@
     "setup-share-profile": {
       "width": 764,
       "height": 568,
-      "sourceHash": "e4898ca748cf2032e179aff8da077113b933a569fbe242f7996d26584f4d6978",
+      "sourceHash": "b901372137dab7ba44a4b21f142d09361251bf69bfdf98ceca5801be0b15d827",
       "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
-      "renderedAt": "2026-11-16T07:17:03.451Z",
+      "renderedAt": "2026-11-17T03:01:03.193Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/demo/demo-profile-showcase-states.ts",
@@ -83,8 +83,8 @@
         "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
       ],
       "bytes": {
-        "avif": 5088,
-        "webp": 9178
+        "avif": 4984,
+        "webp": 9286
       }
     }
   }

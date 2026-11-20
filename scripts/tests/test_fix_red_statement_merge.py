@@ -194,3 +194,60 @@ class SharedCloserItMergeTest(unittest.TestCase):
         self.assertEqual(
             statements.resolve_shared_closer_it_text(self.conflict(same, same)),
             "  it('same', () => {\n    expect(1).toBe(1);\n  });\n")
+
+
+class ContainedAddAddTests(unittest.TestCase):
+    def test_real_add_add_keeps_main_tests_and_refuses_changed_or_ambiguous_content(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            work = Path(scratch)
+            def sh(args, **kwargs):
+                return subprocess.run(args, cwd=work, capture_output=True, text=True)
+            def git(*args):
+                result = sh(["git", *args])
+                self.assertEqual(result.returncode, 0, result.stderr)
+            git("init", "-q", "-b", "main")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.test")
+            git("config", "commit.gpgsign", "false")
+            git("config", "core.hooksPath", str(work / "hooks"))
+            git("commit", "--allow-empty", "-qm", "base")
+            git("branch", "feature")
+            rel = "autostart.test.ts"
+            target = work / rel
+            head = ("import { describe, it, expect } from 'vitest';\n"
+                    "describe('autostart', () => {\n"
+                    "  it('refusal fails', () => { expect(false).toBe(false); });\n"
+                    "});\n")
+            extra = ("\n  it.each(['flag-off', 'recent-cycle'])(\n"
+                     "    'skip %s succeeds', status => { expect(status).toBeTruthy(); }\n"
+                     "  );\n")
+            main = head[:-4] + extra + head[-4:]
+            target.write_text(main)
+            git("add", rel)
+            git("commit", "-qm", "main tests")
+            git("checkout", "-q", "feature")
+            target.write_text(head)
+            git("add", rel)
+            git("commit", "-qm", "head tests")
+            self.assertEqual(sh(["git", "merge", "--no-commit", "main"]).returncode, 1)
+            self.assertEqual(edits.resolve_additive_statement_file(work, rel, sh), main)
+            self.assertIn("<<<<<<<", target.read_text())
+            # Changing a retained assertion is never containment.
+            for candidate in (
+                main.replace('toBe(false)', 'toBe(true)'),
+                main.replace(extra, "  const value = 1;\n"),
+                main.replace(extra, "  it('broken', () => { const value = ; });\n"),
+                main.replace(extra, "  // it('fake', () => {});\n"),
+            ):
+                with self.subTest(candidate=candidate):
+                    def changed(args, **kwargs):
+                        if args == ['git', 'show', f':3:{rel}']:
+                            return SimpleNamespace(returncode=0, stdout=candidate)
+                        return sh(args, **kwargs)
+                    self.assertIsNone(edits.resolve_additive_statement_file(work, rel, changed))
+            self.assertIsNone(edits.resolve_additive_statement_file(work, 'source.ts', sh))
+            def unavailable(args, **kwargs):
+                if args[0] == 'node':
+                    return SimpleNamespace(returncode=1, stdout='')
+                return sh(args, **kwargs)
+            self.assertIsNone(edits.resolve_additive_statement_file(work, rel, unavailable))

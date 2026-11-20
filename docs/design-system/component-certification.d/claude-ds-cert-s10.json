@@ -1,0 +1,85 @@
+{
+  "gates": {
+    "apps/web/components/features/release/ReleaseCountdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ReleaseCreditsDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ScheduledReleasePage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/SmartLinkArtwork.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/SmartLinkProviderButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/UnreleasedReleaseHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/share/PublicShareMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/release/ReleaseCreditsDrawer.tsx": {
+      "permission-denied": "The drawer has no permission or gated state. The detector matched the credit role in `<section key={group.role} aria-labelledby={`credits-${group.role}`}>` (roles such as producer)."
+    },
+    "apps/web/components/features/release/ScheduledReleasePage.tsx": {
+      "empty": "The page renders one release; it owns no collection. The detector matched items-center in `className='mt-5 flex w-full items-center justify-center rounded-xl ...'`.",
+      "permission-denied": "The page has no permission or gated state. The detector matched the doc comment `\"Coming Soon\" page for unreleased content from free-plan creators.`"
+    },
+    "apps/web/components/features/release/SmartLinkArtwork.tsx": {
+      "empty": "The artwork renders one image or its placeholder glyph; it owns no collection. The detector matched items-center in `<div className='flex h-full w-full items-center justify-center'>`, and the missing-artwork case is PartialNoArtwork."
+    },
+    "apps/web/components/features/release/SmartLinkProviderButton.tsx": {
+      "empty": "A provider row renders one label and optional icon; it owns no collection. The detector matched items-center in SMART_LINK_PRIMARY_PROVIDER_BUTTON_CLASSNAME ('group flex min-h-13 w-full items-center ...')."
+    },
+    "apps/web/components/features/share/PublicShareMenu.tsx": {
+      "empty": "The rows come from PUBLIC_SHARE_DESTINATIONS, a fixed constant of five destinations in lib/share/destinations.ts, so the list can never be empty (`{PUBLIC_SHARE_DESTINATIONS.map(destination => (`)."
+    }
+  }
+}

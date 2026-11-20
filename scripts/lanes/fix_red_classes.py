@@ -25,6 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import fix_red_size_split
 import machine_gap
 import migration_renumber
 import remediation
@@ -167,6 +168,7 @@ SIGNATURES = (
     ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
     ("tree-byte-budget", TREE_BYTE_BUDGET, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    ("copy-registry-gap", re.compile(r"✖ committed ID registry covers every extracted row"), SYNC_MAIN),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
@@ -204,19 +206,22 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
+        hit = fix_red_size_split.legacy_hit(text, hit)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
             hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes & {"size-baseline-grew", "copy-registry-gap"} and all(item_action == SYNC_MAIN for _, item_action in per_check):
+        cls, action = BEHIND_CLASS, SYNC_MAIN
     elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
         import fix_red_compose
         cls, action, actions = fix_red_compose.composed_route(

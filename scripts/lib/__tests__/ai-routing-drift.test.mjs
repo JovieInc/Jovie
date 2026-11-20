@@ -24,10 +24,37 @@ describe('routing.json shape', () => {
   it('declares a ceiling for every Gateway-key caller and never routes banned providers', () => {
     const ceilings = declaredCeilings(routing);
     expect(ceilings.Jovie_Production).toBeCloseTo(0.8);
-    expect(ceilings['jovie-golden-path-review']).toBe(0.1);
+    expect(ceilings['jovie-golden-path-review']).toBeUndefined();
     expect(ceilings[OIDC_KEY]).toBeGreaterThan(0);
     for (const m of declaredGatewayModels(routing))
       expect(m).not.toMatch(/^(openai|anthropic)\//u);
+  });
+});
+
+describe('shipping reviewer policy', () => {
+  it('declares Cloudflare only and detects residual Gateway spend', () => {
+    expect(
+      routing.callers.find(c => c.id === 'ci.golden-path-review')
+    ).toMatchObject({
+      route: 'workers-ai-only',
+      fallback: null,
+      gatewayKey: null,
+      models: ['@cf/zai-org/glm-5.3-flash'],
+    });
+    expect(
+      evaluateRouting({
+        routing,
+        days: 1,
+        keyRows: [row('jovie-golden-path-review', 1)],
+        modelRows: [],
+        health: {},
+      }).findings
+    ).toEqual([
+      expect.objectContaining({
+        type: 'undeclared-gateway-key',
+        subject: 'jovie-golden-path-review',
+      }),
+    ]);
   });
 });
 
@@ -50,7 +77,7 @@ describe('evaluateRouting', () => {
     days: 2,
     keyRows: [
       row('Jovie_Production', 0.2),
-      row('jovie-golden-path-review', 0.1),
+      row('Jovie_Production', 0.1),
       row(null, 0.4),
     ],
     modelRows: [model('zai/glm-5.3-flash', 0.7)],
@@ -70,16 +97,16 @@ describe('evaluateRouting', () => {
     expect(result.workersAiUsdPerDay).toBe(0.8);
   });
 
-  it('flags a workers-first caller whose key still spends like the Gateway is primary', () => {
+  it('flags a declared key spending above its Gateway ceiling', () => {
     const { findings } = evaluateRouting({
       ...calm,
-      keyRows: [row('jovie-golden-path-review', 2.8)],
+      keyRows: [row('Jovie_Production', 2.8)],
     });
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({
       type: 'gateway-over-ceiling',
       severity: 'high',
-      subject: 'jovie-golden-path-review',
+      subject: 'Jovie_Production',
       usdPerDay: 1.4,
     });
   });
@@ -89,13 +116,13 @@ describe('evaluateRouting', () => {
       ...calm,
       keyRows: [
         {
-          api_key_name: 'jovie-golden-path-review',
+          api_key_name: 'Jovie_Production',
           total_cost: 2.8,
           request_count: 3000,
         },
       ],
     });
-    expect(result.byKey['jovie-golden-path-review']).toMatchObject({
+    expect(result.byKey.Jovie_Production).toMatchObject({
       usdPerDay: 1.4,
       requestsPerDay: 1500,
     });
