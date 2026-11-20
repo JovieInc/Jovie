@@ -98,3 +98,8 @@ attached canvas moves mtime.
 
 `pen-save-receipt/v1` remains editor-state evidence at handback. It does
 not replace this mtime gate. See [`PEN_SAVE_RECEIPT.md`](PEN_SAVE_RECEIPT.md).
+
+Handback for product sync uses the data-backed ship path (JOV-13853): this
+mtime persist receipt + lease save + registry map + code PR — never a `.pen`
+blob through CI. See
+[`docs/design-system/DATA_BACKED_SHIP_PATH.md`](../../docs/design-system/DATA_BACKED_SHIP_PATH.md).
