@@ -499,7 +499,11 @@ def x_post_item(post: dict) -> dict:
 
 
 def poll_x(state: dict, config: dict, env, now: float, search=None) -> tuple[list[dict], dict]:
-    """New posts from the tracked accounts: one Grok CLI call per run, capped per day."""
+    """New posts from tracked accounts: one Grok call per REFRESH_INTERVAL_S, capped per day.
+
+    Failed runs shorten nextAttemptAt to 1h so feeds can recover, but X must not burn a
+    Grok seat call on those feed-only retries (DEFAULT_GROK_CALLS_PER_DAY assumes 6h slots).
+    """
     x = state.setdefault("x", {})
     day = now_iso(now)[:10]
     if x.get("day") != day:
@@ -509,9 +513,14 @@ def poll_x(state: dict, config: dict, env, now: float, search=None) -> tuple[lis
         return [], {"status": "disabled"}
     if x["calls"] >= cap:
         return [], {"status": "capped", "calls": x["calls"]}
+    last_polled = epoch(x.get("lastPolledAt") or "")
+    if last_polled is not None and now - last_polled < REFRESH_INTERVAL_S:
+        return [], {"status": "deferred", "callsToday": x["calls"],
+                    "nextEligibleAt": now_iso(last_polled + REFRESH_INTERVAL_S)}
     since = (x.get("lastCreatedAt") or now_iso(now - 2 * 86400))[:10]
     search = search or x_grok.search_posts
     x["calls"] += 1
+    x["lastPolledAt"] = now_iso(now)
     found = search(config["accounts"], config["queries"], since, env=env)
     x["costUsd"] = round(x["costUsd"] + float(found.get("costUsd") or 0.0), 6)
     seen = x.get("seen", [])
