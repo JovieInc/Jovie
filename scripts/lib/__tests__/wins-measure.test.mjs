@@ -304,7 +304,7 @@ test('measure-due: all queryable metrics succeed atomically', async () => {
   assert.equal(winStatus(win), 'verified');
 });
 
-test('shipping-slo workflow measures due wins into the store after the snapshot', () => {
+test('shipping-slo workflow measures due wins before branch checkouts', () => {
   const text = readFileSync(
     join(
       resolve(import.meta.dirname, '../../..'),
@@ -313,12 +313,17 @@ test('shipping-slo workflow measures due wins into the store after the snapshot'
     'utf8'
   );
   const doc = /** @type {any} */ (load(text));
-  const steps = doc.jobs.measure.steps.map(s => s.run ?? '').join('\n');
-  assert.match(steps, /measure-due --store/);
-  assert.match(steps, /wins-ledger\.mjs/);
-  assert.doesNotMatch(
-    steps.split('Measure due wins')[1] ?? '',
-    /git (commit|push)|canon\/wins\/wins\.jsonl/
-  );
+  const steps = doc.jobs.measure.steps;
+  const names = steps.map(s => s.name ?? '');
+  const measureIdx = names.indexOf('Measure due wins into the runtime store');
+  const snapshotIdx = names.indexOf('Open latest snapshot PR');
+  const ratchetIdx = names.indexOf('Open baseline ratchet PR');
+  const slack = steps.find(s => s.name === 'Slack alert on regressions');
+  assert.ok(measureIdx > 0, 'measure-due step present');
+  assert.ok(measureIdx < snapshotIdx, 'measure-due before snapshot branch');
+  assert.ok(measureIdx < ratchetIdx, 'measure-due before ratchet checkout');
+  assert.equal(steps[measureIdx].continueOnError ?? steps[measureIdx]['continue-on-error'], true);
+  assert.match(String(slack?.if ?? ''), /always\(\)/);
+  assert.match(steps.map(s => s.run ?? '').join('\n'), /measure-due --store/);
   assert.ok(doc.on.schedule || doc.on.workflow_dispatch);
 });

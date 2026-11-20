@@ -146,6 +146,24 @@ jobs:
             echo "samples=$SAMPLES"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Measure due wins into the runtime store
+        # Immediately after --write-latest so JSON field-path adapters see the
+        # fresh snapshot. Must run before snapshot/ratchet steps that switch
+        # git branches (those reset the working tree to origin/main).
+        # continue-on-error: advisory — never suppress snapshot/intake/Slack.
+        # Receipts stay in the runtime store (data vs behaviour).
+        id: wins-measure
+        continue-on-error: true
+        if: ${{ !cancelled() }}
+        env:
+          SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
+          SUMMER_STORE_TOKEN: ${{ secrets.SUMMER_STORE_TOKEN }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY"
+
       # Merge to live per production promotion (alias move), last 10: p50/p95
       # and the slowest stage. REST only, so a GraphQL shed cannot blank it.
       - name: Measure merge-to-live lead time
@@ -278,23 +296,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Measure due wins into the runtime store
-        # After the SLO snapshot so JSON field-path adapters see fresh numbers.
-        # Receipts + measure report stay in the runtime store (data vs behaviour);
-        # never commit receipts into canon/wins/wins.jsonl. Unqueryable dues are
-        # explicit needs-probe skips — no fragile scrapers in v1.
-        if: ${{ !cancelled() }}
-        env:
-          SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
-          SUMMER_STORE_TOKEN: ${{ secrets.SUMMER_STORE_TOKEN }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          GITHUB_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY"
-
       - name: Slack alert on regressions
-        if: ${{ steps.slo.outputs.regressions != '0' && env.SLACK_WEBHOOK_URL != '' }}
+        # always(): do not suppress alerts when an earlier advisory step fails.
+        if: ${{ always() && !cancelled() && steps.slo.outputs.regressions != '0' && env.SLACK_WEBHOOK_URL != '' }}
         env:
           COUNT: ${{ steps.slo.outputs.regressions }}
         run: |
