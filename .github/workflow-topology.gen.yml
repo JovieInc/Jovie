@@ -1363,7 +1363,7 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
-  - name: Security Advisory Loop (Linear devin lane)
+  - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
     category: source-validation
