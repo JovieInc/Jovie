@@ -92,7 +92,7 @@
       ".github/actions/**",
       ".github/scripts/**"
     ],
-    "bodySha256": "ab6e1ef736a3788ac1fba123dd562ca3a26007affe6331fe2badd74b5ddb55f1"
+    "bodySha256": "bc62cf8f075ebef2862467117d0fa78d1483e27b8a82c8ccf7fc44771c24b737"
   },
   {
     "file": ".claude/rules/infra.md",
