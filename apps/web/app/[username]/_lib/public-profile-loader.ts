@@ -19,7 +19,10 @@ import { resolveEffectivePlan } from '@/lib/entitlements/creator-plan';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
-import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
+import {
+  isPublicProfilePublished,
+  isYoungAudienceProfile,
+} from '@/lib/profile/public-profile-access';
 import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -46,8 +49,11 @@ export interface PublicProfileLoaderResult {
    * Creator's own Meta pixel ID when the creator is entitled to ad pixels
    * (canAccessAdPixels) and has Meta enabled in dashboard pixel config.
    * Null otherwise — the browser pixel never fires for unentitled creators.
+   * Also null when the profile is marked young-audience (TRK-6).
    */
   readonly creatorMetaPixelId: string | null;
+  /** TRK-6: owner opted this profile into young-audience pixel suppress. */
+  readonly youngAudience: boolean;
   readonly genres: string[] | null;
   readonly latestRelease: DiscogRelease | null;
   readonly pressPhotos: PressPhoto[];
@@ -61,6 +67,7 @@ const RESERVED_PROFILE_NOT_FOUND: PublicProfileLoaderResult = {
   creatorIsPro: false,
   creatorClerkId: null,
   creatorMetaPixelId: null,
+  youngAudience: false,
   genres: null,
   latestRelease: null,
   pressPhotos: [],
@@ -175,6 +182,7 @@ const fetchProfileAndLinks = async (
         creatorIsPro: false,
         creatorClerkId: null,
         creatorMetaPixelId: null,
+        youngAudience: false,
         genres: null,
         latestRelease: null,
         pressPhotos: [],
@@ -199,6 +207,7 @@ const fetchProfileAndLinks = async (
         creatorIsPro: false,
         creatorClerkId: null,
         creatorMetaPixelId: null,
+        youngAudience: false,
         genres: null,
         latestRelease: null,
         pressPhotos: [],
@@ -247,10 +256,13 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
     const latestRelease = result.latestRelease ?? null;
-    const creatorMetaPixelId = await getCreatorMetaPixelId(
-      result.id,
-      normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
-    );
+    const youngAudience = isYoungAudienceProfile(result.settings);
+    const creatorMetaPixelId = youngAudience
+      ? null
+      : await getCreatorMetaPixelId(
+          result.id,
+          normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
+        );
 
     return {
       profile,
@@ -259,6 +271,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro,
       creatorClerkId,
       creatorMetaPixelId,
+      youngAudience,
       genres: result.genres ?? null,
       latestRelease,
       pressPhotos: result.pressPhotos ?? [],
@@ -281,6 +294,7 @@ const fetchProfileAndLinks = async (
       creatorIsPro: false,
       creatorClerkId: null,
       creatorMetaPixelId: null,
+      youngAudience: false,
       genres: null,
       latestRelease: null,
       pressPhotos: [],
@@ -417,10 +431,17 @@ async function withFreshEntitlements(
     creatorIsPro: Boolean(authority.userIsPro),
     creatorClerkId:
       typeof authority.userClerkId === 'string' ? authority.userClerkId : null,
-    creatorMetaPixelId: await getCreatorMetaPixelId(
-      authority.id,
-      normalizeCreatorPixelPlan(authority.userPlan, authority.userTrialEndsAt)
-    ),
+    // Preserve TRK-6 suppress from the body; do not re-arm pixels after
+    // entitlement refresh when the profile is marked young-audience.
+    creatorMetaPixelId: body.youngAudience
+      ? null
+      : await getCreatorMetaPixelId(
+          authority.id,
+          normalizeCreatorPixelPlan(
+            authority.userPlan,
+            authority.userTrialEndsAt
+          )
+        ),
   };
 }
 

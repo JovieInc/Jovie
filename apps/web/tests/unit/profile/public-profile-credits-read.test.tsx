@@ -98,6 +98,7 @@ const PROFILE_RESULT = {
   creatorIsPro: false,
   creatorClerkId: 'user-1',
   creatorMetaPixelId: null,
+  youngAudience: false,
   genres: ['house'],
   latestRelease: { id: 'release-1', title: 'Latest Track', slug: 'latest' },
   pressPhotos: [],

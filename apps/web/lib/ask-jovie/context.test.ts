@@ -48,6 +48,7 @@ function loaderResult(
     creatorIsPro: false,
     creatorClerkId: null,
     creatorMetaPixelId: null,
+    youngAudience: false,
     genres: ['pop'],
     latestRelease: null,
     pressPhotos: [],

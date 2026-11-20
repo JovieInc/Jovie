@@ -285,9 +285,11 @@ async function ArtistPageContent({
     creatorIsPro,
     creatorClerkId,
     creatorMetaPixelId,
+    youngAudience,
     latestRelease,
     pressPhotos,
   } = profileResult;
+  const pixelsAllowed = !youngAudience; // TRK-6 young-audience suppress
 
   if (status === 'error') {
     return <PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />;
@@ -489,13 +491,10 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke || isClaimed ? null : (
         <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
       )}
-      {/* Server-side pixel tracking */}
-      {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
-      {/* Browser Meta pixel (fbq) — builds the retargeting website custom
-          audience; CAPI alone cannot (JOV-5078). Creator pixel is
-          entitlement-gated in the loader; the Jovie platform pixel is the
-          customer-one retarget path. */}
-      {isPublicNoAuthSmoke ? null : (
+      {isPublicNoAuthSmoke || !pixelsAllowed ? null : (
+        <JoviePixel profileId={profile.id} />
+      )}
+      {isPublicNoAuthSmoke || !pixelsAllowed ? null : (
         <MetaPixel
           pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
             (id): id is string => Boolean(id)

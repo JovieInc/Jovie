@@ -30,6 +30,10 @@ vi.mock('@/lib/queries', async importOriginal => ({
   }),
 }));
 
+vi.mock('@/lib/queries/useSettingsMutation', () => ({
+  useUpdateSettingsMutation: () => ({ mutateAsync: vi.fn() }),
+}));
+
 function wrap(node: ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -133,6 +137,30 @@ describe('DataPrivacySection', () => {
       )
     );
     expect(screen.getByText('Delete your account')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows young-audience and discovery toggles for the selected profile', async () => {
+    const artist = {
+      id: 'owner-profile',
+      owner_user_id: 'owner',
+      handle: 'artist',
+      spotify_id: '',
+      name: 'Artist',
+      published: true,
+      is_verified: false,
+      is_featured: false,
+      marketing_opt_out: false,
+      created_at: '2026-10-17T00:00:00Z',
+      settings: { searchable: false, youngAudience: false },
+    };
+    const { container } = render(wrap(<DataPrivacySection artist={artist} />));
+    expect(
+      screen.getByRole('switch', { name: 'Young audience' })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('switch', { name: 'Show in Jovie discovery' })
+    ).not.toBeChecked();
     await expectNoA11yViolations(container);
   });
 });

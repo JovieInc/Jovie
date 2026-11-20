@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: October 2026_
+_Last updated: November 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -13,6 +13,8 @@ Jovie exists so you can share your story with confidence. That means keeping you
 ### Age Requirement
 
 Jovie is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will promptly delete it. If you believe a child under 13 has provided us with personal information, please contact privacy@jov.ie.
+
+Creators can mark a public profile as intended for a young audience. When that setting is on, advertising pixels and retargeting forwarding stay off on that profile.
 
 ### Account Information
 
@@ -76,6 +78,18 @@ To limit abuse, we limit how many requests a caller can make to the connector, a
 ### Profiles Built Before They Are Claimed
 
 Separately from the connector, Jovie may create an artist profile page from publicly available music data before the artist has a Jovie account. An unclaimed profile may be shown publicly or held private, depending on how and when it was created. The artist can claim it by signing in through a claim link or the profile's claim page. To ask us to remove an unclaimed profile, contact privacy@jov.ie.
+
+### Audience and visitor data
+
+Public artist profiles and related pages may collect data about visitors and fans, separately from a Jovie account:
+
+- **Fan and subscriber contacts:** When someone signs up for alerts or notifications on an artist profile, we collect the email address and/or phone number they provide, plus the channels and categories they chose.
+- **SMS opt-ins:** If SMS alerts are offered and accepted, we store the phone number, the opt-in timestamp, and related consent records needed to send messages and honor opt-outs.
+- **Visitor analytics cookies:** We may set first-party cookies such as `jv_aid` (anonymous visitor identifier) and `jv_identified` (marks that a browser has been associated with a signed-in Jovie account) to de-duplicate profile visits and audience analytics. See the Cookie Policy for durations and controls.
+- **Visit and engagement signals:** Profile views, link clicks, approximate city/region, referrer, and device/browser details used for creator analytics and product reliability.
+- **Outreach to unclaimed artists:** When Jovie builds or contacts a profile before the artist has claimed it, we may use publicly available music and contact data, and we may email an address associated with that artist. To ask us to stop outreach or remove an unclaimed profile, contact privacy@jov.ie.
+
+Artists who collect fan contacts on Jovie use those contacts to message their audience. Jovie processes that audience data to provide the product. How an artist uses contacts outside Jovie is governed by that artist's own notices where required.
 
 ### Usage Data
 

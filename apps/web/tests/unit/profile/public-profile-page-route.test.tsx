@@ -256,6 +256,7 @@ const OK_RESULT: PublicProfileLoaderResult = {
   creatorIsPro: false,
   creatorClerkId: 'clerk-1',
   creatorMetaPixelId: null,
+  youngAudience: false,
   genres: ['house'],
   latestRelease: {
     id: 'release-1',
@@ -265,7 +266,6 @@ const OK_RESULT: PublicProfileLoaderResult = {
   pressPhotos: [],
   status: 'ok',
 };
-
 const EMPTY_CATALOG_RESULT: PublicProfileLoaderResult = {
   ...OK_RESULT,
   latestRelease: null,
