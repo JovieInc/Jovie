@@ -134,10 +134,7 @@ function consumeFromMemory(
   if (count <= rule.max) {
     return allowOpen();
   }
-  const retryAfter = Math.max(
-    1,
-    Math.ceil((existing.resetAtMs - now) / 1000)
-  );
+  const retryAfter = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
   return { allowed: false, retryAfter };
 }
 

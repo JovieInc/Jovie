@@ -69,9 +69,7 @@ describe('pathFromAuthRateLimitKey', () => {
       '/sign-in/email-otp'
     );
     expect(
-      pathFromAuthRateLimitKey(
-        'no-trusted-ip|/email-otp/send-verification-otp'
-      )
+      pathFromAuthRateLimitKey('no-trusted-ip|/email-otp/send-verification-otp')
     ).toBe('/email-otp/send-verification-otp');
   });
 });
@@ -163,9 +161,9 @@ describe('Better Auth Redis rate-limit storage (Upstash selected)', () => {
 
   it('still degrades open for non-sensitive auth paths when Redis is down', async () => {
     mocks.getRedis.mockReturnValue(null);
-    await expect(
-      authRateLimitStorage.consume('ip|/ok', rule)
-    ).resolves.toEqual({ allowed: true, retryAfter: null });
+    await expect(authRateLimitStorage.consume('ip|/ok', rule)).resolves.toEqual(
+      { allowed: true, retryAfter: null }
+    );
     await expect(
       authRateLimitStorage.consume('ip|/list-accounts', rule)
     ).resolves.toEqual({ allowed: true, retryAfter: null });
