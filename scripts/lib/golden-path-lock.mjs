@@ -52,6 +52,7 @@ export const MERGE_GATE_TEST_FILES = Object.freeze([
   'apps/web/tests/unit/onboarding/onboardingChatHelpers.errors.test.ts',
   'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
   'apps/web/tests/unit/api/waitlist/waitlist.test.ts',
+  'apps/web/tests/unit/certification/golden-path-cert-guardrails.test.ts',
 ]);
 
 export const GOLDEN_PATH_LOCK_SELF_TEST_FILES = Object.freeze([
@@ -93,6 +94,12 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/components/features/onboarding/',
   'apps/web/lib/onboarding/',
   'apps/web/lib/chat/',
+  'apps/web/lib/ovie/certifications/',
+  'apps/web/lib/acquisition/',
+  'scripts/prod-cert.mjs',
+  'scripts/lib/prod-cert',
+  'scripts/golden-path-cert-reuse.mjs',
+  'scripts/lib/golden-path-cert-reuse.mjs',
   'scripts/lib/golden-path-lock.mjs',
   'scripts/golden-path-lock.mjs',
   '.github/workflows/golden-path-prod-autofix.yml',
@@ -809,25 +816,9 @@ const FINISHED_AGENT_STATUSES = new Set(['FINISHED', 'ERROR', 'EXPIRED']);
  * @param {unknown} agents @param {string} [fingerprint] @returns {string[]}
  */
 export function findOwnedAgents(agents, fingerprint) {
-  const list = Array.isArray(agents) ? agents : [];
-  const needle = String(fingerprint ?? '');
-  if (!needle) return [];
-  const branch = autofixBranchPrefix(needle);
-  return list
-    .filter(agent => {
-      const record = /** @type {Record<string, unknown>} */ (agent ?? {});
-      if (FINISHED_AGENT_STATUSES.has(String(record.status ?? ''))) {
-        return false;
-      }
-      const haystack = JSON.stringify(agent ?? {}).toLowerCase();
-      return (
-        haystack.includes(needle.toLowerCase()) || haystack.includes(branch)
-      );
-    })
-    .map(agent => {
-      const record = /** @type {Record<string, unknown>} */ (agent ?? {});
-      return record.id;
-    })
+  return findOwnedAgentRecords(agents, fingerprint)
+    .filter(agent => !FINISHED_AGENT_STATUSES.has(String(agent.status ?? '')))
+    .map(agent => agent.id)
     .filter(
       /** @returns {id is string} */
       id => typeof id === 'string' && id.length > 0
@@ -835,7 +826,9 @@ export function findOwnedAgents(agents, fingerprint) {
 }
 
 /**
- * Full agent records whose serialized form mentions the fingerprint.
+ * Full agent records whose serialized form mentions the fingerprint or its
+ * deterministic autofix branch prefix (the Cursor list API omits prompt text).
+ * Includes finished records so 24h launch-rate accounting sees completed runs.
  * @param {unknown} agents @param {string} [fingerprint]
  * @returns {Record<string, unknown>[]}
  */
@@ -843,10 +836,15 @@ export function findOwnedAgentRecords(agents, fingerprint) {
   const list = Array.isArray(agents) ? agents : [];
   const needle = String(fingerprint ?? '');
   if (!needle) return [];
-  return list.filter(agent => {
-    const haystack = JSON.stringify(agent ?? {}).toLowerCase();
-    return haystack.includes(needle.toLowerCase());
-  });
+  const branch = autofixBranchPrefix(needle).toLowerCase();
+  return list
+    .filter(agent => {
+      const haystack = JSON.stringify(agent ?? {}).toLowerCase();
+      return (
+        haystack.includes(needle.toLowerCase()) || haystack.includes(branch)
+      );
+    })
+    .map(agent => /** @type {Record<string, unknown>} */ (agent ?? {}));
 }
 
 /** @param {unknown} agent @returns {number|null} epoch ms, or null when unparseable */
@@ -1009,12 +1007,7 @@ export async function executeAutofix({
         return findOwnedAgentRecords(agents, fingerprint);
       })()
     : [];
-  const ownedAgentIds = ownedAgents
-    .map(agent => agent.id)
-    .filter(
-      /** @param {unknown} id @returns {id is string} */
-      id => typeof id === 'string' && id.length > 0
-    );
+  const ownedAgentIds = findOwnedAgents(ownedAgents, fingerprint);
 
   const openPrs = githubToken
     ? (
