@@ -6,6 +6,8 @@ paths: ["apps/ios/**", "**/*.swift"]
 
 Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Better Auth via the browser PKCE flow, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. The Mac direction is SwiftUI/AppKit on shared iOS client foundations; Electron remains shipped until qualified cutover. Share platform-neutral client behavior and existing design owners while keeping UIKit/AppKit in platform shells — [`.claude/rules/macos.md`](macos.md).
 
+**Client boundary:** apply [native / web / Electron policy](../../canon/ENGINEERING.md#native--web--electron-boundary) before adding WKWebView shells, Safari handoffs, or claiming a web-only `/app/*` path in-app. Receipts for current surfaces (web-only workspaces, Settings billing handoff, public-profile WKWebView, LYB native health loop) live in [`docs/architecture/native-web-electron-decisions.md`](../../docs/architecture/native-web-electron-decisions.md). Core profile completion after `.needsOnboarding` stays native (see Physical-Device Acceptance).
+
 The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 
 Release channels follow [docs/IOS_RELEASE_CHANNELS.md](../../docs/IOS_RELEASE_CHANNELS.md): TestFlight is the dogfood rail, the App Store is stable, and in-app UI may only report provenance — never simulate a channel switch.

@@ -97,6 +97,9 @@ describe('decideFailingHead', () => {
     ]);
     expect(body).toContain('`PR Ready`');
     expect(body).toContain('`Migration Guard`');
+    expect(body).toContain('will not re-enter the queue');
+    expect(body).toContain('lane-fix-red');
+    expect(body).not.toContain('re-admits it when checks pass');
   });
 });
 
@@ -115,17 +118,20 @@ describe('stuckHead failing-head pass', () => {
     };
   };
 
-  it('dequeues, comments with the failing checks, and never enqueues or dispatches', async () => {
+  it('dequeues, labels lane-fix-red, comments with the failing checks, and never enqueues or dispatches', async () => {
     wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
+    routes['issues/23966/labels'] = {};
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeued: true });
     expect(dequeuePullRequest).toHaveBeenCalledWith(
       expect.objectContaining({ number: 23966 })
     );
     const posted = writes();
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain('issues/23966/comments');
-    expect(posted[0]).toContain('PR Ready');
+    expect(posted).toHaveLength(2);
+    expect(posted.some(c => c.includes('issues/23966/labels'))).toBe(true);
+    expect(posted.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
+    expect(posted.some(c => c.includes('issues/23966/comments'))).toBe(true);
+    expect(posted.find(c => c.includes('comments'))).toContain('PR Ready');
     expect(
       calls.some(c => /workflow run|enqueuePullRequest|jump/i.test(c))
     ).toBe(false);

@@ -414,4 +414,28 @@ describe('useOnboardingClaim', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('releases inflightTriggersRef when cancelled mid-flight so re-enabling can complete claim', async () => {
+    let resolveFirst!: (value: Response) => void;
+    const firstPromise = new Promise<Response>(resolve => {
+      resolveFirst = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstPromise)
+      .mockResolvedValueOnce(jsonResponse({ claimed: 1 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(<ClaimHarness trigger={0} enabled={true} />);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    rerender(<ClaimHarness trigger={0} enabled={false} />);
+    resolveFirst(jsonResponse({ claimed: 1 }));
+
+    rerender(<ClaimHarness trigger={0} enabled={true} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

@@ -69,7 +69,7 @@
     "trial_claim": 2
   },
   "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": {
-    "free_forever_claim": 2
+    "free_forever_claim": 1
   },
   "apps/web/components/features/admin/FunnelMetricsStrip.tsx": {
     "billing_claim": 1

@@ -4,6 +4,7 @@ import {
   type InteractionLatencySample,
   percentile,
 } from './performance-interaction-report';
+import { originRepositorySlug } from './performance-surface-origin';
 
 // These ceilings belong to JOV-3887. Trusted policy may only tighten them.
 const metrics = {
@@ -508,10 +509,8 @@ export function loadTrustedSurfaceBaseline(
     return args[0] === 'show' ? output : output.trim();
   };
   requireEvidence(
-    [
-      'https://github.com/JovieInc/Jovie.git',
-      'git@github.com:JovieInc/Jovie.git',
-    ].includes(git('remote', 'get-url', 'origin')),
+    originRepositorySlug(git('remote', 'get-url', 'origin')) ===
+      'JovieInc/Jovie',
     'repository provenance mismatch'
   );
   requireEvidence(

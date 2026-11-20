@@ -16,7 +16,12 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case authProviderSelected = "auth_provider_selected"
   case authCallbackReceived = "auth_callback_received"
   case authCallbackURLParsed = "auth_callback_url_parsed"
-  case authSessionClosed = "auth_session_closed"
+  /// Terminal user dismiss of the system auth sheet. Never a failure.
+  case authCancelled = "auth_cancelled"
+  /// Terminal auth failure (URL build, session start, provider, exchange).
+  case authFailed = "auth_failed"
+  /// Non-terminal presentation retry before another sheet open. Not cancel/fail.
+  case authPresentationRetry = "auth_presentation_retry"
   case nativeAuthExchangeStarted = "native_auth_exchange_started"
   case nativeAuthExchangeSucceeded = "native_auth_exchange_succeeded"
   case nativeAuthExchangeFailed = "native_auth_exchange_failed"
@@ -34,6 +39,10 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case teleprompterRecordingStarted = "teleprompter_recording_started"
   case teleprompterRecordingCompleted = "teleprompter_recording_completed"
   case teleprompterRecordingFailed = "teleprompter_recording_failed"
+  /// Identity share stage: public URL copied to pasteboard. Not delivery.
+  case profileUrlCopied = "profile_url_copied"
+  /// Identity share stage: system share sheet presented. Not recipient visit.
+  case profileSharePresented = "profile_share_presented"
 }
 
 struct ObservabilityConfiguration: Equatable {

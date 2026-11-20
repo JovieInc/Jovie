@@ -9,6 +9,10 @@ function readWeb(relativePath: string): string {
   return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
 }
 
+/**
+ * Drift W1 / T0.5: `--scale-press: 0.98` is the cross-platform SoT. Native
+ * projection lands in T4.1; this suite locks the web emitter + consumers.
+ */
 describe('shared press-motion contract', () => {
   it('keeps the canonical press scale subtle and reduced-motion safe', () => {
     const designSystem = readWeb('styles/design-system.css');

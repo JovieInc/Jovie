@@ -62,19 +62,19 @@ const LEDGER = {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run actionlint': {
+  'ci-fast-remaining-shards/Run actionlint': {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Start base-branch history fetch': {
+  'ci-fast-remaining-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Decide structural lane': {
+  'ci-fast-remaining-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run structural ci-fast lane': {
+  'ci-fast-remaining-shards/Run structural ci-fast lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -106,15 +106,15 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Start base-branch history fetch': {
+  'ci-fast-structural-lanes-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Decide structural lane': {
+  'ci-fast-structural-lanes-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Run lanes coverage pytest': {
+  'ci-fast-structural-lanes-shards/Run lanes coverage pytest': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },

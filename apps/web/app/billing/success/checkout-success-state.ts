@@ -29,7 +29,78 @@ export const CHECKOUT_RECOVERY_COPY = {
   title: 'Checkout not confirmed',
   subtitle:
     'This session is missing, expired, or still processing. We have not marked a paid plan as active.',
+  openSessionSubtitle:
+    'Your checkout session is still open. Complete payment to activate your plan.',
 } as const;
+
+export function normalizeOpenCheckoutUrl(url: unknown): string | null {
+  return typeof url === 'string' &&
+    url.startsWith('https://checkout.stripe.com/')
+    ? url
+    : null;
+}
+
+export async function fetchValidatedSession(
+  sessionId: string | null,
+  signal: AbortSignal
+): Promise<{
+  plan: PaidPlanId | null;
+  needsProfile: boolean;
+  proofPending: boolean;
+  profileLive: boolean | null;
+  shareUrl: string | null;
+  sessionStatus: string | null;
+  checkoutUrl: string | null;
+} | null> {
+  if (typeof fetch !== 'function') return null;
+  const endpoint = sessionId
+    ? `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`
+    : '/api/billing/checkout-session';
+  const response = await Promise.resolve(
+    fetch(endpoint, { cache: 'no-store', signal })
+  );
+  if (!response) return null;
+  if (!response.ok) {
+    return {
+      plan: null,
+      needsProfile: false,
+      proofPending: false,
+      profileLive: false,
+      shareUrl: null,
+      sessionStatus: null,
+      checkoutUrl: null,
+    };
+  }
+  const body = (await response.json()) as {
+    plan?: string | null;
+    needsProfile?: boolean;
+    proofPending?: boolean;
+    profileLive?: boolean;
+    profileShareUrl?: string | null;
+    sessionStatus?: string | null;
+    checkoutUrl?: string | null;
+  };
+  const proofPending = body.proofPending === true;
+  const needsProfile = body.needsProfile === true;
+  const profileLive =
+    typeof body.profileLive === 'boolean' ? body.profileLive : null;
+  return {
+    plan: resolvePaidPlan(body.plan ?? null),
+    needsProfile,
+    proofPending,
+    profileLive,
+    shareUrl:
+      !proofPending &&
+      !needsProfile &&
+      profileLive !== false &&
+      typeof body.profileShareUrl === 'string'
+        ? body.profileShareUrl
+        : null,
+    sessionStatus:
+      typeof body.sessionStatus === 'string' ? body.sessionStatus : null,
+    checkoutUrl: normalizeOpenCheckoutUrl(body.checkoutUrl),
+  };
+}
 
 /**
  * Post-checkout copy names only what the paid plan turns on today
@@ -189,4 +260,64 @@ export function shouldCelebratePaidSuccess(
   view: CheckoutSuccessView
 ): view is Extract<CheckoutSuccessView, { kind: 'success' }> {
   return view.kind === 'success';
+}
+
+export function resolveCheckoutSuccessCopy(input: {
+  readonly view: CheckoutSuccessView;
+  readonly isOnboardingUpgrade: boolean;
+  readonly proofPending: boolean;
+  readonly canClaimProfileLive: boolean;
+  readonly isArtistVisibilitySuccess: boolean;
+  readonly paidDisplayName: string | null;
+  readonly proofPendingTerms: string;
+  readonly sessionStatus: string | null;
+}): { readonly title: string; readonly subtitle: string } {
+  const {
+    view,
+    isOnboardingUpgrade,
+    proofPending,
+    canClaimProfileLive,
+    isArtistVisibilitySuccess,
+    paidDisplayName,
+    proofPendingTerms,
+    sessionStatus,
+  } = input;
+
+  let title: string;
+  if (view.kind !== 'success') {
+    title =
+      view.kind === 'pending'
+        ? CHECKOUT_PENDING_COPY.title
+        : CHECKOUT_RECOVERY_COPY.title;
+  } else if (isOnboardingUpgrade && (!canClaimProfileLive || proofPending)) {
+    title = 'Your plan is active';
+  } else if (isOnboardingUpgrade) {
+    title = 'Your profile is live and upgraded';
+  } else if (paidDisplayName) {
+    title = `Welcome to ${paidDisplayName}!`;
+  } else {
+    title = CHECKOUT_RECOVERY_COPY.title;
+  }
+
+  let subtitle: string;
+  if (view.kind === 'pending') {
+    subtitle = CHECKOUT_PENDING_COPY.subtitle;
+  } else if (view.kind === 'recovery') {
+    subtitle =
+      sessionStatus === 'open'
+        ? CHECKOUT_RECOVERY_COPY.openSessionSubtitle
+        : CHECKOUT_RECOVERY_COPY.subtitle;
+  } else if (proofPending) {
+    subtitle = proofPendingTerms;
+  } else if (isOnboardingUpgrade) {
+    subtitle = isArtistVisibilitySuccess
+      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
+      : "You're all set. Here's what you just unlocked.";
+  } else if (isArtistVisibilitySuccess) {
+    subtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
+  } else {
+    subtitle = "Your plan is active. Here's what you just unlocked.";
+  }
+
+  return { title, subtitle };
 }

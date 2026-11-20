@@ -39,7 +39,8 @@ async function readVerdict(): Promise<GoldenPathVerdict | null> {
   try {
     const report = await readCachedAcquisitionEligibility();
     if (!report) return null;
-    return report.eligible === true ? report.verdict : 'UNKNOWN';
+    if (report.eligible === true) return report.verdict;
+    return report.verdict === 'BLOCKED' ? 'BLOCKED' : 'UNKNOWN';
   } catch (error) {
     await captureError('Golden path verdict unreadable for admission', error, {
       route: 'lib/waitlist/golden-path-admission.server',
@@ -171,13 +172,21 @@ export async function requiresProofBeforePublic(
   return !adminApproval;
 }
 
-/** True while any of the user's profiles is private awaiting proof. */
+/** True while the active profile (or any profile when omitted) is private awaiting proof. */
 export async function hasProofPendingProfile(
-  appUserId: string
+  appUserId: string,
+  profileId?: string | null
 ): Promise<boolean> {
   const rows = await db
     .select({ settings: creatorProfiles.settings })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, appUserId));
+    .where(
+      profileId
+        ? and(
+            eq(creatorProfiles.userId, appUserId),
+            eq(creatorProfiles.id, profileId)
+          )
+        : eq(creatorProfiles.userId, appUserId)
+    );
   return rows.some(row => isProofBlockingPublication(row.settings));
 }

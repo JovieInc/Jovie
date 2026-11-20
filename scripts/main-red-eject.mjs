@@ -657,6 +657,21 @@ async function failingHead(head, doApply) {
   });
   if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
   await dequeue(head.number);
+  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py): the
+  // Lane Fix Relay will not clear it on source-green alone, so the PR cannot
+  // look healthy while JOV-6620 blocks same-head re-enroll.
+  await gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${REPO}/issues/${head.number}/labels`,
+    '-f',
+    `labels[]=${FIX_RED_LABEL}`,
+  ]).catch(error =>
+    console.error(
+      `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
+    )
+  );
   // The dequeue is the fix; a failed comment must not undo or retry it.
   await gh([
     'api',
