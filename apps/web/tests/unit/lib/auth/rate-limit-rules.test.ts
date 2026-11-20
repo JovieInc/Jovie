@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTH_RATE_LIMIT_RULES,
   isDeterministicTestOtpEmail,
+  isSensitiveAuthRateLimitPath,
 } from '@/lib/auth/rate-limit-rules';
 
 const OTP_SEND_PATH = '/email-otp/send-verification-otp' as const;
@@ -54,6 +55,25 @@ describe('Better Auth rate-limit policy', () => {
     for (const path of OTP_PATHS) {
       expect(typeof AUTH_RATE_LIMIT_RULES[path]).toBe('function');
     }
+  });
+
+  it('classifies OTP, passwordless, and credential paths as Redis fail-closed', () => {
+    for (const path of [
+      '/email-otp/send-verification-otp',
+      '/sign-in/email-otp',
+      '/sign-in/social',
+      '/sign-up/email',
+      '/phone-number/send-otp',
+      '/phone-number/verify',
+      '/one-time-token/verify',
+      '/request-password-reset',
+      '/change-password',
+      '/change-email',
+    ]) {
+      expect(isSensitiveAuthRateLimitPath(path)).toBe(true);
+    }
+    expect(isSensitiveAuthRateLimitPath('/get-session')).toBe(false);
+    expect(isSensitiveAuthRateLimitPath('/ok')).toBe(false);
   });
 });
 

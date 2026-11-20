@@ -166,9 +166,9 @@ export interface RedisDataConsumerPolicy {
 
 export const REDIS_DATA_CONSUMERS = {
   'auth/rate-limit': {
-    class: 'advisory',
+    class: 'mandatory',
     recovery:
-      'Degrade open when Redis is missing. Sessions stay in Postgres plus the cookie cache',
+      'Fail closed for OTP/passwordless/credential paths when Redis is missing (deny + Retry-After). Fail open only for non-abuse Better Auth paths. Sessions stay in Postgres plus the cookie cache',
   },
   'musicfetch/budget-guard': {
     class: 'mandatory',

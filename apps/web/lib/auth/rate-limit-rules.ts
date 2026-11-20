@@ -142,3 +142,28 @@ export const AUTH_RATE_LIMIT_RULES = {
   '/phone-number/verify': { window: 60, max: 5 },
   '/one-time-token/verify': { window: 60, max: 10 },
 } as const;
+
+/**
+ * Auth paths where a Redis outage must fail closed (deny + Retry-After).
+ *
+ * OTP send/verify, passwordless sign-in, phone OTP, one-time tokens, and
+ * credential mutation endpoints are abuse-critical: fail-open during an
+ * Upstash outage unbounded OTP spray / credential stuffing. Non-abuse
+ * Better Auth paths (if any still hit storage) may still degrade open.
+ *
+ * Keys are `ip|pathname` from Better Auth `createRateLimitKey`.
+ */
+export function isSensitiveAuthRateLimitPath(path: string): boolean {
+  return (
+    path.startsWith('/email-otp/') ||
+    path.startsWith('/sign-in/') ||
+    path.startsWith('/sign-up/') ||
+    path.startsWith('/phone-number/') ||
+    path.startsWith('/one-time-token/') ||
+    path.startsWith('/forget-password') ||
+    path === '/request-password-reset' ||
+    path === '/send-verification-email' ||
+    path === '/change-password' ||
+    path === '/change-email'
+  );
+}

@@ -16,6 +16,16 @@ CSP, webhooks, secrets, email, fail-closed persistence, biome-ignore, environmen
 
 For webhook signature verification: verify before parsing business logic.
 
+## Better Auth Path Rate Limits Fail Closed On Sensitive Routes
+
+Better Auth path counters live in Redis (`apps/web/lib/auth/rate-limit-storage.ts`), not in session storage. Sessions and OTP verification values stay in Postgres.
+
+When Redis is missing, times out, or the consume script cannot set a TTL:
+
+- **Fail closed** for abuse-critical auth paths (email OTP send/sign-in, phone OTP, one-time tokens, `/sign-in/*`, `/sign-up/*`, password reset / change-email / change-password). Return deny with `retryAfter` = rule window so Better Auth responds 429 + `X-Retry-After`. Classifier: `isSensitiveAuthRateLimitPath` in `rate-limit-rules.ts`.
+- **Fail open** only for non-abuse Better Auth paths that still hit this storage (if any). Do not broaden fail-open to OTP or passwordless endpoints to “keep sign-in available” during an outage — that unbounded spray is worse than a temporary deny.
+- Inventory: `REDIS_DATA_CONSUMERS['auth/rate-limit']` in `lib/rate-limit/outage-policy.ts` (mandatory).
+
 ## No Unlimited Anything
 
 - **EVERY** user-facing or system-facing capability, quota, rate, or resource (dictation, API calls, tokens, compute, storage, any consumable) MUST have an abuse limit.
