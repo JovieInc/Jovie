@@ -97,7 +97,9 @@ export function assertOriginalJobsRetained(current, baseline) {
     if (id === 'cancel-superseded') continue;
     const actual = current.jobs[id];
     const left =
-      id === 'unit' ? normalizeUnitJob(actual, { requireTypecheck: true }) : actual;
+      id === 'unit'
+        ? normalizeUnitJob(actual, { requireTypecheck: true })
+        : actual;
     const right = id === 'unit' ? normalizeUnitJob(job) : job;
     assert.deepEqual(strip(left), strip(right), id);
     for (const name of owned) {
