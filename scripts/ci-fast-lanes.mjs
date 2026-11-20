@@ -1315,7 +1315,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/mutation-diff.test.mjs scripts/lib/__tests__/mutation-evidence-score.test.mjs scripts/lib/__tests__/mutation-evidence-inputs.test.mjs scripts/lib/__tests__/mutation-evidence-report.test.mjs scripts/lib/__tests__/mutation-evidence.test.mjs scripts/lib/__tests__/mutation-inputs.test.mjs scripts/lib/__tests__/mutation-survivor-drafts.test.mjs',
-  'scripts/lib/__tests__/mutation-source.test.mjs',
+  'scripts/lib/__tests__/mutation-source.test.mjs scripts/lib/__tests__/mutation-heatmap-scores.test.mjs scripts/lib/__tests__/coverage-surface-tokens.test.mjs',
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs scripts/lib/__tests__/mutation-ui-target-workflow.test.mjs',
