@@ -35,6 +35,11 @@ describe('RATE_LIMIT_OUTAGE_POLICY', () => {
       'onboarding',
       'adminImpersonate',
       'accountDelete',
+      'handleCheck',
+      'api',
+      'spotifySearchApi',
+      'appleMusicSearch',
+      'wrapLinkAnonymous',
     ] as const) {
       expect(RATE_LIMIT_OUTAGE_POLICY[name]).toMatchObject({
         class: 'mandatory',
