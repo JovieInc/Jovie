@@ -44,6 +44,14 @@ class QuotedPathListMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_additive_quoted_list_text(prose))
         self.assertIsNone(classes.merge_additive_quoted_path_line("LANE_TESTS = [\n", 'LANE_TESTS = ["scripts/a.py",\n'))
 
+    def test_rejects_ambiguous_quoted_entries(self):
+        a = "  'scripts/a.test.mjs',\n"
+        b = "  'scripts/b.test.mjs',\n"
+        self.assertIsNone(classes.merge_additive_quoted_entries(a + a, b))
+        self.assertIsNone(classes.merge_additive_quoted_entries(a + b, b + a))
+        self.assertIsNone(classes.merge_additive_quoted_entries(a, "    'scripts/b.test.mjs',\n"))
+        self.assertIsNone(classes.merge_additive_quoted_entries(a, '  "scripts/b.test.mjs",\n'))
+
     def test_sorts_double_quoted_json_paths_after_the_union(self):
         text = (
             "[\n"

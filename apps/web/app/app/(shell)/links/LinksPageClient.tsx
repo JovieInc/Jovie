@@ -181,15 +181,20 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
   // Entity-rail parity: present the inspector through the shell's right-rail
   // slot (AppShellFrame + AppShellRightRail) like every other workspace,
   // instead of a local aside bolted onto the table row.
-  useRegisterRightPanel(
-    selectedRow ? (
-      <LinkInspector
-        row={selectedRow}
-        onClose={closeInspector}
-        onUnmount={restoreOriginatingFocus}
-      />
-    ) : null
+  // Memoized so a page render that does not change the selection does not
+  // push a new panel element through the shell frame.
+  const inspectorPanel = useMemo(
+    () =>
+      selectedRow ? (
+        <LinkInspector
+          row={selectedRow}
+          onClose={closeInspector}
+          onUnmount={restoreOriginatingFocus}
+        />
+      ) : null,
+    [selectedRow, closeInspector, restoreOriginatingFocus]
   );
+  useRegisterRightPanel(inspectorPanel);
 
   if (rows.length === 0) {
     return (

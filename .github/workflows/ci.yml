@@ -751,14 +751,16 @@ jobs:
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
-              echo "path_diff_base_sha=$MERGE_GROUP_BASE_SHA" >> "$GITHUB_OUTPUT"
-              echo "path_diff_head_sha=$MERGE_GROUP_HEAD_SHA" >> "$GITHUB_OUTPUT"
-              echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
-              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
-                echo "$output=false" >> "$GITHUB_OUTPUT"
-              done
-              echo "selected_lanes=none" >> "$GITHUB_OUTPUT"
-              echo "shared_contract_impact=none" >> "$GITHUB_OUTPUT"
+              {
+                echo "path_diff_base_sha=$MERGE_GROUP_BASE_SHA"
+                echo "path_diff_head_sha=$MERGE_GROUP_HEAD_SHA"
+                echo "is_noop_merge_group=true"
+                for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
+                  echo "$output=false"
+                done
+                echo "selected_lanes=none"
+                echo "shared_contract_impact=none"
+              } >> "$GITHUB_OUTPUT"
               emit_ci_lanes none
               exit 0
             fi
@@ -881,12 +883,14 @@ jobs:
             echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
-            echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
-            echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
-            echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
-              echo "$t=false" >> "$GITHUB_OUTPUT"
-            done
+            {
+              echo "has_code_changes=true"
+              echo "run_promptfoo_evals=false"
+              echo "run_golden_eval_set=false"
+              for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
+                echo "$t=false"
+              done
+            } >> "$GITHUB_OUTPUT"
             emit_ci_lanes
             exit 0
           fi
@@ -947,9 +951,9 @@ jobs:
 
           ONBOARDING_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.onboarding\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/components/features/onboarding/|apps/web/lib/onboarding/)'
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ONBOARDING_LIGHTHOUSE_PATTERN"; then
-            echo "run_onboarding_lighthouse=true" >> $GITHUB_OUTPUT
+            echo "run_onboarding_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_onboarding_lighthouse=false" >> $GITHUB_OUTPUT
+            echo "run_onboarding_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
           ADMIN_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.admin\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/admin/|apps/web/components/features/admin/)'
@@ -1013,15 +1017,17 @@ jobs:
           # Fork guard: disable E2E for forks (no secrets)
           if [[ "$IS_FORK" == "true" ]]; then
             echo "Fork PR: disabling e2e and build"
-            echo "run_e2e=false" >> "$GITHUB_OUTPUT"
-            echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
-            echo "run_build=false" >> "$GITHUB_OUTPUT"
-            echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
-            echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
-            echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
-            echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
-            echo "run_test=false" >> "$GITHUB_OUTPUT"
-            echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_e2e=false"
+              echo "run_golden_path=false"
+              echo "run_build=false"
+              echo "run_public_lighthouse=false"
+              echo "run_dashboard_lighthouse=false"
+              echo "run_admin_lighthouse=false"
+              echo "run_chat_lighthouse=false"
+              echo "run_test=false"
+              echo "run_test_performance=false"
+            } >> "$GITHUB_OUTPUT"
           fi
 
           emit_ci_lanes
@@ -1071,7 +1077,7 @@ jobs:
             mv "$root/sealed.json" "$root/$receipt"
           done
           cat "$root/summary.md" >> "$GITHUB_STEP_SUMMARY"
-          printf '\n### Blog content qualification\n\n- Profile: `%s`\n- Receipt: `blog-content-receipt.json`\n' \
+          printf "\n### Blog content qualification\n\n- Profile: \`%s\`\n- Receipt: \`blog-content-receipt.json\`\n" \
             "$profile" >> "$GITHUB_STEP_SUMMARY"
 
       # The trusted classifier can still select mac or ios. The queue must
@@ -3845,7 +3851,7 @@ jobs:
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 
-          for attempt in $(seq 1 30); do
+          for ((attempt = 1; attempt <= 30; attempt++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || {
               echo "::error::Combined-head standalone server died"
               exit 1
@@ -3958,19 +3964,74 @@ jobs:
       # every aggregate that requires this one, so the build skips only that
       # duplicate pass. Both run scripts/routes.mjs and write apps/ovie/.next,
       # so they cannot share one workspace concurrently.
-      # Nothing restores apps/ovie/.next/cache, so the build keeps Turbopack's
-      # persistent cache read-only instead of spending ~14s persisting it.
+      # Turbopack's persistent build cache (Next 16 default) lives under
+      # apps/ovie/.next/cache/turbopack. Merge-group and dispatch runs only
+      # restore the newest trusted main entry. The writer is
+      # next-build-cache-warm.yml's warm-ovie job, which runs on every push
+      # to main (and manual dispatch on main) and builds at most once per UTC
+      # hour per dependency hash; keep its key scheme identical to this
+      # restore. Queue-proven main pushes skip this job, so the save steps
+      # below only fire on a direct-main fallback run. The path is compiler
+      # state only (no fetch/image cache, no build output), and Turbopack
+      # revalidates every entry against current inputs. A miss falls through
+      # to a full compile and must not fail the job. PR and merge-group runs
+      # never write this cache, so they cannot poison the shared main key.
+      - name: Resolve Ovie Next build cache hour
+        id: ovie-next-build-cache-hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore Ovie Next build cache (read-only)
+        id: ovie-next-build-cache
+        if: hashFiles('apps/ovie/package.json') != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-ovie-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/ovie/package.json', 'apps/ovie/next.config.mjs') }}-${{ steps.ovie-next-build-cache-hour.outputs.hour }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-ovie-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/ovie/package.json', 'apps/ovie/next.config.mjs') }}-
+            ${{ runner.os }}-next-build-ovie-v1-
       - name: Build independent Ovie app
         if: hashFiles('apps/ovie/package.json') != ''
         run: |
           set -euo pipefail
-          NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build
+          # Only push saves the cache: skip the ~14s persist elsewhere.
+          # Any value, even empty, sets read-only.
+          [ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1
+          NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build
           test -f apps/ovie/.next/BUILD_ID
           test -f apps/ovie/.next/standalone/apps/ovie/server.js
           test ! -d apps/ovie/.next/standalone/apps/docs/app
         env:
           NEXT_PUBLIC_APP_URL: http://localhost:3105
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+      - name: Measure Ovie Next build cache (trusted main only)
+        id: ovie-next-build-cache-size
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.ovie-next-build-cache.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/ovie/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Ovie Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Ovie Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Ovie Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Ovie Next build cache (trusted main only)
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.ovie-next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ steps.ovie-next-build-cache.outputs.cache-primary-key }}
 
   ci-typecheck-ovie:
     name: Ovie Typecheck (combined)
@@ -4118,7 +4179,7 @@ jobs:
             cat "$RUNNER_TEMP/storybook-dev.log" 2>/dev/null || true
             echo "::endgroup::"' EXIT
 
-          for attempt in $(seq 1 150); do
+          for ((attempt = 1; attempt <= 150; attempt++)); do
             kill -0 "$STORYBOOK_PID" 2>/dev/null || {
               echo "::error::Storybook dev server died"
               exit 1
@@ -5036,7 +5097,7 @@ jobs:
 
           echo "Waiting for standalone server..."
           SERVER_READY=false
-          for i in {1..30}; do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               echo "Server is ready!"
@@ -5175,6 +5236,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        with:
+          prefer_prepared_workspace: ${{ github.event_name == 'merge_group' && needs.neon-db.result == 'success' }}
 
       # Relative budgets compile the merge-group base in this workspace, then
       # head. Restore the read-only Turbopack cache first so both compiles
@@ -5351,7 +5414,7 @@ jobs:
 
           echo "Waiting for standalone server..."
           SERVER_READY=false
-          for i in {1..30}; do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
@@ -5618,7 +5681,7 @@ jobs:
 
           echo "Waiting for standalone server..."
           SERVER_READY=false
-          for i in {1..30}; do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
@@ -5748,7 +5811,7 @@ jobs:
 
           echo "Waiting for standalone server..."
           SERVER_READY=false
-          for i in {1..30}; do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
@@ -5879,7 +5942,7 @@ jobs:
 
           echo "Waiting for standalone server..."
           SERVER_READY=false
-          for i in {1..30}; do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
@@ -6251,7 +6314,7 @@ jobs:
           # Shard 1/10 on 2 pinned CPUs: 557s serial -> 336s parallel, same
           # 318 files / 2277 tests. In-file tests stay serial (maxConcurrency 1).
           export NODE_OPTIONS="--max-old-space-size=3072"
-          VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"
+          VITEST_CI_FLAGS=(--pool=forks "--maxWorkers=$(nproc)" --fileParallelism)
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
           # Use shard-specific output file so Codecov Test Analytics receives every shard
@@ -6263,7 +6326,7 @@ jobs:
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
-            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            pnpm turbo test:fast --filter=@jovie/web -- "${VITEST_CI_FLAGS[@]}" $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "$OUTPUT_FLAG"
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
             # run_web includes Ovie/CLI and inputs outside Turbo's graph.
@@ -6271,7 +6334,7 @@ jobs:
             pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
             UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
             # Preserve sibling packages' existing empty-shard policy.
-            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- "${VITEST_CI_FLAGS[@]}" $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "$OUTPUT_FLAG"
             WEB_CACHE_FLAG=""
             if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
               echo "Affected graph omitted web; running the selected web lane explicitly"
@@ -6281,13 +6344,13 @@ jobs:
               WEB_CACHE_FLAG="--force"
             fi
             # Override the wrapper's empty-suite success only for web shards.
-            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- "${VITEST_CI_FLAGS[@]}" $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "$OUTPUT_FLAG"
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
             # interaction suites; main dispatches take the full-suite branch above.
             # --passWithNoTests: some shards may have no files matching the filter
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} critical interaction $OUTPUT_FLAG
+            pnpm turbo test:fast --affected -- "${VITEST_CI_FLAGS[@]}" $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} critical interaction "$OUTPUT_FLAG"
           fi
       - name: Run quarantined unit tests (retries)
         # Unsharded: one shard runs it, not every shard (~12s each). Its cost is
@@ -6835,7 +6898,7 @@ jobs:
           SERVER_PID=$!
 
           SERVER_READY=false
-          for i in $(seq 1 30); do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -sf http://localhost:3220 > /dev/null 2>&1; then
               SERVER_READY=true
@@ -6979,7 +7042,7 @@ jobs:
 
           PORT=3270 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
-          for i in $(seq 1 30); do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -sf http://localhost:3270 > /dev/null 2>&1; then break; fi
             sleep 1
@@ -7161,7 +7224,7 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           SERVER_READY=false
-          for i in $(seq 1 30); do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -sf http://localhost:3240 > /dev/null 2>&1; then
               SERVER_READY=true
@@ -7220,8 +7283,10 @@ jobs:
     # Push leaves neon-db skipped; this job opens its own ephemeral branch.
     # A red push run does not fail CI. The gate still blocks when the range
     # requires a green journey.
-    needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    # The journey builds its own real-auth artifact; the public build uses mock
+    # auth and must not prevent this lane from running if its prerequisites fail.
+    needs: [ci-path-changes, neon-db]
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -7404,7 +7469,7 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           SERVER_READY=false
-          for i in $(seq 1 30); do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -sf http://localhost:3250 > /dev/null 2>&1; then
               SERVER_READY=true
@@ -7514,6 +7579,7 @@ jobs:
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/canonical-artist-site/m2-receipt.json
@@ -7521,24 +7587,28 @@ jobs:
 
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
 
       - name: Verify waitlist admission
         id: canonical_waitlist
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
-        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c 'exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT"' && cat "$PROFILE_RESULT"
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c "exec tsx scripts/certify-artist-profile.ts --output \"\$PROFILE_CERT_DIR\" > \"\$PROFILE_RESULT\"" && cat "$PROFILE_RESULT"
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie
@@ -7578,13 +7648,26 @@ jobs:
           mkdir -p "$CERT_DIR"
           : > "$HISTORY"
           failed=0
+          # Reuse the profile probe's observed revision; no extra production read.
+          # Stop once that ancestor is present, or immediately on a failed page.
+          LIVE_BUILD="$(node -e '
+            const fs = require("node:fs");
+            try {
+              const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              const report = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
+              const sha = report?.snapshot?.releaseSha;
+              if (typeof sha === "string" && /^[0-9a-f]{7,40}$/i.test(sha)) process.stdout.write(sha.toLowerCase());
+            } catch {}
+          ' "$CERT_DIR/profile-result.json")"
           for page in 1 2 3 4 5; do
-            gh api "repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}" --jq '.[].sha' >> "$HISTORY" || failed=1
+            node packages/api-client/cli.ts gh --priority deploy -- api "repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}" --jq '.[].sha' >> "$HISTORY" || failed=1
+            if [ -n "$LIVE_BUILD" ] && grep -q "^$LIVE_BUILD" "$HISTORY"; then break; fi
+            if [ "$failed" -ne 0 ]; then break; fi
           done
           if [ "$failed" -ne 0 ]; then
             : > "$HISTORY"
           fi
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --navigation-status "$NAVIGATION_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --navigation-status "$NAVIGATION_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --journey-report "${{ runner.temp }}/journey-evidence/playwright-report.json" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}
@@ -8017,7 +8100,7 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "--shard=${SHARD_INDEX}/${SHARD_TOTAL}" ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
@@ -9252,7 +9335,7 @@ jobs:
 
           # Wait for server readiness
           SERVER_READY=false
-          for i in $(seq 1 30); do
+          for ((i = 1; i <= 30; i++)); do
             kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -sf http://localhost:3260 > /dev/null 2>&1; then
               SERVER_READY=true

@@ -10,7 +10,6 @@ const meta: Meta<typeof InboxAttentionLink> = {
     itemId: 'home',
     attention: 'empty',
     pendingCount: 0,
-    runtimeUpdate: false,
     navigationPending: false,
   },
   decorators: [
@@ -32,14 +31,6 @@ export const Pending: Story = {
     label: 'Inbox, 3 pending items',
     attention: 'available',
     pendingCount: 3,
-  },
-};
-
-export const UpdateAvailable: Story = {
-  args: {
-    label: 'Inbox, app update available',
-    attention: 'available',
-    runtimeUpdate: true,
   },
 };
 

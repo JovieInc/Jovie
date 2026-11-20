@@ -754,6 +754,8 @@ jobs:
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           CRAWL_SHARD: ${{ matrix.shard }}/4
+          CRAWL_DEPLOYMENT_ID: ${{ needs.resolve-target.outputs.deployment_id }}
+          CRAWL_INVOCATION_ID: ${{ github.run_id }}.${{ github.run_attempt }}.${{ matrix.shard }}
           SHARD_INDEX: ${{ matrix.shard }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -802,7 +804,8 @@ jobs:
           # This job uploads only from the guard's producer stage, so the
           # crawl writes its receipt under the guard too. Run outside it, the
           # receipt never reached the stage and every upload was refused.
-          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+            PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
             node .github/scripts/guard-playwright-artifacts.mjs --run -- \
               node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
                 --out product-crawl-receipt "${state_args[@]}"
@@ -1033,14 +1036,6 @@ jobs:
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
         run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT"
 
-      # Only a complete fresh export is saved, under the key it was made from.
-      - name: Save the Golden Path Pen export
-        if: ${{ !cancelled() && steps.pen-export.outputs.export_cacheable == 'true' && steps.pen-export.outputs.cache_key != '' }}
-        uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
-        with:
-          path: ${{ runner.temp }}/pen-golden-path/png
-          key: ${{ steps.pen-export.outputs.cache_key }}
-
       - name: Certify the golden path on production
         id: certify
         if: ${{ !cancelled() }}
@@ -1066,15 +1061,13 @@ jobs:
             --steps "$steps_json" \
             --out "${RUNNER_TEMP}/prod-cert-receipts.json" \
             --post --file-issues || status=$?
-          # JOV-12620: a not-certified verdict (exit 1) is already posted to the
-          # ledger, filed in Linear and uploaded below: its own receipt, not a
-          # probe failure. Only smoke, auth and Lighthouse turn this run red; a
-          # crash that records no verdict (exit 2) still fails.
           if [ "$status" -eq 1 ]; then
-            echo "::warning title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
-            { echo "### Golden path not certified (receipt, non-blocking)"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
-              jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
+            if [ -s "${RUNNER_TEMP}/prod-cert-receipts.json" ]; then
+              { echo "### Golden path not certified"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
+                jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 1
           fi
           exit "$status"
 

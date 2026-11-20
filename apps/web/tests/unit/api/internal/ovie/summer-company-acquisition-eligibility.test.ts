@@ -150,6 +150,7 @@ describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => 
       offer_checkout: ['m2-revenue-path:live#pro_checkout_199'],
       activation: ['m2-revenue-path:live#activation'],
       payment_entitlement: ['github:ci.yml#Golden Path (manual)@main'],
+      buyer_would_pay: ['github:buyer-eval-gate.yml@main'],
       instrumentation: ['founder-funnel:30d'],
     };
     const eligibility = evaluateAcquisitionEligibility({

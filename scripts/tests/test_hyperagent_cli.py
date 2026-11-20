@@ -9,7 +9,8 @@ import runpy
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "scripts/hyperagent"
@@ -150,6 +151,54 @@ class HyperagentCliTest(unittest.TestCase):
         self.assertEqual(requests[2][2]["Mcp-Session-Id"], "session-1")
         self.assertEqual(requests[2][2]["MCP-Protocol-Version"], "2025-03-26")
         self.assertEqual(requests[2][3], 17)
+
+    def test_reason_health_requires_the_managed_research_role_without_credentials(self):
+        config = json.loads((ROOT / "scripts/lanes/reason.json").read_text())
+        specs = [config["proposer"], *config["reviewers"], config["research"],
+                 config["researchEscalation"], config["judgmentProposer"]]
+        forbidden = Mock(side_effect=AssertionError("local health must not access credentials or provider"))
+        protected = ("access_token", "token_bundle", "http_json", "mcp_call", "execute",
+                     "cmd_login", "token_path", "client_path", "config_dir")
+        with patch.dict(self.globals, {name: forbidden for name in protected}):
+            for spec in specs:
+                if spec["health"][0] != "hyperagent":
+                    continue
+                with self.subTest(route=spec["name"]):
+                    code, out, error = self.main(spec["health"][1:])
+                    self.assertEqual((code, error), (0, ""))
+                    self.assertEqual(set(json.loads(out)["models"]), set(self.document["models"]))
+        forbidden.assert_not_called()
+
+    def test_incompatible_legacy_cli_cannot_reach_queue_claim_or_model_budget(self):
+        reason = runpy.run_path(str(ROOT / "scripts/lanes/reason_lane.py"))
+        config = json.loads((ROOT / "scripts/lanes/reason.json").read_text())
+        # Captured native contract: models-only succeeds, but --role is unknown.
+        def legacy_cli(args, **_kwargs):
+            if args == ["hyperagent", "models", "--json"]:
+                return SimpleNamespace(returncode=0, stdout='{"models": {}}', stderr="")
+            return SimpleNamespace(returncode=2, stdout="",
+                                   stderr="hyperagent: error: unrecognized arguments: --role research")
+        run = Mock(side_effect=legacy_cli)
+        queue = Mock(side_effect=AssertionError("queue queried before compatible CLI readiness"))
+        budget = Mock(side_effect=AssertionError("model budget reached before compatible CLI readiness"))
+        ownership = Mock(side_effect=AssertionError("claim reached before compatible CLI readiness"))
+        execute = Mock(side_effect=AssertionError("model execution reached before compatible CLI readiness"))
+        linear = Mock()
+        held = SimpleNamespace(held=True, release=Mock())
+        locks = Mock(return_value=held)
+        lane = SimpleNamespace(Locked=locks, Linear=Mock(return_value=linear), LinearRateLimited=RuntimeError)
+        host = SimpleNamespace(state=self.directory / "state", linear_env=self.directory / "linear.env")
+        host.state.mkdir()
+        with patch.dict(reason["drain"].__globals__, queued_jobs=queue, budget_allows=budget,
+                        _ownership=ownership, one_job=execute, execute=execute):
+            result = reason["drain"](host, lane, config, run=run)
+        self.assertEqual(result, {"status": "proposer-unhealthy"})
+        self.assertTrue(run.called)
+        for effect in (queue, budget, ownership, execute, linear.gql, linear.move, linear.comment):
+            effect.assert_not_called()
+        self.assertEqual([call.args[0].name for call in locks.call_args_list], ["reason.lock"])
+        held.release.assert_called_once_with()
+        self.assertEqual(list(host.state.iterdir()), [])
 
     def test_existing_reason_commands_have_valid_models_overrides_and_roles(self):
         config = json.loads((ROOT / "scripts/lanes/reason.json").read_text())

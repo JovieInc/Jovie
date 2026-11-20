@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
+
+from atomic_state import atomic_write_text
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,14 +47,15 @@ MACHINE_FILES = frozenset({
     "scripts/tests/test_fix_red_classes.py",
     "scripts/tests/test_fix_red_mixed_repairs.py",
     "scripts/tests/test_fix_red_compose.py",
+    "scripts/tests/test_workflow_job_gate.py",
 })
 _CERT_USES = re.compile(
     r"^([+-])    uses: JovieInc/ci/\.github/workflows/public-app-certification\.yml@([0-9a-f]{40})\Z")
 _CERT_REF = re.compile(r"^([+-])      ci-ref: ([0-9a-f]{40})\Z")
 
 
-def _forward_count(comparison, old: str, new: str, message: str) -> int:
-    url = f"https://github.com/JovieInc/ci/compare/{old}...{new}"
+def _forward_count(comparison, old: str, new: str, message: str, *, repository="JovieInc/ci") -> int:
+    url = f"https://github.com/{repository}/compare/{old}...{new}"
     count = comparison.get("ahead_by")
     commits = comparison.get("commits")
     if (comparison.get("html_url") != url or comparison.get("status") != "ahead"
@@ -69,9 +73,9 @@ def _forward_count(comparison, old: str, new: str, message: str) -> int:
     return count
 
 
-def _adopted_count(adopted, new: str, message: str) -> int:
+def _adopted_count(adopted, new: str, message: str, *, repository="JovieInc/ci") -> int:
     if (not isinstance(adopted, dict)
-            or adopted.get("html_url") != f"https://github.com/JovieInc/ci/compare/{new}...{new}"
+            or adopted.get("html_url") != f"https://github.com/{repository}/compare/{new}...{new}"
             or adopted.get("status") != "identical"
             or any(type(adopted.get(key)) is not int or adopted[key] != 0
                    for key in ("ahead_by", "behind_by", "total_commits"))
@@ -152,13 +156,55 @@ def pin_revisions(files) -> tuple[str, str, str | None]:
     return old, new, _cert_old(certs[0], new) if certs else None
 
 
-def _metric(name: str, count: int, after: int, old: str, new: str) -> str:
+def github_action_revisions(files) -> tuple[str, str, str]:
+    """Accept one root-action SHA replacement, optionally beside this repair machine."""
+    message = "action Win requires one modified workflow with only a consistent action pin bump"
+    if not isinstance(files, list) or any(not isinstance(file, dict) for file in files):
+        raise ValueError(message)
+    workflows = [file for file in files if not (
+        file.get("filename") in MACHINE_FILES and file.get("status") in {"added", "modified"})]
+    if (len(workflows) != 1 or workflows[0].get("status") != "modified"
+            or not re.fullmatch(r"\.github/workflows/[\w.-]+\.ya?ml", workflows[0].get("filename") or "")
+            or not isinstance(workflows[0].get("patch"), str)):
+        raise ValueError(message)
+    changed = [line for line in workflows[0]["patch"].splitlines() if line.startswith(("+", "-"))]
+    pattern = re.compile(
+        r"([+-])( +uses: )([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*)"
+        r"@([0-9a-f]{40})(?: +#.*)?")
+    pins = [pattern.fullmatch(line) for line in changed]
+    if len(pins) != 2 or any(pin is None for pin in pins):
+        raise ValueError(message)
+    old, new = pins
+    if (old[1] != "-" or new[1] != "+" or (old[2], old[3]) != (new[2], new[3]) or old[4] == new[4]):
+        raise ValueError(message)
+    return old[3], old[4], new[4]
+
+
+def _metric(name: str, count: int, after: int, old: str, new: str, *, repository="JovieInc/ci") -> str:
     return (
         f"- Metric: {name} | commits | lower | {count} | {after} | "
         "GitHub compare API, old pin versus adopted target | "
-        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
-        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by"
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/{repository}/compare/{old}...{new} --jq .ahead_by && "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/{repository}/compare/{new}...{new} --jq .ahead_by"
     )
+
+
+def github_action_pin(files, comparison, *, adopted_comparison) -> str:
+    """Prove upstream pin freshness, without inferring runtime or throughput gains."""
+    repository, old, new = github_action_revisions(files)
+    count = _forward_count(comparison, old, new, "action upstream comparison must match the forward pin bump",
+                           repository=repository)
+    after = _adopted_count(adopted_comparison, new, "action adopted target must prove zero remaining commits",
+                           repository=repository)
+    section = "\n".join([
+        "## Win", "", f"- Claim: Bring the {repository} pin up to the verified upstream target; "
+        "runtime or throughput improvement is not measured.",
+        "- Area: ci", "- Theme: dependency-maintenance",
+        _metric("upstream action commits behind target", count, after, old, new, repository=repository),
+        f"- Verify: https://github.com/{repository}/compare/{old}...{new}", "",
+    ])
+    validate(section)
+    return section
 
 
 def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison: dict,
@@ -249,26 +295,190 @@ def dependabot_patch_ignores(before: dict, after: dict, *, before_sha: str, afte
     return section
 
 
+def _load_yaml(text: str):
+    """Parse with the repo's js-yaml. Callers fail closed on any non-zero parser result."""
+    done = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
+console.log(JSON.stringify(load(readFileSync(0, 'utf8'))));
+"""], cwd=ROOT, input=text, text=True, capture_output=True, check=True, timeout=10)
+    return json.loads(done.stdout)
+
+
 def dependabot_snapshot(sha: str) -> dict:
     """Read immutable repository data; parse YAML with the installed repo parser."""
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("snapshot requires an exact Git revision")
     def read(path):
         return subprocess.check_output(["git", "show", f"{sha}:{path}"], cwd=ROOT, text=True)
-    yaml = subprocess.run(["node", "--input-type=module", "-e", """
-import { readFileSync } from 'node:fs';
-import { load } from 'js-yaml';
-console.log(JSON.stringify(load(readFileSync(0, 'utf8'))));
-"""], cwd=ROOT, input=read(".github/dependabot.yml"), text=True, capture_output=True, check=True, timeout=10)
-    return {"manifest": json.loads(read("package.json")), "config": json.loads(yaml.stdout)}
+    return {"manifest": json.loads(read("package.json")), "config": _load_yaml(read(".github/dependabot.yml"))}
+
+
+def pen_retry_win(before_sha: str, after_sha: str) -> str:
+    """Measure one injected transient failure using the same test on both revisions.
+
+    This is a controlled scenario, not a claim about live outage frequency or time saved.
+    Refuse missing tests, unrelated failures, and non-ancestral or unchanged revisions.
+    """
+    if any(not re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (before_sha, after_sha)):
+        raise ValueError("retry evidence requires exact Git revisions")
+    if before_sha == after_sha or subprocess.run(
+            ["git", "merge-base", "--is-ancestor", before_sha, after_sha], cwd=ROOT).returncode:
+        raise ValueError("retry evidence requires distinct ancestral revisions")
+    source = "scripts/invariants/pen-golden-path.mjs"
+    test = "scripts/invariants/pen-golden-path.test.mjs"
+    name = "a transient browser-install failure is retried before the strict diff runs"
+
+    def read(sha, path):
+        return subprocess.check_output(["git", "show", f"{sha}:{path}"], cwd=ROOT, text=True)
+
+    test_text = read(after_sha, test)
+    with tempfile.TemporaryDirectory(prefix="pen-retry-win-") as tmp:
+        directory = Path(tmp)
+        atomic_write_text(directory / "pen-golden-path.test.mjs", test_text)
+        results = []
+        for sha in (before_sha, after_sha):
+            atomic_write_text(directory / "pen-golden-path.mjs", read(sha, source))
+            results.append(subprocess.run(
+                ["node", "--test-reporter=tap", f"--test-name-pattern=^{name}$",
+                 str(directory / "pen-golden-path.test.mjs")],
+                cwd=ROOT, text=True, capture_output=True, timeout=30))
+    old, new = results
+    if (old.returncode != 1 or "# tests 1\n" not in old.stdout
+            or "# fail 1\n" not in old.stdout or "apt-get failed: 503" not in old.stdout
+            or new.returncode != 0 or "# tests 1\n" not in new.stdout
+            or "# pass 1\n" not in new.stdout or "# fail 0\n" not in new.stdout):
+        raise ValueError("retry scenario did not produce the expected red-before-green outcome")
+    section = "\n".join([
+        "## Win", "",
+        "- Claim: Reach the strict Pen diff after injected transient browser-install failures in a controlled test.",
+        "- Area: ci", "- Theme: probe-reliability",
+        "- Metric: controlled transient-install scenarios reaching strict diff | scenarios | higher | 0 | 1 | "
+        "same deterministic regression test against both Git revisions; not live outage frequency | "
+        f"python3 scripts/lanes/repair_win.py pen-retry {before_sha} {after_sha}",
+        f"- Verify: https://github.com/JovieInc/Jovie/compare/{before_sha}...{after_sha}", "",
+    ])
+    validate(section)
+    return section
+
+
+def workflow_gate_path(files) -> str:
+    """The one workflow beside this repair machine. Any other path fails closed."""
+    message = "measured win diff is not a pin bump"
+    if not isinstance(files, list) or any(not isinstance(file, dict) for file in files):
+        raise ValueError(message)
+    workflows = [file for file in files if not (
+        file.get("filename") in MACHINE_FILES and file.get("status") in {"added", "modified"})]
+    name = workflows[0].get("filename") if len(workflows) == 1 else ""
+    if (len(workflows) != 1 or workflows[0].get("status") != "modified"
+            or not re.fullmatch(r"\.github/workflows/[\w.-]+\.ya?ml", name or "")):
+        raise ValueError(message)
+    return name
+
+
+def _job_if(job) -> str:
+    if not isinstance(job, dict) or job.get("if") is None:
+        return ""
+    if not isinstance(job.get("if"), str):
+        raise ValueError("workflow job if must be a string")
+    return " ".join(job["if"].split())
+
+
+def _unwrap(expr: str) -> str:
+    expr = expr.strip()
+    while len(expr) >= 2 and expr[0] == "(" and expr[-1] == ")":
+        depth = 0
+        whole = True
+        for index, char in enumerate(expr):
+            depth += (char == "(") - (char == ")")
+            if depth < 0 or (depth == 0 and index != len(expr) - 1):
+                whole = False
+                break
+        if not whole or depth != 0:
+            break
+        expr = expr[1:-1].strip()
+    return expr
+
+
+def _without_job_if(doc):
+    jobs = doc.get("jobs") if isinstance(doc, dict) else None
+    if not isinstance(jobs, dict) or not jobs:
+        raise ValueError("workflow job gate requires a jobs map")
+    clone = json.loads(json.dumps(doc))
+    for job in clone["jobs"].values():
+        if isinstance(job, dict):
+            job.pop("if", None)
+    return clone
+
+
+_NEW_GATE = re.compile(r"vars\.([A-Z][A-Z0-9_]*) == 'true'(?: && (.*))?\Z")
+
+
+def workflow_job_gate(before_text: str, after_text: str, *, before_sha: str, after_sha: str, path: str) -> str:
+    """Count jobs whose if does not require one newly added vars.NAME == 'true'.
+
+    Parsed workflow YAML at two revisions. This is configuration coverage, not a
+    live Actions variable read and not elapsed runner time.
+    """
+    if any(not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (before_sha, after_sha)):
+        raise ValueError("workflow job gate requires exact Git revisions")
+    if not isinstance(path, str) or not re.fullmatch(r"\.github/workflows/[\w.-]+\.ya?ml", path):
+        raise ValueError("workflow job gate requires one workflow path")
+    before, after = _load_yaml(before_text), _load_yaml(after_text)
+    if _without_job_if(before) != _without_job_if(after):
+        raise ValueError("workflow job gate accepts only job if changes")
+    old_jobs, new_jobs = before["jobs"], after["jobs"]
+    if set(old_jobs) != set(new_jobs):
+        raise ValueError("workflow job gate accepts only job if changes")
+    added = []
+    for name in old_jobs:
+        old_if, new_if = _job_if(old_jobs[name]), _job_if(new_jobs[name])
+        if old_if == new_if:
+            continue
+        match = _NEW_GATE.fullmatch(new_if)
+        if match is None:
+            raise ValueError("workflow job gate requires a new vars.NAME == 'true' conjunction")
+        added.append(match.group(1))
+        if _unwrap(match.group(2) or "") != old_if:
+            raise ValueError("workflow job gate must preserve the previous job if")
+    if len(set(added)) != 1:
+        raise ValueError("workflow job gate requires exactly one new variable")
+    variable = added[0]
+    token = f"vars.{variable} == 'true'"
+    old_count = sum(token not in _job_if(job) for job in old_jobs.values())
+    new_count = sum(token not in _job_if(job) for job in new_jobs.values())
+    if new_count >= old_count:
+        raise ValueError("workflow job gate requires fewer ungated jobs")
+    section = "\n".join([
+        "## Win", "",
+        f"- Claim: Require {variable} before the previously ungated workflow jobs run.",
+        "- Area: ci", "- Theme: workflow-killswitch",
+        f"- Metric: {variable} ungated jobs | jobs | lower | {old_count} | {new_count} | "
+        "parsed workflow YAML at the two revisions | "
+        f"python3 scripts/lanes/repair_win.py workflow-job-gate {before_sha} {after_sha} {path}",
+        f"- Verify: https://github.com/JovieInc/Jovie/compare/{before_sha}...{after_sha}", "",
+    ])
+    validate(section)
+    return section
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=["dependabot-patches"])
+    parser.add_argument("kind", choices=["dependabot-patches", "pen-retry", "workflow-job-gate"])
     parser.add_argument("before_sha")
     parser.add_argument("after_sha")
+    parser.add_argument("path", nargs="?")
     args = parser.parse_args()
-    print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
-                                  before_sha=args.before_sha, after_sha=args.after_sha), end="")
+    if args.kind == "pen-retry":
+        print(pen_retry_win(args.before_sha, args.after_sha), end="")
+    elif args.kind == "workflow-job-gate":
+        if not args.path:
+            parser.error("workflow-job-gate requires a workflow path")
+        def read(sha):
+            return subprocess.check_output(["git", "show", f"{sha}:{args.path}"], cwd=ROOT, text=True)
+        print(workflow_job_gate(read(args.before_sha), read(args.after_sha), before_sha=args.before_sha,
+                                 after_sha=args.after_sha, path=args.path), end="")
+    else:
+        print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
+                                      before_sha=args.before_sha, after_sha=args.after_sha), end="")

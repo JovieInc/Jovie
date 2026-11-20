@@ -1449,6 +1449,23 @@ class OutcomeLaneTest(unittest.TestCase):
         result = outcome.drain(host, lane, run=run, now=time.time())
         return result, calls, comments, state
 
+    def test_cursor_resumes_after_a_full_scan_and_wraps_after_the_last_page(self):
+        calls = []
+        def page(query, variables):
+            start = int(variables["after"] or 0)
+            calls.append(start)
+            stop = min(251, start + variables["first"])
+            return {"issues": {"nodes": [{"identifier": str(i)} for i in range(start, stop)],
+                               "pageInfo": {"endCursor": str(stop), "hasNextPage": stop < 251}}}
+
+        api = SimpleNamespace(gql=page)
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            for now in (10, 11, 12):
+                outcome.candidates(api, state, now)
+            self.assertEqual(calls, [0, 50, 100, 150, 200, 250, 0, 50, 100, 150])
+            self.assertFalse((state / outcome.STATE_FILE).exists())
+
     def test_a_verified_issue_gets_an_itemized_comment_and_a_pass_receipt(self):
         verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
             {"criterion": "Sentence case titles", "status": "pass",

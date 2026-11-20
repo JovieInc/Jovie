@@ -80,11 +80,13 @@ attempt=1
 run_gh "$@"
 while [ "$status" -ne 0 ]; do
   message="$(cat "$err" "$out" 2>/dev/null || true)"
-  if printf '%s\n' "$message" | grep -qiE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429'; then
+  # Drain the response: grep -q can close the pipe early, making printf fail
+  # with SIGPIPE and turning a valid match into a refusal under pipefail.
+  if printf '%s\n' "$message" | grep -iE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429' >/dev/null; then
     break
   fi
   if [ "$attempt" -ge "$retry_attempts" ] ||
-    ! printf '%s\n' "$message" | grep -Eqi 'HTTP (408|5[0-9][0-9])|timed? out|timeout|error connecting|connection reset'; then
+    ! printf '%s\n' "$message" | grep -Ei 'HTTP (408|5[0-9][0-9])|timed? out|timeout|error connecting|connection reset' >/dev/null; then
     cat "$err" >&2
     exit "$status"
   fi

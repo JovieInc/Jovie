@@ -131,6 +131,13 @@ describe('ContactDetailSidebar', () => {
       'data-layout',
       'grid'
     );
+    expect(screen.getByTestId('contact-detail-entity-header')).toHaveClass(
+      'px-3',
+      'pt-3'
+    );
+    expect(screen.getByTestId('contact-detail-entity-header')).not.toHaveClass(
+      'px-2'
+    );
     const avatarFrame = screen.getByTestId('contact-entity-avatar-frame');
     const avatarMedia = avatarFrame.firstElementChild;
     expect(avatarFrame).toHaveClass('size-14', 'rounded-full');

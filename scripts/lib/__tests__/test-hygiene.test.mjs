@@ -141,6 +141,89 @@ describe('scanTestFile', () => {
     ).toEqual(['real-sleep']);
   });
 
+  it('flags mocking the module the file is named after, but not its dependencies', () => {
+    const subject = (file, text) =>
+      scanTestFile(file, text)
+        .map(f => f.rule)
+        .filter(rule => rule === 'mocked-subject');
+    const renders = "it('a', () => { expect(f()).toBe(1); });";
+    expect(
+      subject('PricingTable.test.tsx', `vi.mock('./PricingTable');\n${renders}`)
+    ).toEqual(['mocked-subject']);
+    expect(
+      subject(
+        'PricingTable.certificate.test.tsx',
+        `vi.mock('./PricingTable');\n${renders}`
+      )
+    ).toEqual(['mocked-subject']);
+    // Dependencies stay mockable: packages, aliases, differently-named
+    // siblings, and observation spies.
+    expect(
+      subject('redis.test.ts', `vi.mock('@upstash/redis');\n${renders}`)
+    ).toEqual([]);
+    expect(
+      subject('rate-limit.test.ts', `vi.mock('@/lib/rate-limit');\n${renders}`)
+    ).toEqual([]);
+    expect(subject('checkout.test.ts', `vi.mock('./db');\n${renders}`)).toEqual(
+      []
+    );
+    expect(
+      subject(
+        'checkout.test.ts',
+        `it('a', () => { vi.spyOn(db, 'query'); expect(f()).toBe(1); });`
+      )
+    ).toEqual([]);
+  });
+
+  it('flags retry budgets and raised timeouts as flake masking', () => {
+    const OPT = (key, value) => `{ ${key}: ${value} }`;
+    const renders = '() => { expect(f()).toBe(1); }';
+    expect(rules(`it('a', ${OPT('retry', 2)}, ${renders});`)).toEqual([
+      'flake-mask',
+    ]);
+    expect(rules(`describe('d', ${OPT('retries', 3)}, ${renders});`)).toEqual([
+      'flake-mask',
+    ]);
+    expect(
+      rules(
+        `it('a', () => { ${['this', 'retries'].join('.')}(_n); expect(f()).toBe(1); });`
+      )
+    ).toEqual(['flake-mask']);
+    expect(
+      rules(`test.${['re', 'try'].join('')}(2)('a', ${renders});`)
+    ).toEqual(['flake-mask']);
+    expect(
+      rules(`jest.${['set', 'Timeout'].join('')}(30000); it('a', ${renders});`)
+    ).toEqual(['flake-mask']);
+    expect(rules(`it('a', ${OPT('timeout', 15000)}, ${renders});`)).toEqual([
+      'flake-mask',
+    ]);
+    expect(
+      rules(`test.use(${OPT('testTimeout', 20000)}); it('a', ${renders});`)
+    ).toEqual(['flake-mask']);
+  });
+
+  it('keeps query configs, disabling retries and condition budgets clean', () => {
+    const OPT = (key, value) => `{ ${key}: ${value} }`;
+    const renders = '() => { expect(f()).toBe(1); }';
+    expect(
+      rules(
+        "it('a', () => { mount(new QueryClient({ defaultOptions: { queries: { retry: false } } })); expect(f()).toBe(1); });"
+      )
+    ).toEqual([]);
+    expect(rules(`it('a', ${OPT('timeout', 4000)}, ${renders});`)).toEqual([]);
+    expect(
+      rules(
+        "it('a', async () => { await vi.waitFor(fn, { timeout: 8000 }); expect(f()).toBe(1); });"
+      )
+    ).toEqual([]);
+    expect(
+      rules(
+        "it('a', async () => { await expect(row).toBeVisible({ timeout: 30000 }); });"
+      )
+    ).toEqual([]);
+  });
+
   it('scans conditional and table tests, and does not take check() for an assertion', () => {
     expect(rules("it.skipIf(ci)('a', async () => { await go(); });")).toEqual([
       'no-assertion',
@@ -220,6 +303,23 @@ describe('ratchet', () => {
       count: 2,
       allowed: 1,
     });
+  });
+
+  it('never baselines zero-tolerance rules', () => {
+    expect(
+      compareToBaseline(
+        { 'mocked-subject': { 'a.test.ts': 9 } },
+        { 'mocked-subject': { 'a.test.ts': 1 } }
+      )
+    ).toEqual([
+      { rule: 'mocked-subject', file: 'a.test.ts', count: 1, allowed: 0 },
+    ]);
+    expect(
+      lowerBaseline(
+        { 'mocked-subject': { 'a.test.ts': 3 } },
+        { 'mocked-subject': { 'a.test.ts': 1 } }
+      )
+    ).toEqual({});
   });
 
   it('only lowers the baseline and drops fixed pairs', () => {

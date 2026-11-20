@@ -18,6 +18,8 @@ const {
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPushMock }),
+  usePathname: () => '/app/insights',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -83,20 +85,19 @@ describe('InsightsPanelView', () => {
     });
   });
 
-  it('wraps every category filter inside the compact viewport', () => {
+  it('lists every category in the toolbar select', async () => {
+    const user = userEvent.setup();
     renderPanel();
 
-    const tablist = screen.getByRole('tablist', {
-      name: 'Filter Insights By Category',
-    });
-    expect(tablist).toHaveClass('flex-wrap');
+    expect(
+      screen.queryByRole('tablist', { name: 'Filter Insights By Category' })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('tablist')).toHaveLength(1);
 
-    const tabs = within(tablist).getAllByRole('tab');
-    expect(tabs).toHaveLength(9);
-    for (const tab of tabs) {
-      expect(tab).toHaveClass('shrink-0');
-      expect(tab).not.toHaveClass('flex-1');
-    }
+    await user.click(
+      screen.getByRole('button', { name: 'Category: All Categories' })
+    );
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(9);
   });
 
   it('uses the canonical workspace empty state without decorative card chrome', () => {
@@ -162,7 +163,10 @@ describe('InsightsPanelView', () => {
       </TooltipProvider>
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Growth' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Category: All Categories' })
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Growth' }));
     expect(useInsightsQueryMock).toHaveBeenLastCalledWith({
       category: ['growth'],
       limit: 50,
@@ -349,11 +353,10 @@ describe('InsightsPanelView', () => {
       </TooltipProvider>
     );
 
+    expect(screen.getAllByRole('tablist')).toHaveLength(1);
     expect(
-      within(
-        screen.getByRole('tablist', { name: 'Filter Insights By Category' })
-      ).getAllByRole('tab')
-    ).toHaveLength(9);
+      screen.getByRole('button', { name: 'Category: All Categories' })
+    ).toBeVisible();
     const rows = screen.getByTestId('insights-loading-rows');
     const firstRow = rows.querySelector('.border-b');
     expect(firstRow).toHaveClass('px-1', 'py-3.5');
@@ -442,11 +445,15 @@ describe('InsightsPanelView', () => {
       expect(routerPushMock).toHaveBeenCalledWith('/app/contacts?tab=audience');
     });
 
-    it('preserves the category filters and Generate beside the workspace tabs', () => {
+    it('keeps the category select and Generate beside the workspace tabs', () => {
       renderPanel();
 
+      expect(screen.getAllByRole('tablist')).toHaveLength(1);
       expect(
-        screen.getByRole('tablist', { name: 'Filter Insights By Category' })
+        screen.getByRole('tablist', { name: 'Audience Workspace' })
+      ).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'Category: All Categories' })
       ).toBeVisible();
       expect(
         screen.getByRole('button', { name: 'Generate insights' })

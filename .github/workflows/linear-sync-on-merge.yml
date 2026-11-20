@@ -35,7 +35,12 @@ permissions:
 jobs:
   sync_done:
     name: Project merge and deploy evidence onto Linear
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    # Tim 2026-11-19 9:40 AM PT: no GitHub<->Linear sync in either direction.
+    # Off unless the repo variable LINEAR_GITHUB_SYNC_ENABLED is exactly 'true'
+    # (unset = off). Rollback = set the variable; no file change needed.
+    if: >-
+      vars.LINEAR_GITHUB_SYNC_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     # Quota holds share this existing window with evaluation and cache saves.
     timeout-minutes: 15
@@ -70,6 +75,7 @@ jobs:
             .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
             scripts/lib/github-installation-quota.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
@@ -90,6 +96,7 @@ jobs:
             scripts/invariants/browser-owned-input-matrix.json
             scripts/invariants/product-reference-coherence.mjs
             scripts/invariants/screen-proof-resolver.mjs
+            scripts/invariants/screen-proof-transport.mjs
             scripts/invariants/screen-proof-final-paths.mjs
             scripts/invariants/screen-proof-attempt-checks.mjs
             scripts/lib/playwright-png.mjs

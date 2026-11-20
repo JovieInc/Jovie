@@ -1,11 +1,19 @@
 // JOV-9854: golden-path receipts attribute a missing browser check to deploy
 // skew when the served build's smoke never implemented it. Split from
 // prod-cert.test.mjs (size-500).
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadCertSteps } from '../../prod-cert.mjs';
-import { runProductionCertification } from '../prod-cert.mjs';
+import {
+  EXPECTED_BROWSER_CHECKS,
+  runProductionCertification,
+} from '../prod-cert.mjs';
 import { PEN_IDS } from './fixtures/pen-green-env.mjs';
 import { fakeFetch, SHA, T } from './fixtures/prod-cert-fakes.mjs';
+
+const REPO_ROOT = resolve(import.meta.dirname, '../../..');
+const NEWER_PRODUCER_SHA = 'b'.repeat(40);
 
 describe('JOV-9854 deploy-skew attribution', () => {
   const step = (surface, id, status = 'passed') => ({
@@ -29,7 +37,7 @@ describe('JOV-9854 deploy-skew attribution', () => {
     const { receipts } = await runProductionCertification({
       fetchImpl: fakeFetch(),
       authStatus: 'passed',
-      producerSourceSha: SHA,
+      producerSourceSha: NEWER_PRODUCER_SHA,
       steps: [
         capabilities('onboarding', ['dashboard-first-value']),
         step('onboarding', 'dashboard-first-value'),
@@ -51,6 +59,81 @@ describe('JOV-9854 deploy-skew attribution', () => {
       publicProfile.checks.find(c => c.id === 'profile-edit-save-readback')
         .summary
     ).toContain('served build predates');
+  });
+
+  it('reports missing producer implementation instead of deploy skew when servedSha === producerSourceSha', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch({ sha: SHA }),
+      authStatus: 'passed',
+      producerSourceSha: SHA,
+      steps: [
+        capabilities('checkout', ['checkout-entry-renders']),
+        step('checkout', 'checkout-entry-renders'),
+      ],
+    });
+    const checkout = receipts.find(r => r.surface === 'checkout');
+    expect(checkout.status).toBe('blocked');
+    const missing = checkout.checks.find(
+      c => c.id === 'fresh-user-checkout-entry'
+    );
+    expect(missing.status).toBe('blocked');
+    expect(missing.summary).toContain(
+      'auth smoke at aaaaaaaa does not declare browser check fresh-user-checkout-entry (missing producer implementation, not deploy skew)'
+    );
+    expect(missing.summary).not.toContain('served build predates');
+  });
+
+  it('closed-loop parity: every EXPECTED_BROWSER_CHECKS entry is declared and walked by E2E specs', () => {
+    const specFiles = [
+      'apps/web/tests/e2e/smoke-prod-auth.spec.ts',
+      'apps/web/tests/e2e/prod-cert-start-chat.spec.ts',
+    ];
+    const declaredBySurface = new Map();
+    const walkedSteps = new Set();
+
+    for (const relPath of specFiles) {
+      const src = readFileSync(resolve(REPO_ROOT, relPath), 'utf8');
+      const capBlock = src.match(
+        /recordCertCapabilities\(\{([\s\S]*?)\}\);/u
+      )?.[1];
+      expect(
+        capBlock,
+        `${relPath} must call recordCertCapabilities`
+      ).toBeTruthy();
+      for (const entry of capBlock.matchAll(
+        /['"]?([a-z-]+)['"]?\s*:\s*\[([^\]]*)\]/gu
+      )) {
+        const surface = entry[1];
+        const set = declaredBySurface.get(surface) ?? new Set();
+        for (const idMatch of entry[2].matchAll(/['"]([a-z0-9-]+)['"]/gu)) {
+          set.add(idMatch[1]);
+        }
+        declaredBySurface.set(surface, set);
+      }
+      for (const stepMatch of src.matchAll(
+        /\bcertStep\(\s*['"]([a-z-]+)['"]\s*,\s*['"]([a-z0-9-]+)['"]/gu
+      )) {
+        walkedSteps.add(`${stepMatch[1]}/${stepMatch[2]}`);
+      }
+    }
+
+    expect([...declaredBySurface.keys()].sort()).toEqual(
+      Object.keys(EXPECTED_BROWSER_CHECKS).sort()
+    );
+    for (const [surface, expectedIds] of Object.entries(
+      EXPECTED_BROWSER_CHECKS
+    )) {
+      const declared = [...(declaredBySurface.get(surface) ?? [])].sort();
+      expect(declared, `capability mismatch on ${surface}`).toEqual(
+        [...expectedIds].sort()
+      );
+      for (const id of expectedIds) {
+        expect(
+          walkedSteps.has(`${surface}/${id}`),
+          `missing certStep('${surface}', '${id}') implementation in E2E specs`
+        ).toBe(true);
+      }
+    }
   });
 
   it('an implemented check that is absent from the steps still reads as not run', async () => {

@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -63,6 +61,7 @@ export {
 } from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -71,6 +70,19 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  runSourceGuardPoolCli,
+  runSourceGuards,
+} from './lib/ci-source-guard-pool.mjs';
+
+export {
+  expandSourcePoolEntries,
+  runSourceGuardPool,
+  runSourceGuards,
+  sourceGuardConcurrency,
+  sourceGuardLocks,
+} from './lib/ci-source-guard-pool.mjs';
+
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
@@ -197,6 +209,92 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
 });
 
 /**
+ * The merged-with-base guard runs its scans as one bounded pool instead of a
+ * serial `;` chain. Same commands, same fail-closed outcome (any failure fails
+ * the guard); run-all means a failure no longer hides later failures.
+ */
+export const MERGED_WITH_BASE_POOL_CONCURRENCY = 4;
+
+/** Measured long poles inside the merged-with-base pool (ordering only). */
+export const MERGED_WITH_BASE_POOL_LONG_POLES = Object.freeze([
+  // The node --test invariants batch (~120s) and the web vitest run.
+  'scripts/invariants/registry.test.mjs',
+  'tests/unit/api/webhooks/linear.test.ts',
+]);
+
+/** Short, stable pool id for a scan command. */
+function mergedBasePoolId(command) {
+  return command
+    .replace(/^pnpm (?:--filter(?:=| )\S+ )?/u, '')
+    .replace(/^run /u, '')
+    .replace(/^node \.github\/scripts\//u, '.github/scripts/')
+    .trim();
+}
+
+/**
+ * Pool spec for the merged-with-base guard: the design-surface scans, every
+ * PR_CHEAP_SCAN_COMMANDS entry, and the `pnpm invariants:check` chain. The
+ * chain entry is split into one pool entry per top-level `&&` segment at run
+ * time (expandSourcePoolEntries) so the real long pole parallizes too.
+ */
+export const MERGED_WITH_BASE_POOL_SPEC = Object.freeze({
+  concurrency: MERGED_WITH_BASE_POOL_CONCURRENCY,
+  commands: Object.freeze([
+    Object.freeze({
+      id: 'design-surfaces',
+      command: 'node scripts/invariants/design-surfaces.mjs',
+    }),
+    Object.freeze({
+      id: 'stack-pattern-ratchet',
+      command:
+        'if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi',
+    }),
+    ...PR_CHEAP_SCAN_COMMANDS.map(command =>
+      Object.freeze({ id: mergedBasePoolId(command), command })
+    ),
+    Object.freeze({
+      id: 'invariants-check',
+      command: 'pnpm invariants:check',
+      splitChain: true,
+    }),
+  ]),
+});
+
+/** Serial setup of the merged-with-base guard (unchanged from the old chain). */
+const MERGED_WITH_BASE_SETUP = Object.freeze([
+  'set -euo pipefail',
+  't="$(mktemp -d)"',
+  'root="$PWD"',
+  'git worktree add -q --detach "$t" HEAD',
+  'for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done',
+  'trap \'git worktree remove --force "$t"\' EXIT',
+  'cd "$t"',
+  'git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true',
+  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
+  '[ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }',
+]);
+
+const MERGED_WITH_BASE_RUNNER_PATH = fileURLToPath(
+  new URL('./ci-fast-lanes.mjs', import.meta.url)
+);
+
+/**
+ * The merged-with-base guard command: identical setup, then the pool runner.
+ * The spec is embedded as a quoted heredoc so the exact scan commands stay
+ * readable in the guard command (the structural inventory test reads them).
+ * @returns {string}
+ */
+function mergedWithBaseCommand() {
+  const pool = [
+    `cat > "$t/subpool.json" <<'JOVIE_SOURCE_GUARD_POOL'`,
+    JSON.stringify(MERGED_WITH_BASE_POOL_SPEC),
+    'JOVIE_SOURCE_GUARD_POOL',
+    `node ${shellQuote(MERGED_WITH_BASE_RUNNER_PATH)} --run-source-guard-pool "$t/subpool.json"`,
+  ].join('\n');
+  return `bash -c ${shellQuote(`${MERGED_WITH_BASE_SETUP.join('; ')};\n${pool}`)}`;
+}
+
+/**
  * Body of the lanes-selftest-changed-tests guard (run under bash -c). Exported
  * so the test can assert the env and the file selection.
  */
@@ -225,6 +323,8 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // Worktree setup also runs in the issue runner; catch fixture and dispatch regressions before release.
+  'if printf "%s\\n" "$files" | grep -Fxq "scripts/lanes/worktree_pool.py"; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.RunIssueTest";; esac; fi',
   // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
   // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
   // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
@@ -360,7 +460,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs lib/__tests__/synthetic-canary-catchup.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.cases\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -552,8 +652,12 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     // Merged-with-base invariants. Textual merge conflicts stay on their gates.
+    // Setup is unchanged (worktree, node_modules links, fetch, merge with base,
+    // conflict and registry skip-outs); the scans and the invariants chain run
+    // as one bounded pool with run-all semantics — same commands, same
+    // fail-closed outcome, and a failure no longer hides later failures.
     id: 'merged-with-base-invariants',
-    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; [ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
+    command: mergedWithBaseCommand(),
     inputs: /./u,
     prOnly: true,
   }),
@@ -591,14 +695,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
-    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Slop-test ratchet (2026-11-15; landmine rules 2026-11-19): no new focused,
+    // skipped, assertion-free, tautological, mock-only, snapshot-only, real-sleep,
+    // over-mocked, mocked-subject (interfere-inc/landmines rule A) or flake-mask
+    // (rules B/C: retry budgets, raised per-test timeouts) tests.
     // Existing ones are baselined per file and may only go down.
     id: 'test-hygiene',
     command:
       'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
     inputs:
-      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -616,40 +722,89 @@ export const SOURCE_GUARDS = Object.freeze([
 ]);
 
 /**
+ * Cheap-first Source Validation order (JOV-13111). Highest historical
+ * fail-probability per second runs first; every selected guard still runs.
+ * Ledger: scripts/lib/source-guard-history.json. Kept in this file because
+ * rolling-ci-dispatch.yml sparse-checks it by name — a new import breaks
+ * that closure. A missing or invalid ledger yields null and manifest order.
+ */
+export const SOURCE_GUARD_HISTORY_SCHEMA = 'jovie.source-guard-history/v1';
+const SOURCE_GUARD_HISTORY_URL = new URL(
+  './lib/source-guard-history.json',
+  import.meta.url
+);
+
+/** Entries, or null when the ledger is missing, unreadable, or off-schema. */
+export function loadSourceGuardHistory(
+  read = path => readFileSync(path, 'utf8')
+) {
+  try {
+    const parsed = JSON.parse(read(SOURCE_GUARD_HISTORY_URL));
+    if (
+      parsed?.schema !== SOURCE_GUARD_HISTORY_SCHEMA ||
+      !parsed.entries ||
+      typeof parsed.entries !== 'object' ||
+      Array.isArray(parsed.entries)
+    )
+      return null;
+    return parsed.entries;
+  } catch {
+    return null;
+  }
+}
+
+/** Fail-probability per second. 0 without usable runs. */
+function guardFailureScore(entry) {
+  const runs = Number(entry?.runs);
+  const failures = Number(entry?.failures);
+  if (
+    !Number.isInteger(runs) ||
+    runs <= 0 ||
+    !Number.isInteger(failures) ||
+    failures < 0
+  )
+    return 0;
+  const failProbability = Math.min(failures / runs, 1);
+  const durationMs = Number(entry?.durationMs);
+  const durationSeconds =
+    Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 0;
+  // No measured duration keeps the fail-probability. Never invent a duration.
+  return durationSeconds > 0
+    ? failProbability / durationSeconds
+    : failProbability;
+}
+
+/** Stable reorder: higher score first, ties keep manifest order. */
+export function orderSourceGuardsByFailureRate(guards, entries) {
+  if (!entries) return [...guards];
+  return guards
+    .map((guard, index) => ({
+      guard,
+      index,
+      score: guardFailureScore(entries[guard?.id]),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.guard);
+}
+
+/**
  * @param {string} event GITHUB_EVENT_NAME ('' locally)
  * @param {readonly string[] | null} changed changed paths; null = unreadable
  * @returns {Array<(typeof SOURCE_GUARDS)[number]>}
  */
 export function selectSourceGuards(event, changed) {
-  return SOURCE_GUARDS.filter(guard => {
-    if (guard.prOnly && event !== 'pull_request' && event !== '') return false;
-    // Manual, local, and unreadable or empty diffs fail closed onto the guard.
-    if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
-      return true;
-    }
-    return changed.some(file => guard.inputs.test(file));
-  });
-}
-
-export function runSourceGuards() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  const guards = selectSourceGuards(event, listAllChangedFiles());
-  if (guards.length === 0) {
-    return {
-      code: 0,
-      output: 'Source-read guards skipped (no guard input changed)\n',
-      skipped: true,
-    };
-  }
-  // Independent guards: report every failure in one run.
-  let combined = '';
-  let code = 0;
-  for (const guard of guards) {
-    const result = shell(guard.command);
-    combined += `[source-guards] ${guard.id}: exit ${result.code}\n${result.output}`;
-    if (result.code !== 0 && code === 0) code = result.code;
-  }
-  return { code, output: combined };
+  return orderSourceGuardsByFailureRate(
+    SOURCE_GUARDS.filter(guard => {
+      if (guard.prOnly && event !== 'pull_request' && event !== '')
+        return false;
+      // Manual, local, and unreadable or empty diffs fail closed onto the guard.
+      if (event === 'workflow_dispatch' || event === '' || !changed?.length) {
+        return true;
+      }
+      return changed.some(file => guard.inputs.test(file));
+    }),
+    loadSourceGuardHistory()
+  );
 }
 
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
@@ -692,6 +847,8 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
   'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-fixture.ts',
+  'apps/web/tests/unit/ci/runner-setup-prepared-workspace.ts',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
 ]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
@@ -766,7 +923,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
@@ -893,6 +1050,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
+  'scripts/pr-body-lint.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -901,6 +1059,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/typecheck-native-qualification.test.mjs',
   'scripts/lib/native-typecheck-evidence.test.mjs',
   'scripts/lib/native-typecheck-graph.test.mjs',
+  'scripts/lib/native-typecheck-redirect.test.mjs',
+  'scripts/lib/native-typecheck-redirect-worker.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -908,6 +1068,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-process-timeout.test.mjs',
   'scripts/lib/preflight-failure-summary.test.mjs',
   'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-changed-format.test.mjs',
@@ -915,6 +1076,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/prepush-offload.test.mjs',
   'scripts/preflight-install.test.mjs',
   'scripts/lib/__tests__/ci-rounds.test.mjs',
+  'scripts/lib/__tests__/linear-reference-requirement.test.mjs', // JOV-13063 observe-mode Linear reference check.
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',
@@ -974,6 +1136,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/product-crawl/closed-in-production.test.mjs',
+  'scripts/product-crawl/crawl.test.mjs',
   'scripts/product-crawl/orphaned-overlays.test.mjs',
   'scripts/product-crawl/overlay-walk.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
@@ -988,7 +1151,11 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
+  'scripts/hooks/verify-git-hooks.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/pr-size-local.test.mjs',
+  'scripts/hooks/company-size.test.mjs',
+  'scripts/hooks/warden-local-review.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -1027,6 +1194,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/release-lag-check.test.mjs',
   'scripts/production-controller-read-token.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
+  'scripts/lib/__tests__/gh-call-tally.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
   'scripts/lib/__tests__/fleet-rules-verdict-retry.test.mjs',
@@ -1036,6 +1204,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
+  'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
+  'scripts/linear-team-drift.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
@@ -1046,6 +1216,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/format-biome-json.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/flake-ledger-workflow.test.mjs',
   'scripts/lib/__tests__/linear-cooldown.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
@@ -1094,7 +1265,7 @@ export const DEPRECATION_COVERAGE_COMMAND =
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
 export const PR_OPEN_COVERAGE_COMMAND =
-  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs';
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs scripts/pr-open-win.test.mjs scripts/pr-open-priority.test.mjs scripts/pr-body-lint.test.mjs';
 
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
   SCRIPT_CONTRACT_NODE_TESTS.filter(
@@ -1121,6 +1292,7 @@ export const RELEASE_LINEAGE_CONTRACT_COMMAND =
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
   'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
@@ -1167,11 +1339,13 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/next-build-cache-contract.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
   'scripts/lib/__tests__/performance-gate-lanes.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
+  'scripts/lib/__tests__/undraft-hold-signals.test.mjs',
   'scripts/lib/__tests__/workflow-expression-budget.test.mjs',
   'scripts/lib/__tests__/stale-branch-sweep.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
@@ -1179,6 +1353,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/brand-deals-skill-contract.test.mjs',
   'scripts/lib/__tests__/brand-construction.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
+  'scripts/lib/__tests__/changelog-publication-recovery.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/no-wall-clock-assertions.test.mjs',
   'scripts/lib/__tests__/run-actionlint.test.mjs',
@@ -1194,6 +1369,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/daily-changelog-editorial-publication.test.mjs',
+  'scripts/lib/__tests__/source-guard-scheduler.test.mjs',
   'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
@@ -1225,6 +1402,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
+  'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
@@ -1263,6 +1441,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/lanes-linear-status.test.mjs',
+  'scripts/lib/__tests__/spend-expiry-status.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',
   'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/fleet-registry.test.mjs',
@@ -1280,6 +1459,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/dependabot-pin-sync.test.mjs',
   'scripts/lib/__tests__/merge-to-live.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
+  'scripts/lib/__tests__/scripts-typecheck-default-options.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
@@ -1304,6 +1484,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lookup-token.test.mjs',
   'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
+  'scripts/lib/__tests__/ci-release-import-closure.test.mjs',
   'scripts/lib/__tests__/public-feed-qualification.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
@@ -1338,9 +1519,11 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-capacity.test.mjs',
   'scripts/lib/__tests__/tooling-health.test.mjs',
   'scripts/lib/__tests__/merge-queue-speed.test.mjs',
+  'scripts/lib/__tests__/merge-queue-cancel-causes.test.mjs', // JOV-13109 MQ cancel causes.
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
 ]);
@@ -1358,7 +1541,8 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
+/** @typedef {{ catalogId: string | null, rows: object[], wallMs?: number, state?: string }} StructuralCommandReceipt */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number, structuralCommands?: StructuralCommandReceipt }} LaneResult */
 
 const LANES = [
   {
@@ -2418,7 +2602,7 @@ function shellQuote(value) {
 }
 
 /** Async twin of shell() so structural commands can overlap. */
-function shellAsync(command, env = process.env) {
+export function shellAsync(command, env = process.env) {
   return new Promise(resolveResult => {
     const stdout = [];
     const stderr = [];
@@ -2481,7 +2665,7 @@ const OPAQUE_ENTRY_LOCKS = Object.freeze([
   [PLAYWRIGHT_RECEIPT_CI_TEST, 'coverage:apps/web'],
 ]);
 
-function packageScripts(dir) {
+export function packageScripts(dir) {
   try {
     const pkg = JSON.parse(
       readFileSync(resolve(REPO_ROOT, dir, 'package.json'), 'utf8')
@@ -2569,13 +2753,18 @@ export function structuralLocks(command) {
  * jump an earlier command that shares one of their locks. `stop` is consulted
  * before each start; once it returns true nothing new starts (in-flight
  * commands still finish) and the unstarted commands stay undefined.
+ * `keepGoing: true` keeps starting commands after a failure (run-all) — the
+ * first failure in list order still decides the exit code.
+ * `onSettle(index, result)` fires when a command finishes, so callers can
+ * stream output while later commands are still in flight.
  * @param {readonly string[]} commands
- * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean}} opts
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number, stop?: () => boolean, keepGoing?: boolean, onSettle?: (index: number, result: ExecResult & {durationMs: number}) => void}} opts
  * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
  * @typedef {{code: number, output: string}} ExecResult
  */
 export function runCommandPool(commands, opts) {
   const { execute, concurrency } = opts;
+  const keepGoing = opts.keepGoing === true;
   const locks = opts.locks ?? commands.map(() => []);
   const now = opts.now ?? Date.now;
   const results = new Array(commands.length);
@@ -2606,6 +2795,7 @@ export function runCommandPool(commands, opts) {
         durationMs: Math.max(0, now() - startedAt),
       };
       if (code !== 0) failed = true;
+      opts.onSettle?.(index, results[index]);
       pump();
     };
     const start = index => {
@@ -2641,7 +2831,7 @@ export function runCommandPool(commands, opts) {
       pumping = true;
       do {
         repump = false;
-        while (!failed && !stopped && running < concurrency) {
+        while (!(failed && !keepGoing) && !stopped && running < concurrency) {
           if (pending.length > 0 && opts.stop?.()) {
             stopped = true;
             break;
@@ -2652,7 +2842,10 @@ export function runCommandPool(commands, opts) {
         }
       } while (repump);
       pumping = false;
-      if (running === 0 && (failed || stopped || pending.length === 0)) {
+      if (
+        running === 0 &&
+        (stopped || pending.length === 0 || (failed && !keepGoing))
+      ) {
         resolveAll(results);
       }
     };
@@ -2749,7 +2942,7 @@ export async function runStructural(opts = {}) {
     API_CLIENT_PY_COMMAND,
     RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
-    'node --test .github/scripts/dependency-parity-evidence.test.mjs',
+    'node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-run.test.mjs',
@@ -2773,7 +2966,7 @@ export async function runStructural(opts = {}) {
     'node --test .github/scripts/collect-quarantine-evidence.test.mjs',
     'node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs',
     'node --test .github/scripts/marketing-dom-workflow.test.mjs',
-    'node --test .github/scripts/update-quarantine.test.js',
+    'node --test .github/scripts/update-quarantine.test.js scripts/linear-team-drift.test.mjs scripts/lib/__tests__/flake-ledger.test.mjs scripts/lib/__tests__/guard-test-network-guard.test.mjs scripts/propose-flip-quarantine.test.mjs',
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,
     SCRIPT_CONTRACT_VITEST_COMMAND,
@@ -2854,10 +3047,22 @@ export async function runStructural(opts = {}) {
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).
+  // Landing events (push to main, merge groups) validate the exact tree the
+  // PR fleet judges: the PR-time script-contracts source guard runs the FULL
+  // lists on every PR, and its repo-wide ratchets scan the tree dynamically
+  // (git ls-files + whole-repo scans), so the static derived selector can
+  // never pick them. #25864's apps/ios-only landing carried a wall-clock
+  // assertion that kept every open PR's merged-tree guard red for ~53h while
+  // main's own push stayed green (JOV-13095). On landing events run the full
+  // lists too, so the break reds main/merge-group itself instead of
+  // stranding PRs on stale heads.
+  const landingEvent = event === 'push' || event === 'merge_group';
   const dependentScriptTests =
     selected.has('operations') || !changed?.length
       ? []
-      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
+      : landingEvent
+        ? SCRIPT_CONTRACT_NODE_TESTS
+        : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2886,6 +3091,12 @@ export async function runStructural(opts = {}) {
     ...scriptContractNodeArgs(dependentScriptTests).map(
       args => `node ${args.join(' ')}`
     ),
+    // The vitest half of the script contracts (workspace-scripts project:
+    // wall-clock ratchet, copy inventory, ...) is otherwise operations-only.
+    // Reuse the same command operations runs; operations still runs it once.
+    ...(landingEvent && !selected.has('operations')
+      ? [SCRIPT_CONTRACT_VITEST_COMMAND]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
@@ -2995,6 +3206,32 @@ export async function runStructural(opts = {}) {
   const timings = results.flatMap((result, index) =>
     result ? [{ index, command: parts[index], ...result }] : []
   );
+  // Keep every selected index, including holes left by fail-fast or stop. Only
+  // digests cross into the artifact; command arguments and output stay in logs.
+  const catalog = parts.map((command, index) => ({
+    index,
+    id: createHash('sha256').update(command).digest('hex'),
+  }));
+  const commandReceipt = {
+    catalogId: createHash('sha256')
+      .update(JSON.stringify(catalog))
+      .digest('hex'),
+    wallMs,
+    rows: catalog.map(({ index, id }) => {
+      const result = results[index];
+      return {
+        index,
+        recipe: id,
+        ...(result
+          ? {
+              status: 'completed',
+              durationMs: result.durationMs,
+              exit: result.code,
+            }
+          : { status: 'unstarted' }),
+      };
+    }),
+  };
   // First failure in list order, not completion order.
   const failedIndex = results.findIndex(result => result && result.code !== 0);
   if (failedIndex !== -1) {
@@ -3010,6 +3247,7 @@ export async function runStructural(opts = {}) {
       ),
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // findIndex, not some(): unstarted commands are holes in the results array.
@@ -3021,11 +3259,12 @@ export async function runStructural(opts = {}) {
       skipped: true,
       timings,
       wallMs,
+      commandReceipt,
     };
   }
   // Deterministic list order regardless of completion order.
   const combined = results.map(result => result.output).join('');
-  return { code: 0, output: combined, timings, wallMs };
+  return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -3094,6 +3333,13 @@ function writeLaneResults(results, laneGroup, setupError) {
         schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
+        execution: {
+          runId: process.env.GITHUB_RUN_ID || null,
+          runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+          sha: process.env.GITHUB_SHA || null,
+          eventName: process.env.GITHUB_EVENT_NAME || null,
+          jobId: process.env.GITHUB_JOB || null,
+        },
         lanes: results,
         setupError: setupError || null,
         generatedAt: new Date().toISOString(),
@@ -3158,6 +3404,15 @@ async function main() {
           status: 'skipped',
           logExcerpt,
           durationMs,
+          ...(lane.id === 'structural'
+            ? {
+                structuralCommands: {
+                  state: 'not-run',
+                  catalogId: null,
+                  rows: [],
+                },
+              }
+            : {}),
         });
         continue;
       }
@@ -3215,6 +3470,15 @@ async function main() {
         status,
         logExcerpt,
         durationMs,
+        ...(lane.id === 'structural'
+          ? {
+              structuralCommands: outcome.commandReceipt ?? {
+                state: skipped ? 'not-run' : 'missing',
+                catalogId: null,
+                rows: [],
+              },
+            }
+          : {}),
       });
     }
   } catch (error) {
@@ -3243,5 +3507,9 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 ) {
-  await main();
+  if (process.argv[2] === '--run-source-guard-pool') {
+    process.exitCode = await runSourceGuardPoolCli(process.argv[3]);
+  } else {
+    await main();
+  }
 }

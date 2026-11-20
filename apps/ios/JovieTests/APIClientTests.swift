@@ -815,40 +815,45 @@ struct APIClientTests {
   }
 
   @Test func fetchesAppleWalletPassWithFreshTokenAfterUnauthorized() async throws {
-    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
-    let passData = Data([0x50, 0x4B, 0x03, 0x04])
-    var requestCount = 0
+    // Same fenced-401 isolation as retriesWithFreshTokenAfterUnauthorized:
+    // without the lock a parallel suite rotating the global store generation
+    // makes the fence discard the 401 as stale (run 44533014226).
+    try await withNativeSessionTokenStoreTestIsolation {
+      let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+      let passData = Data([0x50, 0x4B, 0x03, 0x04])
+      var requestCount = 0
 
-    MockURLProtocol.requestHandler = { request in
-      requestCount += 1
-      #expect(request.url?.path == "/api/wallet/apple/profile-pass")
-      #expect(request.value(forHTTPHeaderField: "Accept") == "application/vnd.apple.pkpass")
-      #expect(
-        request.value(forHTTPHeaderField: "Authorization")
-          == "Bearer \(requestCount == 1 ? "stale-token" : "fresh-token")"
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.url?.path == "/api/wallet/apple/profile-pass")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/vnd.apple.pkpass")
+        #expect(
+          request.value(forHTTPHeaderField: "Authorization")
+            == "Bearer \(requestCount == 1 ? "stale-token" : "fresh-token")"
+        )
+
+        let statusCode = requestCount == 1 ? 401 : 200
+        let response = HTTPURLResponse(
+          url: request.url!,
+          statusCode: statusCode,
+          httpVersion: nil,
+          headerFields: ["Content-Type": "application/vnd.apple.pkpass"]
+        )!
+
+        return (response, statusCode == 401 ? Data() : passData)
+      }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
       )
 
-      let statusCode = requestCount == 1 ? 401 : 200
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: statusCode,
-        httpVersion: nil,
-        headerFields: ["Content-Type": "application/vnd.apple.pkpass"]
-      )!
+      let data = try await client.fetchAppleWalletProfilePass()
 
-      return (response, statusCode == 401 ? Data() : passData)
+      #expect(data == passData)
+      #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
     }
-
-    let client = APIClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: tokenProvider
-    )
-
-    let data = try await client.fetchAppleWalletProfilePass()
-
-    #expect(data == passData)
-    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
   @Test func mapsInvalidJSONToDecodingFailed() async throws {

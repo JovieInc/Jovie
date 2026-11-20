@@ -1,17 +1,17 @@
 {
   "schema": "jovie-review-escapes/v1",
   "windowDays": 30,
-  "mergedPrs": 937,
-  "escapedPrs": 38,
-  "escapeRate": 0.0406,
+  "mergedPrs": 957,
+  "escapedPrs": 37,
+  "escapeRate": 0.0387,
   "byLayer": {
     "preflight": 0,
     "unit_test": 14,
     "ci_guard": 18,
-    "risk_tier_review": 5,
+    "risk_tier_review": 4,
     "production_cert": 2
   },
-  "guardRate": 0.9744,
+  "guardRate": 0.9737,
   "unguarded": [
     {
       "originPr": 23990,
@@ -277,14 +277,6 @@
       "guardAdded": true
     },
     {
-      "originPr": 22180,
-      "fixPr": 22538,
-      "kind": "fix",
-      "hours": 44.2,
-      "layer": "risk_tier_review",
-      "guardAdded": true
-    },
-    {
       "originPr": 22447,
       "fixPr": 22451,
       "kind": "fix",
@@ -333,5 +325,5 @@
       "guardAdded": true
     }
   ],
-  "generatedAt": "2026-11-16T23:53:29.752Z"
+  "generatedAt": "2026-11-19T16:39:29.541Z"
 }

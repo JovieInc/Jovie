@@ -1,8 +1,6 @@
 import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
-import {
-  getProfilesByUsernames,
-  getTopProfilesForStaticGeneration,
-} from '@/lib/services/profile/queries';
+import { PROFILE_MODE_PRERENDERED_KEYS } from '@/lib/routing/generated/profile-mode-prerender-set';
+import { getTopProfilesForStaticGeneration } from '@/lib/services/profile/queries';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -38,33 +36,29 @@ export async function getProfileStaticParams(limit = 100): Promise<
   }
 }
 
-export async function getProfileModeRenderStaticParams(): Promise<
-  Array<{
-    username: string;
-    profileMode: string;
-    marker: string;
-  }>
-> {
-  try {
-    const modes = aliasBudgetProfileModeParams();
-    const usernames = [...new Set(modes.map(mode => mode.username))];
-    const profiles = await getProfilesByUsernames(usernames);
-    return modes.flatMap(mode => {
-      const profile = profiles.get(mode.username);
-      if (!profile?.isPublic) return [];
-      return [mode];
-    });
-  } catch (error) {
-    logger.error(
-      'Failed to load profile mode render static params',
-      {
-        error,
-        route: '/[username]/profile-mode-render/[profileMode]/[marker]',
-      },
-      'public-profile'
-    );
-    // A missing build database must not fail deployment. The on-demand route
-    // remains the runtime fallback.
-    return [];
-  }
+/**
+ * Single-sourced from the pre-build script's generated set (JOV-13104).
+ *
+ * `scripts/write-profile-mode-prerender-set.mjs` answers "which alias-budget
+ * pairs have a public profile in the build database" seconds before
+ * `next build` and writes PROFILE_MODE_PRERENDERED_KEYS; the proxy bounds the
+ * `?mode=` rewrite to that same set. This route used to re-ask the question
+ * through the drizzle pool, so a build where that read failed or disagreed
+ * (observed in the nightly Visual Regression setup job) prerendered no mode
+ * documents while the proxy still rewrote — the rewrite then landed on an
+ * un-prerendered pair whose ISR fallback serves the flight-only
+ * `__next_error__` 404 shell instead of the profile (JOV-12481). Consuming
+ * the generated set makes the prerendered documents and the rewrite bound
+ * identical by construction: a pair is prerendered if and only if the proxy
+ * is willing to rewrite to it.
+ */
+export function getProfileModeRenderStaticParams(): Array<{
+  username: string;
+  profileMode: string;
+  marker: string;
+}> {
+  const prerendered = new Set(PROFILE_MODE_PRERENDERED_KEYS);
+  return aliasBudgetProfileModeParams().filter(mode =>
+    prerendered.has(`${mode.username}:${mode.profileMode}`)
+  );
 }

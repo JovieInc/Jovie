@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "1bd8b0d403e47bcb0b23fdbd8e8afc642136d978489bb415a7db05169bb98d4c"
+    "bodySha256": "1446014ed54249c991905ac56b9551be78a2f9fa86b2d569f1db048c5bda50e7"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "62b91cddba6fb6b74cb0e43f37691238fc0c88eb0e13cb30d092ca2d7369ff54"
+    "bodySha256": "f0601db128861684e7e5defaaaa541e9d7e0a34d9ea119ccdbeb7cc025bffeae"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -92,7 +92,7 @@
       ".github/actions/**",
       ".github/scripts/**"
     ],
-    "bodySha256": "ab6e1ef736a3788ac1fba123dd562ca3a26007affe6331fe2badd74b5ddb55f1"
+    "bodySha256": "bc62cf8f075ebef2862467117d0fa78d1483e27b8a82c8ccf7fc44771c24b737"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -125,7 +125,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "e5839d7117c7952d97d4954d44afa73a7005c0c6f211a170022905b91aa12f63"
+    "bodySha256": "edf613bccb1ef6b81e36d48242e66668595380cf0218c0a8b4c3dca433bd9c8b"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -218,7 +218,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
+    "bodySha256": "85ca0524f0c139b54e2e5b7e9d6992d287ecab2ac27b68c9352d90b0a2f1f68a"
   },
   {
     "file": ".claude/rules/testing.md",

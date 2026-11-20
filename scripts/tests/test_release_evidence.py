@@ -5,6 +5,7 @@ Run with:
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -101,6 +102,86 @@ class CarryStreak(unittest.TestCase):
         rows = runs("failure", "failure", "success")
         current = release_evidence.red_streaks(release_evidence.job_conclusions(rows, jobs_of_factory(rows)))["golden-path"]
         self.assertEqual(release_evidence.carry_streak(current, {"firstBadSha": "old", "count": 9})["firstBadSha"], rows[1]["head_sha"])
+
+
+def _reply(status, headers, body):
+    return SimpleNamespace(returncode=0 if status == "200" else 1,
+                           stdout=f"HTTP/1.1 {status}\n" + "".join(f"{k}: {v}\n" for k, v in headers) + f"\n{json.dumps(body)}",
+                           stderr="")
+
+
+class ConditionalReads(unittest.TestCase):
+    """JOV-13142: the two unconditional per-tick reads (runs list, main head) go through
+    If-None-Match, so a tick where main has not changed costs no fresh core calls."""
+
+    RUNS_PATH = (f"repos/{release_evidence.REPO}/actions/workflows/ci.yml/runs?branch=main&event=push"
+                 f"&status=completed&per_page={release_evidence.RUNS_READ}")
+    MAIN_PATH = f"repos/{release_evidence.REPO}/commits/main"
+
+    def test_a_304_confirmed_read_is_free_and_used(self):
+        rows = runs("failure", "failure")
+        calls = []
+
+        def gh(args, **_):
+            path = args[-1]
+            calls.append(list(args))
+            if args[:1] == ["api"] and "-i" in args:  # conditional_page's -i read (with or without If-None-Match)
+                if "workflows/ci.yml/runs" in path:
+                    return _reply("304", [], {})  # the seeded ETag matches: this read is free
+                return _reply("200", [("ETag", '"m1"')], {"sha": "f" * 40})
+            if "workflows/ci.yml/runs" in path:
+                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            elif "/jobs?" in path:
+                body = {"jobs": jobs_of_factory(rows)(int(path.split("/runs/")[1].split("/")[0]))}
+            elif path.endswith("/logs"):
+                return SimpleNamespace(returncode=0, stdout="✘ 1 › tests/e2e/x.spec.ts:5:1", stderr="")
+            else:
+                body = {"sha": "f" * 40}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "cache" / "etag"
+            cache.mkdir(parents=True)
+            key = hashlib.sha256(self.RUNS_PATH.encode()).hexdigest()[:32] + ".json"
+            cached = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            (cache / key).write_text(json.dumps({"etag": '"v1"', "body": cached}))
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0, run=gh, version=lambda: "a163bac")
+            # the streak came from the 304-confirmed cached body, not a fresh read
+            self.assertEqual(out["streaks"]["golden-path"]["count"], 2)
+            # the runs read sent If-None-Match and was NEVER re-read the plain way
+            runs_reads = [c for c in calls if any("workflows/ci.yml/runs" in a for a in c)]
+            self.assertEqual(len(runs_reads), 1)
+            self.assertTrue(any(a.startswith("If-None-Match:") for a in runs_reads[0]))
+            self.assertIn('If-None-Match: "v1"', runs_reads[0])
+            # the main head read is conditional too, and its 200 wrote an ETag for the next tick
+            main_reads = [c for c in calls if any(a.endswith("/commits/main") for a in c)]
+            self.assertEqual(len(main_reads), 1)
+            self.assertIn("-i", main_reads[0])
+            self.assertTrue((cache / (hashlib.sha256(self.MAIN_PATH.encode()).hexdigest()[:32] + ".json")).exists())
+
+    def test_a_malformed_conditional_reply_falls_back_to_the_plain_read(self):
+        rows = runs("success")
+        calls = []
+
+        def gh(args, **_):
+            path = args[-1]
+            calls.append(list(args))
+            if args[:2] == ["api", "-i"]:  # no status line: conditional_page must decline
+                return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": []}), stderr="")
+            if "workflows/ci.yml/runs" in path:
+                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            elif "/jobs?" in path:
+                body = {"jobs": jobs_of_factory(rows)(int(path.split("/runs/")[1].split("/")[0]))}
+            else:
+                body = {"sha": "f" * 40}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0, run=gh, version=lambda: "a163bac")
+            self.assertEqual(out["streaks"], {})
+            # both fixed reads fell back and still produced a full, correct sample
+            plain_runs = [c for c in calls if c[:1] == ["api"] and "-i" not in c and "workflows/ci.yml/runs" in c[-1]]
+            self.assertEqual(len(plain_runs), 1)
 
 
 class LogRetry(unittest.TestCase):
@@ -232,7 +313,7 @@ class Sample(unittest.TestCase):
         attempt = [1]
 
         def gh(args, **_):
-            path = args[1]
+            path = args[-1]  # JOV-13142: conditional reads call with ["api", "-i", ...path]; the -i reply is declined and falls back
             calls.append(path)
             if path.startswith("repos/JovieInc/Jovie/actions/workflows/ci.yml/runs"):
                 body = {"workflow_runs": [{**{k: v for k, v in r.items() if k != "_job"}, "run_attempt": attempt[0]} for r in rows]}

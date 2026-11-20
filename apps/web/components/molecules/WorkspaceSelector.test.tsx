@@ -161,4 +161,24 @@ describe('WorkspaceSelector', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('rests on the brand mark and keeps the workspace name in the reveal box', () => {
+    render(
+      <WorkspaceSelector
+        currentWorkspaceId='customer'
+        workspaces={workspaces}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Switch Workspace: Jovie',
+    });
+    // globals.css hides `.sidebar-wordmark` at rest and grows it on hover,
+    // focus-visible or while the menu is open.
+    expect(trigger).toHaveClass('sidebar-wordmark-reveal');
+    const wordmark = trigger.querySelector('.sidebar-wordmark');
+    expect(wordmark).toHaveClass('overflow-hidden');
+    expect(wordmark).toHaveTextContent('Jovie');
+    // No flex gap: the hidden name must not pad the resting trigger.
+    expect(trigger.className).not.toMatch(/(?:^|\s)gap-/);
+  });
 });

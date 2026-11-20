@@ -30,6 +30,7 @@ web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/develope
 web.proof-methodology|web|proof-methodology|apps/web/app/(marketing)/proof/methodology/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
+web.sentry-example|web|developer-tooling|apps/web/app/sentry-example-page/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
 web.engineering-preview|web|engineering-preview|apps/web/app/(marketing)/engineering/preview/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
@@ -109,6 +110,9 @@ web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mob
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
+web.tour-dates|web|tour-dates|apps/web/app/app/(shell)/tour-dates/page.tsx|desktop,mobile
+web.chats|web|chats|apps/web/app/app/(shell)/chats/page.tsx|desktop,mobile
+web.insights|web|insights|apps/web/app/app/(shell)/insights/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile

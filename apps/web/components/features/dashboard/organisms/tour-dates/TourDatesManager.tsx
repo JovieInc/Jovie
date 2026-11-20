@@ -25,12 +25,17 @@ interface TourDatesManagerProps {
   readonly profileId: string;
   readonly initialTourDates: TourDateViewModel[];
   readonly connectionStatus: BandsintownConnectionStatus;
+  /** Failure reporter for the owning surface (ProfileSidebarHeader
+   * convention): toasts cannot render in every embedding surface, so the
+   * sync failure is also handed to the owner verbatim. */
+  readonly onSyncError?: (message: string) => void;
 }
 
 export function TourDatesManager({
   profileId,
   initialTourDates,
   connectionStatus,
+  onSyncError,
 }: Readonly<TourDatesManagerProps>) {
   const [tourDates, setTourDates] =
     useState<TourDateViewModel[]>(initialTourDates);
@@ -82,8 +87,9 @@ export function TourDatesManager({
       }
     } catch {
       toast.error('Failed to sync tour dates');
+      onSyncError?.('Failed to sync tour dates');
     }
-  }, [syncMutation]);
+  }, [onSyncError, syncMutation]);
 
   const handleDisconnectClick = useCallback(() => {
     setDisconnectDialogOpen(true);

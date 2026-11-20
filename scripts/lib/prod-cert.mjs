@@ -459,6 +459,7 @@ export async function runProductionCertification({
           now,
           capabilities: stepState.capabilitiesBySurface[surface] ?? null,
           producerSourceSha,
+          servedSha: served.sha,
         })
       );
     }

@@ -13,7 +13,8 @@ hold the revert back; it replaces the revert only by landing first (Main Health 
 dependency bump is always reverted, never debugged in place. A red with no culprit commit (a test that expired by
 the clock on an unchanged main) has nothing to revert and stays with the remediation intake.
 
-Pure: no clock, network or git. Callers pass the runs, the commit range and the time. Revert PRs share the
+No clock, network or git. Callers pass the runs, the commit range and the time; generated Win evidence is checked
+with the canonical local Fleet validator before returning a plan. Revert PRs share the
 main-red-eject contract (scripts/lib/main-red-eject.mjs) so its re-land job and caps treat them the same: branch
 `compounding/revert-<pr>-<sha7>`, labels `compounding` (Merge Queue Green Enroll jumps it) and `main-red-revert`
 (re-landed as a repair PR once it merges), and the `<!-- main-red-eject {...} -->` body marker.
@@ -22,6 +23,8 @@ from __future__ import annotations
 
 import json
 import re
+
+import repair_win
 
 REVERT_SLA_S = 15 * 60
 MAX_ATTEMPTS = 2  # MAX_ATTEMPTS_PER_CHANGE in scripts/lib/main-red-eject.mjs: revert, re-land, revert, then a human
@@ -148,6 +151,11 @@ def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jov
            "behind it inherits the red.")
     rule = ("Dependency bumps are always reverted, never debugged in place." if dependency else
             "Revert first, diagnose second: a forward fix replaces this revert only if it lands first.")
+    # Reuse the repair loop's Fleet policy so a generated compounding PR cannot publish invalid evidence.
+    win = ("## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n"
+           "- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | Main Health runs "
+           f"| first red Main Health run to this PR's created_at\n- Verify: {attribution.get('run') or url}\n- Pending: yes")
+    repair_win.validate(win)
     body = "\n\n".join([
         f"<!-- main-red-eject {json.dumps({'check': check, 'culprit': sha, 'origin': pr, 'attempt': attempt, 'source': SOURCE, 'namedAt': int(named_at)}, sort_keys=True)} -->",
         f"## Summary\n\nno Linear issue: main is red (revert first). {why} {rule}",
@@ -156,10 +164,7 @@ def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jov
         f"## Next\n\nThis revert jumps the queue (`{COMPOUNDING_LABEL}`). When it merges, #{pr} is re-landed as a repair "
         "PR with this failure attached. If a forward fix lands first and Main Health is green again, this PR is closed.",
         '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
-        # `compounding` PRs owe a Win section (Fleet Rules, scripts/lib/wins-ledger.mjs requiresWin).
-        "## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n"
-        "- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | Main Health runs "
-        f"| first red Main Health run to this PR's created_at\n- Verify: {attribution.get('run') or url}\n- Pending: yes",
+        win,
     ])
     return {
         "branch": f"compounding/revert-{pr}-{sha[:7]}",
