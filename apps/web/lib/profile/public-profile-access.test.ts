@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isPrivacyAffectingProfileUpdate,
   isProfileSearchable,
   isPublicProfilePublished,
   isYoungAudienceProfile,
@@ -40,5 +41,26 @@ describe('isPublicProfilePublished', () => {
     expect(isPublicProfilePublished('t')).toBe(true);
     expect(isPublicProfilePublished(false)).toBe(false);
     expect(isPublicProfilePublished('true')).toBe(false);
+  });
+});
+
+describe('isPrivacyAffectingProfileUpdate', () => {
+  it('is false for unrelated or empty updates', () => {
+    expect(isPrivacyAffectingProfileUpdate({})).toBe(false);
+    expect(isPrivacyAffectingProfileUpdate({ settings: {} })).toBe(false);
+    expect(isPrivacyAffectingProfileUpdate({ settings: null })).toBe(false);
+  });
+
+  it('hard-expires on isPublic, searchable, or youngAudience', () => {
+    expect(isPrivacyAffectingProfileUpdate({ isPublic: false })).toBe(true);
+    expect(
+      isPrivacyAffectingProfileUpdate({ settings: { searchable: false } })
+    ).toBe(true);
+    expect(
+      isPrivacyAffectingProfileUpdate({ settings: { youngAudience: true } })
+    ).toBe(true);
+    expect(
+      isPrivacyAffectingProfileUpdate({ settings: { youngAudience: false } })
+    ).toBe(true);
   });
 });

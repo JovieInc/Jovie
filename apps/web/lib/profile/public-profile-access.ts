@@ -21,3 +21,22 @@ export function isYoungAudienceProfile(settings: unknown): boolean {
 export function isPublicProfilePublished(value: unknown): boolean {
   return value === true || value === 1 || value === 't';
 }
+
+/**
+ * Profile updates that must hard-expire the public snapshot (`expire: 0`)
+ * instead of soft revalidation — visibility, searchability, and young-audience
+ * pixel suppress (TRK-6) all change what visitors may see/load.
+ */
+export function isPrivacyAffectingProfileUpdate(updates: {
+  readonly isPublic?: unknown;
+  readonly settings?: {
+    readonly searchable?: unknown;
+    readonly youngAudience?: unknown;
+  } | null;
+}): boolean {
+  return (
+    updates.isPublic !== undefined ||
+    updates.settings?.searchable !== undefined ||
+    updates.settings?.youngAudience !== undefined
+  );
+}

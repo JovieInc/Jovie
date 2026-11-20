@@ -18,6 +18,7 @@ import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync'
 import { hasAdvancedFeatures } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
+import { isPrivacyAffectingProfileUpdate } from '@/lib/profile/public-profile-access';
 import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
 
 /**
@@ -137,9 +138,7 @@ export async function applyProfileUpdate(input: {
       updatedProfile,
       oldUsernameNormalized,
       clerkUserId: appUserId,
-      privacyChanged:
-        parsedUpdates.isPublic !== undefined ||
-        parsedUpdates.settings?.searchable !== undefined,
+      privacyChanged: isPrivacyAffectingProfileUpdate(parsedUpdates),
     }),
   ]);
 
