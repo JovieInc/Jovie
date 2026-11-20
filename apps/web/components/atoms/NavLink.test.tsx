@@ -66,6 +66,7 @@ describe('NavLink', () => {
   });
 
   it('keeps a long primary CTA and Arabic navigation focusable and axe-clean', async () => {
+    // Primary NavLink composes Button asChild + Link (no FrostedButton twin).
     const user = userEvent.setup();
     const { container } = render(
       <nav dir='rtl' lang='ar'>

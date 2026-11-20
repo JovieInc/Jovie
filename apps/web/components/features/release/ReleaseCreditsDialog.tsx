@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/features/release/ReleaseCreditsDialog.test.tsx
 import {
   Button,
   Sheet,
