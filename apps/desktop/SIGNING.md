@@ -1,10 +1,16 @@
 # Desktop App Signing & Auto-Update Setup
 
-> One-time setup. Once these 6 GitHub secrets are added, production-impacting
-> desktop changes on verified `main` open one deterministic post-land version
-> stamp PR. When that stamp clears normal CI and the native merge queue, the
-> exact verified generation produces a signed, notarized macOS DMG that the
-> existing app can auto-update to.
+> One-time setup. Once these 6 GitHub secrets are added:
+>
+> - **Production:** desktop-impacting changes on verified `main` open one
+>   deterministic post-land version stamp PR. When that stamp clears CI and
+>   the merge queue, the verified generation publishes a signed `vX.Y.Z` DMG
+>   that the production app auto-updates to.
+> - **Dogfood (Tim's MBP):** every green `main` CI whose desktop source changed
+>   since the last `desktop-staging` publish runs `desktop-dogfood.yml`, which
+>   signs and rolls the `desktop-staging` prerelease. Installed **Jovie Staging**
+>   auto-updates with no stamp PR and no babysitting.
+>
 > Notarization uses the modern App Store Connect API key flow — no
 > app-specific passwords to rotate.
 
@@ -131,23 +137,32 @@ spctl --assess --type execute --verbose=2 /Volumes/Jovie/Jovie.app
 # Expected: "accepted" + "source=Notarized Developer ID"
 ```
 
-To publish staging from exact current `main` after its `CI` run is green:
+To bootstrap or force a dogfood (staging) publish from exact current `main`
+after its `CI` run is green:
 
 ```bash
-gh workflow run desktop-release.yml --ref main -f environment=staging
+gh workflow run desktop-dogfood.yml --ref main -f force_rebuild=true
 ```
 
-The same publisher also reconciles staging daily. It verifies exact green
-`main` CI, compares desktop source with the last signed staging release, and
+`desktop-dogfood.yml` also runs after every successful `CI` push to `main`.
+It compares desktop source with the last signed `desktop-staging` release and
 publishes only when that source changed. A superseded main generation skips;
-missing or untrusted staging release provenance fails closed and requires the
-explicit manual bootstrap path above.
+missing baseline provenance fails closed and requires the explicit force
+bootstrap above (once).
 
 The workflow derives the next-patch
 `X.Y.(Z+1)-staging.<run-id>.<attempt>` version, updates only the
 `desktop-staging` rolling prerelease and `staging-mac.yml`, and binds its exact
 version, source revision, channel, and build time into the signed app's
 verifiable build identity. Production remains stable and unchanged.
+
+### Tim's daily-driver done-check
+
+1. One-time (if `Jovie Staging.app` is missing): install the latest DMG from
+   <https://github.com/JovieInc/Jovie/releases/tag/desktop-staging>.
+2. Open Jovie Staging once so the 03:41 LaunchAgent registers.
+3. After that, desktop-relevant lands on `main` → green CI → dogfood publish →
+   auto-update. No further manual install.
 
 ## Recovering an existing installed (unsigned) app
 
@@ -193,8 +208,8 @@ Staging and production use distinct updater caches (`extraMetadata.name` in
 pending download before install-on-quit.
 
 electron-updater (Squirrel.Mac) has no post-install rollback. The staging
-channel is the canary: it publishes signed prereleases from green `main`
-before production stamps land.
+channel is Tim's dogfood canary: `desktop-dogfood.yml` publishes signed
+prereleases from green `main` before production stamps land.
 
 ## Cost & cadence
 
@@ -220,7 +235,9 @@ before production stamps land.
 - `apps/desktop/scripts/notarize-release-dmg.cjs` — shared DMG signing,
   notarization, stapling, and updater-metadata finalization hook
 - `apps/desktop/build/entitlements.mac.plist` — hardened-runtime entitlements
-- `.github/workflows/desktop-release.yml` — auto-trigger + keychain setup + build
+- `.github/workflows/desktop-release.yml` — production auto-trigger + build
+- `.github/workflows/desktop-dogfood.yml` — founder dogfood (staging) from green main
+- `apps/desktop/electron-builder.staging.yml` — staging/dogfood packaging
 - `apps/web/lib/desktop/electron-bridge.ts` — guarded renderer wrappers + fallback
 - `apps/web/lib/desktop/electron-bridge.test.ts` — regression test for the
   shame-on-me bug (`E.onUpdateAvailable is not a function`)

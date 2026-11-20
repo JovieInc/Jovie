@@ -41,6 +41,7 @@
     {"id": "workflow:design-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-gate.yml"},
     {"id": "workflow:design-governance", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-governance.yml"},
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
+    {"id": "workflow:desktop-dogfood", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-dogfood.yml", "note": "Founder Mac staging/dogfood channel from green main; production stamps stay on desktop-release.yml."},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
