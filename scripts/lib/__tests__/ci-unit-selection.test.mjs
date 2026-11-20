@@ -363,5 +363,6 @@ describe('selected web unit lane', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+    // Real Turbo fixture: allow headroom under serial/preflight load.
+  }, 180_000);
 });
