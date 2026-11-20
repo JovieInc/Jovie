@@ -70,11 +70,11 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     let token: String
   }
 
-  private let baseURL: URL
-  private let session: URLSession
-  private let tokenProvider: TokenProviding
-  private let decoder: JSONDecoder
-  private let requestTimeout: TimeInterval
+  let baseURL: URL
+  let session: URLSession
+  let tokenProvider: TokenProviding
+  let decoder: JSONDecoder
+  let requestTimeout: TimeInterval
 
   init(
     baseURL: URL,
@@ -89,7 +89,7 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     self.requestTimeout = requestTimeout
   }
 
-  private func resolveAuthorization(
+  func resolveAuthorization(
     forceRefresh: Bool,
     tokenOverride: String?
   ) async throws -> NativeRequestAuthorization {
@@ -102,7 +102,7 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
 
   /// Legacy 401 retries keep the original request fence so a suspended refresh
   /// cannot adopt a replacement login as the terminal owner (JOV-12807).
-  private func resolveLegacyRequestCredentials(
+  func resolveLegacyRequestCredentials(
     forceRefresh: Bool,
     tokenOverride: String?,
     inheritedFence: NativeSessionRequestFence?
@@ -594,248 +594,6 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       return try decoder.decode(MobileMeResponse.self, from: data)
     } catch {
       MobileAuthDiagnostics.record("mobile_me_decode_failed")
-      throw APIClientError.decodingFailed
-    }
-  }
-
-  private func sendAppleWalletProfilePassRequest(
-    forceRefresh: Bool,
-    tokenOverride: String? = nil,
-    inheritedFence: NativeSessionRequestFence? = nil
-  ) async throws -> Data {
-    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
-      forceRefresh: forceRefresh,
-      tokenOverride: tokenOverride,
-      inheritedFence: inheritedFence
-    )
-    var request = URLRequest(url: baseURL.appending(path: "/api/wallet/apple/profile-pass"))
-    request.httpMethod = "GET"
-    request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/vnd.apple.pkpass", forHTTPHeaderField: "Accept")
-
-    let data: Data
-    let response: URLResponse
-
-    do {
-      (data, response) = try await session.data(for: request)
-    } catch let error as URLError {
-      throw APIClientError.transportFailed(code: error.code.rawValue)
-    } catch {
-      throw APIClientError.invalidResponse
-    }
-
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw APIClientError.invalidResponse
-    }
-
-    if httpResponse.statusCode == 401, !forceRefresh {
-      let refreshed = try await APIClientSessionFence.refreshOrDiscard(
-        after: token, fence: sessionFence, provider: tokenProvider
-      )
-      return try await sendAppleWalletProfilePassRequest(
-        forceRefresh: true,
-        tokenOverride: refreshed.token,
-        inheritedFence: refreshed.fence
-      )
-    }
-    if httpResponse.statusCode == 401, forceRefresh {
-      APIClientSessionFence.terminalIfCurrent(sessionFence)
-    }
-
-    guard (200 ... 299).contains(httpResponse.statusCode) else {
-      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
-    }
-
-    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
-
-    return data
-  }
-
-  private func sendAudienceHighlightsRequest(
-    forceRefresh: Bool,
-    tokenOverride: String? = nil,
-    inheritedFence: NativeSessionRequestFence? = nil
-  ) async throws -> MobileAudienceHighlightsResponse {
-    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
-      forceRefresh: forceRefresh,
-      tokenOverride: tokenOverride,
-      inheritedFence: inheritedFence
-    )
-    var request = URLRequest(
-      url: baseURL.appending(path: "/api/mobile/v1/audience/highlights")
-    )
-    request.httpMethod = "GET"
-    request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-    let data: Data
-    let response: URLResponse
-
-    do {
-      (data, response) = try await session.data(for: request)
-    } catch let error as URLError {
-      throw APIClientError.transportFailed(code: error.code.rawValue)
-    } catch {
-      throw APIClientError.invalidResponse
-    }
-
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw APIClientError.invalidResponse
-    }
-
-    if httpResponse.statusCode == 401, !forceRefresh {
-      let refreshed = try await APIClientSessionFence.refreshOrDiscard(
-        after: token, fence: sessionFence, provider: tokenProvider
-      )
-      return try await sendAudienceHighlightsRequest(
-        forceRefresh: true,
-        tokenOverride: refreshed.token,
-        inheritedFence: refreshed.fence
-      )
-    }
-    if httpResponse.statusCode == 401, forceRefresh {
-      APIClientSessionFence.terminalIfCurrent(sessionFence)
-    }
-
-    guard (200 ... 299).contains(httpResponse.statusCode) else {
-      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
-    }
-
-    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
-
-    do {
-      return try decoder.decode(MobileAudienceHighlightsResponse.self, from: data)
-    } catch {
-      throw APIClientError.decodingFailed
-    }
-  }
-
-  private func sendActionLoopInboxRequest(
-    workspace: MobileWorkspaceMode,
-    forceRefresh: Bool,
-    tokenOverride: String? = nil,
-    inheritedFence: NativeSessionRequestFence? = nil
-  ) async throws -> MobileActionLoopInboxResponse {
-    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
-      forceRefresh: forceRefresh,
-      tokenOverride: tokenOverride,
-      inheritedFence: inheritedFence
-    )
-    var components = URLComponents(
-      url: baseURL.appending(path: "/api/mobile/v1/inbox"),
-      resolvingAgainstBaseURL: false
-    )
-    if workspace == .ovie {
-      components?.queryItems = [URLQueryItem(name: "workspace", value: workspace.rawValue)]
-    }
-    guard let url = components?.url else {
-      throw APIClientError.invalidResponse
-    }
-    var request = URLRequest(url: url)
-    request.httpMethod = "GET"
-    request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-    let data: Data
-    let response: URLResponse
-
-    do {
-      (data, response) = try await session.data(for: request)
-    } catch let error as URLError {
-      throw APIClientError.transportFailed(code: error.code.rawValue)
-    } catch {
-      throw APIClientError.invalidResponse
-    }
-
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw APIClientError.invalidResponse
-    }
-
-    if httpResponse.statusCode == 401, !forceRefresh {
-      let refreshed = try await APIClientSessionFence.refreshOrDiscard(
-        after: token, fence: sessionFence, provider: tokenProvider
-      )
-      return try await sendActionLoopInboxRequest(
-        workspace: workspace,
-        forceRefresh: true,
-        tokenOverride: refreshed.token,
-        inheritedFence: refreshed.fence
-      )
-    }
-    if httpResponse.statusCode == 401, forceRefresh {
-      APIClientSessionFence.terminalIfCurrent(sessionFence)
-    }
-
-    guard (200 ... 299).contains(httpResponse.statusCode) else {
-      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
-    }
-
-    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
-
-    do {
-      return try decoder.decode(MobileActionLoopInboxResponse.self, from: data)
-    } catch {
-      throw APIClientError.decodingFailed
-    }
-  }
-
-  private func sendActionLoopCalendarRequest(
-    forceRefresh: Bool,
-    tokenOverride: String? = nil,
-    inheritedFence: NativeSessionRequestFence? = nil
-  ) async throws -> MobileActionLoopCalendarResponse {
-    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
-      forceRefresh: forceRefresh,
-      tokenOverride: tokenOverride,
-      inheritedFence: inheritedFence
-    )
-    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/calendar"))
-    request.httpMethod = "GET"
-    request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-    let data: Data
-    let response: URLResponse
-
-    do {
-      (data, response) = try await session.data(for: request)
-    } catch let error as URLError {
-      throw APIClientError.transportFailed(code: error.code.rawValue)
-    } catch {
-      throw APIClientError.invalidResponse
-    }
-
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw APIClientError.invalidResponse
-    }
-
-    if httpResponse.statusCode == 401, !forceRefresh {
-      let refreshed = try await APIClientSessionFence.refreshOrDiscard(
-        after: token, fence: sessionFence, provider: tokenProvider
-      )
-      return try await sendActionLoopCalendarRequest(
-        forceRefresh: true,
-        tokenOverride: refreshed.token,
-        inheritedFence: refreshed.fence
-      )
-    }
-    if httpResponse.statusCode == 401, forceRefresh {
-      APIClientSessionFence.terminalIfCurrent(sessionFence)
-    }
-
-    guard (200 ... 299).contains(httpResponse.statusCode) else {
-      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
-    }
-
-    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
-
-    do {
-      return try decoder.decode(MobileActionLoopCalendarResponse.self, from: data)
-    } catch {
       throw APIClientError.decodingFailed
     }
   }
