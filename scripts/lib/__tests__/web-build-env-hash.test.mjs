@@ -11,8 +11,8 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { load } from 'js-yaml';
 import { buildEnvHash } from '../../ci/web-build-env-hash.mjs';
+import { loadWorkflowYaml } from '../queue-parity.mjs';
 
 const options = { lockfile: 'fixed lock inputs', nodeMajor: '24' };
 const hash = env => buildEnvHash(env, options);
@@ -125,7 +125,7 @@ test('CLI blocks flag drift, wrong SHA/profile/attempt and missing or corrupt ma
     // Exercise the real consumer shell, including tar and the verifier. A
     // present artifact with a mismatched env or missing tar must never reach
     // the rebuild path. This is independent of Turbo or Actions caching.
-    const workflow = load(
+    const workflow = loadWorkflowYaml(
       readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')
     );
     const extract = workflow.jobs['ci-smoke-required'].steps.find(

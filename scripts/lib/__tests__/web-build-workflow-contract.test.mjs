@@ -2,13 +2,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { load } from 'js-yaml';
 import { buildEnvHash } from '../../ci/web-build-env-hash.mjs';
-import { evaluateIf } from '../queue-parity.mjs';
+import { evaluateIf, loadWorkflowYaml } from '../queue-parity.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 const read = file => readFileSync(resolve(root, file), 'utf8');
-const workflow = load(read('.github/workflows/ci.yml'));
+const workflow = loadWorkflowYaml(read('.github/workflows/ci.yml'));
+
+test('loadWorkflowYaml returns a mapping and rejects other documents', () => {
+  const doc = loadWorkflowYaml('jobs:\n  build:\n    steps: []\n');
+  assert.deepEqual(Object.keys(doc.jobs ?? {}), ['build']);
+  assert.throws(() => loadWorkflowYaml('- item\n'), /not a mapping/);
+  assert.throws(() => loadWorkflowYaml('plain\n'), /not a mapping/);
+});
 const jobs = workflow.jobs;
 const step = (id, name) => {
   const found = jobs[id].steps.find(s => s.name === name);
@@ -214,7 +220,7 @@ test('artifact identity includes run attempt and optional downloads cannot swall
       if (/download/.test(s.uses || ''))
         assert.equal(s['continue-on-error'], undefined);
     }
-  const optional = load(
+  const optional = loadWorkflowYaml(
     read('.github/actions/download-optional-web-build/action.yml')
   );
   const download = optional.runs.steps.find(s =>

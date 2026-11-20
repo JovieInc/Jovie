@@ -101,24 +101,55 @@ const UNKNOWN_JSON_PROPERTY =
   /error TS2339: Property '.+' does not exist on type 'unknown'/;
 const JSON_ENVELOPE_MOCK = /error TS2322:.*NeonJsonEnvelope/;
 
+const UNKNOWN_PROPERTY_FILE = /^(.+?)\(\d+,\d+\): error TS2339:/;
+const JSON_UNKNOWN_REPAIR =
+  'TS2339 on unknown: scripts checkJs types response.json() as unknown ' +
+  '(scripts/tsconfig.json lib es2022). Give that json() result a JSDoc type ' +
+  'before reading properties. Do not grow scripts/typecheck-baseline.json to absorb these.';
+const YAML_UNKNOWN_REPAIR =
+  'TS2339 on unknown: js-yaml load() returns unknown. Read the document through ' +
+  'loadWorkflowYaml from scripts/lib/queue-parity.mjs. Do not grow ' +
+  'scripts/typecheck-baseline.json to absorb these.';
+
+/** @param {readonly string[]} diagnosticLines */
+function unknownPropertySources(diagnosticLines, read) {
+  let yaml = false;
+  let json = false;
+  const seen = new Set();
+  for (const line of diagnosticLines) {
+    const match = UNKNOWN_PROPERTY_FILE.exec(line);
+    if (!match || seen.has(match[1])) continue;
+    seen.add(match[1]);
+    let text = '';
+    try {
+      const path = resolve(REPO_ROOT, match[1]);
+      text = read ? read(path) : readFileSync(path, 'utf8');
+    } catch {
+      text = '';
+    }
+    if (/from ['"]js-yaml['"]/.test(text)) yaml = true;
+    if (/\.json\(\)/.test(text)) json = true;
+  }
+  return { yaml, json };
+}
+
 /**
- * Recurring Source Validation repair: scripts/tsconfig.json (checkJs, lib
- * es2022) types `response.json()` as `unknown`, so a new property read is
- * TS2339 and the shrink-only baseline fails. The fix is a JSDoc type at the
- * read, never a higher baseline count. That same type then becomes the
- * injected `request` mock's return type, and `{ branches: unknown[] }` is
- * TS2322 against it.
+ * TS2339 on unknown from `response.json()` or js-yaml `load()`. Name
+ * `loadWorkflowYaml` when the cited file imports js-yaml, and a JSDoc type
+ * for json(). The json() type is also the request-mock return, so
+ * `{ branches: unknown[] }` is TS2322. Never raise the baseline.
  * @param {readonly string[]} diagnosticLines
+ * @param {(path: string) => string} [read]
  * @returns {string | null}
  */
-export function unknownJsonPropertyRepair(diagnosticLines) {
+export function unknownJsonPropertyRepair(diagnosticLines, read) {
   const lines = diagnosticLines ?? [];
   if (lines.some(line => UNKNOWN_JSON_PROPERTY.test(line))) {
-    return (
-      'TS2339 on unknown: scripts checkJs types response.json() as unknown ' +
-      '(scripts/tsconfig.json lib es2022). Give that json() result a JSDoc type ' +
-      'before reading properties. Do not grow scripts/typecheck-baseline.json to absorb these.'
-    );
+    const { yaml, json } = unknownPropertySources(lines, read);
+    if (yaml && json) {
+      return `${YAML_UNKNOWN_REPAIR} ${JSON_UNKNOWN_REPAIR}`;
+    }
+    return yaml ? YAML_UNKNOWN_REPAIR : JSON_UNKNOWN_REPAIR;
   }
   if (lines.some(line => JSON_ENVELOPE_MOCK.test(line))) {
     return (
