@@ -6,19 +6,51 @@
 export const PEN_DATA_BACKED_SHIP_SCHEMA = 'jovie.pen-data-backed-ship/v1';
 export const PERSIST_SCHEMA = 'pen-live-canvas-persist/v1';
 
+/**
+ * Undo git C-quoting (`core.quotePath`) so `.pen` matching cannot miss
+ * non-ASCII / special paths wrapped in `"…"` with octal escapes.
+ * @param {string} path
+ */
+export function normalizeGitPath(path) {
+  let value = String(path ?? '').trim();
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    // Octal escapes are raw UTF-8 bytes (not Unicode code points).
+    const bytes = [];
+    const body = value.slice(1, -1);
+    for (let i = 0; i < body.length; ) {
+      if (body[i] === '\\' && i + 1 < body.length) {
+        const next = body[i + 1];
+        if (next === '\\' || next === '"') {
+          bytes.push(next.charCodeAt(0));
+          i += 2;
+          continue;
+        }
+        const oct = body.slice(i + 1, i + 4);
+        if (/^[0-7]{3}$/.test(oct)) {
+          bytes.push(Number.parseInt(oct, 8));
+          i += 4;
+          continue;
+        }
+      }
+      bytes.push(body.charCodeAt(i));
+      i += 1;
+    }
+    value = Buffer.from(bytes).toString('utf8');
+  }
+  return value.replaceAll('\\', '/');
+}
+
 /** @param {string} path */
 export function isPenBlobPath(path) {
-  const name = String(path ?? '')
-    .replaceAll('\\', '/')
-    .trim()
-    .split('/')
-    .pop();
+  const name = normalizeGitPath(path).split('/').pop();
   return Boolean(name && /\.pen$/i.test(name));
 }
 
 /** @param {readonly string[]} paths */
 export function checkChangedPathsForPenBlobs(paths) {
-  const penBlobs = [...new Set(paths.filter(isPenBlobPath))].sort();
+  const penBlobs = [
+    ...new Set(paths.map(normalizeGitPath).filter(isPenBlobPath)),
+  ].sort();
   return {
     ok: penBlobs.length === 0,
     penBlobs,
@@ -66,7 +98,8 @@ export function validateDataBackedShipReceipt(receipt) {
   const lease = obj(doc.leaseSave);
   if (!lease) block('lease_save_missing', 'leaseSave is required.');
   else {
-    if (!t(lease.holder)) block('lease_holder_missing', 'leaseSave.holder required.');
+    if (!t(lease.holder))
+      block('lease_holder_missing', 'leaseSave.holder required.');
     if (!t(lease.tokenRef) && !t(lease.token))
       block('lease_token_missing', 'leaseSave.token or tokenRef required.');
     if (!Array.isArray(lease.touched) || lease.touched.length === 0)
@@ -80,22 +113,36 @@ export function validateDataBackedShipReceipt(receipt) {
     if (!Array.isArray(ids) || ids.length === 0)
       block('registry_identities_missing', 'registryMap.identities required.');
     else if (ids.some(id => typeof id !== 'string' || !id.trim()))
-      block('registry_identities_invalid', 'identities must be nonempty strings.');
+      block(
+        'registry_identities_invalid',
+        'identities must be nonempty strings.'
+      );
   }
 
   const codePaths = doc.codeSyncPaths;
   if (!Array.isArray(codePaths) || codePaths.length === 0) {
-    block('code_sync_missing', 'codeSyncPaths must list code sync paths (no .pen).');
+    block(
+      'code_sync_missing',
+      'codeSyncPaths must list code sync paths (no .pen).'
+    );
   } else {
-    const pens = codePaths.filter(p => typeof p === 'string' && isPenBlobPath(p));
+    const pens = codePaths.filter(
+      p => typeof p === 'string' && isPenBlobPath(p)
+    );
     if (pens.length)
-      block('code_sync_contains_pen', `codeSyncPaths has .pen: ${pens.join(', ')}`);
+      block(
+        'code_sync_contains_pen',
+        `codeSyncPaths has .pen: ${pens.join(', ')}`
+      );
   }
 
   if (doc.parityProbe != null) {
     const status = t(obj(doc.parityProbe)?.status);
     if (!['skipped', 'passed', 'failed'].includes(status))
-      block('parity_probe_status', 'parityProbe.status: skipped|passed|failed.');
+      block(
+        'parity_probe_status',
+        'parityProbe.status: skipped|passed|failed.'
+      );
   }
 
   return {

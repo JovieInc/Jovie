@@ -20,13 +20,18 @@ function arg(argv, name) {
 }
 
 function gitLines(args) {
-  const r = spawnSync('git', args, {
+  // quotePath=false avoids C-quoted names that would hide a trailing .pen
+  const r = spawnSync('git', ['-c', 'core.quotePath=false', ...args], {
     cwd: REPO,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr || r.stdout}`);
-  return r.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+  if (r.status !== 0)
+    throw new Error(`git ${args.join(' ')}: ${r.stderr || r.stdout}`);
+  return r.stdout
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
 }
 
 function gitChangedFiles(base) {
@@ -103,7 +108,9 @@ Docs: docs/design-system/DATA_BACKED_SHIP_PATH.md`);
   if (command === 'pilot') {
     const receipt = buildPilotShipReceipt();
     const validation = validateDataBackedShipReceipt(receipt);
-    console.log(JSON.stringify({ mode: 'pilot', receipt, validation }, null, 2));
+    console.log(
+      JSON.stringify({ mode: 'pilot', receipt, validation }, null, 2)
+    );
     return validation.ok ? 0 : 1;
   }
   return 2;
