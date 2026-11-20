@@ -11,8 +11,12 @@ on:
   workflow_run:
     workflows: ['desktop-release']
     types: [completed]
-  # No cron: JOV-INV-042 cron allowlist is frozen; desktop-release completion
-  # is the primary event. workflow_dispatch covers manual reconcile.
+  # No cron: JOV-INV-042 cron allowlist is frozen (no new GitHub schedules).
+  # Stamp dwell escalation therefore waits on the next desktop-release
+  # completion or a manual workflow_dispatch — there is no sibling scheduled
+  # freshness reconciler to piggyback. Quiet periods without a release event
+  # do not mint a new clock; reopen via Gem lanes tick only if dwell latency
+  # becomes an owner-tracked gap.
   workflow_dispatch:
 
 permissions:

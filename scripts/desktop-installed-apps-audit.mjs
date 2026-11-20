@@ -22,6 +22,8 @@ import {
   isStagingAssetName,
   validateReleaseEnvelope,
 } from './desktop-release-assets.mjs';
+import { isInstallationQuota403 } from './lib/github-installation-quota.mjs';
+import { classifyGitHubFailure } from './lib/github-rate-limit.mjs';
 
 const APPLICATIONS_DIR = '/Applications';
 export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -368,13 +370,22 @@ async function githubJson(url, fetchImpl = fetch) {
     headers: githubHeaders('application/vnd.github+json'),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    const detail = body.trim().slice(0, 240);
+    throw new Error(
+      `GitHub ${response.status} for ${url}${detail ? `: ${detail}` : ''}`
+    );
+  }
   return response.json();
 }
 
 /**
  * Transient fetch/API failures are incomplete observation — not a bad publish.
  * Digest/content mismatches stay verification failures.
+ * Bare permission 403s stay verification/publication errors; only rate-limit /
+ * secondary-rate-limit style 403s (same family as github-rate-limit.mjs) count
+ * as observation failures.
  * @param {unknown} error
  */
 export function isPublicationObservationError(error) {
@@ -391,7 +402,10 @@ export function isPublicationObservationError(error) {
     /Published feed returned (\d{3})\./.exec(message);
   if (!statusMatch) return false;
   const status = Number(statusMatch[1]);
-  return status === 429 || status >= 500;
+  if (status === 429 || status >= 500) return true;
+  if (status !== 403) return false;
+  if (isInstallationQuota403(message, 403)) return true;
+  return classifyGitHubFailure({ status: 403, message }).kind !== 'none';
 }
 
 async function shippedVersion(release, channel, fetchImpl) {
@@ -479,8 +493,13 @@ async function shippedVersion(release, channel, fetchImpl) {
         signal: AbortSignal.timeout(30_000),
       }
     );
-    if (!response.ok)
-      throw new Error(`Published feed returned ${response.status}.`);
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      const detail = body.trim().slice(0, 240);
+      throw new Error(
+        `Published feed returned ${response.status}.${detail ? ` ${detail}` : ''}`
+      );
+    }
     const bytes = Buffer.from(await response.arrayBuffer());
     if (
       bytes.length !== feed.size ||
