@@ -192,7 +192,6 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         plan: result.plan,
         correlation: result.correlation,
         stripeEventTimestamp,
-        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'customer.subscription.created',
       });
     }
@@ -306,7 +305,6 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         plan: result.plan,
         correlation: result.correlation,
         stripeEventTimestamp,
-        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'customer.subscription.updated',
       });
     }

@@ -141,6 +141,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       amountPaid: invoice.amount_paid,
       currency: invoice.currency,
       priceId,
+      invoiceId: invoice.id,
     }).catch(error => {
       logger.warn('Failed to send payment recovery email', {
         userId,
@@ -219,6 +220,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       await invalidateBillingCache(result.appUserId);
 
       if (canCompleteIdempotentPostEffects(result)) {
+        this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+
         const paymentDelivery = await trackServerEvent(
           invoice.billing_reason === 'subscription_cycle'
             ? 'subscription_renewed'
@@ -236,14 +239,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         if (!paymentDelivery.ok) {
           throw new Error(
             `Payment analytics delivery failed: ${paymentDelivery.error}`
-          );
-        }
-
-        if (!result.skipped) {
-          this.sendRecoveryEmailIfNeeded(
-            invoice,
-            subscription,
-            result.appUserId
           );
         }
       }

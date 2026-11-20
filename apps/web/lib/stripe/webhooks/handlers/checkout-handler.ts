@@ -144,7 +144,6 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
         correlation: result.correlation,
         acquisitionId,
         stripeEventTimestamp,
-        skipWelcomeEmail: Boolean(result.skipped),
         eventName: 'checkout.session.completed',
       });
     }

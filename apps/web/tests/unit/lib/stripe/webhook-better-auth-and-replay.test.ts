@@ -122,7 +122,7 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
     expect(mocks.trackServerEvent).not.toHaveBeenCalled();
   });
 
-  it('completes idempotent post-activation effects on duplicate_event retry after a transient failure without re-sending welcome email', async () => {
+  it('completes idempotent post-activation effects on duplicate_event retry after a transient failure and still enqueues welcome email', async () => {
     mocks.dbSelectRows = [{ id: 'ba-user-uuid-retry', clerkId: null }];
     mocks.retrieveSub.mockResolvedValue({
       id: 'sub_retry_1',
@@ -180,8 +180,10 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
       1,
       expect.objectContaining({
         appUserId: 'ba-user-uuid-retry',
-        skipWelcomeEmail: false,
       })
+    );
+    expect(mocks.runPostEffects.mock.calls[0]?.[0]?.skipWelcomeEmail).not.toBe(
+      true
     );
 
     const retryRes = await handler.handle(ctx);
@@ -191,8 +193,10 @@ describe('Stripe webhooks: Better Auth UUID fallback, expanded customer, skipped
       2,
       expect.objectContaining({
         appUserId: 'ba-user-uuid-retry',
-        skipWelcomeEmail: true,
       })
+    );
+    expect(mocks.runPostEffects.mock.calls[1]?.[0]?.skipWelcomeEmail).not.toBe(
+      true
     );
   });
 
