@@ -76,6 +76,7 @@ jobs:
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
+            scripts/lib/script-contract-security-tests.mjs
             scripts/lib/ci-failure-excerpts.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -581,6 +582,7 @@ jobs:
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
+            scripts/lib/script-contract-security-tests.mjs
             scripts/lib/ci-failure-excerpts.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -872,6 +874,7 @@ jobs:
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
+            scripts/lib/script-contract-security-tests.mjs
             scripts/lib/ci-failure-excerpts.mjs
             scripts/lib/test-file-dependencies.mjs
             scripts/invariants/scanned-paths.mjs
@@ -1018,6 +1021,7 @@ jobs:
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
+            scripts/lib/script-contract-security-tests.mjs
             scripts/lib/ci-failure-excerpts.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
