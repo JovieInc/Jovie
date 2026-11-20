@@ -1457,60 +1457,53 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       });
 
       const telemetry = createSurfaceTelemetry(page);
-      try {
-        await certStep(
-          'onboarding',
-          'fresh-user-onboarding-first-value',
-          async () => {
-            assertExactNavigationUrl(
-              page.url(),
-              expectedOrigin,
-              'Onboarding chat'
+      await certStep(
+        'onboarding',
+        'fresh-user-onboarding-first-value',
+        async () => {
+          assertExactNavigationUrl(
+            page.url(),
+            expectedOrigin,
+            'Onboarding chat'
+          );
+          const input = page.locator('[aria-label="Chat message input" i]');
+          const sendButton = page.getByRole('button', {
+            name: 'Send message',
+          });
+          await expect(input).toBeVisible({ timeout: 30_000 });
+          await fillControlledInputUntilEnabled(
+            input,
+            sendButton,
+            'Help me set up my artist profile'
+          );
+          const [response] = await Promise.all([
+            page.waitForResponse(
+              candidate =>
+                candidate.request().method() === 'POST' &&
+                new URL(candidate.url()).pathname === '/api/chat',
+              { timeout: 60_000 }
+            ),
+            sendButton.click(),
+          ]);
+          if (response.status() !== 200) {
+            const body = await response.text().catch(() => '');
+            throw new Error(
+              `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
             );
-            const input = page.locator('[aria-label="Chat message input" i]');
-            const sendButton = page.getByRole('button', {
-              name: 'Send message',
-            });
-            await expect(input).toBeVisible({ timeout: 30_000 });
-            await fillControlledInputUntilEnabled(
-              input,
-              sendButton,
-              'Help me set up my artist profile'
-            );
-            const [response] = await Promise.all([
-              page.waitForResponse(
-                candidate =>
-                  candidate.request().method() === 'POST' &&
-                  new URL(candidate.url()).pathname === '/api/chat',
-                { timeout: 60_000 }
-              ),
-              sendButton.click(),
-            ]);
-            if (response.status() !== 200) {
-              const body = await response.text().catch(() => '');
-              throw new Error(
-                `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
-              );
-            }
-            await expect(
-              page.locator("[data-testid='chat-message-reply']").first()
-            ).toBeVisible({ timeout: 60_000 });
-            // The reply element is also where a quota wall renders (the weekly
-            // limit streams its notice as an assistant message); a visible
-            // element alone is a false pass (JOV-9625). Require real content.
-            await assertAssistantReply(
-              page,
-              'fresh-user onboarding first value'
-            );
-            return 'first assistant reply';
-          },
-          () => 'fresh user reached first value: onboarding chat first reply'
-        );
-        telemetry.record('onboarding');
-        await telemetry.capture(page, 'onboarding');
-      } finally {
-        await page.unrouteAll({ behavior: 'ignoreErrors' });
-      }
+          }
+          await expect(
+            page.locator("[data-testid='chat-message-reply']").first()
+          ).toBeVisible({ timeout: 60_000 });
+          // The reply element is also where a quota wall renders (the weekly
+          // limit streams its notice as an assistant message); a visible
+          // element alone is a false pass (JOV-9625). Require real content.
+          await assertAssistantReply(page, 'fresh-user onboarding first value');
+          return 'first assistant reply';
+        },
+        () => 'fresh user reached first value: onboarding chat first reply'
+      ).finally(() => page.unrouteAll({ behavior: 'ignoreErrors' }));
+      telemetry.record('onboarding');
+      await telemetry.capture(page, 'onboarding');
     }
 
     await certStep(
