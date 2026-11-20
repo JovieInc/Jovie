@@ -36,7 +36,10 @@ describe('CTA label weight lock (JOV-5317)', () => {
   });
 
   it('keeps the shared web button on the medium token, not semibold or book', () => {
-    const source = readRepo('packages/ui/atoms/button.tsx');
+    const source = [
+      readRepo('packages/ui/atoms/button.tsx'),
+      readRepo('packages/ui/atoms/button-styles.ts'),
+    ].join('\n');
 
     expect(source).toContain('[font-weight:var(--font-weight-medium)]');
     expect(source).not.toMatch(/\bfont-(?:semibold|bold|book)\b/);
