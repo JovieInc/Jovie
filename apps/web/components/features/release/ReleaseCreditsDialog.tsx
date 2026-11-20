@@ -90,20 +90,19 @@ export function ReleaseCreditsDialog({
       <>
         {trigger}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent
-            side='bottom'
-            className='overflow-hidden rounded-t-2xl px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'
-          >
-            <SheetHeader className='border-b border-subtle pb-3 text-left'>
-              <SheetTitle className='text-app font-semibold text-primary-token'>
-                Credits
-              </SheetTitle>
-              <SheetDescription className='sr-only'>
-                View all credited collaborators for this release
-              </SheetDescription>
-            </SheetHeader>
-            <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
-              {content}
+          <SheetContent side='bottom'>
+            <div className='overflow-hidden px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
+              <SheetHeader>
+                <div className='border-b border-subtle pb-3 text-left'>
+                  <SheetTitle>Credits</SheetTitle>
+                  <SheetDescription className='sr-only'>
+                    View all credited collaborators for this release
+                  </SheetDescription>
+                </div>
+              </SheetHeader>
+              <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
+                {content}
+              </div>
             </div>
           </SheetContent>
         </Sheet>
@@ -114,23 +113,18 @@ export function ReleaseCreditsDialog({
   return (
     <>
       {trigger}
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        size='sm'
-        className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-hidden sm:mx-auto sm:w-full'
-      >
-        <DialogTitle className='text-app font-semibold text-primary-token'>
-          Credits
-        </DialogTitle>
-        <DialogDescription className='sr-only'>
-          View all credited collaborators for this release
-        </DialogDescription>
-        <DialogBody className='mt-2'>
-          <div className='rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
-            {content}
-          </div>
-        </DialogBody>
+      <Dialog open={open} onClose={() => setOpen(false)} size='sm'>
+        <div className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-hidden sm:mx-auto sm:w-full'>
+          <DialogTitle>Credits</DialogTitle>
+          <DialogDescription className='sr-only'>
+            View all credited collaborators for this release
+          </DialogDescription>
+          <DialogBody className='mt-2'>
+            <div className='rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
+              {content}
+            </div>
+          </DialogBody>
+        </div>
       </Dialog>
     </>
   );
