@@ -114,9 +114,9 @@ export function lintMarketingTokens(options = {}) {
     error = (...a) => console.error(...a),
   } = options;
 
-  const sources = (scanRoots ?? collectMarketingSources(webRoot)).flatMap(dir =>
-    walk(dir, [])
-  );
+  const sources = scanRoots
+    ? scanRoots.flatMap(dir => walk(dir, []))
+    : collectMarketingSources(webRoot);
 
   /** @type {Record<string, { file: string, line: number }[]>} */
   const hits = {};
@@ -163,7 +163,9 @@ export function lintMarketingTokens(options = {}) {
     error(`lint-marketing-tokens: --strict failed with ${strictHits} hit(s)`);
     return { code: 1 };
   }
-  log('lint-marketing-tokens: ok (informational mode)');
+  if (!args.includes('--json')) {
+    log('lint-marketing-tokens: ok (informational mode)');
+  }
   return { code: 0 };
 }
 

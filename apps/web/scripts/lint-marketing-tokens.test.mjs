@@ -91,6 +91,38 @@ describe('marketing token lint (JOV-13064)', () => {
     expect(strict.code).toBe(1);
   });
 
+  it('scans default marketing roots and keeps strict JSON parseable', () => {
+    const { root, scanRoot } = makeFixture();
+    fixtureRoot = root;
+    writeFileSync(join(scanRoot, 'P.tsx'), 'max-w-[1296px]\n');
+    /** @type {string[]} */
+    const out = [];
+    const result = lintMarketingTokens({
+      args: ['--json', '--strict'],
+      webRoot: root,
+      log: (...lines) => out.push(lines.join(' ')),
+      error: () => {},
+    });
+    expect(result.code).toBe(1);
+    expect(JSON.parse(out.join('\n')).hits['raw-1296']).toEqual([
+      { file: 'components/marketing/P.tsx', line: 1 },
+    ]);
+  });
+
+  it('emits only JSON for a clean strict scan', () => {
+    const { root } = makeFixture();
+    fixtureRoot = root;
+    /** @type {string[]} */
+    const out = [];
+    const result = lintMarketingTokens({
+      args: ['--json', '--strict'],
+      webRoot: root,
+      log: (...lines) => out.push(lines.join(' ')),
+    });
+    expect(result.code).toBe(0);
+    expect(JSON.parse(out.join('\n'))).toEqual({ hits: {} });
+  });
+
   it('collects ts/tsx/css but skips tests', () => {
     const { root, scanRoot } = makeFixture();
     fixtureRoot = root;
