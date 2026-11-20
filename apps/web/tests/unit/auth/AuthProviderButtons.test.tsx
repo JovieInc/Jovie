@@ -108,10 +108,13 @@ describe('AuthProviderButtonSlots', () => {
     ).toEqual(['google', 'apple']);
   });
 
-  it('pins the Pen oaz9c 28px face with a visible hairline', () => {
+  it('pins the Pen oaz9c 28px face with a visible hairline and theme-aware text token', () => {
     const css = readFileSync(join(process.cwd(), 'styles/theme.css'), 'utf8');
+    const button = css.match(/\n\.auth-provider-button \{([^}]*)\}/)?.[1] ?? '';
     const face = css.match(/\n\.auth-provider-face \{([^}]*)\}/)?.[1] ?? '';
 
+    expect(button).toMatch(/color: var\(--color-text-primary-token\);/);
+    expect(button).not.toMatch(/--color-text-primary;/);
     expect(face).toMatch(/min-height: 28px;/);
     expect(face).toMatch(/padding: 0 16px;/);
     // The transparent pill has no fill, so the subtle hairline vanished.

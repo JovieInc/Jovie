@@ -70,21 +70,52 @@ describe('golden-path lock test files', () => {
 });
 
 describe('golden-path lock classifier', () => {
-  it('marks chat, start, waitlist, and homepage CTA paths', () => {
+  it('marks chat, start, waitlist, checkout, claim, and homepage CTA paths', () => {
     const classified = classifyChangedPaths([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
     expect(classified.matched).toEqual([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
     ]);
+  });
+
+  it('verifies every live Golden Path surface exists on disk and triggers touchesGoldenPath', () => {
+    const liveGoldenPathFiles = [
+      'apps/web/components/homepage/HomepageEditorial.tsx',
+      'apps/web/data/homepageStartCta.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
+      'apps/web/components/features/onboarding/OnboardingChat.tsx',
+      'apps/web/components/features/onboarding/ChatProposeCheckoutCard.tsx',
+      'apps/web/app/(auth)/signup/SignUpPageClient.tsx',
+      'apps/web/app/(auth)/signin/SignInPageClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/[username]/_components/PublicClaimBanner.tsx',
+      'apps/web/app/r/[slug]/ReleaseLandingPage.tsx',
+    ];
+    for (const relPath of liveGoldenPathFiles) {
+      expect(
+        readFileSync(join(REPO_ROOT, relPath), 'utf8').length
+      ).toBeGreaterThan(0);
+      expect(classifyChangedPaths([relPath]).touchesGoldenPath).toBe(true);
+    }
   });
 
   it('still records docs-only diffs without treating them as a skip', () => {

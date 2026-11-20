@@ -548,10 +548,7 @@ export async function decideFallbackTurn(
   input: Readonly<{
     uiMessages: readonly UIMessage[];
     state: OnboardingTurnState;
-    /**
-     * System-1 hint (JOV-9627): the classifier already read the first message
-     * as an artist name, so skip the greeting and open the picker prefilled.
-     */
+    /** System-1 hint (JOV-9627): classifier read turn 1 as an artist name, so open the picker prefilled. */
     openPickerQuery?: string;
   }>
 ): Promise<FallbackTurn> {
@@ -559,6 +556,7 @@ export async function decideFallbackTurn(
   const draft = state.profileDraft;
   if (
     draft &&
+    !input.openPickerQuery?.trim() &&
     (draft.activeRole !== 'artist' || (state.spotifyArtistId && !draft.outcome))
   ) {
     const reply = (

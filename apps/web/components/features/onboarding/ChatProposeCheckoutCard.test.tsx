@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   formatPublicPriceDisplay,
@@ -109,7 +109,7 @@ describe('ChatProposeCheckoutCard', () => {
     );
   });
 
-  it('paints Continue with the on-media tokens', () => {
+  it('renders Continue with canonical primary button contrast and 44px hit target', () => {
     render(
       <ChatProposeCheckoutCard
         payload={{
@@ -120,11 +120,16 @@ describe('ChatProposeCheckoutCard', () => {
       />
     );
 
-    expect(screen.getByRole('link', { name: 'Continue' })).toHaveClass(
-      'bg-on-media',
-      'text-ink-on-media',
-      'dark:text-on-media'
+    const cta = screen.getByRole('link', { name: 'Continue' });
+    fireEvent.focus(cta);
+    fireEvent.click(cta);
+    expect(cta).toHaveClass(
+      'bg-btn-primary',
+      'text-btn-primary-foreground',
+      'before:min-h-11',
+      'before:min-w-11'
     );
+    expect(cta).not.toHaveClass('dark:bg-surface-1');
   });
 
   it.each([
