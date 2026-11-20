@@ -91,15 +91,12 @@ export function ReleaseCreditsDialog({
         {trigger}
         <Sheet open={open} onOpenChange={setOpen}>
           {/*
-            Bottom SheetContent ships with sheetSurfaceStyles `p-5` and no
-            top radius. Own padding + rounded-t on the surface itself so we
-            do not nest a second px-5 under the default pad, and so mobile
-            keeps the original rounded top edge.
+            Bottom SheetContent already owns `p-5` (sheetSurfaceStyles) and
+            `rounded-t-2xl` (bottom side variant). Do not nest a second px-5 or
+            restyle radius/padding here — that double-pads and trips the
+            shrink-only no-restyle gate.
           */}
-          <SheetContent
-            side='bottom'
-            className='overflow-hidden rounded-t-2xl px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'
-          >
+          <SheetContent side='bottom' className='overflow-hidden'>
             <SheetHeader>
               <div className='border-b border-subtle pb-3 text-left'>
                 <SheetTitle>Credits</SheetTitle>
@@ -111,6 +108,11 @@ export function ReleaseCreditsDialog({
             <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
               {content}
             </div>
+            {/* Extra safe-area beyond the surface p-5 (1.25rem). */}
+            <div
+              aria-hidden
+              className='h-[max(0px,calc(env(safe-area-inset-bottom)-1.25rem))]'
+            />
           </SheetContent>
         </Sheet>
       </>

@@ -165,7 +165,7 @@ unless linked below.
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 83 |
 | `linear-namespace` | `error` | G + I | Yes | 687 |
-| `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2985 messages (grandfathered) |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 211 files; 2981 messages (grandfathered) |
 | `off-scale-step` | `error` | G + I | Yes | None; vs base |
 | `source-identity` | `error` | I | Yes | 1885 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 587; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=241 |
