@@ -300,7 +300,14 @@
   --color-text-secondary-token: #d0d6e0;
   --color-text-tertiary-token: #8a8f98;
   --color-text-quaternary-token: #62666d;
-  --profile-stage-bg: #050608;
+  /* Public profiles are a fixed-dark scenic surface — pin ZiaWI dark ladder. */
+  --noir-ion-canvas: #030406;
+  --noir-ion-shell: #07080a;
+  --noir-ion-card: #131417;
+  --noir-ion-elevated: #1a1b1e;
+  --noir-ion-floating: #232427;
+  /* Stage floor = ZiaWI canvas. Overlay/scrim/glow remain scenic paint. */
+  --profile-stage-bg: var(--noir-ion-canvas);
   --profile-stage-overlay:
     radial-gradient(
       circle at 50% 12%,
@@ -333,8 +340,8 @@
     );
   --profile-content-bg: linear-gradient(
     180deg,
-    rgba(14, 16, 20, 0.96),
-    rgba(10, 12, 16, 0.94)
+    color-mix(in srgb, var(--noir-ion-card) 96%, transparent),
+    color-mix(in srgb, var(--noir-ion-shell) 94%, transparent)
   );
   --profile-panel-border: rgba(255, 255, 255, 0.09);
   --profile-panel-shadow:
@@ -345,7 +352,7 @@
     rgba(255, 255, 255, 0.02) 20%,
     transparent 100%
   );
-  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-bg: var(--noir-ion-card);
   --profile-drawer-highlight: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.08),
@@ -1997,8 +2004,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --shadow-button-inset:
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
-  /* Public profile premium surfaces */
-  --profile-stage-bg: #efeff3;
+  /* Public profile premium surfaces — solids on ZiaWI; overlays stay scenic */
+  --profile-stage-bg: var(--noir-ion-canvas);
   --profile-stage-overlay:
     radial-gradient(
       circle at 18% 14%,
@@ -2020,8 +2027,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --profile-stage-glow-b: rgba(226, 228, 235, 0.72);
   --profile-content-bg: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.95),
-    rgba(247, 247, 249, 0.92)
+    color-mix(in srgb, var(--noir-ion-card) 95%, transparent),
+    color-mix(in srgb, var(--noir-ion-shell) 92%, transparent)
   );
   --profile-panel-border: rgba(255, 255, 255, 0.78);
   --profile-panel-shadow:
@@ -2032,7 +2039,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     rgba(255, 255, 255, 0.08) 24%,
     transparent 100%
   );
-  --profile-drawer-bg: rgb(248, 248, 250);
+  --profile-drawer-bg: var(--noir-ion-card);
   --profile-drawer-highlight: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.48),
@@ -2146,7 +2153,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      compressed ordered tail. */
   --noir-ion-text-secondary: #a0a5af;
   /* Stays below secondary, and still clears 4.5:1 when a done task row
-     composites this color at opacity 0.75 over the shell canvas #101114. */
+     composites this color at opacity 0.75 over the shell card (#131417). */
   --noir-ion-text-muted: #9da2ac;
   /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
   --noir-ion-text-tertiary: #8c939e;
@@ -2186,7 +2193,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
-  --app-shell-content-surface: #131417;
+  --app-shell-content-surface: var(--noir-ion-card);
   --app-shell-card-shadow: none;
   --app-shell-border: rgba(168, 176, 195, 0.12);
   --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
@@ -2338,8 +2345,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
   --shadow-button: var(--shadow-button-inset);
 
-  /* Public profile premium surfaces */
-  --profile-stage-bg: #050608;
+  /* Public profile premium surfaces — solids on ZiaWI; overlays stay scenic */
+  --profile-stage-bg: var(--noir-ion-canvas);
   --profile-stage-overlay:
     radial-gradient(
       circle at 50% 12%,
@@ -2356,8 +2363,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
   --profile-content-bg: linear-gradient(
     180deg,
-    rgba(14, 16, 20, 0.96),
-    rgba(10, 12, 16, 0.94)
+    color-mix(in srgb, var(--noir-ion-card) 96%, transparent),
+    color-mix(in srgb, var(--noir-ion-shell) 94%, transparent)
   );
   --profile-panel-border: rgba(255, 255, 255, 0.09);
   --profile-panel-shadow:
@@ -2368,7 +2375,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     rgba(255, 255, 255, 0.02) 20%,
     transparent 100%
   );
-  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-bg: var(--noir-ion-card);
   --profile-drawer-highlight: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.08),
@@ -3803,7 +3810,12 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-text-secondary-token: #d0d6e0;
   --color-text-tertiary-token: #8a8f98;
   --color-text-quaternary-token: #62666d;
-  --profile-drawer-bg: rgb(14, 16, 20);
+  --noir-ion-canvas: #030406;
+  --noir-ion-shell: #07080a;
+  --noir-ion-card: #131417;
+  --noir-ion-elevated: #1a1b1e;
+  --noir-ion-floating: #232427;
+  --profile-drawer-bg: var(--noir-ion-card);
   --profile-panel-border: rgba(255, 255, 255, 0.09);
   --profile-drawer-highlight: linear-gradient(
     180deg,

@@ -696,9 +696,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /const APP_BACKGROUND_COLOR = '#08090a';/);
   assert.doesNotMatch(mainSource, /background: #08090a/);
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
-  assert.match(tokenSource, /backgroundColor: '#06080d'/);
-  assert.match(tokenSource, /surfaceColor: '#0f1420'/);
-  assert.doesNotMatch(tokenSource, /#06070a|#101216|#0a0b0e|#161a20/);
+  assert.match(tokenSource, /backgroundColor: '#030406'/);
+  assert.match(tokenSource, /surfaceColor: '#131417'/);
+  assert.doesNotMatch(
+    tokenSource,
+    /#06080d|#0f1420|#06070a|#101216|#0a0b0e|#161a20/
+  );
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
@@ -850,7 +853,7 @@ test('Mac cinematic splash renders the wordmark lockup that settles to the 32px 
   const tokens = {
     macCornerMarkSizePx: 40,
     macCornerMarkOpacity: 0.35,
-    macCinematicCanvas: '#030407',
+    macCinematicCanvas: '#030406',
     markCream: '#F5F4F0',
     splashMarkSizePx: 32,
   };
