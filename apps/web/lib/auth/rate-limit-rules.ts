@@ -17,17 +17,14 @@ import { isProdcertCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
 
 /**
- * Staging synthetic principals: on the staging deployment (VERCEL_ENV=preview
- * built from main) the canonical test-email shape on our own test domains may
- * use the deterministic code without E2E_TEST_MODE, so agents can walk sign-up
- * on staging with no DB access. One strict anchored pattern: own domains only,
- * never an admin-looking local part (the seeded admin persona must not be
- * passwordless on staging).
+ * Staging signal: PR previews are also VERCEL_ENV=preview, so require the
+ * main-branch commit ref that aliases to staging.jov.ie.
+ *
+ * Staging deploys against the production database (release.md). A fixed OTP
+ * on that host is a known password for any matching live account (including
+ * prod canaries like browse-ready+clerk_test@jov.ie). Never allow it here —
+ * not even with E2E_TEST_MODE=1.
  */
-const STAGING_SYNTHETIC_EMAIL =
-  /^(?!.*admin)[a-z0-9._-]+(\+[a-z0-9._-]+)*\+(e2e|clerk_test)(\+[a-z0-9._-]*)?@(jov\.ie|test\.jovie\.com)$/i;
-
-/** Positive staging signal: PR previews are VERCEL_ENV=preview too. */
 function isStagingDeployment(): boolean {
   return (
     env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === 'main'
@@ -38,8 +35,9 @@ function isStagingDeployment(): boolean {
  * Deterministic test-OTP gate. Fail closed:
  * - the email must match the canonical test shape (never any other address);
  * - VERCEL_ENV=production is always refused;
+ * - staging (preview built from main / staging.jov.ie) is always refused
+ *   because it shares the production database;
  * - on Vercel (VERCEL=1) with VERCEL_ENV unset or unknown: refused;
- * - staging (preview built from main): only STAGING_SYNTHETIC_EMAIL;
  * - other preview deployments, development, and local/CI runners (no Vercel):
  *   need the explicit E2E_TEST_MODE=1 opt-in.
  *
@@ -49,6 +47,7 @@ function isStagingDeployment(): boolean {
 export function isDeterministicTestOtpEmail(email: string): boolean {
   if (!TEST_OTP_EMAIL_PATTERN.test(email)) return false;
   if (env.VERCEL_ENV === 'production') return false;
+  if (isStagingDeployment()) return false;
   if (
     process.env.VERCEL === '1' &&
     env.VERCEL_ENV !== 'preview' &&
@@ -56,7 +55,6 @@ export function isDeterministicTestOtpEmail(email: string): boolean {
   ) {
     return false;
   }
-  if (isStagingDeployment() && STAGING_SYNTHETIC_EMAIL.test(email)) return true;
   return env.E2E_TEST_MODE === '1';
 }
 
