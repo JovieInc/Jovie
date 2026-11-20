@@ -1,18 +1,21 @@
 import 'server-only';
 
 import { and, eq, gt } from 'drizzle-orm';
+import { TEST_AUTH_BYPASS_SESSION_PREFIX } from '@/lib/auth/test-mode-constants';
 import { db } from '@/lib/db';
 import { baVerifications } from '@/lib/db/schema/better-auth';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
+import { adminStepUpIdentifier } from './mfa-constants';
 
-/** A passkey (Touch ID) step-up unlocks admin data for this long. */
-export const ADMIN_STEP_UP_TTL_MS = 12 * 60 * 60 * 1000;
-
-/** First passkey enrollment requires a sign-in at most this old. */
-export const PASSKEY_ENROLLMENT_MAX_SESSION_AGE_MS = 10 * 60 * 1000;
-
-export function adminStepUpIdentifier(sessionId: string): string {
-  return `admin-step-up:${sessionId}`;
-}
+export {
+  ADMIN_STEP_UP_TTL_MS,
+  adminStepUpIdentifier,
+  PASSKEY_ENROLLMENT_MAX_SESSION_AGE_MS,
+} from './mfa-constants';
+export {
+  seedAdminMfaStepUpForBypassUser,
+  seedAdminMfaStepUpReceipt,
+} from './mfa-seed';
 
 /**
  * True when this exact Better Auth session was created by a passkey
@@ -25,6 +28,16 @@ export async function hasRecentAdminMfaReverification(
 ): Promise<boolean> {
   const sessionId = authResult?.sessionId;
   if (!sessionId) return false;
+  // Secretless PR visual capture has no ba_verifications table (JOV-7126).
+  // Only the producer's own test-auth bypass session id shape is exempt —
+  // production sessions never use this prefix, and normal E2E with a DB
+  // seeds a real receipt instead of taking this branch.
+  if (
+    isVisualCaptureSyntheticAuthEnabled() &&
+    sessionId.startsWith(TEST_AUTH_BYPASS_SESSION_PREFIX)
+  ) {
+    return true;
+  }
   try {
     const [row] = await db
       .select({ id: baVerifications.id })
