@@ -540,36 +540,6 @@ def merge_failures(peers: dict | None, number: int, failing: dict | None) -> dic
     return merged
 
 
-# main-red-eject failing-head comments carry this marker (scripts/lib/main-red-eject.mjs).
-FAILING_HEAD_EJECT_RE = re.compile(r"<!-- main-red-eject (\{.*?\}) -->")
-
-
-def failing_head_eject_holds(number: int, head_oid: str | None, sh=run) -> bool | None:
-    """Whether main-red-eject hold-labeled this exact head. None = unreadable (fail closed)."""
-    if not head_oid:
-        return False
-    read = sh(["gh", "api", f"repos/{REPO}/issues/{number}/comments?per_page=100"])
-    if getattr(read, "returncode", 1):
-        return None
-    try:
-        comments = json.loads(read.stdout or "[]")
-    except (ValueError, TypeError):
-        return None
-    if not isinstance(comments, list):
-        return None
-    for comment in comments:
-        match = FAILING_HEAD_EJECT_RE.search(str((comment or {}).get("body") or ""))
-        if not match:
-            continue
-        try:
-            fields = json.loads(match.group(1))
-        except (ValueError, TypeError):
-            continue
-        if fields.get("failingHeadDequeued") == head_oid:
-            return True
-    return False
-
-
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -588,6 +558,7 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
     # JOV-8492: this rollup can only supersede a red the relay itself applied (see label_episodes.py).
+    # Reconcile gap-fill (jovie-bot) clears on the host sweep — see reconcile unlabel.
     if label_episode_applier(number, LANE_FIX_RED, sh) != RELAY_RED_LABELLER:
         return False
     deleted = sh(["gh", "api", "-X", "DELETE", f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
@@ -1192,18 +1163,37 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
 
 HOLD_DEQUEUE = "dequeued-by-hand"
 FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
+# main-red-eject failing-head posts this on the dequeued head (durable without comments).
+EJECT_HOLD_CONTEXT = "jovie-merge-group-eject-hold/v1"
 FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
+
+
+def _hold_receipt_logins(sha: str | None, context: str, sh=run) -> set[str] | None:
+    """Creator logins for a successful commit-status hold receipt. None = unreadable."""
+    if not sha:
+        return set()
+    listed = sh([
+        "gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq",
+        f'[.[] | select(.context == "{context}" and .state == "success") | .creator.login] '
+        "| unique | join(\" \")",
+    ])
+    if listed.returncode != 0:
+        return None
+    return set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS
 
 
 def failure_held(sha: str | None, sh=run) -> bool:
     """The merge-group failure hold wrote its receipt on this exact head before dequeuing it.
     On 2026-10-12 #21393 was held this way and got no repair signal: the PR sat CLEAN, refused
     by the enroll controller until a new head that nothing was asked to push."""
-    if not sha:
-        return False
-    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq", f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
-                 '| .creator.login] | unique | join(" ")'])
-    return listed.returncode == 0 and bool(set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS)
+    writers = _hold_receipt_logins(sha, FAILURE_HOLD_CONTEXT, sh)
+    return bool(writers)  # unreadable → False (same as the prior returncode check)
+
+
+def eject_held(sha: str | None, sh=run) -> bool | None:
+    """main-red-eject failing-head labeled this exact head. None = unreadable (fail closed)."""
+    writers = _hold_receipt_logins(sha, EJECT_HOLD_CONTEXT, sh)
+    return None if writers is None else bool(writers)
 
 
 def rerun_after_quota(workflow_run: dict, kind: str, sh=run) -> bool:
@@ -2633,9 +2623,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
             if applier != RELAY_RED_LABELLER:
                 if applier is None or applier not in FAILURE_HOLD_WRITERS:
                     continue  # human / unreadable: fail closed
-                eject = failing_head_eject_holds(number, head_oid, lane.sh)
-                if eject is not False:
-                    continue  # eject hold or unreadable comments: keep
+                if eject_held(head_oid, lane.sh) is not False:
+                    continue  # eject hold or unreadable statuses: keep
                 # jovie-bot gap-fill with no merge-group evidence: clear
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:

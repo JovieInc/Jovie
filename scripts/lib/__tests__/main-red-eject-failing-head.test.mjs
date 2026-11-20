@@ -127,18 +127,23 @@ describe('stuckHead failing-head pass', () => {
     };
   };
 
-  it('dequeues, labels lane-fix-red, comments with the failing checks, and never enqueues or dispatches', async () => {
+  it('dequeues, labels lane-fix-red, stamps eject-hold status, comments, and never enqueues or dispatches', async () => {
     wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
     routes['issues/23966/labels'] = {};
+    routes['statuses/abc123'] = {};
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeued: true });
     expect(dequeuePullRequest).toHaveBeenCalledWith(
       expect.objectContaining({ number: 23966 })
     );
     const posted = writes();
-    expect(posted).toHaveLength(2);
+    expect(posted).toHaveLength(3);
     expect(posted.some(c => c.includes('issues/23966/labels'))).toBe(true);
     expect(posted.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
+    expect(posted.some(c => c.includes('statuses/abc123'))).toBe(true);
+    expect(posted.some(c => c.includes('jovie-merge-group-eject-hold/v1'))).toBe(
+      true
+    );
     expect(posted.some(c => c.includes('issues/23966/comments'))).toBe(true);
     expect(posted.find(c => c.includes('comments'))).toContain('PR Ready');
     expect(

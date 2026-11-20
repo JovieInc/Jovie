@@ -677,6 +677,25 @@ async function failingHead(head, doApply) {
       `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
     );
   }
+  // Durable hold receipt for reconcile (commit status survives without comments).
+  if (labeled && head.sha) {
+    await gh([
+      'api',
+      '-X',
+      'POST',
+      `repos/${REPO}/statuses/${head.sha}`,
+      '-f',
+      'state=success',
+      '-f',
+      'context=jovie-merge-group-eject-hold/v1',
+      '-f',
+      `description=failing-head eject hold on #${head.number}`,
+    ]).catch(error =>
+      console.error(
+        `::warning::failing-head eject-hold status failed: ${error.message}`
+      )
+    );
+  }
   // The dequeue is the fix; a failed comment must not undo or retry it.
   await gh([
     'api',
