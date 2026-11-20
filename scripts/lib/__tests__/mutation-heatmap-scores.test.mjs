@@ -37,7 +37,7 @@ test('normalizeRepoWebPath accepts web-relative, repo-relative, and abs paths', 
     'apps/web/lib/stripe/dunning.ts'
   );
   assert.equal(
-    normalizeRepoWebPath('/tmp/checkout/apps/web/lib/auth/x.ts'),
+    normalizeRepoWebPath('/workspace/checkout/apps/web/lib/auth/x.ts'),
     'apps/web/lib/auth/x.ts'
   );
 });
