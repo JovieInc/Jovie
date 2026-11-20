@@ -166,11 +166,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     'validation-sync',
     'linear-sync-on-merge',
     'founder-taste-order',
+    'ordinary-issue-validation-closure-replay',
   ]) {
     expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
       `lib/__tests__/${test}.test.mjs`
     );
   }
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    'outcome-residual-policy'
+  );
   // An explicit '=true' becomes a string in Vitest 5 and silently checks
   // aggregate coverage. Exercise its actual parser at this runner boundary.
   expect(
