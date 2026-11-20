@@ -37,7 +37,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
-from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section, with_machine_receipt
 from pr_repair_evidence import with_locking_pr
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
 from intake_linear import (  # noqa: E402  (Linear intake filing split out; size-500)
@@ -1083,7 +1083,7 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None, previous_win_section: str | None = None,
-                         blast_radius: dict | None = None, literal_mentions: tuple[str, ...] = ()) -> str:
+                         blast_radius: dict | None = None, literal_mentions: tuple[str, ...] = (), machine_receipt: str | None = None) -> str:
     """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
     decisions = re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)
     if len(decisions) > 1:
@@ -1117,7 +1117,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    updated = with_blast_radius(updated, blast_radius)
+    updated = with_machine_receipt(with_blast_radius(updated, blast_radius), machine_receipt)
     return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision),
                                      literal_mentions=literal_mentions)
 
@@ -1136,11 +1136,11 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
                             locking_pr: int | None = None, win_section: str | None = None,
                             previous_win_section: str | None = None,
                             premise: dict | None = None, blast_radius: dict | None = None,
-                            literal_mentions: tuple[str, ...] = ()) -> bool:
+                            literal_mentions: tuple[str, ...] = (), machine_receipt: str | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
             customer_decision is None and locking_pr is None and win_section is None and premise is None and blast_radius is None
-            and not literal_mentions and red_before_green_block(pr, excerpt) is None):
+            and not literal_mentions and machine_receipt is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
@@ -1148,7 +1148,7 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
                                    win_section=win_section, previous_win_section=previous_win_section, premise=premise,
-                                   blast_radius=blast_radius, literal_mentions=literal_mentions)
+                                   blast_radius=blast_radius, literal_mentions=literal_mentions, machine_receipt=machine_receipt)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:

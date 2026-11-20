@@ -112,17 +112,25 @@ export function ghShape(args: readonly string[]): {
     );
     const effective = method ?? (hasFields ? 'POST' : 'GET');
     const write = effective !== 'GET' && effective !== 'HEAD';
-    if (
-      (target === 'rate_limit' || target === '/rate_limit') &&
-      effective === 'GET'
-    )
-      return { resource: 'core', write: false, idempotent: true, cost: 0 };
     return {
       resource: target.replace(/^\//, '').startsWith('search/')
         ? 'search'
         : 'core',
       write,
       idempotent: !write || effective === 'PUT' || effective === 'DELETE',
+      // GET /rate_limit is exempt from primary quota, never secondary limits.
+      ...(effective === 'GET' &&
+      !args.includes('--hostname') &&
+      !args.some(arg =>
+        /^(?:--(?:hostname|method|field|raw-field|input)=|-X.|-[fF].)/.test(arg)
+      ) &&
+      [
+        'rate_limit',
+        '/rate_limit',
+        'https://api.github.com/rate_limit',
+      ].includes(target)
+        ? { cost: 0 }
+        : {}),
     };
   }
   const read = args[0] === 'search' || READ_PORCELAIN.has(args[1] ?? '');
@@ -264,6 +272,7 @@ export async function runGh(
         s,
         {
           priority,
+          // A free quota observation still passes the same circuit breaker.
           costs: shape.cost === 0 ? {} : { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
@@ -312,7 +321,14 @@ export async function runGh(
       !GH_TRANSIENT.test(result.stderr)
         ? 'client'
         : failure.kind;
-    const settled: Failure = { kind, retryAtMs: failure.retryAtMs };
+    // A primary-free endpoint cannot spend core quota. If a server throttle
+    // carries an empty core header, keep the secondary breaker authoritative
+    // and preserve the full provider reset/backoff window for free probes.
+    const freeProbeThrottle = shape.cost === 0 && kind === 'primary';
+    const settled: Failure = {
+      kind: freeProbeThrottle ? 'secondary' : kind,
+      retryAtMs: failure.retryAtMs,
+    };
     const observations = parseBudget(spec, headers, at, shape.resource);
     if (result.code === 0 && shape.cost === 0) {
       const headerResources = new Set(observations.map(row => row.resource));

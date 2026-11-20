@@ -699,9 +699,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // Existing ones are baselined per file and may only go down.
     id: 'test-hygiene',
     command:
-      'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
+      'node scripts/test-hygiene.mjs && node scripts/lib/__tests__/guard-test-network-guard.test.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
     inputs:
-      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/(?:test-hygiene|guard-test-network-guard)\.mjs|lib\/guard-test-network\.ratchet\.gen\.json|test-quality\/test-hygiene-baseline\.json|test-quality\/test-hygiene-landmines\.ratchet\.json|ci-fast-lanes\.mjs)$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -994,12 +994,9 @@ export const LANES_COVERAGE_GROUP_COMMANDS = lanesCoverageGroupCommands(
   structuralPythonRegression
 );
 
-/**
- * Structural Python regressions, split so the pool can overlap them. Each
- * command keeps its original `&&` dependencies (coverage run → report).
- */
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
-export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
+export const API_CLIENT_TS_COMMAND =
+  'pnpm --filter @jovie/api-client exec vitest run --coverage --coverage.include=gh.ts --coverage.thresholds.lines=85 --coverage.thresholds.branches=80 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-api-client-ts-coverage" --maxWorkers=2';
 /** @jovie/research router + decision log suite, run with the operations lane. */
 export const RESEARCH_TS_COMMAND = 'pnpm --filter @jovie/research test';
 
@@ -1312,7 +1309,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-shard-attribution.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
   'scripts/lib/__tests__/vendored-actions.test.mjs',
-  'scripts/lib/__tests__/api-quota-report.test.mjs',
+  'scripts/lib/__tests__/api-quota-report.test.mjs scripts/lib/__tests__/api-quota-sampling.test.mjs',
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',

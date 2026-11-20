@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
@@ -61,6 +62,7 @@ describe('api quota report', () => {
       )
     ).toEqual({
       bucket: 'github-token',
+      resource: 'core',
       remaining: 0,
       limit: 1000,
       used: 1000,
@@ -226,6 +228,7 @@ describe('quota windows follow the reset epoch, not the clock hour', () => {
   const sample = (secondsBeforeReset, remaining, bucket = 'github-token') => ({
     at: reset - secondsBeforeReset,
     bucket,
+    resource: 'core',
     remaining,
     limit: 5000,
     used: 5000 - remaining,

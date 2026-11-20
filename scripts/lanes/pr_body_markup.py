@@ -8,6 +8,18 @@ RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 
 
+def with_machine_receipt(body: str, receipt: str | None) -> str:
+    """Append only a caller-supplied receipt; preserve an existing machine decision."""
+    if receipt is None:
+        return body
+    if not isinstance(receipt, str) or not re.fullmatch(
+            r"(?:Machine: built [A-Za-z0-9_-][A-Za-z0-9_./-]*|Machine-gap: [A-Z][A-Z0-9]*-[1-9][0-9]*)", receipt):
+        raise ValueError("machine receipt requires one explicit Machine: built path or Machine-gap: issue line")
+    if re.search(r"^(?:Machine:|Machine-gap:)", body, re.M):
+        return body
+    return body.rstrip("\n") + "\n\n" + receipt + "\n"
+
+
 def repair_customer_decision(updated: str, decisions: list[str], customer_decision: dict | None) -> str:
     """Preserve original comments through section replacement before selecting a missing note."""
     for decision in decisions:
