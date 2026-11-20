@@ -130,8 +130,8 @@ export function deriveClaimedOnboardingStateFromToolEvents(
       artist = readArtist(output) ?? artist;
 
       if (
-        output.action === 'check_handle' ||
-        output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+        output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED ||
+        (output.action === 'check_handle' && output.available !== false)
       ) {
         handle = cleanHandle(output.handle) ?? handle;
       }

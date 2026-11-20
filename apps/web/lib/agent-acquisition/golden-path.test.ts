@@ -46,17 +46,22 @@ describe('presentGoldenPathQualification', () => {
     });
   });
 
-  it('maps every hold to queued with the locked copy', () => {
+  it('maps every hold to queued with the locked copy and flags verification holds', () => {
     for (const reason of [
       'hold_golden_path_not_green',
       'hold_capacity_full',
       'hold_reach_unknown',
+      'hold_high_profile_needs_verification',
       'hold_open_learnings',
     ]) {
       const view = presentGoldenPathQualification({ admit: false, reason });
       expect(view.status).toBe('queued');
       expect(view.reason).toBe(reason);
       expect(view.message).toBe(GOLDEN_PATH_WAITLIST_COPY);
+      expect(view.requiresVerification).toBe(
+        reason === 'hold_reach_unknown' ||
+          reason === 'hold_high_profile_needs_verification'
+      );
     }
   });
 });
