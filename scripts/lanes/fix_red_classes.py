@@ -34,7 +34,7 @@ from fix_red_mixed_repairs import first_route_reason, mixed_repairs, promote_bod
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_conflict_resolvers import merge_additive_quoted_entries
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
+                                     base_moved, error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_biome import BIOME_FORMAT_TEXT
 from fix_red_source_edits import (  # noqa: F401
@@ -206,7 +206,7 @@ def stamp_internal_changelog(body) -> str | None:
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
-    a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
+    a check with no log is `other`. A BEHIND branch, or an empty failure list whose base tip moved, is `stale-branch`."""
     logs = logs or {}
     import cert_stub_sync, detached_native_sync, fix_red_measured_win
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
@@ -237,6 +237,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         cls, action = "other", AGENT
     signature = error_signature("\n".join(logs.get(name) or "" for name in names)) if cls in {"other", "mixed"} else ""
     if cls in {"other", "mixed"} and pr.get("mergeStateStatus") == "BEHIND":
+        cls, action = BEHIND_CLASS, SYNC_MAIN
+    elif not names and cls == "other" and pr.get("mergeStateStatus") != "DIRTY" and base_moved(pr):
         cls, action = BEHIND_CLASS, SYNC_MAIN
     # A body defect beside only sync-main classes still stamps red-before-green, then syncs.
     cls, action = promote_body_and_sync(cls, action, per_check)

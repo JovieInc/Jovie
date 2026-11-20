@@ -12,6 +12,7 @@ import { OFFER, type Offer } from './offer';
 export type ClaimId =
   | 'price.free'
   | 'price.pro'
+  | 'price.pro_compact'
   | 'currency'
   | 'trial.summary'
   | 'trial.no_card'
@@ -50,6 +51,12 @@ const DEFS: readonly ClaimDef[] = [
     appliesTo: () => true,
     render: o =>
       `${o.plans.pro.displayName} is ${money(o.plans.pro.amountCents)}/${o.plans.pro.interval === 'month' ? 'month' : 'year'}.`,
+  },
+  {
+    id: 'price.pro_compact',
+    appliesTo: () => true,
+    render: o =>
+      `${formatAmount(o.plans.pro.amountCents, o.currency)}/${o.plans.pro.interval === 'month' ? 'mo' : 'yr'}`,
   },
   {
     id: 'currency',

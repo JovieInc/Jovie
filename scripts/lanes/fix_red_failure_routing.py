@@ -200,6 +200,22 @@ def base_tip(pr) -> str:
     return oid if isinstance(oid, str) and _SHA.fullmatch(oid) else ""
 
 
+def base_moved(pr) -> bool:
+    """Recorded base snapshot differs from the live base tip.
+
+    A pending jovie-execution status hides BEHIND as UNSTABLE, so an empty
+    failure list dispatched a model (fix-red-e3b0c44298). Missing or equal
+    oids stay false; base_tip's snapshot fallback must not count as a move.
+    """
+    if not isinstance(pr, dict):
+        return False
+    recorded, ref = pr.get("baseRefOid"), pr.get("baseRef")
+    target = ref.get("target") if isinstance(ref, dict) else None
+    tip = target.get("oid") if isinstance(target, dict) else None
+    valid = isinstance(recorded, str) and isinstance(tip, str) and _SHA.fullmatch(recorded) and _SHA.fullmatch(tip)
+    return bool(valid and recorded != tip)
+
+
 def sync_claim(pr, action: str) -> str:
     """Route claim key. sync-main is once per head and base tip.
 

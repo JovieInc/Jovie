@@ -39,3 +39,10 @@ export const SpotifyStep: Story = {
     initialResumeStep: 'spotify',
   },
 };
+
+export const PlanStep: Story = {
+  args: {
+    initialProfileId: 'storybook-profile',
+    initialResumeStep: 'upgrade',
+  },
+};

@@ -298,5 +298,43 @@ class LoneReadyTest(unittest.TestCase):
             case.doCleanups()
 
 
+class EmptyFailureBaseMovedTest(unittest.TestCase):
+    """fix-red-e3b0c44298: no red check, while a pending status hides BEHIND."""
+
+    def pr(self, *, status="UNSTABLE", recorded="a" * 40, tip="b" * 40, checks=None, include_base=True):
+        row = {"mergeStateStatus": status, "statusCheckRollup": checks if checks is not None else [
+            {"name": "PR Ready", "conclusion": "SUCCESS"}]}
+        if include_base:
+            row["baseRefOid"] = recorded
+            row["baseRef"] = {"target": {"oid": tip}}
+        return row
+
+    def test_empty_failures_with_a_moved_base_sync_main(self):
+        import fix_red_classes as classes
+        pending = self.pr(checks=[
+            {"name": "PR Ready", "conclusion": "SUCCESS"},
+            {"__typename": "StatusContext", "context": "jovie-execution/boundary", "state": "PENDING"},
+        ])
+        got = classes.classify(pending, {})
+        self.assertEqual((got["cls"], got["action"], got["checks"]), ("stale-branch", "sync-main", []))
+
+    def test_a_real_failure_keeps_its_route_when_the_base_moved(self):
+        import fix_red_classes as classes
+        failed = self.pr(checks=[{"name": "Source Validation", "conclusion": "FAILURE"}])
+        other = classes.classify(failed, {"Source Validation": "AssertionError: expected 1"})
+        self.assertEqual((other["cls"], other["action"]), ("other", "agent"))
+        rerun = classes.classify(failed, {"Source Validation": "API rate limit exceeded"})
+        self.assertEqual(rerun["action"], "rerun")
+
+    def test_missing_equal_or_dirty_base_stays_on_the_model(self):
+        import fix_red_classes as classes
+        same = "c" * 40
+        equal = classes.classify(self.pr(recorded=same, tip=same), {})
+        missing = classes.classify(self.pr(include_base=False), {})
+        short = classes.classify(self.pr(recorded="abc", tip="b" * 40), {})
+        dirty = classes.classify(self.pr(status="DIRTY"), {})
+        self.assertEqual([row["action"] for row in (equal, missing, short, dirty)], ["agent"] * 4)
+
+
 if __name__ == "__main__":
     unittest.main()

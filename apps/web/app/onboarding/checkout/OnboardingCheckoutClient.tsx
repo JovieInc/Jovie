@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Mail, Sparkles } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -17,8 +17,9 @@ import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel'
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
-import { getEntitlements, getLimit } from '@/lib/entitlements/registry';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
@@ -56,28 +57,6 @@ function getAnnualSavingsPercent(
   const yearlyAtMonthly = monthlyAmount * 12;
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
-
-const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
-
-// Paid-only, entitlement-gated items. Tips are not plan-gated, so they are not
-// sold as an upgrade; verification is a reviewed request, not automatic.
-const OFFER_HIGHLIGHTS = [
-  {
-    icon: Mail,
-    label: 'Release Emails',
-    detail: 'Email your verified subscribers when new music drops',
-  },
-  {
-    icon: BarChart3,
-    label: `${PRO_ANALYTICS_DAYS}-day Analytics`,
-    detail: 'Geographic insights & advanced data',
-  },
-  {
-    icon: BadgeCheck,
-    label: 'Verified Badge',
-    detail: 'Request verification, reviewed by our team',
-  },
-] as const;
 
 function releaseYear(releaseDate: string | null): string | null {
   return releaseDate?.slice(0, 4) || null;
@@ -475,22 +454,19 @@ export function OnboardingCheckoutClient({
           className='mb-6 p-4'
           data-testid='onboarding-checkout-offer-card'
         >
-          <div className='space-y-3'>
-            {OFFER_HIGHLIGHTS.map(item => (
-              <div key={item.label} className='flex items-start gap-3'>
-                <item.icon
-                  className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+          <ul aria-label={planMarketing.displayName} className='space-y-3'>
+            {getPaidPlanAdditionNames().map(feature => (
+              <li key={feature} className='flex items-start gap-3'>
+                <Check
                   aria-hidden='true'
+                  className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
                 />
-                <div>
-                  <p className='text-app font-medium text-primary-token'>
-                    {item.label}
-                  </p>
-                  <p className='text-xs text-tertiary-token'>{item.detail}</p>
-                </div>
-              </div>
+                <p className='text-app font-medium text-primary-token'>
+                  {feature}
+                </p>
+              </li>
             ))}
-          </div>
+          </ul>
         </ContentSurfaceCard>
 
         {/* Annual toggle */}

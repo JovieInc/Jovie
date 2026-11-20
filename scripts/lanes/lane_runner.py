@@ -6546,7 +6546,7 @@ def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Pa
     return types.SimpleNamespace(returncode=0)
 
 
-REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt baseRefOid baseRef{target{oid}}
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
 latestOpinionatedReviews(first:100,writersOnly:false){totalCount pageInfo{hasNextPage}
 nodes{id state body submittedAt updatedAt author{__typename login} commit{oid}}}
