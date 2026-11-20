@@ -90,7 +90,7 @@ const STRUCTURAL_DECISION_JOBS = [
 ];
 
 describe('ci-fast shard fan-in contracts', () => {
-  const jobs = loadYaml(WORKFLOW).jobs;
+  const jobs = /** @type {{ jobs: Record<string, any> }} */ (loadYaml(WORKFLOW)).jobs;
   const script = (job, name) =>
     jobs[job].steps.find(step => step.name === name).run;
   const run = (code, env) =>

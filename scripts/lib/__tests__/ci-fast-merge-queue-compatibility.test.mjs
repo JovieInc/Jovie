@@ -199,7 +199,7 @@ const BASELINE_AGGREGATOR_NEEDS = {
 };
 
 describe('merge-queue critical-path compatibility', () => {
-  const jobs = loadYaml(WORKFLOW).jobs;
+  const jobs = /** @type {{ jobs: Record<string, any> }} */ (loadYaml(WORKFLOW)).jobs;
   it('preserves every existing runner label and required check identity', () => {
     for (const { labels, jobs: ids } of BASELINE_RUNNER_GROUPS) {
       for (const id of ids) expect(jobs[id]['runs-on'], id).toEqual(labels);

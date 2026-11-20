@@ -36,10 +36,12 @@ describe('structural core matrix shards', () => {
     return started;
   };
 
-  const workflow = load(
-    readFileSync(
-      new URL('../../../.github/workflows/ci.yml', import.meta.url),
-      'utf8'
+  const workflow = /** @type {{ jobs: Record<string, any> }} */ (
+    load(
+      readFileSync(
+        new URL('../../../.github/workflows/ci.yml', import.meta.url),
+        'utf8'
+      )
     )
   );
   it.each(['operations', 'web', 'mac', 'operations,web,mac', 'none'])(
@@ -90,10 +92,12 @@ describe('lanes coverage matrix legs', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it('runs exactly one leg command for only:<group>', async () => {
-    const job = load(
-      readFileSync(
-        new URL('../../../.github/workflows/ci.yml', import.meta.url),
-        'utf8'
+    const job = /** @type {{ jobs: Record<string, any> }} */ (
+      load(
+        readFileSync(
+          new URL('../../../.github/workflows/ci.yml', import.meta.url),
+          'utf8'
+        )
       )
     ).jobs['ci-fast-structural-lanes-shards'];
     expect(job.env.CI_FAST_STRUCTURAL_LANES).toBe('only:${{ matrix.group }}');
