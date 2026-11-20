@@ -411,16 +411,25 @@ describe('postdeploy-probes workflow wiring (JOV-12639)', () => {
     );
   });
 
-  it('keys the Pen export cache by content, saved under the export step key', () => {
+  it('restores the content-addressed Pen export cache read-only without dead cache saves on read-only tokens', () => {
     const steps = jobs['golden-path-cert'].steps;
     const restore = steps.find(s =>
       String(s.uses).endsWith('actions-cache/restore')
     );
-    const save = steps.find(s => String(s.uses).endsWith('actions-cache/save'));
     expect(restore.with.key).toBe('${{ steps.pen-source.outputs.cache_key }}');
-    expect(save.with.key).toBe('${{ steps.pen-export.outputs.cache_key }}');
-    expect(save.if).toContain(
-      "steps.pen-export.outputs.export_cacheable == 'true'"
-    );
+
+    for (const [jobId, job] of Object.entries(jobs)) {
+      const perms = Object.values(job.permissions ?? {});
+      expect(
+        perms.every(scope => scope === 'read'),
+        `postdeploy-probes job ${jobId} must stay strictly read-only`
+      ).toBe(true);
+      for (const candidate of job.steps ?? []) {
+        expect(
+          String(candidate.uses ?? ''),
+          `read-only job ${jobId} must not attempt cache/save (cache write denied without writable token scopes)`
+        ).not.toMatch(/actions-cache\/save|actions\/cache\/save/);
+      }
+    }
   });
 });

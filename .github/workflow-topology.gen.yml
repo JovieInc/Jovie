@@ -127,6 +127,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:liveness
     jobCount: 3
+  - name: Buyer Eval Gate
+    path: .github/workflows/buyer-eval-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:buyer-eval-gate
+    jobCount: 1
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
