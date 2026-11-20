@@ -198,20 +198,22 @@ function ProfilePreviewCard({
       </ContentSurfaceCard>
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
-        <ContentSurfaceCard className='mb-4 flex items-start gap-3 px-4 py-3'>
-          <Sparkles
-            className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
-            aria-hidden='true'
-          />
-          <p className='text-app text-secondary-token'>
-            You have{' '}
-            <span className='font-medium tabular-nums text-primary-token'>
-              {spotifyFollowers.toLocaleString()} Spotify followers
-            </span>
-            {'. '}
-            {offerName} analytics shows exactly where they&apos;re listening
-            from.
-          </p>
+        <ContentSurfaceCard className='mb-4 px-4 py-3'>
+          <div className='flex items-start gap-3'>
+            <Sparkles
+              className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+              aria-hidden='true'
+            />
+            <p className='text-app text-secondary-token'>
+              You have{' '}
+              <span className='font-medium tabular-nums text-primary-token'>
+                {spotifyFollowers.toLocaleString()} Spotify followers
+              </span>
+              {'. '}
+              {offerName} analytics shows exactly where they&apos;re listening
+              from.
+            </p>
+          </div>
         </ContentSurfaceCard>
       ) : null}
     </>

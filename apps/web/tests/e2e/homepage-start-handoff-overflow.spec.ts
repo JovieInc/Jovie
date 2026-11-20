@@ -1,10 +1,12 @@
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageEditorialCopy';
 import { CLAIM_PROFILE_STARTER_PROMPT } from '@/data/marketingCtaIntents';
 import { expect, test } from './setup';
+import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const HOMEPAGE_NAVIGATION_TIMEOUT = 60_000;
+const SMARTLINK_FIXTURE_ROUTE = '/jovie-screen-fixture/screen-cert-release';
 type PlaywrightPage = import('@playwright/test').Page;
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -21,15 +23,15 @@ async function interceptAnalytics(page: PlaywrightPage) {
   );
 }
 
-test.describe('Homepage -> /start automatic opener handoff', () => {
+test.describe('Golden Path entry handoff and release smartlink overflow', () => {
   for (const [label, viewport] of [
     ['desktop', { width: 1440, height: 900 }],
     ['mobile', { width: 390, height: 844 }],
   ] as const) {
-    test(`auto-sends the /start opener on ${label} from both the hero CTA and handle form`, async ({
+    test(`auto-sends the /start opener on ${label} from both the hero CTA and handle form without overflow`, async ({
       browser,
       baseURL,
-    }) => {
+    }, testInfo) => {
       const heroContext = await browser.newContext({ baseURL, viewport });
       try {
         const page = await heroContext.newPage();
@@ -52,6 +54,7 @@ test.describe('Homepage -> /start automatic opener handoff', () => {
           timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
         });
         await waitForHydration(page);
+        await expectNoDocumentOverflow(page, testInfo, `home-${label}`);
         await page.getByTestId('homepage-primary-cta').click();
         await expect(page).toHaveURL(/\/start\?starter_prompt=/);
         await expect(
@@ -63,6 +66,7 @@ test.describe('Homepage -> /start automatic opener handoff', () => {
         await expect(
           page.getByText('What should we call you on your page?')
         ).toBeVisible();
+        await expectNoDocumentOverflow(page, testInfo, `start-hero-${label}`);
       } finally {
         await heroContext.close();
       }
@@ -107,9 +111,34 @@ test.describe('Homepage -> /start automatic opener handoff', () => {
             'Checking jov.ie/lunaharbor — what should we call you?'
           )
         ).toBeVisible();
+        await expectNoDocumentOverflow(page, testInfo, `start-handle-${label}`);
       } finally {
         await formContext.close();
       }
+    });
+
+    test(`renders the release smartlink route surface on ${label} without hydration errors or horizontal overflow`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize(viewport);
+      await interceptAnalytics(page);
+      const response = await page.goto(SMARTLINK_FIXTURE_ROUTE, {
+        waitUntil: 'domcontentloaded',
+        timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+      });
+      expect(response?.status()).toBe(200);
+      await waitForHydration(page);
+      await expect(
+        page.getByRole('heading', {
+          level: 1,
+          name: 'Screen Cert Fixture Release',
+        })
+      ).toBeVisible();
+      await expectNoDocumentOverflow(
+        page,
+        testInfo,
+        `smartlink-release-${label}`
+      );
     });
   }
 });
