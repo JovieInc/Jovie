@@ -16,13 +16,12 @@ const dequeuePullRequest = vi.fn(async () => ({ ok: true }));
 vi.mock('../../merge-queue-backend.mjs', () => ({ dequeuePullRequest }));
 
 const { stuckHead } = await import('../../main-red-eject.mjs');
+const { marker, supersededIncidents } = await import('../main-red-eject.mjs');
 const {
   decideFailingHead,
   failingHeadComment,
   failingRequiredChecks,
-  marker,
-  supersededIncidents,
-} = await import('../main-red-eject.mjs');
+} = await import('../main-red-eject-failing-head.mjs');
 
 const run = (id, name, conclusion) => ({ id, name, conclusion });
 const queue = (state, sha = 'abc123', dwellMin = 10) => ({
@@ -141,9 +140,9 @@ describe('stuckHead failing-head pass', () => {
     expect(posted.some(c => c.includes('issues/23966/labels'))).toBe(true);
     expect(posted.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
     expect(posted.some(c => c.includes('statuses/abc123'))).toBe(true);
-    expect(posted.some(c => c.includes('jovie-merge-group-eject-hold/v1'))).toBe(
-      true
-    );
+    expect(
+      posted.some(c => c.includes('jovie-merge-group-eject-hold/v1'))
+    ).toBe(true);
     expect(posted.some(c => c.includes('issues/23966/comments'))).toBe(true);
     expect(posted.find(c => c.includes('comments'))).toContain('PR Ready');
     expect(

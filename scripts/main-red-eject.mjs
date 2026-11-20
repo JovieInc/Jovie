@@ -24,12 +24,9 @@ import {
   checkKey,
   classifyEvidence,
   decideEject,
-  decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
-  applyFailingHeadEpisode,
-  failingRequiredChecks,
   failureSignature,
   HEAD_STUCK_ALERT_MIN,
   headDwell,
@@ -47,6 +44,11 @@ import {
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
+import {
+  applyFailingHeadEpisode,
+  decideFailingHead,
+  failingRequiredChecks,
+} from './lib/main-red-eject-failing-head.mjs';
 import {
   remediateUnrevertable,
   unattributedPlan,
