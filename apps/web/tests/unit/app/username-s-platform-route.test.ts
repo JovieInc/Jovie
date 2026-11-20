@@ -160,6 +160,39 @@ describe('GET /[username]/s/[platform]', () => {
     expect(res.headers.get('location')).toBe('https://instagram.com/timwhite');
   });
 
+  it('flushes the 301 before the rate limiter resolves (redirect latency budget)', async () => {
+    let releaseLimit: (result: {
+      success: boolean;
+      limit: number;
+      remaining: number;
+      reset: Date;
+    }) => void = () => undefined;
+    mocks.publicClickLimiter.limit.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseLimit = resolve;
+        })
+    );
+
+    const res = await GET(makeRequest('/tim/s/ig'), {
+      params: Promise.resolve({ username: 'tim', platform: 'ig' }),
+    });
+
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('https://instagram.com/timwhite');
+    expect(mocks.recordClickEvent).not.toHaveBeenCalled();
+
+    releaseLimit({
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date(Date.now() + 60_000),
+    });
+    await vi.waitFor(() => {
+      expect(mocks.recordClickEvent).toHaveBeenCalled();
+    });
+  });
+
   it('302s to the profile when the platform link is missing', async () => {
     mocks.linkLimit.mockResolvedValueOnce([]);
 
