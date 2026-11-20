@@ -83,7 +83,12 @@ function writeSummary(wins, argv, io) {
 
 export async function main(argv, io = console) {
   const [cmd] = argv;
-  const wins = cmd === 'measure-due' ? await loadWins(argv) : readLedger();
+  // receipt --store must merge runtime-store overlays first: measure-due
+  // receipts live only in the store, and a ledger-only overwrite would erase them.
+  const wins =
+    cmd === 'measure-due' || (cmd === 'receipt' && argv.includes('--store'))
+      ? await loadWins(argv)
+      : readLedger();
   if (cmd === 'validate') {
     const problems = validateLedger(wins);
     for (const p of problems) io.error(p);
@@ -237,19 +242,18 @@ export async function main(argv, io = console) {
   }
   if (cmd === 'receipt') {
     const id = arg(argv, 'id');
-    let win = wins.find(w => w.id === id);
-    if (!win && argv.includes('--store')) {
-      const loaded = await loadWins(['--store']);
-      win = loaded.find(w => w.id === id);
-    }
+    const win = wins.find(w => w.id === id);
     if (!win) throw new Error('unknown win id');
-    win.receipts.push({
-      metric: arg(argv, 'metric'),
-      value: Number(arg(argv, 'value')),
-      at: new Date().toISOString(),
-      evidence: arg(argv, 'evidence'),
-      sha: arg(argv, 'sha') ?? null,
-    });
+    win.receipts = [
+      ...(win.receipts ?? []),
+      {
+        metric: arg(argv, 'metric'),
+        value: Number(arg(argv, 'value')),
+        at: new Date().toISOString(),
+        evidence: arg(argv, 'evidence'),
+        sha: arg(argv, 'sha') ?? null,
+      },
+    ];
     const problems = validateWin(win);
     if (problems.length) throw new Error(problems.join('; '));
     if (argv.includes('--store')) {

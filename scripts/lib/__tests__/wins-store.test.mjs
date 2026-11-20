@@ -112,3 +112,52 @@ test('mergeWins: store receipts overlay ledger rows by id', () => {
   assert.ok(merged.find(w => w.id === 'b'));
   assert.ok(merged.find(w => w.id === 'c'));
 });
+
+test('receipt --store must merge store receipts before overwrite (not ledger-only)', async () => {
+  // measure-due writes receipts to the store only. A later `receipt --store`
+  // that starts from the ledger copy and overwrites would erase them.
+  const ledgerWin = {
+    id: 'win-receipt',
+    receipts: [],
+    claim: 'ledger',
+  };
+  const storeReceipt = {
+    metric: 'auto',
+    value: 0.4,
+    at: '2026-10-21T00:00:00Z',
+    evidence: 'docs/metrics/shipping-slo-latest.json#x',
+  };
+  const storeWin = {
+    id: 'win-receipt',
+    receipts: [storeReceipt],
+    claim: 'store',
+  };
+  const merged = mergeWins([ledgerWin], [storeWin]);
+  const win = merged.find(w => w.id === 'win-receipt');
+  win.receipts = [
+    ...(win.receipts ?? []),
+    {
+      metric: 'manual',
+      value: 0.5,
+      at: '2026-10-22T00:00:00Z',
+      evidence: 'https://example.test/r',
+      sha: null,
+    },
+  ];
+  /** @type {string | undefined} */
+  let body;
+  const fetchImpl = /** @type {any} */ (
+    async (_u, o) => {
+      body = o?.body;
+      return { ok: true, status: 200 };
+    }
+  );
+  assert.equal(
+    await overwriteWinInStore(win, env, fetchImpl),
+    'receipt recorded in store'
+  );
+  const written = JSON.parse(/** @type {string} */ (body));
+  assert.equal(written.receipts.length, 2);
+  assert.equal(written.receipts[0].metric, 'auto');
+  assert.equal(written.receipts[1].metric, 'manual');
+});

@@ -140,6 +140,21 @@ test('workflow records wins in the store and never opens a ledger PR', () => {
   assert.doesNotMatch(steps, /git (commit|push)|pr create/);
 });
 
+test('receipt --store loads store overlays before overwrite (not ledger-only)', () => {
+  const src = readFileSync(
+    resolve(import.meta.dirname, '../../wins-ledger.mjs'),
+    'utf8'
+  );
+  assert.match(
+    src,
+    /cmd === 'receipt' && argv\.includes\('--store'\)[\s\S]*?loadWins\(argv\)/
+  );
+  assert.doesNotMatch(
+    src,
+    /if \(!win && argv\.includes\('--store'\)\) \{\s*const loaded = await loadWins/
+  );
+});
+
 test('clusters trigger at ten verified wins only', () => {
   const wins = Array.from({ length: 10 }, (_, i) => {
     const w = base();
