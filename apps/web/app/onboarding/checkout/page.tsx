@@ -23,7 +23,7 @@ import {
 } from '@/lib/claim/claim-verification';
 import { PRICING } from '@/lib/config/pricing';
 import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
-import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
+import { resolveOnboardingCheckoutCatalog } from '@/lib/onboarding/catalog-preview.server';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   hasOnboardingUpgradeOfferState,
@@ -284,11 +284,10 @@ export default async function OnboardingCheckoutPage({
   const catalogSpotifyId = profileData.spotifyId ?? heldLowReachSpotifyId;
   const [proofFindings, catalog] = await Promise.all([
     profileData.id ? loadClaimTimeProof(profileData.id) : Promise.resolve([]),
-    storedCatalog
-      ? Promise.resolve(storedCatalog)
-      : catalogSpotifyId
-        ? fetchOnboardingCatalogPreview(catalogSpotifyId)
-        : Promise.resolve(null),
+    resolveOnboardingCheckoutCatalog({
+      storedCatalog,
+      spotifyArtistId: catalogSpotifyId,
+    }),
   ]);
 
   return (

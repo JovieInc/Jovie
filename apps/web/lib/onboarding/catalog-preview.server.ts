@@ -30,6 +30,22 @@ export function isValueBeforePaywallEnabled(): boolean {
  * newest overall. Two bounded requests, no pagination. Never throws: a
  * failed lookup returns null and the preview falls back to identity only.
  */
+/**
+ * Checkout catalog: stored profile settings win over a live Spotify lookup, but
+ * both respect FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL (JOV-9758).
+ */
+export async function resolveOnboardingCheckoutCatalog(params: {
+  storedCatalog: OnboardingCatalogPreview | null;
+  spotifyArtistId: string | null;
+}): Promise<OnboardingCatalogPreview | null> {
+  if (!isValueBeforePaywallEnabled()) return null;
+  if (params.storedCatalog) return params.storedCatalog;
+  if (params.spotifyArtistId) {
+    return fetchOnboardingCatalogPreview(params.spotifyArtistId);
+  }
+  return null;
+}
+
 export async function fetchOnboardingCatalogPreview(
   spotifyArtistId: string
 ): Promise<OnboardingCatalogPreview | null> {
