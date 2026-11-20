@@ -174,16 +174,24 @@ export function advanceOnboardingProfileDraft(
   const roleText = text
     .replace(/https?:\/\/\S+/gi, '')
     .replace(/\bnot\s+(?:(?:really\s+)?an?\s+)?\w+/gi, '');
-  const mentioned = onboardingRoleSchema.options.filter(role =>
+  const rawMentioned = onboardingRoleSchema.options.filter(role =>
     ONBOARDING_ROLE_ADAPTERS[role].matches.test(roleText)
   );
+  const explicitRoleShift =
+    /\b(i am|i'm|im|also|first|focus|prioriti[sz]e|priority)\b/i.test(roleText);
+  const mentioned =
+    previous.awaiting === 'outcome' && !explicitRoleShift
+      ? rawMentioned.filter(role => previous.roles.includes(role))
+      : rawMentioned;
   const detected = mentioned.length
     ? mentioned
-    : urls.flatMap(raw =>
-        onboardingRoleSchema.options.filter(role =>
-          ONBOARDING_ROLE_ADAPTERS[role].sourceRole(new URL(raw))
-        )
-      );
+    : previous.awaiting === 'outcome' && !explicitRoleShift
+      ? []
+      : urls.flatMap(raw =>
+          onboardingRoleSchema.options.filter(role =>
+            ONBOARDING_ROLE_ADAPTERS[role].sourceRole(new URL(raw))
+          )
+        );
   draft.roles = [...new Set([...draft.roles, ...detected])].sort();
   if (draft.roles.length === 1) draft.activeRole = draft.roles[0] ?? null;
   else if (

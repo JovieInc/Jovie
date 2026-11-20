@@ -310,4 +310,59 @@ describe('adaptive onboarding recorded conversations', () => {
     ).toBeNull();
     expect(readOnboardingProfileDraft(null)).toBeNull();
   });
+
+  it('preserves activeRole and saves free-form outcome answers containing cross-role nouns unless the user explicitly shifts roles', () => {
+    let artistDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      { id: 'r1', text: 'music' }
+    );
+    artistDraft = advanceOnboardingProfileDraft(artistDraft, {
+      id: 's1',
+      text: 'skip',
+    });
+    expect(artistDraft.awaiting).toBe('outcome');
+    artistDraft = advanceOnboardingProfileDraft(artistDraft, {
+      id: 'o1',
+      text: 'Lead with my music videos and featured content',
+    });
+    expect(artistDraft.roles).toEqual(['artist']);
+    expect(artistDraft.activeRole).toBe('artist');
+    expect(artistDraft.outcome).toBe(
+      'Lead with my music videos and featured content'
+    );
+    expect(artistDraft.awaiting).toBe('review');
+
+    let founderDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      { id: 'r2', text: 'a company' }
+    );
+    founderDraft = advanceOnboardingProfileDraft(founderDraft, {
+      id: 's2',
+      text: 'skip',
+    });
+    founderDraft = advanceOnboardingProfileDraft(founderDraft, {
+      id: 'o2',
+      text: 'Show our product launch and services',
+    });
+    expect(founderDraft.roles).toEqual(['founder']);
+    expect(founderDraft.activeRole).toBe('founder');
+    expect(founderDraft.outcome).toBe('Show our product launch and services');
+    expect(founderDraft.awaiting).toBe('review');
+
+    let multiDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      { id: 'r3', text: 'writing' }
+    );
+    multiDraft = advanceOnboardingProfileDraft(multiDraft, {
+      id: 's3',
+      text: 'skip',
+    });
+    multiDraft = advanceOnboardingProfileDraft(multiDraft, {
+      id: 'o3',
+      text: 'I am also a founder',
+    });
+    expect(multiDraft.roles).toEqual(['author', 'founder']);
+    expect(multiDraft.activeRole).toBeNull();
+    expect(multiDraft.awaiting).toBe('priority');
+  });
 });
