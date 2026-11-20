@@ -1080,9 +1080,14 @@ class ManagedReleaseRestartTest(unittest.TestCase):
     def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory)
-            old, new = state / "old", state / "new"
+            old, new = state / "scripts/lanes", state / "new"
             shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
-            shutil.copyfile(ROOT / "scripts/shipping_origin.py", state / "shipping_origin.py")
+            shutil.copytree(ROOT / "scripts/apiclient", state / "scripts/apiclient",
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copyfile(ROOT / "scripts/shipping_origin.py", state / "scripts/shipping_origin.py")
+            providers = state / "packages/api-client/providers.json"
+            providers.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / "packages/api-client/providers.json", providers)
             new.mkdir()
             receipt = state / "executed.json"
             (new / "hud.py").write_text(
@@ -1116,7 +1121,7 @@ hud.render = render
 hud.main()
 """)
             flags = ["--width", "160", "--height", "45", "--interval", "0.001"]
-            result = subprocess.run([sys.executable, str(harness), *flags],
+            result = subprocess.run([sys.executable, "-I", str(harness), *flags],
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(receipt.read_text()),
