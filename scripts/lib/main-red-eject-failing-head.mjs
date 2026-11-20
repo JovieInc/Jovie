@@ -51,16 +51,20 @@ export function decideFailingHead({ head, failing, mainGreen }) {
   return { dequeue: true, reason: 'required-check-failed', failing };
 }
 
+/** PR tip for hold receipts — never the merge-group synthetic `head.sha`. */
+export const ejectHoldSha = head => head?.headRefOid ?? null;
+
 export const failingHeadComment = (head, failing, { labeled = true } = {}) =>
-  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). ${labeled ? 'Push a new commit that fixes the merge-group failure; `lane-fix-red` keeps the repair lane owning it until that new head is green.' : 'Push a new commit that fixes the merge-group failure (repair-label apply failed on this wake — still blocked from same-head re-enroll by JOV-6620).'}`;
+  `${marker({ failingHeadDequeued: ejectHoldSha(head) })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). ${labeled ? 'Push a new commit that fixes the merge-group failure; `lane-fix-red` keeps the repair lane owning it until that new head is green.' : 'Push a new commit that fixes the merge-group failure (repair-label apply failed on this wake — still blocked from same-head re-enroll by JOV-6620).'}`;
 
 /** Commit-status context reconcile reads for a failing-head eject hold (JOV-6620). */
 export const EJECT_HOLD_CONTEXT = 'jovie-merge-group-eject-hold/v1';
 
 /**
  * After dequeue: label lane-fix-red, stamp eject-hold status, comment.
- * Status receipt is what reconcile uses to keep merge-group holds (Sentry #26143).
- * @param {{ gh: (args: string[]) => Promise<unknown>, repo: string, head: {number:number, sha?:string|null}, failing: string[], label?: string }} input
+ * Status goes on PR headRefOid so reconcile's eject_held(headRefOid) finds it
+ * (merge-group headCommit.oid differs — Sentry #26143 HIGH).
+ * @param {{ gh: (args: string[]) => Promise<unknown>, repo: string, head: {number:number, sha?:string|null, headRefOid?:string|null}, failing: string[], label?: string }} input
  */
 export async function applyFailingHeadEpisode({
   gh,
@@ -83,12 +87,13 @@ export async function applyFailingHeadEpisode({
   } catch (error) {
     console.error(`::warning::failing-head ${label} failed: ${error.message}`);
   }
-  if (labeled && head.sha) {
+  const holdSha = ejectHoldSha(head);
+  if (labeled && holdSha) {
     await gh([
       'api',
       '-X',
       'POST',
-      `repos/${repo}/statuses/${head.sha}`,
+      `repos/${repo}/statuses/${holdSha}`,
       '-f',
       'state=success',
       '-f',
@@ -99,6 +104,10 @@ export async function applyFailingHeadEpisode({
       console.error(
         `::warning::failing-head eject-hold status failed: ${error.message}`
       )
+    );
+  } else if (labeled && !holdSha) {
+    console.error(
+      '::warning::failing-head eject-hold skipped: missing pullRequest.headRefOid'
     );
   }
   await gh([

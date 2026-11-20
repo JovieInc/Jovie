@@ -19,12 +19,21 @@ const { stuckHead } = await import('../../main-red-eject.mjs');
 const { marker, supersededIncidents } = await import('../main-red-eject.mjs');
 const {
   decideFailingHead,
+  ejectHoldSha,
   failingHeadComment,
   failingRequiredChecks,
 } = await import('../main-red-eject-failing-head.mjs');
 
+const MERGE_GROUP_SHA = 'mgdeadbeef01';
+const PR_HEAD_SHA = 'prcafe012345';
+
 const run = (id, name, conclusion) => ({ id, name, conclusion });
-const queue = (state, sha = 'abc123', dwellMin = 10) => ({
+const queue = (
+  state,
+  sha = MERGE_GROUP_SHA,
+  dwellMin = 10,
+  headRefOid = PR_HEAD_SHA
+) => ({
   data: {
     repository: {
       mergeQueue: {
@@ -37,7 +46,11 @@ const queue = (state, sha = 'abc123', dwellMin = 10) => ({
                 Date.now() - dwellMin * 60_000
               ).toISOString(),
               headCommit: sha ? { oid: sha } : null,
-              pullRequest: { number: 23966, labels: { nodes: [] } },
+              pullRequest: {
+                number: 23966,
+                headRefOid: headRefOid ?? null,
+                labels: { nodes: [] },
+              },
             },
           ],
         },
@@ -90,7 +103,7 @@ describe('decideFailingHead', () => {
     ).toBe(false);
   });
   it('names every failing check in the comment', () => {
-    const body = failingHeadComment({ sha: 'abc' }, [
+    const body = failingHeadComment({ headRefOid: 'abc' }, [
       'PR Ready',
       'Migration Guard',
     ]);
@@ -102,12 +115,19 @@ describe('decideFailingHead', () => {
   });
 
   it('does not claim lane-fix-red when label apply failed', () => {
-    const body = failingHeadComment({ sha: 'abc' }, ['PR Ready'], {
+    const body = failingHeadComment({ headRefOid: 'abc' }, ['PR Ready'], {
       labeled: false,
     });
     expect(body).toContain('JOV-6620');
     expect(body).toContain('repair-label apply failed');
     expect(body).not.toContain('`lane-fix-red` keeps');
+  });
+
+  it('holds on PR headRefOid, never the merge-group synthetic sha', () => {
+    expect(
+      ejectHoldSha({ sha: MERGE_GROUP_SHA, headRefOid: PR_HEAD_SHA })
+    ).toBe(PR_HEAD_SHA);
+    expect(ejectHoldSha({ sha: MERGE_GROUP_SHA })).toBe(null);
   });
 });
 
@@ -126,10 +146,10 @@ describe('stuckHead failing-head pass', () => {
     };
   };
 
-  it('dequeues, labels lane-fix-red, stamps eject-hold status, comments, and never enqueues or dispatches', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
+  it('dequeues, labels lane-fix-red, stamps eject-hold on PR tip, comments, and never enqueues or dispatches', async () => {
+    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: MERGE_GROUP_SHA });
     routes['issues/23966/labels'] = {};
-    routes['statuses/abc123'] = {};
+    routes[`statuses/${PR_HEAD_SHA}`] = {};
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeued: true });
     expect(dequeuePullRequest).toHaveBeenCalledWith(
@@ -139,12 +159,19 @@ describe('stuckHead failing-head pass', () => {
     expect(posted).toHaveLength(3);
     expect(posted.some(c => c.includes('issues/23966/labels'))).toBe(true);
     expect(posted.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
-    expect(posted.some(c => c.includes('statuses/abc123'))).toBe(true);
+    // Sentry HIGH: status must hit PR headRefOid, not merge-group headCommit.
+    expect(posted.some(c => c.includes(`statuses/${PR_HEAD_SHA}`))).toBe(true);
+    expect(posted.some(c => c.includes(`statuses/${MERGE_GROUP_SHA}`))).toBe(
+      false
+    );
     expect(
       posted.some(c => c.includes('jovie-merge-group-eject-hold/v1'))
     ).toBe(true);
     expect(posted.some(c => c.includes('issues/23966/comments'))).toBe(true);
     expect(posted.find(c => c.includes('comments'))).toContain('PR Ready');
+    expect(
+      calls.some(c => c.includes('check-runs') && c.includes(MERGE_GROUP_SHA))
+    ).toBe(true);
     expect(
       calls.some(c => /workflow run|enqueuePullRequest|jump/i.test(c))
     ).toBe(false);
@@ -154,7 +181,7 @@ describe('stuckHead failing-head pass', () => {
     wire({
       checks: [run(1, 'PR Ready', 'failure')],
       main: 'failure',
-      sha: 'abc123',
+      sha: MERGE_GROUP_SHA,
     });
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeue: false });
@@ -163,14 +190,14 @@ describe('stuckHead failing-head pass', () => {
   });
 
   it('leaves a head with no failed required check, without reading main CI', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'in_progress')], sha: 'abc123' });
+    wire({ checks: [run(1, 'PR Ready', 'in_progress')], sha: MERGE_GROUP_SHA });
     await stuckHead({ doApply: true });
     expect(dequeuePullRequest).not.toHaveBeenCalled();
     expect(calls.some(c => c.includes('event=push'))).toBe(false);
   });
 
   it('does nothing in dry mode', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
+    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: MERGE_GROUP_SHA });
     const out = await stuckHead({ doApply: false });
     expect(out).toMatchObject({ dequeue: true });
     expect(dequeuePullRequest).not.toHaveBeenCalled();
@@ -204,7 +231,7 @@ describe('stale queue-head-stuck alerts', () => {
 
   it('closes older heads alerts when a new head alerts, and keeps its own', async () => {
     routes = {
-      'api graphql': queue('AWAITING_CHECKS', 'abc123', 60),
+      'api graphql': queue('AWAITING_CHECKS', MERGE_GROUP_SHA, 60),
       'check-runs': { check_runs: [] },
       'labels=main-health-incident': [
         alert(24100, 'queue-head-stuck:24099'),

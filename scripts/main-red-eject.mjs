@@ -295,7 +295,9 @@ function commandProbe(cmd) {
 // ---- queue -----------------------------------------------------------------
 
 async function queueEntries() {
-  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
+  // headCommit = merge-group synthetic SHA (check-runs live here).
+  // pullRequest.headRefOid = PR tip — eject-hold status + reconcile use this.
+  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number headRefOid labels(first:30){nodes{name}}}}}}}}`;
   const [o, r] = REPO.split('/');
   const out = JSON.parse(
     await gh(
@@ -307,6 +309,7 @@ async function queueEntries() {
     number: n.pullRequest.number,
     position: n.position,
     sha: n.headCommit?.oid ?? null,
+    headRefOid: n.pullRequest.headRefOid ?? null,
     state: n.state,
     enqueuedAt: n.enqueuedAt,
     compounding: n.pullRequest.labels.nodes.some(
