@@ -155,6 +155,7 @@
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "ios:app-store:test": "node --test apps/ios/scripts/app-store-graphics.test.mjs",
     "ios:dogfood": "bash apps/ios/scripts/dogfood-ios.sh",
+    "ios:journey:inventory": "node --test apps/ios/scripts/apple-journey-inventory.test.mjs",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
     "auth:redirect-uris": "tsx scripts/auth-redirect-uris.ts",
