@@ -44,9 +44,6 @@ vi.mock('@/lib/db', async importOriginal => ({
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   assertOviePrivacyUnlocked: async () => {},
 }));
-vi.mock('@/lib/admin/mfa', () => ({
-  hasRecentAdminMfaReverification: async () => true,
-}));
 vi.mock('@/lib/sentry/set-user-context', () => ({
   attachSentryContext: async () => {},
 }));
@@ -155,6 +152,8 @@ describe('Better Auth impersonation identity boundary', () => {
             const query = dialect.sqlToQuery(condition);
             expect(query.sql).not.toContain('clerk');
             const id = String(query.params[0]).toLowerCase();
+            // Live passkey step-up receipts use identifier admin-step-up:<sessionId>.
+            if (id.startsWith('admin-step-up:')) return [{ id: 'step-up' }];
             if (id === ACTOR || id === actor.betterAuthUserId) return [actor];
             if (
               targetExists &&
