@@ -94,8 +94,8 @@ export const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
-      {/* Play/status indicator — 16px column */}
-      <div className='flex w-4 shrink-0 items-center justify-center'>
+      {/* Play column matches IconButton xs (h-6/w-6); do not restyle with h-*. */}
+      <div className='flex w-6 shrink-0 items-center justify-center'>
         {hasPreview && (
           <IconButton
             size='xs'

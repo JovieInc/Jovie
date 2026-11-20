@@ -237,5 +237,9 @@ describe('ReleaseCell', () => {
     expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
     // Playing skips fade=parent, so the control stays fully opaque (no opacity-0).
     expect(pauseButton.className).not.toContain('opacity-0');
+    // IconButton xs → h-6/w-6; column must match (was w-4 under DrawerInline h-4).
+    expect(pauseButton.className).toContain('h-6');
+    expect(pauseButton.className).toContain('w-6');
+    expect(pauseButton.parentElement?.className).toContain('w-6');
   });
 });
