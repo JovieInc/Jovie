@@ -98,7 +98,14 @@ export async function fetchLatestProductionVerifiedSha(input = {}) {
         headers,
         signal: AbortSignal.timeout(30_000),
       });
-      if (!jobsResponse.ok) continue;
+      // Non-OK jobs fetch is incomplete observation — never skip to an older
+      // verified SHA (that can premature-resolve Summer when published matches).
+      if (!jobsResponse.ok) {
+        return {
+          status: 'unknown',
+          reason: `Production Verified jobs lookup returned ${jobsResponse.status}`,
+        };
+      }
       const jobsBody = await jobsResponse.json();
       const jobs = Array.isArray(jobsBody?.jobs) ? jobsBody.jobs : [];
       const verified = jobs.some(
