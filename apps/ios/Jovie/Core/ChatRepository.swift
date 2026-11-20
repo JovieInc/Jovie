@@ -371,8 +371,9 @@ final class ChatRepository {
           measurementTurnID = clientTurnId
           measurementGeneration = captureGeneration
           #endif
+          let hadPriorUserMessages = timeline.contains { $0.role == .user }
           appendOptimisticTurn(text: text, clientTurnId: clientTurnId)
-          notePostIdentityFirstSendStarted(isRetry: isRetry)
+          notePostIdentityFirstSendStarted(isRetry: isRetry, hadPriorUserMessages: hadPriorUserMessages)
         }
       }, onEvent: { event in
         await coalescer.ingest(event)
@@ -389,14 +390,14 @@ final class ChatRepository {
           clientTurnId: clientTurnId,
           message: "Summer did not confirm a terminal state for this turn."
         )
-        notePostIdentityFirstSendOutcome(.failed, isRetry: isRetry, failureReason: "missing_terminal_state")
+        notePostIdentityFirstSendOutcome(.failed, failureReason: "missing_terminal_state")
       }
       isOffline = false
       if assistantStatus(clientTurnId: clientTurnId) != .failed,
          assistantStatus(clientTurnId: clientTurnId) != .canceled
       {
         lastErrorMessage = nil
-        notePostIdentityFirstSendOutcome(.succeeded, isRetry: isRetry)
+        notePostIdentityFirstSendOutcome(.succeeded)
       }
       await persistCache(generation: generation, selection: selection)
     } catch {
@@ -414,7 +415,7 @@ final class ChatRepository {
         // A nil fixture callback never grants managed cancellation persistence.
         if let expected = identity.ownership, context.authorization != .managed(expected) { return }
         markAssistantCanceled(clientTurnId: clientTurnId)
-        notePostIdentityFirstSendOutcome(.cancelled, isRetry: isRetry)
+        notePostIdentityFirstSendOutcome(.cancelled)
         await persistCache(generation: generation, selection: selection, allowingCancellation: true)
       } else {
         context.acceptingEvents = true
@@ -425,7 +426,6 @@ final class ChatRepository {
         if assistantStatus(clientTurnId: clientTurnId) == .failed || sessionExpired {
           notePostIdentityFirstSendOutcome(
             .failed,
-            isRetry: isRetry,
             failureReason: PostIdentityChatMeasurement.failureReason(for: error)
           )
         }

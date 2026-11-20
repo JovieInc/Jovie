@@ -34,7 +34,7 @@ struct PostIdentityChatMeasurementTests {
     )
   }
 
-  @Test func liveIdentityGateExcludesFixturesAndUnearnedIdentity() {
+  @Test func upgradeWithIdentityBitAloneIsNotEligibleWithoutArming() {
     let suiteName = "jovie.postIdentity.eligibility.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
@@ -47,11 +47,11 @@ struct PostIdentityChatMeasurementTests {
     }
 
     let userID = "user_post_identity"
-    #expect(
-      PostIdentityChatMeasurement.isEligible(userID: userID, launchMode: .live) == false
-    )
-
     FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    // Pre-existing Identity bit without cohort arming must not count as customers.
+    #expect(PostIdentityChatMeasurement.isEligible(userID: userID, launchMode: .live) == false)
+
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
     #expect(PostIdentityChatMeasurement.isEligible(userID: userID, launchMode: .live))
     #expect(
       PostIdentityChatMeasurement.isEligible(
@@ -82,6 +82,7 @@ struct PostIdentityChatMeasurementTests {
 
     let userID = "user_stages"
     FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
 
     #expect(
       PostIdentityChatMeasurement.noteEmptyChatHomeSeen(
@@ -142,6 +143,7 @@ struct PostIdentityChatMeasurementTests {
     )
 
     let events = provider.breadcrumbs.map(\.event)
+    #expect(events.contains(.identityFirstValueSeen))
     #expect(events.contains(.chatEmptyHomeSeen))
     #expect(events.contains(.chatFirstSendStarted))
     #expect(events.contains(.chatFirstSendCancelled))
@@ -155,6 +157,76 @@ struct PostIdentityChatMeasurementTests {
     #expect(failed.context["reason"] as? String == "http_500")
     #expect(failed.context["prompt"] == nil)
     #expect(failed.context["text"] == nil)
+  }
+
+  @Test func retryAfterFailCanStillEmitFirstSendSucceeded() {
+    let suiteName = "jovie.postIdentity.retrySuccess.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let previousFirstValue = FirstValueLandingPolicy.replaceDefaultsForTesting(defaults)
+    let previousMeasurement = PostIdentityChatMeasurement.replaceDefaultsForTesting(defaults)
+    let provider = RecordingObservabilityProvider()
+    Observability.useProviderForTesting(provider)
+    defer {
+      Observability.resetForTesting()
+      _ = FirstValueLandingPolicy.replaceDefaultsForTesting(previousFirstValue)
+      _ = PostIdentityChatMeasurement.replaceDefaultsForTesting(previousMeasurement)
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let userID = "user_retry_success"
+    FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
+
+    #expect(PostIdentityChatMeasurement.noteFirstSendStarted(userID: userID, launchMode: .live))
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendOutcome(
+        userID: userID,
+        launchMode: .live,
+        outcome: .failed,
+        failureReason: "http_500"
+      )
+    )
+    // Retry path must not start again, but may complete success.
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendStarted(
+        userID: userID,
+        launchMode: .live,
+        isRetry: true
+      ) == false
+    )
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendOutcome(
+        userID: userID,
+        launchMode: .live,
+        outcome: .succeeded
+      )
+    )
+    #expect(provider.breadcrumbs.map(\.event).contains(.chatFirstSendSucceeded))
+  }
+
+  @Test func priorUserMessagesBlockFirstSendStarted() {
+    let suiteName = "jovie.postIdentity.priorMessages.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let previousFirstValue = FirstValueLandingPolicy.replaceDefaultsForTesting(defaults)
+    let previousMeasurement = PostIdentityChatMeasurement.replaceDefaultsForTesting(defaults)
+    defer {
+      _ = FirstValueLandingPolicy.replaceDefaultsForTesting(previousFirstValue)
+      _ = PostIdentityChatMeasurement.replaceDefaultsForTesting(previousMeasurement)
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let userID = "user_prior"
+    FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
+    #expect(
+      PostIdentityChatMeasurement.noteFirstSendStarted(
+        userID: userID,
+        launchMode: .live,
+        hadPriorUserMessages: true
+      ) == false
+    )
   }
 
   @Test func emptyHomeDwellRequiresPriorEmptySeenAndNoStartedSend() {
@@ -174,6 +246,7 @@ struct PostIdentityChatMeasurementTests {
 
     let userID = "user_dwell"
     FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
 
     #expect(
       PostIdentityChatMeasurement.noteEmptyChatHomeDwell(
@@ -211,7 +284,7 @@ struct PostIdentityChatMeasurementTests {
     #expect(provider.breadcrumbs.map(\.event).contains(.chatEmptyHomeDwell))
   }
 
-  @Test func retriesDoNotInflateFirstSendStages() {
+  @Test func retriesDoNotInflateFirstSendStarted() {
     let suiteName = "jovie.postIdentity.retry.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
@@ -225,18 +298,11 @@ struct PostIdentityChatMeasurementTests {
 
     let userID = "user_retry"
     FirstValueLandingPolicy.markIdentityFirstValuePresented(userID: userID, defaults: defaults)
+    PostIdentityChatMeasurement.noteIdentityFirstValueSeen(userID: userID, launchMode: .live)
     #expect(
       PostIdentityChatMeasurement.noteFirstSendStarted(
         userID: userID,
         launchMode: .live,
-        isRetry: true
-      ) == false
-    )
-    #expect(
-      PostIdentityChatMeasurement.noteFirstSendOutcome(
-        userID: userID,
-        launchMode: .live,
-        outcome: .succeeded,
         isRetry: true
       ) == false
     )
@@ -275,6 +341,9 @@ struct PostIdentityChatMeasurementTests {
 
     appState.lockReadyShellInitialTab(markIdentityFirstValue: true)
     #expect(FirstValueLandingPolicy.hasPresentedIdentityFirstValue(userID: "user_identity_land"))
+    #expect(
+      PostIdentityChatMeasurement.isEligible(userID: "user_identity_land", launchMode: .live)
+    )
     let seen = try #require(provider.breadcrumbs.first { $0.event == .identityFirstValueSeen })
     #expect(seen.context["stage"] as? String == "identity_landed")
     let countAfterFirstMark = provider.breadcrumbs.count

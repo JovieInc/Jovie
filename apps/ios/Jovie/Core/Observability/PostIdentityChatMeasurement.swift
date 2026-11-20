@@ -4,6 +4,8 @@ import Foundation
 /// Screen view is never activation. Cancel is never fail. Live launch only.
 enum PostIdentityChatMeasurement {
   enum StageBit: String {
+    /// Armed only when Identity first-value is newly marked this install era.
+    case measurementArmed = "measurementArmed"
     case emptyHomeSeen = "emptyHomeSeen"
     case firstSendStarted = "firstSendStarted"
     case firstSendCancelled = "firstSendCancelled"
@@ -57,7 +59,8 @@ enum PostIdentityChatMeasurement {
     defaults.set(true, forKey: storageKey(bit: bit, userID: userID))
   }
 
-  /// Live cohort that already saw Identity first-value and has not succeeded yet.
+  /// Live cohort armed at Identity land that has not succeeded a first send yet.
+  /// Pre-existing Identity bits without arming (upgrade) are not customers in this funnel.
   static func isEligible(
     userID: String?,
     launchMode: LaunchMode,
@@ -68,12 +71,14 @@ enum PostIdentityChatMeasurement {
     guard FirstValueLandingPolicy.hasPresentedIdentityFirstValue(userID: userID) else {
       return false
     }
+    guard hasEmitted(bit: .measurementArmed, userID: userID) else { return false }
     return !hasEmitted(bit: .firstSendSucceeded, userID: userID)
   }
 
   /// Identity land is the funnel denominator. Not chat activation.
   static func noteIdentityFirstValueSeen(userID: String?, launchMode: LaunchMode) {
     guard launchMode == .live, let userID, !userID.isEmpty else { return }
+    markEmitted(bit: .measurementArmed, userID: userID)
     Observability.addBreadcrumb(
       .identityFirstValueSeen,
       context: ["stage": "identity_landed"]
@@ -128,14 +133,16 @@ enum PostIdentityChatMeasurement {
   }
 
   /// First admitted send after Identity (authorization acquired). No prompt text.
+  /// Retries never start the funnel; prior user messages mean this is not first send.
   @discardableResult
   static func noteFirstSendStarted(
     userID: String?,
     launchMode: LaunchMode,
     isFixtureSeeded: Bool = false,
-    isRetry: Bool = false
+    isRetry: Bool = false,
+    hadPriorUserMessages: Bool = false
   ) -> Bool {
-    guard !isRetry else { return false }
+    guard !isRetry, !hadPriorUserMessages else { return false }
     guard isEligible(userID: userID, launchMode: launchMode, isFixtureSeeded: isFixtureSeeded)
     else { return false }
     guard !hasEmitted(bit: .firstSendStarted, userID: userID) else { return false }
@@ -148,16 +155,15 @@ enum PostIdentityChatMeasurement {
   }
 
   /// Terminal first-send outcome. Cancel never uses the failed event.
+  /// Retries may still emit success after an earlier fail/cancel on the same funnel.
   @discardableResult
   static func noteFirstSendOutcome(
     userID: String?,
     launchMode: LaunchMode,
     outcome: FirstSendOutcome,
     isFixtureSeeded: Bool = false,
-    isRetry: Bool = false,
     failureReason: String? = nil
   ) -> Bool {
-    guard !isRetry else { return false }
     guard isEligible(userID: userID, launchMode: launchMode, isFixtureSeeded: isFixtureSeeded)
     else { return false }
     guard hasEmitted(bit: .firstSendStarted, userID: userID) else { return false }
