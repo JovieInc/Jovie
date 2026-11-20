@@ -326,7 +326,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:native
     jobCount: 1

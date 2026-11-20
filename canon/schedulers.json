@@ -67,7 +67,6 @@
     "github:jovie:node-runtime-freshness",
     "github:jovie:visual-regression",
     "github:jovie:cli-chaos-nightly",
-    "github:jovie:deepsec-native",
     "vercel:jovie-web:frequent",
     "vercel:jovie-web:daily-maintenance",
     "vercel:jovie-web:generate-insights",

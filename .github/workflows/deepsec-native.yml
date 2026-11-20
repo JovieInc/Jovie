@@ -2,13 +2,12 @@ name: Native Security Advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
 # necessary-trust-boundary: Native subscription authentication lives on a commissioned runner; trusted controller and recorder credentials must remain outside the isolated source checkout and scanner subprocess environment.
-# removal-trigger: Remove this hosted hop when Summer's native scanner tool proves source leases, canonical reconciliation, and bounded native execution for 30 consecutive days.
+# removal-trigger: Delete this workflow when Summer-owned native scanning is either permanently abandoned or replaced by a commissioned event-driven scanner with runner proof.
+# retired: 2026-11-20 — daily cron removed; every prior run skipped while vars.DEEPSEC_NATIVE_ENABLED != true.
 # clock-class: temporal-resource
-# Native execution requires an explicitly commissioned subscription runner.
-# No variable means no scan, no ledger/comment write, and no Linear mutation.
+# Native execution requires an explicitly commissioned subscription runner and Tim to flip DEEPSEC_NATIVE_ENABLED.
+# Keep workflow_dispatch only so a commissioned enable can be proven without resurrecting a silent daily skip clock.
 on:
-  schedule:
-    - cron: '17 7 * * *'
   workflow_dispatch:
     inputs:
       pr_number:

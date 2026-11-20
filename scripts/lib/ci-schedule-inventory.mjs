@@ -115,8 +115,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'external: the npm-published @jovie/cli bytes, their unpinned installs, and read-only production probes drift with no repository event',
   '.github/workflows/cost-anomaly-gate.yml':
     'external: production event volume in Sentry can run away with no deploy or repository event',
-  '.github/workflows/deepsec-native.yml':
-    'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':

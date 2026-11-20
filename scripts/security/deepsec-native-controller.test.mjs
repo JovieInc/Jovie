@@ -367,6 +367,8 @@ test('CLI is explicitly default-off before any source read or external write', a
   assert.match(workflow, /jovie-native-subscription/);
   assert.match(workflow, /npm ci --ignore-scripts/);
   assert.doesNotMatch(workflow, /AI_GATEWAY|OPENAI_API_KEY|ANTHROPIC/);
+  assert.doesNotMatch(workflow, /^\s*schedule:/m);
+  assert.match(workflow, /workflow_dispatch:/);
 });
 
 test('disabled CLI exits nonzero with a bounded diagnostic', () => {

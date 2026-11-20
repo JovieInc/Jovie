@@ -99,7 +99,7 @@ export function nativeSourceState(sourceRoot, files) {
     throw new Error('isolated real source checkout required');
   const remote = git(sourceRoot, ['remote', 'get-url', 'origin']);
   if (
-    !/^(?:https:\/\/github\.com\/|git@github\.com:)JovieInc\/Jovie(?:\.git)?$/.test(
+    !/^(?:https:\/\/(?:[^/@]+@)?github\.com\/|git@github\.com:)JovieInc\/Jovie(?:\.git)?$/.test(
       remote
     )
   )

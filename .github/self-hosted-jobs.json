@@ -25,7 +25,7 @@
     {
       "workflow": "deepsec-native.yml",
       "job": "*",
-      "reason": "needs the host's native subscription login (jovie-native-subscription label)"
+      "reason": "workflow_dispatch enable path still needs the host's native subscription login (jovie-native-subscription); daily cron retired 2026-11-20"
     },
     {
       "workflow": "delivery-control-receipts.yml",
