@@ -161,7 +161,7 @@ unless linked below.
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
 | `arbitrary-values` | `error` | G + I | Yes | 1651 |
-| `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
+| `component-family` | `error` | G | Yes | button=27; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
