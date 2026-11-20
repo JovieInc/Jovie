@@ -199,11 +199,7 @@ const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
 // Number()/parseInt coercion is deliberately avoided (Number(null) === 0).
 const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
-/**
- * Age unshipped main from CI landing receipts, preserving the measured bound.
- * Unreadable evidence is unknown and cannot page or resolve an incident.
- * Runtime outages remain the production endpoint probe's responsibility.
- */
+/** Main-arrival evidence only; missing evidence cannot page or resolve. */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
   fetchImpl = fetch,
@@ -228,6 +224,7 @@ export async function observeProductionFreshness({
     oldestUnshippedAt: null,
     unshippedArrivedAt: null,
     unshippedAgeSeconds: 0,
+    unshippedAgeIsLowerBound: false,
   };
   const unknownResult = extra => ({ ...base, ...extra, healthy: null });
   // An unconfigured repository is an absent probe, not unreadable evidence.
@@ -290,6 +287,7 @@ export async function observeProductionFreshness({
     now,
     timeoutMs,
     githubClient,
+    staleAfterSeconds,
   });
   if (!arrival.ok) {
     return unknownResult({
@@ -307,7 +305,7 @@ export async function observeProductionFreshness({
     healthy: !stale,
     incidentClass: stale ? FRESHNESS_INCIDENT_CLASS : null,
     reason: stale
-      ? `unshipped-for-${unshippedAgeSeconds}s`
+      ? `unshipped-for-${arrival.unshippedAgeIsLowerBound ? 'at-least-' : ''}${unshippedAgeSeconds}s`
       : `unshipped-for-${unshippedAgeSeconds}s-within-${staleAfterSeconds}s`,
     liveSha,
     mainSha,
@@ -315,7 +313,7 @@ export async function observeProductionFreshness({
     oldestUnshippedAt,
     unshippedArrivedAt,
     unshippedAgeSeconds,
-    // Within-bound main lag means the release FIFO is catching up.
+    unshippedAgeIsLowerBound: arrival.unshippedAgeIsLowerBound,
     catchingUp: !stale,
     summary: stale
       ? `behind by ${unshippedCommits}, stale`

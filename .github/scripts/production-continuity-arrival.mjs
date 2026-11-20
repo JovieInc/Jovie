@@ -20,22 +20,34 @@ export async function readMainArrival({
   now,
   timeoutMs,
   githubClient,
+  staleAfterSeconds,
 }) {
   const commits = compare?.commits;
   if (
     !Array.isArray(commits) ||
-    commits.length !== compare.ahead_by ||
+    commits.length > compare.ahead_by ||
     !commits.length
   )
     return unknown('unshipped-range-unreadable');
   const shas = new Set(commits.map(commit => commit?.sha));
+  const rangeComplete =
+    commits.length === compare.ahead_by && shas.has(mainSha);
+  const truncated =
+    commits.length < compare.ahead_by &&
+    compare.status === 'ahead' &&
+    compare.total_commits === compare.ahead_by &&
+    compare.merge_base_commit?.sha === liveSha;
   if (
     shas.size !== commits.length ||
     ![...shas].every(isSha) ||
-    !shas.has(mainSha) ||
+    !(rangeComplete || truncated) ||
     shas.has(liveSha)
   )
     return unknown('unshipped-range-unreadable');
+  // A validated ahead comparison proves its main endpoint is unshipped even
+  // when GitHub truncates the commit inventory. It can prove a stale lower
+  // bound, but never certify freshness for the unread portion of the range.
+  shas.add(mainSha);
   const oldestUnshippedAt = commits[0]?.commit?.committer?.date;
   if (!Number.isFinite(timestamp(oldestUnshippedAt)))
     return unknown('unshipped-age-unreadable');
@@ -84,9 +96,8 @@ export async function readMainArrival({
     )
   )
     return unknown('unshipped-arrival-unreadable');
-  // A bounded page must cover the range's arrival window. Exact oldest-head
-  // evidence or a known live ancestor bounds it; otherwise the full ledger is
-  // required. An old unrelated page alone proves neither freshness nor a stall.
+  // Freshness requires the whole range and arrival window. A matching old
+  // unshipped receipt alone can prove staleness; an unrelated old page cannot.
   const complete =
     ledger.total_count === runs.length ||
     runs.some(
@@ -95,13 +106,27 @@ export async function readMainArrival({
   const arrivals = runs
     .filter(run => shas.has(run.head_sha))
     .map(run => timestamp(run.created_at));
-  if (!complete || !arrivals.length)
-    return unknown('unshipped-arrival-unreadable');
+  if (!arrivals.length) return unknown('unshipped-arrival-unreadable');
   const arrivedMs = Math.min(...arrivals);
+  const unshippedAgeSeconds = Math.max(
+    0,
+    Math.floor((nowMs - arrivedMs) / 1000)
+  );
+  const unshippedAgeIsLowerBound = !(rangeComplete && complete);
+  if (
+    unshippedAgeIsLowerBound &&
+    !(
+      Number.isFinite(staleAfterSeconds) &&
+      staleAfterSeconds > 0 &&
+      unshippedAgeSeconds >= staleAfterSeconds
+    )
+  )
+    return unknown('unshipped-arrival-unreadable');
   return {
     ok: true,
     oldestUnshippedAt,
     unshippedArrivedAt: new Date(arrivedMs).toISOString(),
-    unshippedAgeSeconds: Math.max(0, Math.floor((nowMs - arrivedMs) / 1000)),
+    unshippedAgeSeconds,
+    unshippedAgeIsLowerBound,
   };
 }

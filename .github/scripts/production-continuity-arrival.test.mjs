@@ -26,6 +26,7 @@ function fixture({
   ledger = { total_count: 1, workflow_runs: [run()] },
   status = 200,
   clientError = null,
+  compareExtra = {},
 } = {}) {
   const fetchCalls = [],
     requests = [];
@@ -45,7 +46,7 @@ function fixture({
           : url.endsWith('/commits/main')
             ? { sha: MAIN }
             : url.includes('/compare/')
-              ? { ahead_by: ahead, commits }
+              ? { ahead_by: ahead, commits, ...compareExtra }
               : null;
         assert.ok(body, `unexpected unbudgeted read: ${url}`);
         return { status: 200, json: async () => body };
@@ -261,4 +262,107 @@ it('bounds a partial ledger with the known live ancestor when a batch has no old
   assert.equal(result.healthy, true);
   assert.equal(result.unshippedAgeSeconds, 1260);
   assert.equal(f.requests.length, 1);
+});
+
+describe('verified stale lower bounds with incomplete inventories', () => {
+  const truncated = overrides =>
+    fixture({
+      commits: Array.from({ length: 250 }, (_, n) => ({
+        sha: (n + 1).toString(16).padStart(40, '0'),
+        commit: { committer: { date: CREATED } },
+      })),
+      ahead: 251,
+      compareExtra: {
+        status: 'ahead',
+        total_commits: 251,
+        merge_base_commit: { sha: LIVE },
+      },
+      ...overrides,
+    });
+
+  it('reports a verified old unshipped main even when compare omits its SHA', async () => {
+    const f = truncated({
+      ledger: {
+        total_count: 1,
+        workflow_runs: [run(MAIN, '2026-11-20T09:00:00Z')],
+      },
+    });
+    const result = await observeProductionFreshness(f.options);
+    assert.equal(result.healthy, false);
+    assert.equal(result.incidentClass, 'production-stale');
+    assert.equal(result.unshippedAgeSeconds, 330 * 60);
+    assert.equal(result.unshippedAgeIsLowerBound, true);
+    assert.equal(result.reason, 'unshipped-for-at-least-19800s');
+    assert.equal(f.requests.length, 1);
+  });
+
+  it('does not certify freshness from a truncated range with a recent main arrival', async () => {
+    const f = truncated();
+    const result = await observeProductionFreshness(f.options);
+    assert.equal(result.healthy, null);
+    assert.equal(result.incidentClass, null);
+    assert.equal(result.reason, 'unshipped-arrival-unreadable');
+    assert.equal(f.requests.length, 1);
+  });
+
+  it('requires exact ahead and merge-base evidence before trusting an omitted main SHA', async () => {
+    for (const extra of [
+      { status: 'diverged' },
+      { total_commits: 250 },
+      { merge_base_commit: { sha: OLDEST } },
+    ]) {
+      const f = truncated({
+        compareExtra: {
+          status: 'ahead',
+          total_commits: 251,
+          merge_base_commit: { sha: LIVE },
+          ...extra,
+        },
+      });
+      const result = await observeProductionFreshness(f.options);
+      assert.equal(result.healthy, null);
+      assert.equal(f.requests.length, 0);
+    }
+  });
+
+  it('preserves the caller bound when a partial range proves less than that bound', async () => {
+    const f = truncated({
+      ledger: {
+        total_count: 1,
+        workflow_runs: [run(MAIN, '2026-11-20T09:00:00Z')],
+      },
+    });
+    for (const staleAfterSeconds of [360 * 60, 0, -1, NaN, Infinity]) {
+      const result = await observeProductionFreshness({
+        ...f.options,
+        staleAfterSeconds,
+      });
+      assert.equal(result.healthy, null);
+      assert.equal(result.incidentClass, null);
+    }
+    assert.equal(f.requests.length, 5);
+  });
+
+  it('uses a verified old unshipped head as a lower bound even if the ledger window is partial', async () => {
+    const f = fixture({
+      commits: [OLDEST, MAIN].map(sha => ({
+        sha,
+        commit: { committer: { date: CREATED } },
+      })),
+      ledger: {
+        total_count: 101,
+        workflow_runs: [
+          run(MAIN, '2026-11-20T09:00:00Z'),
+          ...Array.from({ length: 99 }, (_, n) =>
+            run((n + 1).toString(16).padStart(40, '0'))
+          ),
+        ],
+      },
+    });
+    const result = await observeProductionFreshness(f.options);
+    assert.equal(result.healthy, false);
+    assert.equal(result.unshippedAgeIsLowerBound, true);
+    assert.equal(result.unshippedAgeSeconds, 330 * 60);
+    assert.equal(f.requests.length, 1);
+  });
 });

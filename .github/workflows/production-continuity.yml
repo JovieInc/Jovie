@@ -105,7 +105,7 @@ jobs:
             echo "| Unknown targets | ${UNKNOWN_TARGETS:-none} (${UNKNOWN_REASONS:-none}) |"
             # Release lag stays visible while it is still inside the stale bound.
             jq -r '.targets[] | select(.id == "jovie-production-freshness")
-              | "| Production freshness | live \(.liveSha // "unknown" | .[0:7]) vs main \(.mainSha // "unknown" | .[0:7]): \(.unshippedCommits) unshipped, oldest \(.unshippedAgeSeconds)s (\(.reason)) |"' \
+              | "| Production freshness | live \(.liveSha // "unknown" | .[0:7]) vs main \(.mainSha // "unknown" | .[0:7]): \(.unshippedCommits) unshipped, age \(.unshippedAgeSeconds)s (\(.reason)) |"' \
               "$RUNNER_TEMP/production-continuity.json" || true
           } >> "$GITHUB_STEP_SUMMARY"
 
