@@ -20,7 +20,14 @@ export function assertProfileClaimProof() {
   const runner = surfaces.steps.find(
     step => step.name === 'Run surface elevation matrix (Storybook)'
   );
-  const invocation = runner.run.match(
+  const command =
+    runner.run === 'bash .github/scripts/run-storybook-surfaces.sh'
+      ? readFileSync(
+          resolve(root, '.github/scripts/run-storybook-surfaces.sh'),
+          'utf8'
+        )
+      : runner.run;
+  const invocation = command.match(
     /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
   );
   expect(invocation).not.toBeNull();

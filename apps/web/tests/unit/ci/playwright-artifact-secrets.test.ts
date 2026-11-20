@@ -1008,17 +1008,23 @@ describe('Playwright artifact secret boundary', () => {
     const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
     const job = jobBlock(source, 'ci-storybook-surfaces');
     const steps = workflowStepBlocks(job);
-    const surface = steps.find(step =>
-      step.startsWith(
-        '      - name: Run surface elevation matrix (Storybook)\n'
+    const surface = steps
+      .find(step =>
+        step.startsWith(
+          '      - name: Run surface elevation matrix (Storybook)\n'
+        )
       )
-    );
+      ?.replace('bash .github/scripts/run-storybook-surfaces.sh', () =>
+        readFileSync(
+          join(githubRoot, 'scripts/run-storybook-surfaces.sh'),
+          'utf8'
+        )
+      );
     const upload = steps.find(step =>
       step.startsWith(
         '      - name: Upload combined Storybook failure evidence\n'
       )
     );
-
     expect(surface).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
     expect(surface).not.toContain('JOVIE_LIVE_STORYBOOK_CERT');
     expect(surface).toContain('guard-playwright-artifacts.mjs" --run --');
@@ -1032,7 +1038,6 @@ describe('Playwright artifact secret boundary', () => {
     );
     expect(upload).toContain("allow-markdown: 'true'");
   });
-
   it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
     const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
     for (const [jobId, stepName] of [
@@ -1064,7 +1069,6 @@ describe('Playwright artifact secret boundary', () => {
     expect(visualUpload).toContain("allow-images: 'true'");
     expect(visualUpload).toContain("public-images: 'true'");
   });
-
   // JOV-7707: the artifact boundary is enforced as policy over parsed workflow
   // YAML. New producers, uploads and jobs are held to these rules by default,
   // so adding one needs no inventory edit; only exemptions are listed.
@@ -1099,7 +1103,6 @@ describe('Playwright artifact secret boundary', () => {
       )
     ).toEqual([]);
   });
-
   it('routes every Playwright output upload through the staged safe uploader', () => {
     const violations = workflowJobs().flatMap(({ file, id, job }) =>
       (job.steps ?? []).flatMap((step, index) =>
@@ -1135,7 +1138,6 @@ describe('Playwright artifact secret boundary', () => {
     ] as const)
       expect(uploadViolations(unsafe)).toContain(violation);
   });
-
   it('keeps checkout and git credentials out of every safe-upload job', () => {
     const safeUploadJobs = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
@@ -1150,7 +1152,6 @@ describe('Playwright artifact secret boundary', () => {
         safeUploadJobAudit(job).violations,
         `${job.file}:${job.id}`
       ).toEqual([]);
-
     const fixtureCheckout = `      - uses: actions/checkout@0123456789abcdef
         with:
           persist-credentials: false`;
@@ -1211,7 +1212,6 @@ ${fixtureCheckout}
     ])
       expect(gitPushAuthViolations(unsafePush), unsafePush).not.toEqual([]);
   });
-
   it('requires a staged producer receipt and reviewed image/Markdown allowances', () => {
     const violations = workflowJobs().flatMap(({ file, id, job }) => {
       const key = `${file}:${id}`;

@@ -66,7 +66,9 @@ function expectedCheckoutStep(exactBase) {
     '            scripts/lib/merge-group-local-evidence.mjs',
     '            scripts/lib/merge-group-member-policy.mjs',
     '            scripts/lib/pr-size-exclusions.mjs',
+    '            scripts/lib/pr-size-guard-cli.mjs',
     '            scripts/lib/pr-size-guard-policy.mjs',
+    '            scripts/lib/size-guard-github.mjs',
     '            scripts/lib/repo-hygiene-limits.mjs',
     '          sparse-checkout-cone-mode: false',
   ].join('\n');

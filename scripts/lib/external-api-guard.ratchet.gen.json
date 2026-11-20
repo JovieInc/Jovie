@@ -527,9 +527,6 @@
     "scripts/lib/pr-size-guard-label-provenance.mjs": {
       "gh-subprocess": 1
     },
-    "scripts/lib/pr-size-guard-policy.mjs": {
-      "gh-subprocess": 1
-    },
     "scripts/lib/publish-coverage-report.mjs": {
       "gh-subprocess": 1
     },

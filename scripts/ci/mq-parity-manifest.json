@@ -1,0 +1,215 @@
+{
+  "schema": "jovie-mq-parity/v1",
+  "issue": "JOV-13071",
+  "jobs": {
+    "ci-merge-group-workspace": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Validate and publish the installed dependency graph of the synthetic head, and compare constituent digest receipts with the actual combined lockfile. Inputs: github.event.merge_group.head_sha." } },
+    "main-queue-provenance": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "The MQ event emits a neutral provenance receipt keyed to the synthetic head; only push:main reads the completed queue run for that head. Inputs: github.event.merge_group.head_sha." } },
+    "ci-lockfile-preflight": {
+      "twins": [
+        { "workflow": ".github/workflows/source-validation.yml", "job": "deterministic", "mq_step": "Verify workflow references", "pr_step": "Run deterministic source contract", "command": "node scripts/verify-workflow-references.mjs" },
+        { "workflow": ".github/workflows/source-validation.yml", "job": "deterministic", "mq_step": "Compare workspace manifest and lockfile specifiers", "pr_step": "Run deterministic source contract", "command": "node scripts/lockfile-specifier-preflight.mjs" }
+      ]
+    },
+    "ci-path-changes": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.base_sha", "github.event.merge_group.head_sha"],
+        "reason": "Classify the exact synthetic range against the queue base (including a moved base and combined package dependency graph), then publish product/path selections. Inputs: github.event.merge_group.base_sha, github.event.merge_group.head_sha."
+      },
+      "note": "Source Validation deterministic already runs product-lane-classifier.mjs on the PR diff."
+    },
+    "ci-merge-group-admission": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.head_ref", "github.event.merge_group.head_sha"],
+        "reason": "Prove live queue membership and external admission checks for the synthetic queue ref; a source-head run cannot attest that membership. Inputs: github.event.merge_group.head_ref, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-merge-group-supersede": {
+      "needs_merged_tree": { "inputs": ["github.event.merge_group.head_ref", "github.event.merge_group.head_sha"], "reason": "Cancel superseded queue runs for the synthetic queue ref and head; no queue run exists at PR time. Inputs: github.event.merge_group.head_ref, github.event.merge_group.head_sha." }
+    },
+    "ci-risk-classifier": {
+      "twins": [
+        { "workflow": ".github/workflows/source-validation.yml", "job": "deterministic", "mq_step": "Evaluate repository instruction contracts", "pr_step": "Evaluate repository instruction contracts", "command": "node --run agent-context:check" },
+        { "workflow": ".github/workflows/source-validation.yml", "job": "deterministic", "mq_step": "Evaluate repository instruction contracts", "pr_step": "Evaluate repository instruction contracts", "command": "node --run agent-context:test" }
+      ],
+      "note": "Risk classification additionally reads the exact synthetic range."
+    },
+    "ci-secret-scan": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "security", "mq_step": "Verify backup-file fixture coverage", "pr_step": "Scan the exact source diff", "command": "./scripts/security/verify-gitleaks-coverage.sh" }],
+      "note": "Existing source secret scanner and backup-file fixture coverage; combined history is still scanned in MQ."
+    },
+    "ci-golden-path-lock": { "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "security", "mq_step": "Fail-closed golden path lock", "pr_step": "Scan the exact source diff", "command": "node scripts/golden-path-lock.mjs merge-gate" }] },
+    "ci-visual-snapshot-compare": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Build and package the combined homepage generation whose HTML, assets and visual fixture imports can differ from any constituent head. Inputs: github.event.merge_group.head_sha." } },
+    "ci-visual-snapshot-homepage": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-visual-snapshot-compare.result", "github.event.merge_group.head_sha"],
+        "reason": "Inspect the combined build artifact emitted by the snapshot producer; a source build cannot attest the bytes of that artifact. Inputs: needs.ci-visual-snapshot-compare.result, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-visual-marketing-dom": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-visual-snapshot-compare.result", "github.event.merge_group.head_sha"],
+        "reason": "Inspect the combined build artifact emitted by the snapshot producer; a source build cannot attest the bytes of that artifact. Inputs: needs.ci-visual-snapshot-compare.result, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-visual-marketing-routes": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-visual-snapshot-compare.result", "github.event.merge_group.head_sha"],
+        "reason": "Inspect the combined build artifact emitted by the snapshot producer; a source build cannot attest the bytes of that artifact. Inputs: needs.ci-visual-snapshot-compare.result, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-fast-typecheck": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run ci-fast lanes", "pr_step": "Run typecheck lane parity", "command": "node scripts/ci-fast-lanes.mjs", "env": { "CI_FAST_LANE_GROUP": "typecheck" } }],
+      "note": "The existing PR task copy is not the same ci-fast lane. The PR twin now exercises the actual lane on TypeScript graph inputs using the canonical affected-path selector."
+    },
+    "ci-fast-remaining": {
+      "twins": [
+        {
+          "workflow": ".github/workflows/source-validation.yml",
+          "job": "unit",
+          "mq_step": "Run structural ci-fast lane",
+          "pr_step": "Run structural remaining parity",
+          "command": "node scripts/ci-fast-lanes.mjs",
+          "env": { "CI_FAST_ONLY_STRUCTURAL": "true", "CI_FAST_STRUCTURAL_PYTEST": "skip", "CI_FAST_STRUCTURAL_WEB": "skip", "CI_FAST_STRUCTURAL_LANES": "skip" }
+        }
+      ],
+      "note": "PR path selection and product-lane classifier bound the work to affected inputs. MQ keeps its full existing contract."
+    },
+    "ci-fast-structural-python": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run structural pytest shards", "pr_step": "Run structural Python parity", "command": "node scripts/ci-fast-lanes.mjs", "env": { "CI_FAST_ONLY_STRUCTURAL": "true", "CI_FAST_STRUCTURAL_PYTEST": "only" } }],
+      "note": "PR path selection and product-lane classifier bound the work to affected inputs. MQ keeps its full existing contract."
+    },
+    "ci-fast-structural-web": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run structural web commands", "pr_step": "Run structural web parity", "command": "node scripts/ci-fast-lanes.mjs", "env": { "CI_FAST_ONLY_STRUCTURAL": "true", "CI_FAST_STRUCTURAL_WEB": "only" } }],
+      "note": "PR path selection and product-lane classifier bound the work to affected inputs. MQ keeps its full existing contract."
+    },
+    "ci-fast-structural-lanes": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run lanes coverage pytest", "pr_step": "Run lanes coverage parity", "command": "node scripts/ci-fast-lanes.mjs", "env": { "CI_FAST_ONLY_STRUCTURAL": "true", "CI_FAST_STRUCTURAL_LANES": "only" } }],
+      "note": "PR path selection and product-lane classifier bound the work to affected inputs. MQ keeps its full existing contract."
+    },
+    "ci-profile-admission-browser": {
+      "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Certify the synthetic public-profile rendering, accessible controls and diagnostic redaction against the combined route/component graph. Inputs: github.event.merge_group.head_sha." },
+      "note": "PR source guards already run the affected profile browser admission proof through ci-fast-lanes.mjs."
+    },
+    "ci-promptfoo-evals": {
+      "twins": [
+        { "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Validate Promptfoo config", "pr_step": "Validate Promptfoo config", "command": "pnpm --filter @jovie/web run evals:validate" },
+        {
+          "workflow": ".github/workflows/source-validation.yml",
+          "job": "unit",
+          "mq_step": "Run deterministic Promptfoo evals",
+          "pr_step": "Run deterministic Promptfoo evals",
+          "command": "pnpm run evals",
+          "env": { "JOVIE_RUN_LIVE_EVALS": "0", "JOVIE_RUN_LIVE_HTTP_EVALS": "0", "JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS": "0", "JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS": "0" }
+        }
+      ]
+    },
+    "ci-golden-eval-set": { "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run golden eval-set CI gate", "pr_step": "Run golden eval-set CI gate", "command": "pnpm run evals:golden", "env": { "JOVIE_RUN_LIVE_EVALS": "0" } }] },
+    "neon-db": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Create an isolated database for the synthetic migration/schema set, verify prior-release upgrade, and certify DB integration using the combined application graph. Inputs: github.event.merge_group.head_sha." } },
+    "drizzle-migration-guard": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "migration", "mq_step": "Run Migration Guard", "pr_step": "Validate changed migration surfaces", "command": "pnpm exec tsx scripts/online-index-migrate.ts --validate-only" }],
+      "note": "Existing PR migration checks run the same validation from apps/web; combined journal ordering remains checked in MQ."
+    },
+    "ci-build-layout": {
+      "twins": [
+        { "workflow": ".github/workflows/source-validation.yml", "job": "coverage", "mq_step": "Build exact combined head", "pr_step": "Build exact PR head", "command": "pnpm turbo build --filter=@jovie/web" },
+        { "workflow": ".github/workflows/source-validation.yml", "job": "coverage", "mq_step": "Enforce authed route initial JS budgets", "pr_step": "Enforce authed route initial JS budgets", "command": "node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next" },
+        { "workflow": ".github/workflows/source-validation.yml", "job": "coverage", "mq_step": "Enforce route render modes and HTML weight", "pr_step": "Enforce route render modes and HTML weight", "command": "node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next" }
+      ]
+    },
+    "ci-build-ovie": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Build the combined independent Ovie app using the synthetic workspace dependency graph, routing imports and static output. Inputs: github.event.merge_group.head_sha." } },
+    "ci-typecheck-ovie": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Typecheck the combined Ovie workspace dependency graph; constituent heads may change shared contracts and callers independently. Inputs: github.event.merge_group.head_sha." } },
+    "ci-storybook-surfaces": {
+      "twins": [{ "workflow": ".github/workflows/source-validation.yml", "job": "unit", "mq_step": "Run surface elevation matrix (Storybook)", "pr_step": "Run surface elevation matrix (Storybook)", "command": "bash .github/scripts/run-storybook-surfaces.sh", "env": { "JOVIE_STORYBOOK_MANUAL_AXE": "1" } }],
+      "note": "PR executes all three browser shards on affected paths. MQ certification matrix leg additionally reads the synthetic head/base in component-merge-group-storybook-cert.mjs; preserved unchanged."
+    },
+    "ci-ios": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "The reusable iOS workflow certifies the combined native/shared contract graph and reports results for this exact synthetic head. Inputs: github.event.merge_group.head_sha." } },
+    "ci-macos": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "The reusable Mac workflow certifies the combined desktop/shared contract graph and reports results for this exact synthetic head. Inputs: github.event.merge_group.head_sha." } },
+    "ci-cross-product-integration": {
+      "needs_merged_tree": { "inputs": ["needs.ci-unit-tests.result", "github.event.merge_group.head_sha"], "reason": "Join the exact product-lane results and test shared contracts against the combined cross-product graph. Inputs: needs.ci-unit-tests.result, github.event.merge_group.head_sha." },
+      "rollup_lanes": ["ci-unit-tests", "ci-build-layout", "ci-build-ovie", "ci-typecheck-ovie", "ci-storybook-surfaces", "ci-ios", "ci-macos"]
+    },
+    "ci-fast": {
+      "needs_merged_tree": { "inputs": ["needs.ci-fast-typecheck.result", "github.event.merge_group.head_sha"], "reason": "Join all ci-fast child lanes; a rollup failure is not an independent executable family. Inputs: needs.ci-fast-typecheck.result, github.event.merge_group.head_sha." },
+      "rollup_lanes": ["ci-fast-typecheck", "ci-fast-remaining", "ci-profile-admission-browser", "ci-fast-structural-python", "ci-fast-structural-web", "ci-fast-structural-lanes"]
+    },
+    "ci-product-lane-receipt": {
+      "needs_merged_tree": { "inputs": ["needs.ci-risk-classifier.result", "github.event.merge_group.head_sha"], "reason": "Join the exact affected product-lane receipts for the combined generation; failures belong to those lanes. Inputs: needs.ci-risk-classifier.result, github.event.merge_group.head_sha." },
+      "rollup_lanes": ["ci-risk-classifier", "ci-fast", "ci-blog-content", "ci-unit-tests", "ci-build-layout", "ci-build-ovie", "ci-typecheck-ovie", "ci-storybook-surfaces", "ci-ios", "ci-macos", "ci-cross-product-integration"]
+    },
+    "ci-merge-group-ready": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-risk-classifier.result", "github.event.merge_group.head_sha"],
+        "reason": "Join required admission, security, dependency, eval, coverage and product lanes for the synthetic generation; failures belong to those lanes. Inputs: needs.ci-risk-classifier.result, github.event.merge_group.head_sha."
+      },
+      "rollup_lanes": [
+        "ci-risk-classifier",
+        "ci-fast",
+        "ci-blog-content",
+        "ci-unit-tests",
+        "ci-exact-head-coverage",
+        "ci-build-layout",
+        "ci-build-ovie",
+        "ci-typecheck-ovie",
+        "ci-storybook-surfaces",
+        "ci-ios",
+        "ci-macos",
+        "ci-cross-product-integration",
+        "ci-product-lane-receipt",
+        "ci-promptfoo-evals",
+        "ci-golden-eval-set",
+        "ci-secret-scan",
+        "ci-golden-path-lock",
+        "ci-visual-snapshot-compare",
+        "ci-visual-snapshot-homepage",
+        "ci-visual-marketing-dom",
+        "ci-visual-marketing-routes",
+        "drizzle-migration-guard",
+        "neon-db",
+        "ci-lighthouse-dashboard-pr",
+        "ci-lighthouse-onboarding-pr"
+      ]
+    },
+    "ci-merge-suite-scope": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-unit-tests.result", "github.event.merge_group.head_sha"],
+        "reason": "Claim full_web_units only after the full combined unit matrix and PR Ready succeed; a source affected-unit receipt cannot attest full combined scope. Inputs: needs.ci-unit-tests.result, github.event.merge_group.head_sha."
+      },
+      "rollup_lanes": ["ci-unit-tests", "ci-merge-group-ready"]
+    },
+    "ci-exact-head-coverage": {
+      "needs_merged_tree": {
+        "inputs": ["needs.ci-exact-head-coverage-shard.result", "github.event.merge_group.head_sha"],
+        "reason": "Join and measure the four combined coverage shard reports for the exact synthetic head; source coverage uses its own source head and diff. Inputs: needs.ci-exact-head-coverage-shard.result, github.event.merge_group.head_sha."
+      },
+      "rollup_lanes": ["ci-exact-head-coverage-shard"]
+    },
+    "ci-lighthouse-dashboard-pr": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.base_sha", "github.event.merge_group.head_sha"],
+        "reason": "Compare signed-in Lighthouse output from the synthetic application build against the queue base build, with isolated DB/auth fixtures and identical route budgets. Inputs: github.event.merge_group.base_sha, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-lighthouse-onboarding-pr": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.base_sha", "github.event.merge_group.head_sha"],
+        "reason": "Compare signed-in Lighthouse output from the synthetic application build against the queue base build, with isolated DB/auth fixtures and identical route budgets. Inputs: github.event.merge_group.base_sha, github.event.merge_group.head_sha."
+      }
+    },
+    "ci-blog-content": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Render and compare publication/SEO certification receipts for the exact combined blog output and article fixture graph. Inputs: github.event.merge_group.head_sha." } },
+    "ci-unit-tests": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.head_sha", "github.event.merge_group.base_sha"],
+        "reason": "The exhaustive unit matrix certifies all tests and affected sibling packages for github.event.merge_group.head_sha against github.event.merge_group.base_sha. Source Validation already runs JOV-6834 affected unit shards with the same test:fast configuration, pool and quarantine; that source subset cannot attest the full combined scope."
+      },
+      "note": "Existing twin: source-validation.yml#unit, Run web unit tests related to the exact PR diff. JOV-6834 owns this source test:fast subset; no new unit shards or changed MQ test selection."
+    },
+    "ci-exact-head-coverage-shard": {
+      "needs_merged_tree": {
+        "inputs": ["github.event.merge_group.base_sha", "github.event.merge_group.head_sha"],
+        "reason": "Measure runtime/branch coverage of the synthetic head against the queue base; each shard report is bound to those SHAs. Inputs: github.event.merge_group.base_sha, github.event.merge_group.head_sha."
+      },
+      "note": "Existing PR twin: source-validation.yml#coverage / Run changed-behavior coverage ratchet, using check-changed-test-coverage.mjs on the source diff."
+    },
+    "security-gate": { "needs_merged_tree": { "inputs": ["github.event.merge_group.head_sha"], "reason": "Publish the security evidence joined for the exact synthetic generation; source security evidence cannot name this later combined head. Inputs: github.event.merge_group.head_sha." } }
+  }
+}

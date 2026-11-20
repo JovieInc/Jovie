@@ -182,6 +182,7 @@ command -v go >/dev/null || fail 'Go is required to build the source-pinned acti
   export GOTOOLCHAIN=local GOWORK=off GOFLAGS='' CGO_ENABLED=0
   export GOOS="$actionlint_goos" GOARCH="$actionlint_goarch"
   command -v cat >/dev/null || fail 'cat is required for the upstream stdin regression'
+  go mod verify || fail 'cached Go module checksum mismatch'
   go test -p=1 -mod=readonly -count=1 -timeout=20s \
     -run '^TestProcessConcurrentStdinDoesNotDeadlock$' \
     -coverprofile="$tool_dir/actionlint-pipe.coverage" . || fail 'upstream stdin regression failed'

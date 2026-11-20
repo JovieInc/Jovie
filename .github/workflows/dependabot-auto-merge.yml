@@ -73,7 +73,9 @@ jobs:
             scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-exclusions.mjs
+            scripts/lib/pr-size-guard-cli.mjs
             scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/size-guard-github.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs

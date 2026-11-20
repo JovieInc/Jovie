@@ -112,12 +112,25 @@ function jobBlock(jobId, nextJobId) {
       start
     );
   }
-  return WORKFLOW.slice(start, end);
+  // Resolve the shared shell runner when checking the effective spec list.
+  return WORKFLOW.slice(start, end).replace(
+    '        run: bash .github/scripts/run-storybook-surfaces.sh',
+    '        run: |\n' +
+      readFileSync(
+        resolve(REPO_ROOT, '.github/scripts/run-storybook-surfaces.sh'),
+        'utf8'
+      )
+        .split('\n')
+        .map(line => `          ${line}`)
+        .join('\n')
+  );
 }
 
 /**
- * @typedef {{run?: string, uses?: string, if?: string | boolean,
- *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{name?: string, run?: string, uses?: string, if?: string | boolean,
+ *   env?: Record<string, string>,
+ *   with?: {'go-version'?: string, cache?: boolean,
+ *     reuse_merge_group_workspace?: string, path?: string}}} ActionlintWorkflowStep
  * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
  */
 function assertActionlintCompiler(steps) {
@@ -2739,9 +2752,36 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
-    expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+    const steps = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW)).jobs[
+      'ci-fast-remaining'
+    ].steps;
+    const nodeSetup = steps.findIndex(
+      step => step.uses === './.github/actions/setup-node-pnpm'
     );
+    const goSetup = steps.findIndex(step =>
+      step.uses?.startsWith('actions/setup-go@')
+    );
+    const cache = steps.findIndex(
+      step => step.name === 'Restore verified actionlint Go modules'
+    );
+    const lint = steps.findIndex(step => step.name === 'Run actionlint');
+    const awaitHistory = steps.findIndex(
+      step => step.name === 'Fetch base-branch history'
+    );
+    expect(steps[nodeSetup].with.reuse_merge_group_workspace).toBe('true');
+    expect(goSetup).toBeGreaterThan(nodeSetup);
+    expect(cache).toBeGreaterThan(goSetup);
+    expect(lint).toBeGreaterThan(cache);
+    expect(awaitHistory).toBeGreaterThan(lint);
+    expect(steps[lint].if).toBeUndefined();
+    expect(steps[lint].env).toMatchObject({
+      RELEASE_DOWNLOAD_TOKEN: '${{ github.token }}',
+    });
+    expect(steps[lint].env.PINNED_DOWNLOAD_CACHE_DIR).toBe(
+      steps.find(step => step.name === 'Restore pinned actionlint downloads')
+        .with.path
+    );
+    assertActionlintCompiler(steps);
     expect(
       remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)
     ).toHaveLength(1);

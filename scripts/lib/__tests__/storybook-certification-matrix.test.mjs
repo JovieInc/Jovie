@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -40,6 +41,11 @@ function runMatrixMember(shard, exitCode = 0) {
   const bin = join(root, 'bin');
   mkdirSync(bin);
   mkdirSync(join(root, 'apps/web'), { recursive: true });
+  mkdirSync(join(root, '.github/scripts'), { recursive: true });
+  copyFileSync(
+    join(repoRoot, '.github/scripts/run-storybook-surfaces.sh'),
+    join(root, '.github/scripts/run-storybook-surfaces.sh')
+  );
   writeFileSync(join(bin, 'curl'), '#!/bin/sh\nexit 0\n');
   writeFileSync(
     join(bin, 'node'),

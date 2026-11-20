@@ -136,6 +136,7 @@ function shallowFixture(mainCommits = 80) {
     'merge-group-member-policy.mjs',
     'pr-size-exclusions.mjs',
     'pr-size-guard-policy.mjs',
+    'size-guard-github.mjs',
     'repo-hygiene-limits.mjs',
   ])
     copyFileSync(
@@ -206,7 +207,6 @@ describe('targeted complete ancestry for PR Size Guard', () => {
       'merge-base --all'
     );
   });
-
   it('matches full ancestry and policy inputs while excluding unrelated refs and objects', () => {
     const f = shallowFixture();
     const before = git(f.clone, ['config', '--local', '--list']);

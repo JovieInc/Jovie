@@ -128,8 +128,22 @@ const EVENT = JSON.parse(
   )
 );
 
+function withSharedStorybookRunner(workflow) {
+  return workflow.replace(
+    '        run: bash .github/scripts/run-storybook-surfaces.sh',
+    '        run: |\n' +
+      readFileSync(
+        resolve(REPO_ROOT, '.github/scripts/run-storybook-surfaces.sh'),
+        'utf8'
+      )
+        .split('\n')
+        .map(line => `          ${line}`)
+        .join('\n')
+  );
+}
+
 function getJobBlock(workflow, jobKey) {
-  const lines = workflow.split('\n');
+  const lines = withSharedStorybookRunner(workflow).split('\n');
   const start = lines.findIndex(line => line === `  ${jobKey}:`);
   expect(start, `Missing workflow job: ${jobKey}`).toBeGreaterThanOrEqual(0);
 
@@ -4623,11 +4637,13 @@ describe('merge-group Playwright artifact guard', () => {
   it('lets every guarded layout and Storybook Playwright step keep error-context.md', () => {
     // A test that fails once and passes on retry leaves error-context.md; the
     // guard must scan it (redacted) instead of failing the passed step.
-    const guardedSteps = CI_WORKFLOW.split(/\n {6}- name: /u).filter(step =>
-      /^(Run deterministic layout behavior guard|Run surface elevation matrix \(Storybook\))/u.test(
-        step
-      )
-    );
+    const guardedSteps = withSharedStorybookRunner(CI_WORKFLOW)
+      .split(/\n {6}- name: /u)
+      .filter(step =>
+        /^(Run deterministic layout behavior guard|Run surface elevation matrix \(Storybook\))/u.test(
+          step
+        )
+      );
     // Combined-head layout + Storybook, and the manual layout guard job.
     expect(guardedSteps).toHaveLength(3);
     for (const step of guardedSteps) {

@@ -19,10 +19,7 @@ import {
   getScreenshotArguments,
 } from './visual-workflow-ast';
 
-// JOV-7707: workflow contracts here read parsed YAML and execute the shipped
-// step shell with stubbed tools; PR/merge-group gate aggregation is covered by
-// ready-gates.test.ts.
-
+// JOV-7707: resolve shared shell commands for assertions and stubbed execution.
 type Step = {
   name?: string;
   uses?: string;
@@ -84,11 +81,17 @@ function job(id: string): Job {
 function step(owner: Job, name: string) {
   const index = owner.steps.findIndex(entry => entry.name === name);
   expect(index, `missing step ${name}`).toBeGreaterThanOrEqual(0);
-  return { index, step: owner.steps[index] as Step };
+  const found = owner.steps[index] as Step;
+  const run = found.run?.replace(
+    'bash .github/scripts/run-storybook-surfaces.sh',
+    () =>
+      readFileSync(
+        resolve(repoRoot, '.github/scripts/run-storybook-surfaces.sh'),
+        'utf8'
+      )
+  );
+  return { index, step: { ...found, run } };
 }
-
-// Runs a step's shell in a temp workspace with stub tools on PATH. Each stub
-// appends its argv to calls.log; `stubs` maps a tool to extra shell.
 function runStep(
   run: string,
   stubs: Record<string, string>,
@@ -154,9 +157,6 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('runs three two-worker browser shards beside one merge-group certification', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
-    // Three disjoint Playwright shards cover the full spec list. Merge groups
-    // also require one parallel certification; any member failure fails the
-    // matrix result read by the aggregates.
     expect(storybook.strategy).toEqual({
       'fail-fast': true,
       matrix: {

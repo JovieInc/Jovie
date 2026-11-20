@@ -83,6 +83,14 @@ test('metadata reuse and no unit diff still provision the guard shard only', () 
           steps: {
             reuse: { outputs: { reuse } },
             scope: { outputs: { web, ui: 'false', ovie: 'false' } },
+            'mq-parity': {
+              outputs: {
+                typecheck: 'false',
+                structural: 'false',
+                storybook: 'false',
+                evals: 'false',
+              },
+            },
           },
         };
         for (const name of names) {
