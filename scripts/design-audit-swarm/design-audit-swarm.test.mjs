@@ -58,7 +58,10 @@ describe('design-audit-swarm', () => {
       sourceIssue: 'JOV-13850',
     });
     assert.equal(summary.dryRun, true);
-    assert.equal(summary.proposed[0].linear.identifier, 'DRY-RUN');
+    const linear = /** @type {{ identifier?: string }} */ (
+      summary.proposed[0].linear
+    );
+    assert.equal(linear.identifier, 'DRY-RUN');
     assert.equal(summary.contract.mutatesPen, false);
   });
 });

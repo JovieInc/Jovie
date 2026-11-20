@@ -1115,6 +1115,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/security-advisory-intake.close-scan.test.mjs',
   'scripts/sonar-token-validation.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/design-audit-swarm/design-audit-swarm.test.mjs',
   'scripts/evals/artist-identity.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',

@@ -10,9 +10,6 @@ name: Design Governance
 # ci-fast / PR Ready merge gate.
 
 on:
-  schedule:
-    # Monday 08:17 UTC — docs/design-system/GOVERNANCE.md standing weekly audit.
-    - cron: '17 8 * * 1'
   push:
     branches: [main]
     paths:

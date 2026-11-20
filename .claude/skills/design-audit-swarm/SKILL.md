@@ -35,5 +35,6 @@ node scripts/design-audit-swarm/cli.mjs run --recipe pen-parity --dry-run
 ## Continuous / scheduled
 
 - Agents: `/design-audit-swarm` (prefer dry first).
-- Scheduled: `.github/workflows/design-governance.yml` (Mon 08:17 UTC + events)
-  runs `design:audit-swarm:dry` on the standing governance scheduler — no second cron.
+- Continuous: `.github/workflows/design-governance.yml` (push/PR/dispatch —
+  event-driven, no cron) runs `design:audit-swarm:dry` on the standing
+  governance workflow.
