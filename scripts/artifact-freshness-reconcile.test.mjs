@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ARTIFACT_FRESHNESS_KEY,
+  canResolveSummerForFreshness,
   collectArtifactFreshness,
   desktopRelevantBetween,
   fetchLatestProductionVerifiedSha,
@@ -187,4 +188,62 @@ test('resolveSummerForFreshness closes by stable fingerprint on green', async ()
   assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
   assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
   assert.equal(calls[0].runId, '99');
+});
+
+test('unknown production certified is not resolve-eligible even when published/feed look green', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+      staging: {
+        version: '26.11.4-staging.1.1',
+        publishedAt: '2026-11-15T01:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+    },
+    certified: {
+      status: 'unknown',
+      reason: 'No recent successful Production Verified job on main.',
+    },
+    desktopRelevant: false,
+  });
+  assert.equal(receipt.red, false);
+  assert.equal(canResolveSummerForFreshness(receipt), false);
+});
+
+test('known verified production certified allows Summer resolve when receipt is green', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+      staging: {
+        version: '26.11.4-staging.1.1',
+        publishedAt: '2026-11-15T01:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+    },
+    certified: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      verified: true,
+      at: '2026-11-20T00:00:00Z',
+    },
+    desktopRelevant: false,
+  });
+  assert.equal(receipt.red, false);
+  assert.equal(canResolveSummerForFreshness(receipt), true);
 });

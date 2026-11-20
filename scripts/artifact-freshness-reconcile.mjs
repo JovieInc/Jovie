@@ -317,6 +317,27 @@ export async function pageSummerForFreshness(input) {
 }
 
 /**
+ * Summer may close only when production certified was actually observed.
+ * Unknown/missing certified skips certified-unpublished checks; closing on
+ * that green would bury an open stall the next successful lookup would catch.
+ *
+ * @param {ReturnType<typeof buildArtifactFreshnessReceipt>} receipt
+ */
+export function canResolveSummerForFreshness(receipt) {
+  if (receipt?.red === true) return false;
+  const production = (receipt?.channels ?? []).find(
+    channel => channel.channel === 'production'
+  );
+  const certified = production?.stages?.certified;
+  return (
+    certified?.status === 'known' &&
+    certified.verified === true &&
+    typeof certified.sourceRevision === 'string' &&
+    FULL_SHA.test(certified.sourceRevision)
+  );
+}
+
+/**
  * @param {{
  *   readonly sourceUrl?: string;
  *   readonly runId?: string;
@@ -379,6 +400,13 @@ async function main() {
     const paged = await pageSummerForFreshness({ receipt, sourceUrl });
     console.log(`[artifact-freshness] summer=${JSON.stringify(paged)}`);
     if (!paged.ok) process.exitCode = 1;
+    return;
+  }
+
+  if (!canResolveSummerForFreshness(receipt)) {
+    console.log(
+      '[artifact-freshness] observation incomplete (production certified unknown); Summer not resolved.'
+    );
     return;
   }
 
