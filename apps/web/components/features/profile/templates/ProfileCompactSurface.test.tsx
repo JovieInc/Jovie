@@ -719,7 +719,7 @@ describe('ProfileCompactSurface', () => {
       'utf8'
     );
     expect(source).toContain('onOpenReleaseCredits={onOpenReleaseCredits}');
-    expect(source).toContain("from '@jovie/ui'"); // Drift T2.1 IconButton
+    expect(source).toMatch(/IconButton[\s\S]*from '@jovie\/ui'|from '@jovie\/ui'[\s\S]*IconButton/);
     expect(source).not.toContain('CircleIconButton');
   });
 });
