@@ -4,7 +4,7 @@ name: desktop-dogfood
 # necessary-trust-boundary: Signs and notarizes the founder Staging desktop feed with Apple Developer ID and App Store Connect API secrets that GITHUB_TOKEN cannot hold; runs only after green CI on main and publishes the rolling desktop-staging tag without writing production VERSION stamps.
 # removal-trigger: Remove when Tim's daily-driver Mac runs a native signed auto-update channel from main with the same continuous feed, or when production stamps themselves land every green main tip.
 # clock-class: event-driven
-# github-token-budget: 12 calls/run - authorize selects/decides dogfood SHA against main+CI+last staging feed; package re-checks main ancestry before and after publish
+# github-token-budget: 24 calls/run - authorize selects/decides dogfood SHA against main+CI+last staging feed; package (+quota retry rebuild) re-checks main ancestry before and after publish
 run-name: Desktop dogfood ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # Founder Mac dogfood channel (Tim's daily-driver MBP).
@@ -257,7 +257,373 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: write
+    outputs:
+      quota_deferred: ${{ steps.prepare-staging.outputs.quota_deferred || steps.publish-staging.outputs.quota_deferred }}
+      quota_reset_epoch: ${{ steps.prepare-staging.outputs.quota_reset_epoch || steps.publish-staging.outputs.quota_reset_epoch }}
     env:
+      RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+      HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
+      HAS_APPLE_API_CREDENTIALS: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+      HAS_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.release_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Revalidate authorized mainline source before packaging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main before dogfood packaging."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Dogfood generation $RELEASE_SHA is not a trusted ancestor of current main before packaging."
+              exit 1
+            }
+          fi
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Prime Node toolcache
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Electron downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-downloads-
+
+      - name: Compute monotonic staging release version
+        id: staging-version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node apps/desktop/scripts/sync-version.mjs \
+            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Require staging signing and notarization credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$HAS_MAC_SIGNING_CREDENTIALS" = "true" ] &&
+            [ "$HAS_APPLE_API_CREDENTIALS" = "true" ] &&
+            [ "$HAS_APPLE_TEAM_ID" = "true" ] || {
+            echo "::error::Dogfood publication requires macOS signing certificate, App Store Connect API key, and Apple team ID secrets."
+            exit 1
+          }
+
+      - name: Validate rolling staging prerelease
+        id: prepare-staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node scripts/desktop-release-assets.mjs prepare \
+            --environment staging \
+            --sha "$RELEASE_SHA" \
+            --version "${{ steps.staging-version.outputs.version }}"
+          status=$?
+          set -e
+          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
+
+      - name: Import Apple Developer cert (macOS)
+        if: ${{ steps.prepare-staging.outputs.quota_deferred != 'true' }}
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/jovie-build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+
+          echo "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$MAC_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          EXISTING_KEYCHAINS=$(security list-keychain -d user | tr -d '"')
+          # shellcheck disable=SC2086
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH" >/dev/null
+
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
+
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              awk '/"Developer ID Application:/{print $2}'
+          )"
+          SIGNING_IDENTITY_COUNT="$(
+            printf '%s\n' "$SIGNING_IDENTITY" |
+              awk 'NF { count++ } END { print count + 0 }'
+          )"
+          [ "$SIGNING_IDENTITY_COUNT" -eq 1 ] || {
+            echo "::error::Expected exactly one Developer ID Application identity."
+            exit 1
+          }
+
+          rm -f "$CERT_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "JOVIE_MAC_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Stage Apple API key (macOS)
+        if: ${{ steps.prepare-staging.outputs.quota_deferred != 'true' }}
+        env:
+          APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/apple-api-key.p8"
+          if printf '%s' "$APPLE_API_KEY_CONTENTS" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s' "$APPLE_API_KEY_CONTENTS" > "$KEY_PATH"
+          else
+            printf '%s' "$APPLE_API_KEY_CONTENTS" | base64 --decode > "$KEY_PATH"
+          fi
+          chmod 600 "$KEY_PATH"
+          head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" || {
+            echo "::error::Staged Apple API key is not a valid PEM .p8 file"
+            exit 1
+          }
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Package staging desktop app
+        if: ${{ steps.prepare-staging.outputs.quota_deferred != 'true' }}
+        env:
+          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_RELEASE_DMG: 'true'
+          ELECTRON_ENV: staging
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
+        run: pnpm --filter @jovie/desktop package:staging
+
+      - name: Verify staging desktop artifact set
+        if: ${{ steps.prepare-staging.outputs.quota_deferred != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="${{ steps.staging-version.outputs.version }}"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*$ ]] || {
+            echo "::error::Staging version is not valid prerelease semver."
+            exit 1
+          }
+          staging_files=(
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
+            "apps/desktop/dist/staging-mac.yml"
+          )
+          for staging_file in "${staging_files[@]}"; do
+            [ -f "$staging_file" ] || {
+              echo "::error::Expected staging desktop artifact is missing: $staging_file"
+              exit 1
+            }
+          done
+
+          staging_app="apps/desktop/dist/mac-universal/Jovie Staging.app"
+          [ -d "$staging_app" ] || {
+            echo "::error::Packaged staging app bundle is missing."
+            exit 1
+          }
+          codesign --verify --deep --strict "$staging_app"
+          spctl --assess --type execute --verbose=2 "$staging_app"
+          xcrun stapler validate "$staging_app"
+
+          identity_file="$staging_app/Contents/Resources/build-identity.json"
+          cmp apps/desktop/build/build-identity.json "$identity_file"
+          node -e '
+            const fs = require("fs");
+            const [file, version, sha] = process.argv.slice(1);
+            const record = JSON.parse(fs.readFileSync(file, "utf8"));
+            const exact = Object.keys(record).sort().join(",") === "builtAt,channel,sourceRevision,version" &&
+              record.channel === "staging" && record.version === version &&
+              record.sourceRevision === sha &&
+              new Date(record.builtAt).toISOString() === record.builtAt;
+            if (!exact) throw new Error("Packaged staging build identity is not exact.");
+          ' "$identity_file" "$release_version" "$RELEASE_SHA"
+          runtime_identity="$("$staging_app/Contents/MacOS/Jovie Staging" --print-build-identity | tail -n 1)"
+          node -e '
+            const fs = require("fs");
+            const expected = {...JSON.parse(fs.readFileSync(process.argv[1], "utf8")), provenance: "verified"};
+            if (JSON.stringify(JSON.parse(process.argv[2])) !== JSON.stringify(expected))
+              throw new Error("Runtime staging build identity is not exact.");
+          ' "$identity_file" "$runtime_identity"
+          embedded_version="$(/usr/libexec/PlistBuddy \
+            -c 'Print :CFBundleShortVersionString' \
+            "$staging_app/Contents/Info.plist")"
+          [ "$embedded_version" = "$release_version" ] || {
+            echo "::error::Staging app embedded version is not exact."
+            exit 1
+          }
+          update_config="$staging_app/Contents/Resources/app-update.yml"
+          grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
+          grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
+          grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
+          grep -Eq "^updaterCacheDirName:[[:space:]]*'?jovie-desktop-staging-updater'?[[:space:]]*$" "$update_config"
+
+          staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
+          xcrun stapler validate "$staging_dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$staging_dmg"
+
+      - name: Publish staging desktop prerelease
+        id: publish-staging
+        if: ${{ steps.prepare-staging.outputs.quota_deferred != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main before dogfood publication."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Dogfood generation $RELEASE_SHA is not a trusted ancestor of current main before publication."
+              exit 1
+            }
+          fi
+          set +e
+          node scripts/desktop-release-assets.mjs upload-and-publish \
+            --environment staging \
+            --sha "$RELEASE_SHA" \
+            --version="${{ steps.staging-version.outputs.version }}" \
+            --dist "apps/desktop/dist"
+          status=$?
+          set -e
+          bash .github/scripts/desktop-quota-defer-exit.sh "$status"
+
+      - name: Clean up keychain
+        if: always() && env.KEYCHAIN_PATH != ''
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" || true
+
+      - name: Clean up Apple API key
+        if: always() && env.APPLE_API_KEY != ''
+        run: |
+          rm -f "$APPLE_API_KEY"
+
+  wait-for-deferred-desktop-quota:
+    name: Wait for deferred dogfood installation quota
+    needs: [authorize, publish]
+    if: >-
+      needs.publish.result == 'success' &&
+      needs.publish.outputs.quota_deferred == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      contents: read
+    steps:
+      - name: Sleep until the known installation reset
+        env:
+          RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
+          QUOTA_RESET_EPOCH: ${{ needs.publish.outputs.quota_reset_epoch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Deferred dogfood generation SHA is malformed." >&2
+            exit 1
+          }
+          [[ "$QUOTA_RESET_EPOCH" =~ ^[0-9]+$ ]] || {
+            echo "::error::Installation quota defer has no reset epoch." >&2
+            exit 1
+          }
+          now="$(date +%s)"
+          wait_for=$((QUOTA_RESET_EPOCH + 5 - now))
+          if [ "$wait_for" -lt 0 ]; then
+            wait_for=0
+          fi
+          # Same 3900s cap as gh-api-hold's token window. This is the gap
+          # between publisher attempts, not a longer in-request hold.
+          if [ "$wait_for" -gt 3900 ]; then
+            echo "::error::Installation quota reset is ${wait_for}s away, outside the 3900s retry cap. Not passing." >&2
+            exit 1
+          fi
+          reset_iso="$(node -e 'console.log(new Date(Number(process.argv[1]) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z"))' "$QUOTA_RESET_EPOCH")"
+          sentence="Reattempting dogfood publication of $RELEASE_SHA after the installation quota reset at ${reset_iso}."
+          echo "::notice::${sentence}"
+          echo "$sentence" >> "$GITHUB_STEP_SUMMARY"
+          sleep "$wait_for"
+
+  rebuild-deferred-desktop:
+    name: Publish dogfood desktop prerelease
+    needs: [authorize, wait-for-deferred-desktop-quota]
+    if: needs.wait-for-deferred-desktop-quota.result == 'success'
+    timeout-minutes: 45
+    # Quota retry of publish. Steps stay identical; a second installation
+    # defer fails closed via DESKTOP_QUOTA_RETRY.
+    runs-on: macos-15
+    permissions:
+      contents: write
+    outputs:
+      quota_deferred: ${{ steps.prepare-staging.outputs.quota_deferred || steps.publish-staging.outputs.quota_deferred }}
+      quota_reset_epoch: ${{ steps.prepare-staging.outputs.quota_reset_epoch || steps.publish-staging.outputs.quota_reset_epoch }}
+    env:
+      DESKTOP_QUOTA_RETRY: '1'
       RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
       HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
       HAS_APPLE_API_CREDENTIALS: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
