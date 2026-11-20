@@ -126,11 +126,12 @@ export function keyMatches(key, file) {
   }
   return candidates.some(candidate => {
     if (!key.includes('/')) {
-      // Bare filenames and route groups are web-local keys. Matching them
-      // against any repo basename (e.g. scripts/*/baseline.json vs a fixture
-      // named baseline.json) falsely selects web source-read tests on
-      // unrelated ratchet/baseline edits (JOV-10443).
-      if (!file.startsWith(WEB)) return false;
+      // Bare filenames and route groups match apps/web paths and repo-root
+      // files (package.json, turbo.json). They must not match every nested
+      // basename outside apps/web (e.g. scripts/*/baseline.json), or
+      // swift-arch ratchets falsely select web disk-read tests (JOV-10443).
+      const isRepoRootFile = !file.includes('/');
+      if (!file.startsWith(WEB) && !isRepoRootFile) return false;
       return basename(candidate) === key || candidate.split('/').includes(key);
     }
     const padded = `/${candidate}`;
