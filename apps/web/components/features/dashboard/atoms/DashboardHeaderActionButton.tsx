@@ -13,11 +13,12 @@ import { cn } from '@/lib/utils';
 // IconButton size instead of a height restyle.
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-8 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 sm:font-medium sm:tracking-normal [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
+// The base class owns the surface; pressed state changes only the label tone.
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
-  'border-transparent bg-transparent text-primary-token shadow-none';
+  'text-primary-token';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
   'rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0';

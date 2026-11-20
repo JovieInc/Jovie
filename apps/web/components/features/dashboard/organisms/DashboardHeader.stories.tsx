@@ -1,5 +1,10 @@
-import { Button } from '@jovie/ui';
+import '../../../../styles/system-b-app.css';
+import { Button, CommonDropdown, TitleMenuTrigger } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { PanelRight, Pin } from 'lucide-react';
+import { useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { DashboardHeaderActionButton } from '../atoms/DashboardHeaderActionButton';
 import { DashboardHeader } from './DashboardHeader';
 
 const meta = {
@@ -74,7 +79,7 @@ export const LongContentTitle: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-105'>
+      <div className='w-105 max-w-full'>
         <Story />
       </div>
     ),
@@ -100,4 +105,59 @@ export const RtlTitle: Story = {
       </div>
     ),
   ],
+};
+
+function HeaderControls({ menu = false }: { readonly menu?: boolean }) {
+  const [railOpen, setRailOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [title, setTitle] = useState('New Chat');
+  return (
+    <DashboardHeader
+      breadcrumbs={[{ label: menu ? title : 'Views' }]}
+      breadcrumbSuffix={
+        menu ? (
+          <CommonDropdown
+            align='start'
+            trigger={<TitleMenuTrigger label={title} />}
+            items={[
+              {
+                id: 'tour',
+                type: 'action',
+                label: 'Plan The Autumn Tour',
+                onClick: () => setTitle('Plan The Autumn Tour'),
+              },
+            ]}
+          />
+        ) : undefined
+      }
+      railToggle={
+        <AppIconButton
+          ariaLabel='Toggle Details'
+          aria-pressed={railOpen}
+          onClick={() => setRailOpen(open => !open)}
+        >
+          <PanelRight />
+        </AppIconButton>
+      }
+      action={
+        <DashboardHeaderActionButton
+          ariaLabel='Pin View'
+          label='Pin View'
+          icon={<Pin />}
+          pressed={pinned}
+          onClick={() => setPinned(value => !value)}
+        />
+      }
+    />
+  );
+}
+
+/** Shared controls keep the same geometry through hover, focus and selection. */
+export const WithControls: Story = {
+  render: () => <HeaderControls />,
+};
+
+/** The same title atom used by ChatHistorySwitcher, within the real header. */
+export const WithTitleMenu: Story = {
+  render: () => <HeaderControls menu />,
 };

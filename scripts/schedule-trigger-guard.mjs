@@ -62,8 +62,50 @@ function git(root, ...args) {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   });
   return run.status === 0 ? run.stdout : null;
+}
+
+/**
+ * Parent SHAs stored on HEAD. A depth-1 merge checkout still has these in the
+ * commit object after `git rev-parse HEAD^1` fails (the parent object is
+ * absent). Only a real merge (two or more parents) is a pull merge ref.
+ */
+function headParents(root) {
+  const header = git(root, 'cat-file', '-p', 'HEAD');
+  if (!header) return [];
+  const parents = [];
+  for (const line of header.split('\n')) {
+    if (line.startsWith('parent ')) {
+      const sha = line.slice('parent '.length).trim();
+      if (/^[0-9a-f]{40}$/.test(sha)) parents.push(sha);
+    } else if (parents.length > 0) {
+      break;
+    }
+  }
+  return parents;
+}
+
+function commitPresent(root, sha) {
+  return git(root, 'cat-file', '-e', `${sha}^{commit}`) !== null;
+}
+
+/**
+ * First parent of a merge checkout: the base GitHub actually merged into
+ * `refs/pull/N/merge`. Fetch it at depth 1 when this checkout does not have
+ * the object. Returns null when HEAD is not a merge or the object cannot be
+ * fetched, so the caller can fall through.
+ */
+function mergeCheckoutBase(root) {
+  const parents = headParents(root);
+  if (parents.length < 2) return null;
+  const first = parents[0];
+  if (commitPresent(root, first)) return first;
+  if (git(root, 'fetch', '--quiet', '--depth=1', 'origin', first) === null) {
+    return null;
+  }
+  return commitPresent(root, first) ? first : null;
 }
 
 /** The PR's base SHA from the runner's event payload, when present. */
@@ -80,16 +122,21 @@ export function eventBaseSha(env = process.env) {
 }
 
 /**
- * Diff base: explicit env override, else the merge-base with origin/main.
- * A depth-1 merge-ref checkout (PR Fleet Rules) stays shallow at the grafted
- * commit, so the merge-base cannot traverse it even after fetching main; the
- * event payload's base SHA is then fetched directly and diffed as a range,
- * which works on the grafted commit (verified against the PR Fleet Rules
- * checkout shape). A missing base degrades to the documented skip, like
- * external-api-guard.
+ * Diff base: explicit env override, else the first parent of a merge checkout,
+ * else the merge-base with origin/main.
+ *
+ * PR Fleet Rules checks out `refs/pull/N/merge` at depth 1. That commit's
+ * first parent is the main SHA GitHub merged. `pull_request.base.sha` stays
+ * at the last synchronize and is older once main moves, so a schedule that
+ * landed on main looks newly added. `git merge-base` cannot traverse a
+ * grafted merge commit even after fetching main. The event payload remains
+ * the fallback for a non-merge checkout. A missing base degrades to the
+ * documented skip, like external-api-guard.
  */
 export function diffBase(root, env = process.env) {
   if (env.TURBO_SCM_BASE) return env.TURBO_SCM_BASE;
+  const mergedHead = mergeCheckoutBase(root);
+  if (mergedHead) return mergedHead;
   let merged = git(root, 'merge-base', 'HEAD', 'origin/main');
   if (!merged) {
     git(root, 'fetch', '--quiet', '--depth=250', 'origin', 'main');

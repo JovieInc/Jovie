@@ -110,6 +110,82 @@ async function expectFlatSurface(locator: Locator) {
   expect(metrics.backgroundColor).toBe('rgba(0, 0, 0, 0)');
 }
 
+async function readWorkspaceSeam(page: Page, firstRow: Locator) {
+  const header = page.getByTestId('dashboard-header');
+  const title = header.getByRole('heading');
+  const action = page.getByTestId('new-release-header-trigger');
+  await expect(action).toBeVisible();
+  const type = await title.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      weight: style.fontWeight,
+      medium: style.getPropertyValue('--font-weight-medium').trim(),
+      size: style.fontSize,
+    };
+  });
+  return {
+    header: await header.boundingBox(),
+    title: await title.boundingBox(),
+    leadingColumn: await firstRow
+      .locator('[data-artwork-frame]')
+      .first()
+      .boundingBox(),
+    railSlot: await page
+      .getByTestId('dashboard-header-rail-slot')
+      .boundingBox(),
+    action: await action.boundingBox(),
+    type,
+  };
+}
+
+function expectCompactHeaderGeometry(
+  sample: Awaited<ReturnType<typeof readWorkspaceSeam>>
+) {
+  expect(sample.header?.height).toBe(44);
+  expect((sample.title?.x ?? 0) - (sample.header?.x ?? 0)).toBe(12);
+  expect(sample.railSlot?.width).toBe(28);
+  expect(sample.railSlot?.height).toBe(28);
+  expect(sample.action?.height).toBe(32);
+  expect(sample.type.size).toBe('12px');
+  expect(sample.type.weight).toBe(sample.type.medium);
+}
+
+async function recordCollectionSeamShadow(
+  closed: Awaited<ReturnType<typeof readWorkspaceSeam>>,
+  open: Awaited<ReturnType<typeof readWorkspaceSeam>>
+) {
+  // The existing source seam contract owns px-3. Collection-wide optical
+  // certification is still shadow: do not turn current list-owner debt into
+  // a new release gate, or weaken the existing header/drawer assertions.
+  const samples = [closed, open].map(sample => ({
+    ...sample,
+    leadingColumnDelta: (sample.leadingColumn?.x ?? 0) - (sample.title?.x ?? 0),
+  }));
+  const aligned = samples.every(
+    sample => sample.leadingColumn !== null && sample.leadingColumnDelta === 0
+  );
+  test.info().annotations.push({
+    type: 'shadow:workspace-optical-seam',
+    description: aligned
+      ? 'Release leading column shares the header seam in both rail states.'
+      : 'Release leading column differs from the header seam; list owner follow-up required.',
+  });
+  await test.info().attach('workspace-optical-seam.json', {
+    body: JSON.stringify(
+      {
+        contract: 'workspace page optical seam contract',
+        status: aligned ? 'aligned' : 'gap',
+        toolbar: 'not mounted by this release collection',
+        footer: 'not mounted by this release collection',
+        samples,
+      },
+      null,
+      2
+    ),
+    contentType: 'application/json',
+  });
+}
+
 async function livesInsideRoundedCard(locator: Locator) {
   return locator.evaluate(node => {
     let current: HTMLElement | null = node as HTMLElement;
@@ -138,6 +214,36 @@ function getPrimaryReleaseTitle() {
 }
 
 for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: compact collection header preserves the shared seam through rail opening`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/demo', { waitUntil: 'domcontentloaded' });
+    const firstReleaseRow = page.locator('[data-shell-release-row]').first();
+    await expect(firstReleaseRow).toBeVisible();
+    await page.getByTestId('new-release-header-trigger').waitFor();
+    await setTheme(page, theme);
+    await page.evaluate(() => document.fonts.ready);
+    const closedSeam = await readWorkspaceSeam(page, firstReleaseRow);
+    expectCompactHeaderGeometry(closedSeam);
+    await test.info().attach('collection-rail-closed.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await firstReleaseRow.click();
+    await expect(page.getByTestId('release-sidebar')).toBeVisible();
+    const openSeam = await readWorkspaceSeam(page, firstReleaseRow);
+    expectCompactHeaderGeometry(openSeam);
+    expect(openSeam.header?.height).toBe(closedSeam.header?.height);
+    expect(openSeam.title?.x).toBe(closedSeam.title?.x);
+    expect(openSeam.title?.y).toBe(closedSeam.title?.y);
+    await recordCollectionSeamShadow(closedSeam, openSeam);
+    await test.info().attach('collection-rail-open.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+
   test(`${theme}: /demo release drawer matches the shipped shell`, async ({
     page,
   }) => {
