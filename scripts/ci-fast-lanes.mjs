@@ -1315,10 +1315,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/mutation-diff.test.mjs scripts/lib/__tests__/mutation-evidence-score.test.mjs scripts/lib/__tests__/mutation-evidence-inputs.test.mjs scripts/lib/__tests__/mutation-evidence-report.test.mjs scripts/lib/__tests__/mutation-evidence.test.mjs scripts/lib/__tests__/mutation-inputs.test.mjs scripts/lib/__tests__/mutation-survivor-drafts.test.mjs',
-  'scripts/lib/__tests__/mutation-source.test.mjs',
+  'scripts/lib/__tests__/mutation-source.test.mjs scripts/lib/__tests__/mutation-heatmap-scores.test.mjs scripts/lib/__tests__/coverage-surface-tokens.test.mjs',
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
-  'scripts/lib/__tests__/mutation-heatmap-scores.test.mjs',
-  'scripts/lib/__tests__/coverage-surface-tokens.test.mjs',
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs scripts/lib/__tests__/mutation-ui-target-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-admission.test.mjs',
@@ -1527,6 +1525,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
+  'scripts/lib/__tests__/product-lane-docs-only.test.mjs',
+  'scripts/lib/__tests__/structural-asserted-docs.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/(^| )scripts\//gu, '$1')
