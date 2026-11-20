@@ -55,11 +55,14 @@ describe('DashboardNav interactions', () => {
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link).toHaveAccessibleName(label);
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
-    expect(homeLinks).toHaveLength(2);
+    // Exact "Home" is the nav row; the rail bell uses a qualified name.
+    const homeLinks = screen.getAllByRole('link', { name: /^Home$/ });
+    expect(homeLinks).toHaveLength(1);
     for (const link of homeLinks) {
       expect(link.querySelector('svg')).toBeTruthy();
     }
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention?.querySelector('svg')).toBeTruthy();
   });
 
   it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
@@ -75,7 +78,7 @@ describe('DashboardNav interactions', () => {
     const inbox = container.querySelector('[data-navigation-item-id="home"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Home');
+    expect(inbox).toHaveAccessibleName('Home — notifications');
 
     expect(newChat).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
     expect(newChat.parentElement).toHaveAttribute('data-sidebar-search-slot');
