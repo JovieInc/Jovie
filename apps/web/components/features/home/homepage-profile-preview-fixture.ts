@@ -765,7 +765,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       kind: 'email-preview',
       title: 'New music from Tim White',
       body: 'Take Me Over is live now. Listen from the same link.',
-      accentLabel: 'Home',
+      accentLabel: 'Inbox',
     },
   }),
   'fans-show-alert': createSuccessStatusShowcaseState({
