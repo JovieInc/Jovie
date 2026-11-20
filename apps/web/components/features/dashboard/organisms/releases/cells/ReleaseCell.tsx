@@ -98,8 +98,11 @@ export const ReleaseCell = memo(function ReleaseCell({
       <div className='flex w-4 shrink-0 items-center justify-center'>
         {hasPreview && (
           <IconButton
-            size='lg'
+            size='xs'
             variant='inline'
+            // Playing: fully opaque (no fade). Idle: reveal on row hover via
+            // fade=parent (replaces the retired DrawerInlineIconButton className).
+            fade={isPlaying ? undefined : 'parent'}
             onClick={handleTogglePlayback}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
@@ -107,9 +110,9 @@ export const ReleaseCell = memo(function ReleaseCell({
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-2.5 w-2.5' />
+              <Pause className='h-2.5 w-2.5 text-(--color-accent-purple-text)' />
             ) : (
-              <Play className='h-2.5 w-2.5' />
+              <Play className='h-2.5 w-2.5 text-quaternary-token' />
             )}
           </IconButton>
         )}

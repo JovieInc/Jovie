@@ -427,18 +427,17 @@ describe('IconButton accessible name', () => {
         <svg aria-hidden='true' />
       </IconButton>
     );
-    expect(screen.getByRole('button', { name: 'Fade parent' }).className).toContain(
-      'opacity-0'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Fade parent' }).className
+    ).toContain('opacity-0');
 
     rerender(
       <IconButton ariaLabel='Fade visible' fade='visible'>
         <svg aria-hidden='true' />
       </IconButton>
     );
-    expect(screen.getByRole('button', { name: 'Fade visible' }).className).toContain(
-      'opacity-60'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Fade visible' }).className
+    ).toContain('opacity-60');
   });
-
 });

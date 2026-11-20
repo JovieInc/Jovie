@@ -235,6 +235,7 @@ describe('ReleaseCell', () => {
     });
 
     expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
-    expect(pauseButton.className).toContain('opacity-100');
+    // Playing skips fade=parent, so the control stays fully opaque (no opacity-0).
+    expect(pauseButton.className).not.toContain('opacity-0');
   });
 });

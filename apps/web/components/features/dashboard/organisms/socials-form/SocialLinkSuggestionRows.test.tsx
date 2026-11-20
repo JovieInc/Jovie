@@ -25,7 +25,9 @@ describe('SocialLinkSuggestionRows', () => {
         onDismiss={onDismiss}
       />
     );
-    await user.click(screen.getByRole('button', { name: /Dismiss Instagram/i }));
+    await user.click(
+      screen.getByRole('button', { name: /Dismiss Instagram/i })
+    );
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 });

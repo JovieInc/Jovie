@@ -2,8 +2,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { IngestedSuggestions } from './IngestedSuggestions';
 import type { SuggestedLink } from './hooks/useSuggestions';
+import { IngestedSuggestions } from './IngestedSuggestions';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn().mockResolvedValue(undefined),
