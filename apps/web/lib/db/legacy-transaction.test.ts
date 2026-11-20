@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { logDbErrorMock, transactionMock } = vi.hoisted(() => ({
   logDbErrorMock: vi.fn(),
@@ -15,6 +17,8 @@ vi.mock('@/lib/db', () => ({
 vi.mock('./client/logging', () => ({
   logDbError: logDbErrorMock,
 }));
+
+import { applyRlsTransactionUser } from '@/lib/db';
 
 import {
   runAtomicDbOperation,
@@ -86,6 +90,88 @@ describe('runLegacyDbTransaction', () => {
 });
 
 describe('atomic retry boundary', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(applyRlsTransactionUser).mockReset();
+  });
+
+  it('pins the RLS identity before the residual transaction deadline (JOV-8807)', async () => {
+    // The deadline in runAtomicDbOperation includes pool checkout and any
+    // serialization retry, so under contention the residual budget can be
+    // near zero. When the deadline guard ran first, the next statement — the
+    // RLS set_config — inherited that doomed server-side budget and failed
+    // with a timeout reported as revenue-spine:v1:rls_setup:timeout
+    // (Sentry 7806231669). The RLS identity must be pinned first, bounded by
+    // the pool-level statement_timeout instead.
+    const applyRlsMock = vi.mocked(applyRlsTransactionUser);
+    const order: string[] = [];
+    applyRlsMock.mockImplementation(async () => {
+      order.push('rls_setup');
+    });
+    const tx = {
+      execute: vi.fn(async () => {
+        order.push('deadline_guard');
+      }),
+    };
+    transactionMock.mockReset().mockImplementation(async fn => fn(tx));
+
+    await expect(
+      runAtomicDbOperation(async () => 'written', {
+        actorId: 'trusted-user',
+        retry: 'never',
+      })
+    ).resolves.toBe('written');
+
+    expect(order[0]).toBe('rls_setup');
+    expect(order[1]).toBe('deadline_guard');
+    expect(applyRlsMock).toHaveBeenCalledWith(tx, 'trusted-user');
+  });
+
+  it('subtracts RLS setup time from the remaining statement budget', async () => {
+    let now = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.mocked(applyRlsTransactionUser).mockImplementation(async () => {
+      now += 40;
+    });
+    const tx = { execute: vi.fn<(query: SQL) => Promise<void>>() };
+    transactionMock.mockReset().mockImplementation(async fn => fn(tx));
+
+    await expect(
+      runAtomicDbOperation(async () => 'written', {
+        actorId: 'trusted-user',
+        retry: 'never',
+        timeoutMs: 100,
+      })
+    ).resolves.toBe('written');
+
+    const query = new PgDialect().sqlToQuery(tx.execute.mock.calls[0][0]);
+    expect(query.params).toEqual(['60', '60', '60']);
+    expect(query.sql).toContain("set_config('statement_timeout'");
+  });
+
+  it('rejects an expired budget after RLS setup without starting business work', async () => {
+    let now = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.mocked(applyRlsTransactionUser).mockImplementation(async () => {
+      now += 100;
+    });
+    const tx = { execute: vi.fn() };
+    const operation = vi.fn(async () => 'written');
+    transactionMock.mockReset().mockImplementation(async fn => fn(tx));
+
+    await expect(
+      runAtomicDbOperation(operation, {
+        actorId: 'trusted-user',
+        retry: 'serialization',
+        timeoutMs: 100,
+      })
+    ).rejects.toThrow('Atomic database deadline exceeded');
+
+    expect(operation).not.toHaveBeenCalled();
+    expect(tx.execute).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not replay an ambiguous commit or a no-retry operation', async () => {
     const failure = new Error('connection lost during COMMIT');
     transactionMock.mockReset().mockImplementation(async fn => {

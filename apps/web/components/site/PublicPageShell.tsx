@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
@@ -24,6 +25,10 @@ export interface PublicPageShellProps {
   readonly chrome?: ResolvedSiteChrome;
   readonly className?: string;
   readonly footerClassName?: string;
+  /** Pen design-diff section id for the footer. */
+  readonly footerPenSection?: string;
+  /** Decorative art behind the footer content (the homepage Orbit horizon). */
+  readonly footerDecoration?: ReactNode;
   /** Set false when the route owns its final CTA (the homepage). */
   readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
@@ -31,6 +36,10 @@ export interface PublicPageShellProps {
   /** Overrides the per-page header brand config (icon-only vs lockup). */
   readonly headerBrand?: MarketingHeaderBrand;
   readonly headerCta?: MarketingHeaderCta;
+  /** Header shows Log in only, no primary CTA. */
+  readonly headerHidePrimaryCta?: boolean;
+  /** Wordmark at the left of the header (the homepage). */
+  readonly headerLeftWordmark?: boolean;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
@@ -56,10 +65,14 @@ export function PublicPageShell({
   chrome,
   className,
   footerClassName,
+  footerPenSection,
+  footerDecoration,
   footerShowCta,
   footerVariant,
   headerBrand,
   headerCta,
+  headerHidePrimaryCta = false,
+  headerLeftWordmark = false,
   headerVariant = 'landing',
   logoSize = 'xs',
   logoVariant,
@@ -85,6 +98,8 @@ export function PublicPageShell({
         logoVariant={logoVariant}
         navLinks={navLinks}
         primaryCta={headerCta}
+        hidePrimaryCta={headerHidePrimaryCta}
+        leftWordmark={headerLeftWordmark}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
       />
@@ -104,6 +119,8 @@ export function PublicPageShell({
       <MarketingFooter
         className={footerClassName}
         columns={chrome?.footerColumns}
+        penSection={footerPenSection}
+        decoration={footerDecoration}
         showCta={footerShowCta}
         legalLinks={chrome?.legalLinks}
         variant={footerVariant}

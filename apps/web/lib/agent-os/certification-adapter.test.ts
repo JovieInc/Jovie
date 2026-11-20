@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   MARKETING_COMPONENT_REGISTRY,
@@ -6,32 +7,34 @@ import {
 import type {
   CertificationEvidenceReceipt,
   CertificationEvidenceStatus,
-  CertificationReviewPacket,
+  CertificationReviewPacket as Packet,
 } from '@/lib/agent-os/certification';
 import {
+  MarketingCertificationAssuranceError as AssuranceError,
+  MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX as AUDIT_PREFIX,
+  type CertificationRecordBackend as Backend,
   buildMarketingAssuranceProfileDigest,
-  type CertificationRecordBackend,
   evaluateMarketingAssurance,
-  MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX,
-  MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD,
-  MARKETING_CERTIFICATION_LEDGER_MAX_BYTES,
-  MARKETING_CERTIFICATION_STORE_KEY,
+  MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD as HOT_AUDIT_LIMIT,
   type MarketingAssuranceEvidenceBinding,
   type MarketingAssuranceProfile,
-  MarketingCertificationAssuranceError,
-  MarketingCertificationPersistenceError,
-  MarketingCertificationRegistryDriftError,
-  MarketingCertificationStore,
+  MarketingCertificationPersistenceError as PersistenceError,
+  MarketingCertificationRegistryDriftError as RegistryDriftError,
+  MARKETING_CERTIFICATION_LEDGER_MAX_BYTES as ROW_BUDGET_BYTES,
+  type MarketingCertificationProjectionRow as Row,
+  MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX as SHARD_PREFIX,
+  MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA as SHARD_SCHEMA,
+  MARKETING_CERTIFICATION_STORE_KEY as STORE_KEY,
+  MarketingCertificationStore as Store,
 } from '@/lib/agent-os/certification-adapter';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REGISTRY = MARKETING_COMPONENT_REGISTRY.filter(
   entry => entry.sourceBacked
 ).slice(0, 2);
-
-function memoryBackend(
-  records = new Map<string, unknown>()
-): CertificationRecordBackend {
+const [FIRST, SECOND] = REGISTRY;
+const at = (time: string) => `2026-09-04T20:${time}.000Z`;
+function memoryBackend(records = new Map<string, unknown>()): Backend {
   return {
     async compareAndSet(key, expected, next) {
       if (records.get(key) !== expected) return false;
@@ -48,32 +51,34 @@ function memoryBackend(
     },
   };
 }
-
-/**
- * Production shape: the jsonb column stores the ledger string, but Drizzle
- * parses it again on read, so get() returns an object (2026-09-28).
- */
-function jsonbBackend(
-  records = new Map<string, string>()
-): CertificationRecordBackend {
+/** Production jsonb reads return decoded objects, retaining string CAS values. */
+function jsonbBackend(records = new Map<string, unknown>()): Backend {
+  const backend = memoryBackend(records);
   return {
-    async compareAndSet(key, expected, next) {
-      if (records.get(key) !== expected) return false;
-      records.set(key, next);
-      return true;
-    },
+    ...backend,
     async get(key) {
-      const stored = records.get(key);
-      return stored === undefined ? null : JSON.parse(stored);
-    },
-    async setIfAbsent(key, value) {
-      if (records.has(key)) return false;
-      records.set(key, value as string);
-      return true;
+      const stored = await backend.get(key);
+      return stored === null ? null : JSON.parse(stored as string);
     },
   };
 }
-
+function createStore(records = new Map<string, unknown>(), entries = REGISTRY) {
+  return new Store(memoryBackend(records), entries);
+}
+function hotLedger(records: Map<string, unknown>) {
+  return JSON.parse(records.get(STORE_KEY) as string);
+}
+function packetKey(records: Map<string, unknown>, identityId: string) {
+  const revision = hotLedger(records).records[identityId].packetRevision;
+  return `${SHARD_PREFIX}${identityId}${revision ? `:${revision}` : ''}`;
+}
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 function proof(
   tier: CertificationEvidenceReceipt['tier'],
   id: string,
@@ -89,7 +94,6 @@ function proof(
     tier,
   };
 }
-
 function binding(
   tier: CertificationEvidenceReceipt['tier'],
   id: string
@@ -101,47 +105,24 @@ function binding(
     tier,
   };
 }
-
 function assuranceProfile(
   entry: MarketingRegistryEntry,
   overrides: Partial<MarketingAssuranceProfile> = {}
 ): MarketingAssuranceProfile {
   const { profileDigest: _ignoredDigest, ...profileOverrides } = overrides;
   const profile = {
-    mandatory: [
-      {
-        evidence: binding(
-          'canonical_references',
-          `${entry.id}-assurance-security`
-        ),
-        id: `${entry.id}-security`,
-        kind: 'security',
-      },
-      {
-        evidence: binding(
-          'invariant_evaluation',
-          `${entry.id}-assurance-integrity`
-        ),
-        id: `${entry.id}-integrity`,
-        kind: 'integrity',
-      },
-      {
-        evidence: binding(
-          'visual_proof',
-          `${entry.id}-assurance-accessibility`
-        ),
-        id: `${entry.id}-accessibility`,
-        kind: 'accessibility',
-      },
-      {
-        evidence: binding(
-          'tests_coverage',
-          `${entry.id}-assurance-correctness`
-        ),
-        id: `${entry.id}-correctness`,
-        kind: 'correctness',
-      },
-    ],
+    mandatory: (
+      [
+        ['security', 'canonical_references'],
+        ['integrity', 'invariant_evaluation'],
+        ['accessibility', 'visual_proof'],
+        ['correctness', 'tests_coverage'],
+      ] as const
+    ).map(([kind, tier]) => ({
+      evidence: binding(tier, `${entry.id}-assurance-${kind}`),
+      id: `${entry.id}-${kind}`,
+      kind,
+    })),
     notApplicable: [],
     optionalParity: [],
     provenance: binding(
@@ -157,12 +138,11 @@ function assuranceProfile(
     profileDigest: buildMarketingAssuranceProfileDigest(profile),
   };
 }
-
 function packetForProfile(
   entry: MarketingRegistryEntry,
   profile: MarketingAssuranceProfile,
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
+  overrides: Partial<Packet> = {}
+): Packet {
   const candidate = packet(entry, overrides);
   return {
     ...candidate,
@@ -173,13 +153,29 @@ function packetForProfile(
     ),
   };
 }
-
 const ASSURANCE_PROFILES = REGISTRY.map(entry => assuranceProfile(entry));
-
+const FIRST_PROFILE = ASSURANCE_PROFILES[0];
+const OPTIONAL_PARITY = {
+  desiredOutcome: 'Optional outcome',
+  economics: {
+    confidence: 'medium',
+    displacedWork: 'other work',
+    expectedRoi: 'bounded',
+    measuredTrigger: 'measured signal',
+    totalOwnershipCost: 'bounded',
+  },
+};
+function ready(
+  store: Store,
+  assuranceProfiles = ASSURANCE_PROFILES,
+  existingEntryId: string | null = null
+) {
+  return store.projectReviewReady({ assuranceProfiles, existingEntryId });
+}
 function packet(
   entry: MarketingRegistryEntry,
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
+  overrides: Partial<Packet> = {}
+): Packet {
   if (!entry.resolvedSource) throw new Error('source-backed fixture required');
   const mediaId = `${entry.id}-media`;
   const variantId = `${entry.id}-default`;
@@ -237,13 +233,13 @@ function packet(
       proof('tests_coverage', `${entry.id}-assurance-correctness`),
     ],
     visualProof: [
-      proof('visual_proof', `${entry.id}-visual`),
+      proof('visual_proof', `dogfood-judge:${entry.id}`),
       proof('visual_proof', `${entry.id}-assurance-accessibility`),
     ],
     ...overrides,
   };
 }
-
+const digest = (row: Row) => row.admission.decisionEvidenceDigest!;
 function decision(digest: string, id = 'decision-1') {
   return {
     decision: 'approved' as const,
@@ -253,11 +249,24 @@ function decision(digest: string, id = 'decision-1') {
     reviewer: 'Tim White',
   };
 }
-
+function approve(
+  store: Store,
+  entry: MarketingRegistryEntry,
+  digest: string,
+  decidedAt: string,
+  id?: string
+) {
+  return store.recordFounderDecision({
+    assuranceProfile: assuranceProfile(entry),
+    decidedAt,
+    decision: decision(digest, id),
+    subjectId: entry.id,
+  });
+}
 describe('MarketingCertificationStore', () => {
   it('inspects the exact registry without initializing durable state', async () => {
     const records = new Map<string, unknown>();
-    const backend: CertificationRecordBackend = {
+    const backend: Backend = {
       async get(key) {
         return records.get(key) ?? null;
       },
@@ -268,10 +277,8 @@ describe('MarketingCertificationStore', () => {
         throw new Error('read-only inspection attempted a write');
       },
     };
-    const store = new MarketingCertificationStore(backend, REGISTRY);
-
-    const projection = await store.inspectLedger('2026-09-04T20:00:00.000Z');
-
+    const store = new Store(backend, REGISTRY);
+    const projection = await store.inspectLedger(at('00:00'));
     expect(records.size).toBe(0);
     expect(projection.registryIds).toEqual(REGISTRY.map(entry => entry.id));
     expect(projection.rows).toHaveLength(REGISTRY.length);
@@ -283,30 +290,20 @@ describe('MarketingCertificationStore', () => {
       'Ledger projection time must be a valid timestamp'
     );
     expect(records.size).toBe(0);
-
-    await new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
-    ).projectLedger();
-    const persistedProjection = await store.inspectLedger(
-      '2026-09-04T20:00:00.000Z'
-    );
+    await createStore(records).projectLedger();
+    const persistedProjection = await store.inspectLedger(at('00:00'));
     expect(persistedProjection.registryIds).toEqual(projection.registryIds);
     expect(persistedProjection.rows).toHaveLength(REGISTRY.length);
-    const persisted = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
+    const persisted = hotLedger(records);
     persisted.registryIds.pop();
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(persisted));
+    records.set(STORE_KEY, JSON.stringify(persisted));
     await expect(store.inspectLedger()).rejects.toBeInstanceOf(
-      MarketingCertificationRegistryDriftError
+      RegistryDriftError
     );
   });
-
   it('persists a fail-closed placeholder for every registry identity', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    const result = await store.projectLedger('2026-09-04T20:00:00.000Z');
-
+    const store = createStore();
+    const result = await store.projectLedger(at('00:00'));
     expect(result.registryIds).toEqual(REGISTRY.map(entry => entry.id));
     expect(result.rows).toHaveLength(REGISTRY.length);
     expect(result.rows.every(row => row.packet.source === null)).toBe(true);
@@ -314,70 +311,46 @@ describe('MarketingCertificationStore', () => {
       true
     );
   });
-
   it('grows a persisted registry with fail-closed placeholders and preserves evidence', async () => {
     const records = new Map<string, string>();
     const backend = jsonbBackend(records);
-    const original = new MarketingCertificationStore(
-      backend,
-      REGISTRY.slice(0, 1)
-    );
-    const first = await original.ingestPacket(
-      packet(REGISTRY[0]),
-      '2026-09-04T20:01:00.000Z'
-    );
-    await original.recordFounderDecision({
-      assuranceProfile: assuranceProfile(REGISTRY[0]),
-      decidedAt: '2026-09-04T20:01:01.000Z',
-      decision: decision(first.admission.decisionEvidenceDigest!),
-      subjectId: REGISTRY[0].id,
-    });
-    const before = JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!);
-    const expanded = new MarketingCertificationStore(backend, REGISTRY);
-
-    const inspected = await expanded.inspectLedger('2026-09-04T20:02:00.000Z');
+    const original = new Store(backend, REGISTRY.slice(0, 1));
+    const first = await original.ingestPacket(packet(FIRST), at('01:00'));
+    await approve(original, FIRST, digest(first), at('01:01'));
+    const before = JSON.parse(records.get(STORE_KEY)!);
+    const expanded = new Store(backend, REGISTRY);
+    const inspected = await expanded.inspectLedger(at('02:00'));
     expect(inspected.registryIds).toEqual(REGISTRY.map(entry => entry.id));
-    expect(JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!)).toEqual(
-      before
-    );
-    const projection = await expanded.projectLedger('2026-09-04T20:02:00.000Z');
+    expect(JSON.parse(records.get(STORE_KEY)!)).toEqual(before);
+    const projection = await expanded.projectLedger(at('02:00'));
     expect(projection.rows[1]).toMatchObject({
       admission: { state: 'working' },
       decisions: [],
       packet: { source: null },
     });
-    expect(
-      JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!).records[
-        REGISTRY[0].id
-      ]
-    ).toEqual(before.records[REGISTRY[0].id]);
+    expect(JSON.parse(records.get(STORE_KEY)!).records[FIRST.id]).toEqual(
+      before.records[FIRST.id]
+    );
     await expect(
-      expanded.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:03:00.000Z')
-    ).resolves.toMatchObject({ identityId: REGISTRY[1].id });
+      expanded.ingestPacket(packet(SECOND), at('03:00'))
+    ).resolves.toMatchObject({ identityId: SECOND.id });
     await expect(original.projectLedger()).rejects.toBeInstanceOf(
-      MarketingCertificationRegistryDriftError
+      RegistryDriftError
     );
   });
-
   it('retries registry growth against concurrent evidence without overwriting it', async () => {
     const records = new Map<string, unknown>();
     const backend = memoryBackend(records);
-    const original = new MarketingCertificationStore(
-      backend,
-      REGISTRY.slice(0, 1)
-    );
-    await original.projectLedger('2026-09-04T20:00:00.000Z');
+    const original = new Store(backend, REGISTRY.slice(0, 1));
+    await original.projectLedger(at('00:00'));
     let raced = false;
-    const expanded = new MarketingCertificationStore(
+    const expanded = new Store(
       {
         ...backend,
         async compareAndSet(key, expected, next, ttl) {
           if (!raced) {
             raced = true;
-            await original.ingestPacket(
-              packet(REGISTRY[0]),
-              '2026-09-04T20:01:00.000Z'
-            );
+            await original.ingestPacket(packet(FIRST), at('01:00'));
             return false;
           }
           return backend.compareAndSet(key, expected, next, ttl);
@@ -385,72 +358,57 @@ describe('MarketingCertificationStore', () => {
       },
       REGISTRY
     );
-    const projection = await expanded.projectLedger('2026-09-04T20:02:00.000Z');
+    const projection = await expanded.projectLedger(at('02:00'));
     expect(raced).toBe(true);
-    expect(projection.rows[0].packet).toEqual(packet(REGISTRY[0]));
+    expect(projection.rows[0].packet).toEqual(packet(FIRST));
     expect(projection.rows[1].packet.source).toBeNull();
   });
-
   it('reconciles registry growth before the first evidence ingest', async () => {
     const records = new Map<string, unknown>();
     const backend = memoryBackend(records);
-    await new MarketingCertificationStore(
-      backend,
-      REGISTRY.slice(0, 1)
-    ).projectLedger('2026-09-04T20:00:00.000Z');
+    await new Store(backend, REGISTRY.slice(0, 1)).projectLedger(at('00:00'));
     await expect(
-      new MarketingCertificationStore(backend, REGISTRY).ingestPacket(
-        packet(REGISTRY[1]),
-        '2026-09-04T20:01:00.000Z'
-      )
-    ).resolves.toMatchObject({ identityId: REGISTRY[1].id });
+      new Store(backend, REGISTRY).ingestPacket(packet(SECOND), at('01:00'))
+    ).resolves.toMatchObject({ identityId: SECOND.id });
   });
-
   it('does not repair corrupt records while extending the registry', async () => {
     const records = new Map<string, unknown>();
     const backend = memoryBackend(records);
-    await new MarketingCertificationStore(
-      backend,
-      REGISTRY.slice(0, 1)
-    ).projectLedger();
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    await new Store(backend, REGISTRY.slice(0, 1)).projectLedger();
+    await new Store(backend, REGISTRY.slice(0, 1)).ingestPacket(
+      packet(FIRST),
+      at('00:00')
     );
-    ledger.records[REGISTRY[0].id].packet.subject.id = 'incorrect-identity';
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
-    const projection = await new MarketingCertificationStore(
-      backend,
-      REGISTRY
-    ).projectLedger();
-    const stored = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    expect(stored.records[REGISTRY[0].id].packet.subject.id).toBe(
-      'incorrect-identity'
-    );
+    const shardKey = packetKey(records, FIRST.id);
+    const shard = JSON.parse(records.get(shardKey) as string);
+    shard.packet.subject.id = 'incorrect-identity';
+    records.set(shardKey, JSON.stringify(shard));
+    const projection = await new Store(backend, REGISTRY).projectLedger();
+    const storedShard = JSON.parse(records.get(shardKey) as string);
+    expect(storedShard.packet.subject.id).toBe('incorrect-identity');
+    expect(
+      storedShard.packetUpdatedAt ?? storedShard.evaluatedAt
+    ).toBeDefined();
+    const stored = hotLedger(records);
     expect(stored.registryIds).toEqual(REGISTRY.map(entry => entry.id));
     const failed = projection.entryOutcomes.find(
-      outcome => outcome.identityId === REGISTRY[0].id
+      outcome => outcome.identityId === FIRST.id
     );
     expect(failed?.evaluation).toBe('failed');
     expect(failed?.row.admission.state).toBe('working');
     expect(
       projection.entryOutcomes
-        .filter(outcome => outcome.identityId !== REGISTRY[0].id)
+        .filter(outcome => outcome.identityId !== FIRST.id)
         .every(outcome => outcome.evaluation === 'evaluated')
     ).toBe(true);
   });
-
   it('bounds registry extension contention without persisting partial additions', async () => {
     const records = new Map<string, unknown>();
     const backend = memoryBackend(records);
-    await new MarketingCertificationStore(
-      backend,
-      REGISTRY.slice(0, 1)
-    ).projectLedger();
-    const before = records.get(MARKETING_CERTIFICATION_STORE_KEY);
+    await new Store(backend, REGISTRY.slice(0, 1)).projectLedger();
+    const before = records.get(STORE_KEY);
     let attempts = 0;
-    const store = new MarketingCertificationStore(
+    const store = new Store(
       {
         ...backend,
         async compareAndSet() {
@@ -464,106 +422,76 @@ describe('MarketingCertificationStore', () => {
       'initialization lost compare-and-set repeatedly'
     );
     expect(attempts).toBe(5);
-    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(before);
+    expect(records.get(STORE_KEY)).toBe(before);
   });
-
   it('validates initialization and the exact registry denominator', async () => {
     const records = new Map<string, unknown>();
-    const store = new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
-    );
+    const store = createStore(records);
     await expect(store.projectLedger('not-a-date')).rejects.toThrow(
       'Ledger projection time must be a valid timestamp'
     );
-    expect(records.has(MARKETING_CERTIFICATION_STORE_KEY)).toBe(false);
-    expect(
-      () =>
-        new MarketingCertificationStore(memoryBackend(), [
-          REGISTRY[0],
-          REGISTRY[0],
-        ])
-    ).toThrow(MarketingCertificationRegistryDriftError);
-
-    await store.projectLedger();
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    expect(records.has(STORE_KEY)).toBe(false);
+    expect(() => new Store(memoryBackend(), [FIRST, FIRST])).toThrow(
+      RegistryDriftError
     );
-    ledger.registryIds.push(REGISTRY[0].id);
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    await store.projectLedger();
+    const ledger = hotLedger(records);
+    ledger.registryIds.push(FIRST.id);
+    records.set(STORE_KEY, JSON.stringify(ledger));
     await expect(store.projectLedger()).rejects.toBeInstanceOf(
-      MarketingCertificationRegistryDriftError
+      RegistryDriftError
     );
   });
-
   it.each<CertificationEvidenceStatus>([
     'missing',
     'pending',
     'failed',
     'blocked',
   ])('never projects %s evidence as Review Ready', async status => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
+    const store = createStore();
     const visualProof =
       status === 'missing'
         ? []
         : [proof('visual_proof', `${status}-visual`, status)];
     const row = await store.ingestPacket(
-      packet(REGISTRY[0], { visualProof }),
-      '2026-09-04T20:01:00.000Z'
+      packet(FIRST, { visualProof }),
+      at('01:00')
     );
-
     expect(row.admission.state).toBe('working');
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: ASSURANCE_PROFILES,
-        existingEntryId: null,
-      })
-    ).resolves.toMatchObject({ eligibleSubjectIds: [], selected: null });
+    await expect(ready(store)).resolves.toMatchObject({
+      eligibleSubjectIds: [],
+      selected: null,
+    });
   });
-
   it('persists through a jsonb backend that returns the parsed ledger', async () => {
     const records = new Map<string, string>();
-    const store = new MarketingCertificationStore(
-      jsonbBackend(records),
-      REGISTRY
-    );
-
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:02:00.000Z');
-    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:02:01.000Z');
-
+    const store = new Store(jsonbBackend(records), REGISTRY);
+    await store.ingestPacket(packet(FIRST), at('02:00'));
+    await store.ingestPacket(packet(SECOND), at('02:01'));
     const stored = [...records.values()][0];
     expect(typeof stored).toBe('string');
     const ledger = JSON.parse(stored ?? '{}');
-    expect(ledger.records[REGISTRY[0].id].packetUpdatedAt).toBe(
-      '2026-09-04T20:02:00.000Z'
-    );
-    expect(ledger.records[REGISTRY[1].id].packetUpdatedAt).toBe(
-      '2026-09-04T20:02:01.000Z'
-    );
+    expect(ledger.records[FIRST.id].packetUpdatedAt).toBe(at('02:00'));
+    expect(ledger.records[SECOND.id].packetUpdatedAt).toBe(at('02:01'));
     await expect(store.inspectLedger()).resolves.toMatchObject({
       contract: expect.any(String),
     });
   });
-
   it('selects deterministically at most one and preserves occupied Badge', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:02:00.000Z');
-    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:02:01.000Z');
-
-    const open = await store.projectReviewReady({
-      assuranceProfiles: ASSURANCE_PROFILES,
-      existingEntryId: null,
-    });
-    expect(open.selected?.subject.id).toBe(REGISTRY[0].id);
+    const store = createStore();
+    await store.ingestPacket(packet(FIRST), at('02:00'));
+    await store.ingestPacket(packet(SECOND), at('02:01'));
+    const open = await ready(store);
+    expect(open.selected?.subject.id).toBe(FIRST.id);
     expect(open.eligibleSubjectIds).toEqual(REGISTRY.map(entry => entry.id));
     expect(open.withheld).toEqual([
-      { reason: 'max_one_arbitration', subjectId: REGISTRY[1].id },
+      { reason: 'max_one_arbitration', subjectId: SECOND.id },
     ]);
-
-    const occupied = await store.projectReviewReady({
-      assuranceProfiles: ASSURANCE_PROFILES,
-      existingEntryId: 'badge-semantic-tones',
-    });
+    const occupied = await ready(
+      store,
+      ASSURANCE_PROFILES,
+      'badge-semantic-tones'
+    );
     expect(occupied.selected).toBeNull();
     expect(
       occupied.withheld.every(
@@ -571,35 +499,28 @@ describe('MarketingCertificationStore', () => {
       )
     ).toBe(true);
   });
-
   it('withholds an unmapped identity while unrelated qualified work continues', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:02:10.000Z');
-    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:02:11.000Z');
-
-    const result = await store.projectReviewReady({
-      assuranceProfiles: [assuranceProfile(REGISTRY[1])],
-      existingEntryId: null,
-    });
-
-    expect(result.selected?.subject.id).toBe(REGISTRY[1].id);
-    expect(result.eligibleSubjectIds).toEqual([REGISTRY[1].id]);
+    const store = createStore();
+    await store.ingestPacket(packet(FIRST), at('02:10'));
+    await store.ingestPacket(packet(SECOND), at('02:11'));
+    const result = await ready(store, [assuranceProfile(SECOND)]);
+    expect(result.selected?.subject.id).toBe(SECOND.id);
+    expect(result.eligibleSubjectIds).toEqual([SECOND.id]);
     expect(result.assurance).toMatchObject([
       {
         blockers: [{ code: 'assurance_profile_missing' }],
         status: 'unqualified',
-        subjectId: REGISTRY[0].id,
+        subjectId: FIRST.id,
       },
-      { blockers: [], status: 'qualified', subjectId: REGISTRY[1].id },
+      { blockers: [], status: 'qualified', subjectId: SECOND.id },
     ]);
     expect(result.withheld).toContainEqual({
       reason: 'assurance_unqualified',
-      subjectId: REGISTRY[0].id,
+      subjectId: FIRST.id,
     });
   });
-
   it('fails closed for missing, failed, or mismatched named mandatory evidence', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const requirementId = `${entry.id}-landed-enforcement`;
     const evidenceId = `${entry.id}-landed-enforcement-receipt`;
     const profile = assuranceProfile(entry, {
@@ -612,54 +533,35 @@ describe('MarketingCertificationStore', () => {
         },
       ],
     });
-    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
-    await store.ingestPacket(
-      packetForProfile(entry, profile),
-      '2026-09-04T20:02:20.000Z'
-    );
-
-    const missing = await store.projectReviewReady({
-      assuranceProfiles: [profile],
-      existingEntryId: null,
-    });
-    expect(missing.selected).toBeNull();
-    expect(missing.assurance[0].blockers).toMatchObject([
-      { code: 'assurance_receipt_missing', requirementId },
-    ]);
-
-    await store.ingestPacket(
-      packetForProfile(entry, profile, {
-        operational: { ci: [proof('ci', evidenceId, 'failed')] },
-      }),
-      '2026-09-04T20:02:21.000Z'
-    );
-    const failed = await store.projectReviewReady({
-      assuranceProfiles: [profile],
-      existingEntryId: null,
-    });
-    expect(failed.assurance[0].blockers).toMatchObject([
-      { code: 'assurance_receipt_failed', requirementId },
-    ]);
-
-    await store.ingestPacket(
-      packetForProfile(entry, profile, {
-        operational: {
-          ci: [{ ...proof('ci', evidenceId), ref: 'github:wrong/run' }],
-        },
-      }),
-      '2026-09-04T20:02:22.000Z'
-    );
-    const mismatched = await store.projectReviewReady({
-      assuranceProfiles: [profile],
-      existingEntryId: null,
-    });
-    expect(mismatched.assurance[0].blockers).toMatchObject([
-      { code: 'assurance_receipt_ref_mismatch', requirementId },
-    ]);
+    const store = createStore(undefined, [entry]);
+    const receipts = [
+      null,
+      proof('ci', evidenceId, 'failed'),
+      { ...proof('ci', evidenceId), ref: 'github:wrong/run' },
+    ];
+    const codes = [
+      'assurance_receipt_missing',
+      'assurance_receipt_failed',
+      'assurance_receipt_ref_mismatch',
+    ];
+    for (const [index, receipt] of receipts.entries()) {
+      await store.ingestPacket(
+        packetForProfile(
+          entry,
+          profile,
+          receipt ? { operational: { ci: [receipt] } } : {}
+        ),
+        `2026-09-04T20:02:2${index}.000Z`
+      );
+      const result = await ready(store, [profile]);
+      if (index === 0) expect(result.selected).toBeNull();
+      expect(result.assurance[0].blockers).toMatchObject([
+        { code: codes[index], requirementId },
+      ]);
+    }
   });
-
   it('keeps optional parity advisory and validates its complete economics', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const optionalParity = {
       desiredOutcome: 'Raise the public-page score from the floor to parity.',
       economics: {
@@ -672,19 +574,15 @@ describe('MarketingCertificationStore', () => {
       id: `${entry.id}-optional-perfect-score`,
       publicPageScoreTarget: 100 as const,
     };
-    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
+    const store = createStore(undefined, [entry]);
     const optionalProfile = assuranceProfile(entry, {
       optionalParity: [optionalParity],
     });
     await store.ingestPacket(
       packetForProfile(entry, optionalProfile),
-      '2026-09-04T20:02:30.000Z'
+      at('02:30')
     );
-
-    const result = await store.projectReviewReady({
-      assuranceProfiles: [optionalProfile],
-      existingEntryId: null,
-    });
+    const result = await ready(store, [optionalProfile]);
     expect(result.selected?.subject.id).toBe(entry.id);
     expect(result.assurance[0]).toMatchObject({
       blockers: [],
@@ -696,7 +594,6 @@ describe('MarketingCertificationStore', () => {
       ],
       status: 'qualified',
     });
-
     const invalid = assuranceProfile(entry, {
       optionalParity: [
         {
@@ -705,22 +602,16 @@ describe('MarketingCertificationStore', () => {
         },
       ],
     });
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [invalid],
-        existingEntryId: null,
-      })
-    ).rejects.toBeInstanceOf(MarketingCertificationAssuranceError);
-
+    await expect(ready(store, [invalid])).rejects.toBeInstanceOf(
+      AssuranceError
+    );
     const evidenceId = `${entry.id}-optional-parity-proof`;
     const evidencedProfile = assuranceProfile(entry, {
       optionalParity: [
         { ...optionalParity, evidence: binding('visual_proof', evidenceId) },
       ],
     });
-    const evidencedStore = new MarketingCertificationStore(memoryBackend(), [
-      entry,
-    ]);
+    const evidencedStore = new Store(memoryBackend(), [entry]);
     const evidencedPacket = packetForProfile(entry, evidencedProfile);
     await evidencedStore.ingestPacket(
       {
@@ -730,34 +621,24 @@ describe('MarketingCertificationStore', () => {
           proof('visual_proof', evidenceId),
         ],
       },
-      '2026-09-04T20:02:31.000Z'
+      at('02:31')
     );
     await expect(
-      evidencedStore.projectReviewReady({
-        assuranceProfiles: [evidencedProfile],
-        existingEntryId: null,
-      })
+      ready(evidencedStore, [evidencedProfile])
     ).resolves.toMatchObject({
       assurance: [{ optionalParity: [{ status: 'evidenced' }] }],
     });
   });
-
   it('requires one explicit disposition for every mandatory dimension', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const base = assuranceProfile(entry);
     const withoutSecurity = base.mandatory.filter(
       requirement => requirement.kind !== 'security'
     );
-    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
+    const store = createStore(undefined, [entry]);
     await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [
-          { ...base, mandatory: withoutSecurity, notApplicable: [] },
-        ],
-        existingEntryId: null,
-      })
+      ready(store, [{ ...base, mandatory: withoutSecurity, notApplicable: [] }])
     ).rejects.toThrow('dimension security');
-
     const notApplicableProfile = assuranceProfile(entry, {
       mandatory: withoutSecurity,
       notApplicable: [
@@ -769,18 +650,12 @@ describe('MarketingCertificationStore', () => {
     });
     await store.ingestPacket(
       packetForProfile(entry, notApplicableProfile),
-      '2026-09-04T20:02:35.000Z'
+      at('02:35')
     );
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [notApplicableProfile],
-        existingEntryId: null,
-      })
-    ).resolves.toMatchObject({
+    await expect(ready(store, [notApplicableProfile])).resolves.toMatchObject({
       assurance: [{ blockers: [], status: 'qualified' }],
     });
   });
-
   it.each([
     [
       'invalid profile shape',
@@ -790,9 +665,9 @@ describe('MarketingCertificationStore', () => {
     [
       'invalid evidence binding',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         provenance: {
-          ...assuranceProfile(REGISTRY[0]).provenance,
+          ...FIRST_PROFILE.provenance,
           selector: ' ',
         },
       },
@@ -801,7 +676,7 @@ describe('MarketingCertificationStore', () => {
     [
       'non-canonical profile provenance',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         provenance: binding('tests_coverage', 'profile-from-tests'),
       },
       'canonical_references',
@@ -809,9 +684,9 @@ describe('MarketingCertificationStore', () => {
     [
       'unsupported mandatory kind',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         mandatory: [
-          ...assuranceProfile(REGISTRY[0]).mandatory,
+          ...FIRST_PROFILE.mandatory,
           {
             evidence: binding('tests_coverage', 'invented-kind'),
             id: 'invented-kind',
@@ -824,12 +699,12 @@ describe('MarketingCertificationStore', () => {
     [
       'duplicate requirement id',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         mandatory: [
-          ...assuranceProfile(REGISTRY[0]).mandatory,
+          ...FIRST_PROFILE.mandatory,
           {
             evidence: binding('tests_coverage', 'duplicate-id-receipt'),
-            id: `${REGISTRY[0].id}-security`,
+            id: `${FIRST.id}-security`,
             kind: 'written_invariant',
           },
         ],
@@ -839,11 +714,11 @@ describe('MarketingCertificationStore', () => {
     [
       'reused mandatory receipt',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         mandatory: [
-          ...assuranceProfile(REGISTRY[0]).mandatory,
+          ...FIRST_PROFILE.mandatory,
           {
-            evidence: assuranceProfile(REGISTRY[0]).mandatory[0].evidence,
+            evidence: FIRST_PROFILE.mandatory[0].evidence,
             id: 'reused-receipt',
             kind: 'written_invariant',
           },
@@ -854,8 +729,8 @@ describe('MarketingCertificationStore', () => {
     [
       'floor on non-public requirement',
       {
-        ...assuranceProfile(REGISTRY[0]),
-        mandatory: assuranceProfile(REGISTRY[0]).mandatory.map(requirement =>
+        ...FIRST_PROFILE,
+        mandatory: FIRST_PROFILE.mandatory.map(requirement =>
           requirement.kind === 'security'
             ? { ...requirement, publicPageScoreFloor: 97 }
             : requirement
@@ -866,8 +741,8 @@ describe('MarketingCertificationStore', () => {
     [
       'invalid not-applicable rationale',
       {
-        ...assuranceProfile(REGISTRY[0]),
-        mandatory: assuranceProfile(REGISTRY[0]).mandatory.filter(
+        ...FIRST_PROFILE,
+        mandatory: FIRST_PROFILE.mandatory.filter(
           requirement => requirement.kind !== 'security'
         ),
         notApplicable: [{ dimension: 'security', rationale: ' ' }],
@@ -877,7 +752,7 @@ describe('MarketingCertificationStore', () => {
     [
       'invalid optional shape',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         optionalParity: [{}],
       } as unknown as MarketingAssuranceProfile,
       'need an id, desired outcome, and economics',
@@ -885,18 +760,11 @@ describe('MarketingCertificationStore', () => {
     [
       'duplicate optional id',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         optionalParity: [
           {
-            desiredOutcome: 'Optional outcome',
-            economics: {
-              confidence: 'medium',
-              displacedWork: 'other work',
-              expectedRoi: 'bounded',
-              measuredTrigger: 'measured signal',
-              totalOwnershipCost: 'bounded',
-            },
-            id: `${REGISTRY[0].id}-security`,
+            ...OPTIONAL_PARITY,
+            id: `${FIRST.id}-security`,
           },
         ],
       },
@@ -905,17 +773,10 @@ describe('MarketingCertificationStore', () => {
     [
       'invalid optional target',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         optionalParity: [
           {
-            desiredOutcome: 'Optional outcome',
-            economics: {
-              confidence: 'medium',
-              displacedWork: 'other work',
-              expectedRoi: 'bounded',
-              measuredTrigger: 'measured signal',
-              totalOwnershipCost: 'bounded',
-            },
+            ...OPTIONAL_PARITY,
             id: 'optional-target',
             publicPageScoreTarget: 99,
           },
@@ -926,18 +787,11 @@ describe('MarketingCertificationStore', () => {
     [
       'reused optional receipt',
       {
-        ...assuranceProfile(REGISTRY[0]),
+        ...FIRST_PROFILE,
         optionalParity: [
           {
-            desiredOutcome: 'Optional outcome',
-            economics: {
-              confidence: 'medium',
-              displacedWork: 'other work',
-              expectedRoi: 'bounded',
-              measuredTrigger: 'measured signal',
-              totalOwnershipCost: 'bounded',
-            },
-            evidence: assuranceProfile(REGISTRY[0]).mandatory[0].evidence,
+            ...OPTIONAL_PARITY,
+            evidence: FIRST_PROFILE.mandatory[0].evidence,
             id: 'optional-reused-receipt',
           },
         ],
@@ -947,20 +801,14 @@ describe('MarketingCertificationStore', () => {
   ])(
     'rejects malformed assurance mapping: %s',
     async (_label, profile, error) => {
-      const store = new MarketingCertificationStore(memoryBackend(), [
-        REGISTRY[0],
-      ]);
+      const store = createStore(undefined, [FIRST]);
       await expect(
-        store.projectReviewReady({
-          assuranceProfiles: [profile as MarketingAssuranceProfile],
-          existingEntryId: null,
-        })
+        ready(store, [profile as MarketingAssuranceProfile])
       ).rejects.toThrow(error);
     }
   );
-
   it('rejects ambiguous, stale-source, unknown, and duplicate assurance mappings', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const profile = assuranceProfile(entry);
     const duplicateReceiptPacket = packet(entry);
     const securityReceipt = duplicateReceiptPacket.canonicalReferences.find(
@@ -997,34 +845,23 @@ describe('MarketingCertificationStore', () => {
       expect.objectContaining({ code: 'assurance_receipt_source_mismatch' })
     );
     expect(() =>
-      evaluateMarketingAssurance(packet(entry), assuranceProfile(REGISTRY[1]))
+      evaluateMarketingAssurance(packet(entry), assuranceProfile(SECOND))
     ).toThrow('cannot evaluate');
-
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
+    const store = createStore();
     await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [
-          { ...profile, subjectId: 'unknown-marketing-identity' },
-        ],
-        existingEntryId: null,
-      })
-    ).rejects.toBeInstanceOf(MarketingCertificationRegistryDriftError);
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [profile, profile],
-        existingEntryId: null,
-      })
-    ).rejects.toThrow('Duplicate assurance profile');
+      ready(store, [{ ...profile, subjectId: 'unknown-marketing-identity' }])
+    ).rejects.toBeInstanceOf(RegistryDriftError);
+    await expect(ready(store, [profile, profile])).rejects.toThrow(
+      'Duplicate assurance profile'
+    );
   });
-
   it('binds the exact assurance profile content to its provenance receipt', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const profile = assuranceProfile(entry);
     const tamperedProfile = { ...profile, version: 'v2' };
     expect(() =>
       evaluateMarketingAssurance(packet(entry), tamperedProfile)
     ).toThrow('profile digest does not match');
-
     const mismatchedPacket = packet(entry);
     const provenanceIndex = mismatchedPacket.canonicalReferences.findIndex(
       receipt => receipt.id === profile.provenance.receiptId
@@ -1043,9 +880,8 @@ describe('MarketingCertificationStore', () => {
       expect.objectContaining({ code: 'assurance_profile_digest_mismatch' })
     );
   });
-
   it('keeps the mandatory public-page floor distinct from optional 100', async () => {
-    const entry = REGISTRY[0];
+    const entry = FIRST;
     const floorReceiptId = `${entry.id}-public-page-floor-97`;
     const profile = assuranceProfile(entry, {
       mandatory: [
@@ -1058,7 +894,7 @@ describe('MarketingCertificationStore', () => {
         },
       ],
     });
-    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
+    const store = createStore(undefined, [entry]);
     const base = packetForProfile(entry, profile);
     await store.ingestPacket(
       {
@@ -1068,17 +904,11 @@ describe('MarketingCertificationStore', () => {
           proof('tests_coverage', floorReceiptId),
         ],
       },
-      '2026-09-04T20:02:40.000Z'
+      at('02:40')
     );
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [profile],
-        existingEntryId: null,
-      })
-    ).resolves.toMatchObject({
+    await expect(ready(store, [profile])).resolves.toMatchObject({
       assurance: [{ blockers: [], status: 'qualified' }],
     });
-
     const invalid = {
       ...profile,
       mandatory: profile.mandatory.map(requirement =>
@@ -1087,35 +917,22 @@ describe('MarketingCertificationStore', () => {
           : requirement
       ),
     } as unknown as MarketingAssuranceProfile;
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [invalid],
-        existingEntryId: null,
-      })
-    ).rejects.toThrow('approved 97-point floor');
+    await expect(ready(store, [invalid])).rejects.toThrow(
+      'approved 97-point floor'
+    );
   });
-
   it('revalidates assurance before recording a founder decision', async () => {
-    const entry = REGISTRY[0];
-    const store = new MarketingCertificationStore(memoryBackend(), [entry]);
+    const entry = FIRST;
+    const store = createStore(undefined, [entry]);
     const incomplete = packet(entry, {
       canonicalReferences: packet(entry).canonicalReferences.filter(
         receipt => receipt.id !== `${entry.id}-assurance-security`
       ),
     });
-    const row = await store.ingestPacket(
-      incomplete,
-      '2026-09-04T20:02:50.000Z'
-    );
+    const row = await store.ingestPacket(incomplete, at('02:50'));
     expect(row.admission.state).toBe('review_ready');
-
     await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(entry),
-        decidedAt: '2026-09-04T20:02:51.000Z',
-        decision: decision(row.admission.decisionEvidenceDigest!),
-        subjectId: entry.id,
-      })
+      approve(store, entry, digest(row), at('02:51'))
     ).resolves.toMatchObject({
       assurance: {
         blockers: [{ code: 'assurance_receipt_missing' }],
@@ -1126,69 +943,40 @@ describe('MarketingCertificationStore', () => {
     });
     expect((await store.projectLedger()).rows[0].decisions).toEqual([]);
   });
-
   it('persists founder decisions and rejects local or global replay', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    const first = await store.ingestPacket(
-      packet(REGISTRY[0]),
-      '2026-09-04T20:03:00.000Z'
-    );
-    const second = await store.ingestPacket(
-      packet(REGISTRY[1]),
-      '2026-09-04T20:03:01.000Z'
-    );
+    const store = createStore();
+    const first = await store.ingestPacket(packet(FIRST), at('03:00'));
+    const second = await store.ingestPacket(packet(SECOND), at('03:01'));
     const sharedId = 'decision-shared';
     await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[0]),
-        decidedAt: '2026-09-04T20:03:02.000Z',
-        decision: decision(first.admission.decisionEvidenceDigest!, sharedId),
-        subjectId: REGISTRY[0].id,
-      })
+      approve(store, FIRST, digest(first), at('03:02'), sharedId)
     ).resolves.toMatchObject({ ok: true });
     await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[0]),
-        decidedAt: '2026-09-04T20:03:03.000Z',
-        decision: decision(
-          first.admission.decisionEvidenceDigest!,
-          'decision-2'
-        ),
-        subjectId: REGISTRY[0].id,
-      })
+      approve(store, FIRST, digest(first), at('03:03'), 'decision-2')
     ).resolves.toMatchObject({
       ok: false,
       reason: 'duplicate_founder_decision',
     });
     await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[1]),
-        decidedAt: '2026-09-04T20:03:03.000Z',
-        decision: decision(second.admission.decisionEvidenceDigest!, sharedId),
-        subjectId: REGISTRY[1].id,
-      })
+      approve(store, SECOND, digest(second), at('03:03'), sharedId)
     ).resolves.toMatchObject({
       ok: false,
       reason: 'duplicate_founder_decision',
     });
   });
-
   it('retries decisions against concurrent packets without stale taste locks', async () => {
     const records = new Map<string, unknown>();
     const writable = memoryBackend(records);
-    const baseStore = new MarketingCertificationStore(writable, REGISTRY);
-    const basePacket = packet(REGISTRY[0]);
-    const initial = await baseStore.ingestPacket(
-      basePacket,
-      '2026-09-04T20:04:00.000Z'
-    );
+    const baseStore = new Store(writable, REGISTRY);
+    const basePacket = packet(FIRST);
+    const initial = await baseStore.ingestPacket(basePacket, at('04:00'));
     let race = true;
-    const racing: CertificationRecordBackend = {
+    const racing: Backend = {
       ...writable,
       async compareAndSet(key, expected, next, ttl) {
         if (race) {
           race = false;
-          const concurrentPacket = packet(REGISTRY[0]);
+          const concurrentPacket = packet(FIRST);
           await baseStore.ingestPacket(
             {
               ...concurrentPacket,
@@ -1197,72 +985,149 @@ describe('MarketingCertificationStore', () => {
                 proof('visual_proof', 'new-taste'),
               ],
             },
-            '2026-09-04T20:04:01.000Z'
+            at('04:01')
           );
           return false;
         }
         return writable.compareAndSet(key, expected, next, ttl);
       },
     };
-
-    const result = await new MarketingCertificationStore(
-      racing,
-      REGISTRY
-    ).recordFounderDecision({
-      assuranceProfile: assuranceProfile(REGISTRY[0]),
-      decidedAt: '2026-09-04T20:04:02.000Z',
-      decision: decision(initial.admission.decisionEvidenceDigest!),
-      subjectId: REGISTRY[0].id,
+    const result = await new Store(racing, REGISTRY).recordFounderDecision({
+      assuranceProfile: FIRST_PROFILE,
+      decidedAt: at('04:02'),
+      decision: decision(digest(initial)),
+      subjectId: FIRST.id,
     });
     expect(result).toMatchObject({
       ok: false,
       reason: 'decision_digest_mismatch',
     });
   });
-
   it('rejects stale packet CAS retries and keeps newer failed evidence', async () => {
     const records = new Map<string, unknown>();
     const writable = memoryBackend(records);
-    const store = new MarketingCertificationStore(writable, REGISTRY);
-    const current = packet(REGISTRY[0]);
-    await store.ingestPacket(current, '2026-09-04T20:05:00.000Z');
+    const store = new Store(writable, REGISTRY);
+    const current = packet(FIRST);
+    await store.ingestPacket(current, at('05:00'));
     let race = true;
-    const racing: CertificationRecordBackend = {
+    const racing: Backend = {
       ...writable,
       async compareAndSet(key, expected, next, ttl) {
         if (race) {
           race = false;
           await store.ingestPacket(
-            packet(REGISTRY[0], {
+            packet(FIRST, {
               testsCoverage: [
                 proof('tests_coverage', 'newer-failure', 'failed'),
               ],
             }),
-            '2026-09-04T20:05:02.000Z'
+            at('05:02')
           );
           return false;
         }
         return writable.compareAndSet(key, expected, next, ttl);
       },
     };
-
     await expect(
-      new MarketingCertificationStore(racing, REGISTRY).ingestPacket(
-        packet(REGISTRY[0], {
+      new Store(racing, REGISTRY).ingestPacket(
+        packet(FIRST, {
           testsCoverage: [proof('tests_coverage', 'older-pass', 'passed')],
         }),
-        '2026-09-04T20:05:01.000Z'
+        at('05:01')
       )
     ).rejects.toThrow('is not newer than the persisted packet');
     const persisted = (await store.projectLedger()).rows[0];
     expect(persisted.packet.testsCoverage[0].status).toBe('failed');
     expect(persisted.admission.state).toBe('working');
   });
-
+  it('commits concurrent packet revisions with their own hot stamps and audit events', async () => {
+    const records = new Map<string, unknown>();
+    const writable = memoryBackend(records);
+    const store = createStore(records);
+    await store.ingestPacket(packet(FIRST), at('05:00'));
+    const olderAtShard = deferred();
+    const newerAtShard = deferred();
+    const releaseNewer = deferred();
+    const olderAt = at('05:01');
+    const newerAt = at('05:02');
+    const racing = (at: string): Backend => {
+      let intercepted = false;
+      async function write(
+        key: string,
+        next: unknown,
+        perform: () => Promise<boolean>
+      ) {
+        const isPacket = key.startsWith(SHARD_PREFIX);
+        if (
+          !isPacket ||
+          intercepted ||
+          JSON.parse(next as string).evaluatedAt !== at
+        )
+          return perform();
+        intercepted = true;
+        if (at === olderAt) {
+          olderAtShard.resolve();
+          await newerAtShard.promise;
+          return perform();
+        }
+        const result = await perform();
+        newerAtShard.resolve();
+        await releaseNewer.promise;
+        return result;
+      }
+      return {
+        ...writable,
+        compareAndSet: (key, expected, next, ttl) =>
+          write(key, next, () =>
+            writable.compareAndSet(key, expected, next, ttl)
+          ),
+        setIfAbsent: (key, value, ttl) =>
+          write(key, value, () => writable.setIfAbsent(key, value, ttl)),
+      };
+    };
+    const olderPacket = packet(FIRST, {
+      testsCoverage: [proof('tests_coverage', 'older-pass')],
+    });
+    const newerPacket = packet(FIRST, {
+      testsCoverage: [proof('tests_coverage', 'newer-failure', 'failed')],
+    });
+    const older = new Store(racing(olderAt), REGISTRY).ingestPacketWithOutcomes(
+      olderPacket,
+      olderAt
+    );
+    await olderAtShard.promise;
+    const newer = new Store(racing(newerAt), REGISTRY).ingestPacketWithOutcomes(
+      newerPacket,
+      newerAt
+    );
+    await newerAtShard.promise;
+    let olderResult: Awaited<typeof older>;
+    try {
+      olderResult = await older;
+    } finally {
+      releaseNewer.resolve();
+    }
+    const newerResult = await newer;
+    expect(olderResult.row.packet).toEqual(olderPacket);
+    expect(olderResult.row.packetUpdatedAt).toBe(olderAt);
+    expect(newerResult.row.packet).toEqual(newerPacket);
+    expect(newerResult.row.packetUpdatedAt).toBe(newerAt);
+    const persisted = (await store.inspectLedger()).rows[0];
+    expect(persisted.packet).toEqual(newerPacket);
+    expect(persisted.packetUpdatedAt).toBe(newerAt);
+    expect(persisted.admission.state).toBe('working');
+    expect(hotLedger(records).records[FIRST.id].packetUpdatedAt).toBe(newerAt);
+    const audit = await store.readAuditHistory(FIRST.id);
+    expect(audit.some(event => event.at === olderAt)).toBe(true);
+    expect(audit.some(event => event.at === newerAt)).toBe(true);
+    expect(newerResult.entryOutcomes[0].row.auditHistory).toEqual(
+      persisted.auditHistory
+    );
+  });
   it('compares packet timestamps numerically and validates mutation input', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    const valid = packet(REGISTRY[0]);
-    const row = await store.ingestPacket(valid, '2026-09-04T20:06:00.000Z');
+    const store = createStore();
+    const valid = packet(FIRST);
+    const row = await store.ingestPacket(valid, at('06:00'));
     await expect(
       store.ingestPacket(valid, '2026-09-04T21:00:00+02:00')
     ).rejects.toThrow('is not newer than the persisted packet');
@@ -1273,56 +1138,42 @@ describe('MarketingCertificationStore', () => {
       store.ingestPacket({
         ...valid,
         testsCoverage: [{ ...valid.testsCoverage[0], status: 'invented' }],
-      } as unknown as CertificationReviewPacket)
+      } as unknown as Packet)
     ).rejects.toThrow('invalid runtime shape');
+    await expect(approve(store, FIRST, digest(row), 'invalid')).rejects.toThrow(
+      'valid timestamp'
+    );
     await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[0]),
-        decidedAt: 'invalid',
-        decision: decision(row.admission.decisionEvidenceDigest!),
-        subjectId: REGISTRY[0].id,
-      })
-    ).rejects.toThrow('valid timestamp');
-    await expect(
-      store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[0]),
-        decidedAt: '2026-09-04T20:05:59.000Z',
-        decision: decision(row.admission.decisionEvidenceDigest!, ''),
-        subjectId: REGISTRY[0].id,
-      })
+      approve(store, FIRST, digest(row), at('05:59'), '')
     ).rejects.toThrow(/invalid|predates/);
   });
-
   it('rejects source, identity, unknown, and unresolved input drift', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
+    const store = createStore();
     await expect(
       store.ingestPacket(
-        packet(REGISTRY[0], {
-          source: { ...packet(REGISTRY[0]).source!, paths: ['wrong.tsx'] },
+        packet(FIRST, {
+          source: { ...packet(FIRST).source!, paths: ['wrong.tsx'] },
         })
       )
     ).rejects.toThrow('does not bind canonical source');
     await expect(
       store.ingestPacket(
-        packet(REGISTRY[0], {
-          subject: { ...packet(REGISTRY[0]).subject, title: 'Spoofed' },
+        packet(FIRST, {
+          subject: { ...packet(FIRST).subject, title: 'Spoofed' },
         })
       )
     ).rejects.toThrow('does not match its canonical registry identity');
     await expect(
       store.ingestPacket(
-        packet(REGISTRY[0], {
-          subject: { ...packet(REGISTRY[0]).subject, id: 'unknown' },
+        packet(FIRST, {
+          subject: { ...packet(FIRST).subject, id: 'unknown' },
         })
       )
     ).rejects.toThrow('Unknown marketing certification identity');
-
     const unresolved = MARKETING_COMPONENT_REGISTRY.find(
       entry => !entry.sourceBacked
     )!;
-    const unresolvedStore = new MarketingCertificationStore(memoryBackend(), [
-      unresolved,
-    ]);
+    const unresolvedStore = new Store(memoryBackend(), [unresolved]);
     const placeholder = (await unresolvedStore.projectLedger()).rows[0].packet;
     await expect(
       unresolvedStore.ingestPacket({
@@ -1336,53 +1187,37 @@ describe('MarketingCertificationStore', () => {
       })
     ).rejects.toThrow('has no resolved canonical source');
   });
-
   it('posts the rest of a ledger when one stored record cannot be evaluated', async () => {
     const records = new Map<string, unknown>();
-    const store = new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
-    );
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:10:00.000Z');
-    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:10:01.000Z');
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    ledger.records[REGISTRY[0].id].packet.subject.title = 'Spoofed title';
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
-
-    const posted = await store.ingestPacket(
-      packet(REGISTRY[1]),
-      '2026-09-04T20:10:02.000Z'
-    );
-    expect(posted.identityId).toBe(REGISTRY[1].id);
+    const store = createStore(records);
+    await store.ingestPacket(packet(FIRST), at('10:00'));
+    await store.ingestPacket(packet(SECOND), at('10:01'));
+    const spoofedShardKey = packetKey(records, FIRST.id);
+    const spoofedShard = JSON.parse(records.get(spoofedShardKey) as string);
+    spoofedShard.packet.subject.title = 'Spoofed title';
+    records.set(spoofedShardKey, JSON.stringify(spoofedShard));
+    const posted = await store.ingestPacket(packet(SECOND), at('10:02'));
+    expect(posted.identityId).toBe(SECOND.id);
     expect(posted.admission.state).not.toBe('working');
-
-    const projection = await store.inspectLedger('2026-09-04T20:10:03.000Z');
+    const projection = await store.inspectLedger(at('10:03'));
     const failed = projection.entryOutcomes.find(
-      outcome => outcome.identityId === REGISTRY[0].id
+      outcome => outcome.identityId === FIRST.id
     );
     const sibling = projection.entryOutcomes.find(
-      outcome => outcome.identityId === REGISTRY[1].id
+      outcome => outcome.identityId === SECOND.id
     );
     expect(failed).toMatchObject({
       evaluation: 'failed',
-      message: expect.stringContaining(REGISTRY[0].id),
+      message: expect.stringContaining(FIRST.id),
     });
     expect(failed?.row.admission.state).toBe('working');
     expect(failed?.row.admission.blockers.length).toBeGreaterThan(0);
-    expect(failed?.row.packet.subject.title).toBe(REGISTRY[0].storybookTitle);
+    expect(failed?.row.packet.subject.title).toBe(FIRST.storybookTitle);
     expect(sibling?.evaluation).toBe('evaluated');
-    expect(sibling?.row.packet.source?.paths).toEqual([
-      REGISTRY[1].resolvedSource,
-    ]);
-    const review = await store.projectReviewReady({
-      assuranceProfiles: ASSURANCE_PROFILES,
-      existingEntryId: null,
-    });
-    expect(review.eligibleSubjectIds).not.toContain(REGISTRY[0].id);
+    expect(sibling?.row.packet.source?.paths).toEqual([SECOND.resolvedSource]);
+    const review = await ready(store);
+    expect(review.eligibleSubjectIds).not.toContain(FIRST.id);
   });
-
   it('rebinds recipe.homepage onto its current source without certifying the stale packet', async () => {
     const homepage = MARKETING_COMPONENT_REGISTRY.find(
       entry => entry.id === 'recipe.homepage'
@@ -1390,39 +1225,33 @@ describe('MarketingCertificationStore', () => {
     if (!homepage?.resolvedSource) {
       throw new Error('recipe.homepage must stay source-backed');
     }
-    const sibling = REGISTRY[0];
+    const sibling = FIRST;
     const registry = [homepage, sibling];
     const records = new Map<string, unknown>();
-    const store = new MarketingCertificationStore(
-      memoryBackend(records),
-      registry
+    const store = new Store(memoryBackend(records), registry);
+    const admitted = await store.ingestPacket(packet(homepage), at('11:00'));
+    await approve(
+      store,
+      homepage,
+      digest(admitted),
+      at('11:01'),
+      'homepage-lock'
     );
-    const admitted = await store.ingestPacket(
-      packet(homepage),
-      '2026-09-04T20:11:00.000Z'
-    );
-    await store.recordFounderDecision({
-      assuranceProfile: assuranceProfile(homepage),
-      decidedAt: '2026-09-04T20:11:01.000Z',
-      decision: decision(
-        admitted.admission.decisionEvidenceDigest!,
-        'homepage-lock'
-      ),
-      subjectId: homepage.id,
-    });
-    await store.ingestPacket(packet(sibling), '2026-09-04T20:11:02.000Z');
-
+    await store.ingestPacket(packet(sibling), at('11:02'));
     const stalePath =
       'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx';
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    ledger.records[homepage.id].packet.source.paths = [stalePath];
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
-    const beforeWrite = records.get(MARKETING_CERTIFICATION_STORE_KEY);
-
+    const shardKey = packetKey(records, homepage.id);
+    const shard = JSON.parse(records.get(shardKey) as string);
+    shard.packet.source.paths = [stalePath];
+    const historical = JSON.stringify(shard);
+    const hot = hotLedger(records);
+    const revision = createHash('sha256').update(historical).digest('hex');
+    hot.records[homepage.id].packetRevision = revision;
+    records.set(`${SHARD_PREFIX}${homepage.id}:${revision}`, historical);
+    records.set(STORE_KEY, JSON.stringify(hot));
+    const beforeWrite = records.get(STORE_KEY);
     const viewed = await store.inspectLedger('2026-09-04T20:11:02.500Z');
-    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(beforeWrite);
+    expect(records.get(STORE_KEY)).toBe(beforeWrite);
     const viewedHomepage = viewed.entryOutcomes.find(
       outcome => outcome.identityId === homepage.id
     );
@@ -1431,14 +1260,9 @@ describe('MarketingCertificationStore', () => {
     expect(viewedHomepage?.row.packet.source?.paths).toEqual([
       homepage.resolvedSource,
     ]);
-
-    const posted = await store.ingestPacket(
-      packet(sibling),
-      '2026-09-04T20:11:03.000Z'
-    );
+    const posted = await store.ingestPacket(packet(sibling), at('11:03'));
     expect(posted.identityId).toBe(sibling.id);
-
-    const rebound = await store.inspectLedger('2026-09-04T20:11:04.000Z');
+    const rebound = await store.inspectLedger(at('11:04'));
     const homepageRow = rebound.entryOutcomes.find(
       outcome => outcome.identityId === homepage.id
     );
@@ -1460,20 +1284,13 @@ describe('MarketingCertificationStore', () => {
     expect(homepageRow?.row.packet.canonicalReferences[0]?.summary).toContain(
       stalePath
     );
-    const stored = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    const storedShard = JSON.parse(
+      records.get(packetKey(records, homepage.id)) as string
     );
-    expect(stored.records[homepage.id].packet.source.paths).toEqual([
-      homepage.resolvedSource,
-    ]);
-    expect(stored.records[homepage.id].packetUpdatedAt).toBe(
-      '2026-09-04T20:11:00.000Z'
-    );
-
-    const recertified = await store.ingestPacket(
-      packet(homepage),
-      '2026-09-04T20:11:05.000Z'
-    );
+    expect(storedShard.packet.source.paths).toEqual([homepage.resolvedSource]);
+    const storedHot = hotLedger(records);
+    expect(storedHot.records[homepage.id].packetUpdatedAt).toBe(at('11:00'));
+    const recertified = await store.ingestPacket(packet(homepage), at('11:05'));
     expect(recertified.packet.source?.paths).toEqual([homepage.resolvedSource]);
     expect(recertified.packet.source?.sha).toBe(SHA);
     expect(recertified.admission.state).not.toBe('working');
@@ -1483,68 +1300,44 @@ describe('MarketingCertificationStore', () => {
       )
     ).toBe(false);
   });
-
   it.each([42, '{', '{}'] as const)(
     'fails closed for corrupt ledger %j',
     async raw => {
-      const backend = memoryBackend(
-        new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
-      );
+      const backend = memoryBackend(new Map([[STORE_KEY, raw]]));
       await expect(
-        new MarketingCertificationStore(backend, REGISTRY).projectLedger()
-      ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
+        new Store(backend, REGISTRY).projectLedger()
+      ).rejects.toBeInstanceOf(PersistenceError);
     }
   );
-
   it('rejects persisted decision, audit, and replay corruption', async () => {
     for (const corruption of ['decision', 'audit', 'replay'] as const) {
       const records = new Map<string, unknown>();
-      const store = new MarketingCertificationStore(
-        memoryBackend(records),
-        REGISTRY
-      );
-      const admitted = await store.ingestPacket(
-        packet(REGISTRY[0]),
-        '2026-09-04T20:07:00.000Z'
-      );
-      await store.recordFounderDecision({
-        assuranceProfile: assuranceProfile(REGISTRY[0]),
-        decidedAt: '2026-09-04T20:07:01.000Z',
-        decision: decision(admitted.admission.decisionEvidenceDigest!),
-        subjectId: REGISTRY[0].id,
-      });
-      const ledger = JSON.parse(
-        records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-      );
+      const store = createStore(records);
+      const admitted = await store.ingestPacket(packet(FIRST), at('07:00'));
+      await approve(store, FIRST, digest(admitted), at('07:01'));
+      const ledger = hotLedger(records);
       if (corruption === 'decision')
-        ledger.records[REGISTRY[0].id].decisions[0].subjectId = REGISTRY[1].id;
+        ledger.records[FIRST.id].decisions[0].subjectId = SECOND.id;
       if (corruption === 'audit')
-        ledger.records[REGISTRY[0].id].auditHistory[0].subjectId =
-          REGISTRY[1].id;
+        ledger.records[FIRST.id].auditHistory[0].subjectId = SECOND.id;
       if (corruption === 'replay')
-        ledger.records[REGISTRY[1].id].decisions = [
+        ledger.records[SECOND.id].decisions = [
           {
-            ...ledger.records[REGISTRY[0].id].decisions[0],
-            subjectId: REGISTRY[1].id,
+            ...ledger.records[FIRST.id].decisions[0],
+            subjectId: SECOND.id,
           },
         ];
-      records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+      records.set(STORE_KEY, JSON.stringify(ledger));
       await expect(store.projectLedger()).rejects.toBeInstanceOf(
-        MarketingCertificationPersistenceError
+        PersistenceError
       );
     }
   });
-
   it('preserves a taste lock while operational evidence advances', async () => {
-    const store = new MarketingCertificationStore(memoryBackend(), REGISTRY);
-    const base = packet(REGISTRY[0]);
-    const admitted = await store.ingestPacket(base, '2026-09-04T20:08:00.000Z');
-    await store.recordFounderDecision({
-      assuranceProfile: assuranceProfile(REGISTRY[0]),
-      decidedAt: '2026-09-04T20:08:01.000Z',
-      decision: decision(admitted.admission.decisionEvidenceDigest!),
-      subjectId: REGISTRY[0].id,
-    });
+    const store = createStore();
+    const base = packet(FIRST);
+    const admitted = await store.ingestPacket(base, at('08:00'));
+    await approve(store, FIRST, digest(admitted), at('08:01'));
     const operational = await store.ingestPacket(
       {
         ...base,
@@ -1555,14 +1348,13 @@ describe('MarketingCertificationStore', () => {
           runtimeDogfood: [proof('runtime_dogfood', 'runtime')],
         },
       },
-      '2026-09-04T20:08:02.000Z'
+      at('08:02')
     );
     expect(operational.admission.state).toBe('monitored');
     expect(operational.admission.currentDecision?.id).toBe('decision-1');
   });
-
   it('bounds initialization and update contention', async () => {
-    const neverInitializes: CertificationRecordBackend = {
+    const neverInitializes: Backend = {
       async compareAndSet() {
         return false;
       },
@@ -1574,88 +1366,272 @@ describe('MarketingCertificationStore', () => {
       },
     };
     await expect(
-      new MarketingCertificationStore(
-        neverInitializes,
-        REGISTRY
-      ).projectLedger()
+      new Store(neverInitializes, REGISTRY).projectLedger()
     ).rejects.toThrow('initialization lost compare-and-set repeatedly');
-
     const records = new Map<string, unknown>();
-    const seed = new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
-    );
-    await seed.projectLedger('2026-09-04T20:09:00.000Z');
-    const neverUpdates: CertificationRecordBackend = {
+    const seed = createStore(records);
+    await seed.projectLedger(at('09:00'));
+    const neverUpdates: Backend = {
       async compareAndSet() {
         return false;
       },
       async get(key) {
         return records.get(key);
       },
-      async setIfAbsent() {
-        return false;
-      },
+      setIfAbsent: memoryBackend(records).setIfAbsent,
     };
     await expect(
-      new MarketingCertificationStore(neverUpdates, REGISTRY).ingestPacket(
-        packet(REGISTRY[0]),
-        '2026-09-04T20:09:01.000Z'
-      )
-    ).rejects.toThrow('update lost compare-and-set repeatedly');
+      new Store(neverUpdates, REGISTRY).ingestPacket(packet(FIRST), at('09:01'))
+    ).rejects.toThrow(/lost compare-and-set repeatedly/);
   });
-
   it('moves old audit events to append-only chunks without losing any, and keeps the ledger row small', async () => {
     const records = new Map<string, unknown>();
-    const store = new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
-    );
-    const id = REGISTRY[0].id;
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:00:00.000Z');
-    const seeded = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
+    const store = createStore(records);
+    const id = FIRST.id;
+    await store.ingestPacket(packet(FIRST), at('00:00'));
+    const seeded = hotLedger(records);
     const event = seeded.records[id].auditHistory[0];
     expect(event).toBeDefined();
     seeded.records[id].auditHistory = Array.from({ length: 600 }, () => event);
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(seeded));
-
+    records.set(STORE_KEY, JSON.stringify(seeded));
     await store.ingestPacket(
-      packet(REGISTRY[0], {
+      packet(FIRST, {
         testsCoverage: [proof('tests_coverage', 'changed', 'failed')],
       }),
-      '2026-09-04T20:01:00.000Z'
+      at('01:00')
     );
-
-    const hot = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
+    const hot = hotLedger(records);
     expect(hot.records[id].auditArchiveChunks).toBe(1);
     expect(hot.records[id].auditHistory.length).toBeLessThanOrEqual(
-      MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD + 5
+      HOT_AUDIT_LIMIT + 5
     );
-    expect(
-      records.has(`${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${id}:0`)
-    ).toBe(true);
+    expect(records.has(`${AUDIT_PREFIX}:${id}:0`)).toBe(true);
     const full = await store.readAuditHistory(id);
     expect(full.length).toBeGreaterThanOrEqual(601);
-    expect(
-      Buffer.byteLength(
-        records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-      )
-    ).toBeLessThan(MARKETING_CERTIFICATION_LEDGER_MAX_BYTES);
+    expect(Buffer.byteLength(records.get(STORE_KEY) as string)).toBeLessThan(
+      ROW_BUDGET_BYTES
+    );
   });
-
   it('does not rewrite the ledger when a re-posted packet means the same thing', async () => {
     const records = new Map<string, unknown>();
-    const store = new MarketingCertificationStore(
-      memoryBackend(records),
-      REGISTRY
+    const store = createStore(records);
+    await store.ingestPacket(packet(FIRST), at('00:00'));
+    const before = records.get(STORE_KEY);
+    await store.ingestPacket(packet(FIRST), at('05:00'));
+    expect(records.get(STORE_KEY)).toBe(before);
+  });
+  it.each(['get', 'batch'])(
+    'fails closed for malformed shards with %s backend capability',
+    async mode => {
+      for (const corruption of [
+        'missing',
+        'json',
+        'packet',
+        'identity',
+        'time',
+        'stamp',
+        'hash',
+        'inline',
+        'inline-empty',
+      ]) {
+        const records = new Map<string, unknown>();
+        const backend = memoryBackend(records);
+        if (mode === 'batch') {
+          backend.getMany = async keys =>
+            new Map(keys.map(key => [key, records.get(key)]));
+          const get = backend.get;
+          backend.get = async key => {
+            expect(key.startsWith(SHARD_PREFIX)).toBe(false);
+            return get(key);
+          };
+        }
+        const store = new Store(backend, REGISTRY);
+        await store.ingestPacket(packet(FIRST), at('00:00'));
+        await store.ingestPacket(packet(SECOND), at('00:01'));
+        const key = packetKey(records, FIRST.id);
+        const shard = JSON.parse(records.get(key) as string);
+        if (corruption === 'packet') shard.packet.testsCoverage = 'invalid';
+        if (corruption === 'identity') shard.identityId = SECOND.id;
+        if (corruption === 'time') shard.evaluatedAt = 'invalid';
+        if (corruption === 'stamp') shard.evaluatedAt = at('00:02');
+        if (corruption === 'hash')
+          shard.packet.visualProof[0].summary = 'tampered';
+        records.set(key, corruption === 'json' ? '{' : JSON.stringify(shard));
+        if (corruption === 'missing') records.delete(key);
+        if (corruption.startsWith('inline')) {
+          const legacy = hotLedger(records);
+          legacy.records[FIRST.id].packet = {
+            ...packet(FIRST),
+            visualProof: {},
+          };
+          if (corruption === 'inline-empty') {
+            legacy.records[FIRST.id].auditHistory = [];
+            delete legacy.records[FIRST.id].packetRevision;
+          }
+          records.set(STORE_KEY, JSON.stringify(legacy));
+        }
+        const hot = records.get(STORE_KEY);
+        const projected = await store.inspectLedger();
+        expect(records.get(STORE_KEY)).toBe(hot);
+        expect(projected.rows[0].admission.state).toBe('working');
+        expect(projected.rows[0].admission.blockers.length).toBeGreaterThan(0);
+        expect(projected.rows[1].packet).toEqual(packet(SECOND));
+        expect((await ready(store)).eligibleSubjectIds).not.toContain(FIRST.id);
+        await store.ingestPacket(packet(SECOND), at('00:02'));
+        expect((await store.inspectLedger()).entryOutcomes[0].evaluation).toBe(
+          'failed'
+        );
+        const repaired = await store.ingestPacket(packet(FIRST), at('00:03'));
+        expect(repaired.packet).toEqual(packet(FIRST));
+        expect(repaired.admission.state).toBe('review_ready');
+        expect((await store.inspectLedger()).entryOutcomes[0].evaluation).toBe(
+          'evaluated'
+        );
+      }
+    }
+  );
+  it('does not certify an uncommitted legacy shard matching initialization time', async () => {
+    const records = new Map<string, unknown>();
+    const store = createStore(records);
+    await store.projectLedger(at('00:00'));
+    records.set(
+      `${SHARD_PREFIX}${FIRST.id}`,
+      JSON.stringify({
+        schema: SHARD_SCHEMA,
+        identityId: FIRST.id,
+        evaluatedAt: at('00:00'),
+        packet: packet(FIRST),
+      })
     );
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:00:00.000Z');
-    const before = records.get(MARKETING_CERTIFICATION_STORE_KEY);
-    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:05:00.000Z');
-    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(before);
+    const before = new Map(records);
+    const projected = await store.inspectLedger();
+    expect(projected.rows[0].packet.source).toBeNull();
+    expect(projected.rows[0].admission.state).toBe('working');
+    expect(projected.rows[0].auditHistory).toEqual([]);
+    expect(records).toEqual(before);
+    expect(
+      (await store.ingestPacket(packet(FIRST), at('00:01'))).packet
+    ).toEqual(packet(FIRST));
+  });
+  it('accepts the exact hot budget, rejects one byte more, and recovers via audit compaction', async () => {
+    const records = new Map<string, unknown>();
+    const store = createStore(records);
+    await store.ingestPacket(packet(FIRST), at('00:00'));
+    const hot = hotLedger(records);
+    const record = hot.records[FIRST.id];
+    record.auditHistory = Array.from({ length: 41 }, () => ({
+      ...record.auditHistory[0],
+      summary: '',
+    }));
+    record.auditHistory[0].summary = 'x'.repeat(
+      ROW_BUDGET_BYTES - Buffer.byteLength(JSON.stringify(hot))
+    );
+    records.set(STORE_KEY, JSON.stringify(hot));
+    expect(Buffer.byteLength(records.get(STORE_KEY) as string)).toBe(
+      ROW_BUDGET_BYTES
+    );
+    await expect(
+      store.ingestPacket(packet(FIRST), at('00:01'))
+    ).resolves.toMatchObject({ packetUpdatedAt: at('00:00') });
+    record.auditHistory[0].summary += 'x';
+    const oversized = JSON.stringify(hot);
+    records.set(STORE_KEY, oversized);
+    await expect(
+      store.ingestPacket(packet(FIRST), at('00:01'))
+    ).rejects.toThrow(/budget|bytes|size/i);
+    expect(records.get(STORE_KEY)).toBe(oversized);
+    await store.compactAudit();
+    expect(Buffer.byteLength(records.get(STORE_KEY) as string)).toBeLessThan(
+      ROW_BUDGET_BYTES
+    );
+    expect(await store.readAuditHistory(FIRST.id)).toHaveLength(41);
+    expect((await store.inspectLedger()).rows[0].packet).toEqual(packet(FIRST));
+  });
+  it('accepts an exact UTF-8 shard budget and rejects one byte more before committing', async () => {
+    const records = new Map<string, unknown>();
+    const store = createStore(records);
+    const evaluatedAt = at('00:00');
+    const base = packet(FIRST, {
+      visualProof: [
+        { ...proof('visual_proof', 'dogfood-judge:budget'), summary: '' },
+      ],
+    });
+    const emptySize = Buffer.byteLength(
+      JSON.stringify({
+        schema: SHARD_SCHEMA,
+        identityId: FIRST.id,
+        evaluatedAt,
+        packet: base,
+      })
+    );
+    const available = ROW_BUDGET_BYTES - emptySize;
+    const summary = `${'é'.repeat(Math.floor(available / 2))}${'x'.repeat(available % 2)}`;
+    const bounded = {
+      ...base,
+      visualProof: [{ ...base.visualProof[0], summary }],
+    };
+    await store.ingestPacket(bounded, evaluatedAt);
+    expect(
+      Buffer.byteLength(records.get(packetKey(records, FIRST.id)) as string)
+    ).toBe(ROW_BUDGET_BYTES);
+    const before = new Map(records);
+    await expect(
+      store.ingestPacket(
+        {
+          ...base,
+          visualProof: [{ ...base.visualProof[0], summary: `${summary}x` }],
+        },
+        at('00:01')
+      )
+    ).rejects.toThrow(/budget|bytes|size/i);
+    expect(records).toEqual(before);
+  });
+  it('keeps the hot ledger row under the KV row budget when stored packets are large (JOV-12830)', async () => {
+    const records = new Map<string, unknown>();
+    const store = createStore(records);
+    const fatReceipts = Array.from({ length: 550 }, (_, i) =>
+      proof('visual_proof', `jov-12830-fat-${i}`)
+    );
+    for (const [i, entry] of REGISTRY.entries()) {
+      await store.ingestPacket(
+        packet(entry, { visualProof: fatReceipts }),
+        `2026-11-16T20:0${i}:00.000Z`
+      );
+    }
+    const hot = hotLedger(records);
+    for (const [_i, entry] of REGISTRY.entries()) {
+      const shardKey = packetKey(records, entry.id);
+      const shard = JSON.parse(records.get(shardKey) as string);
+      hot.records[entry.id].packet = shard.packet;
+      delete hot.records[entry.id].packetRevision;
+      records.delete(shardKey);
+    }
+    records.set(STORE_KEY, JSON.stringify(hot));
+    expect(Buffer.byteLength(records.get(STORE_KEY) as string)).toBeGreaterThan(
+      ROW_BUDGET_BYTES
+    );
+    await store.ingestPacket(
+      packet(FIRST, {
+        testsCoverage: [proof('tests_coverage', 'jov-12830-new', 'failed')],
+      }),
+      '2026-11-16T21:00:00.000Z'
+    );
+    expect(Buffer.byteLength(records.get(STORE_KEY) as string)).toBeLessThan(
+      ROW_BUDGET_BYTES
+    );
+    const view = await store.inspectLedger('2026-11-16T21:00:01.000Z');
+    const reingested = view.entryOutcomes.find(
+      candidate => candidate.identityId === FIRST.id
+    );
+    expect(reingested?.evaluation).toBe('evaluated');
+    expect(
+      reingested?.row.packet.testsCoverage?.some(r => r.id === 'jov-12830-new')
+    ).toBe(true);
+    const sibling = view.entryOutcomes.find(
+      candidate => candidate.identityId === SECOND.id
+    );
+    expect(sibling?.evaluation).toBe('evaluated');
+    expect(sibling?.row.packet.visualProof?.length).toBe(fatReceipts.length);
+    expect((await store.readAuditHistory(FIRST.id)).length).toBeGreaterThan(0);
   });
 });

@@ -1,8 +1,10 @@
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  HOMEPAGE_EDITORIAL_COPY as COPY,
+  HOMEPAGE_INVITE_ANCHOR,
+} from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { expect, test } from './setup';
-import { inspectRouteDom } from './utils/route-dom-detector';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
@@ -55,129 +57,91 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
-// Artist-profile homepage (EVENT 2026-10-20): claim + live profile, three
-// real fan states, then the free offer and the same claim.
+// Editorial homepage (Tim, 2026-11-03): the music-line hero, the profile and
+// releases chapters, then the claim-your-profile close into /start (Tim,
+// 2026-11-12: "Switch it"). No prices.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the artist-profile hero with the jov.ie/ claim as the one primary action', async ({
+  test('renders the locked headline with one claim action and a live-profile link', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
     await expect(
-      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
+      hero.getByRole('heading', { level: 1, name: COPY.hero.headline })
     ).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
 
+    const claim = getClaimProfileIntent();
     const cta = page.getByTestId('homepage-primary-cta');
-    await expect(cta).toBeVisible();
-    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
-    await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
-      'action',
-      '/start'
+    await expect(cta).toHaveText(claim.label);
+    await expect(cta).toHaveAttribute('href', claim.href);
+    const live = page.getByTestId('homepage-hero-live-profile');
+    await expect(live).toHaveText(COPY.hero.secondaryAction);
+    await expect(live).toHaveAttribute(
+      'href',
+      TIM_WHITE_PROFILE.publicProfilePath
     );
-    await expect(hero.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-    // The proof is the real product: a registry capture of a live profile,
-    // loaded eagerly as the LCP image.
-    const profile = hero.getByRole('img', {
-      name: HOMEPAGE_COPY.hero.profile.alt,
-    });
-    await expect(profile).toBeVisible();
-    expect(
-      await profile.evaluate(image => (image as HTMLImageElement).naturalWidth)
-    ).toBeGreaterThan(0);
-    // Preserve main's visitor-focused claim: no founder card or retired search.
-    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
-    await expect(page.getByText('Request access')).toHaveCount(0);
   });
 
-  test('claiming a handle hands off with the handle (/start, or /signup while waitlisted)', async ({
+  test('sends every claim action to /start and shows no prices', async ({
     page,
   }) => {
-    await page.route('**/api/handle/**', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: '{"available":true}',
-      })
-    );
-    const startRequest = page.waitForRequest(
-      request =>
-        ['/start', '/signup'].includes(new URL(request.url()).pathname) &&
-        new URL(request.url()).searchParams.get('handle') === 'averyclaims',
-      { timeout: 15_000 }
-    );
-    await page.locator('#homepage-claim-handle').fill('averyclaims');
-    await page.getByTestId('homepage-primary-cta').click();
-    await startRequest;
-  });
-
-  test('shows real profile states that scroll on phones without page overflow', async ({
-    page,
-  }) => {
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      const gallery = page.getByTestId('homepage-fan-states');
-      await gallery.scrollIntoViewIfNeeded();
-      // #23358 keeps real faces off the homepage: states are caption-only by
-      // design (no scenarioId, so no capture and no phone frame). The gallery
-      // must paint every caption with zero image content, and its rendered
-      // count must match the shipped copy record.
-      await expect(gallery.getByRole('img')).toHaveCount(0);
-      await expect(gallery).toHaveAttribute(
-        'data-count',
-        String(HOMEPAGE_FAN_STATES_COPY.states.length)
-      );
-      for (const state of HOMEPAGE_FAN_STATES_COPY.states) {
-        // hasText is a substring match and every caption body contains the
-        // word "listen", so filter on the title's exact text instead (the
-        // title span is the only element whose full text equals it).
-        const item = gallery.getByRole('listitem').filter({
-          has: page.getByText(state.title, { exact: true }),
-        });
-        await item.scrollIntoViewIfNeeded();
-        await expect(item).toBeVisible();
-        await expect(
-          gallery.getByText(state.title, { exact: true })
-        ).toBeVisible();
-        await expect(gallery.getByText(state.body)).toBeVisible();
-      }
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth
-      );
-      expect(overflow).toBeLessThanOrEqual(1);
-      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-      expect(
-        snapshot.findings.filter(finding =>
-          ['misaligned-text-stack', 'clipped-heading'].includes(finding.kind)
-        )
-      ).toEqual([]);
+    await expect(
+      page.locator(
+        'main a:visible[href*="/signup"], main a:visible[href*="/claim"]'
+      )
+    ).toHaveCount(0);
+    const startLinks = page.locator('main a:visible[href^="/start"]');
+    expect(await startLinks.count()).toBeGreaterThan(0);
+    for (const href of await startLinks.evaluateAll(links =>
+      links.map(link => link.getAttribute('href'))
+    )) {
+      expect(href).toBe(getClaimProfileIntent().href);
     }
+    await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
+    await expect(page.locator('main')).not.toContainText(/\$\d/);
   });
 
-  test('mounts hero, profile states, and the offer close in order', async ({
+  test('closes on the claim action into /start', async ({ page }) => {
+    const close = page.locator(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    await close.scrollIntoViewIfNeeded();
+    await expect(
+      close.getByRole('heading', { name: COPY.claim.headline })
+    ).toBeVisible();
+    await expect(close.getByTestId('waitlist-role-form')).toHaveCount(0);
+    const cta = close.getByTestId('homepage-close-cta');
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute('type', 'submit');
+    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'method',
+      'get'
+    );
+    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      getClaimProfileIntent().href
+    );
+  });
+
+  test('mounts hero, profile, releases, and the claim close in order', async ({
     page,
   }) => {
     const headings = await page
       .locator('main h1:visible, main h2:visible')
       .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
     expect(headings.filter(Boolean)).toEqual([
-      HOMEPAGE_COPY.hero.headline,
-      HOMEPAGE_FAN_STATES_COPY.headline,
-      HOMEPAGE_COPY.offer.headline,
+      COPY.hero.headline,
+      COPY.profile.headline,
+      COPY.releases.headline,
+      COPY.claim.headline,
     ]);
-    await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
-      HOMEPAGE_COPY.hero.claim.action
-    );
-    await expect(page.getByTestId('homepage-offer-summary')).toContainText(
-      '$0'
-    );
+    await expect(
+      page.getByRole('img', { name: COPY.profile.alt })
+    ).toBeVisible();
   });
 
   test('header is the canonical docked shell with the Customers flyout', async ({
@@ -202,10 +166,10 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    // The homepage never shows Request access; the header front door is /start.
+    // The header action enters /start with the shared claim intent.
     await expect(
-      header.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: getClaimProfileIntent().label })
+    ).toHaveAttribute('href', getClaimProfileIntent().href);
     await expect(
       header.getByRole('link', { name: 'Request access' })
     ).toHaveCount(0);
@@ -236,7 +200,7 @@ test.describe('Homepage', () => {
     await expect(page.locator('#marketing-header-flyout-tools')).toHaveCount(0);
   });
 
-  test('keeps the hero copy and claim inside the viewport on phones and at 200% zoom', async ({
+  test('keeps the headline and action inside the viewport on phones and at 200% zoom', async ({
     page,
   }) => {
     for (const viewport of [
@@ -249,12 +213,13 @@ test.describe('Homepage', () => {
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
 
+      await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
       for (const locator of [
         page.getByRole('heading', { level: 1 }),
-        page.locator('#homepage-claim-handle'),
         page.getByTestId('homepage-primary-cta'),
       ]) {
-        await expect(locator).toBeInViewport();
+        // The action may sit below a very short fold; it must still reflow
+        // inside the width.
         await locator.scrollIntoViewIfNeeded();
         const box = await locator.boundingBox();
         expect(box, 'element renders').not.toBeNull();
@@ -266,7 +231,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('paints the whole two-line headline without clipping descenders', async ({
+  test('paints the whole headline without clipping descenders', async ({
     page,
   }) => {
     for (const viewport of [
@@ -278,7 +243,7 @@ test.describe('Homepage', () => {
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
       const heading = page.getByRole('heading', { level: 1 });
-      await expect(heading).toHaveText(HOMEPAGE_COPY.hero.headline);
+      await expect(heading).toHaveText(COPY.hero.headline);
       const box = await heading.evaluate(el => ({
         scrollHeight: el.scrollHeight,
         clientHeight: el.clientHeight,
@@ -293,7 +258,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('aligns the hero with the shared section spine', async ({ page }) => {
+  test('aligns the chapters to the shared section spine', async ({ page }) => {
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
@@ -301,23 +266,107 @@ test.describe('Homepage', () => {
     ]) {
       await page.setViewportSize(viewport);
       await gotoHomepage(page);
-      const geometry = await page.evaluate(() => {
-        const heading = document.querySelector('main h1');
-        const container = document.querySelector(
-          '[data-testid="marketing-section-product-gallery"] .ap-section-container'
-        );
-        if (!heading || !container) {
-          throw new Error('The hero and the product gallery must render');
+      const lefts = await page.evaluate(() =>
+        ['feature-split', 'product-gallery', 'cta'].map(id => {
+          const container = document.querySelector(
+            `[data-testid="marketing-section-${id}"] .ap-section-container`
+          );
+          if (!container) throw new Error(`The ${id} chapter must render`);
+          return container.getBoundingClientRect().x;
+        })
+      );
+      for (const left of lefts) {
+        expect(
+          Math.abs(left - lefts[0]),
+          `${viewport.width}px: ${JSON.stringify(lefts)}`
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test('keeps every section and mockup inside the one content box', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // Static geometry: the scroll-driven fade-ups scale what they reveal.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 1024, height: 900 },
+      { width: 1280, height: 900 },
+      { width: 1440, height: 900 },
+      { width: 1512, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+      const report = await page.evaluate(() => {
+        const out: string[] = [];
+        const desktop = window.innerWidth >= 1024;
+        const sections = document.querySelectorAll<HTMLElement>('.hv3');
+        if (sections.length < 4) out.push(`only ${sections.length} sections`);
+        for (const section of sections) {
+          const rule = section.querySelector<HTMLElement>(':scope > .hv3-rule');
+          if (!rule) continue;
+          const side = Number.parseFloat(getComputedStyle(rule).paddingLeft);
+          const box = section.getBoundingClientRect();
+          const left = box.left + side;
+          const right = box.right - side;
+          const name = section.className;
+          // Everything a reader sees as a pane or a column stays in the box.
+          for (const el of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage, .hv3-window, .hv3-lift, .hv3-plate, .hv3-phone, .hv3-captions, .hv3-moment, .hv3-sheet, .hv3-steps, .hv3-index'
+          )) {
+            if (
+              el.closest('[hidden]') ||
+              getComputedStyle(el).display === 'none'
+            )
+              continue;
+            const r = el.getBoundingClientRect();
+            if (r.width === 0) continue;
+            // On phones a stage crops its mockup at the box: measure the
+            // visible part.
+            const clip = el.closest<HTMLElement>('.hv3-stage');
+            const c = clip && clip !== el ? clip.getBoundingClientRect() : null;
+            const l = c ? Math.max(r.left, c.left) : r.left;
+            const rr = c ? Math.min(r.right, c.right) : r.right;
+            if (l < left - 1 || rr > right + 1) {
+              out.push(
+                `${name} ${el.className}: ${l.toFixed(1)}-${rr.toFixed(1)} outside ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // A full-width stage is the box itself, edge to edge.
+          for (const stage of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage--hero, .hv3-stage--releases'
+          )) {
+            const r = stage.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${stage.className}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} is not the box ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // On desktop the hero window and the release panes fill the box.
+          if (!desktop) continue;
+          for (const sel of [
+            '.hv3-rig--hero .hv3-window',
+            '.hv3-rig--releases',
+          ]) {
+            const el = section.querySelector<HTMLElement>(sel);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${sel}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} does not fill ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
         }
-        return {
-          headingLeft: heading.getBoundingClientRect().x,
-          spineLeft: container.getBoundingClientRect().x,
-        };
+        return out;
       });
-      expect(
-        Math.abs(geometry.headingLeft - geometry.spineLeft),
-        `${viewport.width}px: ${JSON.stringify(geometry)}`
-      ).toBeLessThanOrEqual(1);
+      expect(report, `${viewport.width}px`).toEqual([]);
     }
   });
 
@@ -396,114 +445,11 @@ test.describe('Homepage', () => {
 
     expect(errors).toEqual([]);
   });
-
-  /**
-   * JOV-6436: Public Get started CTAs land on same-origin /signup.
-   * /start remains the post-auth capture chat; /waitlist is the receipt.
-   */
-  test('all data-cta-sign-up elements navigate to signup (JOV-6436)', async ({
-    page,
-  }) => {
-    await gotoHomepage(page);
-
-    const ctaLinks = page.locator('[data-cta-sign-up="true"]');
-    const count = await ctaLinks.count();
-
-    // The homepage converts through the jov.ie/you claim (hero + close).
-    // Header sign-up anchors, when present, still land on /signup.
-    await expect(
-      page.getByRole('button', { name: 'Claim', exact: true })
-    ).toHaveCount(2);
-
-    for (let i = 0; i < count; i += 1) {
-      const cta = ctaLinks.nth(i);
-      const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
-
-      if (tagName === 'a') {
-        const href = await cta.getAttribute('href');
-        const isSignupRoute =
-          href === PUBLIC_WAITLIST_URL ||
-          href === '/signup' ||
-          (href?.startsWith('/signup?') ?? false);
-        expect(
-          isSignupRoute,
-          `CTA at index ${i} (href="${href}") must route to /signup`
-        ).toBe(true);
-      }
-    }
-  });
 });
 
-// User input must survive the transition from native SSR form to client owner.
-test.describe('Homepage claim readiness', () => {
-  for (const entry of ['fill', 'keyboard'] as const) {
-    test(`preserves server-entered handles through readiness (${entry})`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await interceptAnalytics(page);
-      await page.route('**/api/journey/step', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/handle/check?**', route =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: '{"available":true}',
-        })
-      );
-      let releaseAssets = () => {};
-      const assetsReleased = new Promise<void>(resolve => {
-        releaseAssets = resolve;
-      });
-      await page.route('**/_next/static/**', async route => {
-        if (route.request().resourceType() === 'script') await assetsReleased;
-        await route.continue();
-      });
-      try {
-        await page.goto('/', {
-          waitUntil: 'commit',
-          timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
-        });
-        const input = page.locator('#homepage-claim-handle');
-        await expect(input).toBeEditable();
-        const draft =
-          entry === 'fill' ? 'Jov6220EarlyFill' : 'jov6220earlykeys';
-        if (entry === 'fill') await input.fill(draft);
-        else await input.pressSequentially(draft);
-        await expect(input).toHaveValue(draft);
-        const normalized = draft.toLowerCase();
-        const availability = page.waitForResponse(response => {
-          const url = new URL(response.url());
-          return (
-            url.pathname === '/api/handle/check' &&
-            url.searchParams.get('handle') === normalized
-          );
-        });
-        releaseAssets();
-        expect((await availability).status()).toBe(200);
-        await expect(input).toHaveValue(normalized);
-        await expect(page.getByTestId('homepage-handle-status')).toContainText(
-          `@${normalized} is available`
-        );
-        const handoff = page.waitForRequest(request => {
-          const url = new URL(request.url());
-          return (
-            ['/start', '/signup'].includes(url.pathname) &&
-            url.searchParams.get('handle') === normalized
-          );
-        });
-        if (entry === 'fill')
-          await page.getByTestId('homepage-primary-cta').click();
-        else await input.press('Enter');
-        await handoff;
-      } finally {
-        releaseAssets();
-      }
-    });
-  }
-
-  test('preserves the native GET handle handoff without JavaScript', async ({
+// The claim actions must work from the server-rendered HTML alone.
+test.describe('Homepage without JavaScript', () => {
+  test('keeps the hero action and the claim close reachable', async ({
     browser,
     baseURL,
   }) => {
@@ -518,22 +464,23 @@ test.describe('Homepage claim readiness', () => {
         waitUntil: 'domcontentloaded',
         timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
       });
-      const form = page.getByTestId('homepage-claim-form');
-      await expect(form).toHaveAttribute('action', '/start');
-      await expect(form).toHaveAttribute('method', 'get');
-      const input = page.locator('#homepage-claim-handle');
-      await expect(input).toHaveAttribute('name', 'handle');
-      await input.fill('jov6220native');
-      const handoff = page.waitForRequest(request => {
-        const url = new URL(request.url());
-        return (
-          request.method() === 'GET' &&
-          url.pathname === '/start' &&
-          url.searchParams.get('handle') === 'jov6220native'
-        );
-      });
-      await page.getByTestId('homepage-primary-cta').click();
-      await handoff;
+      await expect(page.getByTestId('homepage-primary-cta')).toHaveAttribute(
+        'href',
+        getClaimProfileIntent().href
+      );
+      await expect(
+        page
+          .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
+          .getByTestId('homepage-claim-entry')
+      ).toHaveAttribute('action', getClaimProfileIntent().href);
+      await expect(page.getByTestId('homepage-claim-entry')).toHaveAttribute(
+        'method',
+        'get'
+      );
+      await expect(page.getByTestId('homepage-close-cta')).toHaveAttribute(
+        'type',
+        'submit'
+      );
     } finally {
       await context.close();
     }

@@ -132,7 +132,7 @@ export const Empty: Story = {
   render: renderWithResponse(respondEmpty),
   play: async ({ canvasElement }) => {
     const { canvas } = await typeQuery(canvasElement, 'zzz');
-    expect(await canvas.findByText(/No artists match/)).toBeVisible();
+    expect(await canvas.findByText(/No artists match '/)).toBeVisible();
   },
 };
 

@@ -2,13 +2,19 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildWebVitestFastArgs } from '../../../scripts/lib/ci-web-vitest-fast-args.mjs';
+import { withLocalWorkerLimit } from './vitest-local-workers.mjs';
 
-function runVitest(args) {
+/** @param {string[]} args @returns {Promise<number>} */
+export function runVitest(args) {
   return new Promise((finish, fail) => {
     const command = process.platform === 'win32' ? 'vitest.cmd' : 'vitest';
-    const child = spawn(command, buildWebVitestFastArgs(args), {
-      stdio: 'inherit',
-    });
+    const child = spawn(
+      command,
+      withLocalWorkerLimit(buildWebVitestFastArgs(args)),
+      {
+        stdio: 'inherit',
+      }
+    );
 
     child.once('error', fail);
     child.once('exit', (code, signal) => {

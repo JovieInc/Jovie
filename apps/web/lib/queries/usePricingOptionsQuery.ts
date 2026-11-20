@@ -9,8 +9,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
-import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
 
@@ -23,13 +23,14 @@ export interface PricingOption {
   currency: string;
   interval: string;
   description: string;
+  plan?: string;
 }
 
 /**
  * Raw response from the pricing options API.
  * The API returns both fields for backwards compatibility.
  */
-interface PricingOptionsRawResponse {
+export interface PricingOptionsRawResponse {
   pricingOptions?: PricingOption[];
   options?: PricingOption[];
 }
@@ -39,21 +40,8 @@ interface PricingOptionsRawResponse {
  */
 export interface PricingOptionsResponse {
   options: PricingOption[];
-}
-
-const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
-  '/api/stripe/pricing-options'
-);
-
-async function fetchPricingOptions({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<PricingOptionsResponse> {
-  const raw = await fetchPricingOptionsRaw({ signal });
-  return {
-    options: [...(raw.pricingOptions ?? []), ...(raw.options ?? [])],
-  };
+  /** The person's price lock; options already carry the locked price. */
+  priceLock: PriceLockView | null;
 }
 
 /**
@@ -76,7 +64,10 @@ export const pricingOptionsQueryOptions = {
   get queryKey() {
     return queryKeys.billing.pricingOptions();
   },
-  queryFn: fetchPricingOptions,
+  queryFn: (context: { signal?: AbortSignal }) =>
+    import('./usePriceLockQuery').then(module =>
+      module.fetchPricingOptions(context)
+    ),
   ...STABLE_CACHE,
   retry: createClassifiedRetry(0),
 };

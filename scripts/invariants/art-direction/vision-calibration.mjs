@@ -74,7 +74,8 @@ export function wilsonLower(successes, total, z = 1.96) {
 }
 
 export function measure(observations, labels) {
-  const byKey = new Map(observations.map(o => [o.key, o]));
+  // Observations name the judged frame explicitly; accept older exported rows.
+  const byKey = new Map(observations.map(o => [o.frameId ?? o.key, o]));
   const out = {};
   for (const [criterion, flag] of Object.entries(CRITERIA)) {
     let tp = 0,

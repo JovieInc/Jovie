@@ -776,14 +776,36 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(unknown.pressure, 'unknown');
   });
 
-  it('includes normalized host load in capacity evidence and backoff', () => {
-    if (process.platform === 'linux') {
-      const host = readHostPressure('/proc');
-      assert.ok(Number.isFinite(host.loadAvg1));
-      assert.ok(Number.isInteger(host.cpuCount));
-      assert.ok(host.cpuCount > 0);
-    }
+  it('fails closed when proc exists without pressure files', () => {
+    const procRoot = mkdtempSync(join(tmpdir(), 'jovie-proc-no-pressure-'));
+    try {
+      writeFileSync(join(procRoot, 'loadavg'), '0.50 0.30 0.20 1/128 12345\n');
+      writeFileSync(join(procRoot, 'cpuinfo'), 'processor\t: 0\n');
+      writeFileSync(join(procRoot, 'meminfo'), 'MemAvailable:   16777216 kB\n');
 
+      const host = readHostPressure(procRoot);
+      assert.deepEqual(host, {
+        cpuSomeAvg10: null,
+        memoryFullAvg10: null,
+        ioFullAvg10: null,
+        loadAvg1: null,
+        cpuCount: null,
+        availableMemoryBytes: null,
+      });
+
+      const unknown = evaluateRuntimeCapacity(healthySignals({ host }), {
+        now: NOW,
+        previousCleanStreak: CLEAN_STREAK_REQUIRED,
+      });
+      assert.equal(unknown.allowed, false);
+      assert.equal(unknown.reason, 'host-pressure-unknown');
+      assert.equal(unknown.pressure, 'unknown');
+    } finally {
+      rmSync(procRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('includes normalized host load in capacity evidence and backoff', () => {
     const overloaded = evaluateRuntimeCapacity(
       healthySignals({
         host: {

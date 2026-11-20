@@ -33,8 +33,11 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
-| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
+| Awaited destructure conflicts: when every hunk starts with `const { names } = await expr;` for the same expression, keep main's names then head-only names and union the trailing statements. Aliases, a changed expression, or any other hunk stay for the model | `resolve_additive_list_conflict()`, `fix_red_source_edits.resolve_complementary_destructure_text()` |
+| Liveness quota conflicts: when every hunk is the quota-deferral union in `github-json-read.mjs` or `automation-liveness.mjs`, keep the rate-limit classifier short-circuit and the spent-budget deferral. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_liveness_quota.resolve_liveness_quota_text()` |
+| Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -52,8 +55,8 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
-| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` first (a non-branch ref: no Actions or Vercel build); existing backup refs are immutable and push hooks run. A snapshot that is not proven secret-free is not published and the checkout stays untouched. A failed backup keeps the checkout and strips only build output. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
-| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. A denied tick still drains the Linear outbox first — it is the doctor's own reporting channel, and the flush is bounded and touches only small state JSONs on the state root, never the full worktree volume (JOV-10355). Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is preserved with full parent history in the verified private `JovieInc/Ops` archive at `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` (a non-branch ref). Set `LANES_SWEEP_ARCHIVE_GH` to the absolute path of the existing authorized GitHub CLI to select its saved credentials; token environment and App shims are not fallback credentials. Exact repository identity, private visibility, active status and push rights are checked before and after creation, and the exact remote SHA is read back before removal. Backup refs are immutable and ordinary push hooks run. Missing credentials, incomplete ancestry, failed scans, metadata, push or readback keep the checkout untouched. A clean scan never establishes privacy; source origin is never an archive fallback. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
+| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. A denied tick still drains the Linear outbox first — it is the doctor's own reporting channel, and the flush is bounded and touches only small state JSONs on the state root, never the full worktree volume (JOV-10355). Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is preserved only in the verified private archive; unverified preservation keeps the checkout and build output) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
 | Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Host upkeep on the same update event (no timers): fetch the bare object mirror the lanes clone borrows from (`objects/info/alternates`, under `<root>/locks/<name>-mirror.lock`) right before update's own fetch, and refresh the codex lanes' `autoreview`/`behavior-validator` skills from `~/agent-skills` only when its `main` moved. Both are bounded, non-fatal, and recorded in `update.json` | `update()` |
@@ -64,6 +67,7 @@ The harness, not the model, owns:
 | Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. LYB runs iOS only in merge groups, so one failed_checks ejection sends that head to repair with the failed merge-group run's log in the prompt, and a queued PR is never re-enqueued Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
+| Dormant Codex Cloud adapter: `CODEX_CLOUD_ENV` and absolute `CODEX_CLOUD_BINARY` explicitly select the environment and real CLI. It supports opt-in repo-only submission, locked single-writer reservations, quota fallback, unknown-outcome holds, on-demand status and remote-id-correlated PR capture. No Claude Code provider. No `run_issue` dispatch or routing activation; subscription headroom, result application and dispatch remain the commissioning boundary tracked by JOV-10357. Stats report time-to-PR p50/p95 and unmeasured marginal cost | `cloud_lane.route()`, `status()`, `poll()`, `stats()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
 Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
@@ -131,11 +135,10 @@ origin fails without changing existing bytes. New heads require new receipts;
 neither repair nor review/finalizer receipts rewrite origin history.
 
 The Dependabot metadata-certified producer and atomic pin-sync writer emit after
-their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+their final heads are known. Shipping SLO (snapshot and ratchet),
 Screenshots (new and updated PR), Production Controller customer notes, Desktop
 Release stamps, and both coverage/nightly report publishers use the same
-`shipping_origin.py emit-automation` boundary after publication. Sentry records
-the evidenced Claude provider, without inventing a model from its routing tier.
+`shipping_origin.py emit-automation` boundary after publication.
 
 Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
 days. The existing lanes dispatch tick reads artifacts from both reporting
@@ -363,21 +366,66 @@ Ranking, prioritization and strategy decisions are not made on Summer's flash mo
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
 (question, decision type, context refs, deadline). Only issues with that block are reason-lane
 jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
-Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
-(flock `reason.lock`), so a job starts within a minute. Per job:
+The optional independent reason wake is **inactive by default**. After the native owner
+commissions the actual admission producer under JOV-12872, `LANES_REASON_WAKE=1` opts the
+installer into a five-minute recovery backstop (`jovie-lanes-reason.timer` on Linux,
+`com.jovie.lanes-reason` on macOS). Default installation leaves any existing reason artifacts
+alone; opt-in refuses unmarked operator-owned units/plists. Both the native producer and
+backstop invoke only the accepted `$state/current/reason_lane.py tick`. Native owners must
+inventory installed commands, identities, provider/resource policy and existing wakes before
+activation. A local adapter or timer is not evidence that the real producer is connected.
+
+The verified native producer invokes `tick --event-file <private-file>` with
+`LANES_REASON_WAKE=1`. The bounded JSON object has exactly `schema: jovie.reason-event/v1`,
+`issueId` (canonical UUID), `issueIdentifier` (`JOV-N`), `issueUpdatedAt` (UTC revision),
+`deliveryId` (64 lowercase hex), `providerAt` and `receivedAt` (UTC timestamps or null).
+It carries metadata only: current native queue eligibility is always reread; event content
+never executes or grants admission. Private per-revision receipts in `reason-events/pending`
+and `reason-events/checked` coalesce duplicate deliveries. The same guarded backstop retries
+lost or blocked checks. Busy controls stay pending; event finalization and drain exit each
+request the same guarded check once, closing the final-read/unlock race without a polling loop.
+A successful check or spawned drain does not prove worker acceptance
+or job completion. Raw provider-to-received and received-to-check timestamp pairs remain
+explicitly unqualified until native producer verification; they are separate from queue-check
+duration and do not produce intake-dwell samples. A distinct event or pending recovery forces
+one current Linear queue read through the existing shared client/cache; ordinary fallback
+keeps its 60-second cache. Native activation must measure event volume and verify quota
+headroom; this path does not claim zero additional API calls. Opt-in propagates to main
+dispatcher/drain and independent-wake environments. A continuation requires inherited
+`LANES_REASON_WAKE=1` and qualified private pending evidence; absent/explicit `0` remains
+blocked with an owner and next action. JOV-12872 must verify all accepted worker environments.
+Default/`0` installation is not an uninstaller: it leaves pre-existing reason units alone.
+To stop this optional component, its native owner disables the producer and sets its accepted
+worker environments to `LANES_REASON_WAKE=0`, then runs
+`systemctl --user disable --now jovie-lanes-reason.timer` on Linux, or
+`launchctl unload ~/Library/LaunchAgents/com.jovie.lanes-reason.plist` on macOS after confirming
+that artifact is source-owned. The existing lifecycle drain/EX remains the operator stop for
+all lane work; ordinary dispatcher fallback remains available.
+
+The ordinary dispatch hook remains a fallback before code preparation. Every path preserves
+shared disk admission, lifecycle drains, `reason.lock`, issue leases, provider routes and
+approved budgets; concurrent wakes do not add model concurrency. `tick.json` says only
+`scheduled`; `reason-tick.json` and append-only daily `runs/reason-checks/YYYY-MM-DD.jsonl`
+record queue-check timing, accepted-release provenance and explicit blockers. The daily date
+comes from the locally generated observation time; older audit history is retained.
+Per job:
 
 1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,
    `linear:open-p0-p1` (open JOV P0/P1 list); URLs are listed, not fetched. Models get no tools.
-2. Proposer: `claude -p` on Opus 5.5 (subscription login; `~/.config/jovie-lanes/claude.env` may
-   hold `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), structured JSON, `--max-budget-usd`.
+2. Proposer: the configured Hyperagent GLM 5.3 route. Money/auth/release judgment jobs use
+   the configured Hyperagent Opus 5.5 agent; an absent judgment agent stays unavailable.
+   `reason.json` owns the existing routes and limits; personal Claude is not a reasoning route.
 3. Adversarial reviewer, first healthy of: `grok` CLI on grok-4.7 (subscription), then the
    Hyperagent "Grok 4.7 Reviewer" agent (Hyperagent credits, through `~/.local/bin/hyperagent`).
    A 402/quota answer cools that reviewer for 6h.
 4. `reconcile()`: high confidence only when a reviewer ran, kept the #1, shares two of the top
    three, did not reject, and the proposer is at or above 0.6. Anything else is low.
-5. A comment with a `summer.reasoning-result/v1` block, the GBrain page
-   `ops/summer/decisions/<date>-<jov-n>-<slug>`, then Done. That state change is the Linear
-   webhook that wakes Summer. A failed job retries once, then goes to Canceled with a `failed` block.
+5. Seal the full produced result in private `reason-results/` state before publication.
+   Verify the complete GBrain memo and the exact, stable-ID Linear result comment before
+   Done wakes Summer. An uncertain write keeps a blocked receipt with its owner and next
+   action; the existing drain retries those saved bytes without model work. Changed input,
+   expired deadlines and corrupt state stay blocked. Model failures retain their existing
+   bounded retry and Canceled outcome.
 
 `decisionType: research` (tier 4) runs the Hyperagent research backend instead and posts the memo.
 Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
@@ -529,13 +577,49 @@ exclusions.
 
 Each lane's `routes` in `providers.json` give a model, the capability it clears (`bounded` < `standard` < `frontier`), a cost class and a base cost: Devin SWE-2 free 0, Hyperagent GLM 5.3 subsidized 1, Sonnet 5.5 2, Opus 5.5 frontier 3, Codex xhigh frontier 3.5 (headroom for the Codex-only sensitive labels). No route calls a raw model API key. `routing.json` sets the floor: JOV-7343 protected surfaces and orchestration labels are frontier, frozen plans and docs are bounded (a frozen plan on a protected surface stays frontier), the rest is standard.
 
-Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work. Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
+Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work, except that within a capability class the pool whose allowance expires first wins (see Model pools). Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
 
 `claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in `~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off 5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
 Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
 Hyperagent can also repair existing PRs remotely (`hyperagent_repair.py`, enabled by `remoteRepairs: true` in `providers.json`; it ships `false` until GLM 5.3 model timeouts stop ending repair threads early). The shared daily cap below applies either way. Each hyperagent lane turn first takes one DIRTY or required-check-red PR (revenue and golden-path first, then `compounding`, then oldest), sends the branch, head and failing-check log excerpt, and the agent pushes to the same branch with a `Hyperagent-Repair: <attempt>` trailer. The lane counts a success only when the PR head moved forward (no force push), the tip carries that trailer, and every required check is green; the receipt (`kind: remote-repair`, stage stamps, thread URL) goes to `runs/ledger.jsonl` and a PR comment. It never touches a hold-labelled PR or a head pushed in the last 30 minutes. One writer per PR: the local `locks/repair-pr-N.lock` flock, an in-flight `fix-attempts.json` record (no local attempt charged) and a lane claim comment; a definite failure releases all three, an unknown remote outcome keeps the record and comment until their TTLs. The 24 threads/day cap (`HYPERAGENT_RUNS_PER_DAY`) is shared with the mesh bridge counter and the lane's issue runs; a spent cap ends the hyperagent turn before it claims issues. `hyperagent_repair.py status` shows cap use and the queue; `run --pr N` does one repair by hand.
+
+### Model pools
+
+`model-pools.json` is the one table of the fleet's pools: the Claude subscription, Hyperagent,
+Codex, Grok, Devin, Kimi, and the two metered routes (Vercel AI Gateway, Anthropic API key). Each
+row says what quota or credit is behind the pool and where its reset or expiry is read from.
+`model_pools.py` uses it in four places:
+
+- Anthropic rule (Tim, 2026-11-11): Fable, Opus, Sonnet, Haiku and any `claude-*` run only on the
+  Claude subscription (`claude_lane.py`) or Hyperagent, never the Gateway or a metered API key.
+- CI: `python3 scripts/lanes/model_pools.py check` runs in the fast lane's guard chain and fails on
+  any lane config, registry row or workflow that routes an Anthropic model through a forbidden or
+  undeclared pool. Exceptions are named in the table with an owner and a removal trigger; one
+  that matches nothing fails, so the list only shrinks.
+- Runtime: `run_agent` refuses the command before it starts, the router never offers a forbidden
+  route, and the outcome judge refuses an Anthropic model on the Gateway. Each refusal is appended
+  to `runs/model-pool-refusals.jsonl`. The command check reads every model spelling (`-m X`, `-m=X`,
+  `--model X`, `--model=X`, a `model=X` config override, the pool's `modelEnv` variables) and fails
+  closed: a raw `claude` CLI and a model flag with no value are refused. That reading applies to
+  agent entry points (pool executors and the table's `agentRunners`); a gate command such as
+  `git commit -m ...` is read only for a long `--model` value. CI runs the agent check on every
+  configured `cmd`.
+- Direct API calls: `model_pool_calls.py` checks every model request body before it is sent
+  (`scripts/apiclient`, the PR remediation swarm's model pick, the outcome judge). An Anthropic model
+  addressed to the Gateway or `api.anthropic.com`, or a model request there whose model cannot be
+  read, is refused and recorded.
+- Selection: among available routes of the chosen capability class that still have soft allowance
+  left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window while one is open; an idle lane has no expiry,
+  Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
+  registry and its live overlay, Devin's free window). A pool with no reading sorts last and the
+  cost order decides ties. The choice is on the routing decision and the run receipt (`modelPool`).
+
+`python3 scripts/lanes/model_pools.py utilization [--window-hours 24] [--write]` prints, per pool,
+runs and agent busy time over the window against declared capacity (slots x window, soft run cap),
+with the pool's current expiry reading. `--write` saves it as `model-pool-utilization.json` in the
+lanes state dir for a board to read. Slots and concurrency are not set here.
 
 ## Install on a host
 
@@ -787,11 +871,18 @@ Needs-human, obsolete and ladder-exhausted share one PR comment marked
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
 via `lane-fix-escalating` / `lane-fix-exhausted`.
 
-Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
-fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
-it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
-`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
-issues drain first.
+Non-PR intake files one Linear issue immediately (JOV-13077, Tim 2026-11-19: Linear is the
+single source of truth): one issue per fingerprint, labeled `remediation`, `agent-ready` and
+`ws:ci` / `ws:release-deploy` / `ws:reliability`, created through the deterministic-UUID
+fence in `pr_events.ensure_linear_intake`. A recurrence with new evidence updates the same
+issue with one occurrence comment. No GitHub issue is created; when a context has no Linear
+client (the hosted relay before the workflow half exports `LANES_LINEAR_APP_ENV`) the intake
+defers visibly and the next derivation re-files it — never a GitHub fallback. Legacy GitHub
+intake issues (including ones `main-red-remediate.mjs` still files) convert once via
+`convert_intake` after the 30-minute claim window and then close. `ws:ci` is the first
+workstream rank, so those issues drain first. The description header is load-bearing for the dedupe fence: a hand-edited
+intake description makes filing defer fail-closed (`intake-destination-binding-mismatch`)
+instead of re-filing.
 
 ### Label contract (`remediation:<fingerprint>`)
 
@@ -875,6 +966,15 @@ MusicFetch.
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
 
+The bounded public `lanes-status.json` projection replaces the historical
+`remediation.byFingerprint` index with `byFingerprintSummary` counts and a
+`byFingerprintRef` into the same publication's `lanes-status-details.json`.
+The reference binds through `publicProjection.fullEvidence`; absence of the index
+is not an empty or partial result. Full evidence and active ownership/escalation
+arrays remain unchanged. If essential data still exceeds the 256 KiB budget,
+size alerts retain its `requiredBytes`, separately from the small published
+unavailable envelope's `publishedBytes`, until the actual snapshot fits again.
+
 ## Fleet work ledger (`fleet_ledger.py`)
 
 One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and
@@ -901,6 +1001,48 @@ Also in the same module and companions:
 - `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
   `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
   agent in `runs/delegations.jsonl`.
+- `pool_feed.py`: seats, not one free slot, decide how much backlog a lane holds. The router's
+  choice per issue used to stand while that lane had any free slot, so one free seat on the cheapest
+  lane took the routing of the whole backlog and every other lane left as `none-eligible`. A worker
+  now seats the admitted backlog in claim order along each issue's own candidate order (the router's:
+  cost, quota pressure, the use-or-lose pace discount): a lane takes as many issues as it has free
+  intake seats, the next issue goes to the next available lane, and a lane that idled after it was
+  offered an issue has declined it. Admission gates, capability floors, pins, the sensitive-surface
+  restriction, PR and WIP budgets and every quota limit are unchanged; no seat or limit is added.
+  Each pass records, per lane, free seats, seats fed and the reason any seat stayed idle
+  (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
+  the old routing; `observe` records what it would do and claims as before.
+
+## Observed admission capacity
+
+`pr_wip.py admit` and `new_issue_budget` use the caller's matched shared quota ledger
+and the fresh runner backlog in `release-flow.json`. Producer PR counts and the
+November 1 WIP targets remain diagnostic. Historical merge dwell and quota-deferred
+head counts cannot hold new work after the current constraint clears.
+
+A known zero remains blocked until its provider reset. A passed reset needs a fresh
+observation; it does not imply a refilled bucket. An existing admission invocation may
+make one quota-free `/rate_limit` refresh through the shared client. Unknown quota or
+CI evidence retains the existing bounded base and repair seats and prevents growth.
+Actual calls reserve at the shared client, and PR creation makes one bounded attempt.
+Caller quota does not certify a separate Actions installation. Recorded WIP overrides
+cannot override real quota or CI saturation.
+
+After its normal body and diff qualification, `pr:open` uses the existing `repair`
+request priority for corrections with red-before-green evidence on the canonical CI,
+agent-control-plane, identity, payment or proxy risk surfaces. The same priority reaches
+the prospective gate and the single creation attempt. It can use the existing repair
+reserve; it cannot spend an empty bucket or override CI backlog.
+
+`pr:open open --no-repair-reserve` explicitly declines that reserve and uses `default`
+for both capacity admission and the single creation request. It is a boolean downgrade,
+not a free-form priority setting; automatic selection stays unchanged when omitted.
+The existing publication receipt records the automatic and effective priorities.
+Every quota, CI, source, body and publication-head gate still applies.
+
+Ship now: use observed capacity with the existing event and lanes invocation paths.
+Re-evaluate when: JOV-7514 runtime receipts show idle capacity or a wrong-bucket hold.
+Then: repair that evidence path under JOV-8754; do not add another controller.
 
 ## Tests
 
@@ -1011,3 +1153,14 @@ own gate fails before CI does.
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
 is truthy, and unreadable briefs stay warnings even then.
+
+### Dormant cloud adapter recovery
+
+An unknown submit outcome keeps the reservation held. Do not retry or delete the ledger.
+The commissioning owner (JOV-10357) must inspect the configured environment with the real
+`codex cloud list --json` and correlate the remote task to the branch and submission time.
+After verifying the task id, append an `accepted` event with that id to the same ledger
+and inspect it with `status()`. Only positive evidence that no remote task was accepted
+permits an operator to append a `limit` rejection event for that exact task/branch;
+ambiguous CLI diagnostics such as 429 or capacity are insufficient. Corrupt ledgers hold
+routing; preserve the original and restore verified records before resuming.

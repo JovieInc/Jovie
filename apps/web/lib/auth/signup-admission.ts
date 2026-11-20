@@ -11,35 +11,59 @@ import {
   isNull,
   ne,
 } from 'drizzle-orm';
+import { dogfoodAdmissionAudit } from '@/lib/accounts/dogfood-account';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { isProdcertCanaryEmail } from '@/lib/synthetic/prodcert-identities';
-import { normalizeEmail } from '@/lib/utils/email';
+import { getEmailDomain, normalizeEmail } from '@/lib/utils/email';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 
 /**
- * Public account creation stays closed, across OTP and OAuth alike. This hook
- * runs only for new Better Auth identities; existing-user sign-in is unchanged.
- * Recipient ownership must already be proven by Better Auth's OTP/provider.
- * The issued invitation remains subject to token redemption after sign-in.
+ * New-account admission gate for Better Auth (`user.create.before`).
+ * Recipient ownership must always be proven by Better Auth's OTP/provider.
+ * While `PUBLIC_SIGNUP_CLOSED` is false (canon/PRODUCT.md, 2026-11-09), any
+ * verified email may create an account; setting `FEATURE_PUBLIC_SIGNUP_CLOSED=true`
+ * activates the invite-only kill switch.
  */
 export async function assertNewAccountAdmission(user: {
   email: string;
   emailVerified: boolean;
 }): Promise<void> {
-  const deny = () => {
+  const deny = (reason: 'email_unverified' | 'no_active_invitation') => {
+    // The OTP is already consumed when this runs, and the client sees only a
+    // 403. Log every denial (domain only, never the address) so a blocked
+    // sign-in is visible in runtime logs (2026-11-09 sign-in incident).
+    console.warn(
+      `[auth] new account denied ${JSON.stringify({
+        code: 'SIGNUP_INVITE_REQUIRED',
+        reason,
+        emailDomain: getEmailDomain(user.email) ?? 'unknown',
+      })}`
+    );
     throw new APIError('FORBIDDEN', {
       code: 'SIGNUP_INVITE_REQUIRED',
       message: 'An active invitation is required to create an account.',
     });
   };
 
-  if (user.emailVerified !== true) deny();
+  if (user.emailVerified !== true) deny('email_unverified');
   const email = normalizeEmail(user.email);
 
   // Production canaries prove ownership with the same random OTP as users.
   // This existing predicate does not grant a deterministic production OTP.
   if (isProdcertCanaryEmail(email)) return;
+
+  // Founder dogfood mailboxes live on the founder's own domain, whose
+  // catch-all only he reads, so the verified OTP above proves it is him.
+  // Audited server-side with the domain only, never the address.
+  const dogfood = dogfoodAdmissionAudit(user.email);
+  if (dogfood) {
+    console.info(`[auth] dogfood account admitted ${JSON.stringify(dogfood)}`);
+    return;
+  }
+
+  if (!isPublicSignupClosed()) return;
 
   // Never use the cached post-auth gate here: pending/noncanonical entries,
   // expired/redeemed invitations and revoked approval cannot admit a user.
@@ -82,5 +106,5 @@ export async function assertNewAccountAdmission(user: {
     )
     .limit(1);
 
-  if (!existingUser) deny();
+  if (!existingUser) deny('no_active_invitation');
 }

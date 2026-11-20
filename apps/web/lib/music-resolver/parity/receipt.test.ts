@@ -76,23 +76,34 @@ describe('parity receipt', () => {
     expect(changed.corpus.sha256).not.toBe(receipt.corpus.sha256);
   });
 
-  it('writes content-addressed receipts exclusively and preserves existing bytes', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'jov-7822-receipt-'));
-    directories.push(directory);
-    const receipt = createEvaluationReceipt(input);
-    const file = await writeEvaluationReceipt(
-      join(directory, 'receipts'),
-      receipt
-    );
-    const bytes = readFileSync(file);
-    expect(basename(file)).toBe(`${sha256(bytes)}.json`);
-    expect(statSync(file).mode & 0o777).toBe(0o444);
-    expect(JSON.parse(bytes.toString())).toEqual(receipt);
-    await expect(
-      writeEvaluationReceipt(join(directory, 'receipts'), receipt)
-    ).rejects.toMatchObject({ code: 'EEXIST' });
-    expect(readFileSync(file)).toEqual(bytes);
-  });
+  it.each([
+    { mask: 0o022, mode: 0o444 },
+    { mask: 0o077, mode: 0o400 },
+  ])(
+    'writes content-addressed receipts exclusively and preserves existing bytes with umask $mask',
+    async ({ mask, mode }) => {
+      const directory = mkdtempSync(join(tmpdir(), 'jov-7822-receipt-'));
+      directories.push(directory);
+      const receipt = createEvaluationReceipt(input);
+      const previousMask = process.umask(mask);
+      try {
+        const file = await writeEvaluationReceipt(
+          join(directory, 'receipts'),
+          receipt
+        );
+        const bytes = readFileSync(file);
+        expect(basename(file)).toBe(`${sha256(bytes)}.json`);
+        expect(statSync(file).mode & 0o777).toBe(mode);
+        expect(JSON.parse(bytes.toString())).toEqual(receipt);
+        await expect(
+          writeEvaluationReceipt(join(directory, 'receipts'), receipt)
+        ).rejects.toMatchObject({ code: 'EEXIST' });
+        expect(readFileSync(file)).toEqual(bytes);
+      } finally {
+        process.umask(previousMask);
+      }
+    }
+  );
 
   it.each([
     { candidateSha: 'short' },

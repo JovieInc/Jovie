@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "jovie-universal-gate-ladder",
-  "description": "Shared pre-commit → pre-push → PR gate ladder for web + iOS (JOV-3210). Adapters map to husky hooks and GitHub Actions; do not fork intent per app.",
+  "description": "Shared pre-commit \u2192 pre-push \u2192 PR gate ladder for web + iOS (JOV-3210). Adapters map to husky hooks and GitHub Actions; do not fork intent per app.",
   "rungs": [
     {
       "id": "conflict-markers",
@@ -26,8 +26,8 @@
       },
       "prePush": null,
       "pr": {
-        "web": "security.yml → Gitleaks Secret Scanning",
-        "ios": "security.yml → Gitleaks Secret Scanning"
+        "web": "security.yml \u2192 Gitleaks Secret Scanning",
+        "ios": "security.yml \u2192 Gitleaks Secret Scanning"
       }
     },
     {
@@ -93,7 +93,7 @@
       },
       "pr": {
         "web": "merge-group Unit Tests (ci-unit-tests shards)",
-        "ios": "merge-group ci-ios → ios-ci.yml unit tests + coverage; TestFlight requires the full UI/screenshot regression"
+        "ios": "merge-group ci-ios \u2192 ios-ci.yml unit tests + coverage; TestFlight requires the full UI/screenshot regression"
       }
     },
     {
@@ -109,6 +109,24 @@
       }
     },
     {
+      "id": "file-size-500",
+      "name": "Company Guards size-500 (per-file line ratchet)",
+      "intent": "Keep source files under the pinned JovieInc/ci guards/size.mjs limit. One implementation at every rung: pre-commit WARNS on staged files (never blocks), pre-push and PR hard-block.",
+      "hardBlock": true,
+      "preCommit": {
+        "web": "bash scripts/hooks/company-size-local.sh --staged (warn-only, exit 0)",
+        "ios": "bash scripts/hooks/company-size-local.sh --staged (warn-only, exit 0)"
+      },
+      "prePush": {
+        "web": "bash scripts/hooks/company-size-local.sh (via pre-push-gate.sh)",
+        "ios": "bash scripts/hooks/company-size-local.sh (via pre-push-gate.sh)"
+      },
+      "pr": {
+        "web": "company-guards.yml \u2192 size-500",
+        "ios": "company-guards.yml \u2192 size-500"
+      }
+    },
+    {
       "id": "osv",
       "name": "Dependency vulnerability scan",
       "intent": "Surface known vulnerable deps on the PR/security path.",
@@ -119,6 +137,21 @@
         "web": "security.yml / CodeQL / Trivy (post-merge heavy; PR secret scans hard-block)",
         "ios": "security.yml (shared)"
       }
+    },
+    {
+      "id": "warden-local-review",
+      "name": "Local AI review (Sentry Warden)",
+      "intent": "Advisory local AI code review before commit/push (warden.toml). Local-only: warns when the CLI or credentials are missing, never blocks, and must never be wired as a PR status check or merge gate.",
+      "hardBlock": false,
+      "preCommit": {
+        "web": "bash scripts/hooks/warden-local-review.sh staged",
+        "ios": "bash scripts/hooks/warden-local-review.sh staged"
+      },
+      "prePush": {
+        "web": "bash scripts/hooks/warden-local-review.sh branch",
+        "ios": "bash scripts/hooks/warden-local-review.sh branch"
+      },
+      "pr": null
     },
     {
       "id": "aggregate",

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import {
   cliGbrainClient,
   resolveGbrainBin,
@@ -28,13 +28,18 @@ const json = file => JSON.parse(read(file));
 const size = value => Buffer.byteLength(JSON.stringify(value));
 const fields = (value, keys) =>
   keys.split(' ').every(k => typeof value[k] === 'string' && value[k].trim());
-function directory(path) {
-  if (path !== dirname(path)) directory(dirname(path));
+function directory(path, bound = path) {
+  const parent = dirname(path);
+  if (path !== parent) directory(parent, bound);
   if (!fs.existsSync(path)) fs.mkdirSync(path, { mode: 0o700 });
-  check(
-    fs.lstatSync(path).isDirectory() && !fs.lstatSync(path).isSymbolicLink(),
-    'unsafe-directory'
-  );
+  // Only the caller root and below must be real directories. Ancestors above
+  // that root include macOS /var -> /private/var, so a tmpdir() store failed
+  // every local pre-push while Linux CI stayed green.
+  const prefix = bound.endsWith(sep) ? bound : `${bound}${sep}`;
+  if (path === bound || path.startsWith(prefix)) {
+    const stat = fs.lstatSync(path);
+    check(stat.isDirectory() && !stat.isSymbolicLink(), 'unsafe-directory');
+  }
   return path;
 }
 function write(file, body) {
@@ -92,7 +97,8 @@ export async function memory(
 ) {
   const brain = deps.brain || cliGbrainClient;
   const execute = deps.run || run;
-  const base = directory(join(resolve(root), name(namespace)));
+  const storeRoot = resolve(root);
+  const base = directory(join(storeRoot, name(namespace)), storeRoot);
   const tasks = directory(join(base, 'tasks'));
   name(task);
   check(

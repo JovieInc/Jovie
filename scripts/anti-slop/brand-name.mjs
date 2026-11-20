@@ -47,6 +47,7 @@ const GUARD_SOURCES = new Set([
   'scripts/anti-slop/brand-name-messages.mjs',
   'scripts/anti-slop/brand-name.exceptions.json',
   'scripts/lib/__tests__/brand-name.test.mjs',
+  'scripts/lib/__tests__/brand-name-copy.test.mjs',
   'docs/design-system/anti-slop-rules.json',
 ]);
 const BINARY_LIKE =

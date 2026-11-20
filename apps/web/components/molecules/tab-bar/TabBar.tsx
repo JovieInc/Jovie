@@ -7,6 +7,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
   OverflowMenuTrigger,
+  PlainButton,
   type SegmentControlOption,
   Tooltip,
   TooltipContent,
@@ -19,13 +20,13 @@ import { cn } from '@/lib/utils';
 
 /** Canonical pill segmented-control tab styling (re-exported by DrawerTabs; also used by InspectorTabs). */
 export const TAB_BAR_RAIL_CLASSNAME =
-  'flex min-w-0 items-center gap-0.5 rounded-full border border-(--app-shell-border)/70 bg-(--surface-0)/70 p-0.5';
+  'flex min-w-0 items-center gap-0.5 rounded-full border border-(--app-shell-border)/70 bg-surface-0 p-0.5';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
   'inline-flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border-0 bg-transparent px-3 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
 
 export const TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME =
-  'bg-(--surface-2) font-medium text-primary-token ring-1 ring-inset ring-(--app-shell-border)';
+  'bg-surface-3 font-medium text-primary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
   'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border-0 bg-transparent px-2.5 text-xs font-caption tracking-tight text-tertiary-token transition-[background-color,color] duration-fast hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16';
@@ -166,7 +167,7 @@ export function TabBar<T extends string>({
             )}
           >
             {displayOptions.map(option => (
-              <button
+              <PlainButton
                 key={option.value}
                 ref={el => setTabRef(option.value, el)}
                 type='button'
@@ -184,7 +185,7 @@ export function TabBar<T extends string>({
                 )}
               >
                 {option.label}
-              </button>
+              </PlainButton>
             ))}
             {/* Hidden sr-only tab for active overflow item (ARIA compliance) */}
             {showOverflow && activeInOverflow ? (
@@ -320,7 +321,7 @@ function LegacyTabBar<T extends string>({
       )}
     >
       {options.map(option => (
-        <button
+        <PlainButton
           key={option.value}
           type='button'
           role='tab'
@@ -337,7 +338,7 @@ function LegacyTabBar<T extends string>({
           )}
         >
           {option.label}
-        </button>
+        </PlainButton>
       ))}
     </div>
   );

@@ -1,5 +1,4 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
@@ -23,20 +22,35 @@ export interface MarketingCtaIntent {
   readonly support: string;
 }
 
+export const CLAIM_PROFILE_STARTER_PROMPT = 'I want to claim my profile.';
+
+export function buildClaimProfileStarterPrompt(handle?: string): string {
+  const trimmedHandle = handle?.trim().replace(/^@/, '') ?? '';
+  return trimmedHandle
+    ? `I want to claim jov.ie/${trimmedHandle}.`
+    : CLAIM_PROFILE_STARTER_PROMPT;
+}
+
+function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
+  const params = new URLSearchParams({
+    starter_prompt: buildClaimProfileStarterPrompt(trimmedHandle),
+    ...(trimmedHandle ? { handle: trimmedHandle } : {}),
+  });
+  return `${APP_ROUTES.START}?${params.toString()}`;
+}
+
+export function buildClaimProfileStartHref(handle?: string): string {
+  return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
+}
+
 // Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379): the
 // chat admits or reserves, so no front door routes to /signup or /waitlist.
-const CLAIM_PROFILE_WAITLIST_INTENT = {
-  id: 'claim-profile',
-  label: 'Claim your profile',
-  href: APP_ROUTES.START,
-  eventName: 'landing_cta_claim_profile',
-  support: 'Free to start. Reserve your name now.',
-} as const satisfies MarketingCtaIntent;
-
+// Always carry starter_prompt so landing on /start from / initiates the opener
+// automatically with zero extra clicks.
 const CLAIM_PROFILE_OPEN_SIGNUP_INTENT = {
   id: 'claim-profile',
   label: 'Claim your profile',
-  href: APP_ROUTES.START,
+  href: buildClaimProfileStartHref(),
   eventName: 'landing_cta_claim_profile',
   support: 'Free to start. No credit card.',
 } as const satisfies MarketingCtaIntent;
@@ -52,28 +66,8 @@ export const MARKETING_CTA_INTENTS = {
   },
 } as const satisfies Record<string, MarketingCtaIntent>;
 
-export type ClaimProfileCtaIntent =
-  | typeof CLAIM_PROFILE_WAITLIST_INTENT
-  | typeof CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
+export type ClaimProfileCtaIntent = typeof CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 
-function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
-  if (!trimmedHandle) return APP_ROUTES.START;
-
-  const params = new URLSearchParams({
-    starter_prompt: `I want to claim jov.ie/${trimmedHandle}.`,
-    handle: trimmedHandle,
-  });
-  return `${APP_ROUTES.START}?${params.toString()}`;
-}
-
-export function buildClaimProfileStartHref(handle?: string): string {
-  return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
-}
-
-export function getClaimProfileIntent(
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
-): ClaimProfileCtaIntent {
-  return waitlistEnabled
-    ? CLAIM_PROFILE_WAITLIST_INTENT
-    : CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
+export function getClaimProfileIntent(): ClaimProfileCtaIntent {
+  return CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 }

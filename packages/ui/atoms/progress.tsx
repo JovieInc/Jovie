@@ -103,6 +103,8 @@ export function ProgressBar({
         data-state={state}
         className={cn(
           'h-1.5 w-full overflow-hidden rounded-full bg-surface-2',
+          // Mirror the track so the indeterminate sweep runs toward the inline end.
+          !hasDeterminateValue && 'rtl:-scale-x-100',
           trackClassName
         )}
       >

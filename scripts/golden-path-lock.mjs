@@ -22,6 +22,7 @@ import {
   MERGE_GATE_TEST_FILES,
   validateReceipt,
 } from './lib/golden-path-lock.mjs';
+import { resolveGoldenPathSourceScope } from './lib/golden-path-source-scope.mjs';
 
 const FORBIDDEN_ENV = Object.freeze([
   'E2E_PROD_USER',
@@ -145,6 +146,7 @@ function runVitest(files, { filterWeb, coverage = false }) {
         '--coverage.enabled',
         '--coverage.provider=v8',
         '--coverage.include=lib/golden-path-lock.mjs',
+        '--coverage.include=lib/golden-path-source-scope.mjs',
         `--coverage.reportsDirectory=${coverageReportDirectory}`,
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
@@ -204,17 +206,28 @@ async function fetchJsonSafe(response) {
 
 async function runMergeGate(args) {
   assertNoSignupSecretSkip();
+  const sourceScope = resolveGoldenPathSourceScope();
   const classification = classifyChangedPaths(
-    readChangedFiles(args.changedFiles)
+    sourceScope.verified
+      ? sourceScope.files
+      : readChangedFiles(args.changedFiles)
   );
-  const product = runVitest(MERGE_GATE_TEST_FILES, { filterWeb: true });
+  const product = sourceScope.runProduct
+    ? runVitest(MERGE_GATE_TEST_FILES, { filterWeb: true })
+    : {
+        ok: true,
+        reason:
+          'Verified source delta is outside the Golden Path; owning lane checks remain required',
+      };
   const self = runVitest(GOLDEN_PATH_LOCK_SELF_TEST_FILES, {
     filterWeb: false,
     coverage: true,
   });
   const checks = [
     {
-      id: 'merge-gate-product-tests',
+      id: sourceScope.runProduct
+        ? 'merge-gate-product-tests'
+        : 'merge-gate-product-scope',
       ok: product.ok,
       reason: product.reason,
     },
@@ -228,6 +241,8 @@ async function runMergeGate(args) {
     ok: checks.every(check => check.ok),
     checks,
     classification,
+    sourceScope,
+    testFiles: sourceScope.runProduct ? MERGE_GATE_TEST_FILES : [],
   });
   writeReceipt(receipt, args.receipt);
   if (!receipt.ok) {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_FLAG_DEFAULTS } from './contracts';
 import {
   DISCOVERABILITY_FLAGS,
   isDiscoverabilityFlagEnabled,
@@ -8,6 +9,7 @@ describe('discoverability flags', () => {
   it('keeps unapproved workspace doors off when the snapshot is missing', () => {
     for (const name of ['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'] as const) {
       expect(DISCOVERABILITY_FLAGS[name]).toBe(false);
+      expect(APP_FLAG_DEFAULTS[name]).toBe(DISCOVERABILITY_FLAGS[name]);
       expect(isDiscoverabilityFlagEnabled(name)).toBe(false);
       expect(isDiscoverabilityFlagEnabled(name, {})).toBe(false);
     }

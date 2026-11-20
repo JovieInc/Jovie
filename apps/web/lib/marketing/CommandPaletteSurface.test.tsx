@@ -90,7 +90,13 @@ describe('CommandPaletteSurface', () => {
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expectSelected(input, rows[0]);
     await userEvent.type(input, 'no-matching-command');
-    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    // The empty-state hint renders as a disabled placeholder option (valid
+    // listbox child); no selectable rows remain.
+    expect(
+      screen
+        .queryAllByRole('option')
+        .filter(row => row.getAttribute('aria-disabled') !== 'true')
+    ).toHaveLength(0);
     expect(input).not.toHaveAttribute('aria-activedescendant');
     expect(fireEvent.keyDown(input, { key: '1', ctrlKey: true })).toBe(true);
     fireEvent.keyDown(input, { key: 'ArrowDown' });

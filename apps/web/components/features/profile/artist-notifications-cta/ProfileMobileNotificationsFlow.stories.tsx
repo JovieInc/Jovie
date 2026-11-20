@@ -69,7 +69,13 @@ const meta: Meta<typeof ProfileMobileNotificationsFlow> = {
 export default meta;
 type Story = StoryObj<typeof ProfileMobileNotificationsFlow>;
 
+// Open stories set html[data-profile-flow-open] so the consent card yields
+// for the duration of the flow (JOV-3209). Closed leaves the card in place.
 export const Email: Story = {};
+
+export const Closed: Story = {
+  args: { open: false },
+};
 
 export const Preferences: Story = {
   args: { step: 'preferences', canEditPreferences: true },

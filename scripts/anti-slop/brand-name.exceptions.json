@@ -60,6 +60,11 @@
       "file": "apps/web/lib/tracking/fire-subscribe-event.ts",
       "match": "label: 'jovie'",
       "reason": "Exact machine tracking label for Jovie's own marketing pixel in pixelConfigs, paired with the creator label. This runtime identifier is not presentation copy."
+    },
+    {
+      "file": "apps/web/lib/leads/buyer-signal-rules.ts",
+      "match": "export const JOVIE_HOSTS = ['jov.ie', 'jovie.com'];",
+      "reason": "Exact existing machine host compatibility list in buyer-signal-rules.ts; preserve its classification behavior. This is not a prose claim about the public product domain, and adjacent domain copy remains checked."
     }
   ]
 }

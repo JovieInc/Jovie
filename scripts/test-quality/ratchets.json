@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "mode": "warn",
+  "note": "Per-surface floors that only ratchet up (test minutes budget only down). mode=warn per the launch-over-perfect-gates rule: violations are reported and filed as work, not failed. Flip mode to enforce once two consecutive weekly reports hold. Update with: node scripts/test-quality-loop.mjs ratchet --state <state> --update",
+  "mutationScoreFloor": {
+    "billing": null,
+    "auth": null,
+    "golden-path": null,
+    "public-traffic": null,
+    "default": null
+  },
+  "coverageFloor": {
+    "billing": null,
+    "auth": null,
+    "golden-path": null,
+    "public-traffic": null,
+    "default": null
+  },
+  "sweepMinutesBudgetPerModule": null,
+  "flakyTestBudget": 7
+}

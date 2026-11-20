@@ -9,6 +9,16 @@ const meta = {
   title: 'Organisms/HomeLoop/HomeLoopAsks',
   component: HomeLoopAsks,
   parameters: { layout: 'padded' },
+  // Home is a dark-surface view; the "+N more" overflow line renders directly
+  // on the canvas, so give the story the dark base for the intended contrast
+  // context (axe color-contrast).
+  decorators: [
+    Story => (
+      <div className='w-full max-w-xl bg-base p-4'>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     asks: HOME_LOOP_FIXTURE_ASKS,
     answers: {},

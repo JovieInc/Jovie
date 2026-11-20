@@ -165,7 +165,7 @@ describe('SuggestedDspMatches', () => {
 
     render(<SuggestedDspMatches profileId='profile-1' />);
 
-    expect(screen.getByText('Suggested')).toBeInTheDocument();
+    expect(screen.getByText('Suggested')).toBeInTheDocument(); // JOV-8873 name contract
     // Linear-scale section label: quiet Title Case, no all-caps eyebrow treatment.
     expect(screen.getByText('Suggested').className).not.toContain('uppercase');
     // Name appears in both row and popover content

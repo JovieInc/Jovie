@@ -13,6 +13,14 @@ import { buildArtifacts } from './generate';
 describe('generated artifact parity', () => {
   const artifacts = buildArtifacts();
 
+  const artifactOrThrow = (name: string): string => {
+    const contents = artifacts[name];
+    if (contents === undefined) {
+      throw new Error(`${name} missing from generated artifacts`);
+    }
+    return contents;
+  };
+
   it('produces a deterministic artifact set', () => {
     const first = buildArtifacts();
     const second = buildArtifacts();
@@ -20,11 +28,11 @@ describe('generated artifact parity', () => {
     expect(Object.keys(first).length).toBeGreaterThan(0);
   });
   it('preserves work.next routing and resolves every discovery/OpenAPI schema reference', () => {
-    const discovery = JSON.parse(artifacts['manifest.json']);
+    const discovery = JSON.parse(artifactOrThrow('manifest.json'));
     for (const action of discovery.actions)
       for (const ref of Object.values(action.schemas))
         expect(artifacts[String(ref)], String(ref)).toBeDefined();
-    const api = JSON.parse(artifacts['openapi.json']);
+    const api = JSON.parse(artifactOrThrow('openapi.json'));
     expect(
       api.paths['/api/v1/actions/work.next/invoke'].post.requestBody.content[
         'application/json'
@@ -63,7 +71,7 @@ describe('generated artifact parity', () => {
   });
 
   it('advertises only implemented internal fleet dispatchers', () => {
-    const api = JSON.parse(artifacts['openapi.json']);
+    const api = JSON.parse(artifactOrThrow('openapi.json'));
     for (const path of Object.values(api.paths)) {
       const operation = (path as { post?: Record<string, unknown> }).post;
       if (operation)

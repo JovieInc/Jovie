@@ -96,6 +96,16 @@ export async function runAtomicDbOperation<T>(
   const attempt = () =>
     runLegacyDbTransaction(
       async tx => {
+        if (performance.now() >= deadline)
+          throw new Error('Atomic database deadline exceeded');
+        // Bind identity under the pool's statement timeout. A nearly exhausted
+        // request budget must not cancel RLS setup itself (JOV-8807).
+        await applyRlsTransactionUser(
+          tx,
+          options.system ? 'system_ingestion' : options.actorId
+        );
+        // Setup consumes the original budget too. Reject before business work
+        // if it expired, and install only the time that actually remains.
         const remaining = Math.floor(deadline - performance.now());
         if (remaining <= 0)
           throw new Error('Atomic database deadline exceeded');
@@ -103,10 +113,6 @@ export async function runAtomicDbOperation<T>(
       set_config('statement_timeout', ${String(remaining)}, true),
       set_config('lock_timeout', ${String(Math.min(remaining, 1000))}, true),
       set_config('idle_in_transaction_session_timeout', ${String(remaining)}, true)`);
-        await applyRlsTransactionUser(
-          tx,
-          options.system ? 'system_ingestion' : options.actorId
-        );
         return atomicDbContext.run({ actorId: options.actorId }, async () => {
           const result = await operation(tx);
           if (performance.now() >= deadline)

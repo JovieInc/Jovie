@@ -1,6 +1,60 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '../../constants/routes';
 
+test('starter handoff paints its composer only after its contents arrive', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 615 });
+  await page.goto(
+    '/iframe.html?id=features-onboarding-onboardingchat--starter-verification&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  const input = page.getByRole('textbox', {
+    name: 'Chat message input',
+    exact: false,
+  });
+  await expect(input).toHaveValue('I want to claim jov.ie/sam.');
+  const dock = page.getByTestId('chat-empty-state-centered-composer');
+  const geometry = await dock.evaluate(async element => {
+    const nodes = [...element.childNodes];
+    const originalInput = element.querySelector('textarea');
+    const frame = () =>
+      new Promise<void>(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+    await document.fonts.ready;
+    await frame();
+    const complete = element.getBoundingClientRect().toJSON();
+    // A network chunk can stop before any composer child has arrived. Keep
+    // the real dock, nodes, and app CSS; restore the same controls afterward.
+    element.replaceChildren();
+    await frame();
+    const pending = {
+      height: element.getBoundingClientRect().height,
+      visibility: getComputedStyle(element).visibility,
+    };
+    element.append(...nodes);
+    await frame();
+    return {
+      complete,
+      pending,
+      restored: element.getBoundingClientRect().toJSON(),
+      retainedInput: element.querySelector('textarea') === originalInput,
+    };
+  });
+  expect(geometry.pending.visibility).toBe('hidden');
+  expect(geometry.complete.height).toBeGreaterThan(geometry.pending.height);
+  expect(geometry.retainedInput).toBe(true);
+  expect(geometry.restored).toEqual(geometry.complete);
+  await expect(input).toBeVisible();
+  await expect(input).toHaveValue('I want to claim jov.ie/sam.');
+  await input.focus();
+  await expect(input).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'Send message', exact: true })
+  ).toBeDisabled();
+});
+
 for (const viewport of [
   { width: 1440, height: 900, fontSize: 16 },
   { width: 390, height: 615, fontSize: 16 },
@@ -123,7 +177,7 @@ for (const viewport of [
   { width: 768, height: 1024, fontSize: 16 },
   { width: 390, height: 615, fontSize: 32 },
 ]) {
-  test(`sign-in keeps its target stable while its label arrives at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
+  test(`onboarding options keep their target stable while the icon arrives at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
@@ -131,13 +185,12 @@ for (const viewport of [
       '/iframe.html?id=features-onboarding-onboardingshell--visitor&viewMode=story',
       { waitUntil: 'domcontentloaded' }
     );
-    const signIn = page
+    const options = page
       .getByTestId('onboarding-sign-in-header')
-      .getByRole('link', { name: 'Sign in', exact: true });
-    await expect(signIn).toBeVisible();
-    // Prove this build resolves the current shared Link owner, including in
-    // isolated worktrees whose dependency links can point at another checkout.
-    await expect(signIn).toHaveAttribute('data-reserved-label', 'Sign in');
+      .getByRole('button', { name: 'Onboarding options', exact: true });
+    await expect(options).toBeVisible();
+    // The existing IconButton owns stable compact geometry and an accessible name.
+    await expect(options).toHaveAttribute('aria-label', 'Onboarding options');
     await page.evaluate(async fontSize => {
       document.documentElement.style.fontSize = `${fontSize}px`;
       await document.fonts.ready;
@@ -149,7 +202,7 @@ for (const viewport of [
       'font-size',
       `${viewport.fontSize}px`
     );
-    const geometry = await signIn.evaluate(async link => {
+    const geometry = await options.evaluate(async link => {
       const nodes = Array.from(link.childNodes);
       const frame = () =>
         new Promise<void>(resolve =>
@@ -159,8 +212,8 @@ for (const viewport of [
         const rect = link.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
       };
-      // The opening anchor and its attributes can paint before its label
-      // arrives. Restore the same nodes; do not replace the real control.
+      // The icon may arrive after its named control. Restore the same nodes;
+      // do not replace the real control.
       link.replaceChildren();
       await frame();
       const pending = box();
@@ -168,7 +221,7 @@ for (const viewport of [
       await frame();
       return { pending, complete: box() };
     });
-    await testInfo.attach('sign-in-label-arrival.json', {
+    await testInfo.attach('onboarding-options-icon-arrival.json', {
       body: JSON.stringify(geometry),
       contentType: 'application/json',
     });
@@ -178,15 +231,20 @@ for (const viewport of [
         1
       );
     }
-    await expect(signIn).toHaveAttribute('href', APP_ROUTES.SIGNIN);
-    await expect(signIn).toHaveText('Sign in');
-    await signIn.focus();
-    await expect(signIn).toBeFocused();
-    const screenshot = testInfo.outputPath('sign-in-label-arrival.png');
+    await options.click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', APP_ROUTES.SIGNIN);
+    await page.keyboard.press('Escape');
+    await options.focus();
+    await expect(options).toBeFocused();
+    const screenshot = testInfo.outputPath(
+      'onboarding-options-icon-arrival.png'
+    );
     await page
       .getByTestId('onboarding-sign-in-header')
       .screenshot({ path: screenshot });
-    await testInfo.attach('sign-in-label-arrival.png', {
+    await testInfo.attach('onboarding-options-icon-arrival.png', {
       path: screenshot,
       contentType: 'image/png',
     });

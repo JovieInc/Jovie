@@ -282,6 +282,26 @@ test('5: real locked paths require a GBrain or locking PR reference', () => {
   );
 });
 
+test('test-quality ratchet config stays locked until the body cites the lock', () => {
+  const path = 'scripts/test-quality/ratchets.json';
+  assert.equal(isLockedArea(path), true);
+  const bare = check(pr(), [file(path)]);
+  assert.ok(
+    bare.errors.some(
+      error => error.startsWith('locked-areas:') && error.includes(path)
+    )
+  );
+  assert.deepEqual(
+    check(
+      pr({
+        body: `${proof}\n## Locked areas\nGBrain: decisions/guardrail-ratchet-intent-discovery-20260624\nLocking PR: #22870`,
+      }),
+      [file(path)]
+    ).errors,
+    []
+  );
+});
+
 const event = {
   repository: { full_name: 'JovieInc/Jovie' },
   pull_request: { number: 1, head: { sha: 'a'.repeat(40) } },
@@ -559,9 +579,7 @@ test('verdict script maps exit codes to the job result and never turns a deferra
         out: done.stdout + done.stderr,
       };
     };
-    // The job result is the verdict. No commit status is posted: it was
-    // informational and its github.token POST turned a verdict read on the CI
-    // App budget into a quota deferral (run 40164178818).
+    // No commit status is posted; the job result is the verdict.
     const noStatusPost = result =>
       assert.doesNotMatch(result.posts, /statuses|-X POST/);
     const green = run(0, '');
@@ -1134,6 +1152,7 @@ test('PR Ready executes the exact-head evidence gate and denies missing, failed,
       head_repository: { id: 1 },
       created_at: '2026-10-29T01:00:00Z',
       id: 42,
+      head_sha: 'a'.repeat(40),
       status: 'completed',
       conclusion: 'success',
       html_url: 'https://github.com/o/r/actions/runs/42',
@@ -1177,6 +1196,7 @@ test('PR Ready executes the exact-head evidence gate and denies missing, failed,
         env: {
           ...process.env,
           HEAD_SHA: 'a'.repeat(40),
+          BASE_SHA: 'b'.repeat(40),
           PR_NUMBER: '42',
           HEAD_REF: row.head_branch,
           HEAD_REPO_ID: '1',

@@ -19,6 +19,10 @@ Before adding a new test, check the heatmap to see which surface needs it most:
 
 **Enforcement:** `.github/pull_request_template.md`, `pnpm test:bug-to-test` (local + `/ship` Step 3.35), and Danger on PRs (`apps/web/dangerfile.ts`).
 
+## Hermetic contract
+
+Tests obey [hermetic-ci](hermetic-ci.md): no real wall clock, no live network, no shared state, seeded randomness. `scripts/wall-clock-test-guard.mjs` and `scripts/hermetic-ci-guard.mjs` fail the PR; ratchets only shrink.
+
 ## Stack
 
 - Unit tests: Vitest with jsdom
@@ -162,6 +166,10 @@ Tests must be written **at feature creation time**, not retroactively. Apply cov
 | Dashboard layout | No | Changes frequently, visual |
 | Homepage copy | No | Marketing, iterates fast |
 | Feedback submission flow | Yes | Deterministic workflow |
+
+## Hash-bound lane fixtures
+
+A change to `scripts/tests/test_disk_guard.py` must register its reviewed SHA-256 in `REVIEWED_FIXTURE_SHA256` in `scripts/lanes/qualification_guard.py` in the same change. Preserve the existing safety floor and prior approved hashes. Before a full lane qualification run, check this binding with `python3 -m pytest scripts/tests/test_qualification_guard.py::GuardContractTest::test_the_repo_fixture_is_a_reviewed_version -q`. This early contract check supplements the normal test and coverage gates.
 
 ## Verify Before Marking Done
 

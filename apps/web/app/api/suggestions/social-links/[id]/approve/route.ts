@@ -13,12 +13,15 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { invalidateSocialLinksCache } from '@/lib/cache';
 
 import { db } from '@/lib/db';
 import { socialLinkSuggestions } from '@/lib/db/schema/dsp-enrichment';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { captureError } from '@/lib/error-tracking';
+import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 const requestSchema = z.object({
   profileId: z.string().uuid(),
@@ -53,7 +56,11 @@ export async function POST(
 
     // Verify ownership
     const [profile] = await db
-      .select({ id: creatorProfiles.id, userId: creatorProfiles.userId })
+      .select({
+        id: creatorProfiles.id,
+        userId: creatorProfiles.userId,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -95,14 +102,22 @@ export async function POST(
 
     const now = new Date();
 
-    // Add as active social link and update suggestion status (sequential ops, no transaction)
-    const platformType = getPlatformType(suggestion.platform);
+    // Same normalization as the dashboard and chat paths: canonical URL and
+    // platform type come from platform detection, not a local table.
+    const detected = detectPlatform(suggestion.url);
+    const platform = detected.isValid
+      ? detected.platform.id
+      : suggestion.platform;
+    const platformType = detected.isValid
+      ? detected.platform.category
+      : 'other';
+    const url = detected.isValid ? detected.normalizedUrl : suggestion.url;
 
     await db.insert(socialLinks).values({
       creatorProfileId: profileId,
-      platform: suggestion.platform,
+      platform,
       platformType,
-      url: suggestion.url,
+      url,
       displayText: suggestion.username ?? undefined,
       state: 'active',
       confidence: suggestion.confidenceScore,
@@ -120,6 +135,11 @@ export async function POST(
         updatedAt: now,
       })
       .where(eq(socialLinkSuggestions.id, suggestionId));
+
+    // The dashboard contract: keep the profile's primary music URLs in step and
+    // refresh the public profile and dashboard caches.
+    await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
+    await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 
     return NextResponse.json({
       success: true,
@@ -139,33 +159,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-function getPlatformType(platform: string): string {
-  const socialPlatforms = [
-    'instagram',
-    'twitter',
-    'tiktok',
-    'facebook',
-    'twitch',
-    'discord',
-    'reddit',
-    'snapchat',
-  ];
-  const musicPlatforms = [
-    'spotify',
-    'apple_music',
-    'youtube_music',
-    'soundcloud',
-    'bandcamp',
-    'tidal',
-    'deezer',
-    'amazon_music',
-  ];
-
-  if (socialPlatforms.includes(platform)) return 'social';
-  if (musicPlatforms.includes(platform)) return 'listen';
-  if (platform === 'youtube') return 'social';
-  if (platform === 'website') return 'other';
-  return 'other';
 }

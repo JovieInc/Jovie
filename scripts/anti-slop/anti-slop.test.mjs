@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,10 +8,12 @@ import { stripVTControlCharacters } from 'node:util';
 import { BRAND_NAME_COVERAGE_COMMAND } from '../ci-fast-lanes.mjs';
 import {
   checkDrift,
+  checkTitleCaseHeadings,
   LEGACY_PATH,
   loadRegistry,
   REGISTRY_PATH,
   REPO_ROOT,
+  TITLE_CASE_HEADING,
   validateRegistry,
 } from './lib.mjs';
 import { runMatchers, runValidate } from './run.mjs';
@@ -153,14 +155,66 @@ test('registry path constant points at the committed file', () => {
   assert.equal(REGISTRY_PATH, 'docs/design-system/anti-slop-rules.json');
 });
 
+test('generic headings use sentence case, preserving proper names', () => {
+  for (const label of [
+    'Usage Stats',
+    'Loading Profile Settings',
+    'Open Links And Music Preview Panel',
+  ])
+    assert.ok(TITLE_CASE_HEADING.test(`title='${label}'`));
+  for (const label of [
+    'Usage stats',
+    'Loading profile settings',
+    'Search Jovie',
+    'Open Apple Music',
+    'MIDI input',
+  ])
+    assert.ok(!TITLE_CASE_HEADING.test(`title='${label}'`));
+});
+
+test('label ratchet permits legacy only, rejects new and duplicate hits, and requires shrinking', () => {
+  const root = repo();
+  const file = 'apps/web/components/shell/Player.tsx';
+  const line = "<div title='Usage Stats' />";
+  put(root, file, line);
+  execFileSync('git', ['init', '-q', root]);
+  execFileSync('git', ['add', '.'], { cwd: root });
+  assert.equal(checkTitleCaseHeadings(root).length, 1);
+  put(
+    root,
+    LEGACY_PATH,
+    JSON.stringify({ files: [], titleCaseHeadings: [`${file}: ${line}`] })
+  );
+  assert.deepEqual(checkTitleCaseHeadings(root), []);
+  put(root, file, `${line}\n${line}`);
+  assert.equal(checkTitleCaseHeadings(root).length, 1);
+  put(root, file, "<div title='Usage stats' />");
+  assert.match(checkTitleCaseHeadings(root)[0], /stale baseline/u);
+  put(root, LEGACY_PATH, JSON.stringify({ files: [], titleCaseHeadings: [] }));
+  assert.deepEqual(checkTitleCaseHeadings(root), []);
+});
+
+test('settings and shell changes select the existing anti-slop CI lane', async () => {
+  const { SOURCE_GUARDS } = await import('../ci-fast-lanes.mjs');
+  const guard = SOURCE_GUARDS.find(rule => rule.id === 'anti-slop');
+  for (const file of [
+    'apps/web/app/app/(shell)/settings/profile/page.tsx',
+    'apps/web/components/shell/SidebarInboxLink.tsx',
+    'scripts/anti-slop/lib.mjs',
+  ])
+    assert.ok(guard.inputs.test(file), file);
+});
+
 // Source Validation loads guard commands from trusted main. Keep the real
 // coverage suite reachable through that existing Node entrypoint on first PR CI.
 test('brand spelling assertions pass with per-file V8 coverage floors', () => {
+  const env = { ...process.env, FORCE_COLOR: '1' };
+  delete env.NO_COLOR; // Exercise ANSI output without conflicting inherited color settings.
   const result = spawnSync(BRAND_NAME_COVERAGE_COMMAND, {
     cwd: REPO_ROOT,
     shell: true,
     encoding: 'utf8',
-    env: { ...process.env, FORCE_COLOR: '1' },
+    env,
     timeout: 120_000,
     maxBuffer: 8 * 1024 * 1024,
   });

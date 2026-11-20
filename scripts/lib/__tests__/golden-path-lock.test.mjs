@@ -31,6 +31,7 @@ import {
   executeAutofix,
   findFingerprintPrs,
   findOpenAutofixPr,
+  findOwnedAgentRecords,
   findOwnedAgents,
   GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
   GOLDEN_PATH_LOCK_SCHEMA,
@@ -63,26 +64,58 @@ describe('golden-path lock test files', () => {
     expect(GOLDEN_PATH_LOCK_SELF_TEST_FILES).toEqual([
       'lib/__tests__/golden-path-lock.test.mjs',
       'lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+      'lib/__tests__/golden-path-source-scope.test.mjs',
     ]);
   });
 });
 
 describe('golden-path lock classifier', () => {
-  it('marks chat, start, waitlist, and homepage CTA paths', () => {
+  it('marks chat, start, waitlist, checkout, claim, and homepage CTA paths', () => {
     const classified = classifyChangedPaths([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
     expect(classified.matched).toEqual([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
     ]);
+  });
+
+  it('verifies every live Golden Path surface exists on disk and triggers touchesGoldenPath', () => {
+    const liveGoldenPathFiles = [
+      'apps/web/components/homepage/HomepageEditorial.tsx',
+      'apps/web/data/homepageStartCta.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
+      'apps/web/components/features/onboarding/OnboardingChat.tsx',
+      'apps/web/components/features/onboarding/ChatProposeCheckoutCard.tsx',
+      'apps/web/app/(auth)/signup/SignUpPageClient.tsx',
+      'apps/web/app/(auth)/signin/SignInPageClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/[username]/_components/PublicClaimBanner.tsx',
+      'apps/web/app/r/[slug]/ReleaseLandingPage.tsx',
+    ];
+    for (const relPath of liveGoldenPathFiles) {
+      expect(
+        readFileSync(join(REPO_ROOT, relPath), 'utf8').length
+      ).toBeGreaterThan(0);
+      expect(classifyChangedPaths([relPath]).touchesGoldenPath).toBe(true);
+    }
   });
 
   it('still records docs-only diffs without treating them as a skip', () => {
@@ -189,6 +222,34 @@ describe('golden-path lock evaluators', () => {
     // An uncertified waitlist wall remains forbidden.
     expect(
       evaluateHomepageHtml('<a href="/waitlist">Claim your profile</a>')
+    ).toMatchObject({ ok: false });
+  });
+
+  it('accepts the open claim front door: "Claim your profile" linking to /start', () => {
+    // Shape of the production hero once the on-page invitation form is gone:
+    // the shared claim-profile intent renders one link into /start.
+    const open = `<a class="btn" data-testid="homepage-primary-cta" href="/start"><span>Claim your profile</span></a>`;
+    expect(evaluateHomepageHtml(open)).toEqual({
+      id: 'homepage-cta',
+      ok: true,
+      reason: 'found claim CTA "Claim your profile" linking to /start',
+    });
+    // The label and a /start link in different controls is not the claim CTA.
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Get started</a><button>Claim your profile</button>'
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Get started</a><a href="/pricing">Claim your profile</a>'
+      )
+    ).toMatchObject({ ok: false });
+    // The invitation form production served on 2026-11-13 has no way into /start.
+    expect(
+      evaluateHomepageHtml(
+        '<form data-testid="waitlist-role-form" aria-label="Jovie opens by invitation"><button>Request an invitation</button></form>'
+      )
     ).toMatchObject({ ok: false });
   });
 
@@ -634,6 +695,17 @@ describe('golden-path lock autofix planner', () => {
     expect(buildAutofixPrompt({ fingerprint: 'x', checks })).toContain(
       'Tell Gem she missed this'
     );
+  });
+
+  it('names the open claim CTA as a certified front door in the autofix prompt', () => {
+    const prompt = buildAutofixPrompt({
+      fingerprint: 'x',
+      checks: [{ id: 'homepage-cta', ok: false, reason: 'missing' }],
+    });
+    expect(prompt).toContain(
+      'claim CTA "Claim your profile" linking to /start'
+    );
+    expect(prompt).toContain('Never revert an open claim CTA');
   });
 
   it('matches owned agents by fingerprint and encodes Basic auth', () => {
@@ -1245,6 +1317,13 @@ describe('golden-path autofix dedupe (JOV-6832)', () => {
       },
     ];
     expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
+    // Full record lookup matches branch-only Cursor list entries (so 24h launch
+    // accounting sees both RUNNING and FINISHED runs) while findOwnedAgents
+    // excludes FINISHED runs so stale finished agents never block escalation.
+    expect(findOwnedAgentRecords(agents, FINGERPRINT).map(a => a.id)).toEqual([
+      'running',
+      'done',
+    ]);
   });
 
   it('binds Cursor dispatch to a stable boundary phase and stops when that boundary is held', () => {

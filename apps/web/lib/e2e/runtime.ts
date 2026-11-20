@@ -1,4 +1,9 @@
 import { publicEnv } from '@/lib/env-public';
+/**
+ * This module sits on the Product Screenshots push-trigger path
+ * (apps/web/lib/e2e/**): a change here re-runs Generate + Certify on the
+ * current main tip, the JOV-7713 exact-prod screen-audit recertification.
+ */
 
 /** Clerk test-mode OTP; reused for fan email capture in local/CI E2E. */
 export const FAN_CAPTURE_E2E_OTP_CODE = '424242';

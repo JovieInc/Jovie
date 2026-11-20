@@ -7,9 +7,11 @@ import {
   NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   NAVIGATION_TELEMETRY_SCHEMA_VERSION,
   navigationLatencyBucketUpperBoundMs,
+} from './navigation-telemetry-contract';
+import {
   navigationTelemetryBatchSchema,
   navigationTelemetryPayloadSchema,
-} from './navigation-telemetry-contract';
+} from './navigation-telemetry-schema';
 
 const VALID_PAYLOAD = {
   schema_version: NAVIGATION_TELEMETRY_SCHEMA_VERSION,

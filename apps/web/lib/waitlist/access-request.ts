@@ -3,6 +3,7 @@ import 'server-only';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import {
   buildProductionWaitlistCanaryMarker,
   hasProductionWaitlistCanaryNamespace,
@@ -57,6 +58,7 @@ import {
   isStatusUpgrade,
   type UserLifecycleStatus,
 } from '@/lib/waitlist/status-precedence';
+import { readSupportLoadCapacity } from '@/lib/waitlist/support-load.server';
 import { recordWaitlistJoin } from './acquisition-stages';
 
 const WAITLIST_LOCK_PREFIX = 'waitlist:';
@@ -345,21 +347,18 @@ async function decideAccess(params: {
     mode === 'waitlist_enabled' ? params.goldenPathAdmission : undefined;
   // Best leads first: with N slots left today, admit now only if fewer than N
   // pending entrants outrank this one; the rest wait for the ranked drain.
+  const budget = await readSupportLoadCapacity(settings);
   if (goldenPathDecision?.admit && params.admissionScore) {
-    const remaining = Math.max(
-      0,
-      settings.autoAcceptDailyLimit - settings.autoAcceptedToday
-    );
     const pending = await listPendingScoresDesc(
       params.tx,
-      remaining,
+      budget.remaining,
       Math.max(1, Math.trunc(settings.autoAcceptAfterDays))
     );
     if (
       isOutrankedByQueue({
         candidateScore: params.admissionScore.score,
         pendingScoresDesc: pending,
-        remainingSlots: remaining,
+        remainingSlots: budget.remaining,
       })
     ) {
       goldenPathDecision = { admit: false, reason: 'hold_outranked' };
@@ -381,7 +380,7 @@ async function decideAccess(params: {
   // Admission state only: nothing here emails or invites anyone.
   let reservedAdmissionSlot = false;
   if (mode === 'waitlist_enabled' && qualification.status === 'approved') {
-    const reservation = await tryReserveAutoAcceptSlot(params.tx);
+    const reservation = await tryReserveAutoAcceptSlot(params.tx, budget);
     if (reservation.shouldAutoAccept) {
       reservedAdmissionSlot = true;
     } else {
@@ -731,9 +730,6 @@ export async function submitWaitlistAccessRequest(
     // may still be holding a stale waitlist_pending entry from a prior
     // /waitlist visit. Mirror the normal-approval invalidation so middleware
     // doesn't keep redirecting the user back to /waitlist.
-    //
-    // Only bust the cache when the userStatus row actually changed; otherwise
-    // we'd thrash the cache on every idempotent re-assert.
     await invalidateProxyUserStateCache(input.appUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',
@@ -770,6 +766,8 @@ export async function submitWaitlistAccessRequest(
   }
 
   if (!suppressCanaryCommunications) {
+    if (input.appUserId)
+      await ensurePriceLockForUserSafely(input.appUserId, 'waitlist');
     await recordWaitlistJoin({
       entryId: result.entryId,
       acquisitionId: input.acquisitionId,

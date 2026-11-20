@@ -210,7 +210,7 @@ describe('ReleaseCell', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Open Skyline Dreams' })
+      screen.getByRole('button', { name: 'Open Skyline Dreams Jovie Artist' })
     );
 
     expect(onSelect).toHaveBeenCalledWith(baseRelease);

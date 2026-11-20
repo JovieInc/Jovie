@@ -1,16 +1,17 @@
 name: Sentry Autofix Recurrence
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Ops
-# necessary-trust-boundary: A main-only job resolves or reopens autofixed Sentry incidents after the post-deploy soak, with a scoped Jovie Bot comment token; source PRs never reach it.
+# necessary-trust-boundary: A main-only job evaluates registered Sentry validation observations against the verified production artifact with a read-only Jovie Bot token; source PRs never reach it.
 # revisit-trigger: Remove the clock dispatch and schedule when Sentry emits a regression-resolved webhook Jovie can consume.
 # clock-class: production-liveness
 
-# Closes the sentry-autofix loop after a fix has landed on current main.
-# Scheduled (Gem clock + cron backstop) / manual only — never a source-PR or merge-queue gate, and never
-# a member of the production-mutation FIFO. Resolves quiet production
-# incidents and reopens ones that are still firing after the post-deploy soak.
-# Missing lastSeen, environment, or current-main ancestry is skip/fail-closed,
-# not a green resolve.
+# Runs the registered Sentry validation observations: Linear issues in
+# Validating that carry a `sentry-observation:v1` registration are checked
+# against Sentry history for the verified production artifact.
+# Scheduled (Gem clock + cron backstop) / manual only — never a source-PR or
+# merge-queue gate, and never a member of the production-mutation FIFO.
+# The legacy resolve/reopen loop over "Sentry autofix" PRs was removed with
+# sentry-autofix.yml (JOV-12619).
 
 on:
   # The Gem lanes tick fires this on the designed cadence
@@ -21,11 +22,6 @@ on:
   schedule:
     - cron: '41 * * * *'
   workflow_dispatch:
-    inputs:
-      observations_only:
-        description: Evaluate registered validation observations without legacy Sentry status mutations
-        type: boolean
-        default: false
 
 permissions: {}
 
@@ -35,7 +31,7 @@ concurrency:
 
 jobs:
   recurrence:
-    name: Resolve or reopen from post-deploy evidence
+    name: Evaluate registered Sentry validation observations
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -43,8 +39,6 @@ jobs:
       name: Production – jovie
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,22 +55,21 @@ jobs:
 
       - uses: ./.github/actions/setup-doppler
 
-      - name: Generate read/comment Jovie Bot token
+      - name: Generate read-only Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.AGENTS_APP_ID }}
           private-key: ${{ secrets.AGENTS_APP_PRIVATE_KEY }}
           permission-contents: read
-          permission-pull-requests: write
-          permission-issues: write
+          permission-pull-requests: read
+          permission-issues: read
 
-      - name: Check recurrence and resolve or reopen
+      - name: Run registered Sentry validation observations
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          SENTRY_RECURRENCE_OBSERVATIONS_ONLY: ${{ inputs.observations_only && '1' || '' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
         run: |

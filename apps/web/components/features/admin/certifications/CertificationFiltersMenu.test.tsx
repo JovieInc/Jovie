@@ -33,7 +33,7 @@ describe('CertificationFiltersMenu', () => {
   it('counts active filters and disables unavailable domains', async () => {
     renderMenu(true);
     const trigger = screen.getByRole('button', {
-      name: 'Certification Filters',
+      name: 'Certification Filters: Flows (4)',
     });
     expect(trigger).toHaveTextContent('Flows (4)');
     await userEvent.click(trigger);
@@ -56,7 +56,7 @@ describe('CertificationFiltersMenu', () => {
     async (name, callback, value) => {
       const callbacks = renderMenu();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Certification Filters' })
+        screen.getByRole('button', { name: 'Certification Filters: Filters' })
       );
       await userEvent.click(screen.getByRole('menuitemradio', { name }));
       expect(callbacks[callback]).toHaveBeenCalledExactlyOnceWith(value);

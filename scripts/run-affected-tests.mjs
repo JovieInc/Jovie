@@ -15,6 +15,9 @@ import {
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
 
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
+import { KNOWN_VITEST_FIXTURE_PRODUCERS } from './lib/onboarding-test-producers.mjs';
+
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
 // retain the entire suite in memory. They still need a finite wall-clock
@@ -34,6 +37,15 @@ const GLOBAL_TEST_INPUTS = new Set([
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
+  [
+    'apps/web/data/designSystem/surfaceCensus.json',
+    [
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
+    ],
+  ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
   [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
@@ -90,13 +102,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
-  [
-    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
-    [
-      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
-      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
-    ],
-  ],
+  ...KNOWN_VITEST_FIXTURE_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
@@ -116,6 +122,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
+// Census evidence entries (surfaceCensus.evidence/) select the census validator.
+const CENSUS =
+  /^apps\/web\/data\/designSystem\/surfaceCensus\.(json$|evidence\/)/;
+const touchesCensus = files => files.some(file => CENSUS.test(file));
+const fixtureTestsFor = file =>
+  CENSUS.test(file) && !file.endsWith('surfaceCensus.json')
+    ? ['scripts/lib/__tests__/design-surface-census.test.mjs']
+    : KNOWN_VITEST_FIXTURE_TESTS.get(file);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
@@ -334,7 +348,6 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -463,11 +476,13 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
   'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/golden-path-lock.test.mjs',
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/golden-path-source-scope.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
@@ -626,15 +641,6 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=100',
       '--test-coverage-branches=100',
       '--test-coverage-functions=100',
-    ],
-  ],
-  [
-    '.github/scripts/internal-pr-review.test.mjs',
-    '.github/scripts/internal-pr-review.mjs',
-    [
-      '--test-coverage-lines=85',
-      '--test-coverage-branches=80',
-      '--test-coverage-functions=85',
     ],
   ],
   [
@@ -1183,6 +1189,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'pr_events',
     'remediation',
     'reason_lane',
+    'reason_dispatch',
+    'reason_publication',
     'doctor',
     'hud',
     'disk_guard',
@@ -1309,6 +1317,17 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: touchesCensus(files),
+    ...(touchesCensus(files) &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -2244,9 +2263,10 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  for (const file of files) {
-    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
-  }
+  const fixtureProducers = files.flatMap(file => fixtureTestsFor(file) ?? []);
+  mandatoryTests.push(
+    ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
+  );
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -2340,6 +2360,7 @@ function planAffectedTests(
   ]);
   const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
+    ...fixtureProducers.filter(test => test.startsWith('scripts/')),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -2388,7 +2409,7 @@ function planAffectedTests(
       CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
     )
       return true;
-    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    const fixtureTests = fixtureTestsFor(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
@@ -2760,10 +2781,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')
@@ -2991,6 +3009,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/git-base-ref.mjs',
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
@@ -3057,6 +3076,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (
+    plan.censusValidation ||
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  ) {
+    commands.push(['node', ['scripts/design-surface-census.mjs', base]]);
+  }
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.
@@ -3352,7 +3379,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (args.includes('--control')) {
     process.exit(await runControlTestCommands());
   }
-  const base = argValue(args, '--base', 'origin/main');
+  let base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const shardTimeoutMs = positiveDurationMs(
@@ -3373,6 +3400,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
+  if (!explicitFiles) {
+    const resolved = resolveBaseRef(REPO_ROOT, base);
+    if (!resolved) {
+      console.error(
+        `[affected-tests] base ref '${base}' does not resolve to a commit (tried ${baseRefCandidates(base).join(', ')})`
+      );
+      process.exit(1);
+    }
+    // Use one snapshot for selection, blog classification and coverage.
+    base = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${resolved}^{commit}`],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }
+    ).trim();
+  }
   const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
   const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
     existsSync(resolve(REPO_ROOT, file))

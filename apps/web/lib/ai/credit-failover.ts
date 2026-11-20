@@ -5,7 +5,8 @@
  * The wrapped model keeps every property of the primary (spec version, id,
  * supported URLs) and only overrides `doGenerate` / `doStream`: when the
  * primary rejects with a failover-worthy error before producing output, the
- * same call is replayed once on the secondary. A credit/quota error also opens
+ * same call is replayed once on the secondary. Credit/quota exhaustion and
+ * model-unavailability (a retired or disallowed model id) both open
  * a short per-provider breaker so the next calls skip the dead provider
  * instead of paying a failed round trip each time.
  */
@@ -85,6 +86,34 @@ export function isProviderCreditError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * True for "this provider cannot serve this model at all": a retired model
+ * (Cloudflare 410 Gone / error 5028), a relay allowlist rejection ("model
+ * not allowed"), or a Gateway model-not-found. Unlike credit errors this
+ * means the MODEL is gone on that provider, not the money: the other
+ * provider runs its own model fleet, so replaying the identical call there
+ * is the only recovery (JOV-10063: the 2026-11-20 Workers AI glm-5.3-flash
+ * retirement took chat down whenever the live relay and the caller's model
+ * map disagreed, because this class never reached the fallback).
+ */
+const MODEL_UNAVAILABLE_MESSAGE =
+  /model not allowed|model not found|unsupported model|unknown model|no longer (?:available|supported)|has been (?:retired|deprecated|removed)|410 gone|is deprecated/iu;
+
+export function isModelUnavailableError(error: unknown): boolean {
+  for (const record of walkErrors(error)) {
+    if (record.statusCode === 410 || record.status === 410) return true;
+    if (record.code === 5028) return true;
+    const message = record.message;
+    if (
+      typeof message === 'string' &&
+      MODEL_UNAVAILABLE_MESSAGE.test(message)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -142,6 +171,124 @@ function logFailover(event: AiFailoverEvent): void {
   console.warn(JSON.stringify(event));
 }
 
+interface StreamPart {
+  readonly type?: string;
+  readonly error?: unknown;
+}
+
+interface StreamResult {
+  readonly stream: ReadableStream<StreamPart>;
+}
+
+const STREAM_METADATA_PARTS = new Set(['stream-start', 'response-metadata']);
+// Bound lookahead memory even when a provider floods metadata without content.
+const MAX_LEADING_STREAM_METADATA_PARTS = 16;
+
+function hasStream(result: unknown): result is StreamResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    typeof (result as StreamResult).stream?.getReader === 'function'
+  );
+}
+
+/** Keep pre-output errors inside the existing one-replay boundary. */
+async function prepareStreamResult(
+  result: unknown,
+  shouldFailover: (error: unknown) => boolean,
+  signal?: AbortSignal
+): Promise<unknown> {
+  if (!hasStream(result)) return result;
+  const reader = result.stream.getReader();
+  const buffered: StreamPart[] = [];
+  let cancellation: Promise<void> | undefined;
+  const cancel = (reason: unknown) => (cancellation ??= reader.cancel(reason));
+  let rejectAbort: ((reason: unknown) => void) | undefined;
+  const aborted = signal
+    ? new Promise<never>((_resolve, reject) => {
+        rejectAbort = reject;
+      })
+    : undefined;
+  void aborted?.catch(() => undefined);
+  const onAbort = () => {
+    rejectAbort?.(signal?.reason);
+    void cancel(signal?.reason).catch(() => undefined);
+  };
+  const dispose = () => signal?.removeEventListener('abort', onAbort);
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) onAbort();
+  const read = async () => {
+    signal?.throwIfAborted();
+    const next = await (aborted
+      ? Promise.race([reader.read(), aborted])
+      : reader.read());
+    signal?.throwIfAborted();
+    return next;
+  };
+  let ended = false;
+  let terminalFailure: { error: unknown } | undefined;
+  try {
+    for (;;) {
+      const next = await read();
+      if (next.done) {
+        ended = true;
+        break;
+      }
+      if (next.value.type === 'error' && shouldFailover(next.value.error)) {
+        throw next.value.error;
+      }
+      const metadata = STREAM_METADATA_PARTS.has(next.value.type ?? '');
+      if (metadata && buffered.length >= MAX_LEADING_STREAM_METADATA_PARTS) {
+        throw new Error('Model stream exceeded its pre-output metadata limit');
+      }
+      buffered.push(next.value);
+      // Text, reasoning and tool parts commit this provider. Never replay them.
+      if (!metadata) break;
+    }
+  } catch (error) {
+    dispose();
+    void cancel(error).catch(() => undefined);
+    if (signal?.aborted || shouldFailover(error)) throw error;
+    // A terminal provider failure must keep the SDK's original stream channel.
+    terminalFailure = { error };
+  }
+
+  let index = 0;
+  return {
+    ...result,
+    stream: new ReadableStream<StreamPart>(
+      {
+        async pull(controller) {
+          try {
+            signal?.throwIfAborted();
+            if (index < buffered.length) {
+              controller.enqueue(buffered[index++]);
+              return;
+            }
+            if (terminalFailure) throw terminalFailure.error;
+            const next = ended ? { done: true as const } : await read();
+            if (next.done) {
+              dispose();
+              controller.close();
+            } else {
+              controller.enqueue(next.value);
+            }
+          } catch (error) {
+            dispose();
+            void cancel(error).catch(() => undefined);
+            controller.error(error);
+          }
+        },
+        cancel(reason) {
+          dispose();
+          return cancel(reason);
+        },
+      },
+      { highWaterMark: 0 }
+    ),
+  };
+}
+
 export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
   input: CreditFailoverInput<MODEL>
 ): MODEL {
@@ -150,13 +297,20 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
   const shouldFailover =
     input.shouldFailover ??
     ((error: unknown) =>
-      (isProviderCreditError(error) || isStreamStallError(error)) &&
+      (isProviderCreditError(error) ||
+        isStreamStallError(error) ||
+        isModelUnavailableError(error)) &&
       !isAbortError(error));
   const emit = input.onFailover ?? logFailover;
 
   async function run<RESULT>(
-    invoke: (model: FailoverCapableModel) => PromiseLike<RESULT>
+    invoke: (
+      model: FailoverCapableModel,
+      replayable: boolean
+    ) => PromiseLike<RESULT>,
+    signal?: AbortSignal
   ): Promise<RESULT> {
+    signal?.throwIfAborted();
     const fallbackModel = secondary.model;
     if (fallbackModel && creditBreakerOpen(primary.name, now())) {
       emit({
@@ -167,16 +321,19 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
         reason: 'breaker',
       });
       if (input.served) input.served.provider = secondary.name;
-      return invoke(fallbackModel);
+      return invoke(fallbackModel, false);
     }
     try {
-      const result = await invoke(primary.model);
+      const result = await invoke(primary.model, Boolean(fallbackModel));
       if (input.served) input.served.provider = primary.name;
       return result;
     } catch (error) {
+      signal?.throwIfAborted();
       if (!fallbackModel || !shouldFailover(error)) throw error;
       const credit = isProviderCreditError(error);
-      if (credit) creditBreaker.set(primary.name, now() + BREAKER_MS);
+      if (credit || isModelUnavailableError(error)) {
+        creditBreaker.set(primary.name, now() + BREAKER_MS);
+      }
       emit({
         kind: 'ai-failover',
         label: input.label,
@@ -184,7 +341,7 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
         to: secondary.name,
         reason: credit ? 'credit' : 'error',
       });
-      const result = await invoke(fallbackModel);
+      const result = await invoke(fallbackModel, false);
       if (input.served) input.served.provider = secondary.name;
       return result;
     }
@@ -196,7 +353,16 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
       value: (options: never) => run(model => model.doGenerate(options)),
     },
     doStream: {
-      value: (options: never) => run(model => model.doStream(options)),
+      value: (options: never) => {
+        const signal = (options as { abortSignal?: AbortSignal }).abortSignal;
+        return run(async (model, replayable) => {
+          const result = await model.doStream(options);
+          // The secondary is already terminal: preserve its SDK error channel.
+          return replayable
+            ? prepareStreamResult(result, shouldFailover, signal)
+            : result;
+        }, signal);
+      },
     },
   });
   return wrapped;

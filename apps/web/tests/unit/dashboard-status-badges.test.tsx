@@ -93,7 +93,7 @@ describe('dashboard status badge semantic ownership', () => {
     expect(contractSource).toContain('text-success');
     expect(contractSource).toContain('text-warning');
     expect(contractSource).toContain('text-error');
-    expect(contractSource).toContain('text-info');
+    expect(contractSource).toContain('text-accent-text');
     expect(contractSource).toContain('text-tertiary-token');
     expect(contractSource).toContain('text-secondary-token');
   });

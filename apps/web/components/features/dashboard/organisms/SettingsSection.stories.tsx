@@ -1,7 +1,8 @@
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RenderedFamily } from '@/.storybook/rendered-family';
-import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsGroup } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsRow } from '@/components/molecules/settings/SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
 const meta = {
@@ -22,17 +23,15 @@ const meta = {
     ),
   ],
   args: {
-    id: 'audience',
-    title: 'Audience & Tracking',
-    description: 'Fan verification, opt-ins, and tracking.',
+    id: 'audience-tracking',
+    title: 'Audience & tracking',
     children: (
-      <SettingsPanel
-        title='Audience verification'
-        description='Control whether new fans must confirm their email.'
-        bodyClassName='px-4 py-4 sm:px-5'
-      >
-        <p className='text-app text-secondary-token'>Settings content</p>
-      </SettingsPanel>
+      <SettingsGroup title='Audience verification'>
+        <SettingsRow
+          title='Double opt-in verification'
+          description='New fans confirm their email before notifications begin.'
+        />
+      </SettingsGroup>
     ),
   },
 } satisfies Meta<typeof SettingsSection>;

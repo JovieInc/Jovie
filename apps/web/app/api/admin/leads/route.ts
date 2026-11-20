@@ -8,10 +8,15 @@ import {
   ilike,
   or,
 } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
-import { leads } from '@/lib/db/schema/leads';
+import { type LeadSignalSnapshot, leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
 import {
   captureError,
@@ -20,8 +25,13 @@ import {
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
+import {
+  matchObservedPage,
+  type ObservedPublicLinkPage,
+  observePublicLinkPage,
+  publicPageSignalSnapshot,
+} from '@/lib/leads/public-link-observation';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
   leadListQuerySchema,
@@ -109,23 +119,7 @@ async function insertLeadWithLegacyFallback(seed: {
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
-export async function GET(request: NextRequest) {
-  // Claim tokens require privileged proof; authorization must never be cached
-  // across explicit relock or session revocation.
-  const entitlements = await getOvieOperatorEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler({ request }: OperatorRouteInput) {
   try {
     const params = Object.fromEntries(request.nextUrl.searchParams);
     const query = leadListQuerySchema.parse(params);
@@ -254,6 +248,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = defineRoute(
+  {
+    route: '/api/admin/leads',
+    // Claim tokens require privileged proof; authorization must never be cached
+    // across explicit relock or session revocation.
+    access: operatorAccess(),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
+
 type LeadProcessResult = {
   url: string;
   status: 'created' | 'duplicate' | 'invalid';
@@ -261,7 +266,8 @@ type LeadProcessResult = {
 };
 
 async function insertLeadOrFallback(
-  seed: Awaited<ReturnType<typeof seedLeadFromUrl>>
+  seed: Awaited<ReturnType<typeof seedLeadFromUrl>>,
+  snapshot: LeadSignalSnapshot | null
 ): Promise<string | null> {
   if (!seed) return null;
   try {
@@ -271,11 +277,24 @@ async function insertLeadOrFallback(
         linktreeHandle: seed.handle,
         linktreeUrl: seed.normalizedUrl,
         discoverySource: 'manual',
-        hasSpotifyLink: seed.hasSpotifyLink,
+        hasSpotifyLink:
+          seed.hasSpotifyLink || Boolean(snapshot?.hasSpotifyLink),
         spotifyUrl: seed.spotifyUrl,
-        hasInstagram: seed.hasInstagram,
+        hasInstagram: seed.hasInstagram || Boolean(snapshot?.hasInstagram),
         instagramHandle: seed.instagramHandle,
         musicToolsDetected: seed.kind === 'apple_music' ? ['apple_music'] : [],
+        ...(snapshot
+          ? {
+              signalSnapshot: snapshot,
+              sourcePlatform: snapshot.sourcePlatform,
+              sourceUrl: snapshot.publicPage?.url,
+              sourceHandle: snapshot.publicPage?.handle,
+              allLinks: snapshot.allLinks,
+              hasTrackingPixels: snapshot.hasTrackingPixels,
+              displayName: snapshot.publicPage?.displayName,
+              bio: snapshot.publicPage?.bio,
+            }
+          : {}),
       })
       .returning({ id: leads.id });
     return inserted?.id ?? null;
@@ -291,7 +310,8 @@ async function insertLeadOrFallback(
 }
 
 async function processLeadUrl(
-  url: string
+  url: string,
+  pages: readonly ObservedPublicLinkPage[]
 ): Promise<{ result: LeadProcessResult; leadId: string | null }> {
   const seed = seedLeadFromUrl(url);
   if (!seed) {
@@ -311,7 +331,13 @@ async function processLeadUrl(
     return { result: { url, status: 'duplicate' }, leadId: null };
   }
 
-  const leadId = await insertLeadOrFallback(seed);
+  const observed =
+    matchObservedPage(seed.normalizedUrl, pages) ??
+    matchObservedPage(url, pages);
+  const leadId = await insertLeadOrFallback(
+    seed,
+    observed ? publicPageSignalSnapshot(observed) : null
+  );
   const result: LeadProcessResult = leadId
     ? { url, status: 'created' }
     : { url, status: 'invalid', reason: 'Insert failed' };
@@ -322,21 +348,7 @@ async function processLeadUrl(
  * POST /api/admin/leads — Manual URL submission (single or batch).
  * Inserts new leads as 'discovered', then triggers qualification.
  */
-export async function POST(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function postHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads',
@@ -353,8 +365,21 @@ export async function POST(request: NextRequest) {
 
     // Deduplicate URLs to prevent TOCTOU race on parallel insert
     const uniqueUrls = [...new Set(validated.data.urls)];
+    const observedAt = new Date().toISOString();
+    const pages = (validated.data.pages ?? []).flatMap(page => {
+      const observed = observePublicLinkPage({
+        url: page.url,
+        displayName: page.displayName,
+        bio: page.bio,
+        text: page.text,
+        links: page.links,
+        hasTrackingPixels: page.hasTrackingPixels,
+        observedAt,
+      });
+      return observed ? [observed] : [];
+    });
     const urlResults = await mapConcurrent(uniqueUrls, 5, async url =>
-      processLeadUrl(url)
+      processLeadUrl(url, pages)
     );
 
     const results: LeadProcessResult[] = [];
@@ -393,3 +418,12 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/leads',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);

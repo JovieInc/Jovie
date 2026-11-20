@@ -11,7 +11,10 @@ import {
 const NEW_CHAT_DRAFT_KEY = '__new__';
 const DRAFT_CACHE_LIMIT = 50;
 
-const draftByConversationId = new Map<string, string>();
+const draftByConversationId = new Map<
+  string,
+  { text: string; scope?: string }
+>();
 const summerRecoveryByContext = new Map<string, SummerTurnRecovery>();
 
 export interface ComposerRecoveryContext {
@@ -102,18 +105,32 @@ function pruneDraftCache(): void {
   }
 }
 
+/** Ownership for entity-enriched drafts; ordinary drafts retain their existing behavior. */
+export function currentComposerDraftScope(): string {
+  return JSON.stringify([getCacheGeneration(), getCacheScope()]);
+}
+
+export function readComposerDraftScope(
+  conversationId: string | null | undefined
+): string | undefined {
+  const scope = draftByConversationId.get(draftKey(conversationId))?.scope;
+  return scope === currentComposerDraftScope() ? scope : undefined;
+}
+
 /** Persist the in-progress composer text for a conversation thread. */
 export function saveComposerDraft(
   conversationId: string | null | undefined,
-  value: string
+  value: string,
+  scope?: string
 ): void {
+  if (scope && scope !== currentComposerDraftScope()) return;
   const key = draftKey(conversationId);
   const nextValue = trimDraft(value);
   if (nextValue.length === 0) {
     draftByConversationId.delete(key);
     return;
   }
-  draftByConversationId.set(key, nextValue);
+  draftByConversationId.set(key, { text: nextValue, scope });
   pruneDraftCache();
 }
 
@@ -121,7 +138,9 @@ export function saveComposerDraft(
 export function readComposerDraft(
   conversationId: string | null | undefined
 ): string {
-  return draftByConversationId.get(draftKey(conversationId)) ?? '';
+  const saved = draftByConversationId.get(draftKey(conversationId));
+  if (saved?.scope && saved.scope !== currentComposerDraftScope()) return '';
+  return saved?.text ?? '';
 }
 
 /** Remove a saved composer draft after a successful send or command commit. */

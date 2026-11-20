@@ -14,25 +14,34 @@
 // Pure Node, zero npm dependencies. Abuse caps live in CAPS below.
 
 import { existsSync, readFileSync } from 'node:fs';
+import {
+  CAPS,
+  ghApi,
+  pruneDeletions,
+  RateLimitDeferredError,
+  selectBackfillRuns,
+} from './ci-timing-github.mjs';
+
+export {
+  CAPS,
+  createWritePacer,
+  ghApi,
+  isBackfillRun,
+  isCollectableRun,
+  pruneDeletions,
+  selectBackfillRuns,
+  WRITE_SPACING_MS,
+} from './ci-timing-github.mjs';
+
+import { parseTurboCacheLog } from './turbo-cache-stats.mjs';
 
 export const SCHEMA_VERSION = 1;
 
-/** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, dataBranch: string, dataDir: string }} */
-export const CAPS = {
-  maxJobPages: 10,
-  jobsPerPage: 100,
-  maxQueueRunsPages: 1,
-  maxRowsPerRunEvent: 1500,
-  maxBackfillRuns: 20,
-  backfillWindowMinutes: 15,
-  retentionDays: 30,
-  maxPruneDeletes: 5000,
-  dataBranch: 'ci-timing-data',
-  dataDir: 'data',
-};
-
-/** Events worth a row; everything else (schedule, workflow_dispatch, repository) is noise. */
-const COLLECTED_EVENTS = new Set(['pull_request', 'merge_group', 'push']);
+/** Workflows whose jobs run turbo; only their logs are read for turbo_cache rows. */
+const TURBO_WORKFLOWS = new Set(['CI', 'Source Validation']);
+/** Job names that run a turbo task (matrix suffixes allowed). */
+const TURBO_JOB_RE =
+  /^(Source Validation|Exact-head Coverage|Unit Tests|Build \+ Layout|Visual Snapshot Compare|ci-fast)/;
 
 const QUEUE_BRANCH_RE = /(?:^|\/)pr-(\d+)-/;
 
@@ -192,6 +201,54 @@ export function queueEventRow({ run, mergedAt, queueDepth, collectedAt }) {
 }
 
 /**
+ * One turbo_cache row per sampled job: which remote cache the job selected
+ * and how many turbo tasks it replayed from cache.
+ * @param {{ run: any, job: any, log: string, collectedAt: string }} args
+ */
+export function turboCacheRow({ run, job, log, collectedAt }) {
+  const stats = parseTurboCacheLog(log);
+  return {
+    schema_version: SCHEMA_VERSION,
+    row_type: 'turbo_cache',
+    pr_number:
+      (run.pull_requests && run.pull_requests.length > 0
+        ? run.pull_requests[0].number
+        : null) ?? parseQueuePrNumber(run.head_branch),
+    head_sha: job.head_sha ?? run.head_sha,
+    run_id: run.id,
+    run_attempt: job.run_attempt ?? run.run_attempt,
+    job_id: job.id,
+    job_name: job.name,
+    workflow_name: run.name,
+    event: run.event,
+    backend: stats.backend ?? (stats.remoteDisabled ? 'none' : null),
+    role: stats.role,
+    turbo_runs: stats.turboRuns,
+    tasks_cached: stats.tasksCached,
+    tasks_total: stats.tasksTotal,
+    collected_at: collectedAt,
+  };
+}
+
+/**
+ * Sampled jobs whose logs are read for turbo_cache rows.
+ * @param {any} run
+ * @param {any[]} jobs
+ */
+export function turboLogJobs(run, jobs) {
+  if (!TURBO_WORKFLOWS.has(run.name)) return [];
+  if (Number(run.id) % CAPS.turboCacheSampleModulo !== 0) return [];
+  return jobs
+    .filter(
+      job =>
+        TURBO_JOB_RE.test(job.name ?? '') &&
+        job.conclusion !== 'skipped' &&
+        job.conclusion !== 'cancelled'
+    )
+    .slice(0, CAPS.maxTurboLogJobsPerRun);
+}
+
+/**
  * @param {Array<any>} rows
  */
 export function toNdjson(rows) {
@@ -199,44 +256,55 @@ export function toNdjson(rows) {
 }
 
 /**
- * Fetch a paginated collection endpoint, bounded by maxPages.
+ * Fetch a paginated collection endpoint, bounded by maxPages. Pages advance
+ * until the fetched item count reaches `total_count` or a short page marks
+ * the end — 101 jobs therefore fetch 2 pages, not 10.
  * @param {(path: string) => Promise<any>} fetchJson
  * @param {string} path
  * @param {number} maxPages
  */
 async function pagedJson(fetchJson, path, maxPages) {
   const first = await fetchJson(path);
-  const firstItems = /** @type {any[]} */ (
-    first.jobs ?? first.workflow_runs ?? first.items ?? []
-  );
-  const total =
-    typeof first.total_count === 'number'
-      ? first.total_count
-      : firstItems.length;
   const pages = [first];
-  const itemsPerPage = firstItems.length || CAPS.jobsPerPage;
-  const maxPossible = maxPages * itemsPerPage;
-  for (
-    let page = 2;
-    page <= maxPages &&
-    firstItems.length < total &&
-    pages.length * itemsPerPage < maxPossible;
-    page += 1
-  ) {
+  const items = [
+    .../** @type {any[]} */ (
+      first.jobs ?? first.workflow_runs ?? first.items ?? []
+    ),
+  ];
+  const total =
+    typeof first.total_count === 'number' ? first.total_count : items.length;
+  const itemsPerPage = items.length || CAPS.jobsPerPage;
+  for (let page = 2; page <= maxPages && items.length < total; page += 1) {
     const sep = path.includes('?') ? '&' : '?';
-    pages.push(await fetchJson(`${path}${sep}page=${page}`));
+    const next = await fetchJson(`${path}${sep}page=${page}`);
+    const nextItems = /** @type {any[]} */ (
+      next.jobs ?? next.workflow_runs ?? next.items ?? []
+    );
+    pages.push(next);
+    items.push(...nextItems);
+    // A short page is the last one even when total_count disagrees.
+    if (nextItems.length < itemsPerPage) break;
   }
-  const items = pages.flatMap(p => p.jobs ?? p.workflow_runs ?? p.items ?? []);
   return { items, pagesFetched: pages.length, total };
 }
 
 /**
- * Collect all rows for one workflow run: one job_attempt row per job attempt
- * plus (merge_group only) one queue_event row with queue depth and merge time.
- * @param {{ run: any, fetchJson: (path: string) => Promise<any>, collectedAt: string }} args
+ * Collect all rows for one workflow run: one job_attempt row per job attempt,
+ * (merge_group only) one queue_event row with queue depth and merge time, and
+ * (sampled runs, when fetchText is given) one turbo_cache row per turbo job.
+ * @param {{ run: any, fetchJson: (path: string) => Promise<any>, fetchText?: (path: string) => Promise<string>, collectedAt: string }} args
  */
-export async function collectRunRows({ run, fetchJson, collectedAt }) {
-  const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/jobs?per_page=${CAPS.jobsPerPage}&filter_run_attempt=${run.run_attempt}`;
+export async function collectRunRows({
+  run,
+  fetchJson,
+  fetchText,
+  collectedAt,
+}) {
+  // The attempt-scoped jobs endpoint is the only race-free way to read a
+  // rerun's jobs: the general /runs/{id}/jobs URL serves the latest attempt
+  // and can mix two attempts' jobs when a rerun starts mid-collection.
+  const attempt = Number(run.run_attempt) || 1;
+  const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=${CAPS.jobsPerPage}`;
   const {
     items: jobs,
     pagesFetched,
@@ -259,6 +327,22 @@ export async function collectRunRows({ run, fetchJson, collectedAt }) {
     rows = rows.concat([
       queueEventRow({ run, mergedAt, queueDepth: depth, collectedAt }),
     ]);
+  }
+
+  if (fetchText) {
+    for (const job of turboLogJobs(run, jobs)) {
+      let log = '';
+      try {
+        log = await fetchText(
+          `/repos/{owner}/{repo}/actions/jobs/${job.id}/logs`
+        );
+      } catch (error) {
+        // A missing or expired log is a gap in the sample, not a failure.
+        if (error instanceof RateLimitDeferredError) throw error;
+        continue;
+      }
+      rows.push(turboCacheRow({ run, job, log, collectedAt }));
+    }
   }
 
   return {
@@ -299,19 +383,6 @@ async function collectMergedAt(fetchJson, run) {
   return pr.merged && pr.merged_at ? pr.merged_at : null;
 }
 
-/**
- * Filter a workflow-run payload down to collectable shape.
- * @param {any} run
- */
-export function isCollectableRun(run) {
-  return Boolean(
-    run &&
-      run.id &&
-      COLLECTED_EVENTS.has(run.event) &&
-      run.status === 'completed'
-  );
-}
-
 // ---------------------------------------------------------------------------
 // CLI (thin): --write-data / --prune. Runs inside GitHub Actions with
 // GITHUB_TOKEN. All calls go through packages/api-client runGh (the gh binary
@@ -325,51 +396,6 @@ function repoCoords() {
   const [owner, repo] = slug.split('/');
   return { owner, repo };
 }
-
-/**
- * GitHub API through the client layer (packages/api-client runGh -> gh api).
- * `path` may contain the literal {owner}/{repo} placeholders, expanded from
- * GITHUB_REPOSITORY. Priority `report`: the collector runs on the clock and
- * must never starve merge/fix traffic.
- * @param {{ owner: string, repo: string }} coords
- * @param {string} method
- * @param {string} path
- * @param {any} [body]
- */
-async function ghApi(coords, method, path, body) {
-  const { runGh } = await import('../../packages/api-client/gh.ts');
-  const resolved = path
-    .replace('{owner}', coords.owner)
-    .replace('{repo}', coords.repo);
-  const args = ['api'];
-  if (method !== 'GET') args.push('-X', method);
-  let cleanup = null;
-  if (body !== undefined) {
-    const { mkdtempSync, writeFileSync: wf, rmSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
-    const dir = mkdtempSync(join(tmpdir(), 'ci-timing-'));
-    const file = join(dir, 'body.json');
-    wf(file, JSON.stringify(body));
-    args.push('--input', file);
-    cleanup = () => rmSync(dir, { recursive: true, force: true });
-  }
-  try {
-    const result = await runGh(args, { priority: 'report' });
-    if (result.deferred) throw new RateLimitDeferredError(result.stderr);
-    if (result.code !== 0) {
-      throw new Error(
-        `API call ${resolved} -> ${result.code}: ${result.stderr.slice(0, 300)}`
-      );
-    }
-    return result.stdout ? JSON.parse(result.stdout) : null;
-  } finally {
-    if (cleanup) cleanup();
-  }
-}
-
-/** Raised when the client layer deferred the call on a rate limit. */
-class RateLimitDeferredError extends Error {}
 
 /**
  * One no-parent-change data-branch commit via the git-data REST API.
@@ -460,31 +486,39 @@ async function modeWriteData() {
   const coords = repoCoords();
   const triggerRun = eventPayload().workflow_run;
 
-  // Overlap backfill: the collector's concurrency group is latest-wins, so a
-  // burst can cancel an older pending collection. Re-scan recently completed
-  // runs; per-run files make re-collection an idempotent overwrite.
-  const windowStart = new Date(
-    Date.now() - CAPS.backfillWindowMinutes * 60_000
-  ).toISOString();
-  const recent = await ghApi(
-    coords,
-    'GET',
-    `/repos/{owner}/{repo}/actions/runs?status=completed&created=>=${encodeURIComponent(windowStart)}&per_page=${CAPS.jobsPerPage}`
-  );
+  // Overlap backfill (best-effort): the collector's concurrency group is
+  // latest-wins, so a burst can cancel an older pending collection. Re-scan
+  // recently completed runs of the measured workflows (CI + Source
+  // Validation, filtered BEFORE the cap); per-run files make re-collection
+  // an idempotent overwrite. This does not recover every dropped pending
+  // run — see selectBackfillRuns.
+  const windowStartMs = Date.now() - CAPS.backfillWindowMinutes * 60_000;
+  const listedRuns = [];
+  const backfillListPages = 3;
+  for (let page = 1; page <= backfillListPages; page += 1) {
+    const list = await ghApi(
+      coords,
+      'GET',
+      `/repos/{owner}/{repo}/actions/runs?status=completed&per_page=${CAPS.jobsPerPage}&page=${page}`
+    );
+    const batch = /** @type {any[]} */ (list?.workflow_runs ?? []);
+    listedRuns.push(...batch);
+    if (batch.length < CAPS.jobsPerPage) break;
+  }
   const runsById = new Map(
-    /** @type {any[]} */ (recent.workflow_runs ?? [])
-      .filter(run => isCollectableRun(run))
-      .slice(0, CAPS.maxBackfillRuns)
-      .map(run => [run.id, run])
+    selectBackfillRuns({ triggerRun, listedRuns, windowStartMs }).map(run => [
+      `${run.id}:${run.run_attempt}`,
+      run,
+    ])
   );
-  if (isCollectableRun(triggerRun)) runsById.set(triggerRun.id, triggerRun);
 
   const files = /** @type {Array<{ path: string, content: string }>} */ ([]);
   let truncatedRuns = 0;
-  for (const run of [...runsById.values()].slice(0, CAPS.maxBackfillRuns)) {
+  for (const run of runsById.values()) {
     const { rows, truncated } = await collectRunRows({
       run,
       fetchJson: path => ghApi(coords, 'GET', path),
+      fetchText: path => ghApi(coords, 'GET', path, undefined, { raw: true }),
       collectedAt: new Date().toISOString(),
     });
     if (rows.length === 0) continue;
@@ -536,37 +570,29 @@ async function modePrune() {
     `/repos/{owner}/{repo}/git/trees/${head.tree.sha}?recursive=1`
   );
   const cutoff = Date.now() - CAPS.retentionDays * 24 * 60 * 60_000;
-  const blobs = /** @type {any[]} */ (tree.tree ?? []).filter(
-    entry => entry.type === 'blob'
-  );
-  const stale = blobs
-    .filter(entry => {
-      const t = ms(
-        `${entry.path.slice(CAPS.dataDir.length + 1, CAPS.dataDir.length + 11)}T00:00:00Z`
-      );
-      return t !== null && t < cutoff;
-    })
-    .slice(0, CAPS.maxPruneDeletes);
+  const stale = pruneDeletions(tree, { cutoffMs: cutoff });
+  if (stale === null) {
+    console.log(
+      'ci-timing-collector: tree listing truncated, skipping prune (fail-safe)'
+    );
+    return;
+  }
   if (stale.length === 0) {
     console.log('ci-timing-collector: prune found nothing past retention');
     return;
   }
 
-  const kept = blobs
-    .filter(entry => !stale.some(s => s.path === entry.path))
-    .map(entry => ({
-      path: entry.path,
-      mode: '100644',
-      type: 'blob',
-      sha: entry.sha,
-    }));
+  // Explicit null-SHA deletions on top of the head tree: base_tree carries
+  // every surviving path forward, and a sha: null entry REMOVES the path.
+  // (Overlaying kept entries onto base_tree was a no-op — the stale blobs
+  // stayed.) Deletions are constrained to data/YYYY-MM-DD/ in pruneDeletions.
   const newTree = await ghApi(
     coords,
     'POST',
     `/repos/{owner}/{repo}/git/trees`,
     {
       base_tree: head.tree.sha,
-      tree: kept,
+      tree: stale,
     }
   );
   const commit = await ghApi(

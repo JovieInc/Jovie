@@ -64,6 +64,18 @@ describe('DemoShell', () => {
     expect(screen.getByText('Demo content')).toBeInTheDocument();
   });
 
+  it('sends the sidebar sign-up into the /start flow', () => {
+    render(
+      <DemoShell activeTab='inbox' onTabChange={vi.fn()}>
+        <div>Demo content</div>
+      </DemoShell>
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Sign up for Jovie' })
+    ).toHaveAttribute('href', '/start');
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource('components/features/demo/DemoShell.tsx');
     expect(source).toContain("@/components/organisms/sidebar'");
@@ -73,5 +85,20 @@ describe('DemoShell', () => {
   it('inherits --sidebar-width from the design-system token, not a px override', () => {
     const source = readWebSource('components/features/demo/DemoShell.tsx');
     expect(source).not.toMatch(/--sidebar-width['"]?\s*:\s*['"]?\d+px/);
+  });
+});
+
+describe('DemoShell workspace selector name (JOV-8873)', () => {
+  it('names the workspace selector with visible text included', () => {
+    render(
+      <DemoShell activeTab='inbox' onTabChange={vi.fn()}>
+        <div>Demo content</div>
+      </DemoShell>
+    );
+    const label = screen.getByText('Open Workspace Selector:');
+    expect(label).toHaveClass('sr-only');
+    const trigger = label.closest('button');
+    expect(trigger).not.toBeNull();
+    expect(trigger).not.toHaveAttribute('aria-label');
   });
 });

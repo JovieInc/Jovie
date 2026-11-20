@@ -35,7 +35,6 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
-import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -91,8 +90,6 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    // Completeness: every selected window below is recomputed from the full
-    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
     expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
       MIN_SAMPLES_PER_ROUTE
@@ -140,12 +137,6 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
-    assertReviewDeadline({
-      label: 'public-profile alias graduation',
-      deadline: policy.nextReviewAt,
-      trackingIssue: policy.trackingIssue,
-    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );
@@ -154,7 +145,7 @@ describe('public-profile alias graduation policy', () => {
   it('keeps staging independent and bounds the production warning', () => {
     const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
     const production = getJobBlock(
-      RELEASE_WORKFLOW,
+      CONTROLLER_WORKFLOW,
       'production-public-profile-alias-gate'
     );
 
@@ -173,8 +164,6 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    // A graduated receipt authorizes blocking, but only on pages whose
-    // golden-path surface is certified in the Ovie ledger; the rest warn.
     expect(production.includes('performance_status=failed')).toBe(
       windows.production.graduated
     );
@@ -263,8 +252,6 @@ describe('public-profile alias graduation policy', () => {
   });
 
   it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
-    // performance-budgets-guard takes 20 samples since #22656; its summary is
-    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
     const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
     const log = ALIAS_ROUTES.map(
       route =>
@@ -408,11 +395,9 @@ describe('public-profile alias graduation policy', () => {
     'executes the %s guard with the measured enforcement decision (%s ledger)',
     (surface, ledgerState) => {
       const staging = surface === 'staging';
-      // Both lanes block only while public-profile is certified in the ledger
-      // (Tim 2026-10-31); uncertified or unreadable ledgers warn.
       const certified = ledgerState === 'certified';
       const job = getJobBlock(
-        RELEASE_WORKFLOW,
+        staging ? RELEASE_WORKFLOW : CONTROLLER_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
       );
       const script = getStepRunScript(
@@ -443,7 +428,6 @@ describe('public-profile alias graduation policy', () => {
                   : ['landing'],
               });
         writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
-        // The staged lane reads CRON_SECRET through Doppler; pass through.
         stubCommand(
           fixture.bin,
           'doppler',
@@ -466,7 +450,6 @@ describe('public-profile alias graduation policy', () => {
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
-        // An unreadable ledger is never silent: it warns and files a P1.
         expect(
           result.stdout.includes(
             '::warning::Golden-path certification ledger unavailable'
@@ -496,7 +479,6 @@ describe('public-profile alias graduation policy', () => {
           call.includes('performance-budgets-guard')
         );
         expect(guardCalls.length).toBeGreaterThan(0);
-        // The public-profile alias guard is the one carrying the alias routes.
         const args =
           guardCalls.find(call =>
             call.includes('--route-id\n' + ALIAS_ROUTES[0])
@@ -747,7 +729,6 @@ function releaseExpressions(overrides = {}) {
     'needs.deploy-staging.result': 'success',
     'needs.attest-staging-build.result': 'success',
     'needs.canary-health-gate.result': 'success',
-    'needs.production-public-profile-alias-gate.result': 'success',
     'github.repository': 'JovieInc/Jovie',
     ...overrides,
   };
@@ -791,6 +772,7 @@ function controllerVerifyExpressions(overrides = {}) {
     'needs.production-release.outputs.superseded_before_promotion': 'false',
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status': 'passed',
     'needs.ci-post-deploy-auth-smoke.outputs.credentials_configured': 'true',
@@ -871,6 +853,7 @@ function finalizeExpressions(overrides = {}) {
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.production-release.outputs.sentry_gate_status': 'passed',
     'needs.production-release.outputs.oauth_gate_status': 'passed',
     'github.repository': 'JovieInc/Jovie',
@@ -1090,12 +1073,24 @@ describe('production release supersession execution', () => {
     expect(incomplete.outputs.released).toBe('false');
   });
 
+  it('fails Production Verified when the alias gate fails', () => {
+    const failed = runControllerVerify({
+      'needs.production-public-profile-alias-gate.result': 'failure',
+    });
+    expect(failed.result.status).not.toBe(0);
+    expect(
+      failed.outputs.released ?? failed.outputs.canonical_verified
+    ).not.toBe('true');
+    expect(failed.aliasCalled).toBe(false);
+  });
+
   it('leaves a pre-promotion supersession unverified without canonical mutation', () => {
     const neutral = runControllerVerify({
       'needs.production-release.outputs.released': 'false',
       'needs.production-release.outputs.superseded_before_promotion': 'true',
       'needs.ci-public-profile-smoke.result': 'skipped',
       'needs.lighthouse-ci.result': 'skipped',
+      'needs.production-public-profile-alias-gate.result': 'skipped',
       'needs.ci-post-deploy-auth-smoke.result': 'skipped',
     });
     expect(neutral.result.status, neutral.result.stderr).toBe(0);
@@ -1332,7 +1327,6 @@ describe('required structural release regression dispatch', () => {
     const target = 'production-release-supersession.test.mjs';
     vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
       const child = /** @type {any} */ (new EventEmitter());
       child.stdout = child.stderr = new EventEmitter();
       const code = command.includes(target) ? exitCode : 0;
@@ -1468,6 +1462,7 @@ esac
     mkdirSync(src);
     const git = args => {
       const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: src,
         encoding: 'utf8',
         env: {

@@ -8,6 +8,8 @@ interface Scenario {
   sse?: boolean;
   titles?: boolean;
   noCandidates?: boolean;
+  prepStatus?: string;
+  claimBody?: string;
 }
 
 const TOOLS = [
@@ -33,7 +35,9 @@ function fakeMcp(scenario: Scenario = {}) {
     init?: RequestInit
   ) => {
     if (init?.method !== 'POST') {
-      return new Response('ok', { status: scenario.claimStatus ?? 200 });
+      return new Response(scenario.claimBody ?? 'ok', {
+        status: scenario.claimStatus ?? 200,
+      });
     }
     const body = JSON.parse(String(init.body));
     const { method, params, id } = body;
@@ -89,7 +93,7 @@ function fakeMcp(scenario: Scenario = {}) {
     }
     if (params?.name === 'release.prepare_launch')
       return args.release_url
-        ? tool({ status: 'launch_draft_ready' })
+        ? tool({ status: scenario.prepStatus ?? 'launch_draft_ready' })
         : tool({
             status: 'error',
             code: 'INVALID_INPUT',
@@ -122,17 +126,21 @@ describe('runCert', () => {
     );
   });
 
-  it('passes the happy path, tags acquisition and reads SSE framing', async () => {
+  it('keeps transport success distinct from an unverified claim outcome', async () => {
     const { fetchImpl, seen } = fakeMcp({
       claimUrl: 'https://jov.ie/claim/x',
       sse: true,
       titles: true,
     });
     const { receipt, exitCode } = await runCert({ ...base, fetchImpl });
-    expect(exitCode).toBe(0);
-    expect(receipt.ok).toBe(true);
+    expect(exitCode).toBe(1);
+    expect(receipt.ok).toBe(false);
     expect(receipt.checks.filter(c => c.status === 'FAIL')).toEqual([]);
-    expect(receipt.passed).toBe(receipt.total);
+    expect(receipt.passed).toBeLessThan(receipt.total);
+    expect(statusOf(receipt.checks, 'claim outcome persisted')).toBe('SKIP');
+    expect(statusOf(receipt.checks, 'run-owned fixtures cleaned up')).toBe(
+      'SKIP'
+    );
     expect(receipt.at).toBe('2026-01-01T00:00:00.000Z');
     expect(receipt.toolsListHash).toMatch(/^[0-9a-f]{64}$/);
     const search = seen.find(s => s.name === 'artist.search_or_import');
@@ -142,6 +150,33 @@ describe('runCert', () => {
     expect(
       receipt.latency['artist.search_or_import']?.count
     ).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each([
+    'This link has expired',
+    'Sign in to continue',
+    'Something went wrong',
+  ])('cannot certify an HTTP 200 claim page: %s', async claimBody => {
+    const { fetchImpl } = fakeMcp({
+      claimUrl: 'https://jov.ie/claim/x',
+      titles: true,
+      claimBody,
+    });
+    const { receipt, exitCode } = await runCert({ ...base, fetchImpl });
+    expect(exitCode).toBe(1);
+    expect(receipt.ok).toBe(false);
+  });
+
+  it('does not call unfinished launch preparation a completed task', async () => {
+    const { fetchImpl } = fakeMcp({
+      claimUrl: 'https://jov.ie/claim/x',
+      titles: true,
+      prepStatus: 'draft_needs_input',
+    });
+    const { receipt } = await runCert({ ...base, fetchImpl });
+    expect(
+      statusOf(receipt.checks, 'prepare_launch with release_url succeeds')
+    ).toBe('FAIL');
   });
 
   it('reports a missing claim_url and missing titles as FAIL without crashing', async () => {

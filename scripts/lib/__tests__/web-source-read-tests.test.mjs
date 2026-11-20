@@ -8,10 +8,17 @@ import {
   keyMatches,
   pathKeys,
   selectSourceReadTests,
+  sourceReadRunnerArgs,
   sourceReadTests,
 } from '../web-source-read-tests.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('publication source-read uses the CI test budget', () => {
+  const args = sourceReadRunnerArgs(['tests/unit/ci/deploy-workflow.test.ts']);
+  assert.ok(args.includes('--testTimeout=12000'));
+  assert.equal(args.at(-1), 'tests/unit/ci/deploy-workflow.test.ts');
+});
 
 test('path keys keep path literals, join runs, file names and route groups', () => {
   const keys = pathKeys(`

@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   COMPUTED_PROOF_SLOTS,
   type ComputedProofSlotId,
@@ -99,8 +100,7 @@ export interface GoldenPathClaim {
   readonly evidence?: ClaimEvidence;
 }
 
-const HOMEPAGE_COPY = 'apps/web/data/homepageCopy.ts';
-const HOMEPAGE_FAN_STATES_COPY = 'apps/web/data/homepageFanStatesCopy.ts';
+const HOMEPAGE_COPY = 'apps/web/data/homepageEditorialCopy.ts';
 const CHECKOUT_CLIENT =
   'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx';
 const PRESENCE_STEPS = 'apps/web/lib/onboarding/presence-build/execute-step.ts';
@@ -111,7 +111,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Be found. Be understood.',
+    copy: HOMEPAGE_EDITORIAL_COPY.hero.headline,
     nature: 'capability',
     capabilityIds: ['artist-profiles', 'public-profile'],
   },
@@ -120,38 +120,25 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.',
+    copy: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
     nature: 'capability',
-    capabilityIds: [
-      'artist-profiles',
-      'public-profile',
-      'artist-notifications',
-    ],
+    capabilityIds: ['artist-profiles', 'public-profile'],
   },
   {
-    id: 'homepage.fan-states.headline',
-    step: 'homepage',
-    route: '/',
-    source: HOMEPAGE_FAN_STATES_COPY,
-    copy: 'Your profile leads with one clear thing.',
-    nature: 'capability',
-    capabilityIds: ['artist-profiles'],
-  },
-  {
-    id: 'homepage.offer.headline',
+    id: 'homepage.profile.body',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Free to claim. Yours to share.',
+    copy: 'Your profile at jov.ie leads with what matters now: your latest release, your links, and a way for listeners to get updates.',
     nature: 'capability',
-    capabilityIds: ['public-profile'],
+    capabilityIds: ['artist-profiles', 'artist-notifications'],
   },
   {
-    id: 'homepage.offer.smart-links',
+    id: 'homepage.releases.body',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Unlimited smart links',
+    copy: 'Each release gets its own page with listen links for every service',
     nature: 'capability',
     capabilityIds: ['smart-links'],
   },

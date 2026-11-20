@@ -15,6 +15,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
+
+function sourcedSecurityHelpers() {
+  const scanner = readFileSync(
+    resolve(repoRoot, 'scripts/security/scan-secrets.sh'),
+    'utf8'
+  );
+  return [
+    ...scanner.matchAll(
+      /^(?:\.|source) "\$REPO_ROOT\/(scripts\/security\/[^"]+)"/gm
+    ),
+  ].map(match => match[1]);
+}
 const resolverPath = resolve(repoRoot, 'scripts/hooks/resolve-repo-node.sh');
 const pinnedVersion = readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim();
 const gate = readFileSync(
@@ -77,6 +89,7 @@ describe('resolve-repo-node.sh', () => {
         PATH: `${nodeBin}:/usr/bin:/bin`,
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
+        JOVIE_NODE_AUTOFETCH: '0',
       },
     });
     return { nvmRoot, result };
@@ -178,6 +191,10 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
     expect(huskyPrePush).toContain(
       'export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
+    expect(huskyPrePush).toContain(
+      'export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"'
+    );
+    expect(huskyPrePush).not.toMatch(/^JOVIE_PREFLIGHT_JOBS=1$/m);
   });
 
   it('keeps the documented max-workers knob in the verify bundle', () => {
@@ -191,9 +208,8 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
 
   it('wires ssh keepalives into setup so long gates do not SIGPIPE git push', () => {
     // git push holds the ssh receive-pack connection open across the hook;
-    // GitHub closes idle connections (~10 min) and git then dies with exit
-    // 141 right after a long gate. setup.sh must set core.sshCommand
-    // keepalives, and the hook must document why they matter.
+    // GitHub closes idle connections (~10 min) and git then dies with exit 141
+    // after a long gate. setup.sh must set core.sshCommand keepalives; the hook documents why.
     const setupSh = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     expect(setupSh).toContain(
       'ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=10'
@@ -224,6 +240,8 @@ describe('publication range failures', () => {
     const env = {
       PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
       HOME: root,
+      // HOME is the fixture so scanners cannot write into the user home; nvm from the host so older ambient Node still reaches the scan.
+      NVM_DIR: process.env.NVM_DIR ?? resolve(process.env.HOME ?? '', '.nvm'),
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'maintenance.auto',
       GIT_CONFIG_VALUE_0: 'false',
@@ -257,6 +275,8 @@ describe('publication range failures', () => {
       'scripts/hooks/resolve-repo-node.sh',
       'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
+      ...sourcedSecurityHelpers(),
+      'scripts/security/scanner-pins.txt',
       'biome.json',
       '.nvmrc',
     ]) {
@@ -265,10 +285,15 @@ describe('publication range failures', () => {
     }
     for (const file of [
       'scripts/ci-branching-guard.mjs',
+      'scripts/company-guards/size.mjs',
       'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
+      'scripts/lib/projected-tree-budget.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
       'scripts/preflight-changed.mjs',
+      'scripts/hooks/prepush-preflight.mjs',
+      'scripts/hooks/pr-size-local.mjs',
+      'scripts/hooks/company-size-local.sh',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');
@@ -366,6 +391,9 @@ describe('publication range failures', () => {
     expect(f.scanLog()).toContain('trufflehog');
     expect(f.scanLog()).toContain('candidate.txt');
     expect(f.scanLog()).not.toContain('seed.txt');
+    expect(sourcedSecurityHelpers()).toContain(
+      'scripts/security/fetch-scanner.sh'
+    );
   });
 
   it('accepts a verified empty range without confusing it with failed enumeration', () => {
@@ -418,4 +446,55 @@ it('discovers publication behavior tests in CI for source-only guard edits', () 
       'scripts/lib/__tests__/pre-push-gate.test.mjs'
     );
   }
+});
+
+describe('company size inventory', () => {
+  it('checks oversized files even when tracked paths exceed the default child buffer', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'size-inventory-'));
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+    );
+    const git = (args, input) => {
+      const result = spawnSync('git', args, {
+        cwd: root,
+        env,
+        input,
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    try {
+      git(['init', '-q']);
+      const blob = git(['hash-object', '-w', '--stdin'], '');
+      const paths = Array.from(
+        { length: 6000 },
+        (_, index) => `fixture/${index}-${'x'.repeat(185)}.ts`
+      );
+      git(
+        ['update-index', '--index-info'],
+        [...paths, 'grown.ts'].map(file => `100644 ${blob}\t${file}\n`).join('')
+      );
+      expect(paths.join('\n').length).toBeGreaterThan(1024 * 1024);
+      writeFileSync(resolve(root, 'grown.ts'), 'source\n'.repeat(501));
+      const module = new URL('../../company-guards/size.mjs', import.meta.url)
+        .href;
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import {run} from ${JSON.stringify(module)}; console.log(JSON.stringify(run()));`,
+        ],
+        { cwd: root, env, encoding: 'utf8', maxBuffer: 1 << 26 }
+      );
+      expect(result.status, result.stderr.slice(0, 1500)).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        fails: ['grown.ts: 501 lines, over 500 and not baselined'],
+        count: 1,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

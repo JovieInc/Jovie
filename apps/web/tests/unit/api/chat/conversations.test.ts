@@ -376,4 +376,27 @@ describe('POST /api/chat/conversations', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it('returns 400 when body field types are invalid', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
+      profile: { id: 'profile_123' },
+    });
+    hoisted.selectFromMock.mockReturnValueOnce({
+      where: vi.fn().mockResolvedValue([{ value: 5 }]),
+    });
+
+    const { POST } = await import('@/app/api/chat/conversations/route');
+    const request = new Request('http://localhost/api/chat/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 123 }),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe('Invalid request body');
+    expect(hoisted.insertMock).not.toHaveBeenCalled();
+  });
 });

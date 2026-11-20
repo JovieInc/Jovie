@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -10,6 +11,7 @@ import {
   getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -46,9 +48,25 @@ export default async function WaitlistPage() {
   // the local E2E auth bypass for other suites. Keep that synthetic actor from
   // turning this anonymous surface into an authenticated /start redirect.
   if (process.env.PUBLIC_NOAUTH_SMOKE === '1') {
+    // Prod parity for the no-database visual runtime (one front door, Tim,
+    // 2026-11-09): an anonymous visitor with open signup gets the same /start
+    // redirect prod serves, so CI captures and prod ship one journey.
+    // Anonymous resolution is DB-free (the gate returns before any read); a
+    // failed resolve — the E2E auth-bypass actor against the noop capture
+    // database — keeps the landing, so the bypass still cannot turn this
+    // surface into an authenticated /start redirect.
+    const smokeAuth = await resolveUserState({
+      createDbUserIfMissing: false,
+    }).catch(() => null);
+    if (
+      smokeAuth?.state === CanonicalUserState.UNAUTHENTICATED &&
+      !isPublicSignupClosed()
+    ) {
+      redirect(APP_ROUTES.START);
+    }
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }
@@ -60,9 +78,15 @@ export default async function WaitlistPage() {
   }
 
   if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
+    // One front door (Tim, 2026-11-09): with signup open, an anonymous
+    // visitor lands in the /start chat instead of the waitlist shell. The
+    // signed-in pending receipt below is untouched.
+    if (!isPublicSignupClosed()) {
+      redirect(APP_ROUTES.START);
+    }
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <WaitlistPublicLanding signupClosed={isPublicSignupClosed()} />
       </WaitlistRouteWithContract>
     );
   }

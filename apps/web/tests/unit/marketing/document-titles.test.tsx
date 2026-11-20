@@ -14,6 +14,7 @@ import { metadata as instantMerchMetadata } from '@/app/(marketing)/instant-merc
 import { metadata as integrationsMetadata } from '@/app/(marketing)/integrations/page';
 import { metadata as pricingLayoutMetadata } from '@/app/(marketing)/pricing/layout';
 import { metadata as pricingMetadata } from '@/app/(marketing)/pricing/page';
+import { metadata as productMetadata } from '@/app/(marketing)/product/page';
 import { metadata as voiceMetadata } from '@/app/(marketing)/voice/page';
 import { APP_NAME } from '@/constants/app';
 import {
@@ -42,12 +43,8 @@ describe('documentTitle', () => {
   it('opts out of the template when the title already names Jovie', () => {
     for (const title of [
       'Compare — Jovie',
-      'Alternatives — Jovie',
-      'CLI — Jovie',
       'Integrations | Jovie',
-      'Developers - Jovie',
       'Pricing | Jovie',
-      'Jovie Pricing',
       'Download Jovie',
       'Start with Jovie',
     ]) {
@@ -59,6 +56,31 @@ describe('documentTitle', () => {
 });
 
 describe('marketing document titles', () => {
+  it('uses one "<Page> | Jovie" format on the walked marketing routes', () => {
+    const resolved = [
+      applyRootTitleTemplate(developersMetadata.title),
+      applyRootTitleTemplate(pricingLayoutMetadata.title),
+      applyRootTitleTemplate(changelogMetadata.title),
+      applyRootTitleTemplate(productMetadata.title),
+      applyRootTitleTemplate(apiVersioningMetadata.title),
+      applyRootTitleTemplate(voiceMetadata.title),
+    ];
+
+    expect(resolved).toEqual([
+      'Developers | Jovie',
+      'Pricing | Jovie',
+      'Changelog: product updates and new features | Jovie',
+      'Product | Jovie',
+      'API versioning and deprecation policy | Jovie',
+      'Voice cloning for creators | Jovie',
+    ]);
+    for (const title of resolved) {
+      // No hyphen or em-dash brand suffix, and no Title Case page names.
+      expect(title).not.toMatch(/ [-—] Jovie$/);
+      expect(title).toMatch(/^[^|]+ \| Jovie$/);
+    }
+  });
+
   it('keeps the listed pages to a single brand suffix', () => {
     const resolved = [
       applyRootTitleTemplate(compareMetadata.title),
@@ -70,9 +92,9 @@ describe('marketing document titles', () => {
     ];
 
     expect(resolved).toEqual([
-      'Compare — Jovie',
-      'Alternatives — Jovie',
-      'CLI — Jovie',
+      'Compare | Jovie',
+      'Alternatives | Jovie',
+      'CLI | Jovie',
       'Integrations | Jovie',
       'Pricing | Jovie',
       'About Jovie',

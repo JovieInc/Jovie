@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { buildInventory, IDS_PATH } from './extract.mjs';
+import { createAssigner, DERIVED_MIN, derivedNumber } from './ids.mjs';
 
 const registry = JSON.parse(readFileSync(IDS_PATH, 'utf8'));
 
@@ -25,7 +26,7 @@ test('IDs are stable across runs and registry-seeded runs', () => {
   );
 });
 
-test('a new line gets the next number and never renumbers old ones', () => {
+test('a line with no pinned ID gets its hash ID; pinned ones never move', () => {
   const { rows } = buildInventory(registry);
   const drop = rows.find(r => r.id.startsWith('SL-'));
   const trimmed = {
@@ -34,24 +35,55 @@ test('a new line gets the next number and never renumbers old ones', () => {
     ),
   };
   const again = buildInventory(trimmed).rows;
-  const max = Math.max(
-    ...Object.values(registry.ids)
-      .filter(v => v.startsWith('SL-'))
-      .map(v => Number(v.split('-')[1]))
-  );
-  // Other not-yet-registered lines (a main that moved) may take the next
-  // numbers first, so assert "after every existing number", not "exactly next".
+  const key = Object.keys(registry.ids).find(k => registry.ids[k] === drop.id);
   const reborn = again.find(
     r => r.text === drop.text && r.source === drop.source
   ).id;
-  assert.match(reborn, /^SL-\d+$/);
-  assert.ok(Number(reborn.split('-')[1]) > max);
+  assert.equal(reborn, `SL-${derivedNumber(key)}`);
   for (const r of rows.filter(x => x.id !== drop.id)) {
     assert.equal(
       again.find(x => x.source === r.source && x.text === r.text)?.id,
       r.id
     );
   }
+});
+
+test('parallel new lines cannot claim the same ID or edit the registry', () => {
+  // Two PRs each add a line under one prefix: each ID depends only on its own
+  // key, so either order of landing gives both the same IDs.
+  const a = createAssigner(registry.ids);
+  const b = createAssigner(registry.ids);
+  const x = 'apps/web/app/(home)/page.tsx#New line from PR one';
+  const y = 'apps/web/app/(home)/page.tsx#New line from PR two';
+  const ax = a.assign('HOME', x);
+  const ay = a.assign('HOME', y);
+  assert.equal(b.assign('HOME', y), ay);
+  assert.equal(b.assign('HOME', x), ax);
+  assert.notEqual(ax, ay);
+  assert.ok(derivedNumber(x) >= DERIVED_MIN && derivedNumber(x) <= 99999);
+  const pinned = new Set(Object.values(registry.ids));
+  assert.ok(!pinned.has(ax) && !pinned.has(ay));
+  assert.deepEqual(JSON.parse(readFileSync(IDS_PATH, 'utf8')), registry);
+});
+
+test('a hash clash steps to the next free number', () => {
+  const seen = new Map();
+  let pair;
+  for (let i = 0; !pair; i += 1) {
+    const k = `clash-${i}`;
+    const n = derivedNumber(k);
+    if (seen.has(n)) pair = [seen.get(n), k, n];
+    else seen.set(n, k);
+  }
+  const [first, second, n] = pair;
+  const { assign } = createAssigner({});
+  assert.equal(assign('HOME', first), `HOME-${n}`);
+  assert.equal(
+    assign('HOME', second),
+    `HOME-${n + 1 > 99999 ? DERIVED_MIN : n + 1}`
+  );
+  const pinnedFirst = createAssigner({ [first]: `HOME-${n}` });
+  assert.notEqual(pinnedFirst.assign('HOME', second), `HOME-${n}`);
 });
 
 test('home record slots are keyed on the record field', () => {
@@ -61,11 +93,13 @@ test('home record slots are keyed on the record field', () => {
   assert.ok(home.some(r => r.source.endsWith('hero.subhead')));
 });
 
-test('committed ID registry covers every extracted row', () => {
+test('every row ID is pinned in ids.gen.json or derived from its key', () => {
   const known = new Set(Object.values(registry.ids));
-  const missing = buildInventory(registry).rows.filter(r => !known.has(r.id));
+  const stray = buildInventory(registry).rows.filter(
+    r => !known.has(r.id) && Number(r.id.split('-')[1]) < DERIVED_MIN
+  );
   assert.deepEqual(
-    missing.map(r => r.id),
+    stray.map(r => r.id),
     []
   );
 });

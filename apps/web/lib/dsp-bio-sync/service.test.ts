@@ -32,6 +32,9 @@ const f = vi.hoisted(() => ({
   limit: vi.fn(),
 }));
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/artist-rules/store', () => ({
+  listEnforcedArtistRules: vi.fn(async () => []),
+}));
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: async (run: (tx: unknown) => unknown) =>
     run({ select: f.select }),

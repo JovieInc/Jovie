@@ -58,12 +58,14 @@ export function wordmarkGeometry(height: number) {
  * Locked mark size ladder (KEEP 2026-09-10 / splash-b-everywhere-v1).
  * Matches the existing Logo.tsx icon scale (xs/sm/md/lg) — no new mark shape.
  * Splash is 32px only: tiny centered cream mark on an empty field.
- * Chrome/header uses 20px. Do not pass ad-hoc pixel sizes.
+ * App chrome uses 20px; marketing headers use 28px (Tim, 2026-11-02).
+ * Do not pass ad-hoc pixel sizes.
  */
 export const BRAND_MARK_SIZE = {
   compact: 16,
   chrome: 20,
   control: 24,
+  marketing: 28,
   splash: 32,
 } as const;
 

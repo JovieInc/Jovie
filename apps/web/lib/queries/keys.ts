@@ -280,6 +280,18 @@ export const queryKeys = {
       [...queryKeys.handle.all, 'suggestions', candidates] as const,
   },
 
+  // Header search queries
+  headerSearch: {
+    all: ['header-search'] as const,
+    libraryAssets: (scopeKey: string, query: string) =>
+      [
+        ...queryKeys.headerSearch.all,
+        'library-assets',
+        scopeKey,
+        query,
+      ] as const,
+  },
+
   // Link wrapping queries
   links: {
     all: ['links'] as const,

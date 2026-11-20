@@ -317,6 +317,7 @@ describe('SpotifyConnectDialog', () => {
           expect(screen.getByRole('alert')).toHaveTextContent(
             "Couldn't reach Spotify. Try again."
           );
+          expect(screen.getByRole('alert')).toHaveClass('text-error-text');
           const retry = get('retry');
           await user.tab();
           expect(retry).toHaveFocus();
@@ -327,4 +328,18 @@ describe('SpotifyConnectDialog', () => {
       await expectNoA11yViolations(container);
     }
   );
+});
+
+describe('SpotifyConnectDialog scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'SpotifyConnectDialog.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
+  });
 });

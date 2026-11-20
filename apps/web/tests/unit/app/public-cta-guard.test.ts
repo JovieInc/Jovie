@@ -92,6 +92,34 @@ describe('public CTA guard', () => {
     // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
+  it('forwards the marketing mark size without changing the default header mark or CTA', () => {
+    const props: HeaderNavProps = {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      logoVariant: 'icon',
+      publicCta: { href: '/start', label: 'Find yourself' },
+    };
+    const { rerender } = render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        ...props,
+        logoMarkSize: 'marketing',
+      })
+    );
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    rerender(createElement<HeaderNavProps>(HeaderNav, props));
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+  });
+
   it('puts the glass header content on the single public container', () => {
     render(
       createElement<HeaderNavProps>(HeaderNav, {
@@ -166,9 +194,24 @@ describe('public CTA guard', () => {
     expect(authActionsSource).toContain('export function AuthActions');
     expect(headerNavSource).toContain('export function HeaderNav');
     expect(headerNavSource).toContain('getHomepageFrontDoorCtaContract(');
-    expect(headerNavSource).toContain('FEATURE_FLAGS.WAITLIST_ENABLED');
+    expect(headerNavSource).not.toContain('WAITLIST_ENABLED');
     expect(headerNavSource).toContain('publicCta = DEFAULT_PUBLIC_CTA');
     expect(headerNavSource).not.toContain("label: 'Request Access'");
+  });
+
+  it('keeps the nav variant resolvers in the extracted variants module', () => {
+    const variantsSource = readFileSync(
+      join(ROOT, 'components/organisms/header-nav-variants.ts'),
+      'utf8'
+    );
+    const headerNavSource = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(variantsSource).toContain('export function getNavLinkVariantClass');
+    expect(variantsSource).toContain('export function getNavGroupVariantClass');
+    expect(headerNavSource).toContain("from './header-nav-variants'");
   });
 
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
@@ -255,7 +298,7 @@ describe('public CTA guard', () => {
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");
     expect(marketingHeader).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
+      'getHomepageFrontDoorCtaContract().primary'
     );
   });
 
@@ -269,7 +312,7 @@ describe('public CTA guard', () => {
     // design-system showUserInfo variant, not the bare compact avatar.
     // Match structure, not indentation: formatter reflow must not break it.
     expect(headerNav).toMatch(
-      /authenticatedUserSlot=\{\s*<UserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
+      /authenticatedUserSlot=\{\s*<LazyUserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
     );
   });
 
@@ -337,3 +380,16 @@ it.each(['marketing-glass', 'default'] as const)(
     );
   }
 );
+
+it('marketing-glass header can render Log in without the primary CTA', () => {
+  render(
+    createElement<HeaderNavProps>(HeaderNav, {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      publicCta: { href: '/pricing', label: 'See plans' },
+      hidePublicCta: true,
+    })
+  );
+  expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull();
+});

@@ -21,7 +21,7 @@ describe('source repository adapters', () => {
   it('inventories every active product repository', () => {
     expect(
       SOURCE_REPOSITORY_ADAPTERS.map(adapter => adapter.repository)
-    ).toEqual(['JovieInc/Jovie', 'JovieInc/LogYourBody', 'JovieInc/ovie']);
+    ).toEqual(['JovieInc/Jovie', 'JovieInc/LogYourBody']);
   });
 
   it.each(SOURCE_REPOSITORY_ADAPTERS)(
@@ -39,7 +39,7 @@ describe('source repository adapters', () => {
   );
 
   it('rejects payloads claiming a different repository', () => {
-    const adapter = sourceAdapterForRepository('JovieInc/ovie');
+    const adapter = sourceAdapterForRepository('JovieInc/LogYourBody');
     expect(
       adapter?.toVerifiedMergeEvent(
         mergePayload({ repository: 'JovieInc/Jovie' })
@@ -67,10 +67,11 @@ describe('source repository adapters', () => {
         mergePayload({ repository: 'JovieInc/Jovie', app: 'ios' })
       )?.app
     ).toBe('ios');
-    const ovie = sourceAdapterForRepository('JovieInc/ovie');
+    const lyb = sourceAdapterForRepository('JovieInc/LogYourBody');
     expect(
-      ovie?.toVerifiedMergeEvent(mergePayload({ repository: 'JovieInc/ovie' }))
-        ?.app
+      lyb?.toVerifiedMergeEvent(
+        mergePayload({ repository: 'JovieInc/LogYourBody' })
+      )?.app
     ).toBe('web');
   });
 });
@@ -128,7 +129,6 @@ describe('consolidated changelog filters', () => {
     await emit('JovieInc/Jovie', 1);
     await emit('JovieInc/Jovie', 2, 'ios');
     await emit('JovieInc/LogYourBody', 1);
-    await emit('JovieInc/ovie', 1);
     return store;
   }
 

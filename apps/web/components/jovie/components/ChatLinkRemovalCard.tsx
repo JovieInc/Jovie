@@ -119,8 +119,8 @@ export function ChatLinkRemovalCard({
   }
 
   return (
-    <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-remove'>
-      <div className='flex items-center gap-3'>
+    <ChatToolSurface>
+      <div className='system-b-chat-link-card system-b-chat-link-card-remove -m-(--space-4) flex items-center gap-3 rounded-xl'>
         <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-remove'>
           <SocialIcon
             platform={normalizeSocialPlatform(platform)}
@@ -146,7 +146,7 @@ export function ChatLinkRemovalCard({
             disabled={state === 'removing'}
             className={cn(
               'system-b-chat-link-primary-action',
-              'bg-error text-error-foreground hover:bg-error/90',
+              'bg-(--color-btn-destructive-bg) text-(--color-btn-destructive-fg) hover:opacity-90',
               'disabled:opacity-50 transition-colors'
             )}
           >

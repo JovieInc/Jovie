@@ -36,6 +36,15 @@ describe('FooterBranding', () => {
     expect(screen.getByRole('link', { name: 'Made with Jovie' })).toHaveFocus();
   });
 
+  it('gives the brand link a real 44px hit box', () => {
+    render(<FooterBranding mark='brand' showCTA={false} />);
+
+    const link = screen.getByRole('link', { name: 'Made with Jovie' });
+    // Real box (axe's target-size cannot see before: pseudo hit areas).
+    expect(link).toHaveClass('min-h-11');
+    expect(link.className).not.toContain('before:h-11');
+  });
+
   it('uses untracked destinations when there is no artist', () => {
     render(<FooterBranding mark='brand' />);
 
@@ -43,11 +52,11 @@ describe('FooterBranding', () => {
       screen.getByRole('link', { name: 'Made with Jovie' })
     ).toHaveAttribute('href', '/');
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
-    ).toHaveAttribute('href', '/waitlist');
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
   });
 
-  it('preserves artist attribution on the brand and waitlist links', () => {
+  it('preserves artist attribution on the brand and claim links', () => {
     render(
       <FooterBranding
         mark='brand'
@@ -60,24 +69,23 @@ describe('FooterBranding', () => {
       screen.getByRole('link', { name: 'Made with Jovie' })
     ).toHaveAttribute('href', '/?utm_source=profile&utm_artist=test-artist');
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
+      screen.getByRole('link', { name: 'Claim your handle' })
     ).toHaveAttribute(
       'href',
-      '/waitlist?utm_source=profile&utm_artist=test-artist'
+      '/start?utm_source=profile&utm_artist=test-artist'
     );
   });
 
-  it('retains the default icon link and optional waitlist action', () => {
+  it('retains the default icon link and optional claim action', () => {
     render(<FooterBranding />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-      'href',
-      '/'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Powered by Jovie Home' })
+    ).toHaveAttribute('href', '/');
     expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Join the waitlist' })
-    ).toHaveAttribute('href', '/waitlist');
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it.each(['icon', 'wordmark', 'text'] as const)(
@@ -85,10 +93,9 @@ describe('FooterBranding', () => {
     mark => {
       render(<FooterBranding mark={mark} size='sm' showCTA={false} />);
 
-      expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
-        'href',
-        '/'
-      );
+      expect(
+        screen.getByRole('link', { name: 'Powered by Jovie Home' })
+      ).toHaveAttribute('href', '/');
       expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
       expect(screen.getAllByRole('link')).toHaveLength(1);
       if (mark === 'text') {
@@ -98,4 +105,22 @@ describe('FooterBranding', () => {
       }
     }
   );
+
+  it('does not force the text mark or claim link into capitals', () => {
+    render(<FooterBranding mark='text' showCTA />);
+    expect(
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).not.toHaveClass('uppercase');
+    expect(
+      screen.getByRole('link', { name: 'Powered by Jovie Home' })
+    ).not.toHaveClass('uppercase');
+  });
+
+  it('keeps the claim-handle link a 24px+ touch target', () => {
+    const { container } = render(<FooterBranding mark='brand' />);
+
+    const link = container.querySelector('a[href*="/start"]');
+    expect(link).not.toBeNull();
+    expect(link).toHaveClass('py-1.5');
+  });
 });

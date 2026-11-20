@@ -82,7 +82,7 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'Select Instagram' }).click();
+    screen.getByRole('button', { name: 'Select Instagram: @artist' }).click();
 
     expect(openSpy).toHaveBeenCalledWith(
       'https://instagram.com/artist',
@@ -110,7 +110,9 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'Select Facebook' }).click();
+    screen
+      .getByRole('button', { name: 'Select Facebook: @Artist Page' })
+      .click();
 
     expect(openSpy).toHaveBeenCalledWith(
       'https://facebook.com/artist',

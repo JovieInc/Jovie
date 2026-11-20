@@ -5,7 +5,10 @@ import { InsightsPanelView } from './InsightsPanel';
 const meta = {
   title: 'Dashboard/Insights/Workspace',
   component: InsightsPanelView,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    nextjs: { navigation: { pathname: '/app/insights' } },
+  },
   args: {
     insights: [],
     isLoading: false,
@@ -38,4 +41,31 @@ export const ErrorState: Story = {
 
 export const EmptyNarrow: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
+};
+
+export const NotEnoughActivity: Story = {
+  args: { lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 6 } },
+};
+
+export const NothingNew: Story = {
+  args: { lastRun: { insightsGenerated: 0, dataPointsAnalyzed: 1240 } },
+};
+
+export const GenerateFailed: Story = {
+  args: { generateFailed: true },
+};
+
+export const CoolingDown: Story = {
+  args: {
+    generateFailed: true,
+    generateFailure: { status: 429, nextAllowedAt: null },
+  },
+};
+
+export const NeedsPlan: Story = {
+  args: { generateFailed: true, generateFailure: { status: 403 } },
+};
+
+export const EmptyCategory: Story = {
+  args: { selectedCategory: 'tour' },
 };

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PreserveSearchRedirect } from './PreserveSearchRedirect';
 
 describe('<PreserveSearchRedirect>', () => {
@@ -30,13 +31,14 @@ describe('<PreserveSearchRedirect>', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders a stable, non-blank redirect state instead of nothing (JOV-6456)', () => {
+  it('renders a stable, non-blank redirect state instead of nothing (JOV-6456)', async () => {
     const { container } = render(
       <PreserveSearchRedirect href='/artist/release-slug/old-track-slug' />
     );
 
     expect(container).not.toBeEmptyDOMElement();
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+    await expectNoA11yViolations(container);
   });
 
   it('redirects to the target href while preserving the current search string', () => {
@@ -49,7 +51,7 @@ describe('<PreserveSearchRedirect>', () => {
     );
   });
 
-  it('does not redirect when already on the target URL', () => {
+  it('keeps the loading shell when already on the target URL', async () => {
     Object.defineProperty(globalThis, 'location', {
       value: {
         origin: 'https://jov.ie',
@@ -62,10 +64,12 @@ describe('<PreserveSearchRedirect>', () => {
       configurable: true,
     });
 
-    render(
+    const { container } = render(
       <PreserveSearchRedirect href='/artist/release-slug/old-track-slug' />
     );
 
     expect(replaceMock).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+    await expectNoA11yViolations(container);
   });
 });

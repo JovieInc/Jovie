@@ -50,3 +50,90 @@ test('remoteHint fires only above 2x cores', () => {
   assert.equal(remoteHint({ load: 20, cores: 12, env: {} }), null);
   assert.equal(remoteHint({ load: 99, cores: 12, env: { CI: '1' } }), null);
 });
+
+test('remote script runs preflight inside the agent-preflight slice when installed', () => {
+  const s = buildRemoteScript({
+    slug: 'feat__x',
+    branch: 'feat/x',
+    sha: 'a'.repeat(40),
+    originUrl: 'git@github.com:JovieInc/Jovie.git',
+    slots: 2,
+    forward: [],
+    bodyB64: '',
+  });
+  assert.match(
+    s,
+    /agent-run" \] && RUN="\$HOME\/\.local\/bin\/agent-run preflight"/
+  );
+  assert.match(s, /timeout 45m nice -n 10 \$RUN pnpm preflight:changed/);
+});
+
+test('bundle mode fetches the shipped bundle and emits sha+tree evidence', () => {
+  const s = buildRemoteScript({
+    slug: 'feat__x',
+    branch: 'feat/x',
+    sha: 'b'.repeat(40),
+    originUrl: 'git@github.com:JovieInc/Jovie.git',
+    slots: 2,
+    forward: ['--fast'],
+    bodyB64: '',
+    bundle: true,
+  });
+  assert.match(s, /\.bundles\/b{40}\.bundle/);
+  assert.match(s, /HEAD\^\{tree\}/);
+  assert.match(s, /PREFLIGHT_REMOTE_EVIDENCE/);
+  assert.equal(parseRemoteArgs(['--bundle']).push, false);
+});
+
+test('a full Gem hands off after the queue limit instead of queuing forever', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { SLOTS_BUSY_EXIT } = await import('./lib/prepush-offload.mjs');
+  const s = buildRemoteScript({
+    slug: 'feat__x',
+    branch: 'feat/x',
+    sha: 'c'.repeat(40),
+    originUrl: 'git@github.com:JovieInc/Jovie.git',
+    slots: 1,
+    forward: ['--fast'],
+    bodyB64: '',
+    bundle: true,
+    queueMaxSec: 1,
+  });
+  assert.match(s, new RegExp(`exit ${SLOTS_BUSY_EXIT}`));
+  assert.equal(parseRemoteArgs(['--queue-max-sec', '90']).queueMaxSec, 90);
+  assert.equal(parseRemoteArgs([]).queueMaxSec, 0);
+  assert.deepEqual(
+    parseRemoteArgs(['--queue-max-sec', '5', '--fast']).forward,
+    ['--fast']
+  );
+  // Run only the slot gate with the single slot held by another process.
+  if (spawnSync('sh', ['-c', 'command -v flock']).status !== 0) return;
+  const gate = s.slice(
+    s.indexOf('# 3. host-wide'),
+    s.indexOf('# 4. body file')
+  );
+  const home = mkdtempSync(path.join(tmpdir(), 'gem-slots-'));
+  mkdirSync(path.join(home, '.cache/gem-remote-preflight-slots'), {
+    recursive: true,
+  });
+  try {
+    const r = spawnSync(
+      'flock',
+      [
+        path.join(home, '.cache/gem-remote-preflight-slots/slot-0.lock'),
+        'bash',
+        '-c',
+        `${gate}\necho got-slot`,
+      ],
+      { encoding: 'utf8', timeout: 20_000, env: { ...process.env, HOME: home } }
+    );
+    assert.equal(r.status, SLOTS_BUSY_EXIT, r.stderr);
+    assert.match(r.stderr, /still busy after 1s; handing off/);
+    assert.doesNotMatch(r.stdout, /got-slot/);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});

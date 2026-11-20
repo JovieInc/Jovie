@@ -129,6 +129,7 @@ export {
   trackingIpVisitsLimiter,
   trackingVisitsLimiter,
   verificationRequestLimiter,
+  waitlistJoinLimiter,
   wrapLinkAnonymousLimiter,
   wrapLinkLimiter,
   youtubeThumbnailPreviewBurstLimiter,

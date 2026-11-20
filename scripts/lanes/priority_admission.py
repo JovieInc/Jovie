@@ -35,6 +35,7 @@ from pathlib import Path
 import backlog_rank
 import binding_refill
 import linear_sync
+import urgent_sla
 
 sys.dont_write_bytecode = True
 
@@ -379,6 +380,7 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
                                                   "marketing": marketing_priority(row.get("labels")),
                                                   "backlogAgeS": round(now - (_epoch(row.get("createdAt")) or now)),
                                                   "displaced": displaced["identifier"] if displaced else None})
+    receipt["urgentSla"] = urgent_sla.record(state, team, live_todo, now)
     excess = len(live_todo) - ceiling(goal)
     if excess > 0:
         for row in stale_demotions(live_todo, ranks, now, min(excess, MAX_DEMOTE_PER_TICK)):

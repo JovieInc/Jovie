@@ -7,10 +7,8 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  NAVIGATION_TELEMETRY_ENDPOINT,
-  type NavigationTelemetryPayload,
-} from '@/lib/tracking/navigation-telemetry-contract';
+import { NAVIGATION_TELEMETRY_ENDPOINT } from '@/lib/tracking/navigation-telemetry-contract';
+import type { NavigationTelemetryPayload } from '@/lib/tracking/navigation-telemetry-schema';
 import { setTestAuthBypassSession } from '../helpers/auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });

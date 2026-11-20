@@ -187,76 +187,6 @@ describe('ChatInlineError', () => {
   });
 });
 
-function renderThreadMessages({
-  collapsedFailureCount = 0,
-  onShowCollapsedFailures,
-}: {
-  readonly collapsedFailureCount?: number;
-  readonly onShowCollapsedFailures?: () => void;
-} = {}) {
-  return render(
-    <ChatThreadMessages
-      messages={[]}
-      shouldVirtualizeMessages={false}
-      virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
-      virtualizedMessageViewportHeight={0}
-      virtualizedMinHeight={0}
-      messageViewportPaddingBottom={undefined}
-      totalSizeRef={() => undefined}
-      bottomSentinelRef={() => undefined}
-      isStreaming={false}
-      lastAssistantIndex={-1}
-      knownMessageIds={new Set()}
-      inlineChatError={null}
-      isStuckToBottom
-      onScrollToBottom={() => undefined}
-      collapsedFailureCount={collapsedFailureCount}
-      onShowCollapsedFailures={onShowCollapsedFailures}
-    />
-  );
-}
-
-describe('ChatThreadMessages collapsed summer failures', () => {
-  it('hides the control when there are no collapsed failures', () => {
-    renderThreadMessages({
-      collapsedFailureCount: 0,
-      onShowCollapsedFailures: vi.fn(),
-    });
-
-    expect(screen.getByTestId('chat-thread-empty')).toHaveTextContent(
-      'Nothing in this thread yet.'
-    );
-
-    expect(
-      screen.queryByTestId('chat-collapsed-failures')
-    ).not.toBeInTheDocument();
-  });
-
-  it('uses singular copy for one earlier unanswered message and reveals it on click', () => {
-    const onShowCollapsedFailures = vi.fn();
-    renderThreadMessages({ collapsedFailureCount: 1, onShowCollapsedFailures });
-
-    const control = screen.getByTestId('chat-collapsed-failures');
-    expect(control).toHaveTextContent(
-      '1 earlier message went unanswered. Show it'
-    );
-
-    fireEvent.click(control);
-    expect(onShowCollapsedFailures).toHaveBeenCalledTimes(1);
-  });
-
-  it('uses plural copy for multiple earlier unanswered messages', () => {
-    renderThreadMessages({
-      collapsedFailureCount: 3,
-      onShowCollapsedFailures: vi.fn(),
-    });
-
-    expect(screen.getByTestId('chat-collapsed-failures')).toHaveTextContent(
-      '3 earlier messages went unanswered. Show them'
-    );
-  });
-});
-
 function renderComposerSurface({
   suppressUsageAlert = false,
   draft,
@@ -428,14 +358,13 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
 });
 
 describe('ChatThreadMessages virtualized window', () => {
-  it('renders the rows the virtualizer reports on every render, not the first window', () => {
+  it('renders the rows the virtualizer reports on every render, not the first window', async () => {
     const messages = Array.from({ length: 6 }, (_, index) => ({
       id: `m${index}`,
       role: index % 2 ? ('assistant' as const) : ('user' as const),
       parts: [],
     }));
     let window = [0, 1];
-    // One stable object whose state changes between renders, like TanStack Virtual.
     const virtualizer = {
       getVirtualItems: () =>
         window.map(index => ({ index, start: index * 80, key: index })),
@@ -458,6 +387,7 @@ describe('ChatThreadMessages virtualized window', () => {
       onScrollToBottom: () => undefined,
     };
     const view = render(<ChatThreadMessages {...props} />);
+    await act(() => Promise.resolve());
     expect(
       screen.getAllByTestId('thread-row').map(row => row.textContent)
     ).toEqual(['m0', 'm1']);

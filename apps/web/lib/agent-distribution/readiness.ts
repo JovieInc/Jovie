@@ -3,7 +3,8 @@
  *
  * A package is ready only when all six gates hold:
  *   agentPathCert        harness receipt (agent-path-cert.json): ok=true, base=https://jov.ie,
- *                        younger than 24h, toolsListHash equals this package's tools/list hash.
+ *                        younger than 24h, toolsListHash equals this package's tools/list hash,
+ *                        all checks pass, including persisted claim outcome and fixture cleanup.
  *   trustSurfaceVisual   trust-surface-visual.json (schema trust-surface-visual/v1): zero severe findings at
  *                        390 and 1440 for every trust route. Nothing in the repo emits severity or widths
  *                        yet: scripts/invariants/screen-audit.mjs takes a judge file of
@@ -24,6 +25,7 @@
  * Time checks (24h freshness, a passed deadline) need a clock. The committed readiness.json is evaluated with
  * no clock so it stays reproducible; `agent-distribution:ready` re-evaluates with the real time.
  */
+import { REQUIRED_OUTCOME_CHECKS } from './cert-helpers';
 import { hashTools } from './hash';
 import { ICON_SIZES, type IconSourceInfo, type RenderedIcon } from './icons';
 import { type Listing, SITE } from './listing';
@@ -107,6 +109,16 @@ export function checkAgentPathCert(
   if (!receipt) return missing();
   const reasons: string[] = [];
   if (receipt.ok !== true) reasons.push('receipt ok is not true');
+  const checks = Array.isArray(receipt.checks) ? receipt.checks.map(rec) : [];
+  if (!checks.length || checks.some(check => check?.status !== 'PASS'))
+    reasons.push('receipt checks are empty, invalid or incomplete');
+  for (const required of REQUIRED_OUTCOME_CHECKS)
+    if (
+      !checks.some(
+        check => check?.check === required && check.status === 'PASS'
+      )
+    )
+      reasons.push(`no passing outcome check: ${required}`);
   if (
     typeof receipt.base !== 'string' ||
     !receipt.base.startsWith(`${CERT_BASE}/`)

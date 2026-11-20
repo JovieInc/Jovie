@@ -48,7 +48,6 @@ import {
 
 const MERGE_URL = 'https://github.com/JovieInc/Jovie/pull/18275';
 const MERGE_SHA = 'eb6a0a68c92750dca7cd378732abf71c24c5558e';
-
 function stackPull(overrides) {
   return {
     number: 1,
@@ -60,7 +59,6 @@ function stackPull(overrides) {
     ...overrides,
   };
 }
-
 /** 2026-09-25 foundation merge. #18293 was still an open draft. */
 const JOV_6586_STACK = [
   stackPull({
@@ -90,7 +88,6 @@ const JOV_6586_STACK = [
     headRef: 'codex/jov-6586-shipping-terminal',
   }),
 ];
-
 const JOV_6586_ISSUE = {
   id: 'issue-6586',
   identifier: 'JOV-6586',
@@ -98,19 +95,16 @@ const JOV_6586_ISSUE = {
   children: [],
   hasChildren: false,
 };
-
 const MERGING_FOUNDATION = {
   number: 18275,
   url: MERGE_URL,
   sha: MERGE_SHA,
 };
-
 const BASE_ENV = {
   LINEAR_API_KEY: 'lin_test',
   GITHUB_TOKEN: 'gh_test',
   GITHUB_REPOSITORY: REPO,
 };
-
 function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
   return syncLinearIssueOnMerge({
     env: {
@@ -127,7 +121,6 @@ function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
     log: () => {},
   });
 }
-
 function sweep(fetchImpl) {
   return syncLinearIssueOnMerge({
     env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
@@ -138,7 +131,6 @@ function sweep(fetchImpl) {
     log: () => {},
   });
 }
-
 function blockingRelation(name = 'Merging', overrides = {}) {
   return {
     id: 'relation-8316',
@@ -160,7 +152,6 @@ function blockingRelation(name = 'Merging', overrides = {}) {
     ...overrides,
   };
 }
-
 describe('linear sync on merge', () => {
   it.each(['Merging', 'Rework', 'Canceled', 'Unknown'])(
     'keeps passing acceptance open for an incoming %s prerequisite',
@@ -185,7 +176,6 @@ describe('linear sync on merge', () => {
       expect(world.comments).toHaveLength(count + 1);
     }
   );
-
   it('closes when incoming prerequisites are Done and ignores unrelated/outgoing edges', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].inverseRelations = [
@@ -198,7 +188,6 @@ describe('linear sync on merge', () => {
     expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe('Done');
     expect(world.updates).toEqual(['JOV-1:Done']);
   });
-
   it('routes a required failed outcome to Rework despite an open prerequisite', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -211,7 +200,6 @@ describe('linear sync on merge', () => {
     expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe('Rework');
     expect(world.updates).toEqual(['JOV-1:Rework']);
   });
-
   it.each([
     ['Done', false, 'Done'],
     ['Merging', false, 'Validating'],
@@ -238,7 +226,6 @@ describe('linear sync on merge', () => {
       expect(issue.state).toBe(target);
     }
   );
-
   it.each([
     { id: 'state-done', name: 'Done', type: 'started' },
     { id: 'state-accepted', name: 'Accepted', type: 'completed' },
@@ -256,7 +243,6 @@ describe('linear sync on merge', () => {
       expect(world.updates).toEqual([]);
     }
   );
-
   it.each(['new edge', 'reopened prerequisite', 'removed edge'])(
     'defers closure on a changed blocking dependency without an issue-version change: %s',
     async change => {
@@ -280,7 +266,6 @@ describe('linear sync on merge', () => {
       expect(world.comments).toEqual([]);
     }
   );
-
   it('reads a blocking prerequisite on a later relation page before acceptance', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Validating';
@@ -316,7 +301,6 @@ describe('linear sync on merge', () => {
     expect(laterReads).toBe(1);
     expect(world.updates).toEqual([]);
   });
-
   it('re-reads a later-page prerequisite state before writing Done', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Validating';
@@ -352,7 +336,6 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
     expect(world.comments).toEqual([]);
   });
-
   it.each(
     [
       'missing connection',
@@ -434,7 +417,6 @@ describe('linear sync on merge', () => {
       expect(world.comments).toEqual([]);
     }
   );
-
   it.each([
     'reopened episode',
     'acceptance edit',
@@ -495,7 +477,6 @@ describe('linear sync on merge', () => {
     expect(world.comments).toEqual([]);
     expect(issue.state).toBe('Validating');
   });
-
   it('closes from a stable server preimage after the immediate state re-read', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Validating';
@@ -515,7 +496,6 @@ describe('linear sync on merge', () => {
     expect(queries[write - 1]).toContain('IssueLifecycle(');
     expect(queries[write - 1]).toContain('updatedAt');
   });
-
   it.each([
     ['snapshot', undefined],
     ['snapshot', 'not-a-server-time'],
@@ -538,7 +518,6 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
     expect(world.comments).toEqual([]);
   });
-
   it.each(['receipt comment', 'child reopen'])(
     'detects a changed %s on a later prewrite page with the same issue version',
     async changed => {
@@ -603,7 +582,6 @@ describe('linear sync on merge', () => {
       expect(issue.state).toBe('Validating');
     }
   );
-
   it.each(['missing issue', 'missing comments', 'unreadable comment page'])(
     'fails closed on an unreadable current preimage: %s',
     async failure => {
@@ -634,7 +612,6 @@ describe('linear sync on merge', () => {
       expect(world.comments).toEqual([]);
     }
   );
-
   it('accepts the same semantic preimage in a different server list order', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -676,7 +653,6 @@ describe('linear sync on merge', () => {
     expect((await mergeEvent(reordered, 101)).action).toBe('moved');
     expect(world.updates).toEqual(['JOV-1:Done']);
   });
-
   it('preserves receipt order when fail and pass share the same server timestamp', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -705,7 +681,6 @@ describe('linear sync on merge', () => {
     expect(world.comments).toEqual([]);
     expect(issue.state).toBe('Validating');
   });
-
   it('does not add a complete preimage re-read for a kept issue', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Validating';
@@ -719,7 +694,6 @@ describe('linear sync on merge', () => {
     expect(reads).toBe(1);
     expect(world.updates).toEqual([]);
   });
-
   it.each(['completed', 'canceled'])(
     'holds unknown %s child delivery timestamps',
     async type => {
@@ -735,7 +709,6 @@ describe('linear sync on merge', () => {
       expect(world.updates).toEqual([]);
     }
   );
-
   it('holds partial child delivery evidence without accepting the parent outcome', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -757,7 +730,6 @@ describe('linear sync on merge', () => {
     await expect(sweep(partial)).rejects.toThrow('Child delivery evidence');
     expect(world.updates).toEqual([]);
   });
-
   it('pages JOV-5853 child evidence and still closes a shipped child', async () => {
     const { world, fetchImpl } = createWorld();
     world.pulls[202] = {
@@ -819,7 +791,6 @@ describe('linear sync on merge', () => {
     expect(world.issues['JOV-2'].state).toBe('Done');
     expect(world.issues['JOV-5853'].state).toBe('In Progress');
   });
-
   it.each([false, true])(
     'requires a fresh parent outcome after child delivery (parent PR=%s)',
     async hasPull => {
@@ -839,7 +810,6 @@ describe('linear sync on merge', () => {
       expect(issue.state).toBe('Done');
     }
   );
-
   // Linear's Duplicate state type is closed work: a duplicate child must not
   // hold its parent open (72 parents waited on sub-issues on 2026-10-21).
   it('treats a Duplicate-state child as closed for the parent gate', async () => {
@@ -853,7 +823,6 @@ describe('linear sync on merge', () => {
     await sweep(fetchImpl);
     expect(issue.state).toBe('Done');
   });
-
   it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -869,7 +838,6 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual(['JOV-1:Done']);
     expect(issue.comments.at(-1).body).toContain('Binding outcome:');
   });
-
   it('does not bind a parent to an old-episode outcome arriving after its reopen', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -903,7 +871,6 @@ describe('linear sync on merge', () => {
     await sweep(fetchImpl);
     expect(issue.state).toBe('Done');
   });
-
   it('does not let an ordinary unmerged issue use a recorded outcome to bypass source delivery', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -912,7 +879,6 @@ describe('linear sync on merge', () => {
     await mergeEvent(fetchImpl, 0);
     expect(world.updates).toEqual([]);
   });
-
   it.each([
     ['open child', { children: [['JOV-2', 'started']] }, {}, 'In Progress'],
     ['failed outcome', {}, { status: 'fail' }, 'Rework'],
@@ -952,7 +918,6 @@ describe('linear sync on merge', () => {
       expect(issue.state).toBe(expected);
     }
   );
-
   it('does not fall back to an old parent pass when its latest evidence is malformed', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -970,7 +935,6 @@ describe('linear sync on merge', () => {
     expect(issue.state).toBe('Validating');
     expect(issue.comments.at(-1).body).toContain('malformed');
   });
-
   it.each(['invalid', 'JOV-1,JOV-2', ' JOV-1', 'JOV-1 ', 'LYB-1'])(
     'rejects a nonempty malformed receipt target before any external request: %s',
     async identifier => {
@@ -992,7 +956,6 @@ describe('linear sync on merge', () => {
       expect(requested).toBe(false);
     }
   );
-
   it.each(['success', 'rate-limit'])(
     'preserves an explicitly supplied full-sweep cursor after a targeted receipt: %s',
     async outcome => {
@@ -1051,7 +1014,6 @@ describe('linear sync on merge', () => {
       }
     }
   );
-
   it.each([undefined, ''])(
     'preserves the existing global sweep when the receipt target is absent: %s',
     async identifier => {
@@ -1076,7 +1038,6 @@ describe('linear sync on merge', () => {
       expect(scanned).toBe(true);
     }
   );
-
   it.each(['JOV-1', 'jov-1'])(
     'targets a parent-only commissioning receipt and preserves its proof across unrelated forward generations: %s',
     async identifier => {
@@ -1135,7 +1096,6 @@ describe('linear sync on merge', () => {
     expect(issue.state).toBe('Done');
     expect(world.updates).toEqual(['JOV-1:Done']);
   });
-
   it('cannot close a reopened episode when its server timestamp is unreadable', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -1149,7 +1109,6 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
     expect(issue.comments.at(-1).body).toMatch(/episode.*unknown/i);
   });
-
   it('does not reuse an escaped-defect closure from before the current episode', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -1175,7 +1134,6 @@ describe('linear sync on merge', () => {
     expect(issue.state).toBe('Done');
     expect(world.updates).toEqual(['JOV-1:Done']);
   });
-
   it('reads a later history page before deciding which receipt belongs to this episode', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -1215,7 +1173,6 @@ describe('linear sync on merge', () => {
     expect(issue.state).toBe('Validating');
     expect(world.updates).toEqual([]);
   });
-
   it.each([
     null,
     {},
@@ -1234,7 +1191,6 @@ describe('linear sync on merge', () => {
     );
     expect(world.updates).toEqual([]);
   });
-
   it('bounds a non-terminating history read without changing state', async () => {
     const { world, fetchImpl } = createWorld();
     let pages = 0;
@@ -1266,7 +1222,6 @@ describe('linear sync on merge', () => {
     expect(pages).toBe(10);
     expect(world.updates).toEqual([]);
   });
-
   it('enters the validation lifecycle for a Summer-bound bot merge', async () => {
     const body = '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc';
     expect(
@@ -1312,7 +1267,6 @@ describe('linear sync on merge', () => {
       })
     ).toEqual({ identifier: 'JOV-6586', issueId: '9b1c' });
   });
-
   it('links markers, branch names, and titles, and ignores prose-only mentions', () => {
     const issue = { identifier: 'JOV-6586', issueId: 'uuid-6586' };
     expect(
@@ -1356,7 +1310,6 @@ describe('linear sync on merge', () => {
       )
     ).toBe(false);
   });
-
   it('matches explicit PR identifiers exactly when deciding closure holds', () => {
     const issue = { identifier: 'JOV-8616', issueId: 'uuid-8616' };
     const pull = { title: 'lifecycle repair', headRef: 'feature/no-ticket' };
@@ -1382,7 +1335,6 @@ describe('linear sync on merge', () => {
       )
     ).toBe(false);
   });
-
   it('holds JOV-6586 while later stack layers are open, ignoring the merging PR', () => {
     const issue = JOV_6586_ISSUE;
     const held = lifecycleHolds({
@@ -1400,7 +1352,6 @@ describe('linear sync on merge', () => {
       }).holds.join('\n')
     ).toMatch(/stopped before the last page[\s\S]*while the check is red/);
   });
-
   it('keeps commissioning parents as outcome acceptance, not a merge hold', () => {
     expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
     expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-6004')).toBe(true);
@@ -1412,7 +1363,6 @@ describe('linear sync on merge', () => {
       )
     ).toContain('label commissioning');
   });
-
   it('moves a merge to Merging, then Done after the deploy sweep', async () => {
     const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
     expect((await mergeEvent(fetchImpl, 101)).action).toBe('moved');
@@ -1436,7 +1386,6 @@ describe('linear sync on merge', () => {
     expect(pages).toBe(2);
     expect(world.updates).toEqual(['JOV-1:Merging', 'JOV-1:Done']);
   });
-
   it('recovers a missed merge from In Progress while preserving unmerged and unlinked writers', async () => {
     const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
     world.issues['JOV-1'].state = 'In Progress';
@@ -1463,7 +1412,6 @@ describe('linear sync on merge', () => {
     expect(world.issues['JOV-3'].state).toBe('In Progress');
     expect(world.updates).toEqual(['JOV-1:Merging']);
   });
-
   it('moves the real escaped-defect merge path to Validating and never Done', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].labels = ['escaped-defect'];
@@ -1475,7 +1423,6 @@ describe('linear sync on merge', () => {
       'escaped-defect-dual-closure'
     );
   });
-
   it('reads every comment page, bounded, so the latest receipt wins', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].description = 'validation-required: outcome';
@@ -1507,7 +1454,6 @@ describe('linear sync on merge', () => {
     });
     await mergeEvent(paged, 101);
     expect(world.issues['JOV-1'].state).toBe('Done');
-
     world.issues['JOV-1'].state = 'Validating';
     const endless = intercept(paged, async (_url, body) =>
       body?.query?.includes('IssueLifecycleComments')
@@ -1518,7 +1464,6 @@ describe('linear sync on merge', () => {
       /exceeds the read bound/
     );
   });
-
   it('holds a parent with open sub-issues and a reopened issue needs an outcome', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].children = [['JOV-2', 'started']];
@@ -1534,7 +1479,6 @@ describe('linear sync on merge', () => {
     await mergeEvent(fetchImpl, 101);
     expect(world.issues['JOV-1'].state).toBe('Validating');
   });
-
   it('isolates a failing issue in the sweep and still evaluates the rest', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Merging';
@@ -1547,7 +1491,6 @@ describe('linear sync on merge', () => {
     await expect(sweep(fetchImpl)).rejects.toThrow(/JOV-2: GitHub HTTP 404/);
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
-
   it('comments and fails closed when the open pull request scan errors', async () => {
     const { world, fetchImpl } = createWorld();
     const failing = intercept(fetchImpl, async url =>
@@ -1563,7 +1506,6 @@ describe('linear sync on merge', () => {
       'stopped before the last page'
     );
   });
-
   it('fails a sweep on a scan error and keeps per-issue failures in the message', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Merging';
@@ -1578,7 +1520,6 @@ describe('linear sync on merge', () => {
     );
     expect(world.updates).toEqual([]);
   });
-
   it('stops a sweep at the Linear rate limit, oldest issue first, and persists the resume cursor', async () => {
     const { world, fetchImpl } = createWorld();
     const cursorDir = mkdtempSync(join(tmpdir(), 'linear-sync-cursor-'));
@@ -1644,7 +1585,6 @@ describe('linear sync on merge', () => {
           .nextIdentifier
       ).toBe('JOV-2');
       expect(world.updates).toEqual([]);
-
       writeFileSync(
         join(cursorDir, 'cursor.json'),
         `${JSON.stringify({
@@ -2646,7 +2586,7 @@ describe('Linear Sync workflow closes its own loops', () => {
     expect(order.every(index => index > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(workflow).toContain(
-      "steps.evaluate.outputs.quota_deferred == 'true'"
+      "steps.evaluate.outputs.quota_deferred == 'true' && steps.evaluate.outputs.deferral_kind != 'linear'"
     );
     expect(workflow).toContain(
       "steps.evaluate_retry.outputs.quota_deferred == 'true'"
@@ -2871,7 +2811,9 @@ globalThis.fetch = async (url, init) => {
       expect(result.status, result.stdout + result.stderr).toBe(0);
       // The deferral was resolved, not thrown: the direct run must still
       // flag it or the workflow's hold-and-retry steps skip (run 41157880216).
-      expect(readFileSync(output, 'utf8')).toBe('quota_deferred=true\n');
+      expect(readFileSync(output, 'utf8')).toBe(
+        'quota_deferred=true\ndeferral_kind=linear\n'
+      );
       expect(readFileSync(summary, 'utf8')).toContain(
         '2 issue(s) deferred to the next sweep'
       );
@@ -2884,6 +2826,64 @@ globalThis.fetch = async (url, init) => {
         JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
           .nextIdentifier
       ).toBe('JOV-2');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('defers a Linear 429 on the sweep listing instead of exiting 1', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'linear-sync-list-429-'));
+    try {
+      const repository = resolve(import.meta.dirname, '../../..');
+      const cursorDir = join(dir, 'cursor');
+      mkdirSync(cursorDir);
+      writeFileSync(
+        join(cursorDir, 'cursor.json'),
+        '{"nextIdentifier":"JOV-9"}\n'
+      );
+      const output = join(dir, 'out');
+      const stub = join(dir, 'stub.mjs');
+      writeFileSync(
+        stub,
+        [
+          "const ok = body => ({ ok: true, headers: { get: () => '' }, json: async () => body });",
+          "const limited = { ok: false, status: 429, headers: { get: name => (name === 'retry-after' ? '30' : null) }, json: async () => ({ errors: [{ extensions: { code: 'RATELIMITED' } }] }) };",
+          "globalThis.fetch = async url => String(url).includes('api.github.com') ? ok([]) : limited;",
+        ].join('\n')
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          pathToFileURL(stub).href,
+          join(repository, 'scripts/lib/linear-sync-on-merge.mjs'),
+        ],
+        {
+          cwd: repository,
+          encoding: 'utf8',
+          timeout: 20_000,
+          env: {
+            ...process.env,
+            LINEAR_API_KEY: 'lin_test',
+            GITHUB_TOKEN: 'gh_test',
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            LIFECYCLE_MODE: 'sweep',
+            GITHUB_WORKSPACE: repository,
+            LINEAR_SYNC_CURSOR_DIR: cursorDir,
+            GITHUB_OUTPUT: output,
+            GITHUB_STEP_SUMMARY: join(dir, 'summary'),
+          },
+        }
+      );
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stdout).toContain('Lifecycle sweep listing deferred');
+      expect(readFileSync(output, 'utf8')).toBe(
+        'quota_deferred=true\ndeferral_kind=linear\n'
+      );
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-9');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

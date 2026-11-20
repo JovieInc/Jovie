@@ -16,7 +16,7 @@ back; policy belongs in `AGENTS.md`, `canon/`, and `.claude/rules/*`.
   the native GitHub merge queue. There is NO `develop`/`preview`/`production`
   branch flow. See `docs/PR_FLOW.md` and `.github/MERGE_QUEUE.md`.
 - **Required status checks:** PR Ready, Migration Guard, Fork PR Gate,
-  PR Size Guard (`.github/BRANCH_PROTECTION.md`).
+  PR Size Guard, Company guards (`.github/BRANCH_PROTECTION.md`).
 - **Report exact check failures — never document-and-continue past a red
   check.** A failing typecheck/lint/test must be fixed or surfaced, not noted.
 - **Toolchain:** Node and pnpm versions are pinned in `.nvmrc` and

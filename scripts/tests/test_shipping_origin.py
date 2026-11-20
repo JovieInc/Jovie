@@ -31,6 +31,19 @@ def resolve(repository, pr, head):
     return repository, {"number": pr, "head": {"sha": head}}
 
 
+@pytest.mark.parametrize("event", ["repository_dispatch", "workflow_dispatch"])
+def test_daily_coverage_audit_preserves_verified_publication(event, tmp_path):
+    candidate = payload(initiator="workflow:test-coverage-audit.yml")
+    trusted = run("test-coverage-audit.yml", event=event)
+    ledger = tmp_path / "ledger"
+    origin.ingest(candidate, trusted, "JovieInc/Jovie", ledger, resolve)
+    assert json.loads(ledger.read_text())["initiator"] == candidate["initiator"]
+    with pytest.raises(ValueError, match="untrusted-origin-run"):
+        origin.ingest(candidate, {**trusted, "head_branch": "untrusted"},
+                      "JovieInc/Jovie", tmp_path / "rejected", resolve)
+    assert not (tmp_path / "rejected").exists()
+
+
 def archive(rows):
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as zipped:
@@ -189,6 +202,73 @@ def test_force_push_read_lag_converges_without_accepting_a_stale_head():
         attribution.resolve_origin_head("jovieinc/jovie", 7, expected, fetch=wrong_pull,
                                         sleep=structural.append)
     assert structural == []
+
+
+def test_repository_identity_read_retries_transport_and_keeps_gh_stderr(monkeypatch):
+    """Run 43845895181: gh api repos/... exited 1 before the head-lag loop."""
+    expected = "a" * 40
+    calls = []
+
+    def fetch(endpoint):
+        calls.append(endpoint)
+        if endpoint == "repos/jovieinc/jovie" and calls.count(endpoint) == 1:
+            raise RuntimeError("origin-read-failed: repos/jovieinc/jovie: exit 1: HTTP 403 rate limit")
+        if endpoint == "repos/jovieinc/jovie":
+            return {"full_name": "JovieInc/Jovie"}
+        if endpoint == "repos/JovieInc/Jovie/pulls/7":
+            return {"number": 7, "state": "open",
+                    "base": {"repo": {"full_name": "JovieInc/Jovie"}},
+                    "head": {"sha": expected, "ref": "feature/work",
+                             "repo": {"full_name": "JovieInc/Jovie"}}}
+        if endpoint == "repos/JovieInc/Jovie/git/ref/heads/feature%2Fwork":
+            return {"object": {"sha": expected}}
+        raise AssertionError(endpoint)
+
+    slept = []
+    repository, _ = attribution.resolve_origin_head(
+        "jovieinc/jovie", 7, expected, fetch=fetch, sleep=slept.append)
+    assert repository == "JovieInc/Jovie"
+    assert slept == [attribution.ORIGIN_HEAD_RETRY_DELAYS[0]]
+    assert calls[:2] == ["repos/jovieinc/jovie", "repos/jovieinc/jovie"]
+
+    refused = []
+    with pytest.raises(ValueError, match="origin-repository-not-allowed"):
+        attribution.resolve_origin_head(
+            "jovieinc/jovie", 7, expected, sleep=refused.append,
+            fetch=lambda _endpoint: {"full_name": "attacker/repo"})
+    assert refused == []
+
+    probed = []
+
+    def not_transport(_endpoint):
+        raise AssertionError("not-transport")
+
+    with pytest.raises(AssertionError, match="not-transport"):
+        attribution.resolve_origin_head(
+            "jovieinc/jovie", 7, expected, fetch=not_transport, sleep=probed.append)
+    assert probed == []
+
+    once = []
+
+    def one_shot(_endpoint):
+        raise RuntimeError("exit 1: rate limit")
+
+    with pytest.raises(RuntimeError, match="rate limit"):
+        attribution.resolve_origin_head(
+            "jovieinc/jovie", 7, expected, fetch=one_shot, sleep=once.append, attempts=1)
+    assert once == []
+
+    def run(args, **_kwargs):
+        return subprocess.CompletedProcess(
+            args, 1, stdout="", stderr="HTTP 403: API rate limit exceeded\n")
+
+    monkeypatch.setattr(attribution.subprocess, "run", run)
+    with pytest.raises(RuntimeError, match="rate limit exceeded") as failure:
+        attribution.resolve_origin_head(
+            "jovieinc/jovie", 7, expected, sleep=lambda _delay: None, attempts=1)
+    message = str(failure.value)
+    assert "repos/jovieinc/jovie" in message
+    assert "exit 1" in message
 
 
 def test_emit_waits_for_the_pushed_head_before_writing_the_receipt(monkeypatch, tmp_path):

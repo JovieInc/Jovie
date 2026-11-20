@@ -32,7 +32,82 @@ export interface KeyframeRecord {
   readonly expectedArtistName?: string;
   readonly audit: LayoutAudit;
   readonly pageErrors: readonly string[];
+  /** Public homepage proof, sampled on both sides of the screenshot bytes. */
+  readonly homePreview?: {
+    readonly before: HomePreviewAudit;
+    readonly after: HomePreviewAudit;
+  };
 }
+
+export interface HomePreviewAudit {
+  /** Endpoint state; neither occlusion nor the exact PNG instant is inferred. */
+  readonly status: 'ready' | 'loading' | 'error' | 'missing' | 'hidden';
+  readonly scenario: 'template-profile-live-mobile';
+  readonly selectedCopy: {
+    readonly headline: string;
+    readonly subhead: string;
+  };
+  readonly frameStatus: string | null;
+  readonly image: {
+    readonly resource: 'expected' | 'unexpected' | 'missing';
+    readonly complete: boolean;
+    readonly naturalWidth: number;
+    readonly naturalHeight: number;
+  };
+  readonly geometry: {
+    readonly viewport: { readonly width: number; readonly height: number };
+    readonly scroll: { readonly x: number; readonly y: number };
+    readonly ancestors: readonly {
+      readonly tag: string;
+      readonly box: {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+      };
+      readonly display: string;
+      readonly visibility: string;
+      readonly opacity: string;
+      readonly contentVisibility: string;
+      readonly transform: string;
+    }[];
+  };
+}
+
+/** Plain JS: no transpiler helpers, URLs, or account data enter this public proof. */
+export const HOME_PREVIEW_AUDIT_SOURCE = `(() => {
+  const proof = document.querySelector('[data-testid="homepage-hero-proof"]');
+  const frame = proof && proof.querySelector('[data-testid="product-screenshot-frame-template-profile-live-mobile"]');
+  const image = frame && frame.querySelector('img');
+  const frameStatus = frame ? frame.getAttribute('data-status') : null;
+  let resource = 'missing';
+  if (image) {
+    resource = 'unexpected';
+    try {
+      const url = new URL(image.currentSrc || image.src, location.href);
+      if (url.origin === location.origin && !url.username && !url.password && url.pathname === '/product-screenshots/template-profile-live-phone.png') resource = 'expected';
+    } catch {}
+  }
+  const ancestors = [];
+  let hidden = false;
+  for (let el = image || frame || proof; el && ancestors.length < 12; el = el.parentElement) {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    hidden ||= style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0 || style.contentVisibility === 'hidden' || rect.width <= 0 || rect.height <= 0;
+    ancestors.push({ tag: el.tagName, box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, display: style.display, visibility: style.visibility, opacity: style.opacity, contentVisibility: style.contentVisibility, transform: style.transform });
+    if (el === document.body) break;
+  }
+  const complete = image instanceof HTMLImageElement && image.complete;
+  const naturalWidth = image instanceof HTMLImageElement ? image.naturalWidth : 0;
+  const naturalHeight = image instanceof HTMLImageElement ? image.naturalHeight : 0;
+  const status = !proof || !frame ? 'missing' : frameStatus === 'error' ? 'error' : !image ? 'missing' : complete && naturalWidth === 0 ? 'error' : hidden ? 'hidden' : frameStatus !== 'loaded' || !complete || !naturalWidth || !naturalHeight ? 'loading' : 'ready';
+  return {
+    status, scenario: 'template-profile-live-mobile', frameStatus,
+    selectedCopy: { headline: (document.querySelector('[data-hero-canvas] h1')?.textContent || '').slice(0, 500), subhead: (document.querySelector('.homepage-hero-canvas__subhead')?.textContent || '').slice(0, 500) },
+    image: { resource, complete, naturalWidth, naturalHeight },
+    geometry: { viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY }, ancestors },
+  };
+})()`;
 
 export interface EssentialViewportAudit {
   readonly supported: boolean;
@@ -280,14 +355,16 @@ export const LAYOUT_AUDIT_SOURCE = `(() => {
 /**
  * Runs in the browser before each screenshot. A stuck-to-bottom chat lands at
  * an arbitrary scroll offset, so a message can straddle the top of the
- * thread: half hidden, half drawn in the fade under the header row. For every
- * scroll container with top clearance (padding-top), nudge scrollTop to the
- * nearest message boundary so no [data-message-id] is drawn partly inside the
- * visible part of that band (all of it, or only the fade ramp when the
- * container masks the rest). Prefer scrolling down (hide the
- * message, keep the latest turn in view); scroll up only when already at the
- * bottom and the lowest content still fits. Returns how many nudges ran. Plain JavaScript for the same
- * reason as LAYOUT_AUDIT_SOURCE.
+ * thread. For every scroll container with top clearance, nudge scrollTop to
+ * the nearest turn boundary so no message or speaker row (JOV-12045: the row
+ * sits above its message's [data-message-id] box) is drawn partly inside the
+ * visible part of that band; the fade band itself is fully masked (JOV-12045),
+ * so settled content is invisible above the clearance or fully visible below
+ * it. Prefer scrolling down (hide the message, keep the latest turn in view);
+ * scroll up only when the lowest content still ends inside the scrollport. A
+ * fresh frame (scrollTop 0) also clears a bottom-edge straddle when the shift
+ * fits the container's top padding. Returns how many nudges ran. Plain
+ * JavaScript for the same reason as LAYOUT_AUDIT_SOURCE.
  */
 export const SETTLE_SCROLL_SOURCE = `(() => {
   let moved = 0;
@@ -298,12 +375,17 @@ export const SETTLE_SCROLL_SOURCE = `(() => {
   for (const scroller of scrollers) {
     const clearance = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
     if (clearance <= 0) continue;
-    // Matches .system-b-chat-thread-top-fade: clear until the last 16px of
-    // the clearance band, so only content drawn below that line is visible.
-    const visibleFrom = scroller.classList.contains('system-b-chat-thread-top-fade') ? clearance - 16 : 0;
+    // Matches .system-b-chat-thread-top-fade: the clearance band is fully
+    // masked (JOV-12045 removed the reveal ramp), so content is visible only
+    // from the clearance line down.
+    const visibleFrom = scroller.classList.contains('system-b-chat-thread-top-fade')
+      ? clearance
+      : 0;
     for (let pass = 0; pass < 3; pass += 1) {
       const edge = scroller.getBoundingClientRect().top;
-      const straddler = Array.from(scroller.querySelectorAll('[data-message-id]')).find(el => {
+      const straddler = Array.from(
+        scroller.querySelectorAll('[data-message-id], [data-testid="onboarding-speaker-row"]')
+      ).find(el => {
         const box = el.getBoundingClientRect();
         const top = box.top - edge;
         const bottom = box.bottom - edge;
@@ -318,20 +400,42 @@ export const SETTLE_SCROLL_SOURCE = `(() => {
       if (before + down <= maxScroll + 0.5) {
         scroller.scrollTop = before + down;
       } else {
-        // Scrolling up pushes everything down; only do it while the lowest
-        // drawn content still clears the container's bottom padding.
+        // Scroll up only while the lowest drawn content still ends inside the
+        // scrollport: content may enter the bottom padding band (fully visible
+        // there) but must not cross the container's bottom edge (JOV-12045: a
+        // bottom-stuck transcript clears a straddling speaker row this way).
         const frame = scroller.getBoundingClientRect();
-        const floor = frame.bottom - (parseFloat(getComputedStyle(scroller).paddingBottom) || 0);
         const lowest = Array.from(scroller.querySelectorAll('*')).reduce((max, el) => {
           if (el.children.length > 0) return max;
           const leaf = el.getBoundingClientRect();
           return leaf.height > 0 && leaf.width > 0 ? Math.max(max, leaf.bottom) : max;
         }, -Infinity);
-        if (lowest + up > floor + 0.5) break;
+        if (lowest + up > frame.bottom + 0.5) break;
         scroller.scrollTop = Math.max(0, before - up);
       }
       if (scroller.scrollTop === before) break;
       moved += 1;
+    }
+    // JOV-12045: an at-rest frame (scrollTop 0) can also straddle the BOTTOM
+    // edge (e.g. the desktop profile footer half-cut on a fresh load).
+    // Scrolling down clears it while the top stays clean: the shift is
+    // absorbed by the container's own top padding, so only straddles that
+    // fit within it are cleared.
+    if (scroller.scrollTop === 0) {
+      const frame = scroller.getBoundingClientRect();
+      const bottomEdge = frame.bottom - (parseFloat(getComputedStyle(scroller).paddingBottom) || 0);
+      const straddler = Array.from(scroller.querySelectorAll('*')).find(el => {
+        if (el.children.length > 0) return false;
+        const box = el.getBoundingClientRect();
+        return box.height > 0 && box.width > 0 && box.top < bottomEdge - 0.5 && box.bottom > bottomEdge + 0.5;
+      });
+      if (straddler) {
+        const overhang = straddler.getBoundingClientRect().bottom - bottomEdge;
+        if (overhang <= clearance) {
+          scroller.scrollTop = overhang;
+          moved += 1;
+        }
+      }
     }
   }
   return moved;
@@ -355,6 +459,10 @@ export async function captureKeyframe(
     // A long-poll or analytics beacon must not block evidence capture.
   });
   await page.evaluate(SETTLE_SCROLL_SOURCE);
+  const homeBefore =
+    id === 'home'
+      ? ((await page.evaluate(HOME_PREVIEW_AUDIT_SOURCE)) as HomePreviewAudit)
+      : undefined;
   sequence += 1;
   const file = `${String(sequence).padStart(2, '0')}-${id}.png`;
   const image = await page.screenshot({
@@ -365,6 +473,10 @@ export async function captureKeyframe(
     // The dev toolbar is CI chrome, not product; reviewers must not judge it.
     style: '[data-testid="dev-toolbar"]{display:none!important}',
   });
+  const homeAfter =
+    id === 'home'
+      ? ((await page.evaluate(HOME_PREVIEW_AUDIT_SOURCE)) as HomePreviewAudit)
+      : undefined;
   const record: KeyframeRecord = {
     schema: GOLDEN_PATH_KEYFRAME_SCHEMA,
     id,
@@ -375,6 +487,10 @@ export async function captureKeyframe(
     expectedArtistName: context.expectedArtistName,
     audit: (await page.evaluate(LAYOUT_AUDIT_SOURCE)) as LayoutAudit,
     pageErrors: errors.splice(0),
+    homePreview:
+      homeBefore && homeAfter
+        ? { before: homeBefore, after: homeAfter }
+        : undefined,
   };
   appendFileSync(join(dir, 'manifest.jsonl'), `${JSON.stringify(record)}\n`);
 }

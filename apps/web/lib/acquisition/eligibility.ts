@@ -17,6 +17,15 @@
 export const ACQUISITION_ELIGIBILITY_CONTRACT =
   'jovie.acquisition-eligibility/v1' as const;
 
+/** Workflows whose latest completed main run is cone evidence. */
+export const CONE_WORKFLOWS = {
+  /** Includes the canonical artist profile certificate (JOV-6920). */
+  revenuePath: 'm2-revenue-path-canary.yml',
+  // Golden Path job (signup to refund) of the latest main ci.yml push/dispatch run.
+  goldenPath: 'ci.yml#Golden Path (manual)',
+  buyerEval: 'buyer-eval-gate.yml', // green only when buyer-eval/gate.mjs passes
+} as const;
+
 export type ConeEvidenceStatus = 'green' | 'red' | 'unknown';
 
 export type AcquisitionEligibilityVerdict = 'ELIGIBLE' | 'BLOCKED' | 'UNKNOWN';
@@ -64,6 +73,16 @@ export const REVENUE_CONE_REQUIREMENTS = [
       'engineering (public-profile canary + canonical profile certificate, JOV-6920)',
     nextAction:
       'Repair the failing profile check, then rerun the public-profile canary and M2 workflow.',
+  },
+  {
+    // Tim, 2026-11-07: model the customers and run a would-they-buy test
+    // before anyone leaves the waitlist. Green only on a passing buyer-eval
+    // gate (scripts/buyer-eval/gate.mjs), which needs a positive canary.
+    id: 'buyer_would_pay',
+    label: 'Modeled buyers say they would pay for the current build',
+    owner: 'buyer-eval gate (decisions/company/buyer-eval-gate-2026-10-31)',
+    nextAction:
+      'Fix the top objection in the latest no-pay buyer verdicts, then rerun the buyer-eval gate on the new build.',
   },
   {
     id: 'selected_rail',

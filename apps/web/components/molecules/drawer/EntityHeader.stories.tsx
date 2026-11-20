@@ -1,5 +1,6 @@
+import { IconButton } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Radio } from 'lucide-react';
+import { MoreHorizontal, Radio } from 'lucide-react';
 import {
   EntityHeader,
   EntityHeaderStatusGlyph,
@@ -49,6 +50,22 @@ export const Person: Story = {
     title: 'Maya Vale',
     subtitle: 'Brand partnerships · Worldwide',
   },
+};
+
+export const GridPerson: Story = {
+  args: {
+    ...Person.args,
+    layout: 'grid',
+    actions: (
+      <IconButton aria-label='More actions' variant='ghost' size='sm'>
+        <MoreHorizontal />
+      </IconButton>
+    ),
+  },
+};
+
+export const GridPersonTitleOnly: Story = {
+  args: { ...GridPerson.args, subtitle: undefined },
 };
 
 export const LongStableIdentity: Story = {
@@ -164,6 +181,57 @@ export const IdentityStates: Story = {
           />
         }
       />
+    </div>
+  ),
+};
+
+/**
+ * Empty: the person has no subtitle or metadata yet. Stable layout keeps the
+ * empty details and metadata rows reserved, so the header height holds.
+ */
+export const EmptyDetailsStableLayout: Story = {
+  args: {
+    thumbnail: <EntityHeaderThumbnail variant='person' name='Maya Vale' />,
+    title: 'Maya Vale',
+    stableLayout: true,
+  },
+};
+
+/**
+ * Right-to-left: an Arabic release in the grid layout. Grid cells follow the
+ * writing direction, so the artwork starts on the right and actions end on
+ * the left.
+ */
+export const RtlArabicRelease: Story = {
+  args: {
+    layout: 'grid',
+    stableLayout: true,
+    thumbnail: (
+      <EntityHeaderThumbnail
+        variant='artwork'
+        name='ليالي القاهرة'
+        src='https://placehold.co/112x112'
+      />
+    ),
+    title: 'ليالي القاهرة (النسخة الموسعة مع الأوركسترا الوطنية)',
+    subtitle: 'فرقة النور للموسيقى الشرقية · أغنية منفردة',
+    statusGlyph: (
+      <EntityHeaderStatusGlyph
+        icon={Radio}
+        label='متاح على المنصات'
+        tone='positive'
+      />
+    ),
+    meta: <span className='text-2xs text-tertiary-token'>٣:٤٢ · طرب</span>,
+    actions: (
+      <IconButton aria-label='المزيد من الإجراءات' variant='ghost' size='sm'>
+        <MoreHorizontal className='size-3.5' aria-hidden='true' />
+      </IconButton>
+    ),
+  },
+  render: args => (
+    <div dir='rtl'>
+      <EntityHeader {...args} />
     </div>
   ),
 };

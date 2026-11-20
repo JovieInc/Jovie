@@ -203,7 +203,7 @@ export interface AskJovieMarkProps {
 
 /**
  * Global "Ask Jovie" entry point. Resting state is a faded mark; hover/focus
- * spins the mark once and slides the wordmark out. Click opens the contextual
+ * spins the mark once and reveals the wordmark (width + opacity). Click opens the contextual
  * chat surface instead of navigating. Honors prefers-reduced-motion.
  */
 export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
@@ -217,10 +217,14 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
           aria-label='Ask Jovie'
           data-testid='ask-jovie-trigger'
           className={cn(
-            'ask-jovie-mark group flex h-7 items-center gap-1.5 rounded-md px-1',
+            // No side padding: the mark's left edge sits on the 12px sidebar
+            // icon column (like the admin switcher) and stays centered when
+            // the rail collapses.
+            'ask-jovie-mark group flex h-7 items-center rounded-md',
             'text-sidebar-item-foreground opacity-60',
             'transition-opacity duration-subtle hover:opacity-100 focus-visible:opacity-100',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+            // Themed ring (token colors, visible in light and dark).
+            'focus-ring-themed'
           )}
         >
           <span className='ask-jovie-mark-icon inline-flex shrink-0'>
@@ -233,8 +237,12 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
               aria-hidden
             />
           </span>
-          <span className='ask-jovie-wordmark'>
-            <span className='overflow-hidden whitespace-nowrap text-app tracking-tight'>
+          {/* Mark only at rest; hover/focus grows the wordmark inside its
+              own clip box. The sidebar logo slot is the flex-1 track, so the
+              header actions never move while it animates. The mark-to-word
+              gap lives inside the clip so the resting ring hugs the mark. */}
+          <span className='ask-jovie-wordmark overflow-hidden'>
+            <span className='overflow-hidden whitespace-nowrap ps-1.5 text-app tracking-tight'>
               Jovie
             </span>
           </span>

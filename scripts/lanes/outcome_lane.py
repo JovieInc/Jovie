@@ -39,10 +39,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import lifecycle  # noqa: E402
+from outcome_scan import scan_issues  # noqa: E402
 import outcome_escalation as esc  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 VERDICT_SCHEMA = "jovie.outcome-verdict/v1"
 VERDICT_FILE = "outcome-verdict.json"
@@ -62,10 +63,6 @@ RETRY_S = 24 * 3600
 VERIFY_TIMEOUT_S = 2400
 PREPARE_TIMEOUT_S = 600
 STATE_FILE = "outcome-lane.json"
-CANDIDATES_QUERY = """query($after:String){issues(first:50,after:$after,
- filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Validating"}}},orderBy:updatedAt){
- pageInfo{hasNextPage endCursor}
- nodes{id identifier title url description comments(last:30){nodes{id body createdAt parent{id} user{name}}}}}}"""
 
 
 def now_iso(epoch: float | None = None) -> str:
@@ -133,18 +130,13 @@ LAST_SCAN = {"seen": 0}  # Validating issues the last candidates() pass scanned 
 
 
 def candidates(linear, state: Path, now: float, limit: int = 200) -> list[tuple[dict, dict]]:
-    found, after, seen = [], None, 0
+    found, seen = [], 0
     records = read_state(state)
-    while seen < limit:
-        page = linear.gql(CANDIDATES_QUERY, {"after": after})["issues"]
-        for issue in page["nodes"]:
-            seen += 1
-            ask = lifecycle_ask(issue)
-            if ask and due(records.get(issue["identifier"]), ask, now):
-                found.append((issue, ask))
-        if not page["pageInfo"]["hasNextPage"]:
-            break
-        after = page["pageInfo"]["endCursor"]
+    for issue in scan_issues(linear, state, now, limit, RETRY_S):
+        seen += 1
+        ask = lifecycle_ask(issue)
+        if ask and due(records.get(issue["identifier"]), ask, now):
+            found.append((issue, ask))
     LAST_SCAN["seen"] = seen
     return found
 
@@ -416,8 +408,7 @@ def ledger(state: Path, issue: str, ask: dict, result: dict) -> None:
            "decision": result.get("decision"), "sha": ask.get("sha")}
     try:
         (state / "runs").mkdir(parents=True, exist_ok=True)
-        with open(state / "runs" / "ledger.jsonl", "a") as out:
-            out.write(json.dumps(row) + "\n")
+        append_json_object(state / "runs" / "ledger.jsonl", row)
     except OSError:
         pass  # measurement never blocks a recorded receipt
 

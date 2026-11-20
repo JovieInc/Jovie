@@ -40,6 +40,42 @@ describe('HomeLoopConstraintBanner', () => {
     );
     expect(banner).toHaveAttribute('data-tone', 'loading');
   });
+
+  it('renders unknown instead of the all-clear while the read is unknown', () => {
+    const { rerender } = render(
+      <HomeLoopConstraintBanner
+        constraint={null}
+        emptyLabel='All clear'
+        unknownLabel='Shipping status is unknown'
+      />
+    );
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping status is unknown');
+    expect(banner).not.toHaveTextContent('All clear');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
+
+    // A named constraint always wins over the unknown line.
+    rerender(
+      <HomeLoopConstraintBanner
+        constraint={{ tone: 'bad', text: '2 items are blocked' }}
+        emptyLabel='All clear'
+        unknownLabel='Shipping status is unknown'
+      />
+    );
+    expect(banner).toHaveTextContent('2 items are blocked');
+    expect(banner).toHaveAttribute('data-tone', 'bad');
+
+    // While loading, the skeleton stays the unknown presentation.
+    rerender(
+      <HomeLoopConstraintBanner
+        constraint={null}
+        emptyLabel='All clear'
+        unknownLabel='Shipping status is unknown'
+        loading
+      />
+    );
+    expect(banner).toHaveAttribute('data-tone', 'loading');
+  });
 });
 
 describe('HomeLoopConstraintBanner details', () => {
@@ -70,6 +106,34 @@ describe('HomeLoopConstraintBanner details', () => {
 });
 
 describe('HomeLoopPulse', () => {
+  it('keeps the provenance layout capability across loading and unavailable states', () => {
+    const { rerender } = render(
+      <HomeLoopPulse tiles={[]} loading reserveSourceCaption />
+    );
+    const pulse = screen.getByTestId('home-loop-pulse');
+    const layout = pulse.className;
+    rerender(
+      <HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} reserveSourceCaption />
+    );
+    expect(pulse.className).toBe(layout);
+    rerender(<HomeLoopPulse tiles={[]} reserveSourceCaption />);
+    expect(pulse.className).toBe(layout);
+  });
+
+  it('renders measurement provenance separately from the target', () => {
+    render(
+      <HomeLoopPulse
+        tiles={[
+          {
+            ...HOME_LOOP_FIXTURE_PULSE[0],
+            sourceCaption: 'Snapshot 2026-11-07 14:24 UTC',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Snapshot 2026-11-07 14:24 UTC')).toBeVisible();
+  });
+
   it('shows each tile with its previous value and a named tone', () => {
     render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
     expect(

@@ -4,7 +4,7 @@
 // and a rate limit. Same relay shape as Summer's summer-workers-ai worker.
 
 export const ALLOWED_MODELS: ReadonlySet<string> = new Set([
-  '@cf/zai-org/glm-5.3-flash',
+  '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
   '@cf/zai-org/glm-5.3',
 ]);
 // Embeddings (gbrain + any OpenAI-compatible /v1/embeddings client). bge-m3:

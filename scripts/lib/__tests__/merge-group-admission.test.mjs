@@ -1255,7 +1255,7 @@ describe('merge-group admission evidence', () => {
   });
 
   it('defaults to a multi-minute admission budget', () => {
-    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(360_000);
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(600_000);
     expect(MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS).toBe(66 * 60 * 1000);
   });
 });

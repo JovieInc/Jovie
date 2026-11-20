@@ -40,7 +40,7 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
 // not the quota-recovery window: an installation 403 whose reset is hours
 // away used to exit 1 inside six minutes and eject an in-cap group
 // (2026-10-15 19:53Z, run 38797397320).
-export const MERGE_GROUP_ADMISSION_WAIT_MS = 360_000;
+export const MERGE_GROUP_ADMISSION_WAIT_MS = 600_000;
 // Hourly installation reset is at most 60 minutes out. Wait that out, plus
 // a minute of clock skew, when the reset header says so. A later reset still
 // fails closed. The ci.yml job timeout must cover this plus the poll window.
@@ -890,7 +890,7 @@ export async function waitForMergeGroupAdmission({
       recoverySourceHeadSha ??= observedSourceHeadSha;
       if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
         delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
-        // Quota sleep uses the recovery budget, not the 6-minute check poll.
+        // Quota sleep uses the recovery budget, not the 10-minute check poll.
         // After it, the poll window starts over so a long reset does not eat
         // the time required checks still need.
         if (now() + delayMs + MAX_API_REQUEST_MS > recoveryDeadlineMs) {

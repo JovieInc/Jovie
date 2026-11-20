@@ -111,7 +111,7 @@ export class Board extends DurableObject<Env> {
     return out;
   }
 
-  async alarm() {
+  override async alarm() {
     try {
       await this.sweep();
     } finally {

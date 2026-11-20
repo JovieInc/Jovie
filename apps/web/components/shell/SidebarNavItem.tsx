@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { SIDEBAR_ENTRY_ROW_CLASS } from './sidebar-optical';
 import { Tooltip } from './Tooltip';
@@ -134,9 +135,13 @@ export function SidebarNavItem({
   tight,
 }: SidebarNavItemProps) {
   const button = (
-    <button
+    <PlainButton
       type='button'
       onClick={item.onActivate}
+      // Collapsed mode renders icon-only: the aria-label supplies the
+      // accessible name (axe button-name). When the label is visible it is
+      // identical, so label-in-name (WCAG 2.5.3) still holds.
+      aria-label={item.label}
       aria-pressed={item.active || undefined}
       className={getSidebarNavRowClassName({
         active: item.active,
@@ -164,7 +169,7 @@ export function SidebarNavItem({
           {item.label}
         </span>
       )}
-    </button>
+    </PlainButton>
   );
 
   return (

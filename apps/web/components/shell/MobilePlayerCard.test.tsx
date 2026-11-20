@@ -37,6 +37,9 @@ describe('MobilePlayerCard', () => {
       'bg-(--app-shell-content-surface)/70'
     );
     expect(container.innerHTML).not.toContain('border-white/10');
+    // Floating cards take the theme's popover shadow, not a fixed dark one.
+    expect(container.innerHTML).toContain('shadow-(--shadow-popover)');
+    expect(container.innerHTML).not.toMatch(/shadow-\[[^\]]*rgba/);
     expect(
       container.querySelector('[data-artwork-frame="thumbnail"]')
     ).toBeInTheDocument();

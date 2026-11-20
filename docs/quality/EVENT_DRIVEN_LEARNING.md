@@ -70,9 +70,9 @@ deployment, and observed terminal/exception delivery require separate receipts.
 
 ## Superseded operations
 
-The [Hermes rule](../../.claude/rules/hermes-air.md),
-[operator history](../HERMES_AIR.md), and Fable pipeline notes are historical
-references. Their nightly dispatch-log clustering, bootstrap/restart commands,
-and old model/cost claims cannot reactivate a runtime or authorize a full-log
-sweep. The current Mac runner, dogfood verifier, unrelated monitors, CI gates,
-and release controls retain their existing contracts.
+The [Mac lane rule](../../.claude/rules/hermes-air.md) is the current Air
+contract. [`docs/HERMES_AIR.md`](../HERMES_AIR.md) is a stub. The old operator
+steps, nightly dispatch-log clustering, and model/cost claims are git history.
+They cannot reactivate a runtime or authorize a full-log sweep. The current Mac
+runner, dogfood verifier, unrelated monitors, CI gates, and release controls
+retain their existing contracts.

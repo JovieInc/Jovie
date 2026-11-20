@@ -22,6 +22,7 @@ import {
   validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
+import { HOMEPAGE_FRONT_DOOR_CTA as CTA } from '@/data/homepageLaunchCopy';
 import {
   MARKETING_COMPONENT_REGISTRY,
   MARKETING_ROUTE_MANIFEST,
@@ -719,13 +720,12 @@ describe('canonical marketing component registry', () => {
       ),
     });
 
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      "aria-hidden='true'"
-    );
-    expect(centrallyReadSources.HomepageV2Route).toContain('inert');
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      'homepage-v2-hero__demo-scale'
-    );
+    const routeSource = centrallyReadSources.HomepageV2Route;
+    expect(routeSource).toContain("aria-hidden='true'");
+    expect(routeSource).toContain('inert');
+    expect(routeSource).toContain('homepage-v2-hero__demo-scale');
+    // Every below-hero section ships unconditionally: no static flag gates.
+    expect(routeSource).not.toContain('FEATURE_FLAGS');
   });
 
   it('keeps terminal CTA actions on the canonical Button atom', () => {
@@ -1139,7 +1139,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      22, 39,
+      20, 39, 2, 2,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({
@@ -1490,9 +1490,8 @@ describe('canonical shared source atom registry', () => {
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Get started', 'Request Access']);
-    // Each instance carries only its independent label override; none
-    // claims a leading-icon slot the Pen master does not expose.
+    ).toEqual(['Download for Mac', 'Get started', CTA.primary.label]);
+    // Each instance carries only its independent label override.
     for (const ref of refs) {
       expect(ref.overrides).toHaveLength(1);
     }
@@ -1769,7 +1768,7 @@ vi.mock('next/link', async () => {
 it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
   const { container } = render(createElement(HomepageV2Route));
   const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
-  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('href', '/start');
   expect(auth).toHaveAttribute('data-test-prefetch', 'false');
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');

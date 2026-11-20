@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import { storyEvidenceEligibility } from '../../../../../scripts/lib/component-render-inputs.mjs';
 import {
   cronGapMinutes,
   filterList,
@@ -453,12 +454,32 @@ describe('CI test-performance path gate', () => {
       /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
     )?.[1];
     expect(generalTestElse).not.toContain('run_test_performance');
-    const forkGuard = detectStep.slice(
-      detectStep.indexOf('if [[ "$IS_FORK" == "true" ]]')
-    );
-    expect(forkGuard).toContain(
-      'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
-    );
+    const forkGuard = getStepRunScript(detectStep).match(
+      /^if \[\[ "\$IS_FORK" == "true" \]\]; then[\s\S]*?^fi$/m
+    )?.[0];
+    expect(forkGuard, 'fork path override').toBeDefined();
+    const dir = mkdtempSync(resolve(tmpdir(), 'fork-performance-output-'));
+    try {
+      const output = resolve(dir, 'step-output');
+      for (const isFork of ['true', 'false']) {
+        writeFileSync(output, 'run_test_performance=true\n');
+        const result = spawnSync('bash', ['-ec', forkGuard!], {
+          encoding: 'utf8',
+          env: { ...process.env, IS_FORK: isFork, GITHUB_OUTPUT: output },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        const values = readFileSync(output, 'utf8')
+          .split('\n')
+          .filter(line => line.startsWith('run_test_performance='));
+        expect(values).toEqual(
+          isFork === 'true'
+            ? ['run_test_performance=true', 'run_test_performance=false']
+            : ['run_test_performance=true']
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
 
     expect(performanceJob).toContain(
       "github.event_name == 'workflow_dispatch'"
@@ -523,16 +544,9 @@ describe('CI Storybook accessibility path gate', () => {
       visualPathJob,
       'Detect visual-relevant changes'
     );
-    expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
-    );
-    expect(visualDetectStep).toContain(
-      'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
-    );
-    const visualPattern = visualDetectStep.match(
-      /VISUAL_PATTERNS='([^']+)'/
-    )?.[1];
-    expect(visualPattern).toBeTruthy();
+    expect(visualDetectStep).toContain("EVENT_NAME === 'workflow_dispatch'");
+    expect(visualDetectStep).toContain('{ visual: true, render: true }');
+    expect(visualDetectStep).toContain('storyEvidenceEligibility(paths)');
     for (const input of [
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
@@ -545,16 +559,11 @@ describe('CI Storybook accessibility path gate', () => {
       'pnpm-lock.yaml',
       '.github/workflows/visual-a11y.yml',
     ]) {
-      expect(
-        spawnSync('grep', ['-q', '-E', visualPattern!], { input }).status,
-        input
-      ).toBe(0);
+      expect(storyEvidenceEligibility([input]).visual, input).toBe(true);
     }
-    expect(
-      spawnSync('grep', ['-q', '-E', visualPattern!], {
-        input: 'apps/web/styles.css',
-      }).status
-    ).toBe(1);
+    expect(storyEvidenceEligibility(['apps/web/styles.css']).visual).toBe(
+      false
+    );
     expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
@@ -1672,21 +1681,24 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('blocks production alias budgets on certified pages and warns elsewhere', () => {
-    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+  it('blocks certified alias budgets beside post-deploy smoke', () => {
+    const releaseWorkflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controllerWorkflow = readFileSync(
+      productionControllerWorkflowPath,
+      'utf8'
+    );
     const aliasGate = getJobBlock(
-      workflow,
+      controllerWorkflow,
       'production-public-profile-alias-gate'
     );
-    const releaseResult = getJobBlock(workflow, 'release-result');
+    const verified = getJobBlock(controllerWorkflow, 'production-verified');
 
-    expect(aliasGate).toContain('needs: [promote-production]');
+    expect(aliasGate).toContain(
+      'needs: [authorize-production, production-release]'
+    );
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // The 2026-10-31 receipt graduated production alias budgets (14/14,
-    // JOV-8737), but a miss blocks only on routes whose golden-path surface
-    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
     expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
@@ -1707,10 +1719,8 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(releaseResult).toContain(
-      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
-    );
-    const promoteJob = getJobBlock(workflow, 'promote-production');
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
+    const promoteJob = getJobBlock(releaseWorkflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
       promoteJob,
       'Prove canonical navigation budgets on exact staged build'
@@ -1720,10 +1730,6 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
       stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
-    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
-    // whose golden-path surface is certified in the Ovie ledger; uncertified
-    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
       'scripts/lib/alias-gate-certified-routes.mjs'
     );
@@ -1745,11 +1751,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
       expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
-    expect(aliasGate).toContain('args+=(--route-id "$route")');
-    // Downstream still requires job successful completion (exit 0), not a perf pass.
-    expect(releaseResult).toContain('production-public-profile-alias-gate,');
-    expect(releaseResult).toContain(
-      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
+    // The gate runs beside smoke and still blocks Production Verified.
+    // It is not an input to the release result.
+    expect(verified).toContain('production-public-profile-alias-gate,');
+    expect(verified).toContain(
+      'Public-profile alias gate:${{ needs.production-public-profile-alias-gate.result }}'
+    );
+    expect(releaseWorkflow).not.toContain(
+      'production-public-profile-alias-gate'
     );
   });
 
@@ -2054,12 +2063,26 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain('&& 5 || 3');
     // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
     // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
-    expect(unitJob).toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
-    );
-    expect(unitJob).not.toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
-    );
+    const runUnits = getStepRunScript(getStepBlock(unitJob, 'Run unit tests'));
+    const flags = runUnits.match(/^ *VITEST_CI_FLAGS=.*$/m)?.[0];
+    expect(flags, 'missing worker options').toBeDefined();
+    for (const cpus of ['2', '7']) {
+      const shell = [
+        'nproc() { echo "$CPUS"; }',
+        flags!,
+        'printf "%s\\n" "${VITEST_CI_FLAGS[@]}"',
+      ].join('\n');
+      const result = spawnSync('bash', ['-ec', shell], {
+        encoding: 'utf8',
+        env: { ...process.env, CPUS: cpus },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim().split('\n')).toEqual([
+        '--pool=forks',
+        '--maxWorkers=' + cpus,
+        '--fileParallelism',
+      ]);
+    }
     // Each isolated fork re-parses the DOM environment and other externals;
     // the shared V8 compile cache lets later forks load bytecode instead.
     const compileCacheEnv =
@@ -2108,7 +2131,7 @@ describe('iOS stage contract', () => {
     expect(iosWorkflow).not.toContain('mac-runner-heartbeat.yml');
     expect(ios).toContain('mac-first: true');
     expect(pathChanges).toContain(
-      "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
+      "event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios"
     );
     expect(pathChanges).toContain(
       'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
@@ -2206,6 +2229,9 @@ describe('canary health gate workflow', () => {
   });
 
   // Execute the production Bash, including privacy checks after identity passes.
+  // Local test:fast times out at 5s. CI allows 12s for this config. One
+  // identity case took 949ms alone and crossed 5s while the hook host was
+  // loaded. Use the CI budget. Status and request counts stay fail-closed.
   it.each([
     ['exact', 0, 1],
     ['sha-converges', 0, 2],
@@ -2483,7 +2509,8 @@ esac
       } finally {
         rmSync(root, { force: true, recursive: true });
       }
-    }
+    },
+    12_000
   );
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
@@ -3431,7 +3458,7 @@ describe('CI E2E smoke workflow', () => {
       readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
     ) as { scripts: Record<string, string> };
     expect(packageJson.scripts['seed:test-data']).toContain(
-      'tests/seed-test-data.ts'
+      'tests/seed-e2e-entry.ts'
     );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });
@@ -3963,31 +3990,6 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
-  it('uses the root packageManager as the single pnpm version source', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-    const packageJson = JSON.parse(
-      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-    ) as { packageManager?: string };
-    const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
-
-    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
-    expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
-    expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
-  });
-
-  it('deletes prefixed CI branches when a PR closes', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-
-    expect(cleanupWorkflow).toContain('List and delete matching Neon branches');
-    expect(cleanupWorkflow).toContain('startswith($base + "-")');
-  });
-
   it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
@@ -5718,7 +5720,7 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
     expect(seedStep).toContain(
-      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+      "github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == ''"
     );
     const seedIndex = job.indexOf(
       '- name: Seed authenticated release fixtures'

@@ -189,8 +189,8 @@ describe('shipping SLO workflow credentials', () => {
       'BRANCH="bot/shipping-slo-snapshot-${{ github.run_id }}-${{ github.run_attempt }}"'
     );
     expect(WORKFLOW).toContain('git push -u origin "$BRANCH"');
-    expect(WORKFLOW).toContain(
-      'gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"'
+    expect(WORKFLOW).toMatch(
+      /if \[ "\$snapshot_lines" -gt 1500 \]; then[\s\S]*?label_args\+=\(--label big-pr\)[\s\S]*?gh pr create --repo "\$\{\{ github\.repository \}\}" --base main --head "\$BRANCH"/
     );
     expect(WORKFLOW).not.toContain('git push origin HEAD:main');
   });
@@ -881,6 +881,45 @@ describe('production verification sources (JOV-8082)', () => {
       report.flat['production_lag.merged_to_verified.p95']
     ).toBeGreaterThan(0);
     expect(report.flat['throughput.verified_per_day']).toBeCloseTo(1 / 7);
+  });
+
+  it("carries the merge-queue speed digest into Summer's slo block", () => {
+    const raw = {
+      runs: { pull_request: [], merge_group: [], main: [] },
+      mergedPrs: [],
+      timelines: {},
+      deployments: [],
+    };
+    const mergeQueueSpeed = {
+      schema: 'jovie-merge-queue-speed/v1',
+      collection: {
+        status: 'collected',
+        collectionId: process.env.GITHUB_RUN_ID
+          ? `${process.env.GITHUB_RUN_ID}/${process.env.GITHUB_RUN_ATTEMPT || '1'}`
+          : null,
+      },
+      generatedAt: ago(0),
+      mergesPerHour: 4.08,
+      groupSuccessRate: 0.409,
+      batchSizeGate: { success2h: 0.524 },
+      mergeGroupCiSeconds: { p50: 798 },
+      queueWaitSeconds: { p50: 3636 },
+    };
+    const report = buildReport(raw, verifiedBaseline(), {
+      now: NOW,
+      mergeQueueSpeed,
+    });
+    expect(report.gistSlo.mergeQueueSpeed).toEqual({
+      mergesPerHour: 4.08,
+      groupSuccessRate: 0.409,
+      groupSuccessRate2h: 0.524,
+      mergeGroupP50Seconds: 798,
+      queueWaitP50Seconds: 3636,
+      generatedAt: mergeQueueSpeed.generatedAt,
+    });
+    expect(
+      buildReport(raw, verifiedBaseline(), { now: NOW }).gistSlo
+    ).not.toHaveProperty('mergeQueueSpeed');
   });
 
   it('honours per-PR Production Verified check evidence', () => {

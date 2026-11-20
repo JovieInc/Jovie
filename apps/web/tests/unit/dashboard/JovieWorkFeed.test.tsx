@@ -146,7 +146,7 @@ describe('JovieWorkFeed', () => {
     render(<JovieWorkFeed profileId='profile-123' />);
 
     expect(
-      screen.getByText(/Jovie has not shipped autonomous work/i)
+      screen.getByText('Nothing Shipped In This Window')
     ).toBeInTheDocument();
     expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe('OUTPUT');
   });

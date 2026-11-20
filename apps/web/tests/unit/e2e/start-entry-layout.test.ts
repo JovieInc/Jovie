@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
+  projectReplyLayoutEvidence,
 } from '../../e2e/utils/start-entry-layout';
 
 let frames: FrameRequestCallback[];
@@ -280,7 +281,26 @@ describe('start entry layout probes', () => {
     installObserver(false);
     installReplyLayoutProbe();
     window.__armClaimLayout?.();
-    expect(window.__claimLayout).toEqual({ supported: false, total: null });
+    expect(window.__claimLayout).toEqual({
+      supported: false,
+      total: null,
+      windowStart: 0,
+    });
+    expect(
+      projectReplyLayoutEvidence({
+        ...window.__claimLayout!,
+        measuredAt: performance.now(),
+        entries: window.__claimLayoutEntries!,
+      })
+    ).toMatchObject({
+      available: true,
+      supported: false,
+      total: null,
+      totalFinite: false,
+      windowStart: 0,
+      entries: [],
+    });
+    expect(projectReplyLayoutEvidence(undefined)).toEqual({ available: false });
     expect(window.__claimLayoutEntries).toEqual([]);
     expect(observe).not.toHaveBeenCalled();
   });
@@ -293,7 +313,11 @@ describe('start entry layout probes', () => {
       { value: 0.1, hadRecentInput: false },
       { value: 0.4, hadRecentInput: true },
     ]);
-    expect(window.__claimLayout).toEqual({ supported: true, total: 0.1 });
+    expect(window.__claimLayout).toEqual({
+      supported: true,
+      total: 0.1,
+      windowStart: 0,
+    });
   });
 
   it('drops handoff shifts from before the reply window, including late delivery, and still fails on an in-window shift', () => {
@@ -323,9 +347,17 @@ describe('start entry layout probes', () => {
       {} as PerformanceObserver
     );
     expect(window.__claimLayout?.total).toBe(0.1503125);
+    expect(window.__claimLayout?.windowStart).toBe(0);
     frameTime = 1_000;
     window.__armClaimLayout?.();
     expect(window.__claimLayout?.total).toBe(0);
+    expect(
+      projectReplyLayoutEvidence({
+        ...window.__claimLayout!,
+        measuredAt: performance.now(),
+        entries: window.__claimLayoutEntries!,
+      })
+    ).toMatchObject({ windowStart: 1_000, measuredAt: 1_000, total: 0 });
     expect(window.__claimLayoutEntries?.[0]).toMatchObject({
       value: 0.1503125,
       startTime: 40,
@@ -354,6 +386,147 @@ describe('start entry layout probes', () => {
       window.__claimLayoutEntries?.find(entry => entry.startTime === 1_200)
         ?.counted
     ).toBe(true);
+  });
+
+  it('retains unrounded reply measurements and numeric rectangles without DOM or private strings', () => {
+    installObserver(true);
+    installReplyLayoutProbe();
+    const secret = 'PRIVATE_EMAIL_URL_TEXT';
+    const node = document.createElement('div');
+    node.id = secret;
+    node.dataset.testid = secret;
+    node.className = secret;
+    node.textContent = secret;
+    deliverEntries(
+      {
+        getEntries: () => [
+          {
+            value: 0.1503125,
+            hadRecentInput: false,
+            startTime: 40.125,
+            sources: [
+              {
+                node,
+                previousRect: { x: 1.25, y: 280.375, width: 1280, height: 319 },
+                currentRect: { x: 1.25, y: 442.625, width: 1280, height: 319 },
+              },
+            ],
+          },
+          { value: 0.4, hadRecentInput: true, startTime: 50.875, sources: [] },
+        ],
+      } as unknown as PerformanceObserverEntryList,
+      {} as PerformanceObserver
+    );
+    frameTime = 123.456;
+    const snapshot = {
+      ...window.__claimLayout!,
+      measuredAt: performance.now(),
+      entries: window.__claimLayoutEntries!,
+      composerFrames: [secret],
+      extra: secret,
+    };
+    const before = structuredClone(snapshot);
+    const evidence = projectReplyLayoutEvidence(snapshot);
+    expect(evidence).toEqual({
+      available: true,
+      supported: true,
+      total: 0.1503125,
+      totalFinite: true,
+      windowStart: 0,
+      windowStartFinite: true,
+      measuredAt: 123.456,
+      measuredAtFinite: true,
+      entries: [
+        {
+          value: 0.1503125,
+          valueFinite: true,
+          startTime: 40.125,
+          startTimeFinite: true,
+          hadRecentInput: false,
+          counted: true,
+          sources: [
+            {
+              previous: {
+                x: 1.25,
+                y: 280.375,
+                width: 1280,
+                height: 319,
+                finite: true,
+              },
+              current: {
+                x: 1.25,
+                y: 442.625,
+                width: 1280,
+                height: 319,
+                finite: true,
+              },
+            },
+          ],
+        },
+        {
+          value: 0.4,
+          valueFinite: true,
+          startTime: 50.875,
+          startTimeFinite: true,
+          hadRecentInput: true,
+          counted: false,
+          sources: [],
+        },
+      ],
+    });
+    expect(JSON.stringify(evidence)).not.toContain(secret);
+    expect(snapshot).toEqual(before);
+  });
+
+  it('marks nonfinite reply evidence explicitly without inventing zero', () => {
+    installObserver(true);
+    installReplyLayoutProbe();
+    deliverEntries(
+      {
+        getEntries: () => [
+          {
+            value: Number.NaN,
+            hadRecentInput: false,
+            startTime: 10,
+            sources: [
+              {
+                previousRect: { x: 0, y: 0, width: 10, height: 10 },
+                currentRect: {
+                  x: Number.POSITIVE_INFINITY,
+                  y: 1,
+                  width: 10,
+                  height: 10,
+                },
+              },
+            ],
+          },
+        ],
+      } as unknown as PerformanceObserverEntryList,
+      {} as PerformanceObserver
+    );
+    const evidence = projectReplyLayoutEvidence({
+      ...window.__claimLayout!,
+      measuredAt: performance.now(),
+      entries: window.__claimLayoutEntries!,
+    });
+    expect(evidence).toMatchObject({
+      supported: true,
+      total: null,
+      totalFinite: false,
+      entries: [
+        {
+          value: null,
+          valueFinite: false,
+          sources: [
+            {
+              current: { x: null, y: 1, width: 10, height: 10, finite: false },
+            },
+          ],
+        },
+      ],
+    });
+    expect(window.__claimLayout?.total).toBeNaN();
+    expect(window.__claimLayoutEntries?.[0].value).toBeNaN();
   });
 
   it('poisons the reply window when an in-window shift value is not finite', () => {

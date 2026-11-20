@@ -137,6 +137,16 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     );
   });
 
+  it('paints a selected row as a fill, never a bordered box', () => {
+    const selectedRule = DESIGN_SYSTEM_CSS.match(
+      /:where\(\.system-b-table-row-selected\),\s*:where\(\.system-b-table-selection-selected\)\s*\{([^}]*)\}/
+    );
+    expect(selectedRule?.[1]).toContain(
+      'background: var(--color-row-selected);'
+    );
+    expect(selectedRule?.[1]).not.toMatch(/box-shadow|border|outline/);
+  });
+
   it('keeps PageToolbar on semantic surfaces (no layout/radius drift)', () => {
     expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('hover:bg-surface-1');
     expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).toContain('bg-surface-1');

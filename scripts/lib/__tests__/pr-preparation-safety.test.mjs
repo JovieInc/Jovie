@@ -31,14 +31,18 @@ const entry = overrides => ({
   ...overrides,
 });
 const checks = () =>
-  ['PR Ready', 'Migration Guard', 'Fork PR Gate', 'PR Size Guard'].map(
-    name => ({
-      __typename: 'CheckRun',
-      name,
-      status: 'COMPLETED',
-      conclusion: 'SUCCESS',
-    })
-  );
+  [
+    'PR Ready',
+    'Migration Guard',
+    'Fork PR Gate',
+    'PR Size Guard',
+    'Company guards',
+  ].map(name => ({
+    __typename: 'CheckRun',
+    name,
+    status: 'COMPLETED',
+    conclusion: 'SUCCESS',
+  }));
 const pr = overrides => ({
   number: 16001,
   title: 'feature',

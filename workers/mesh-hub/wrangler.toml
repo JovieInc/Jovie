@@ -18,6 +18,10 @@ class_name = "Registry"
 name = "BOARD"
 class_name = "Board"
 
+[[durable_objects.bindings]]
+name = "MCP_AUTH"
+class_name = "McpAuth"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Mailbox", "Registry"]
@@ -26,6 +30,11 @@ new_sqlite_classes = ["Mailbox", "Registry"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Board"]
+
+# Remote MCP OAuth server state (src/mcp-oauth.ts).
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["McpAuth"]
 
 # Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
 [ai]
@@ -36,12 +45,13 @@ enabled = true
 
 # Secrets (wrangler secret put; values live in Doppler agent-mesh/prd, never here):
 #   HUB_ADMIN_TOKEN            registry writes only
+#   MCP_OWNER_TOTP_SECRET      base32 TOTP secret of Tim; without it /mcp consent refuses everyone
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
 
 [vars]
-# Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
-# aeon, grokbot and stella are out: each has a real reader (canon MESH-SWARM.md); a stand-in would ack their mail first.
-EXECUTOR_KINDS = "codex,chloe,lola,muse,dots,instinct,devin"
+# Stand-ins are disabled: registered agent mail must wait for its real runtime.
+# A hub-generated reply is never evidence that the addressed agent is available.
+EXECUTOR_KINDS = ""
 EXECUTOR_GRACE_MS = "20000"
 # Alarm once when peer mail sits unhandled this long (ms).
 MAIL_STALE_MS = "600000"

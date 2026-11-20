@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -75,6 +76,35 @@ async function downloadPressPhoto(
   }
 }
 
+interface AboutContactRow {
+  readonly id: string;
+  readonly roleLabel: string;
+  readonly subtitle: string;
+}
+
+/**
+ * The About summary is a link list into the Contact view, which lists every
+ * contact. One row per role keeps two entries for the same role from
+ * rendering as a duplicate "Brand partnerships" (walk 2026-11-09); the row
+ * keeps the first contact's subtitle that has one.
+ */
+function groupAboutContactsByRole(
+  contacts: readonly PublicContact[]
+): AboutContactRow[] {
+  const rows = new Map<string, AboutContactRow>();
+  for (const contact of contacts) {
+    const key = contact.roleLabel.trim().toLowerCase();
+    const subtitle = formatPublicContactSubtitle(contact);
+    const existing = rows.get(key);
+    if (!existing) {
+      rows.set(key, { id: contact.id, roleLabel: contact.roleLabel, subtitle });
+    } else if (!existing.subtitle && subtitle) {
+      rows.set(key, { ...existing, subtitle });
+    }
+  }
+  return [...rows.values()];
+}
+
 export function AboutSection({
   artist,
   genres,
@@ -95,8 +125,8 @@ export function AboutSection({
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
   const hasCredits = Boolean(creditSegments && creditSegments.length > 0);
-  const contactableContacts = contacts.filter(
-    contact => contact.channels.length > 0
+  const contactableContacts = groupAboutContactsByRole(
+    contacts.filter(contact => contact.channels.length > 0)
   );
   const hasContacts = contactableContacts.length > 0;
   const contactHref = `/${encodeURIComponent(artist.handle)}?mode=contact`;
@@ -112,7 +142,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-sm font-book text-white/40'>
+        <p className='text-sm font-book text-on-media/50'>
           No information available yet.
         </p>
       </div>
@@ -124,7 +154,7 @@ export function AboutSection({
       <p className='sr-only'>About {artist.name}</p>
 
       {hasBio && (
-        <p className='text-sm font-book leading-relaxed text-white/70 whitespace-pre-line'>
+        <p className='text-sm font-book leading-relaxed text-on-media/70 whitespace-pre-line'>
           {bioSegments ? (
             <EntityMentionText segments={bioSegments} />
           ) : (
@@ -136,19 +166,19 @@ export function AboutSection({
       {hasMetadata && (
         <div className='flex flex-wrap gap-x-5 gap-y-2'>
           {hasLocation && (
-            <div className='flex items-center gap-2 text-app text-white/50'>
+            <div className='flex items-center gap-2 text-app text-on-media/50'>
               <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>{artist.location}</span>
             </div>
           )}
           {hasHometown && (
-            <div className='flex items-center gap-2 text-app text-white/50'>
+            <div className='flex items-center gap-2 text-app text-on-media/50'>
               <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>From {artist.hometown}</span>
             </div>
           )}
           {hasActiveSince && (
-            <div className='flex items-center gap-2 text-app text-white/50'>
+            <div className='flex items-center gap-2 text-app text-on-media/50'>
               <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span>Active since {artist.active_since_year}</span>
             </div>
@@ -172,11 +202,14 @@ export function AboutSection({
       )}
 
       {hasCredits && (
-        <div data-testid='profile-about-credits'>
-          <h2 className='mb-2 text-app font-caption text-white/70'>
+        <div
+          className='profile-about-credits'
+          data-testid='profile-about-credits'
+        >
+          <h2 className='mb-2 text-balance text-app font-caption text-on-media/70'>
             Selected Credits
           </h2>
-          <p className='text-sm font-book leading-relaxed text-white/70'>
+          <p className='text-sm font-book leading-relaxed text-on-media/70'>
             <EntityMentionText segments={creditSegments ?? []} />
           </p>
         </div>
@@ -184,24 +217,25 @@ export function AboutSection({
 
       {hasContacts && (
         <div data-testid='profile-about-contacts'>
-          <h2 className='mb-2 text-app font-caption text-white/70'>
+          <h2 className='mb-2 text-balance text-app font-caption text-on-media/70'>
             Booking &amp; Contact
           </h2>
           <ul className='flex flex-col gap-1'>
-            {contactableContacts.map(contact => {
-              const subtitle = formatPublicContactSubtitle(contact);
+            {contactableContacts.map(({ id, roleLabel, subtitle }) => {
               return (
-                <li key={contact.id}>
+                <li key={id}>
                   <Link
                     href={contactHref}
                     prefetch={false}
                     className='group inline-flex min-h-11 max-w-full flex-col items-start justify-center gap-0.5 text-left'
                   >
-                    <span className='text-sm font-semibold text-white/80 underline-offset-4 group-hover:underline'>
-                      {contact.roleLabel}
+                    <span className='text-sm font-semibold text-on-media/80 underline-offset-4 group-hover:underline'>
+                      {roleLabel}
                     </span>
                     {subtitle ? (
-                      <span className='text-xs text-white/50'>{subtitle}</span>
+                      <span className='text-xs text-on-media/50'>
+                        {subtitle}
+                      </span>
                     ) : null}
                   </Link>
                 </li>
@@ -214,7 +248,7 @@ export function AboutSection({
       {hasPressPhotos && (
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
-            <h2 className='text-app font-caption text-white/70'>
+            <h2 className='text-balance text-app font-caption text-on-media/70'>
               Press Photos
             </h2>
           </div>
@@ -237,13 +271,13 @@ export function AboutSection({
                     fallbackClassName='bg-surface-2'
                   />
                   {/* Download button — flat icon, circle on hover */}
-                  <button
+                  <PlainButton
                     type='button'
                     disabled={!photo.blobUrl}
                     onClick={() => {
                       void downloadPressPhoto(photo, artist, index);
                     }}
-                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors duration-normal hover:bg-black/40 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 text-on-media/60 transition-colors duration-normal hover:bg-ink-on-media/40 hover:text-on-media/90 disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={
                       photo.originalFilename
                         ? `Download ${photo.originalFilename}`
@@ -251,7 +285,7 @@ export function AboutSection({
                     }
                   >
                     <Download className='h-4 w-4' />
-                  </button>
+                  </PlainButton>
                 </div>
               </div>
             ))}

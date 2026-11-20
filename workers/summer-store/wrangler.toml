@@ -1,0 +1,12 @@
+# Recovered from the deployed Worker (source map sourcesContent) 2026-10-31; was deployed with no source in git.
+name = "summer-store"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+keep_vars = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "summer-store"
+database_id = "3ada16c4-6d15-4284-8ced-9746b721e141"
+# Secret: STORE_TOKEN (wrangler secret put).

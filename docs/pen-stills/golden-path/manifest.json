@@ -1,0 +1,103 @@
+{
+  "$schema": "../manifest.schema.json",
+  "schema": "pen-still-manifest/v1",
+  "penFile": {
+    "name": "Jovie Design Studio — canonical.lib.pen",
+    "note": "Design first (Tim, 2026-11-08). A frame whose penNodeId begins with pending has no Pen design yet and fails certification (pen.design-exists) until designed in Pen and given its real node id; agents never invent stills. Designed frames are exported at certification time by scripts/invariants/pen-golden-path.mjs with the headless Pen CLI (PEN_CLI_KEY + PEN_GOLDEN_PATH_FILE_URL), never stored by hand in git. Protected routes set auth: required and capture with an isolated synthetic canary storageState; signup-signin/request-access is parked while public open signup redirects /waitlist to /start."
+  },
+  "frames": [
+    {
+      "sectionId": "landing/homepage",
+      "penNodeId": "pending-no-design",
+      "stillPath": "docs/pen-stills/golden-path/landing.homepage.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/",
+      "status": "active"
+    },
+    {
+      "sectionId": "signup-signin/signin",
+      "penNodeId": "oaz9c",
+      "stillPath": "docs/pen-stills/golden-path/signup-signin.signin.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/signin",
+      "status": "active"
+    },
+    {
+      "sectionId": "signup-signin/request-access",
+      "penNodeId": "pending-no-design",
+      "stillPath": "docs/pen-stills/golden-path/signup-signin.request-access.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/waitlist",
+      "status": "parked"
+    },
+    {
+      "sectionId": "claim/claim",
+      "penNodeId": "pending-no-design",
+      "stillPath": "docs/pen-stills/golden-path/claim.claim.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/claim",
+      "status": "active"
+    },
+    {
+      "sectionId": "onboarding/start",
+      "penNodeId": "hGHPE",
+      "stillPath": "docs/pen-stills/golden-path/onboarding.start.dark.390.png",
+      "viewport": 390,
+      "mode": "dark",
+      "route": "/start",
+      "status": "active"
+    },
+    {
+      "sectionId": "chat/app-chat",
+      "penNodeId": "hkkdJ",
+      "stillPath": "docs/pen-stills/golden-path/chat.app-chat.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/app/chat",
+      "auth": "required",
+      "status": "active"
+    },
+    {
+      "sectionId": "public-profile/profile",
+      "penNodeId": "D9kdx",
+      "stillPath": "docs/pen-stills/golden-path/public-profile.profile.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/tim",
+      "sectionSelector": ".profile-desktop-surface",
+      "status": "active"
+    },
+    {
+      "sectionId": "smartlink/release",
+      "penNodeId": "SVPSC",
+      "stillPath": "docs/pen-stills/golden-path/smartlink.release.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/tim/wheels-up",
+      "status": "active"
+    },
+    {
+      "sectionId": "checkout/pricing",
+      "penNodeId": "hLRZB",
+      "stillPath": "docs/pen-stills/golden-path/checkout.pricing.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/pricing",
+      "status": "active"
+    },
+    {
+      "sectionId": "checkout/billing-success",
+      "penNodeId": "pending-no-design",
+      "stillPath": "docs/pen-stills/golden-path/checkout.billing-success.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "route": "/billing/success",
+      "auth": "required",
+      "status": "active"
+    }
+  ]
+}

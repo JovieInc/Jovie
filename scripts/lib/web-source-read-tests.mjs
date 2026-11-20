@@ -177,6 +177,28 @@ export function selectSourceReadTests(changed, options = {}) {
 }
 
 /**
+ * test:fast allows 5s locally and 12s in CI. This guard is the publication
+ * hook, so it uses the CI budget. A loaded hook timed out production-config
+ * reads at 5s.
+ * @param {readonly string[]} selected web-relative test paths
+ */
+export function sourceReadRunnerArgs(selected) {
+  return [
+    '--filter',
+    '@jovie/web',
+    'run',
+    'test:fast',
+    '--',
+    '--pool=forks',
+    '--maxWorkers=4',
+    '--fileParallelism',
+    '--retry=1',
+    '--testTimeout=12000',
+    ...selected,
+  ];
+}
+
+/**
  * Web-relative unit paths quarantined by the ledger.
  * @param {string} root
  */
@@ -215,22 +237,10 @@ async function main(args) {
     return 0;
   }
   if (selected.length === 0) return 0;
-  const result = spawnSync(
-    'pnpm',
-    [
-      '--filter',
-      '@jovie/web',
-      'run',
-      'test:fast',
-      '--',
-      '--pool=forks',
-      '--maxWorkers=4',
-      '--fileParallelism',
-      '--retry=1',
-      ...selected,
-    ],
-    { cwd: REPO_ROOT, stdio: 'inherit' }
-  );
+  const result = spawnSync('pnpm', sourceReadRunnerArgs(selected), {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  });
   return result.status ?? 1;
 }
 

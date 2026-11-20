@@ -30,5 +30,5 @@ export async function resolveInitialCookieBannerVisible(): Promise<boolean> {
     );
   }
   // No geo header (local dev, previews): fall back to the proxy's cookie.
-  return cookieStore.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1';
+  return cookieStore.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value !== '0';
 }

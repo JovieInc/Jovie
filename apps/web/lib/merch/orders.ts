@@ -3,11 +3,11 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, asc, sql as drizzleSql, eq, inArray, ne } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { kickQueue } from '@/lib/cron/kick-queue';
 import { db } from '@/lib/db';
 import {
   type MerchCard,
   type MerchOrder,
-  type MerchShippingAddress,
   merchCards,
   merchFulfillmentJobs,
   merchOrders,
@@ -19,7 +19,6 @@ import {
   confirmOrder,
   createDraftOrder,
   isPrintfulConfigured,
-  type PrintfulCreateOrderInput,
 } from '@/lib/printful/client';
 import {
   RELEASE_GMV_ATTRIBUTION_METADATA_KEY,
@@ -40,13 +39,19 @@ import {
   estimateStripeFeeCents,
   MERCH_DEFAULT_REFUND_RESERVE_CENTS,
 } from './pricing';
-import { getMerchCardSellability, getMerchOrderSellability } from './safety';
+import { buildPrintfulOrderInput } from './printful-order-input';
+import {
+  assertMerchCardCheckoutSellable,
+  assertMerchOrderSellable,
+  getMerchCardSellability,
+  getMerchOrderSellability,
+} from './safety';
 import { refreshMerchRank, resolveVariantId } from './service';
-import type {
-  MerchCheckoutInput,
-  MerchCheckoutSessionResult,
-  MerchOrderFulfillmentInput,
-} from './types';
+import {
+  stripeSessionToShippingAddress,
+  validateShippingAddress,
+} from './shipping-address';
+import type { MerchCheckoutInput, MerchCheckoutSessionResult } from './types';
 
 const MAX_FULFILLMENT_ATTEMPTS = 5;
 const PRE_SUBMIT_ORDER_STATUSES: ReadonlySet<MerchOrder['status']> = new Set([
@@ -56,131 +61,14 @@ const PRE_SUBMIT_ORDER_STATUSES: ReadonlySet<MerchOrder['status']> = new Set([
   'paid_fulfillment_failed',
 ]);
 
+// Async payment methods (e.g. ACH) reach checkout.session.completed while the
+// session is still unpaid. Only settled sessions may be fulfilled (JOV-12769).
+const FULFILLABLE_PAYMENT_STATUSES: ReadonlySet<
+  Stripe.Checkout.Session['payment_status']
+> = new Set(['paid', 'no_payment_required']);
+
 function merchBaseUrl(): string {
   return publicEnv.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
-}
-
-function stripeSessionToShippingAddress(
-  session: Stripe.Checkout.Session
-): MerchShippingAddress | null {
-  const details = (
-    session as Stripe.Checkout.Session & {
-      readonly shipping_details?: {
-        readonly name?: string | null;
-        readonly address?: Stripe.Address | null;
-      } | null;
-    }
-  ).shipping_details;
-  const address = details?.address;
-  if (!address) return null;
-
-  return {
-    name: details.name ?? session.customer_details?.name ?? null,
-    line1: address.line1 ?? null,
-    line2: address.line2 ?? null,
-    city: address.city ?? null,
-    state: address.state ?? null,
-    postalCode: address.postal_code ?? null,
-    country: address.country ?? null,
-    phone: session.customer_details?.phone ?? null,
-  };
-}
-
-function validateShippingAddress(
-  address: MerchShippingAddress | null | undefined
-): address is MerchShippingAddress & {
-  readonly name: string;
-  readonly line1: string;
-  readonly city: string;
-  readonly postalCode: string;
-  readonly country: string;
-} {
-  return Boolean(
-    address?.name &&
-      address.line1 &&
-      address.city &&
-      address.postalCode &&
-      address.country
-  );
-}
-
-function assertMerchCardCheckoutSellable(card: MerchCard): void {
-  const result = getMerchCardSellability(card);
-  if (!result.sellable) {
-    throw new Error(`Merch item is not sellable: ${result.reasons.join(' ')}`);
-  }
-}
-
-function assertMerchOrderSellable(
-  order: Pick<
-    MerchOrder,
-    | 'quantity'
-    | 'subtotalCents'
-    | 'printfulProductCostCents'
-    | 'stripeFeeEstimateCents'
-    | 'refundReserveCents'
-    | 'artistPayoutEstimateCents'
-    | 'jovieShareEstimateCents'
-  >
-): void {
-  const result = getMerchOrderSellability(order);
-  if (!result.sellable) {
-    throw new Error(`Merch order is not sellable: ${result.reasons.join(' ')}`);
-  }
-}
-
-function toPrintfulTechnique(technique: string): string {
-  return technique === 'cut_and_sew' ? 'cut-sew' : technique;
-}
-
-function buildPrintfulOrderInput(params: {
-  readonly order: MerchOrder;
-  readonly card: MerchCard;
-  readonly fulfillment: MerchOrderFulfillmentInput;
-}): PrintfulCreateOrderInput {
-  const printFileUrl = params.card.printful.printFileUrls[0];
-  if (!printFileUrl) {
-    throw new Error('Merch card is missing a Printful print file URL');
-  }
-
-  const address = params.fulfillment.shippingAddress;
-  if (!validateShippingAddress(address)) {
-    throw new Error('Order is missing a complete shipping address');
-  }
-
-  return {
-    external_id: params.order.printfulExternalId ?? params.order.id,
-    recipient: {
-      name: address.name,
-      email: params.fulfillment.buyerEmail,
-      phone: address.phone ?? null,
-      address1: address.line1,
-      address2: address.line2 ?? null,
-      city: address.city,
-      state_code: address.state ?? null,
-      country_code: address.country,
-      zip: address.postalCode,
-    },
-    order_items: [
-      {
-        quantity: params.order.quantity,
-        catalog_variant_id: params.order.selectedVariantId,
-        source: 'catalog',
-        placements: params.card.printful.placements.map(placement => ({
-          placement,
-          technique: toPrintfulTechnique(
-            params.card.printful.techniques[0] ?? 'dtg'
-          ),
-          layers: [
-            {
-              type: 'file',
-              url: printFileUrl,
-            },
-          ],
-        })),
-      },
-    ],
-  };
 }
 
 async function getOrderWithCard(orderId: string): Promise<{
@@ -412,6 +300,20 @@ export async function handleMerchCheckoutCompleted(
     return;
   }
 
+  if (!FULFILLABLE_PAYMENT_STATUSES.has(session.payment_status)) {
+    // Wait for checkout.session.async_payment_succeeded; fulfilling an unpaid
+    // session would ship goods for money not captured (JOV-12769).
+    logger.warn(
+      '[merch] Checkout session is not paid yet; waiting for async settlement',
+      {
+        orderId,
+        sessionId: session.id,
+        paymentStatus: session.payment_status,
+      }
+    );
+    return;
+  }
+
   if (
     existing.order.status !== 'checkout_created' &&
     existing.order.status !== 'paid'
@@ -527,9 +429,37 @@ export async function handleMerchCheckoutCompleted(
     })
     .where(eq(merchOrders.id, orderId));
 
+  // Kick only once the order is `paid` with its shipping address, so the
+  // worker never sees a half-written order if an earlier step threw.
+  kickQueue('merch');
+
   await notifyFirstMerchSaleBestEffort({
     creatorProfileId: existing.order.creatorProfileId,
     merchOrderId: existing.order.id,
+  });
+}
+
+export async function handleMerchCheckoutPaymentFailed(
+  session: Stripe.Checkout.Session
+): Promise<void> {
+  const orderId = session.metadata?.merch_order_id;
+  if (!orderId) return;
+
+  const existing = await getOrderWithCard(orderId);
+  if (!existing || existing.order.status !== 'checkout_created') return;
+
+  await db
+    .update(merchOrders)
+    .set({
+      status: 'failed',
+      stripeCheckoutSessionId: session.id,
+      error: `Async payment failed for checkout session ${session.id}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(merchOrders.id, orderId));
+  logger.warn('[merch] Async payment failed for merch checkout', {
+    orderId,
+    sessionId: session.id,
   });
 }
 
@@ -639,6 +569,7 @@ export async function fulfillMerchOrder(orderId: string): Promise<void> {
     'paid',
     'paid_fulfillment_hold',
     'paid_fulfillment_failed',
+    'printful_draft_created',
   ]);
   if (!retryableStatuses.has(row.order.status)) {
     if (row.order.status === 'checkout_created') {
@@ -694,27 +625,47 @@ export async function fulfillMerchOrder(orderId: string): Promise<void> {
     throw new Error('Order is missing a complete shipping address');
   }
 
-  const draft = await createDraftOrder(
-    buildPrintfulOrderInput({
-      order: row.order,
-      card: row.card,
-      fulfillment: {
-        shippingAddress: row.order.shippingAddress,
-        buyerEmail: row.order.buyerEmail,
-        buyerName: row.order.buyerName,
-      },
-    })
-  );
+  const resumableDraftId =
+    row.order.status === 'printful_draft_created'
+      ? row.order.printfulOrderId
+      : null;
+  if (row.order.status === 'printful_draft_created' && !resumableDraftId) {
+    // A draft state without a supplier order id cannot be resumed; refuse to
+    // create a duplicate draft and surface the invariant instead (JOV-12770).
+    throw new Error(
+      `Merch order ${orderId} is in printful_draft_created without a Printful order id`
+    );
+  }
 
-  await db
-    .update(merchOrders)
-    .set({
-      status: 'printful_draft_created',
-      printfulOrderId: String(draft.id),
-      printfulStatus: draft.status ?? null,
-      updatedAt: new Date(),
-    })
-    .where(eq(merchOrders.id, orderId));
+  // Printful order ids arrive as numbers from the API but are stored as text.
+  const draft: {
+    readonly id: string | number;
+    readonly status?: string | null;
+  } = resumableDraftId
+    ? { id: resumableDraftId, status: row.order.printfulStatus }
+    : await createDraftOrder(
+        buildPrintfulOrderInput({
+          order: row.order,
+          card: row.card,
+          fulfillment: {
+            shippingAddress: row.order.shippingAddress,
+            buyerEmail: row.order.buyerEmail,
+            buyerName: row.order.buyerName,
+          },
+        })
+      );
+
+  if (!resumableDraftId) {
+    await db
+      .update(merchOrders)
+      .set({
+        status: 'printful_draft_created',
+        printfulOrderId: String(draft.id),
+        printfulStatus: draft.status ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchOrders.id, orderId));
+  }
 
   const confirmed = await confirmOrder(draft.id);
   await db
@@ -804,7 +755,14 @@ export async function processMerchFulfillmentJobs(limit = 5): Promise<{
           error: lastError,
           updatedAt: new Date(),
         })
-        .where(eq(merchOrders.id, job.merchOrderId));
+        .where(
+          and(
+            eq(merchOrders.id, job.merchOrderId),
+            // A failed confirm leaves a live supplier draft behind; keep the
+            // order resumable instead of resetting it (JOV-12770).
+            ne(merchOrders.status, 'printful_draft_created')
+          )
+        );
       failed++;
     }
   }

@@ -19,6 +19,17 @@ export interface ClaimBannerProps {
   readonly ctaLabel?: string;
   readonly prefetch?: boolean;
   readonly variant?: ClaimBannerVariant;
+  /**
+   * A variant this banner may switch to once the visitor's URL is known.
+   * Its copy is laid out invisibly in the same cell so the banner keeps one
+   * height whichever copy shows.
+   */
+  readonly reserveVariant?: ClaimBannerVariant;
+  /**
+   * False while the variant is still the server's guess, so the impression is
+   * counted once, for the copy the visitor actually reads.
+   */
+  readonly trackExposure?: boolean;
 }
 
 const COPY: Record<
@@ -54,15 +65,22 @@ export function ClaimBanner({
   ctaLabel,
   prefetch,
   variant = 'organic',
+  reserveVariant,
+  trackExposure = true,
 }: ClaimBannerProps) {
   const trackedImpressionKeys = useRef<Set<string>>(new Set());
   const copy = COPY[variant];
+  const reservedBody =
+    reserveVariant && reserveVariant !== variant
+      ? COPY[reserveVariant].body
+      : null;
   const resolvedCtaLabel = ctaLabel ?? copy.ctaLabel;
   const trackedDestination = ctaHref?.startsWith('/claim/')
     ? '/claim/[token]'
     : ctaHref;
 
   useEffect(() => {
+    if (!trackExposure) return;
     const impressionKey = `${profileHandle}:${variant}`;
     if (trackedImpressionKeys.current.has(impressionKey)) return;
     trackedImpressionKeys.current.add(impressionKey);
@@ -73,7 +91,7 @@ export function ClaimBanner({
       layout: readPublicProfileLayout(),
       ...PUBLIC_PROFILE_DESKTOP_CONTEXT,
     });
-  }, [profileHandle, variant]);
+  }, [profileHandle, trackExposure, variant]);
 
   const name = displayName || profileHandle;
 
@@ -86,13 +104,27 @@ export function ClaimBanner({
       <div className='relative max-w-4xl mx-auto px-4 py-2 sm:py-3'>
         <div className='flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3'>
           {/* Banner text */}
-          <div className='flex min-w-0 items-center gap-2 text-center sm:max-w-sm sm:text-left'>
+          <div className='flex min-w-0 items-center gap-2 text-center sm:max-w-sm sm:text-start'>
             <Sparkles
               className='h-4 w-4 shrink-0 max-sm:hidden'
               aria-hidden='true'
             />
-            <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
-              {copy.body}
+            <p className='grid text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
+              <span
+                className='col-start-1 row-start-1'
+                data-testid='claim-banner-copy'
+              >
+                {copy.body}
+              </span>
+              {reservedBody ? (
+                <span
+                  className='invisible col-start-1 row-start-1'
+                  aria-hidden='true'
+                  data-testid='claim-banner-reserved-copy'
+                >
+                  {reservedBody}
+                </span>
+              ) : null}
             </p>
           </div>
 

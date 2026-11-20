@@ -235,15 +235,20 @@ export default async function ContentSmartLinkPage({
 
   // Fetch track list + entity sameAs for structured data (errors silently ignored)
   const [trackList, artistSameAs] = await Promise.all([
-    content.type === 'release' && content.totalTracks && content.totalTracks > 0
+    !isFixtureRequest &&
+    content.type === 'release' &&
+    content.totalTracks &&
+    content.totalTracks > 0
       ? getReleaseTrackList(content.id).catch(() => null)
       : Promise.resolve(null),
-    getArtistEntitySameAs(creator.id, {
-      musicbrainzId: creator.musicbrainzId,
-      spotifyUrl: creator.spotifyUrl,
-      appleMusicUrl: creator.appleMusicUrl,
-      youtubeUrl: creator.youtubeUrl,
-    }).catch(() => [] as string[]),
+    !isFixtureRequest
+      ? getArtistEntitySameAs(creator.id, {
+          musicbrainzId: creator.musicbrainzId,
+          spotifyUrl: creator.spotifyUrl,
+          appleMusicUrl: creator.appleMusicUrl,
+          youtubeUrl: creator.youtubeUrl,
+        }).catch(() => [] as string[])
+      : Promise.resolve([] as string[]),
   ]);
 
   // Generate structured data for SEO
@@ -549,49 +554,6 @@ function ContentPageBody({
   );
 }
 
-/** Resolve the best OG image URL, size, height, and MIME type from content artwork data. */
-function resolveOgImage(
-  artworkSizes: Record<string, string> | null | undefined,
-  artworkUrl: string | null
-): { url: string; width: number; height: number; type: string } {
-  const defaultImage = `${BASE_URL}/og/default.png`;
-  const url =
-    artworkSizes?.['1000'] ??
-    artworkSizes?.original ??
-    artworkUrl ??
-    defaultImage;
-  const isDefault = url === defaultImage;
-
-  let width = 1200;
-  if (artworkSizes?.['1000']) {
-    width = 1000;
-  } else if (!artworkSizes?.original && artworkUrl) {
-    width = 640;
-  }
-
-  const height = isDefault ? 630 : width;
-
-  const EXT_TO_MIME: Record<string, string> = {
-    '.png': 'image/png',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
-  };
-
-  let type = 'image/jpeg';
-  if (isDefault) {
-    type = 'image/png';
-  } else {
-    for (const [ext, mime] of Object.entries(EXT_TO_MIME)) {
-      if (url.includes(ext)) {
-        type = mime;
-        break;
-      }
-    }
-  }
-
-  return { url, width, height, type };
-}
-
 /** Build the SEO description for a content page. */
 function buildContentDescription(
   content: {
@@ -671,18 +633,33 @@ export async function generateMetadata({
   const opaqueDecision =
     await resolveOpaqueInternalProfileUsername(normalizedUsername);
   if (opaqueDecision.action === 'not_found') {
-    return { title: 'Not Found', robots: { index: false, follow: false } };
+    // The page renders notFound() for this state, and Next automatically
+    // injects <meta name="robots" content="noindex"> into every status > 400
+    // render; an explicit robots meta here emitted a SECOND robots tag (the
+    // JOV-12153 duplicate-robots class). Title-only, like the other miss
+    // branches in this file.
+    return { title: 'Not Found' };
   }
   if (opaqueDecision.action === 'redirect') {
     permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
   }
 
-  const creator = await getCreatorByUsername(normalizedUsername);
+  const isFixtureRequest =
+    isScreenCertSmartLinkFixtureRequest(normalizedUsername);
+  if (isFixtureRequest && slug !== SCREEN_CERT_SMARTLINK_RELEASE_SLUG) {
+    return { title: 'Not Found' };
+  }
+
+  const creator = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR
+    : await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     return { title: 'Not Found' };
   }
 
-  const content = await getContentBySlug(creator.id, slug);
+  const content = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_RELEASE_CONTENT
+    : await getContentBySlug(creator.id, slug);
   if (!content) {
     const unpublished = await getUnpublishedReleasePresence(creator.id, slug);
     if (unpublished) {
@@ -731,10 +708,6 @@ export async function generateMetadata({
   );
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
-  const ogImage = isMystery
-    ? null
-    : resolveOgImage(content.artworkSizes, content.artworkUrl);
-  const artworkAlt = `${content.title} ${contentType} artwork`;
   const ogTitle = isMystery
     ? `New music from ${artistName}`
     : `${content.title} by ${artistName}`;
@@ -760,32 +733,16 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      ...(ogImage && {
-        images: [
-          {
-            url: ogImage.url,
-            width: ogImage.width,
-            height: ogImage.height,
-            alt: artworkAlt,
-            type: ogImage.type,
-          },
-        ],
-      }),
+      // No `images` here: the collocated opengraph-image route serves the
+      // branded 1200x630 share card and file-based metadata wins whenever the
+      // object omits its images.
     },
     twitter: {
-      card: ogImage ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title: ogTitle,
       description,
       creator: COMPANY_IDENTITY.xHandle,
       site: COMPANY_IDENTITY.xHandle,
-      ...(ogImage && {
-        images: [
-          {
-            url: ogImage.url,
-            alt: artworkAlt,
-          },
-        ],
-      }),
     },
     other: {
       'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,

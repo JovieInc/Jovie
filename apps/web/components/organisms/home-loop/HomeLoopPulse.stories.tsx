@@ -22,3 +22,28 @@ export const Loading: Story = { args: { loading: true, tiles: [] } };
 export const NotMeasured: Story = {
   args: { tiles: HOME_LOOP_FIXTURE_UNMEASURED_PULSE },
 };
+
+export const SnapshotProvenance: Story = {
+  args: {
+    reserveSourceCaption: true,
+    tiles: [
+      {
+        ...HOME_LOOP_FIXTURE_PULSE[0],
+        key: 'ejections',
+        label: 'Queue ejections',
+        value: '52%',
+        tone: 'bad',
+        was: null,
+        target: 'Target ≤ 10%',
+        sourceCaption: 'Snapshot 2026-11-07 14:24 UTC',
+      },
+    ],
+  },
+};
+
+export const SnapshotLoading: Story = {
+  args: { reserveSourceCaption: true, loading: true, tiles: [] },
+};
+export const SnapshotUnavailable: Story = {
+  args: { reserveSourceCaption: true, tiles: [] },
+};

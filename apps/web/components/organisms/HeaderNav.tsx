@@ -2,7 +2,7 @@
 'use client';
 
 import './HeaderNav.css';
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,13 +11,17 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
-import { UserButton } from '@/components/organisms/user-button';
+import { LazyUserButton } from '@/components/organisms/user-button/user-button.lazy';
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
+import {
+  getNavGroupVariantClass,
+  getNavLinkVariantClass,
+} from './header-nav-variants';
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
@@ -29,6 +33,7 @@ export interface HeaderNavProps {
   readonly className?: string;
   readonly style?: React.CSSProperties;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  readonly logoMarkSize?: BrandMarkSize;
   readonly logoVariant?: LogoVariant;
   readonly hideNav?: boolean;
   readonly hideDesktopNav?: boolean;
@@ -41,6 +46,8 @@ export interface HeaderNavProps {
   readonly minimalAuthLabel?: 'Sign in' | 'Log in';
   readonly includePublicLoginInMobileNav?: boolean;
   readonly publicCta?: HeaderNavCta;
+  /** Marketing-glass only: render Log in without the primary CTA (invite-only homepage). */
+  readonly hidePublicCta?: boolean;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
@@ -116,9 +123,8 @@ export interface HeaderFlyoutMenu {
 }
 
 // One front-door CTA for headers rendered without an explicit publicCta.
-const DEFAULT_PUBLIC_CTA: HeaderNavCta = getHomepageFrontDoorCtaContract(
-  FEATURE_FLAGS.WAITLIST_ENABLED
-).primary;
+const DEFAULT_PUBLIC_CTA: HeaderNavCta =
+  getHomepageFrontDoorCtaContract().primary;
 
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
@@ -193,9 +199,11 @@ function HeaderPrimaryAuthLink({
 function GlassAuthActions({
   publicCta = DEFAULT_PUBLIC_CTA,
   showContactLink = true,
+  hidePublicCta = false,
 }: Readonly<{
   publicCta?: HeaderNavCta;
   showContactLink?: boolean;
+  hidePublicCta?: boolean;
 }>) {
   return (
     <div className='flex items-center gap-1'>
@@ -214,11 +222,13 @@ function GlassAuthActions({
       >
         Log in
       </Link>
-      <HeaderPrimaryAuthLink
-        href={publicCta.href}
-        label={publicCta.label}
-        className='marketing-glass-header__cta'
-      />
+      {hidePublicCta ? null : (
+        <HeaderPrimaryAuthLink
+          href={publicCta.href}
+          label={publicCta.label}
+          className='marketing-glass-header__cta'
+        />
+      )}
     </div>
   );
 }
@@ -324,42 +334,6 @@ function MarketingGlassFlyout({
   );
 }
 
-function getNavLinkVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav-link';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-link';
-  }
-
-  return 'nav-link-linear';
-}
-
-function getNavGroupVariantClass({
-  isHomepagePresentation,
-  isMarketingGlass,
-}: Readonly<{
-  isHomepagePresentation: boolean;
-  isMarketingGlass: boolean;
-}>) {
-  if (isMarketingGlass) {
-    return 'marketing-glass-header__nav';
-  }
-
-  if (isHomepagePresentation) {
-    return 'homepage-header-nav-group';
-  }
-
-  return 'gap-1 lg:gap-1.5';
-}
-
 function getNavContainerVariantClass({
   containerSize,
   isMarketingGlass,
@@ -383,6 +357,7 @@ export function HeaderNav({
   className,
   style,
   logoSize = 'sm',
+  logoMarkSize,
   logoVariant = 'word',
   hideNav = false,
   hideDesktopNav = false,
@@ -395,6 +370,7 @@ export function HeaderNav({
   minimalAuthLabel = 'Sign in',
   includePublicLoginInMobileNav = true,
   publicCta,
+  hidePublicCta = false,
   presentation = 'default',
   flyoutMenus,
   showContactLink = true,
@@ -572,7 +548,7 @@ export function HeaderNav({
 
             return (
               <div key={menu.id} className='marketing-glass-header__nav-item'>
-                <button
+                <PlainButton
                   type='button'
                   className={cn(
                     navLinkClass,
@@ -586,7 +562,7 @@ export function HeaderNav({
                 >
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />
-                </button>
+                </PlainButton>
                 <MarketingGlassFlyout menu={menu} open={open} />
               </div>
             );
@@ -672,6 +648,7 @@ export function HeaderNav({
             <div className='flex items-center'>
               <LogoLink
                 logoSize={logoSize}
+                logoMarkSize={logoMarkSize}
                 variant={logoVariant}
                 reveal={logoReveal && logoVariant === 'icon'}
                 className='rounded-md'
@@ -707,6 +684,7 @@ export function HeaderNav({
             >
               {authMode === 'public-static' && isMarketingGlass ? (
                 <GlassAuthActions
+                  hidePublicCta={hidePublicCta}
                   publicCta={publicCta}
                   showContactLink={showContactLink}
                 />
@@ -731,7 +709,7 @@ export function HeaderNav({
                   publicCtaHref={publicCta?.href}
                   publicCtaLabel={publicCta?.label}
                   authenticatedUserSlot={
-                    <UserButton
+                    <LazyUserButton
                       showUserInfo
                       settingsHref={APP_ROUTES.SETTINGS}
                     />
