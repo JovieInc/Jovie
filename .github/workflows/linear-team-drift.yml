@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: Linear team configuration drift requires a read-only Linear query and report; GitHub has no native report of this policy.
+# removal-trigger: Remove this workflow when the existing Linear event consumer produces the same team-drift receipt from configuration changes.
 # github-token-budget: 0 calls/run - no GitHub API; one read-only Linear GraphQL query; Node is primed from the toolcache.
 name: Linear Team Drift
 
@@ -8,7 +12,7 @@ name: Linear Team Drift
 # check (not a merge gate, not a required check).
 #
 # Triggers are event-driven only (no cron). #26049 offered a daily schedule;
-# that backstop is LATER because a new schedule: trigger needs a
+# that backstop is LATER because a new scheduled trigger needs a
 # canon/automation-schedule-allowlist.json entry and a live
 # canon/automation-registry.jsonl id (scripts/schedule-trigger-guard.mjs).
 on:
@@ -30,7 +34,7 @@ concurrency:
 jobs:
   report:
     name: Report Linear team drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read

@@ -64,6 +64,7 @@
     {"id": "workflow:lane-fix-relay", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/lane-fix-relay.yml"},
     {"id": "workflow:legacy-human-hold-scrub", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/legacy-human-hold-scrub.yml"},
     {"id": "workflow:linear-sync-on-merge", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/linear-sync-on-merge.yml"},
+    {"id": "workflow:linear-team-drift", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/linear-team-drift.yml"},
     {"id": "workflow:m2-revenue-path-canary", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/m2-revenue-path-canary.yml"},
     {"id": "workflow:claim-checkout-dogfood", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/claim-checkout-dogfood.yml"},
     {"id": "workflow:component-certificate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/component-certificate.yml"},
