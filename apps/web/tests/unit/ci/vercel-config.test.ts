@@ -16,6 +16,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
+import { createNextConfigTestRequire } from './next-config-test-require';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -67,30 +68,11 @@ function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
   const configDirectory = dirname(configPath);
   const configModule: { exports: NextConfigForTest } = { exports: {} };
   const identityConfig = (config: unknown) => config;
-  const configRequire = (specifier: string): unknown => {
-    switch (specifier) {
-      case 'path':
-        return repoRequire('node:path');
-      case '../../version.json':
-        return JSON.parse(
-          readFileSync(resolve(configDirectory, specifier), 'utf8')
-        );
-      case '@next/bundle-analyzer':
-        return () => identityConfig;
-      case 'workflow/next':
-        return { withWorkflow: identityConfig };
-      case '@vercel/toolbar/plugins/next':
-        return () => identityConfig;
-      case '@sentry/nextjs/config':
-        return { withSentryConfig: identityConfig };
-      case './lib/routing/legacy-profile-alias-redirects':
-        return repoRequire(resolve(configDirectory, specifier));
-      case './scripts/write-build-deployed-at.cjs':
-        return { writeBuildDeployedAt() {} };
-      default:
-        throw new Error(`Unexpected next.config.js dependency: ${specifier}`);
-    }
-  };
+  const configRequire = createNextConfigTestRequire({
+    configDirectory,
+    repoRequire,
+    identityConfig,
+  });
 
   runInNewContext(
     readFileSync(configPath, 'utf8'),
