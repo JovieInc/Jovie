@@ -63,15 +63,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/atoms/FrostedButton.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/atoms/HeaderIconButton.tsx": [
       "ds-owner",
       "tokens",

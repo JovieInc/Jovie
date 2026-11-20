@@ -33,6 +33,13 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   ghost:
     'border border-transparent bg-transparent text-tertiary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
   link: 'h-auto border-0 bg-transparent p-0 text-primary underline-offset-4 shadow-none hover:underline',
+  // Glass family: shared frosted material (IconButton projects through these).
+  frosted:
+    'border border-subtle bg-icon-button-frosted text-primary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted-hover',
+  'frosted-ghost':
+    'border border-transparent bg-transparent text-tertiary-token shadow-none backdrop-blur-sm hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
+  'frosted-outline':
+    'border border-subtle bg-transparent text-secondary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted hover:text-primary-token',
 };
 
 // 44px minimum hit target for icon buttons below 44px (WCAG 2.5.5 / Apple HIG),
@@ -103,6 +110,12 @@ const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   tertiary: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   ghost: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   link: 'text-error-text hover:text-error-text',
+  frosted:
+    'border-error-subtle bg-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-ghost':
+    'text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-outline':
+    'border-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
 };
 
 const warnedDeprecatedValues = new Set<string>();

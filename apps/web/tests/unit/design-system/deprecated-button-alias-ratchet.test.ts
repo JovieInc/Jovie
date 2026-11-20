@@ -7,11 +7,12 @@ import { describe, expect, it } from 'vitest';
  * Deprecated Button alias ratchet (JOV-5601).
  *
  * `packages/ui/atoms/button-contract.ts` still normalizes legacy variant
- * aliases (`outline`, `whitePill`, `frosted`, …) onto the canonical Button
- * variants for migration compatibility. Live app callsites should name the
- * canonical variant directly so one CTA language survives. This ratchet
- * counts `variant='<alias>'` selections across the web surfaces; the count
- * may only go DOWN. When you retire aliases, lower `count` in
+ * aliases (`outline`, `whitePill`, …) onto the canonical Button variants for
+ * migration compatibility. Frosted glass is first-class on Button (Drift
+ * T2.3) — not an alias. Live app callsites should name the canonical variant
+ * directly so one CTA language survives. This ratchet counts
+ * `variant='<alias>'` selections across the web surfaces; the count may only
+ * go DOWN. When you retire aliases, lower `count` in
  * deprecated-button-alias.baseline.json in the SAME PR.
  *
  * Sibling of raw-button-ratchet.test.ts — same committed-baseline shape.
@@ -28,9 +29,6 @@ export const DEPRECATED_BUTTON_VARIANT_ALIASES = [
   'accent',
   'outline',
   'destructive',
-  'frosted',
-  'frosted-ghost',
-  'frosted-outline',
   'whitePill',
 ] as const;
 
@@ -134,7 +132,7 @@ describe('deprecated Button alias ratchet', () => {
       .join(', ');
     expect(
       total,
-      `Deprecated Button alias selections grew (${total} > ${baseline.count}). Name the canonical variant instead (outline→secondary, whitePill/accent/destructive→primary, frosted→secondary, frosted-ghost→ghost). Heaviest files: ${top}`
+      `Deprecated Button alias selections grew (${total} > ${baseline.count}). Name the canonical variant instead (outline→secondary, whitePill/accent/destructive→primary). Heaviest files: ${top}`
     ).toBeLessThanOrEqual(baseline.count);
   });
 });

@@ -274,7 +274,7 @@ describe('IconButton', () => {
     expect(button.className).not.toContain('ease-out');
   });
 
-  it('uses named frosted background utilities', () => {
+  it('projects frosted through Button glass variants', () => {
     render(
       <IconButton ariaLabel='Frosted action' variant='frosted'>
         <svg aria-hidden='true' />
@@ -282,8 +282,10 @@ describe('IconButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Frosted action' });
+    expect(button).toHaveAttribute('data-variant', 'frosted');
     expect(button.className).toContain('bg-icon-button-frosted');
     expect(button.className).toContain('hover:bg-icon-button-frosted-hover');
+    expect(button.className).toContain('backdrop-blur-sm');
     expect(button.className).not.toMatch(/bg-\[/);
   });
 
