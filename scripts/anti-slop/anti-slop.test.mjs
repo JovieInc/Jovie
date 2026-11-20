@@ -208,6 +208,7 @@ test('settings and shell changes select the existing anti-slop CI lane', async (
 // Source Validation loads guard commands from trusted main. Keep the real
 // coverage suite reachable through that existing Node entrypoint on first PR CI.
 test('brand spelling assertions pass with per-file V8 coverage floors', () => {
+  /** @type {NodeJS.ProcessEnv} */
   const env = { ...process.env, FORCE_COLOR: '1' };
   delete env.NO_COLOR; // Exercise ANSI output without conflicting inherited color settings.
   const result = spawnSync(BRAND_NAME_COVERAGE_COMMAND, {
