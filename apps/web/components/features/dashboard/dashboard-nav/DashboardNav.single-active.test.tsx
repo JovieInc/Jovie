@@ -11,7 +11,7 @@ import {
 import { canonicalSidebarNavigation, chatNavItem } from './config';
 
 /**
- * Guard for Tim's 2026-11-14 screenshot: on `/app`, Inbox and Audience were
+ * Guard for Tim's 2026-11-14 screenshot: on `/app`, Home and Audience were
  * both painted selected while a navigation resolved. At most one nav row may
  * carry `aria-current="page"`, and at most one may paint the selected style.
  */
@@ -84,7 +84,7 @@ describe('DashboardNav selection', () => {
       { route, headerOwnsInbox: true },
     ])
   )(
-    'selects at most one row on $route (header owns inbox: $headerOwnsInbox)',
+    'selects at most one row on $route (header owns Home: $headerOwnsInbox)',
     ({ route, headerOwnsInbox }) => {
       setRoute(route);
       renderDashboardNav({ renderFn: render, headerOwnsInbox });
@@ -114,11 +114,11 @@ describe('DashboardNav selection', () => {
     expectAtMostOneSelected(`${APP_ROUTES.DASHBOARD} -> Audience pending`);
   });
 
-  it('drops the Inbox row when the header bell owns the inbox', () => {
+  it('drops the Home row when the header bell owns the inbox', () => {
     setRoute(APP_ROUTES.DASHBOARD);
     renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
     expect(
-      screen.queryByRole('link', { name: 'Inbox' })
+      screen.queryByRole('link', { name: 'Home' })
     ).not.toBeInTheDocument();
     expect(
       document.querySelector('[data-navigation-item-id="home"]')

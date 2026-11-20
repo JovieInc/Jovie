@@ -298,7 +298,7 @@ describe('sidebar header actions row', () => {
     const { controls } = headerControls();
     expect(controls.bell).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(controls.bell).toHaveAttribute('data-inbox-attention', 'available');
-    expect(controls.bell).toHaveAccessibleName(/^Inbox — /);
+    expect(controls.bell).toHaveAccessibleName(/^Home — /);
     expect(controls.bell.querySelector('span.bg-accent')).not.toBeNull();
   });
 });

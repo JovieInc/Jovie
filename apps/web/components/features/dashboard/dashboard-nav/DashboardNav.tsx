@@ -38,7 +38,7 @@ import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
   chatNavItem,
-  inboxNavItem,
+  homeNavItem,
   userSettingsNavigation,
 } from './config';
 import { InboxAttentionLink } from './InboxAttentionLink';
@@ -405,18 +405,18 @@ export function DashboardNav({
         {headerOwnsInbox ? null : (
           <InboxAttentionLink
             // App updates surface in the shell's update pill, not on the
-            // Inbox: the Inbox page shows no update, so the bell names only
+            // Home bell: Home shows no update, so the bell names only
             // pending work.
-            label={inboxNavItem.name}
-            itemId={inboxNavItem.id}
+            label={homeNavItem.name}
+            itemId={homeNavItem.id}
             attention={inboxNavigation?.state ?? 'unknown'}
             pendingCount={
               inboxNavigation?.state === 'available'
                 ? (inboxNavigation.pendingCount ?? 0)
                 : 0
             }
-            navigationPending={pendingNavigation?.itemId === inboxNavItem.id}
-            onClick={event => handleCommandClick(event, inboxNavItem)}
+            navigationPending={pendingNavigation?.itemId === homeNavItem.id}
+            onClick={event => handleCommandClick(event, homeNavItem)}
           />
         )}
       </RailStagedContent>
