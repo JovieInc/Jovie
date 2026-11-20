@@ -36,16 +36,13 @@ vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: (result: { readonly reset?: number }) => ({
     'retry-after': String(result.reset ?? 60),
   }),
-  // Faithful mirror of the real helper's contract: a degraded/unavailable
-  // backend downgrades a hard block to an advisory allow (fail-open).
-  allowIfRateLimitBackendDegraded: (result: {
-    readonly success: boolean;
-    readonly degraded?: boolean;
-    readonly unavailable?: boolean;
-  }) =>
-    !result.success && (result.degraded === true || result.unavailable === true)
-      ? { ...result, success: true }
-      : result,
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 
 vi.mock('@/lib/claim/context', () => ({
@@ -388,16 +385,14 @@ describe('Claim token route', () => {
     expect(mockClaimLimit).toHaveBeenCalledWith('203.0.113.7');
   });
 
-  it('fails open (proceeds) when the rate-limit backend is degraded', async () => {
+  it('fails closed when the rate-limit backend is unavailable', async () => {
     mockClaimLimit.mockResolvedValue({
       success: false,
-      degraded: true,
+      unavailable: true,
       limit: 20,
       remaining: 0,
-      reset: 60,
+      reset: new Date(Date.now() + 60_000),
     });
-    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
-    mockIsClaimTokenValid.mockResolvedValue(true);
 
     const response = await GET(
       new NextRequest('http://localhost/claim/valid-token'),
@@ -406,10 +401,30 @@ describe('Claim token route', () => {
       }
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/claimableartist?claim=1'
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain('temporarily unavailable');
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the rate-limit backend is degraded', async () => {
+    mockClaimLimit.mockResolvedValue({
+      success: false,
+      degraded: true,
+      limit: 20,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-token'),
+      {
+        params: Promise.resolve({ token: 'valid-token' }),
+      }
     );
-    expect(mockWritePendingClaimContext).toHaveBeenCalledTimes(1);
+
+    expect(response.status).toBe(429);
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 });

@@ -192,7 +192,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
+    "bodySha256": "dbccde7862e8cbdaa28366bd4fbe29c0c582b8f9170e4dd3cd3acbc618092258"
   },
   {
     "file": ".claude/rules/source-of-truth.md",

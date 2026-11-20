@@ -10,10 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
 import {
-  allowIfRateLimitBackendDegraded,
   createRateLimitHeaders,
   getClientIP,
   publicClickLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { reportPostSchema } from '@/lib/validation/schemas/report';
@@ -24,15 +25,19 @@ export async function POST(request: NextRequest) {
   try {
     detectBot(request, '/api/report');
 
-    const rateLimit = allowIfRateLimitBackendDegraded(
-      await publicClickLimiter.limit(getClientIP(request)),
-      { route: '/api/report' }
-    );
+    // Fail closed on Redis outage — public abuse intake must stay bounded.
+    const rateLimit = await publicClickLimiter.limit(getClientIP(request));
     if (!rateLimit.success) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
         {
-          status: 429,
+          error: rateLimitDenialMessage(
+            rateLimit,
+            'Rate limit exceeded. Please try again later.',
+            'Report intake is temporarily unavailable. Please try again later.'
+          ),
+        },
+        {
+          status: rateLimitDenialStatus(rateLimit),
           headers: {
             ...NO_STORE_HEADERS,
             ...createRateLimitHeaders(rateLimit),
