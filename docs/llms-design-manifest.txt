@@ -284,7 +284,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--profile-action-radius`: 14px
 - `--profile-bottom-nav-height`: calc( var(--space-8) + max(10px, env(safe-area-inset-bottom)) + var(--space-2) + var(--space-6) )
 - `--profile-card-radius`: 22px
-- `--profile-drawer-bg`: rgb(14, 16, 20)
+- `--profile-drawer-bg`: var(--noir-ion-card)
 - `--profile-drawer-highlight`: linear-gradient( 180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02) 36%, transparent 100% )
 - `--profile-drawer-radius-desktop`: 20px
 - `--profile-drawer-radius-mobile`: 22px
