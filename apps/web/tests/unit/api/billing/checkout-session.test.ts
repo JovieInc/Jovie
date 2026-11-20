@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   userId: 'app-user-1' as string | null,
+  getCachedAuth: vi.fn(async () => ({ userId: 'app-user-1' as string | null })),
   session: {} as Record<string, unknown>,
   profileRows: [] as Array<{
     clerkId?: string | null;
@@ -32,7 +33,7 @@ vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: async () => ({ userId: mocks.userId }),
+  getCachedAuth: mocks.getCachedAuth,
 }));
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
@@ -64,6 +65,10 @@ function request() {
 describe('GET /api/billing/checkout-session', () => {
   beforeEach(() => {
     mocks.userId = 'app-user-1';
+    mocks.getCachedAuth.mockReset();
+    mocks.getCachedAuth.mockImplementation(async () => ({
+      userId: mocks.userId,
+    }));
     mocks.session = {
       mode: 'subscription',
       status: 'complete',
@@ -98,6 +103,7 @@ describe('GET /api/billing/checkout-session', () => {
     const { GET } = await import('@/app/api/billing/checkout-session/route');
 
     const body = await (await GET(request())).json();
+    expect(mocks.getCachedAuth).toHaveBeenCalledWith({ session: 'fresh' });
     expect(body.needsProfile).toBe(false);
     expect(body.profileLive).toBe(true);
   });

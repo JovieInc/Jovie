@@ -51,11 +51,11 @@ const StartImpersonationSchema = z.object({
  */
 export async function GET() {
   // Require admin privileges
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const auth = await getCachedAuth();
+  const auth = await getCachedAuth({ session: 'fresh' });
   const adminUserId = auth.actorUserId ?? auth.userId;
   if (!adminUserId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

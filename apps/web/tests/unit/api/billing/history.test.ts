@@ -56,6 +56,7 @@ describe('GET /api/billing/history', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
+    expect(mockAuth).toHaveBeenCalledWith({ session: 'fresh' });
   });
 
   it('filters audit log entries to safe fields', async () => {
