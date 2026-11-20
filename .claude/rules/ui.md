@@ -293,8 +293,10 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   consume instances. Do not create route-local masters.
 - Founder review contains only canonical masters and intentional variants. Put
   receipts, duplicates, mappings, and process copy in operator artifacts.
-- Pen is proposal/review evidence until source identity, save/readback, and
-  persistence contracts pass. Visual similarity is not source backing.
+- Pen (+ZiaWI for color) is the publishable design SoT. Unmapped Pen nodes stay
+  proposal until source identity, save/readback, and persistence contracts
+  pass. Visual similarity is not source backing. Figma/Paper are never
+  publishable SoT; Figma MCP is an optional bridge only.
 - Marketing pages share one spine and one type ramp: sections use
   `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
   uses `.marketing-type-display` / `-section` / `-lede`.

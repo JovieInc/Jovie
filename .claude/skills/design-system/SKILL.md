@@ -10,14 +10,15 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 ## Authority
 
 1. `canon/DESIGN.md`, `DESIGN.md` and `.claude/rules/ui.md` stay the written authority. This skill extends them with the operating model below and does not replace them.
-2. Tim's decisions of 2026-10-25 (they apply from now; the DESIGN.md wording that still says "Pen is a review surface" or ranks founder locks first is being amended by the Phase 2 program, so follow these where they differ):
-   - Tokens live in code. `design.tokens.json` is the one token source and generates the Pen variables and the CSS. Pen never originates a token value.
+2. **Pen (+ZiaWI for color) is the only publishable design SoT.** Figma and Paper are scratch/reference. Figma MCP is an optional Code Connect / import-export bridge, never authority.
+3. Tim's decisions of 2026-10-25:
+   - Tokens live in code. `design.tokens.json` is the one token source and generates the Pen variables and the CSS. Pen never originates a token value (color still projects from ZiaWI).
    - Pen is where art direction happens. Code must match the Pen components, enforced in CI.
    - FOUNDER LOCKED / TIM-FINAL in a Pen node name is history, not a freeze. The art director may change those masters for cohesion; Tim reacts after ship.
    - Order of work: app golden path (onboarding, dashboard/releases/right rail, public profile, checkout), then Ovie, then marketing, then Mac and iOS.
    - Direction: evolve, same DNA. Dark first, current palette and type. Raise craft to Linear/Apple level: alignment, motion, density, delight.
-3. Until the token flip lands, `design-system.css` still emits the live values and `design.tokens.json` is a generated projection (`pnpm design:tokens:export`). See `guides/tokens.md` for which direction applies today.
-4. What is not relaxed: the Pen workspace file lock (one writer, live attach, mtime persist gate) in `.claude/rules/pen.md`, copy-leak and ICP-language checks, the shipping gates, and "agents fix red CI, never skip it".
+4. Until the token flip lands, `design-system.css` still emits the live values and `design.tokens.json` is a generated projection (`pnpm design:tokens:export`). See `guides/tokens.md` for which direction applies today.
+5. What is not relaxed: the Pen workspace file lock (one writer, live attach, mtime persist gate) in `.claude/rules/pen.md`, copy-leak and ICP-language checks, the shipping gates, and "agents fix red CI, never skip it".
 
 ## Router
 
