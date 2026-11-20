@@ -25,6 +25,7 @@ import {
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { formatInboxPendingWorkLabel } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
@@ -50,6 +51,20 @@ import {
 } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
 import { usePendingNavigation } from './use-pending-navigation';
+
+/** Rail Home bell name — never bare "Home" beside the Home nav row. */
+function homeAttentionLabel(
+  state: string | undefined,
+  pendingCount: number
+): string {
+  if (state === 'available' && pendingCount > 0) {
+    return `Home — ${formatInboxPendingWorkLabel(pendingCount)}`;
+  }
+  if (state === 'empty') {
+    return 'Home — all caught up';
+  }
+  return 'Home — notifications';
+}
 
 type DashboardNavSection = {
   readonly key: string;
@@ -405,9 +420,14 @@ export function DashboardNav({
         {headerOwnsInbox ? null : (
           <InboxAttentionLink
             // App updates surface in the shell's update pill, not on the
-            // Home bell: Home shows no update, so the bell names only
-            // pending work.
-            label={homeNavItem.name}
+            // Home bell. Qualify the accessible name so it does not collide
+            // with the Home nav row (exact name "Home").
+            label={homeAttentionLabel(
+              inboxNavigation?.state,
+              inboxNavigation?.state === 'available'
+                ? (inboxNavigation.pendingCount ?? 0)
+                : 0
+            )}
             itemId={homeNavItem.id}
             attention={inboxNavigation?.state ?? 'unknown'}
             pendingCount={

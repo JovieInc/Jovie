@@ -6,7 +6,7 @@ const meta: Meta<typeof InboxAttentionLink> = {
   component: InboxAttentionLink,
   parameters: { layout: 'centered' },
   args: {
-    label: 'Home',
+    label: 'Home — all caught up',
     itemId: 'home',
     attention: 'empty',
     pendingCount: 0,
@@ -28,7 +28,7 @@ export const Empty: Story = {};
 
 export const Pending: Story = {
   args: {
-    label: 'Inbox, 3 pending items',
+    label: 'Home — 3 Items Need Attention',
     attention: 'available',
     pendingCount: 3,
   },
@@ -40,7 +40,10 @@ export const NavigationPending: Story = {
 
 /** The pending count has not loaded yet, so the bell shows no badge. */
 export const Partial: Story = {
-  args: { attention: 'unknown' },
+  args: {
+    label: 'Home — notifications',
+    attention: 'unknown',
+  },
 };
 
 /** A large backlog caps the badge at 99 so the bell keeps its size. */
@@ -48,7 +51,7 @@ export const LongContent: Story = {
   args: {
     // The badge caps its visible count at 99+; the accessible name must
     // describe what is rendered (label-content-name-mismatch otherwise).
-    label: 'Inbox, 99+ pending items',
+    label: 'Home — 140 Items Need Attention',
     attention: 'available',
     pendingCount: 140,
   },

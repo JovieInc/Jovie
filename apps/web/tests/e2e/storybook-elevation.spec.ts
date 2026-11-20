@@ -592,10 +592,12 @@ test.describe('central runtime notifications', () => {
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
     // The update is announced by the shell pill, never on the Home bell.
+    // Scope to the Home nav row — the rail bell also carries
+    // data-navigation-item-id="home" with a qualified accessible name.
     await expect(
-      page
-        .getByRole('link', { name: 'Home', exact: true })
-        .and(page.locator('[data-navigation-item-id="home"]'))
+      page.locator(
+        'a[data-navigation-item-id="home"]:not([data-inbox-attention])'
+      )
     ).toHaveAttribute('href', '/app');
     await expect(
       page.getByRole('link', { name: /App Update Available/ })
