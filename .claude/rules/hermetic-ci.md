@@ -31,7 +31,7 @@ Existing debt is frozen per file in `scripts/lib/wall-clock-test-guard.ratchet.j
 - Network: `vi.stubGlobal('fetch', ...)`, `vi.mock`, msw, Playwright `page.route`, `unittest.mock.patch`. Loopback (`127.0.0.1`, `localhost`) and reserved names (`example.com`, `*.test`, `*.invalid`) pass.
 - Tools: download by pinned version, verify sha256, call by absolute path (see `.github/scripts/run-actionlint.sh`). No `@latest`, no `curl | sh`, no `apt-get install` in a gate, no `*-latest` runner image.
 - State: `mkdtemp` / `tmp_path`, never a literal `/tmp/...`. No `--test-isolation=none`, `isolate: false`, or shuffle.
-- Seeds: `vi.spyOn(Math, 'random')`, a seeded generator passed in, `random.Random(1234)`.
+- Seeds: `vi.spyOn(Math, 'random')`, a seeded generator passed in, `random.Random(1234)`. A quoted example is not a draw; a template or f-string interpolation still is.
 - Toolchains: `./.github/actions/setup-node-pnpm`, `actions/setup-python`, `actions/setup-go` in the same job that runs them.
 
 ## Limits the gates do not cover

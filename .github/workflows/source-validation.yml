@@ -2,9 +2,11 @@ name: Source Validation
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # capability-gap: GitHub re-runs pull_request workflows on PR body/title edits and offers no native reuse of the same head's checks; one read-only run lookup per job reuses the exact-head proof.
+# github-token-budget: 230 calls/run - cleanup: at most 10 run-list pages, one initial PR read and 100 live-head reads/cancellations; metadata reuse and PR Ready retain their existing reads.
 # removal-trigger: Remove the lookup when body-dependent decisions leave Source Validation or GitHub stops re-running pull_request workflows on metadata-only edits.
 on:
   pull_request:
+    # scripts/security/security-gate.mjs consumes PR labels; retain label requalification.
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
     branches: [main, 'integration/**']
 permissions:
@@ -12,7 +14,8 @@ permissions:
 concurrency:
   # A synchronize and body/base edit can arrive together on the same head.
   # Canceling the newer suite leaves admission blocked even if its peer passes.
-  # Retain every validation receipt; a new source head has its own queue.
+  # Retain every current-head receipt; only the independent cleanup job below
+  # cancels older heads. Never serialize cleanup behind a different head.
   group: source-validation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
   queue: max
@@ -25,6 +28,104 @@ env:
   CF_TURBO_TOKEN: ${{ secrets.CF_TURBO_CACHE_RO_TOKEN }}
   CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
 jobs:
+  cancel-superseded:
+    name: Source Validation / cancel superseded heads
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      # Cancellation bootstraps only the dependency-free API client and pinned
+      # runtime from the trusted base; it never executes the PR checkout.
+      - name: Checkout the trusted cancellation client
+        id: client
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .source-validation-client
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      - name: Prime cancellation client runtime
+        id: prime
+        if: ${{ steps.client.outcome == 'success' }}
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
+      - name: Setup cancellation client runtime
+        id: runtime
+        if: ${{ steps.prime.outcome == 'success' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .source-validation-client/.nvmrc
+      # Fork/Dependabot tokens cannot write Actions; source checks still run.
+      - name: Cancel only older runs of superseded PR heads
+        # Runs after a failed bootstrap too, to emit the notice. This job is
+        # advisory: not required, not needed by any job, never gates admission.
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        shell: bash
+        env:
+          CLEANUP_READY: ${{ steps.client.outcome == 'success' && steps.prime.outcome == 'success' && steps.runtime.outcome == 'success' }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # Cleanup is advisory: preserve every required check on any API/tool error.
+          trap 'status=$?; if (( status != 0 )); then echo "::notice::Superseded-head cleanup unavailable (exit $status); validation continues."; fi; exit 0' EXIT
+          if [[ "$CLEANUP_READY" != true ]]; then
+            echo "::notice::Superseded-head cleanup bootstrap unavailable; validation continues."
+            exit 0
+          fi
+          api() {
+            node .source-validation-client/packages/api-client/cli.ts gh --priority repair --once -- api "$@"
+          }
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+          live_head() { api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha'; }
+          # A delayed synchronize must never cancel a newer push's suite.
+          current_head="$(live_head)"
+          [[ "$current_head" == "$HEAD_SHA" ]] || exit 0
+          ref_q="$(jq -rn --arg ref "$HEAD_REF" '$ref | @uri')"
+          runs="$(api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?event=pull_request&branch=$ref_q&per_page=100" --paginate --slurp)"
+          # Pagination includes workflow-concurrency queued/pending runs too.
+          # Empty/foreign/ambiguous PR associations fail safe; never infer PR identity
+          # from a branch name (forks and distinct PRs can share one).
+          ids="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --arg repo "$REPOSITORY" --argjson pr "$PR_NUMBER" --argjson run "$RUN_ID" '
+            [.[] | .workflow_runs[]
+              | select(.id < $run and .head_sha != $sha
+                and (.head_sha | strings | test("^[0-9a-f]{40}$"))
+                and .head_branch == $ref and .head_repository.full_name == $repo
+                and .event == "pull_request" and .path == ".github/workflows/source-validation.yml"
+                and [.pull_requests[]?.number] == [$pr]
+                and (.status == "in_progress" or .status == "queued" or .status == "pending"
+                  or .status == "waiting" or .status == "requested"))
+              | .id] | unique | .[:100][]' <<<"$runs")"
+          while IFS= read -r id; do
+            [[ "$id" =~ ^[1-9][0-9]*$ ]] || continue
+            # Recheck before EVERY cancellation, including head reversions.
+            # The immutable id cutoff also protects newer suites if a push
+            # arrives between this read and the cancel request.
+            current_head="$(live_head)"
+            [[ "$current_head" == "$HEAD_SHA" ]] || exit 0
+            if result="$(api --method POST "repos/$REPOSITORY/actions/runs/$id/cancel" 2>&1)"; then
+              echo "Cancelled superseded Source Validation run $id."
+            elif [[ "$result" == *"(HTTP 409)"* ]]; then
+              echo "Source Validation run $id already finished or is cancelling."
+            else
+              echo "$result" >&2
+              exit 1
+            fi
+          done <<<"$ids"
   deterministic:
     name: Source Validation
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
@@ -189,6 +290,43 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      # JOV-13063: every PR references an existing Linear issue (Linear is the
+      # system of record; native GitHub<->Linear sync is disabled). Runs the
+      # evaluator, its Linear client and the policy from the trusted base so a
+      # PR cannot weaken its own check. Mode comes from
+      # .github/linear-reference-policy.json: observe (warning + step summary,
+      # exit 0) until the autonomous promotion bar is met, then enforce. A
+      # Linear outage or a fork PR (no secret) is "unverified" and never
+      # blocks; if the evaluator itself errors, observe mode reports a warning
+      # and enforce mode fails. The merge writer re-verifies after merge.
+      - name: Require a Linear issue reference from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          LINEAR_API_KEY: ${{ github.event.pull_request.head.repo.fork == false && secrets.LINEAR_API_KEY || '' }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          if ! git cat-file -e "$trusted_ref:scripts/lib/linear-reference-requirement.mjs" 2>/dev/null; then
+            echo "Linear reference check not on base yet (bootstrap PR); skipping."
+            exit 0
+          fi
+          guard_root="$(mktemp -d "$RUNNER_TEMP/linear-reference.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/lib/linear-reference-requirement.mjs packages/api-client .github/linear-reference-policy.json | tar -x -C "$guard_root"
+          policy="$guard_root/.github/linear-reference-policy.json"
+          status=0
+          LINEAR_REFERENCE_POLICY="$policy" \
+            node "$guard_root/scripts/lib/linear-reference-requirement.mjs" || status=$?
+          if [ "$status" -ne 0 ]; then
+            mode="$(node -e 'const p=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(p.mode==="enforce"?"enforce":"observe")' "$policy")"
+            if [ "$mode" = "enforce" ]; then
+              exit "$status"
+            fi
+            echo "::warning title=Linear reference (observe)::evaluator exited $status; observe mode does not block."
+          fi
       - name: Check agent-context size after merge onto base
         shell: bash
         env:

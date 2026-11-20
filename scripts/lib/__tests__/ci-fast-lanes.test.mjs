@@ -37,6 +37,7 @@ import {
   runMergeGroupGuards,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_COMMAND,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -286,7 +287,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -486,28 +487,36 @@ describe('runStructural screenshot contract discovery', () => {
     120_000
   );
 
+  const LEADS_CHANGED = ['apps/web/lib/leads/constants.ts'];
   it.each([
-    ['web', ['apps/web/lib/leads/constants.ts'], true],
-    ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
-    ['web', ['apps/web/app/page.tsx'], false],
+    ['pull_request', 'web', LEADS_CHANGED, true],
+    ['pull_request', 'web,operations', LEADS_CHANGED, false],
+    ['pull_request', 'web', ['apps/web/app/page.tsx'], false],
+    ['merge_group', 'web', LEADS_CHANGED, true],
+    ['push', 'web', LEADS_CHANGED, true],
   ])(
-    'runs script contracts that read a changed file without operations (%s)',
-    async (lanes, changed, expected) => {
+    'runs the script contracts a changed file reads; landing events run the full lists (%s)',
+    async (event, lanes, changed, expected) => {
       // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
-      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
-      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
+      // PRs keep the derived selection; landing events run the FULL lists.
+      process.env.GITHUB_EVENT_NAME = event;
       process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
       await runStructural({ execute, changedFileList: changed });
       const commands = execute.mock.calls.map(([command]) => String(command));
+      const landing = event !== 'pull_request';
       const dependent = commands.filter(
         command =>
           command.startsWith('node --test ') &&
           command.includes('scripts/funnel-judge/rubric.test.mjs') &&
-          !command.includes('scripts/agent-context/check.test.mjs')
+          command.includes('scripts/agent-context/check.test.mjs') === landing
       );
       expect(dependent).toHaveLength(expected ? 1 : 0);
+      expect(commands.includes(SCRIPT_CONTRACT_VITEST_COMMAND)).toBe(
+        landing || lanes.includes('operations')
+      );
     }
   );
 

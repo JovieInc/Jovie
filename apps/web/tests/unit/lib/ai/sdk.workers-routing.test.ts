@@ -130,7 +130,7 @@ describe('Workers AI routing in the shared AI layer', () => {
         return new Response(
           JSON.stringify({
             id: 'x',
-            model: '@cf/zai-org/glm-5.3-flash',
+            model: '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
             choices: [
               {
                 index: 0,
