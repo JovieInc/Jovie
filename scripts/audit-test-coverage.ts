@@ -664,7 +664,7 @@ ${tableRows.join('\n')}
 
 ## Priority Queue
 
-Top 5 by \`risk_score × coverage_gap\`. Start here.
+Top 5 by \`risk_score × (coverage_gap + mutation_debt)\` (Mut &lt; 60 adds debt). Start here.
 
 ${priorityList.join('\n')}
 
