@@ -802,7 +802,6 @@ export function selectSourceGuards(event, changed) {
     loadSourceGuardHistory()
   );
 }
-
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
   guard => guard.command
 ).join(' && ');
