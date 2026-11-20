@@ -9,12 +9,7 @@ const child = vi.hoisted(() => ({
 vi.mock('node:child_process', () => child);
 
 import { FakeClock } from './fake-provider.ts';
-import {
-  ghCredential,
-  ghStdoutBytes,
-  runGh,
-  splitIncluded,
-} from './gh.ts';
+import { ghCredential, ghStdoutBytes, runGh, splitIncluded } from './gh.ts';
 import { credentialState } from './policy.ts';
 import { MemoryLedgerStore } from './store.ts';
 
@@ -44,13 +39,17 @@ function makePipeChild(opts: {
     }
     if (opts.stdout !== undefined) {
       const buf =
-        typeof opts.stdout === 'string' ? Buffer.from(opts.stdout) : opts.stdout;
+        typeof opts.stdout === 'string'
+          ? Buffer.from(opts.stdout)
+          : opts.stdout;
       proc.stdout!.emit('data', buf);
     }
     proc.stdout!.emit('end');
     if (opts.stderr !== undefined) {
       const buf =
-        typeof opts.stderr === 'string' ? Buffer.from(opts.stderr) : opts.stderr;
+        typeof opts.stderr === 'string'
+          ? Buffer.from(opts.stderr)
+          : opts.stderr;
       proc.stderr!.emit('data', buf);
     }
     proc.stderr!.emit('end');
@@ -65,7 +64,11 @@ function makeFileChild(opts: {
   code?: number | null;
   error?: Error;
   missingStderr?: boolean;
-}): (cmd: string, argv: string[], spawnOpts: { stdio: unknown[] }) => SpawnChild {
+}): (
+  cmd: string,
+  argv: string[],
+  spawnOpts: { stdio: unknown[] }
+) => SpawnChild {
   return (_cmd, _argv, spawnOpts) => {
     const fd = spawnOpts.stdio[1];
     if (typeof fd === 'number' && opts.bytes) writeSync(fd, opts.bytes);
@@ -222,10 +225,7 @@ describe('gh defaultRun capture paths', () => {
     expect(closed.code).toBe(1);
     expect(closed.stderr).toContain('warn');
     expect(
-      ghStdoutBytes(closed.stdout, [
-        'api',
-        'repos/o/r/actions/artifacts/3/zip',
-      ])
+      ghStdoutBytes(closed.stdout, ['api', 'repos/o/r/actions/artifacts/3/zip'])
     ).toEqual(ZIP);
   });
 
@@ -299,12 +299,12 @@ describe('gh defaultRun capture paths', () => {
       };
     });
     const writes: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(((chunk: string | Uint8Array) => {
-        writes.push(String(chunk));
-        return true;
-      }) as typeof process.stderr.write);
+    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(((
+      chunk: string | Uint8Array
+    ) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write);
     try {
       const result = await runGh(['api', 'repos/o/r'], {
         store,
