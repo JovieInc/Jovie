@@ -6,7 +6,14 @@ Jovie uses CSS custom properties for theming and design tokens. This is a refere
 
 ## Architecture
 
-**Single source of truth:** `apps/web/styles/design-system.css` (~11.8k lines). It `@import`s `apps/web/styles/linear-tokens.css` and is itself imported by `apps/web/app/globals.css` in a locked order (`tailwindcss` → `design-system.css` → `theme.css`).
+**Live write path (until Phase 2 flip):** `apps/web/styles/design-system.css`
+(~11.8k lines) plus compiler-owned `apps/web/design/tokens.json`. It `@import`s
+`apps/web/styles/linear-tokens.css` and is itself imported by
+`apps/web/app/globals.css` in a locked order (`tailwindcss` → `design-system.css`
+→ `theme.css`). Repo-root `design.tokens.json` is the Phase 2 write-SoT target
+and a generated export today — Tim owns flip timing. **Freeze:** no new
+`--linear-*`, carbon shell overrides, or feature token packs
+([governance](../DESIGN_TOKENS.md#write-path-freeze-drift-w1--t01)).
 
 Key architectural properties:
 

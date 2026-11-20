@@ -110,9 +110,14 @@ async function deniedEvidence(response) {
 }
 
 /** Bounded JSON fetch: 200 is ok, any other status or transport is a reason. */
-export async function readJson(fetchImpl, url, headers = {}) {
+export async function readJson(
+  fetchImpl,
+  url,
+  headers = {},
+  timeoutMs = TIMEOUT_MS
+) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, {
       headers: {

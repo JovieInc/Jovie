@@ -21,11 +21,11 @@
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
-    "sha256": "5597fc77308c8da2d01e92e701b9e0ed08ca51ebd9228833cf8a6f6ce732de50"
+    "sha256": "8715bb66cbbbba3d4ceff7bd07dd45577b9383c2ca4d7457d8c418f829612b42"
   },
   {
     "heading": "## Color System",
-    "sha256": "ad853fee1b414099a2f806a1446188530018c913227d35ce08250d85567dc700"
+    "sha256": "1da268127fc6b83deef2cca295fbc431afa97ea46cda2b8e493227f15f03113b"
   },
   {
     "heading": "## Spacing",
@@ -45,15 +45,15 @@
   },
   {
     "heading": "## Motion",
-    "sha256": "1a00660de1e58d0c5331245c46fa3c894e60406b226296bd6b6ca94bc29aef5f"
+    "sha256": "75ac5949ea5d5421271e3bdab6cb0c8611e48dda4682ca41d0e326d239d7f181"
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "3f4917fa28e4c03a78ce89c171ae16ddf4004970b856b1aab9afff00eeaa69f7"
+    "sha256": "7c68f5a0521617dcc245afd35e28fe55827f0eb852a0d94240533fc93bf5348a"
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "a3b3d693de568aa6fb34e5666104e5d25a9e0105dfba63f72dfdff3429515fa1"
+    "sha256": "6de1f43a9a7fae670743264505d3ac126e8e7c20c4b89c2e55e5c45854a98990"
   },
   {
     "heading": "## Full-Screen Status Screens",
@@ -73,7 +73,7 @@
   },
   {
     "heading": "## Source-of-Truth File Map",
-    "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
+    "sha256": "ce8363fcdd1190af7fdf0ef59cf338c5e1dea51c0ce05030b8ec0d7a1876781e"
   },
   {
     "heading": "## Decisions Log",

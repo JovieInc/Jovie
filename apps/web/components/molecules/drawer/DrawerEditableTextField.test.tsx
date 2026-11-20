@@ -61,8 +61,9 @@ describe('DrawerEditableTextField', () => {
     );
 
     const copyButton = screen.getByLabelText('Copy UPC');
-    expect(copyButton.className).toContain('min-h-6');
-    expect(copyButton.className).toContain('min-w-6');
+    // IconButton size=xs → Button icon-xs (h-6 w-6); replaces DrawerInline min-h-6.
+    expect(copyButton.className).toContain('h-6');
+    expect(copyButton.className).toContain('w-6');
   });
 
   it('copies the current value from display mode', async () => {

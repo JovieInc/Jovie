@@ -112,7 +112,10 @@ Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
 
 ## Use Tokens, Not Raw Colors
 
-Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
+Always use System B semantic tokens — never raw Tailwind colors that break
+theme contrast. Write-path freeze (Drift W1): emitter/`design/tokens.json`
+only until Tim flips Phase 2; ban new `--linear-*`, carbon overrides, feature
+packs ([contract](docs/DESIGN_TOKENS.md#write-path-freeze-drift-w1--t01)).
 
 ### Banned patterns
 
@@ -124,7 +127,7 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 | `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
 | `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
 
-**Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
+Opacity overlays (`text-black/20`, `bg-white/5`) on known-dark surfaces are allowed.
 
 ### Enforcement
 
@@ -236,7 +239,7 @@ Read [the shadows reference](docs/design-system/DETAILS.md#shadows) when changin
 
 ## Motion
 
-Read [the motion reference](docs/design-system/DETAILS.md#motion) when changing this area.
+Read [motion](docs/design-system/DETAILS.md#motion) (`--scale-press: 0.98` SoT).
 
 ## App IA & Page Scaffold
 
