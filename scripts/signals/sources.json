@@ -163,6 +163,13 @@
       "url": "https://supabase.com/rss.xml"
     },
     {
+      "id": "higgsfield-changelog",
+      "name": "Higgsfield changelog",
+      "category": "growth-company",
+      "kind": "feed",
+      "url": "https://higgsfield.ai/creator-hub/changelog/rss.xml"
+    },
+    {
       "id": "higgsfield-blog",
       "name": "Higgsfield blog",
       "category": "growth-company",
