@@ -120,7 +120,7 @@ class ParseTests(unittest.TestCase):
         sources = W.load_sources()
         self.assertGreaterEqual(len(sources), 15)
         categories = {item["category"] for item in sources}
-        self.assertEqual(categories, {"ai-lab", "platform", "competitor"})
+        self.assertEqual(categories, {"ai-lab", "platform", "competitor", "growth-company"})
 
 
 class PollTests(unittest.TestCase):
