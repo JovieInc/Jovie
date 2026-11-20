@@ -238,12 +238,16 @@ describe('GET /s/[code]', () => {
 
   it('flushes the 302 before analytics finish (redirect latency budget)', async () => {
     let releaseAnalytics: () => void = () => undefined;
-    mocks.withSystemIngestionSession.mockImplementationOnce(
-      () =>
-        new Promise<void>(resolve => {
-          releaseAnalytics = resolve;
-        })
-    );
+    let markAnalyticsStarted: () => void = () => undefined;
+    const analyticsStarted = new Promise<void>(resolve => {
+      markAnalyticsStarted = resolve;
+    });
+    mocks.withSystemIngestionSession.mockImplementationOnce(() => {
+      markAnalyticsStarted();
+      return new Promise<void>(resolve => {
+        releaseAnalytics = resolve;
+      });
+    });
 
     const response = await GET(new NextRequest('http://localhost/s/abc123'), {
       params: Promise.resolve({ code: 'abc123' }),
@@ -251,9 +255,39 @@ describe('GET /s/[code]', () => {
 
     // The route resolved while the analytics transaction is still pending.
     expect(response.status).toBe(302);
+    await analyticsStarted;
     expect(recordAudienceEvent).not.toHaveBeenCalled();
     releaseAnalytics();
     await Promise.all(mocks.afterTasks.splice(0));
+  });
+
+  it('flushes the 302 before the rate limiter resolves (redirect latency budget)', async () => {
+    let releaseLimit: (result: { success: boolean }) => void = () => undefined;
+    vi.mocked(publicClickLimiter.limit).mockImplementationOnce(
+      () =>
+        new Promise<{ success: boolean }>(resolve => {
+          releaseLimit = resolve;
+        })
+    );
+
+    const response = await GET(
+      new NextRequest('http://localhost/s/abc123', {
+        headers: { 'x-vercel-ip-country': 'US' },
+      }),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://example.com/profile'
+    );
+    expect(mocks.withSystemIngestionSession).not.toHaveBeenCalled();
+
+    releaseLimit({ success: true });
+    await Promise.all(mocks.afterTasks.splice(0));
+    expect(mocks.withSystemIngestionSession).toHaveBeenCalled();
   });
 
   it('treats partial consent cookies as malformed through the shared parser', async () => {
