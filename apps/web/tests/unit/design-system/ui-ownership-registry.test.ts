@@ -447,7 +447,7 @@ describe('cross-surface UI ownership registry', () => {
     );
     expect(owner).toBeDefined();
     expect(owner?.source).toMatch(
-      /\.opacity\(configuration\.isPressed \? JoviePillButtonStyle\.pressedOpacity : 1\)\s*\.scaleEffect\(configuration\.isPressed \? JovieMotion\.pressScale : 1\)\s*\.animation\(JovieMotion\.subtle, value: configuration\.isPressed\)\s*\.padding\(\.vertical, JoviePillButtonStyle\.hitInset\)\s*\.contentShape\(Rectangle\(\)\)/
+      /\.opacity\(configuration\.isPressed \? JoviePillButtonStyle\.pressedOpacity : 1\)\s*\.scaleEffect\(configuration\.isPressed \? JovieMotion\.pressScale : 1\)\s*\.animation\(JovieMotion\.subtle, value: configuration\.isPressed\)\s*\.padding\(\.vertical, JoviePillButtonStyle\.hitInset\)\s*\.frame\(\s*minWidth: JoviePillButtonStyle\.minimumHitHeight,\s*minHeight: JoviePillButtonStyle\.minimumHitHeight\s*\)\s*\.contentShape\(Rectangle\(\)\)/
     );
     const mutations = [
       [

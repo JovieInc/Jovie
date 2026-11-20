@@ -151,8 +151,14 @@ export function ensureDevNextCacheFresh(options) {
   } = options;
 
   const routeSources = scanAppRouteSources(appDir);
+  // Next.js 16 isolatedDevBuild writes `next dev` output under `.next/dev/server/app`
+  // while `next build` writes under `.next/server/app`. Check the isolated dev tree
+  // first so stale pre-warmed snapshots never bypass cache invalidation.
+  const isolatedDevRoutesDir = path.join(nextDir, 'dev', 'server', 'app');
   const compiledRoutesDir = path.join(nextDir, 'server', 'app');
-  const compiledMtimeMs = getCompiledRoutesMtimeMs(compiledRoutesDir);
+  const compiledMtimeMs =
+    getCompiledRoutesMtimeMs(isolatedDevRoutesDir) ??
+    getCompiledRoutesMtimeMs(compiledRoutesDir);
 
   /** @type {'forced' | 'stale' | 'stale-config' | 'fresh' | 'missing'} */
   let cacheState = 'missing';

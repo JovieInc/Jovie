@@ -39,7 +39,7 @@ describe('Get Updates consent wording', () => {
 describe('Get Updates promise', () => {
   it('promises only new music unless the artist has more', () => {
     expect(describeUpdatePromise('Tim', ['newMusic'])).toEqual({
-      title: 'Get New Music',
+      title: 'Get updates',
       body: 'New music from Tim.',
     });
     expect(describeUpdatePromise('Tim', []).body).not.toMatch(/shows|merch/);

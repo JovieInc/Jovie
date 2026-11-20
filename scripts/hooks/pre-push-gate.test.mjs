@@ -24,7 +24,7 @@ function runGate(args = [], env = {}) {
   return spawnSync('bash', [gateScript, ...args], {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...process.env, JOVIE_PREFLIGHT_DEPTH: undefined, ...env },
   });
 }
 
@@ -75,9 +75,24 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /git diff --check/);
   assert.match(publication, /scan-secrets\.sh publication origin\/main/);
   assert.match(publication, /policy-gate-liveness\.mjs/);
+  assert.match(publication, /node scripts\/company-guards\/size\.mjs/);
+  assert.match(publication, /node scripts\/hooks\/pr-size-local\.mjs/);
+  assert.match(publication, /bash scripts\/hooks\/company-size-local\.sh/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
   assert.match(publication, /bash scripts\/hooks\/biome-pre-push\.sh/);
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
+});
+
+test('affected pushes run the company size ratchet before heavier checks', () => {
+  const source = readFileSync(gateScript, 'utf8');
+  const affected = source.split('run_affected() {', 2)[1].split('\n}', 1)[0];
+  assert.match(affected, /node scripts\/company-guards\/size\.mjs/);
+  assert.match(affected, /node scripts\/hooks\/pr-size-local\.mjs/);
+  assert.match(affected, /bash scripts\/hooks\/company-size-local\.sh/);
+  assert.match(
+    affected,
+    /node scripts\/company-guards\/size\.mjs[\s\S]*run_lint/
+  );
 });
 
 for (const linkedWorktree of [false, true]) {
@@ -90,11 +105,17 @@ for (const linkedWorktree of [false, true]) {
     assert.equal(localNames.status, 0, localNames.stderr);
     for (const name of localNames.stdout.trim().split('\n')) delete env[name];
     delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+    delete env.JOVIE_PREFLIGHT_DEPTH;
     env.GIT_CONFIG_GLOBAL = '/dev/null';
     env.GIT_CONFIG_NOSYSTEM = '1';
 
     const git = (cwd, ...args) => {
-      const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+      const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd,
+        env,
+        encoding: 'utf8',
+      });
       assert.equal(result.status, 0, result.stderr);
       return result.stdout.trim();
     };
@@ -199,6 +220,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
   assert.equal(localNames.status, 0, localNames.stderr);
   for (const name of localNames.stdout.trim().split('\n')) delete env[name];
   delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+  delete env.JOVIE_PREFLIGHT_DEPTH;
   env.GIT_CONFIG_GLOBAL = '/dev/null';
   env.GIT_CONFIG_NOSYSTEM = '1';
   const run = (command, args) =>
@@ -226,12 +248,15 @@ test('publication rejects committed formatter drift and accepts the formatted re
     for (const file of ['.nvmrc', 'biome.json']) {
       write(file, readFileSync(path.join(repoRoot, file)));
     }
-    // Other publication checks are outside this formatting contract. Real Git,
-    // the publication dispatcher and the installed Biome run without mocks.
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/preflight-changed.mjs', 'export {};\n');
+    write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
     write('.gitignore', 'node_modules/\n');
@@ -275,7 +300,8 @@ test('publication rejects committed formatter drift and accepts the formatted re
     git('commit', '-m', 'format the repair');
     const accepted = publish();
     assert.equal(accepted.status, 0, `${accepted.stdout}\n${accepted.stderr}`);
-    assert.match(accepted.stdout, /Checked 1 file/);
+    // Biome 2.6 prints "Checked N files" on stderr. The gate still uses the exit code.
+    assert.match(`${accepted.stdout}\n${accepted.stderr}`, /Checked 1 file/);
 
     rmSync(path.join(root, 'node_modules/.bin/biome'));
     const missingTool = publish();
@@ -300,12 +326,16 @@ test('publication blocks missing component stories and tests before publishing',
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript, 'utf8'));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
     write('scripts/hooks/biome-pre-push.sh', 'exit 0\n');
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
     write(
       'bin/git',
       '#!/bin/sh\nif [ "$*" != "rev-parse --local-env-vars" ]; then echo fixture-base; fi\n',
       true
     );
     write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write(
       'scripts/lib/policy-gate-liveness.mjs',
@@ -313,10 +343,10 @@ test('publication blocks missing component stories and tests before publishing',
     );
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
     write('scripts/preflight-changed.mjs', 'export {};\n');
+    write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     const checker = pathToFileURL(
       path.join(repoRoot, 'scripts/component-ship-gate.mjs')
     ).href;
-    // Exercise the real artifact checker; isolate network/scanners and git range discovery.
     write(
       'scripts/component-ship-gate.mjs',
       `
@@ -344,6 +374,7 @@ process.exit(report.ok ? 0 : 1);
             ...process.env,
             PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
             JOVIE_SKIP_PRE_PUSH_GATE: '',
+            JOVIE_PREFLIGHT_DEPTH: '',
           },
         }
       );
@@ -374,6 +405,80 @@ process.exit(report.ok ? 0 : 1);
     const complete = run();
     assert.equal(complete.status, 0, complete.stdout + complete.stderr);
     assert.equal(existsSync(marker), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('pre-push-gate.sh refuses when nested inside a preflight', () => {
+  const result = runGate([], { JOVIE_PREFLIGHT_DEPTH: '1' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /nested inside a preflight/);
+});
+
+test('affected qualification rejects stale surface certification before expensive checks', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-census-'));
+  const write = (file, content) => {
+    const target = path.join(root, file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, content, { mode: 0o755 });
+  };
+  try {
+    write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
+    write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/hooks/pr-size-local.mjs', 'process.exit(0)\n');
+    write('scripts/hooks/company-size-local.sh', 'exit 0\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
+    write('scripts/company-guards/size.mjs', 'export {};\n');
+    write('bin/git', '#!/bin/sh\nexit 0\n');
+    write(
+      'bin/pnpm',
+      `#!/bin/sh
+echo "$*" >> "$QUALIFICATION_CALLS"
+if [ "$*" = 'design:authority:check' ] && [ "$STALE_CENSUS" = 1 ]; then
+  echo 'Surface census: pricing/page.tsx: source changed; renew certification evidence' >&2
+  exit 17
+fi
+`
+    );
+    for (const file of ['preflight.mjs', 'preflight-changed.mjs'])
+      write(`scripts/${file}`, 'export {};\n');
+    write(
+      'scripts/automation-verify.sh',
+      'echo automation-verify >> "$QUALIFICATION_CALLS"\n'
+    );
+    const calls = path.join(root, 'calls');
+    for (const stale of ['1', '0']) {
+      writeFileSync(calls, '');
+      const result = spawnSync(
+        'bash',
+        [path.join(root, 'scripts/hooks/pre-push-gate.sh'), 'affected'],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
+            JOVIE_SKIP_PRE_PUSH_GATE: '',
+            JOVIE_PREFLIGHT_DEPTH: '',
+            QUALIFICATION_CALLS: calls,
+            STALE_CENSUS: stale,
+          },
+        }
+      );
+      const commands = readFileSync(calls, 'utf8').trim().split('\n');
+      assert.equal(result.status, stale === '1' ? 17 : 0, result.stderr);
+      if (stale === '1') {
+        assert.deepEqual(commands, ['design:authority:check']);
+        assert.match(result.stderr, /renew certification evidence/);
+      } else {
+        assert.equal(commands[0], 'design:authority:check');
+        assert.ok(commands.includes('run pre-push'));
+        assert.ok(commands.includes('component-ship-gate'));
+        assert.ok(commands.includes('component-certificate:gate'));
+        assert.equal(commands.at(-1), 'automation-verify');
+      }
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

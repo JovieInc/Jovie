@@ -28,6 +28,7 @@ import {
 } from './commerce-decision';
 import {
   type AcquisitionEligibility,
+  CONE_WORKFLOWS,
   type ConeEvidence,
   type ConeRequirementId,
   evaluateAcquisitionEligibility,
@@ -40,21 +41,12 @@ import {
   revalidateAcquisitionEligibilityReport,
 } from './eligibility-cache';
 
+export { CONE_WORKFLOWS };
+
 const PRODUCTION_BASE_URL = 'https://jov.ie';
 const CACHE_KEY = 'acquisition:eligibility:v1';
 const CACHE_TTL_SECONDS = 10 * 60;
-
-/** Workflows whose latest completed main run is cone evidence. */
-export const CONE_WORKFLOWS = {
-  /** Includes the canonical artist profile certificate (JOV-6920). */
-  revenuePath: 'm2-revenue-path-canary.yml',
-  /**
-   * signup → claim → checkout → verified payment → entitlement → refund: the
-   * Golden Path job of the latest dispatched main ci.yml run. The nightly
-   * workflow only dispatches it, so its own run proves nothing.
-   */
-  goldenPath: 'ci.yml#Golden Path (manual)',
-} as const;
+const GOLDEN_PATH_MAIN_EVENTS = new Set(['push', 'workflow_dispatch']);
 
 const M2_STEP_REQUIREMENTS: Record<M2RevenuePathStepName, ConeRequirementId> = {
   signed_out: 'entry',
@@ -105,10 +97,7 @@ export interface AcquisitionEligibilityDeps {
   readonly readCommerceDecision: () => Promise<unknown>;
 }
 
-/**
- * Conclusion of the named job in a run. A job that never ran, or was skipped
- * because an upstream job failed, counts as the run failing.
- */
+/** Skipped or missing named job counts as failure unless the run cancelled. */
 export function jobConclusion(
   jobs: ReadonlyArray<Record<string, unknown>>,
   jobName: string,
@@ -130,10 +119,10 @@ async function readLatestMainWorkflowRun(
   if (!token || !owner || !repo) {
     return { status: 'unavailable', reason: 'GitHub read is not configured.' };
   }
-  // `file#Job name` reads one job of the latest dispatched main run.
+  // `file#Job name` inspects the newest completed main push or dispatch run.
   const [workflowFile, jobName] = workflowSpec.split('#', 2);
   const repoUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
-  const event = jobName ? '&event=workflow_dispatch' : '';
+  const perPage = jobName ? 10 : 1;
   const readJson = async (url: string) => {
     const response = await serverFetch(url, {
       headers: {
@@ -150,7 +139,7 @@ async function readLatestMainWorkflowRun(
       : { ok: false as const, status: response.status };
   };
   const runs = await readJson(
-    `${repoUrl}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?branch=main&status=completed${event}&per_page=1`
+    `${repoUrl}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?branch=main&status=completed&per_page=${perPage}`
   );
   if (!runs.ok) {
     return {
@@ -158,10 +147,17 @@ async function readLatestMainWorkflowRun(
       reason: `GitHub API error (${runs.status}).`,
     };
   }
-  const payload = runs.payload as {
-    workflow_runs?: Array<Record<string, unknown>>;
-  };
-  const run = payload.workflow_runs?.[0];
+  const list =
+    (runs.payload as { workflow_runs?: Array<Record<string, unknown>> })
+      .workflow_runs ?? [];
+  const run = jobName
+    ? list.find(
+        item =>
+          item.event === undefined ||
+          (typeof item.event === 'string' &&
+            GOLDEN_PATH_MAIN_EVENTS.has(item.event))
+      )
+    : list[0];
   if (!run || typeof run.created_at !== 'string') {
     return { status: 'observed', run: null };
   }
@@ -176,9 +172,9 @@ async function readLatestMainWorkflowRun(
         reason: `GitHub API error (${jobs.status}).`,
       };
     }
-    const list = (jobs.payload as { jobs?: Array<Record<string, unknown>> })
+    const jobList = (jobs.payload as { jobs?: Array<Record<string, unknown>> })
       .jobs;
-    conclusion = jobConclusion(list ?? [], jobName, conclusion);
+    conclusion = jobConclusion(jobList ?? [], jobName, conclusion);
   }
   return {
     status: 'observed',
@@ -493,7 +489,7 @@ export async function computeAcquisitionEligibility(
 ): Promise<AcquisitionEligibilityReport> {
   try {
     const now = deps.now();
-    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce] =
+    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce, buyer] =
       await Promise.all([
         revenuePathEvidence(deps),
         canaryEvidence(
@@ -514,6 +510,7 @@ export async function computeAcquisitionEligibility(
         ),
         funnelEvidence(deps),
         commerceDecisionEvidence(deps, now),
+        workflowEvidence('buyer_would_pay', CONE_WORKFLOWS.buyerEval, deps),
       ]);
     return {
       ...evaluateAcquisitionEligibility({
@@ -525,6 +522,7 @@ export async function computeAcquisitionEligibility(
           goldenPath,
           funnel.evidence,
           ...commerce.evidence,
+          buyer,
         ],
         now,
       }),

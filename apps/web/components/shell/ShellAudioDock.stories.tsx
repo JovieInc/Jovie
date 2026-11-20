@@ -25,13 +25,36 @@ const DOCK_TRACK = {
   musicalKey: '8A',
 };
 
-function PlayerRow({ isPlaying }: { readonly isPlaying: boolean }) {
+type DockTrack = typeof DOCK_TRACK;
+
+const LONG_DOCK_TRACK: DockTrack = {
+  ...DOCK_TRACK,
+  id: 'long-weekend-midnight-drive',
+  title:
+    'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
+  artist: 'The Long Weekend Collective, Avery Stone and the Northern Lights',
+};
+
+const RTL_DOCK_TRACK: DockTrack = {
+  ...DOCK_TRACK,
+  id: 'rtl-layali',
+  title: 'ليالي المدينة الطويلة',
+  artist: 'فرقة الشرق',
+};
+
+function PlayerRow({
+  isPlaying,
+  track = DOCK_TRACK,
+}: {
+  readonly isPlaying: boolean;
+  readonly track?: DockTrack;
+}) {
   return (
     <div className='flex items-center gap-3 px-4 py-1.5'>
       <SidebarNowPlaying
         track={{
-          trackTitle: DOCK_TRACK.title,
-          artistName: DOCK_TRACK.artist,
+          trackTitle: track.title,
+          artistName: track.artist,
           artworkUrl: 'https://placehold.co/640x640/111827/E5E7EB?text=Artwork',
         }}
         isPlaying={isPlaying}
@@ -48,7 +71,7 @@ function PlayerRow({ isPlaying }: { readonly isPlaying: boolean }) {
         duration={213}
         waveformOn={false}
         onToggleWaveform={() => undefined}
-        track={DOCK_TRACK}
+        track={track}
         className='min-w-0 flex-1 px-0 py-0'
       />
     </div>
@@ -60,9 +83,22 @@ interface DockSceneProps {
   readonly chromeState: 'hidden' | 'playing' | 'paused';
   readonly theme: 'light' | 'dark';
   readonly rightRail?: boolean;
+  /** Track shown in the docked player row. */
+  readonly track?: 'default' | 'long' | 'rtl';
 }
 
-function DockScene({ chromeState, theme, rightRail }: DockSceneProps) {
+const SCENE_TRACKS: Record<NonNullable<DockSceneProps['track']>, DockTrack> = {
+  default: DOCK_TRACK,
+  long: LONG_DOCK_TRACK,
+  rtl: RTL_DOCK_TRACK,
+};
+
+function DockScene({
+  chromeState,
+  theme,
+  rightRail,
+  track = 'default',
+}: DockSceneProps) {
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -74,18 +110,23 @@ function DockScene({ chromeState, theme, rightRail }: DockSceneProps) {
       resetAudioChromeSnapshot();
     } else {
       setAudioChromeSnapshot({
-        activeTrackId: DOCK_TRACK.id,
+        activeTrackId: SCENE_TRACKS[track].id,
         compactPlayerVisible: false,
         fullPlayerVisible: true,
       });
     }
     return () => resetAudioChromeSnapshot();
-  }, [chromeState]);
+  }, [chromeState, track]);
 
   const isPlaying = chromeState === 'playing';
 
   return (
-    <div className='flex gap-2 bg-base p-2' style={{ height: 420, width: 720 }}>
+    <div
+      dir={track === 'rtl' ? 'rtl' : undefined}
+      lang={track === 'rtl' ? 'ar' : undefined}
+      className='flex gap-2 bg-base p-2'
+      style={{ height: 420, width: 720 }}
+    >
       {/* Main column: rounded panel + dock below, matching AppShellFrame. */}
       <div className='flex min-w-0 flex-1 flex-col'>
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--app-shell-radius) bg-(--app-shell-content-surface) shadow-(--app-shell-shadow)'>
@@ -98,7 +139,7 @@ function DockScene({ chromeState, theme, rightRail }: DockSceneProps) {
           </div>
         </div>
         <ShellAudioDock>
-          <PlayerRow isPlaying={isPlaying} />
+          <PlayerRow isPlaying={isPlaying} track={SCENE_TRACKS[track]} />
         </ShellAudioDock>
       </div>
       {rightRail ? (
@@ -128,6 +169,7 @@ const meta = {
       options: ['hidden', 'playing', 'paused'],
     },
     theme: { control: 'radio', options: ['light', 'dark'] },
+    track: { control: 'radio', options: ['default', 'long', 'rtl'] },
   },
 } satisfies Meta<typeof DockScene>;
 
@@ -169,4 +211,12 @@ export const PlayingLight: Story = {
 
 export const WithRightRailLight: Story = {
   args: { chromeState: 'playing', rightRail: true, theme: 'light' },
+};
+
+export const LongContent: Story = {
+  args: { chromeState: 'playing', track: 'long' },
+};
+
+export const Rtl: Story = {
+  args: { chromeState: 'playing', track: 'rtl' },
 };

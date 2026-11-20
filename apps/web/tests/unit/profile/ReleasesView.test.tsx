@@ -140,3 +140,42 @@ describe('ReleasesView', () => {
     );
   });
 });
+
+describe('ReleasesView text contrast contract (JOV-8873)', () => {
+  it('raises release metadata to white/64', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/profile/views/ReleasesView.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tracking-tight text-white/64');
+    expect(source).not.toContain('text-white/42');
+  });
+});
+
+describe('ReleasesView focus ring', () => {
+  it('draws each release row focus ring from the canonical focus token', () => {
+    render(
+      <ReleasesView
+        releases={releases}
+        artistId='artist-1'
+        artistHandle='tim'
+        artistName='Tim White'
+      />
+    );
+
+    const links = screen.getAllByRole('link');
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveClass(
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus'
+      );
+      expect(link.className).not.toContain('var(--focus-ring)');
+    }
+  });
+});

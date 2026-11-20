@@ -51,7 +51,7 @@ describe('lib/ai/workers-ai', () => {
       return new Response(
         JSON.stringify({
           id: 'x',
-          model: '@cf/zai-org/glm-5.3-flash',
+          model: '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
           choices: [
             {
               index: 0,
@@ -74,7 +74,7 @@ describe('lib/ai/workers-ai', () => {
     });
 
     expect(object).toEqual({ category: 'spam' });
-    expect(bodies[0]?.model).toBe('@cf/zai-org/glm-5.3-flash');
+    expect(bodies[0]?.model).toBe('@cf/deepseek-ai/deepseek-v4.1-flash-1017');
     expect(bodies[0]?.response_format).toMatchObject({ type: 'json_schema' });
   });
 });

@@ -4,8 +4,11 @@ import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { documentTitle } from '@/lib/seo/document-title';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
 import { SignUpPageClient } from './SignUpPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -40,11 +43,15 @@ export default async function SignUpPage({
     );
   }
 
+  // Closed public signup: anonymous visitors join the waitlist instead.
+  // Sign-in and invite links stay open (canon/PRODUCT.md, 2026-11-02).
+  if (isPublicSignupClosed()) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
+  }
+
   return (
     <Suspense fallback={<AuthFormSkeleton />}>
-      <SignUpPageClient
-        showOfferSummary={isCodeFlagEnabled('AUTH_OFFER_SUMMARY')}
-      />
+      <SignUpPageClient />
     </Suspense>
   );
 }

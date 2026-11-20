@@ -1,7 +1,14 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseTrackedRegularTree } from '../merge-group-member-policy.mjs';
 import {
@@ -11,7 +18,10 @@ import {
 } from '../projected-tree-budget.mjs';
 import {
   HYGIENE_LIMITS,
+  logTrackedBytesBudgetWarnings,
+  trackedBytesBudgetPlanWarning,
   trackedBytesBudgetWarning,
+  trackedBytesBudgetWarnings,
 } from '../repo-hygiene-limits.mjs';
 
 const BASE = '1'.repeat(40);
@@ -57,6 +67,52 @@ function regular(size, path = 'payload.bin') {
 }
 
 describe('source-PR projected combined-tree budget', () => {
+  it('stops publication and qualification on a rejected tree budget', () => {
+    const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+    const root = mkdtempSync(join(tmpdir(), 'pre-push-budget-'));
+    try {
+      for (const directory of ['scripts/hooks', 'scripts/lib', 'bin'])
+        mkdirSync(join(root, directory), { recursive: true });
+      for (const file of ['pre-push-gate.sh', 'resolve-repo-node.sh'])
+        copyFileSync(
+          join(repoRoot, 'scripts/hooks', file),
+          join(root, 'scripts/hooks', file)
+        );
+      copyFileSync(join(repoRoot, '.nvmrc'), join(root, '.nvmrc'));
+      writeFileSync(
+        join(root, 'scripts/lib/projected-tree-budget.mjs'),
+        `
+import assert from 'node:assert/strict';
+assert.deepEqual(process.argv.slice(2), ['--local']);
+console.error('fixture tree exceeds byte budget');
+process.exit(17);
+`
+      );
+      writeFileSync(join(root, 'bin/pnpm'), '#!/usr/bin/env bash\nexit 0\n', {
+        mode: 0o755,
+      });
+      for (const mode of ['affected', 'publication']) {
+        const result = spawnSync(
+          'bash',
+          [join(root, 'scripts/hooks/pre-push-gate.sh'), mode],
+          {
+            cwd: repoRoot,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${join(root, 'bin')}:${process.env.PATH}`,
+              JOVIE_PREFLIGHT_DEPTH: undefined,
+              JOVIE_SKIP_PRE_PUSH_GATE: '',
+            },
+          }
+        );
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(17);
+        expect(result.stderr).toMatch(/fixture tree exceeds byte budget/);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
   it('parses local ls-tree evidence through the shared merge_group byte counter', () => {
     const output = lsTree([
       { mode: '040000', path: 'scripts', type: 'tree' },
@@ -94,12 +150,51 @@ describe('source-PR projected combined-tree budget', () => {
     );
   });
 
+  it('requires merging base cleanup when only the stale PR head exceeds budget', () => {
+    const logs = [];
+    expect(() =>
+      enforceProjectedTreeBudget({
+        baseSha: BASE,
+        git: fakeGit({
+          [BASE_TREE]: [regular(80)],
+          [HEAD_TREE]: [regular(120)],
+          [MERGED_TREE]: [regular(90)],
+        }),
+        headSha: HEAD,
+        log: line => logs.push(line),
+        maxTrackedBytes: 100,
+        mergeBaseSha: MERGE_BASE,
+      })
+    ).toThrow(
+      'PR head has 120 tracked regular-file bytes, exceeding the 100-byte repository budget, while the merged tree fits at 90 bytes; merge the current base branch into the PR branch to incorporate its cleanup, then rerun the guard'
+    );
+    expect(logs).toEqual([]);
+  });
+
+  it('accepts the same PR after it incorporates base cleanup', () => {
+    expect(
+      enforceProjectedTreeBudget({
+        baseSha: BASE,
+        git: fakeGit({
+          [BASE_TREE]: [regular(80)],
+          [HEAD_TREE]: [regular(100)],
+          [MERGED_TREE]: [regular(100)],
+        }),
+        headSha: HEAD,
+        log: () => {},
+        maxTrackedBytes: 100,
+        mergeBaseSha: MERGE_BASE,
+      })
+    ).toEqual({ baseBytes: 80, bytes: 100, delta: 20 });
+  });
+
   it('passes a shrinking PR near budget with a headroom warning', () => {
     const logs = [];
     const result = enforceProjectedTreeBudget({
       baseSha: BASE,
       git: fakeGit({
         [BASE_TREE]: [regular(MAX - 260)],
+        [HEAD_TREE]: [regular(MAX - 1_260)],
         [MERGED_TREE]: [regular(MAX - 1_260)],
       }),
       headSha: HEAD,
@@ -122,6 +217,7 @@ describe('source-PR projected combined-tree budget', () => {
       env: { PR_BASE_SHA: BASE, PR_HEAD_SHA: HEAD, PR_MERGE_BASE: MERGE_BASE },
       git: fakeGit({
         [BASE_TREE]: [regular(100)],
+        [HEAD_TREE]: [regular(150)],
         [MERGED_TREE]: [regular(150)],
       }),
       log: line => logs.push(line),
@@ -143,6 +239,75 @@ describe('source-PR projected combined-tree budget', () => {
     expect(trackedBytesBudgetWarning(96, 100)).toMatch(/96\.00% .*headroom/);
     expect(trackedBytesBudgetWarning(2_100_000, 1_000_000)).toMatch(
       /1\.10 MB over budget/
+    );
+  });
+
+  it('stays quiet at or below the 90% plan line', () => {
+    expect(trackedBytesBudgetPlanWarning(90, 100)).toBeNull();
+    expect(trackedBytesBudgetWarnings(90, 100)).toEqual([]);
+  });
+
+  it('plans the next prune in the 90-95% band without failing', () => {
+    expect(trackedBytesBudgetWarning(93, 100)).toBeNull();
+    const plan = trackedBytesBudgetPlanWarning(93, 100);
+    expect(plan).toMatch(/93\.00% .*headroom/);
+    expect(plan).toMatch(/90% plan line/);
+    expect(trackedBytesBudgetWarnings(93, 100)).toEqual([plan]);
+  });
+
+  it('keeps the shrink-now warning first and silent plan level above 95%', () => {
+    expect(trackedBytesBudgetPlanWarning(MAX - 1)).toBeNull();
+    const logs = [];
+    logTrackedBytesBudgetWarnings(MAX - 1, line => logs.push(line), 'X: ');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatch(/^::warning::X: .*shrink tracked bytes/);
+  });
+
+  it('emits the plan warning from the projected combined-tree check', () => {
+    const logs = [];
+    const bytes = Math.floor(MAX * 0.92);
+    const result = enforceProjectedTreeBudget({
+      baseSha: BASE,
+      git: fakeGit({
+        [BASE_TREE]: [regular(bytes - 10)],
+        [HEAD_TREE]: [regular(bytes)],
+        [MERGED_TREE]: [regular(bytes)],
+      }),
+      headSha: HEAD,
+      log: line => logs.push(line),
+      mergeBaseSha: MERGE_BASE,
+    });
+    expect(result.bytes).toBe(bytes);
+    expect(logs[0]).toMatch(
+      /^::warning::Projected combined tree: .*90% plan line/
+    );
+    expect(logs.at(-1)).toMatch(/^Projected combined tree: PASS/);
+  });
+
+  it('selects the same lowest merge base as CI in a criss-cross history', () => {
+    const lowest = '4'.repeat(40);
+    const treeGit = fakeGit({
+      [BASE_TREE]: [regular(100)],
+      [HEAD_TREE]: [regular(150)],
+      [MERGED_TREE]: [regular(150)],
+    });
+    const git = args => {
+      if (
+        args.join(' ') ===
+        'rev-parse --verify refs/remotes/origin/main^{commit}'
+      )
+        return BASE;
+      if (args.join(' ') === 'rev-parse --verify HEAD^{commit}') return HEAD;
+      if (args[0] === 'merge-base') {
+        expect(args).toEqual(['merge-base', '--all', BASE, HEAD]);
+        return `${MERGE_BASE}\n${lowest}\n`;
+      }
+      if (args[0] === 'merge-tree')
+        expect(args).toContain(`--merge-base=${lowest}`);
+      return treeGit(args);
+    };
+    expect(runProjectedTreeBudget({ local: true, git, log: () => {} })).toEqual(
+      { baseBytes: 100, bytes: 150, delta: 50 }
     );
   });
   it('skips with a warning when the PR head conflicts with the base', () => {
@@ -200,6 +365,28 @@ describe('source-PR projected combined-tree budget', () => {
         mergeBaseSha: mergeBase,
       });
       expect(result).toEqual({ baseBytes: 500, bytes: 1_300, delta: 800 });
+      // A local pre-push check must resolve real refs, ignoring stale CI env.
+      expect(() =>
+        runProjectedTreeBudget({ local: true, git, log: () => {} })
+      ).toThrow();
+      git(['update-ref', 'refs/remotes/origin/main', base]);
+      expect(
+        runProjectedTreeBudget({
+          local: true,
+          env: { PR_BASE_SHA: 'stale', PR_HEAD_SHA: 'stale' },
+          git,
+          log: () => {},
+        })
+      ).toEqual(result);
+      const output = execFileSync(
+        process.execPath,
+        [
+          new URL('../projected-tree-budget.mjs', import.meta.url).pathname,
+          '--local',
+        ],
+        { cwd: dir, encoding: 'utf8' }
+      );
+      expect(output).toContain('PASS — 1300 tracked regular-file bytes');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

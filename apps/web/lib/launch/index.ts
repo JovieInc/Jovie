@@ -105,6 +105,7 @@ export type LaunchOutcomeKind =
 
 export interface LaunchOutcome {
   readonly kind: LaunchOutcomeKind;
+  /** Non-negative safe integer; zero is an observation, not an achievement. */
   readonly count: number;
   readonly observationWindow: string;
   readonly observedAt: string;
@@ -384,6 +385,11 @@ export class InMemoryLaunchRegistry {
     launchId: string,
     outcome: LaunchOutcome
   ): Promise<LaunchRecord> {
+    if (!Number.isSafeInteger(outcome.count) || outcome.count < 0) {
+      throw new Error(
+        'launch outcome count must be a non-negative safe integer'
+      );
+    }
     const status: LaunchStatus =
       outcome.kind === 'visited'
         ? 'visited'
@@ -397,7 +403,10 @@ export class InMemoryLaunchRegistry {
     return this.update(launchId, current => ({
       ...current,
       outcomes: [...current.outcomes, outcome],
-      status: advanceStatus(current.status, status),
+      status:
+        outcome.count > 0
+          ? advanceStatus(current.status, status)
+          : current.status,
     }));
   }
 

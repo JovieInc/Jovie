@@ -1,18 +1,16 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
-import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
-import { WorkspacePage } from '@/components/organisms/WorkspacePage';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/LazyDashboardAudienceClient';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -21,16 +19,14 @@ import {
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import {
   type AppShellRouteContext,
+  type AppShellRouteContextResult,
   loadAppShellRouteContext,
   requireAppShellDashboardUserId,
 } from '../app-shell-route-context';
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
 import { ContactsPageClient } from './ContactsPageClient';
-import {
-  type ContactsWorkspaceTab,
-  resolveContactsWorkspaceTab,
-} from './contacts-workspace';
+import { resolveContactsWorkspaceTab } from './contacts-workspace';
 
 export { resolveContactsWorkspaceTab } from './contacts-workspace';
 
@@ -41,42 +37,6 @@ export const metadata: Metadata = {
   description: 'Your audience, contacts, and audience insights',
 };
 
-function buildAudienceWorkspaceHref(searchParams: SearchParams): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(searchParams)) {
-    if (key === 'tab' || value === undefined) continue;
-    for (const entry of Array.isArray(value) ? value : [value]) {
-      params.append(key, entry);
-    }
-  }
-  params.set('tab', 'audience');
-  return `${APP_ROUTES.CONTACTS}?${params.toString()}`;
-}
-
-function AudienceWorkspaceTabs({
-  activeTab,
-  searchParams,
-}: Readonly<{
-  activeTab: ContactsWorkspaceTab;
-  searchParams: SearchParams;
-}>) {
-  return (
-    <PageToolbar
-      className='border-b border-subtle'
-      start={
-        <RouteSegmentControl
-          value={activeTab}
-          aria-label='Audience Workspace'
-          className='max-w-72'
-          options={getAudienceWorkspaceNavigation(
-            buildAudienceWorkspaceHref(searchParams)
-          )}
-        />
-      }
-    />
-  );
-}
-
 export default async function ContactsPage({
   searchParams = Promise.resolve({}),
 }: Readonly<{
@@ -84,11 +44,34 @@ export default async function ContactsPage({
 }> = {}) {
   const resolvedSearchParams = await searchParams;
   const activeTab = resolveContactsWorkspaceTab(resolvedSearchParams.tab);
-  const routeContext = await loadAppShellRouteContext({
-    route: APP_ROUTES.CONTACTS,
-    dashboardErrorLogMessage: 'Dashboard data load failed on contacts page',
-    dashboardErrorMessage: 'Failed to load contacts. Please refresh the page.',
-  });
+  // Bounded wait (JOV-8791 / resilience.spec.ts): a wedged shell data read
+  // pins the whole document on AppShellSkeleton forever — the matrix chromium
+  // shard-4 failure showed exactly 23 chars (the skeleton's sr-only status)
+  // long past the load window. Past the bound, degrade to visible error UI
+  // instead of an endless skeleton.
+  let routeContext: AppShellRouteContextResult;
+  try {
+    routeContext = await withTimeout(
+      loadAppShellRouteContext({
+        route: APP_ROUTES.CONTACTS,
+        dashboardErrorLogMessage: 'Dashboard data load failed on contacts page',
+        dashboardErrorMessage:
+          'Failed to load contacts. Please refresh the page.',
+      }),
+      {
+        timeoutMs: 10_000,
+        context: 'Contacts route context',
+      }
+    );
+  } catch (error) {
+    throwIfRedirect(error);
+    void captureError('Contacts route context load failed', error, {
+      route: APP_ROUTES.CONTACTS,
+    });
+    return (
+      <PageErrorState message='Failed to load contacts. Please refresh the page.' />
+    );
+  }
   if (!routeContext.ok) {
     return routeContext.error;
   }
@@ -101,16 +84,10 @@ export default async function ContactsPage({
   }
 
   return (
-    <WorkspacePage
+    <AppShellContentPanel
       frame='none'
       contentPadding='none'
       data-testid='contacts-workspace'
-      toolbar={
-        <AudienceWorkspaceTabs
-          activeTab={activeTab}
-          searchParams={resolvedSearchParams}
-        />
-      }
     >
       <div className='min-h-0 flex-1'>
         {activeTab === 'audience' ? (
@@ -128,7 +105,7 @@ export default async function ContactsPage({
           />
         )}
       </div>
-    </WorkspacePage>
+    </AppShellContentPanel>
   );
 }
 
@@ -158,24 +135,35 @@ async function ContactsAudienceWorkspaceContent({
       (segment): segment is AudienceSegment =>
         (audienceFilters as readonly string[]).includes(segment)
     );
-    const [audienceData, tourDates] = await Promise.all([
-      getAudienceServerData({
-        userId: dashboardUserId,
-        selectedProfileId: artist?.id ?? null,
-        searchParams: {
-          page: String(parsedParams.page),
-          pageSize: String(parsedParams.pageSize),
-          sort: parsedParams.sort,
-          direction: parsedParams.direction,
-        },
-        view: parsedParams.view,
-        includeDetails: !isE2E,
-        segments: validSegments,
-      }),
-      !isE2E && artist?.id
-        ? loadUpcomingTourDates(artist.id).catch(() => [])
-        : Promise.resolve([]),
-    ]);
+    // Bounded wait (JOV-8791 / resilience.spec.ts): a wedged audience read
+    // left the whole document parked on AppShellSkeleton forever (matrix run
+    // 41165879189, chromium shard 4 — body text never passed the 23-char
+    // skeleton status line). Past the bound, throw to the route error
+    // boundary so the page shows error UI instead of a permanent skeleton.
+    const [audienceData, tourDates] = await withTimeout(
+      Promise.all([
+        getAudienceServerData({
+          userId: dashboardUserId,
+          selectedProfileId: artist?.id ?? null,
+          searchParams: {
+            page: String(parsedParams.page),
+            pageSize: String(parsedParams.pageSize),
+            sort: parsedParams.sort,
+            direction: parsedParams.direction,
+          },
+          view: parsedParams.view,
+          includeDetails: !isE2E,
+          segments: validSegments,
+        }),
+        !isE2E && artist?.id
+          ? loadUpcomingTourDates(artist.id).catch(() => [])
+          : Promise.resolve([]),
+      ]),
+      {
+        timeoutMs: 10_000,
+        context: 'Contacts audience data',
+      }
+    );
 
     return (
       <LazyDashboardAudienceClient

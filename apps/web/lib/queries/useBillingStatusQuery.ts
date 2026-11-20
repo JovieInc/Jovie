@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getEffectivePlan } from '@/lib/entitlements/registry';
+import { getEffectivePlan } from '@/lib/entitlements/effective-plan';
 import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';

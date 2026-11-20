@@ -76,7 +76,10 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-info/20');
-      expect(badge).toHaveClass('text-info');
+      expect(badge).toHaveClass(
+        'text-(--color-accent-blue-text)',
+        'dark:text-info'
+      );
     });
 
     it('renders green variant', () => {
@@ -85,7 +88,7 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-success/20');
-      expect(badge).toHaveClass('text-success');
+      expect(badge).toHaveClass('text-success-text');
     });
 
     it('renders purple variant', () => {
@@ -94,7 +97,7 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-accent/20');
-      expect(badge).toHaveClass('text-accent');
+      expect(badge).toHaveClass('text-accent-text');
     });
 
     it('renders orange variant', () => {
@@ -103,7 +106,7 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-warning/20');
-      expect(badge).toHaveClass('text-warning');
+      expect(badge).toHaveClass('text-warning-text');
     });
 
     it('renders red variant', () => {
@@ -112,7 +115,7 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-error/20');
-      expect(badge).toHaveClass('text-error');
+      expect(badge).toHaveClass('text-error-text');
     });
 
     it('renders gray variant', () => {
@@ -296,7 +299,7 @@ describe('StatusBadge', () => {
       const badge = screen.getByRole('status');
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-success/20');
-      expect(badge).toHaveClass('text-success');
+      expect(badge).toHaveClass('text-success-text');
       expect(badge).toHaveClass('px-2.5');
       expect(badge).toHaveClass('text-xs');
       expect(badge).toHaveClass('extra-class');

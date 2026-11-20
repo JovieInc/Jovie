@@ -11,7 +11,7 @@
     "name": "hyperagent-glm-proposer",
     "model": "z-ai/glm-5.3",
     "timeoutS": 900,
-    "health": ["hyperagent", "models", "--json"],
+    "health": ["hyperagent", "models", "--role", "research", "--json"],
     "healthy": "models",
     "cmd": [
       "hyperagent",
@@ -56,7 +56,7 @@
       "name": "hyperagent-grok-reviewer",
       "model": "grok-4.7",
       "timeoutS": 900,
-      "health": ["hyperagent", "models", "--json"],
+      "health": ["hyperagent", "models", "--role", "research", "--json"],
       "healthy": "models",
       "cmd": [
         "hyperagent",
@@ -79,7 +79,7 @@
     "name": "hyperagent-glm-research",
     "model": "z-ai/glm-5.3",
     "timeoutS": 1900,
-    "health": ["hyperagent", "models", "--json"],
+    "health": ["hyperagent", "models", "--role", "research", "--json"],
     "healthy": "models",
     "cmd": [
       "hyperagent",
@@ -101,7 +101,7 @@
     "name": "hyperagent-astra-research",
     "model": "astra",
     "timeoutS": 1900,
-    "health": ["hyperagent", "models", "--json"],
+    "health": ["hyperagent", "models", "--role", "research", "--json"],
     "healthy": "models",
     "cmd": [
       "hyperagent",
@@ -123,7 +123,7 @@
     "name": "hyperagent-opus-judgment",
     "model": "claude-opus-5-5",
     "timeoutS": 1560,
-    "health": ["hyperagent", "models", "--json"],
+    "health": ["hyperagent", "models", "--role", "research", "--json"],
     "healthy": "models",
     "cmd": [
       "hyperagent",

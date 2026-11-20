@@ -1,5 +1,13 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   MESH_CURRENT_WIRE_COVERAGE_COMMAND,
@@ -9,6 +17,7 @@ import {
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
+  selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import {
@@ -26,6 +35,59 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const EXCEPTIONS = { ...RUNNER_ONLY_EXCEPTIONS, ...KNOWN_RED_ORPHANS };
 
 describe('scripts test inventory guard', () => {
+  it('selects and expands future automation-liveness splits in the existing lane', () => {
+    const future =
+      'scripts/lib/__tests__/automation-liveness-future-split.test.mjs';
+    const existing = 'scripts/lib/__tests__/automation-liveness.test.mjs';
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(
+        selectSourceGuards(event, [future]).some(
+          guard => guard.id === 'automation-registry'
+        )
+      ).toBe(true);
+    }
+    const guard = selectSourceGuards('pull_request', [future]).find(
+      item => item.id === 'automation-registry'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'liveness-lane-'));
+    try {
+      mkdirSync(join(root, 'scripts/lib/__tests__'), { recursive: true });
+      mkdirSync(join(root, 'bin'));
+      for (const file of [existing, future])
+        writeFileSync(join(root, file), '');
+      // Record real shell expansion without running the unrelated coverage stage.
+      writeFileSync(join(root, 'bin/node'), '#!/bin/sh\nexit 0\n', {
+        mode: 0o755,
+      });
+      writeFileSync(
+        join(root, 'bin/pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@"\n',
+        {
+          mode: 0o755,
+        }
+      );
+      const result = spawnSync('bash', ['-c', guard.command], {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${join(root, 'bin')}:${process.env.PATH}`,
+        },
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const args = result.stdout.trim().split('\n');
+      expect(args).toContain(existing);
+      expect(args).toContain(future);
+      const refs = mapTestReferences(
+        [{ source: 'automation-registry', text: guard.command }],
+        [existing, future]
+      );
+      expect([...refs.values()].every(sources => sources.size > 0)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs the inventory in source validation control commands before queue admission', () => {
     const commands = buildControlTestCommands().map(([command, args]) =>
       [command, ...args].join(' ')
@@ -106,6 +168,64 @@ describe('scripts test inventory guard', () => {
     ).toEqual([]);
   });
 
+  it('discovers the wired planner group and leaves unwired helpers and new orphans unrun', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'planner-ci-inventory-'));
+    const test = 'scripts/lib/__tests__/planner-fixture.test.mjs';
+    const orphan = 'scripts/lib/__tests__/unregistered-fixture.test.mjs';
+    const helper = 'scripts/lib/test-planner-contract-tests.mjs';
+    const importLine =
+      "import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';";
+    mkdirSync(join(root, 'scripts/lib'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{"scripts":{}}');
+    writeFileSync(
+      join(root, helper),
+      "export const TEST_PLANNER_CONTRACT_TESTS = ['" + test + "'];"
+    );
+    const referenced = async (wiredImport, wiredSpread) => {
+      writeFileSync(
+        join(root, 'scripts/ci-fast-lanes.mjs'),
+        (wiredImport ? importLine : '') +
+          '\nexport const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([' +
+          (wiredSpread ? '...TEST_PLANNER_CONTRACT_TESTS,' : '') +
+          ']);'
+      );
+      return mapTestReferences(await collectCiCommands(root), [test, orphan]);
+    };
+    try {
+      expect((await referenced(true, true)).get(test)?.has(helper)).toBe(true);
+      expect((await referenced(true, true)).get(orphan)?.size).toBe(0);
+      expect((await referenced(false, true)).get(test)?.size).toBe(0);
+      expect((await referenced(true, false)).get(test)?.size).toBe(0);
+      const actualLane =
+        importLine +
+        '\nexport const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([\n...TEST_PLANNER_CONTRACT_TESTS,\n]);';
+      for (const inert of [
+        actualLane
+          .split('\n')
+          .map(line => '// ' + line)
+          .join('\n'),
+        '/*\n' + actualLane + '\n*/',
+        'const inert = ' + JSON.stringify(actualLane) + ';',
+      ]) {
+        writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), inert);
+        const refs = mapTestReferences(await collectCiCommands(root), [
+          test,
+          orphan,
+        ]);
+        expect(refs.get(test)?.size).toBe(0);
+        expect(refs.get(orphan)?.size).toBe(0);
+      }
+      writeFileSync(join(root, 'scripts/ci-fast-lanes.mjs'), 'export const =;');
+      await expect(collectCiCommands(root)).rejects.toThrow(
+        /Cannot parse CI planner wiring/
+      );
+      rmSync(join(root, helper));
+      await expect(referenced(true, true)).rejects.toThrow(/ENOENT/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps every exception real, reasoned and still unwired', async () => {
     const { files, unrun } = await inventoryScriptTests(REPO_ROOT);
     const unrunSet = new Set(unrun);
@@ -129,7 +249,7 @@ describe('scripts test inventory guard', () => {
     for (const file of [
       ...SCRIPT_CONTRACT_NODE_TESTS,
       ...SCRIPT_CONTRACT_VITEST_TESTS,
-    ]) {
+    ].flatMap(entry => entry.split(' '))) {
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
     }
   });

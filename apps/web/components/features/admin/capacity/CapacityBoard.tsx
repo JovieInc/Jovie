@@ -9,6 +9,7 @@ import type {
   ProviderView,
 } from '../../../../../../scripts/lib/capacity-registry.mjs';
 import {
+  accountStatusLabel,
   CREDIT_COPY,
   FRESHNESS_TONE,
   formatAge,
@@ -23,10 +24,9 @@ import {
 const TONE_TEXT: Record<Tone, string> = {
   success: 'text-success',
   warning: 'text-warning',
-  danger: 'text-error',
+  danger: 'text-error-text',
   neutral: 'text-tertiary-token',
 };
-
 function Dot({ tone }: Readonly<{ tone: Tone }>) {
   return (
     <span
@@ -47,7 +47,7 @@ function Stat({
   return (
     <div className='min-w-0'>
       <p className='text-2xs text-tertiary-token'>{label}</p>
-      <p className='break-words text-lg font-semibold tabular-nums text-primary-token'>
+      <p className='break-words text-base font-semibold tabular-nums text-primary-token'>
         {value}
       </p>
       {hint ? <p className='text-2xs text-tertiary-token'>{hint}</p> : null}
@@ -154,8 +154,8 @@ function AccountCard({
             </p>
           </div>
           {inactive ? (
-            <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs uppercase text-warning'>
-              {account.status}
+            <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs text-warning'>
+              {accountStatusLabel(account.status)}
             </span>
           ) : null}
         </div>
@@ -408,7 +408,6 @@ function seatNote(
           : 'no pace';
   return `${account}: ${copy}`;
 }
-
 function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
   if (view.paths.length === 0) return null;
   const models = [...new Set(view.paths.map(p => p.model))];
@@ -497,16 +496,17 @@ function AlertBanner({
       {alerts.map(alert => (
         <li
           key={alert.id}
-          role={alert.severity === 'alarm' ? 'alert' : undefined}
           className={cn(
             'rounded-lg border border-subtle bg-surface-0 p-3 text-app',
             alert.severity === 'alarm' ? 'text-error' : 'text-secondary-token'
           )}
         >
-          <span className='mr-2 text-2xs font-semibold uppercase'>
-            {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
-          </span>
-          {alert.message}
+          <div role={alert.severity === 'alarm' ? 'alert' : undefined}>
+            <span className='mr-2 text-2xs font-semibold'>
+              {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
+            </span>
+            {alert.message}
+          </div>
         </li>
       ))}
     </ul>
@@ -530,7 +530,7 @@ function ProviderScreen({
       <ContentSurfaceCard surface='details'>
         <div className='space-y-3 p-4'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h2 className='text-balance text-lg font-semibold text-primary-token'>
+            <h2 className='text-balance text-base font-semibold text-primary-token'>
               {provider.label}
             </h2>
             <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs text-secondary-token'>

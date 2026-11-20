@@ -23,10 +23,6 @@ FLEET_CONTROLLER_JOBS = (
     ("auto-ready-agent-drafts.yml", "green-source"),
 )
 
-MODEL_OR_ADVISORY_JOBS = (
-    ("sentry-autofix.yml", "autofix"),
-)
-
 HOSTED_DEEP_EVIDENCE_JOBS = (
     ("e2e-full-matrix.yml", "e2e-full-matrix"),
     ("e2e-full-matrix.yml", "notify"),
@@ -52,12 +48,12 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
+    ("visual-a11y.yml", "component-story-evidence"),
     ("visual-regression.yml", "visual-regression"),
 )
 
 HOSTED_POST_MERGE_JOBS = (
     ("linear-sync-on-merge.yml", "sync_done"),
-    ("neon-ephemeral-branch-cleanup.yml", "delete-neon-branch"),
 )
 
 def _writer_proof_body(
@@ -212,7 +208,7 @@ assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSh
   livePolicy:{defaultBranch:'main',sha:'b'.repeat(40)},nowMs:now}),/live default-branch head/);
 assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
   livePolicy:{defaultBranch:'main',sha},mode:'apply',confirmation:'wrong',nowMs:now}),/exact SHA-256/);
-const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard'].map(name =>
+const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard','Company guards'].map(name =>
   ({__typename:'CheckRun',name,status:'COMPLETED',conclusion:'SUCCESS'}));
 const pr = {number:16001,state:'OPEN',isDraft:false,baseRefName:'main',baseRefOid:sha,
   headRefName:entry.headRefName,headRefOid:entry.headOid,isCrossRepository:false,
@@ -428,16 +424,14 @@ def test_event_complete_workflows_do_not_retain_fallback_clocks() -> None:
 
 def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
     """Autonomous shipping uses machine gates and never creates a human hold."""
-    for workflow_name in (
-        "sentry-autofix.yml",
-    ):
-        content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
-        assert "blocksUnattendedAutoMerge == true" not in content, workflow_name
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        content = path.read_text(encoding="utf-8")
+        assert "blocksUnattendedAutoMerge == true" not in content, path.name
         assert not re.search(
             r"--add-label(?:=|\s+)[\"']?(?:needs-human|no-auto)", content
-        ), workflow_name
-        assert "Has needs-human label. Skipping" not in content, workflow_name
-        assert "requires human review; skipping" not in content, workflow_name
+        ), path.name
+        assert "Has needs-human label. Skipping" not in content, path.name
+        assert "requires human review; skipping" not in content, path.name
 
 
 def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
@@ -447,12 +441,11 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     )
     trigger = scrub.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
 
-    assert "pull_request_target:" in trigger
-    assert "issues:" in trigger
-    assert "types: [labeled]" in trigger
-    # Event-driven only (JOV-INV-042): the labeled event deletes the label.
-    assert "schedule:" not in trigger
+    # The label's own created/edited event deletes it; no clock (JOV-INV-042).
+    assert "label:\n    types: [created, edited]" in trigger
+    assert "schedule:" not in trigger and "types: [labeled]" not in trigger
     assert "workflow_dispatch:" in trigger
+    assert "paths: [.github/workflows/legacy-human-hold-scrub.yml]" in trigger
     assert "actions/checkout" not in scrub
     assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
     for label in (
@@ -464,6 +457,8 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
         "no-auto",
         "no-auto-merge",
         "no-automerge",
+        "tim-hold",
+        "do-not-merge",
     ):
         assert f"github.event.label.name == '{label}'" in scrub
         assert f" {label}" in scrub
@@ -1014,7 +1009,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
     assert "schedule:" not in nightly
-    assert "push:" in nightly
+    assert "repository_dispatch:\n    types: [clock_nightly_tests]" in nightly
     screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
         "\npermissions:", 1
     )[0]
@@ -1025,20 +1020,18 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
-    """Main pushes outpace the matrix. The in-progress run must finish and
-    report a real conclusion. GitHub keeps a single pending successor.
-    Path filters stay off so an external sweep cannot kill a non-member
-    mid-test (JOV-7167, JOV-7569). No cron: the lane stays evidence-driven."""
+    """The in-progress run must finish and report a real conclusion; GitHub
+    keeps a single pending successor (JOV-7167, JOV-7569). The matrix runs
+    daily from the Gem lanes clock (waste audit 2026-10-29: every-push runs
+    never passed and spent ~110k runner-minutes a month), never a GitHub cron."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
     triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
-    push_trigger = triggers.split("  push:\n", 1)[1].split(
-        "  workflow_dispatch:\n", 1
-    )[0]
     concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
         "\njobs:\n", 1
     )[0]
-    assert "paths:" not in push_trigger
+    assert "  repository_dispatch:\n    types: [clock_e2e_full_matrix]\n" in triggers
+    assert "  push:\n" not in triggers
     assert "schedule:" not in triggers
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
@@ -1304,15 +1297,6 @@ def test_taste_workflows_stay_deleted() -> None:
     guard workflows were deleted on 2026-10-12 (the CLIs remain)."""
     for name in ("taste-classifier.yml", "taste-label-guard.yml"):
         assert not (WORKFLOWS / name).exists(), name
-
-
-def test_model_and_advisory_jobs_never_consume_fixed_ci_runners() -> None:
-    """Long or advisory work cannot starve deterministic merge capacity."""
-    for workflow, job_name in MODEL_OR_ADVISORY_JOBS:
-        block = _job_block(workflow, job_name)
-        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
-        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
-        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
 
 def test_deep_evidence_jobs_use_hosted_capacity() -> None:

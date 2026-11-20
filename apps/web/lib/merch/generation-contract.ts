@@ -18,6 +18,8 @@ import 'server-only';
  *   including merch content-review evidence (JOV-4740).
  */
 
+import type { MerchGenerationFailureSummary } from './generation-failures';
+
 export const MERCH_GENERATION_CONTRACT_VERSION = 'merch-generation/v1';
 
 export const MERCH_CANONICAL_PIPELINE_ID =
@@ -45,6 +47,16 @@ export const MERCH_MOCKUP_TERMINAL_STATUSES: readonly MerchMockupStatus[] = [
  */
 export const MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER =
   'Product mockup failed to render on the real garment; regenerate the design before publishing.';
+
+/**
+ * User-visible publish blocker for an option whose truthful mockup has not
+ * been rendered yet (`pending_mockup`): the option may be selected as a
+ * draft, but the card cannot go live until the real Printful mockup is
+ * attached (`mockup_ready`) — a card without its real product mockup must
+ * never be presented as live merchandise.
+ */
+export const MERCH_MOCKUP_PENDING_PUBLISH_BLOCKER =
+  'The real product mockup has not finished rendering; publish once it is ready.';
 
 /**
  * Reads the persisted mockup lifecycle state from an option's qualityReview
@@ -89,5 +101,7 @@ export interface MerchGenerationReceipt {
   }[];
   /** Final disposition of the batch: ready (options returned) or failed. */
   readonly disposition: 'ready' | 'failed';
+  /** Sanitized per-batch failure outcome (dispatch PR-1). */
+  readonly failureSummary?: MerchGenerationFailureSummary;
   readonly durationMs: number;
 }

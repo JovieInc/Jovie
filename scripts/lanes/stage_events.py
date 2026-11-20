@@ -8,6 +8,12 @@ lanes status gist (doctor.publish_status), which the stage collector reads.
   has a PR, else the issue id; enteredAt/exitedAt = the receipt's startedAt/endedAt.
 - remediation / repair-start: a fix-red run, entityId
   `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>`.
+- incident / undetected, unfiled, open, cleared: one doctor condition generation, from
+  runs/incidents.jsonl (journal_incidents, written by the doctor on every transition).
+- reason-check / queue-check, checked: one exact-release-bound native queue check,
+  from daily runs/reason-checks/YYYY-MM-DD.jsonl; never worker acceptance or job completion.
+- board-task / posted, running, closed: one mesh board task the lanes claimed, from
+  runs/board-intake.jsonl (scripts/lanes/board_intake.py).
 - shipping / gate-seat and gate: a lane adopt (gate) run on `JovieInc/Jovie#<pr>`.
   gate-seat = startedAt → startedAt + gateWaitS (waiting for a host gate seat; a run
   deferred before any seat, e.g. gate-admission-busy, exits at endedAt as abandoned).
@@ -20,7 +26,10 @@ when the run opened a PR or pushed, abandoned otherwise; sourceReceipt =
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import os
+import re
+import stat
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import ledger_archive
@@ -175,12 +184,15 @@ def ndjson(ledger: Path, now: float) -> str:
                             rows.append(row)
         except OSError:
             continue
-    for row in mirror_events(Path(ledger).parent.parent, now):
+    state_dir = Path(ledger).parent.parent
+    for row in [*mirror_events(state_dir, now), *incident_events(state_dir, now), *board_events(state_dir, now),
+                *reason_check_events(state_dir, now)]:
         key = (row["sourceReceipt"], row["stage"])
         if key not in seen:
             seen.add(key)
             rows.append(row)
-    rows.sort(key=lambda row: (row["exitedAt"], row["sourceReceipt"], row["stage"]))
+    # Open stages (exitedAt null) sort by entry; every publish re-derives them.
+    rows.sort(key=lambda row: (row["exitedAt"] or row["enteredAt"], row["sourceReceipt"], row["stage"]))
     lines = [json.dumps(row, separators=(",", ":"), sort_keys=True) for row in rows]
     kept, size = [], 0
     for line in reversed(lines):
@@ -189,3 +201,242 @@ def ndjson(ledger: Path, now: float) -> str:
             break
         kept.append(line)
     return "".join(line + "\n" for line in reversed(kept))
+
+
+# ------------------------------------------------------------------ native reason queue checks
+
+# At most 32 controls of at most 16 KiB each, plus receipt/provenance metadata.
+# One MiB leaves headroom for serialization while containing malformed-row memory.
+REASON_CHECK_MAX_LINE_BYTES = 1024 * 1024
+
+
+def _reason_check_rows(state: Path, now: float):
+    """Stream selected UTC partitions; unreadable/incomplete input aborts this feed publication."""
+    directory = Path(state) / "runs/reason-checks"
+    first = datetime.fromtimestamp(now - WINDOW_S, timezone.utc).date()
+    last = datetime.fromtimestamp(now, timezone.utc).date()
+    try:
+        paths = sorted(directory.iterdir())
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise OSError("reason-check-history-incomplete owner=reason-lane; action=restore readable daily history") from error
+    for path in paths:
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\.jsonl", path.name):
+            continue
+        try:
+            day = date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if not first <= day <= last:
+            continue
+        try:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as handle:
+                if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    raise OSError("partition is not a regular file")
+                for raw in iter(lambda: handle.readline(REASON_CHECK_MAX_LINE_BYTES + 1), b""):
+                    if len(raw) > REASON_CHECK_MAX_LINE_BYTES or not raw.endswith(b"\n"):
+                        raise ValueError("oversized or incomplete receipt row")
+                    item = json.loads(raw.decode("utf-8"))
+                    if not isinstance(item, dict):
+                        raise ValueError("receipt is not an object")
+                    yield item
+        except (OSError, UnicodeError, ValueError) as error:
+            raise OSError("reason-check-history-incomplete owner=reason-lane; action=restore complete daily receipts; "
+                          f"file={path.name}") from error
+
+
+def reason_check_events(state: Path, now: float) -> list[dict]:
+    """Qualified check execution only; never worker acceptance, job execution or publication.
+
+    Missing release provenance remains private and unqualified. Read failures abort publication;
+    the existing doctor status-feed-stale condition reports the resulting telemetry gap.
+    Identical redelivery is one sample; conflicts across all selected partitions prove no sample.
+    """
+    checks, conflicts = {}, set()
+    for item in _reason_check_rows(state, now):
+        host, check_id = item.get("host"), item.get("checkId")
+        if not isinstance(host, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", host) \
+                or not isinstance(check_id, str) or not re.fullmatch(r"[0-9a-f]{32}", check_id):
+            continue
+        key = (host, check_id)
+        if key in checks and checks[key] != item:
+            conflicts.add(key)
+        checks.setdefault(key, item)
+    rows = []
+    for (host, check_id), item in checks.items():
+        if (host, check_id) in conflicts:
+            continue
+        source = item.get("source")
+        if item.get("schema") != "jovie.reason-check/v1" or item.get("owner") != "reason-lane" \
+                or not isinstance(source, dict) or source.get("status") != "available" \
+                or source.get("producer") != "scripts/lanes/reason_dispatch.py" \
+                or any(not re.fullmatch(r"[0-9a-f]{%d}" % size, str(source.get(field) or ""))
+                       for field, size in (("sourceCommit", 40), ("bundleDigest", 64), ("laneTree", 40))):
+            continue
+        entered, exited = _epoch(item.get("startedAt")), _epoch(item.get("observedAt"))
+        if entered is None or exited is None or not entered <= exited <= now or now - exited > WINDOW_S \
+                or item.get("status") not in ("idle", "running", "spawned", "blocked", "linear-rate-limited"):
+            continue
+        failed = item["status"] in ("blocked", "linear-rate-limited") or bool(item.get("blockedOn"))
+        outcome = "failed" if failed else "completed"
+        base = {"schema": SCHEMA, "entityType": "reason-check", "entityId": f"{host}@{check_id}",
+                "actor": "reason-lane", "sourceReceipt": f"reason-check:{host}:{check_id}"}
+        rows.append({**base, "stage": "queue-check", "enteredAt": item["startedAt"],
+                     "exitedAt": item["observedAt"], "outcome": outcome})
+        rows.append({**base, "stage": "checked", "enteredAt": item["observedAt"],
+                     "exitedAt": item["observedAt"], "outcome": outcome})
+    return rows
+
+
+# ------------------------------------------------------------------ incidents (doctor conditions)
+
+INCIDENT_JOURNAL = "runs/incidents.jsonl"
+
+
+def _active(conditions: dict) -> dict:
+    return {key: row for key, row in (conditions or {}).items()
+            if isinstance(row, dict) and row.get("state") == "active"}
+
+
+def journal_incidents(state: Path, previous: dict, result: dict, host: str, now: float) -> list[dict]:
+    """Append one `jovie.incident/v1` row per doctor-condition transition (detected, filed, cleared).
+
+    `previous` and `result` are consecutive doctor.json reports. detected carries the last proof of
+    life (lastGoodEpoch on the condition), filed the tick its Linear issue was filed or reopened, cleared
+    the resolve time.
+    Returns the rows written (the journal is append-only; a lost write only drops a sample)."""
+    before, after = (previous or {}).get("conditions") or {}, (result or {}).get("conditions") or {}
+    issues_before, issues_after = (previous or {}).get("issues") or {}, (result or {}).get("issues") or {}
+    rows = []
+    for key, row in _active(after).items():
+        old = before.get(key) or {}
+        generation = row.get("generation")
+        base = {"schema": "jovie.incident/v1", "host": host, "key": key, "generation": generation}
+        if not (old.get("state") == "active" and old.get("generation") == generation):
+            rows.append({**base, "event": "detected", "detectedEpoch": row.get("firstObservedEpoch"),
+                         "lastGoodEpoch": row.get("lastGoodEpoch")})
+        issue, prior = issues_after.get(key) or {}, issues_before.get(key) or {}
+        is_open = bool(issue.get("id")) and issue.get("closedAt") is None
+        was_open = bool(prior.get("id")) and prior.get("closedAt") is None and not prior.get("pendingAction")
+        if is_open and not issue.get("pendingAction") and not was_open:
+            rows.append({**base, "event": "filed", "filedEpoch": now})
+    for key, row in after.items():
+        if isinstance(row, dict) and row.get("state") == "resolved" and (before.get(key) or {}).get("state") == "active":
+            rows.append({"schema": "jovie.incident/v1", "host": host, "key": key, "generation": row.get("generation"),
+                         "event": "cleared", "clearedEpoch": now})
+    if rows:
+        path = Path(state) / INCIDENT_JOURNAL
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8") as out:
+                for row in rows:
+                    out.write(json.dumps(row, sort_keys=True) + "\n")
+        except OSError:
+            return []
+    return rows
+
+
+def _journal_rows(path: Path):
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(item, dict):
+            yield item
+
+
+def _num(value) -> float | None:
+    return float(value) if type(value) in (int, float) else None
+
+
+def incident_events(state: Path, now: float) -> list[dict]:
+    """incident undetected -> unfiled -> open -> cleared rows, one entity per condition generation.
+
+    undetected = last proof of life -> condition raised (time to detect); unfiled = raised -> Linear
+    issue (time to file); open = issue (or raise, when never filed) -> cleared (time to fix and verify;
+    the claim / PR / merge split of the same issue is the detector-issue entity from summer-config)."""
+    merged: dict[tuple, dict] = {}
+    for item in _journal_rows(Path(state) / INCIDENT_JOURNAL):
+        if not isinstance(item.get("key"), str) or not isinstance(item.get("host"), str):
+            continue
+        ident = (item["host"], item["key"], item.get("generation"))
+        entry = merged.setdefault(ident, {})
+        for field in ("detectedEpoch", "lastGoodEpoch", "filedEpoch", "clearedEpoch"):
+            value = _num(item.get(field))
+            if value is not None and field not in entry:
+                entry[field] = value
+    rows = []
+    for (host, key, generation), entry in merged.items():
+        detected = entry.get("detectedEpoch")
+        if detected is None:
+            continue
+        cleared, filed, good = entry.get("clearedEpoch"), entry.get("filedEpoch"), entry.get("lastGoodEpoch")
+        if filed is not None and (filed < detected or (cleared is not None and filed > cleared)):
+            filed = None  # an issue reused from an earlier generation is not this incident's filing
+        last = cleared if cleared is not None else detected
+        if now - last > WINDOW_S:
+            continue
+        base = {"schema": SCHEMA, "entityType": "incident", "entityId": f"{host}:{key}#{generation}",
+                "actor": "doctor", "sourceReceipt": f"doctor:{host}:{key}:{generation}"}
+        if good is not None and good <= detected:
+            rows.append({**base, "stage": "undetected", "enteredAt": _iso(good), "exitedAt": _iso(detected),
+                         "outcome": "advanced"})
+        if filed is not None:
+            rows.append({**base, "stage": "unfiled", "enteredAt": _iso(detected), "exitedAt": _iso(filed),
+                         "outcome": "advanced"})
+        opened = filed if filed is not None else detected
+        rows.append({**base, "stage": "open", "enteredAt": _iso(opened),
+                     "exitedAt": _iso(cleared) if cleared is not None else None,
+                     "outcome": "completed" if cleared is not None else "open"})
+        if cleared is not None:
+            rows.append({**base, "stage": "cleared", "enteredAt": _iso(cleared), "exitedAt": _iso(cleared),
+                         "outcome": "completed"})
+    return rows
+
+
+# ------------------------------------------------------------------ mesh board intake (board_intake.py)
+
+BOARD_JOURNAL = "runs/board-intake.jsonl"
+
+
+def board_events(state: Path, now: float) -> list[dict]:
+    """board-task posted -> running -> closed rows from the lanes board-intake journal.
+
+    posted = posted on the hub -> claimed by lanes (claim latency); running = claimed -> done/failed
+    (run time; outcome completed or failed, so the terminal row's failRate is 1 - success rate)."""
+    tasks: dict[str, dict] = {}
+    for item in _journal_rows(Path(state) / BOARD_JOURNAL):
+        tid = item.get("id")
+        if not isinstance(tid, str) or item.get("event") not in ("claimed", "done", "failed"):
+            continue
+        entry = tasks.setdefault(tid, {"kind": item.get("kind")})
+        for field in ("postedEpoch", "claimedEpoch"):
+            value = _num(item.get(field))
+            if value is not None:
+                entry.setdefault(field, value)
+        if item["event"] != "claimed" and _num(item.get("closedEpoch")) is not None:
+            entry.update(closedEpoch=float(item["closedEpoch"]), status=item["event"])
+    rows = []
+    for tid, entry in tasks.items():
+        posted, claimed, closed = entry.get("postedEpoch"), entry.get("claimedEpoch"), entry.get("closedEpoch")
+        if claimed is None or now - (closed if closed is not None else claimed) > WINDOW_S:
+            continue
+        base = {"schema": SCHEMA, "entityType": "board-task", "entityId": tid,
+                "actor": f"lanes:{entry.get('kind') or 'task'}", "sourceReceipt": f"board-intake:{tid}"}
+        if posted is not None and posted <= claimed:
+            rows.append({**base, "stage": "posted", "enteredAt": _iso(posted), "exitedAt": _iso(claimed),
+                         "outcome": "advanced"})
+        ok = entry.get("status") == "done"
+        rows.append({**base, "stage": "running", "enteredAt": _iso(claimed),
+                     "exitedAt": _iso(closed) if closed is not None else None,
+                     "outcome": "open" if closed is None else "completed" if ok else "failed"})
+        if closed is not None:
+            rows.append({**base, "stage": "closed", "enteredAt": _iso(closed), "exitedAt": _iso(closed),
+                         "outcome": "completed" if ok else "failed"})
+    return rows

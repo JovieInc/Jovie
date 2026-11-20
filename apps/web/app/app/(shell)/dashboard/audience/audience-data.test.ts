@@ -45,6 +45,25 @@ describe('audience cached transaction identity', () => {
     });
   });
 
+  it('rejects past the bound when the read wedges (resilience.spec.ts)', async () => {
+    // JOV-8791: a hung read must reject so routes render their error state
+    // instead of parking the document on the loading skeleton forever.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(withDbSessionTx).mockReturnValue(new Promise(() => {}));
+      const pending = getAudienceServerData({
+        userId: 'app-user-1',
+        selectedProfileId: 'profile-1',
+        searchParams: {},
+      });
+      const rejection = expect(pending).rejects.toThrow(/timed out/);
+      await vi.advanceTimersByTimeAsync(10_001);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not open a transaction when no profile is selected', async () => {
     const result = await getAudienceServerData({
       userId: 'app-user-1',

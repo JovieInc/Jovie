@@ -75,10 +75,18 @@ describe('JOV-6272 unified release entity cache contract', () => {
 
     // The mutation sites route through the map, not through tag pairs.
     const actions = readSource('app/app/(shell)/dashboard/releases/actions.ts');
+    const creation = readSource('lib/domain/releases.ts');
+    expect(actions).toContain('await createReleaseForProfile({');
+    expect(creation).toContain(
+      'invalidateReleaseCaches(input.userId, input.profileId)'
+    );
+    expect(creation.match(/invalidateReleaseCaches\(/g)).toHaveLength(1);
     expect(
-      actions.match(/invalidateReleaseCaches\(/g)?.length
+      (actions.match(/invalidateReleaseCaches\(/g)?.length ?? 0) +
+        (creation.match(/invalidateReleaseCaches\(/g)?.length ?? 0)
     ).toBeGreaterThanOrEqual(13);
-    expect(actions).not.toContain('createSmartLinkContentTag');
+    for (const source of [actions, creation])
+      expect(source).not.toContain('createSmartLinkContentTag');
   });
 
   it('invalidates the unified release family on profile rename (no handle-keyed self-heal)', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx
+// @coverage-via apps/web/components/jovie/components/SourceEvidence.test.tsx
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
@@ -8,7 +8,11 @@ import { motion, useReducedMotion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
+import { stripMachineContext } from '@/lib/chat/machine-context';
+import { parseTokens } from '@/lib/chat/tokens';
+import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
+import { SourceEvidenceProvider } from '../source-evidence-context';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
@@ -19,10 +23,25 @@ import { FileAttachmentChip } from './FileAttachmentChip';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
+/** Length as read on screen: entity tokens count as their chip label. */
+function visibleTokenLength(text: string): number {
+  return parseTokens(text).reduce(
+    (total, token) =>
+      total +
+      (token.type === 'text'
+        ? token.value.length
+        : token.type === 'entity'
+          ? token.label.length + 2
+          : token.id.length),
+    0
+  );
+}
+
 interface ChatMessageProps {
   readonly id: string;
   readonly role: 'user' | 'assistant' | 'system';
   readonly parts: readonly MessagePart[];
+  readonly sourceFacts?: readonly EnrichedFact[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
   /** Whether this is a synthetic pending placeholder (compact live typing bubble). */
@@ -64,6 +83,7 @@ function areChatMessagePropsEqual(
     previous.id === next.id &&
     previous.role === next.role &&
     previous.parts === next.parts &&
+    previous.sourceFacts === next.sourceFacts &&
     previous.isStreaming === next.isStreaming &&
     previous.isThinking === next.isThinking &&
     previous.avatarUrl === next.avatarUrl &&
@@ -83,6 +103,7 @@ export const ChatMessage = memo(function ChatMessage({
   id,
   role,
   parts,
+  sourceFacts = [],
   isStreaming,
   isThinking,
   profileId,
@@ -101,7 +122,11 @@ export const ChatMessage = memo(function ChatMessage({
   const markdownCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
-  const messageText = getMessageText(parts);
+  const rawMessageText = getMessageText(parts);
+  // User bubbles show only what the person wrote: never machine context.
+  const messageText = isUser
+    ? stripMachineContext(rawMessageText)
+    : rawMessageText;
   const isCopySuccess = markdownCopied || fallbackCopySuccess;
 
   useEffect(() => {
@@ -129,6 +154,13 @@ export const ChatMessage = memo(function ChatMessage({
   };
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
+  // Finished tool events already carry their own feedback control; a second
+  // message-level row would stack two thumbs rows under one reply.
+  const hasToolFeedback =
+    renderTools &&
+    toolEvents.some(
+      event => event.state === 'succeeded' || event.state === 'failed'
+    );
   const fileParts = parts.filter(
     (
       p
@@ -166,7 +198,7 @@ export const ChatMessage = memo(function ChatMessage({
     isUser &&
     attachmentChips.length === 0 &&
     !messageText.includes('\n') &&
-    messageText.length <= 44;
+    visibleTokenLength(messageText) <= 44;
   const userAttachmentContent = attachmentChips.map(chip =>
     chip.isImage ? (
       <ImageAttachmentChip
@@ -257,10 +289,12 @@ export const ChatMessage = memo(function ChatMessage({
                   data-testid='chat-message-reply'
                   className='system-b-chat-message-reply'
                 >
-                  <AssistantMessageText
-                    content={messageText}
-                    isStreaming={Boolean(isStreaming)}
-                  />
+                  <SourceEvidenceProvider facts={sourceFacts}>
+                    <AssistantMessageText
+                      content={messageText}
+                      isStreaming={Boolean(isStreaming)}
+                    />
+                  </SourceEvidenceProvider>
                 </div>
               ) : null}
 
@@ -315,7 +349,7 @@ export const ChatMessage = memo(function ChatMessage({
                       )}
                     </Button>
                   </SimpleTooltip>
-                  {enableFeedback ? (
+                  {enableFeedback && !hasToolFeedback ? (
                     <ChatFeedbackControl
                       messageId={id}
                       turnId={turnId}

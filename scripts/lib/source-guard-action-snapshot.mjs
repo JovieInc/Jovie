@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   contractChildren,
@@ -154,17 +154,34 @@ export function planSourceGuardActions(repoRoot = process.cwd()) {
  * job-owned cache uses the existing ignored /tmp directory and intentionally
  * outlives source restoration and every registered post hook. Hosted job
  * cleanup (or the next checkout's normal clean) disposes of it.
+ * @param {string} [repoRoot]
+ * @param {string} [workspaceRoot]
  */
-export function snapshotSourceGuardActions(repoRoot = process.cwd()) {
+export function snapshotSourceGuardActions(
+  repoRoot = process.cwd(),
+  workspaceRoot
+) {
   const plan = planSourceGuardActions(repoRoot);
   const { source, packages } = plan;
   repoRoot = plan.repoRoot;
-  const parent = join(repoRoot, 'tmp');
+  // Local qualification owns a fresh workspace; hosted actions keep the job's.
+  if (workspaceRoot !== undefined && !isAbsolute(workspaceRoot)) {
+    throw new Error('Source action workspace must be an absolute directory');
+  }
+  workspaceRoot =
+    workspaceRoot === undefined ? repoRoot : resolve(workspaceRoot);
+  if (
+    !lstatSync(workspaceRoot).isDirectory() ||
+    realpathSync(workspaceRoot) !== workspaceRoot
+  ) {
+    throw new Error('Source action workspace must be an ordinary directory');
+  }
+  const parent = join(workspaceRoot, 'tmp');
   if (existsSync(parent) && !lstatSync(parent).isDirectory()) {
     throw new Error('Source action cache parent must be an ordinary directory');
   }
   mkdirSync(parent, { recursive: true });
-  const target = join(repoRoot, SNAPSHOT_RELATIVE);
+  const target = join(workspaceRoot, SNAPSHOT_RELATIVE);
   // Exclusive creation preserves any pre-existing local work, including links.
   mkdirSync(target);
   try {
@@ -190,5 +207,12 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  console.log(JSON.stringify(snapshotSourceGuardActions()));
+  console.log(
+    JSON.stringify(
+      snapshotSourceGuardActions(
+        process.cwd(),
+        process.env.SOURCE_GUARD_ACTION_WORKSPACE
+      )
+    )
+  );
 }

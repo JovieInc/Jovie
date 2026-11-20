@@ -8,11 +8,15 @@ const mocks = vi.hoisted(() => ({
   publishContentVersion: vi.fn(),
   rollbackContent: vi.fn(),
   getContentHistory: vi.fn(),
+  getContentReviewIdentity: vi.fn(),
+  approveContentVersion: vi.fn(),
 }));
 
 vi.mock('@/lib/content-records/access.server', () => ({
   resolveContentWriter: vi.fn(async () => mocks.writer),
-  signPreviewToken: vi.fn((id: string) => `tok-${id}`),
+  signPreviewToken: vi.fn(
+    (identity: { versionId: string }) => `tok-${identity.versionId}`
+  ),
 }));
 
 vi.mock('@/lib/content-records/store.server', async () => {
@@ -22,19 +26,60 @@ vi.mock('@/lib/content-records/store.server', async () => {
     }
   }
   class ContentConflictError extends Error {}
+  class ContentAuthorizationError extends Error {
+    constructor(
+      readonly status: number,
+      message: string
+    ) {
+      super(message);
+    }
+  }
+  class ContentPublicationUncertainError extends Error {
+    constructor(readonly operationId: string) {
+      super('uncertain');
+    }
+  }
   return {
+    ContentAuthorizationError,
+    ContentPublicationUncertainError,
     ContentValidationError,
     ContentConflictError,
     createContentVersion: mocks.createContentVersion,
     publishContentVersion: mocks.publishContentVersion,
     rollbackContent: mocks.rollbackContent,
     getContentHistory: mocks.getContentHistory,
+    getContentReviewIdentity: mocks.getContentReviewIdentity,
+    approveContentVersion: mocks.approveContentVersion,
   };
 });
 
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 const VERSION_ID = '5f0f4c1e-8a7b-4c3d-9e2f-1a2b3c4d5e6f';
+const publication = {
+  expectedLiveVersionId: null,
+  operationId: '3a0b693e-01e4-4b29-b5cd-29218ce5c951',
+  approvalId: '1d151341-7e35-4d55-acce-60c20c35bc28',
+};
+const review = {
+  versionId: VERSION_ID,
+  kind: 'marketing-page',
+  key: 'home',
+  schemaVersion: 1,
+  payloadDigest: 'b'.repeat(64),
+  renderRevision: 'a'.repeat(40),
+  renderBuildId: 'build-a',
+  expectedLiveVersionId: null,
+  previewArm: null,
+  reviewDigest: 'c'.repeat(64),
+};
+const move = (action: string) => ({
+  action,
+  toVersionId: VERSION_ID,
+  cacheInvalidation: 'complete',
+  readback: { source: 'live', versionId: VERSION_ID },
+  delivery: 'unverified',
+});
 
 async function call(
   method: 'GET' | 'POST',
@@ -69,6 +114,9 @@ describe('/api/content-records/[kind]/[key]', () => {
   beforeEach(() => {
     mocks.writer = { ok: true, actor: 'agent:summer' };
     vi.clearAllMocks();
+    mocks.getContentReviewIdentity.mockResolvedValue(review);
+    mocks.publishContentVersion.mockResolvedValue(move('publish'));
+    mocks.rollbackContent.mockResolvedValue(move('rollback'));
   });
 
   it('rejects callers who are not writers', async () => {
@@ -100,10 +148,10 @@ describe('/api/content-records/[kind]/[key]', () => {
     expect(draft.json.error).toMatch(/written only by its producer/);
     const rollback = await call(
       'POST',
-      { action: 'rollback', reason: 'bad number' },
+      { action: 'rollback', reason: 'bad number', ...publication },
       params
     );
-    expect(rollback.status).not.toBe(403);
+    expect(rollback.status).toBe(200);
   });
 
   it('validates a spec without storing it', async () => {
@@ -131,9 +179,12 @@ describe('/api/content-records/[kind]/[key]', () => {
     });
     expect(result.status).toBe(201);
     expect(result.json.version).toEqual({ id: VERSION_ID, version: 3 });
-    expect(result.json.previewUrl).toMatch(
-      new RegExp(`/content-preview/${VERSION_ID}\\?token=tok-${VERSION_ID}$`)
-    );
+    const preview = new URL(result.json.previewUrl);
+    expect(preview.pathname).toBe(`/content-preview/${VERSION_ID}`);
+    expect(preview.searchParams.get('token')).toBe(`tok-${VERSION_ID}`);
+    expect(preview.searchParams.get('digest')).toBe(review.reviewDigest);
+    expect(preview.searchParams.get('live')).toBe('none');
+    expect(result.json.review).toEqual(review);
     expect(mocks.createContentVersion).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'marketing-page' }),
       expect.objectContaining({ key: 'home', author: 'agent:summer' })
@@ -148,7 +199,11 @@ describe('/api/content-records/[kind]/[key]', () => {
       new ContentValidationError(['sections[0]: bad'])
     );
     expect(
-      await call('POST', { action: 'publish', versionId: VERSION_ID })
+      await call('POST', {
+        action: 'publish',
+        versionId: VERSION_ID,
+        ...publication,
+      })
     ).toEqual({
       status: 422,
       json: { ok: false, errors: ['sections[0]: bad'] },
@@ -156,12 +211,11 @@ describe('/api/content-records/[kind]/[key]', () => {
   });
 
   it('publishes and rolls back through the store with the actor and reason', async () => {
-    mocks.publishContentVersion.mockResolvedValue({ action: 'publish' });
-    mocks.rollbackContent.mockResolvedValue({ action: 'rollback' });
     await call('POST', {
       action: 'publish',
       versionId: VERSION_ID,
       reason: 'ship',
+      ...publication,
     });
     expect(mocks.publishContentVersion).toHaveBeenCalledWith(
       expect.anything(),
@@ -170,10 +224,18 @@ describe('/api/content-records/[kind]/[key]', () => {
         versionId: VERSION_ID,
         actor: 'agent:summer',
         reason: 'ship',
+        ...publication,
       }
     );
-    const rolled = await call('POST', { action: 'rollback', reason: 'oops' });
-    expect(rolled).toEqual({ status: 200, json: { action: 'rollback' } });
+    const rolled = await call('POST', {
+      action: 'rollback',
+      reason: 'oops',
+      ...publication,
+    });
+    expect(rolled).toMatchObject({
+      status: 200,
+      json: { action: 'rollback', delivery: 'unverified' },
+    });
   });
 
   it('maps conflicts to 409 and rejects malformed requests', async () => {
@@ -183,10 +245,95 @@ describe('/api/content-records/[kind]/[key]', () => {
     mocks.rollbackContent.mockRejectedValue(
       new ContentConflictError('nothing to roll back to')
     );
-    expect((await call('POST', { action: 'rollback' })).status).toBe(409);
+    expect(
+      (await call('POST', { action: 'rollback', ...publication })).status
+    ).toBe(409);
     expect(
       (await call('POST', { action: 'publish', versionId: 'nope' })).status
     ).toBe(400);
     expect((await call('POST', { action: 'delete' })).status).toBe(400);
+  });
+
+  it('forwards an exact decision to server authentication and rejects reviewer spoofing', async () => {
+    const input = {
+      action: 'approve',
+      versionId: VERSION_ID,
+      decisionId: publication.approvalId,
+      reviewDigest: review.reviewDigest,
+      expectedLiveVersionId: null,
+    };
+    mocks.approveContentVersion.mockResolvedValue({
+      id: publication.approvalId,
+      identity: review,
+    });
+    expect((await call('POST', input)).status).toBe(201);
+    expect(mocks.approveContentVersion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        versionId: VERSION_ID,
+        reviewDigest: review.reviewDigest,
+      }),
+      expect.any(Request)
+    );
+    expect((await call('POST', { ...input, reviewer: 'founder' })).status).toBe(
+      400
+    );
+    const { ContentAuthorizationError } = await import(
+      '@/lib/content-records/store.server'
+    );
+    mocks.approveContentVersion.mockRejectedValue(
+      new ContentAuthorizationError(403, 'Founder session required')
+    );
+    expect((await call('POST', input)).status).toBe(403);
+  });
+
+  it('distinguishes committed pending readback from uncertain database outcome', async () => {
+    mocks.publishContentVersion.mockResolvedValue({
+      ...move('publish'),
+      cacheInvalidation: 'uncertain',
+    });
+    expect(
+      (
+        await call('POST', {
+          action: 'publish',
+          versionId: VERSION_ID,
+          ...publication,
+        })
+      ).status
+    ).toBe(202);
+    const { ContentPublicationUncertainError } = await import(
+      '@/lib/content-records/store.server'
+    );
+    mocks.publishContentVersion.mockRejectedValue(
+      new ContentPublicationUncertainError(publication.operationId)
+    );
+    expect(
+      await call('POST', {
+        action: 'publish',
+        versionId: VERSION_ID,
+        ...publication,
+      })
+    ).toEqual({
+      status: 503,
+      json: { state: 'uncertain', operationId: publication.operationId },
+    });
+  });
+
+  it('requires an explicit expected pointer and preserves a stored draft without a bound preview', async () => {
+    expect(
+      (await call('POST', { action: 'publish', versionId: VERSION_ID })).status
+    ).toBe(400);
+    mocks.createContentVersion.mockResolvedValue({
+      id: VERSION_ID,
+      version: 3,
+      data: {},
+    });
+    mocks.getContentReviewIdentity.mockResolvedValue(null);
+    expect(
+      await call('POST', { action: 'draft', data: await validSpec() })
+    ).toMatchObject({
+      status: 201,
+      json: { version: { id: VERSION_ID }, review: null, previewUrl: null },
+    });
   });
 });

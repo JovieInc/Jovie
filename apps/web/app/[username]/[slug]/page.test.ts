@@ -311,3 +311,71 @@ describe('superseded base slug route resolution', () => {
     );
   });
 });
+
+describe('release share metadata (JOV-9626)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'serve',
+    });
+    hoisted.getCreatorByUsername.mockResolvedValue({
+      id: 'creator-1',
+      username: 'tim',
+      usernameNormalized: 'tim',
+      displayName: 'Tim White',
+      userId: 'user-1',
+      avatarUrl: null,
+      settings: {},
+    });
+    hoisted.getContentBySlug.mockResolvedValue({
+      type: 'release',
+      id: 'content-1',
+      slug: 'midnight-signal',
+      title: 'Midnight Signal',
+      releaseDate: new Date('2026-01-01'),
+      revealDate: null,
+      artworkUrl: 'https://i.scdn.co/image/cover',
+      artworkSizes: null,
+      providerLinks: [],
+      primaryArtists: [],
+    });
+  });
+
+  it('delegates og/twitter images to the collocated branded share-card route', async () => {
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ username: 'tim', slug: 'midnight-signal' }),
+    });
+    // No explicit images: file-based metadata serves the branded
+    // 1200x630 /{username}/{slug}/opengraph-image card for both og:image
+    // and twitter:image.
+    expect(metadata.openGraph?.images).toBeUndefined();
+    expect(metadata.twitter?.images).toBeUndefined();
+    expect(metadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+    });
+    expect(metadata.openGraph?.title).toContain('Midnight Signal');
+    expect(metadata.openGraph?.title).toContain('Tim White');
+  });
+
+  it('resolves seeded screen-cert fixture metadata without hitting creator DB lookups', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '0');
+    vi.stubEnv('VERCEL_ENV', '');
+    hoisted.getCreatorByUsername.mockClear();
+    hoisted.getContentBySlug.mockClear();
+
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({
+        username: 'jovie-screen-fixture',
+        slug: 'screen-cert-release',
+      }),
+    });
+
+    expect(hoisted.getCreatorByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getContentBySlug).not.toHaveBeenCalled();
+    expect(metadata.title).toContain('Screen Cert Fixture Release');
+    expect(metadata.title).toContain('Screen Cert Fixture');
+  });
+});

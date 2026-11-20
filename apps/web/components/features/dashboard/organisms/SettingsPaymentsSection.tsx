@@ -181,7 +181,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Loading payments'
-        description='Checking your stripe connection and payout status.'
+        description='Checking your Stripe connection and payout status.'
       />
     );
   }
@@ -209,12 +209,7 @@ export function SettingsPaymentsSection() {
         icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
         title='Payout setup temporarily unavailable'
         disabled
-        description='Stripe payout onboarding is paused while jovie finishes platform setup. Your account is safe — try again later.'
-        action={
-          <Button variant='secondary' size='sm' disabled>
-            Connect Stripe
-          </Button>
-        }
+        description='Stripe payouts open once Jovie finishes platform setup. Your account is safe.'
       />,
       renderNotice(error ?? PLATFORM_PROFILE_UNAVAILABLE_MESSAGE, 'warning')
     );
@@ -226,7 +221,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Stripe not connected'
-        description='Connect stripe to receive fan payments directly through jovie. Stripe handles payment processing, payouts, and tax reporting.'
+        description='Connect Stripe to receive fan payments directly through Jovie. Stripe handles payment processing, payouts, and tax reporting.'
         action={renderConnectAction('Connect Stripe')}
       />,
       paymentErrorNotice(error)

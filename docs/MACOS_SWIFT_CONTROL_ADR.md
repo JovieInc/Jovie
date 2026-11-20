@@ -21,11 +21,11 @@ The customer Mac app is **Electron wrapping the hosted web app**. It is not a na
 | Surface | Runtime | Role |
 |---|---|---|
 | Packaged `Jovie.app` / Jovie Local | Electron (`apps/desktop`), `BrowserWindow` + preload, `webviewTag: false` | Product shell. Loads hosted Next (`APP_URL`). Local userData = `Jovie-Local`. Default entry `/app/chat`. |
-| Packaged Ovie | Same Electron process | Menu opens `/hud?ovie=mac` (`apps/desktop/src/ovie-door.ts`). One heads-up. |
+| Packaged Ovie door | Same Electron process | Menu opens web Ovie at `/app/ov` (`apps/desktop/src/ovie-door.ts`). Not a separate Ovie. |
 | Electron tray | Same Electron process (`apps/desktop/src/tray.ts`) | Chat / new-message / preferences. |
 | `apps/macos/MenuMonitor` | Native SwiftUI `MenuBarExtra` | Operator shipping-count menu. Not the product app. |
 | iOS `apps/ios` | Native SwiftUI | Product app. WKWebView only for public-profile preview (`PublicProfileBrowserView.swift`). |
-| Archived `JovieInc/ovie` | Swift menu-bar (read-only) | Deprecated launcher. Not the HUD. |
+| `JovieInc/ovie` | Swift menu-bar | Archived 2026-10-28 and removed from the registries. One Ovie: web, shared shell. |
 
 Key files: `apps/desktop/src/main.ts`, `apps/desktop/src/ovie-door.ts`, `apps/desktop/src/renderer-recovery.ts`, `apps/desktop/electron-builder.yml` (`appId: app.jov.ie`), `apps/macos/MenuMonitor/README.md`, `docs/OVIE.md`.
 
@@ -43,12 +43,12 @@ Hunches discarded:
 |---|---|---|
 | [JOV-3854](https://linear.app/jovie/issue/JOV-3854) / [#12894](https://github.com/JovieInc/Jovie/issues/12894) | Done / closed | Standalone Swift Ovie is the wrong shape. New work is Jovie web `/hud`. Swift is a launcher. No new Swift design tokens. |
 | `docs/OVIE.md` History | Canonical | `JovieInc/ovie` archived read-only after 2026-07 founder direction. |
-| [JOV-5298](https://linear.app/jovie/issue/JOV-5298) / [#16414](https://github.com/JovieInc/Jovie/pull/16414) | Merged 2026-08-28 | Packaged Ovie is one web screen (`OvieMacHud`) with three YC metrics. Isolated UI lane. **merged ≠ live** until packaged/local dogfood. |
+| [JOV-5298](https://linear.app/jovie/issue/JOV-5298) / [#16414](https://github.com/JovieInc/Jovie/pull/16414) | Merged 2026-08-28 | Packaged Ovie was one web screen (`OvieMacHud`, since removed; Home at `/app/ov` replaced it). Isolated UI lane. **merged ≠ live** until packaged/local dogfood. |
 | `docs/OVIE_PROGRAM.md` M1 | not-passed | Real packaged Ovie door + Summer + Ubuntu shipping-state. Source/PR/CI are progress, not done. |
 
 There is no open Linear issue or ADR that authorizes rewriting `apps/desktop` in Swift.
 
-Allowed Swift today: iOS product (`apps/ios`), MenuMonitor (`apps/macos/MenuMonitor`), and the archived Ovie launcher. Forbidden without a founder `EVENT:`: a second Mac product shell, a Swift HUD, or remocked atoms.
+Allowed Swift today: iOS product (`apps/ios`), and MenuMonitor (`apps/macos/MenuMonitor`). Forbidden without a founder `EVENT:`: a second Mac product shell, a Swift HUD, or remocked atoms.
 
 ---
 
@@ -81,7 +81,7 @@ Swift on iOS and Mac consumes the one design system. Locked atoms stay ActionBut
 
 ### `ops/reviewed-invariants/ovie-one-hud-no-second-surface-v1`
 
-Ovie inside packaged Jovie.app is the one heads-up: `/hud?ovie=mac` (`ovieOperatorOpsHref`). Forbidden: a second HUD, a Swift Ovie UI, promoting the Ubuntu TUI or MenuMonitor to Ovie, or reopening seven-band `/hud` as the Mac default. Measure: `apps/desktop/scripts/ovie-door.test.ts` and `OvieMacHud` tests; packaged menu still loads that href only.
+Ovie inside packaged Jovie.app is web Ovie at `/app/ov`. Forbidden: a second HUD, any native (Swift or Electron-only) Ovie UI, promoting the Ubuntu TUI or MenuMonitor to Ovie, or reopening seven-band `/hud` as the Mac default. Measure: `apps/desktop/scripts/ovie-door.test.ts` and `pnpm run surfaces:check`; packaged menu still loads that href only.
 
 ### `ops/reviewed-invariants/mac-closed-loop-merged-is-not-live-v1`
 

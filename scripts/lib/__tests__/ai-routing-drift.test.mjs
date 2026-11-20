@@ -1,10 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  budgetExhaustedResult,
   declaredCeilings,
   declaredGatewayModels,
   evaluateRouting,
+  evaluateSubsidyPools,
   OIDC_KEY,
+  profilesFromDropIns,
   workersAiUsdByDay,
 } from '../ai-routing-drift.mjs';
 
@@ -21,10 +24,37 @@ describe('routing.json shape', () => {
   it('declares a ceiling for every Gateway-key caller and never routes banned providers', () => {
     const ceilings = declaredCeilings(routing);
     expect(ceilings.Jovie_Production).toBeCloseTo(0.8);
-    expect(ceilings['jovie-golden-path-review']).toBe(0.1);
+    expect(ceilings['jovie-golden-path-review']).toBeUndefined();
     expect(ceilings[OIDC_KEY]).toBeGreaterThan(0);
     for (const m of declaredGatewayModels(routing))
       expect(m).not.toMatch(/^(openai|anthropic)\//u);
+  });
+});
+
+describe('shipping reviewer policy', () => {
+  it('declares Cloudflare only and detects residual Gateway spend', () => {
+    expect(
+      routing.callers.find(c => c.id === 'ci.golden-path-review')
+    ).toMatchObject({
+      route: 'workers-ai-only',
+      fallback: null,
+      gatewayKey: null,
+      models: ['@cf/deepseek-ai/deepseek-v4.1-flash-1017'],
+    });
+    expect(
+      evaluateRouting({
+        routing,
+        days: 1,
+        keyRows: [row('jovie-golden-path-review', 1)],
+        modelRows: [],
+        health: {},
+      }).findings
+    ).toEqual([
+      expect.objectContaining({
+        type: 'undeclared-gateway-key',
+        subject: 'jovie-golden-path-review',
+      }),
+    ]);
   });
 });
 
@@ -47,7 +77,7 @@ describe('evaluateRouting', () => {
     days: 2,
     keyRows: [
       row('Jovie_Production', 0.2),
-      row('jovie-golden-path-review', 0.1),
+      row('Jovie_Production', 0.1),
       row(null, 0.4),
     ],
     modelRows: [model('zai/glm-5.3-flash', 0.7)],
@@ -67,17 +97,38 @@ describe('evaluateRouting', () => {
     expect(result.workersAiUsdPerDay).toBe(0.8);
   });
 
-  it('flags a workers-first caller whose key still spends like the Gateway is primary', () => {
+  it('flags a declared key spending above its Gateway ceiling', () => {
     const { findings } = evaluateRouting({
       ...calm,
-      keyRows: [row('jovie-golden-path-review', 2.8)],
+      keyRows: [row('Jovie_Production', 2.8)],
     });
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({
       type: 'gateway-over-ceiling',
       severity: 'high',
-      subject: 'jovie-golden-path-review',
+      subject: 'Jovie_Production',
       usdPerDay: 1.4,
+    });
+  });
+
+  it('reports the request volume next to the spend so call-count drift is visible', () => {
+    const result = evaluateRouting({
+      ...calm,
+      keyRows: [
+        {
+          api_key_name: 'Jovie_Production',
+          total_cost: 2.8,
+          request_count: 3000,
+        },
+      ],
+    });
+    expect(result.byKey.Jovie_Production).toMatchObject({
+      usdPerDay: 1.4,
+      requestsPerDay: 1500,
+    });
+    expect(result.findings[0]).toMatchObject({
+      type: 'gateway-over-ceiling',
+      requestsPerDay: 1500,
     });
   });
 
@@ -120,5 +171,125 @@ describe('evaluateRouting', () => {
     expect(
       evaluateRouting({ ...calm, credits: { balanceUsd: 20 } }).findings
     ).toEqual([]);
+  });
+});
+
+describe('subsidy pool ledger', () => {
+  const sha = c => c.repeat(64);
+  const hostProfiles = {
+    'current-login': { home: '/h/.codex', slots: 5, emailSha256: sha('a') },
+    'lyb-pro': { home: '/h/lyb', slots: 1, emailSha256: sha('b') },
+    'jovie-pro': { home: '/h/jovie', slots: 2, emailSha256: sha('c') },
+  };
+  const clone = value => JSON.parse(JSON.stringify(value));
+
+  it("carries Tim's burn policy: 1% floor, proposals only at the floor, no auto-redeem, no paid fallback", () => {
+    expect(routing.subsidyPools.policy).toMatchObject({
+      floorPercent: 1,
+      floorScope: 'new-dispatch',
+      burnOrder: 'use-it-or-lose-it',
+      resetProposal: 'only-when-every-pool-at-floor',
+      autoRedeemResets: false,
+      paidFallback: 'never-without-tim',
+      newAccounts: 'never',
+      apiKeysInWorkers: 'never',
+      targets: { windowUsedBeforeResetPercent: 90 },
+    });
+    expect(evaluateSubsidyPools({ routing })).toEqual([]);
+  });
+
+  it('matches the aliases signed in on the host, with no drift either way', () => {
+    expect(evaluateSubsidyPools({ routing, profiles: hostProfiles })).toEqual(
+      []
+    );
+    const extra = {
+      ...hostProfiles,
+      'new-pro': { home: '/h/new', slots: 1, emailSha256: sha('d') },
+    };
+    const missing = clone(hostProfiles);
+    delete missing['lyb-pro'];
+    expect(
+      evaluateSubsidyPools({ routing, profiles: extra }).map(f => [
+        f.type,
+        f.subject,
+        f.severity,
+      ])
+    ).toEqual([['subsidy-pool-unledgered', 'new-pro', 'high']]);
+    expect(
+      evaluateSubsidyPools({ routing, profiles: missing }).map(f => [
+        f.type,
+        f.subject,
+      ])
+    ).toEqual([['subsidy-pool-not-signed-in', 'lyb-pro']]);
+  });
+
+  it('fails a policy that pauses early, auto-redeems or pays, and any identity in the ledger', () => {
+    const bad = clone(routing);
+    bad.subsidyPools.policy.floorPercent = 15;
+    bad.subsidyPools.policy.autoRedeemResets = true;
+    bad.subsidyPools.policy.paidFallback = 'gateway';
+    bad.subsidyPools.pools[0].note = 'someone@example.com';
+    const findings = evaluateSubsidyPools({ routing: bad });
+    expect(findings.map(f => [f.type, f.subject])).toEqual([
+      ['subsidy-policy-invalid', 'floorPercent'],
+      ['subsidy-policy-invalid', 'autoRedeemResets'],
+      ['subsidy-policy-invalid', 'paidFallback'],
+      ['subsidy-pool-identity', 'codex:current-login'],
+    ]);
+    const withSecret = clone(hostProfiles);
+    withSecret['lyb-pro'].apiKey = 'x';
+    expect(evaluateSubsidyPools({ routing, profiles: withSecret })).toEqual([
+      expect.objectContaining({
+        type: 'subsidy-profile-fields',
+        severity: 'critical',
+      }),
+    ]);
+    const none = clone(routing);
+    delete none.subsidyPools;
+    expect(evaluateSubsidyPools({ routing: none })[0]).toMatchObject({
+      type: 'subsidy-policy-invalid',
+      severity: 'high',
+    });
+  });
+
+  it('pages through evaluateRouting so the cost gate fails on ledger drift', () => {
+    const { findings } = evaluateRouting({
+      routing,
+      profiles: { ...hostProfiles, stray: hostProfiles['lyb-pro'] },
+    });
+    expect(findings.map(f => f.type)).toEqual(['subsidy-pool-unledgered']);
+  });
+
+  it('reads the profiles from systemd drop-ins, last assignment wins', () => {
+    const quoted = JSON.stringify(hostProfiles).replaceAll('"', '\\"');
+    const older =
+      '[Service]\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES={}"\n';
+    const live = `[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=subscription-pool\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES=${quoted}"\n`;
+    expect(profilesFromDropIns([older, live])).toEqual(hostProfiles);
+    expect(profilesFromDropIns(['[Service]\nEnvironment=A=1\n'])).toBeNull();
+  });
+});
+
+describe('budgetExhaustedResult (JOV-12620)', () => {
+  it('reports an exhausted Gateway budget as a runway finding, not drift', () => {
+    const result = budgetExhaustedResult({ days: 2, reason: 'HTTP 402' });
+    expect(result.schema).toBe('jovie.ai-routing-check/v1');
+    expect(result.budgetExhausted).toBe(true);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({
+      type: 'gateway-runway',
+      severity: 'critical',
+    });
+    expect(result.findings[0].message).toContain('budget exhausted (HTTP 402)');
+  });
+
+  it('marks a measured run as not budget-exhausted', () => {
+    const result = evaluateRouting({
+      routing,
+      keyRows: [],
+      modelRows: [],
+      days: 2,
+    });
+    expect(result.budgetExhausted).toBe(false);
   });
 });

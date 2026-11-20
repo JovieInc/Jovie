@@ -95,6 +95,12 @@ export interface ClaimVerificationRecord {
   readonly verifiedAt?: string | null;
   /** Open or decided counter-claim. */
   readonly dispute?: ClaimDispute;
+  /** Grandfathered (`legacy`) claims: end of the 30-day verify window, ISO. */
+  readonly legacyNudgeDueAt?: string;
+  /** Grandfathered claims: when the nudge stage was recorded, ISO. */
+  readonly nudgeSentAt?: string | null;
+  /** When a 50k+ grandfathered claim was reopened for proof, ISO. */
+  readonly legacyProofRequiredAt?: string | null;
   /** Rejections the artist answered with a new request. */
   readonly reopenCount?: number;
 }

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DrawerChoiceChipGroup } from './DrawerChoiceChipGroup';
@@ -26,6 +27,8 @@ describe('DrawerChoiceChipGroup', () => {
     const unselected = screen.getByRole('button', { name: 'Europe' });
 
     expect(group).toHaveClass('flex', 'flex-wrap', 'gap-1.5');
+    expect(selected).toHaveAttribute('data-slot', 'plain-button');
+    expect(selected).toHaveAttribute('type', 'button');
     expect(selected).toHaveAttribute('aria-pressed', 'true');
     expect(selected).toHaveAttribute('data-state', 'on');
     expect(selected).toHaveClass(
@@ -43,7 +46,8 @@ describe('DrawerChoiceChipGroup', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('notifies the owner with the toggled value', () => {
+  it('notifies the owner with the toggled value', async () => {
+    const user = userEvent.setup();
     const onToggle = vi.fn();
     render(
       <DrawerChoiceChipGroup
@@ -54,7 +58,38 @@ describe('DrawerChoiceChipGroup', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Europe' }));
+    await user.click(screen.getByRole('button', { name: 'Europe' }));
     expect(onToggle).toHaveBeenCalledWith('europe');
+    await user.click(screen.getByRole('button', { name: 'Unavailable' }));
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('handles an empty list and long right-to-left labels accessibly', async () => {
+    const { container, rerender } = render(
+      <DrawerChoiceChipGroup
+        options={[]}
+        selectedValues={[]}
+        onToggle={vi.fn()}
+        ariaLabel='Coverage'
+      />
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+    const label = 'أمريكا الشمالية والمناطق المحيطة بها';
+    rerender(
+      <div dir='rtl' lang='ar'>
+        <DrawerChoiceChipGroup
+          options={[{ value: 'region', label }]}
+          selectedValues={[]}
+          onToggle={vi.fn()}
+          ariaLabel='التغطية'
+        />
+      </div>
+    );
+    expect(screen.getByRole('button', { name: label })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -219,7 +219,7 @@ describe('TaskListRow', () => {
       />
     );
     const doneRow = within(done.container).getByTestId('task-list-row-task-1');
-    expect(doneRow.className).toContain('opacity-75');
+    expect(doneRow.className).toContain('opacity-90');
     expect(doneRow.className).not.toContain('opacity-60');
 
     const cancelled = render(

@@ -198,7 +198,9 @@ describe('GET /s/[code]', () => {
       });
 
       const response = await callRoute(
-        new NextRequest('http://localhost/s/abc123'),
+        new NextRequest('http://localhost/s/abc123', {
+          headers: { 'x-vercel-ip-country': 'JP' },
+        }),
         {
           params: Promise.resolve({ code: 'abc123' }),
         }
@@ -258,6 +260,7 @@ describe('GET /s/[code]', () => {
     const request = new NextRequest('http://localhost/s/abc123', {
       headers: {
         Cookie: 'jv_cc={"marketing":false}',
+        'x-vercel-ip-country': 'JP',
       },
     });
 
@@ -282,7 +285,9 @@ describe('GET /s/[code]', () => {
   it('classifies Wallet profile pass scans separately from short links', async () => {
     mocks.sourceLink.sourceType = 'wallet_pass';
 
-    const request = new NextRequest('http://localhost/s/abc123');
+    const request = new NextRequest('http://localhost/s/abc123', {
+      headers: { 'x-vercel-ip-country': 'JP' },
+    });
 
     const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
@@ -298,15 +303,33 @@ describe('GET /s/[code]', () => {
     );
   });
 
+  it('skips audience recording when the geo signal is missing (fail closed)', async () => {
+    const request = new NextRequest('http://localhost/s/abc123');
+    const response = await GET(request, {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['absent consent cookie', 'jv_cc_required=1'],
     ['malformed consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+    [
+      'pending advertising opt-out',
+      'jv_cc_required=0; jv_tracking_consent=rejected',
+    ],
+    [
+      'advertising opt-out with stale server consent',
+      'jv_cc_required=0; jv_tracking_consent=rejected; jv_cc={"essential":true,"analytics":true,"marketing":true}',
+    ],
   ])(
-    'skips audience recording in consent-required regions with %s',
+    'skips audience recording when consent is withheld: %s',
     async (_caseName, cookieHeader) => {
       const request = new NextRequest('http://localhost/s/abc123', {
         headers: {
           Cookie: cookieHeader,
+          'x-vercel-ip-country': 'US',
         },
       });
 
@@ -342,4 +365,28 @@ describe('GET /s/[code]', () => {
     expect(mocks.txInsertMock).not.toHaveBeenCalled();
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['records', '0', true],
+    ['skips', '1', false],
+  ] as const)(
+    '%s audience recording for a US/CA visitor with Sec-GPC: %s',
+    async (_verb, secGpc, recorded) => {
+      const request = new NextRequest('http://localhost/s/abc123', {
+        headers: {
+          'Sec-GPC': secGpc,
+          'x-vercel-ip-country': 'US',
+          'x-vercel-ip-country-region': 'CA',
+        },
+      });
+
+      const response = await callRoute(request, {
+        params: Promise.resolve({ code: 'abc123' }),
+      });
+
+      expect(response.status).toBe(302);
+      expect(recordAudienceEvent).toHaveBeenCalledTimes(recorded ? 1 : 0);
+      expect(mocks.txInsertMock).toHaveBeenCalledTimes(recorded ? 1 : 0);
+    }
+  );
 });

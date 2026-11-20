@@ -1,5 +1,6 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   getPlatformIcon,
   getPlatformIconMetadata,
@@ -58,5 +59,54 @@ describe('platform icon helpers', () => {
       hex: 'FF0000',
     });
     await expect(getPlatformIcon('unknown-xyz')).resolves.toBeUndefined();
+  });
+});
+
+describe('SocialIcon accessibility', () => {
+  it('is hidden from assistive tech by default', async () => {
+    const { container } = render(
+      <p>
+        <SocialIcon platform='spotify' /> Listen on Spotify
+      </p>
+    );
+    expect(container.querySelector('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('exposes a named image when labelled, and hides the unknown fallback', async () => {
+    const { container } = render(
+      <ul>
+        <li>
+          <SocialIcon
+            platform='spotify'
+            aria-hidden={false}
+            aria-label='Spotify'
+          />
+        </li>
+        <li>
+          <SocialIcon platform='my-band-website' /> Band website
+        </li>
+      </ul>
+    );
+    expect(screen.getByRole('img', { name: 'Spotify' })).toBeInTheDocument();
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders brand glyphs beside right-to-left labels', async () => {
+    const { container } = render(
+      <ul dir='rtl'>
+        <li>
+          <SocialIcon platform='youtube' /> شاهد على يوتيوب
+        </li>
+      </ul>
+    );
+    expect(container.querySelector('path')?.getAttribute('d')).not.toContain(
+      'M13.828 10.172'
+    );
+    await expectNoA11yViolations(container);
   });
 });

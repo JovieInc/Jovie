@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useTheme } from 'next-themes';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { ChevronLeft, Ellipsis, RotateCcw, Share2 } from 'lucide-react';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { IconButton } from './icon-button';
 import {
@@ -30,29 +29,9 @@ const SECONDARY_STATE_EXAMPLES = [
 
 type ProofTheme = 'light' | 'dark';
 
-function RootProofTheme({
-  children,
-  theme,
-}: {
-  readonly children: ReactNode;
-  readonly theme: ProofTheme;
-}) {
-  const { theme: activeTheme, setTheme } = useTheme();
-  const initialTheme = useRef(activeTheme);
-
-  useEffect(() => {
-    setTheme(theme);
-    return () => {
-      setTheme(initialTheme.current ?? 'dark');
-    };
-  }, [setTheme, theme]);
-
-  return children;
-}
-
 function SecondaryStateSurface({ theme }: { readonly theme: ProofTheme }) {
   return (
-    <section>
+    <section data-proof-theme={theme} style={{ colorScheme: theme }}>
       <div className='rounded-xl bg-surface-0 p-5 text-primary-token'>
         <p className='mb-4 text-xs font-medium text-secondary-token'>
           {theme === 'dark' ? 'Dark Surface' : 'Light Surface'}
@@ -81,8 +60,22 @@ async function verifySecondaryStateStory(
   canvasElement: HTMLElement,
   theme: ProofTheme
 ) {
-  const root = canvasElement.ownerDocument.documentElement;
-  await waitFor(() => expect(root).toHaveClass(theme));
+  const document = canvasElement.ownerDocument;
+  await waitFor(() =>
+    expect(
+      ['light', 'dark'].some(value =>
+        document.documentElement.classList.contains(value)
+      )
+    ).toBe(true)
+  );
+  const rootTheme = document.documentElement.className;
+  const storedTheme = document.defaultView?.localStorage.getItem(
+    'jovie-theme-storybook'
+  );
+  const scope = canvasElement.querySelector('[data-proof-theme]');
+  await expect(scope).toHaveAttribute('data-proof-theme', theme);
+  if (!scope) throw new Error('Missing secondary-state proof theme scope');
+  await waitFor(() => expect(getComputedStyle(scope).colorScheme).toBe(theme));
 
   const restControl = canvasElement.querySelector<HTMLButtonElement>(
     'button[data-state="idle"]'
@@ -142,6 +135,11 @@ async function verifySecondaryStateStory(
     await expect([visibleBox.width, visibleBox.height]).toEqual([32, 32]);
     await expect([hitTarget.width, hitTarget.height]).toEqual(['44px', '44px']);
   }
+
+  await expect(document.documentElement.className).toBe(rootTheme);
+  await expect(
+    document.defaultView?.localStorage.getItem('jovie-theme-storybook')
+  ).toBe(storedTheme);
 }
 
 const meta: Meta<typeof IconButton> = {
@@ -223,13 +221,6 @@ export const Secondary: Story = {
 };
 
 export const SecondaryStateMatrix: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='light'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='light' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'light');
@@ -246,13 +237,6 @@ export const SecondaryStateMatrix: Story = {
 };
 
 export const SecondaryStateMatrixDark: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='dark'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='dark' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'dark');
@@ -261,20 +245,13 @@ export const SecondaryStateMatrixDark: Story = {
     backgrounds: { default: 'dark' },
     docs: {
       description: {
-        story: 'Desktop dark-surface proof using root-scoped dark tokens.',
+        story: 'Desktop dark-surface proof using locally scoped dark tokens.',
       },
     },
   },
 };
 
 export const SecondaryStateMatrixMobile: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='light'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='light' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'light');
@@ -286,13 +263,6 @@ export const SecondaryStateMatrixMobile: Story = {
 };
 
 export const SecondaryStateMatrixDarkMobile: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='dark'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='dark' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'dark');
@@ -377,4 +347,86 @@ export const AllVariants: Story = {
       ))}
     </div>
   ),
+};
+
+// Certificate states
+
+export const ErrorState: Story = {
+  render: () => (
+    <div className='flex w-72 items-center gap-3 rounded-xl bg-surface-1 px-3 py-2'>
+      <p className='min-w-0 flex-1 truncate text-xs text-error-text'>
+        Upload failed: cover-art.png
+      </p>
+      <IconButton
+        ariaLabel='Retry upload'
+        variant='secondary'
+        size='md'
+        destructive
+      >
+        <RotateCcw aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Failed row: the destructive tone marks the retry control while the row text names what failed.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-60 items-center gap-1 rounded-xl bg-surface-1 px-3 py-2'>
+      <p className='min-w-0 flex-1 truncate text-xs text-primary-token'>
+        Midnight Sessions (Extended Club Mix) feat. The Late Night Collective
+      </p>
+      <IconButton
+        ariaLabel='Share Midnight Sessions (Extended Club Mix) feat. The Late Night Collective'
+        size='md'
+      >
+        <Share2 aria-hidden='true' />
+      </IconButton>
+      <IconButton ariaLabel='More actions for this release' size='md'>
+        <Ellipsis aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long sibling title truncates and a long accessible name stays off-screen; the icon faces keep their fixed size in a narrow row.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      className='flex w-60 items-center gap-1 rounded-xl bg-surface-1 px-3 py-2'
+    >
+      <IconButton ariaLabel='رجوع' size='md'>
+        <ChevronLeft className='rtl:rotate-180' aria-hidden='true' />
+      </IconButton>
+      <p className='min-w-0 flex-1 truncate text-xs text-primary-token'>
+        جلسات منتصف الليل مع فرقة السهرة الطويلة
+      </p>
+      <IconButton ariaLabel='مشاركة' size='md'>
+        <Share2 aria-hidden='true' />
+      </IconButton>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left row: controls follow the inline direction, the back glyph mirrors, and the Arabic title truncates between them.',
+      },
+    },
+  },
 };

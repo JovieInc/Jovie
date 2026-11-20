@@ -15,9 +15,16 @@
  * Only the pushed commit is checked; uncommitted local edits are warned about, not sent.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  EVIDENCE_MARKER,
+  evidenceMatches,
+  parseEvidence,
+  SLOTS_BUSY_EXIT,
+} from './lib/prepush-offload.mjs';
 
 export const DEFAULT_HOST = 'gem';
 // ponytail: 2 slots — Gem hit load 63/16 cores with 4 (2026-10-29); raise when lanes move off Gem.
@@ -35,7 +42,13 @@ export function parseRemoteArgs(argv, env = {}) {
     slots:
       Number.parseInt(env.JOVIE_REMOTE_PREFLIGHT_SLOTS ?? '', 10) ||
       DEFAULT_SLOTS,
+    // 0 = wait for a slot indefinitely (manual runs). The pre-push hook passes a
+    // limit so a full Gem hands off to free hosted runners instead of queuing.
+    queueMaxSec:
+      Number.parseInt(env.JOVIE_REMOTE_PREFLIGHT_QUEUE_MAX_SEC ?? '', 10) || 0,
     push: true,
+    bundle: false,
+    backend: 'gem',
     dryRun: false,
     repo: process.cwd(),
     bodyFile: undefined,
@@ -44,8 +57,16 @@ export function parseRemoteArgs(argv, env = {}) {
   for (let i = 0; i < argv.length; i += 1) {
     const f = argv[i];
     if (f === '--host') a.host = argv[++i];
+    else if (f === '--backend') a.backend = argv[++i];
+    else if (f === '--queue-max-sec')
+      a.queueMaxSec = Number.parseInt(argv[++i], 10) || 0;
     else if (f === '--no-push') a.push = false;
-    else if (f === '--dry-run') a.dryRun = true;
+    // ship HEAD as a git bundle (no push, so no recursion into pre-push) and
+    // require passing evidence bound to the exact sha + tree
+    else if (f === '--bundle') {
+      a.bundle = true;
+      a.push = false;
+    } else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--repo') a.repo = path.resolve(argv[++i]);
     else if (f === '--body-file') a.bodyFile = argv[++i];
     else a.forward.push(f);
@@ -66,6 +87,8 @@ export function buildRemoteScript({
   slots,
   forward,
   bodyB64,
+  bundle = false,
+  queueMaxSec = 0,
 }) {
   const fwd = forward.map(q).join(' ');
   return `set -euo pipefail
@@ -79,7 +102,12 @@ exec 8>"$ROOT/.git.lock"; flock 8
 if [ ! -d "$REPO/.git" ]; then
   git clone --quiet --filter=blob:none ${q(originUrl)} "$REPO"
 fi
-git -C "$REPO" fetch --quiet --no-tags origin ${q(`+refs/heads/${branch}:refs/remotes/origin/${branch}`)} main
+${
+  bundle
+    ? `git -C "$REPO" fetch --quiet --no-tags origin main
+git -C "$REPO" fetch --quiet --no-tags "$ROOT/.bundles/${sha}.bundle" ${q(`+HEAD:refs/preflight/${slug}`)}`
+    : `git -C "$REPO" fetch --quiet --no-tags origin ${q(`+refs/heads/${branch}:refs/remotes/origin/${branch}`)} main`
+}
 if [ -d "$DIR" ]; then
   git -C "$DIR" checkout --quiet --force --detach ${q(sha)}
 else
@@ -101,6 +129,7 @@ fi
 # 3. host-wide concurrency gate: flock slots, queue instead of fail
 slot=""
 announced=0
+tq=$(date +%s)
 while [ -z "$slot" ]; do
   for i in $(seq 0 $((${slots} - 1))); do
     exec 9>"$HOME/.cache/gem-remote-preflight-slots/slot-$i.lock"
@@ -108,6 +137,10 @@ while [ -z "$slot" ]; do
   done
   if [ -z "$slot" ]; then
     [ $announced = 1 ] || { echo "[preflight:remote] all ${slots} remote slots busy; queued." >&2; announced=1; }
+    if [ ${queueMaxSec} -gt 0 ] && [ $(( $(date +%s) - tq )) -ge ${queueMaxSec} ]; then
+      echo "[preflight:remote] all ${slots} remote slots still busy after ${queueMaxSec}s; handing off (exit ${SLOTS_BUSY_EXIT})." >&2
+      exit ${SLOTS_BUSY_EXIT}
+    fi
     sleep 2
   fi
 done
@@ -116,15 +149,28 @@ body_args=()
 ${bodyB64 ? `mkdir -p "$ROOT/.bodies"; printf %s ${q(bodyB64)} | base64 -d > "$ROOT/.bodies/${slug}.md"; body_args=(--body-file "$ROOT/.bodies/${slug}.md")` : ''}
 echo "[preflight:remote] ${slug} @ ${sha.slice(0, 9)} slot $slot setup $(( $(date +%s) - t0 ))s" >&2
 set +e
-timeout 45m nice -n 10 pnpm preflight:changed ${fwd} "\${body_args[@]}"
+# Fork-storm containment: run inside agent-preflight.slice (TasksMax 512) when installed on the host
+# (scripts/capacity/install-agent-slices.sh); otherwise a plain run.
+RUN=""; [ -x "$HOME/.local/bin/agent-run" ] && RUN="$HOME/.local/bin/agent-run preflight"
+timeout 45m nice -n 10 $RUN pnpm preflight:changed ${fwd} "\${body_args[@]}"
 rc=$?
 echo "[preflight:remote] exit $rc total $(( $(date +%s) - t0 ))s" >&2
+# evidence bound to the exact commit and tree that just ran
+tree="$(git rev-parse HEAD^{tree})"
+mkdir -p "$HOME/.cache/remote-preflight/evidence"
+ev="$(printf '{"sha":"%s","tree":"%s","rc":%s,"host":"%s","at":"%s","totalS":%s}' "$(git rev-parse HEAD)" "$tree" "$rc" "$(hostname)" "$(date -u +%FT%TZ)" "$(( $(date +%s) - t0 ))")"
+printf '%s\n' "$ev" > "$HOME/.cache/remote-preflight/evidence/$(git rev-parse HEAD).json"
+echo "${EVIDENCE_MARKER} $ev"
 exit $rc
 `;
 }
 
 function git(cwd, args) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   return { ok: r.status === 0, out: (r.stdout || '').trim(), err: r.stderr };
 }
 
@@ -147,6 +193,14 @@ export async function main({
   const bodyB64 = a.bodyFile
     ? readFileSync(a.bodyFile).toString('base64')
     : undefined;
+  if (a.backend === 'actions') {
+    const { runActions } = await import('./lib/preflight-actions.mjs');
+    return runActions({
+      repo: a.repo,
+      sha,
+      tree: git(a.repo, ['rev-parse', 'HEAD^{tree}']).out,
+    });
+  }
   const script = buildRemoteScript({
     slug: branchSlug(branch),
     branch,
@@ -155,12 +209,35 @@ export async function main({
     slots: a.slots,
     forward: a.forward,
     bodyB64,
+    bundle: a.bundle,
+    queueMaxSec: a.queueMaxSec,
   });
   if (a.dryRun) {
     console.log(script);
     return 0;
   }
-  if (a.push) {
+  const tree = git(a.repo, ['rev-parse', 'HEAD^{tree}']).out;
+  if (a.bundle) {
+    // pre-push runs before the commit reaches origin: ship it as a bundle.
+    const mb = git(a.repo, ['merge-base', 'origin/main', 'HEAD']).out;
+    const bundlePath = path.join(tmpdir(), `preflight-${sha}.bundle`);
+    const b = spawnSync(
+      'git',
+      ['bundle', 'create', '--quiet', bundlePath, mb ? `${mb}..HEAD` : 'HEAD'],
+      { cwd: a.repo, stdio: 'inherit' }
+    );
+    if (b.status !== 0) return 127;
+    const up = spawnSync(
+      'ssh',
+      [
+        a.host,
+        `mkdir -p ~/wt/remote-preflight/.bundles && cat > ~/wt/remote-preflight/.bundles/${sha}.bundle`,
+      ],
+      { input: readFileSync(bundlePath), stdio: ['pipe', 'inherit', 'inherit'] }
+    );
+    rmSync(bundlePath, { force: true });
+    if (up.status !== 0) return 127;
+  } else if (a.push) {
     const p = spawnSync(
       'git',
       ['push', '--quiet', 'origin', `HEAD:refs/heads/${branch}`],
@@ -176,11 +253,30 @@ export async function main({
   }
   return new Promise(resolve => {
     const child = spawn('ssh', [a.host, 'bash', '-s'], {
-      stdio: ['pipe', 'inherit', 'inherit'],
+      stdio: ['pipe', 'pipe', 'inherit'],
+    });
+    let out = '';
+    child.stdout.on('data', d => {
+      process.stdout.write(d);
+      out = (out + d.toString()).slice(-200_000);
     });
     child.stdin.end(script);
     child.on('error', () => resolve(127));
-    child.on('close', (code, sig) => resolve(code ?? (sig ? 143 : 1)));
+    child.on('close', (code, sig) => {
+      const rc = code ?? (sig ? 143 : 1);
+      // bundle mode: a pass only counts with evidence for this exact sha + tree
+      if (
+        a.bundle &&
+        rc === 0 &&
+        !evidenceMatches(parseEvidence(out), { sha, tree })
+      ) {
+        console.error(
+          `[preflight:remote] no passing ${EVIDENCE_MARKER} for ${sha} / ${tree}; treating as failure`
+        );
+        return resolve(1);
+      }
+      resolve(rc);
+    });
   });
 }
 

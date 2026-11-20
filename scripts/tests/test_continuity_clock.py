@@ -145,6 +145,68 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(self.tick()["status"], "cooldown")
 
+    def test_failed_observe_retries_soon_instead_of_a_full_interval(self):
+        # JOV-12812: the hourly summerCanary's 03:38 observe failed on 2026-11-16 and the
+        # clock idled the whole 3600s until 04:39 -- a 2-hour dark gap in monitoring.
+        canary = next(c for c in clock.CLOCKS if c.name == "summerCanary")
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        result = clock.tick(self.path, "gem", self.api, NOW, clocks=(canary,))
+        result = result["clocks"][canary.name]
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"], "TimeoutExpired")
+        state = json.loads((self.path / canary.state_file).read_text())
+        self.assertEqual(state["nextAttemptAt"], NOW + clock.UNCERTAIN_S)
+        self.assertEqual(state["lastResult"], result)
+        self.calls.clear()
+        self.get_error = None
+        # The short window re-observes (and dispatches when due) instead of idling for
+        # another full hour.
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW + clock.UNCERTAIN_S,
+                                    clocks=(canary,))["clocks"][canary.name]["status"], "dispatch-requested")
+
+    def test_failed_observe_never_waits_longer_than_the_clocks_own_interval(self):
+        # The five-minute continuity clock keeps its existing failure cadence.
+        self.get_error = subprocess.TimeoutExpired("gh", 10)
+        self.assertEqual(self.tick()["status"], "failed")
+        self.assertEqual(self.saved()["nextAttemptAt"], NOW + clock.CONTINUITY.interval_s)
+
+    def test_successful_observe_keeps_the_interval_cadence(self):
+        canary = next(c for c in clock.CLOCKS if c.name == "summerCanary")
+        state = lambda: json.loads((self.path / canary.state_file).read_text())
+        # A current run is checked again when that run becomes due: not
+        # immediately, and not a second full interval after this tick.
+        self.rows = [run_row(30)]
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW, clocks=(canary,))["clocks"][canary.name]["status"], "current")
+        self.assertEqual(state()["nextAttemptAt"], NOW + canary.interval_s - 30)
+        # A successful dispatch also returns the clock to its interval cadence.
+        self.rows = [run_row(canary.interval_s)]
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW + canary.interval_s,
+                                    clocks=(canary,))["clocks"][canary.name]["status"], "dispatch-requested")
+        self.assertEqual(state()["nextAttemptAt"], NOW + 2 * canary.interval_s)
+
+    def test_mid_interval_push_wakes_when_that_heartbeat_goes_due(self):
+        # JOV-9993: security-advisory-loop's 04:28Z push was still inside the
+        # 4h interval at the next tick, so the clock slept another full 4h.
+        # Liveness then saw 314m of silence against a 300m budget.
+        advisory = next(c for c in clock.CLOCKS if c.name == "securityAdvisory")
+        age = 84 * 60
+        self.rows = [run_row(age, event="push", id=44458554825)]
+        result = clock.tick(self.path, "gem", self.api, NOW, clocks=(advisory,))
+        seen = result["clocks"][advisory.name]
+        self.assertEqual(seen["status"], "current")
+        state = json.loads((self.path / advisory.state_file).read_text())
+        due_at = NOW + (advisory.interval_s - age)
+        self.assertEqual(state["nextAttemptAt"], due_at)
+        self.assertFalse(any("POST" in call for call in self.calls))
+        self.assertEqual(
+            clock.tick(self.path, "gem", self.api, due_at - 61, clocks=(advisory,))["clocks"][advisory.name]["status"],
+            "cooldown",
+        )
+        # The old full-interval sleep is still in cooldown here. Due-aligned
+        # wake dispatches once the push is interval - slack old.
+        woken = clock.tick(self.path, "gem", self.api, due_at - 60, clocks=(advisory,))
+        self.assertEqual(woken["clocks"][advisory.name]["status"], "dispatch-requested")
+
     def test_nonzero_or_invalid_json_get_fails_closed(self):
         for response in (SimpleNamespace(returncode=1, stdout="secret", stderr="secret"),
                          SimpleNamespace(returncode=0, stdout="invalid", stderr="")):
@@ -231,6 +293,50 @@ class CadenceClocksTest(unittest.TestCase):
     def posts(self):
         return [call[-1] for call in self.calls if "POST" in call]
 
+    @unittest.skipUnless(
+        (ROOT / ".github/workflows").is_dir()
+        and (ROOT / "canon/automation-registry.jsonl").is_file(),
+        "release trees carry no workflows or automation registry",
+    )
+    def test_daily_evidence_clocks_preserve_manual_runs_and_deadman_receipts(self):
+        registry = {row["id"]: row for row in map(json.loads,
+            (ROOT / "canon/automation-registry.jsonl").read_text().splitlines()) if "id" in row}
+        daily = {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}
+        selected = [c for c in clock.CLOCKS if c.name in daily]
+        self.assertEqual({c.name for c in selected}, daily)
+        for c in selected:
+            with self.subTest(workflow=c.workflow):
+                self.assertEqual(c.interval_s, 86400)
+                self.assertFalse(c.github_cron)
+                workflow = (ROOT / ".github/workflows" / c.workflow).read_text()
+                triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+                self.assertIn("  workflow_dispatch:\n", triggers)
+                self.assertNotIn("  push:\n", triggers)
+                self.assertNotIn("  schedule:\n", triggers)
+                row = registry[f"lanes-clock:{c.workflow.removesuffix('.yml')}"]
+                self.assertEqual(row["trigger"]["clock"], c.name)
+                self.assertEqual(row["clock"]["scheduler"], "gem:lanes-tick")
+                self.assertGreaterEqual(len(row["clock"]["whyNotEvent"]), 30)
+                self.assertEqual(row["receipt"]["workflow"], c.workflow)
+                self.assertEqual(row["maxStalenessMinutes"], 36 * 60)
+                self.assertIn(c.state_file, row["receipt"]["location"])
+
+    def test_daily_evidence_dispatches_when_due_and_manual_run_refreshes_cadence(self):
+        for c in clock.CLOCKS:
+            if c.name not in {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}:
+                continue
+            with self.subTest(workflow=c.workflow):
+                self.calls.clear()
+                self.age[c.workflow] = 25 * 3600
+                result = clock.tick(self.path, "gem", self.api, NOW, clocks=(c,))
+                self.assertEqual(result["clocks"][c.name]["status"], "dispatch-requested")
+                self.assertEqual(self.posts(), [f"event_type={c.event_type}"])
+                self.assertTrue((self.path / c.state_file).exists())
+                page = lambda run, args: json.dumps({"workflow_runs": [
+                    run_row(30, event="workflow_dispatch")]})
+                with patch.object(clock, "api", side_effect=page):
+                    self.assertEqual(clock.observe(None, NOW, c)["status"], "current")
+
     @unittest.skipUnless((ROOT / ".github/workflows").is_dir(), "release trees carry no workflows")
     def test_each_workflow_has_a_listening_trigger_and_a_kept_backstop_cron(self):
         # Plain text, no PyYAML: the Gem release self-test runs this file too.
@@ -251,7 +357,10 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400, "postdeploy-probes.yml": 13 * 3600}
+        self.age = {"stale-branch-sweep.yml": 8 * 86400, "vs-linktree-claims.yml": 8 * 86400,
+                    "postdeploy-probes.yml": 13 * 3600,
+                    "nightly-tests.yml": 25 * 3600, "e2e-full-matrix.yml": 25 * 3600,
+                    "test-coverage-audit.yml": 25 * 3600}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -349,12 +458,47 @@ class CredentialsSpendTickTest(unittest.TestCase):
         self.assertEqual(args[:3], ["node", str(self.release / credentials_spend.SCRIPT), "--live"])
         self.assertIn(str(credentials_spend.receipt_path(self.home)), args)
         self.assertNotIn("--file-linear", args)
-        self.assertEqual(sorted(kwargs["env"]), ["HOME", "PATH"], "no host credential reaches the check")
+        self.assertEqual(sorted(kwargs["env"]), ["HOME", "LANES_LINEAR_APP_STATUS", "PATH"], "only redacted metadata reaches the check")
         state = json.loads((self.state / credentials_spend.STATE_FILE).read_text())
         self.assertEqual(state["nextAttemptAt"], NOW + credentials_spend.INTERVAL_S)
         self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW + 3600,
                                                 home=self.home, linear_token=lambda _state: None)["status"], "current")
         self.assertEqual(len(self.calls), 1)
+
+    def test_redacted_token_metadata_is_observed_after_the_existing_filing_token_read(self):
+        import linear_app_token
+        def access(_state):
+            (self.state / linear_app_token.CACHE_NAME).write_text(json.dumps({
+                "schema": linear_app_token.SCHEMA, "scope": linear_app_token.SCOPE,
+                "accessToken": "must-not-escape", "client": "private-client-tag",
+                "expiresAt": NOW + 29 * 86400,
+            }))
+            return "app-access"
+        credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
+                               home=self.home, linear_token=access)
+        env = self.calls[0][1]["env"]
+        raw = env["LANES_LINEAR_APP_STATUS"]
+        self.assertNotIn("must-not-escape", raw)
+        self.assertNotIn("private-client-tag", raw)
+        self.assertEqual(json.loads(raw), {
+            "schema": "jovie.linear-app-status/v1", "observedAt": credentials_spend._iso(NOW),
+            "available": True, "scopeMatches": True, "expiresInS": 29 * 86400,
+            "mintFailed": False,
+        })
+
+    def test_missing_and_failed_cache_metadata_stays_visible_without_minting(self):
+        import linear_app_token
+        with patch.object(linear_app_token, "mint", side_effect=AssertionError("no mint")):
+            missing = credentials_spend.app_token_status(self.state, NOW, False)
+            self.assertFalse(missing["available"])
+            self.assertIsNone(missing["expiresInS"])
+            (self.state / linear_app_token.CACHE_NAME).write_text(json.dumps({
+                "schema": linear_app_token.SCHEMA, "scope": linear_app_token.SCOPE,
+                "mintFailedAt": NOW, "mintError": "never-echo-this",
+            }))
+            failed = credentials_spend.app_token_status(self.state, NOW, False)
+            self.assertTrue(failed["mintFailed"])
+            self.assertNotIn("never-echo-this", json.dumps(failed))
 
     def test_findings_are_filed_as_the_linear_app_never_a_personal_key(self):
         result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
@@ -431,7 +575,8 @@ class SecretHygieneTest(unittest.TestCase):
             # "selftest-skipped" before running the job (merge group 40193646918, 12:42Z).
             os.environ.pop("LANES_SELFTEST", None)
             os.environ.pop("LANES_EXECUTION_BACKEND", None)
-            result = credentials_spend.tick(state, release, run=run, now=NOW, linear_token=lambda _s: FAKE_SECRET)
+            result = credentials_spend.tick(state, release, run=run, now=NOW,
+                                            home=Path(tmp.name), linear_token=lambda _s: FAKE_SECRET)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(captured["env"]["LINEAR_ACCESS_TOKEN"], FAKE_SECRET)  # the child did get it
         for path in state.rglob("*"):

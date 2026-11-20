@@ -37,6 +37,57 @@ export type ClaimLayoutShiftEntry = {
   sources: ClaimLayoutShiftSource[];
 };
 
+/** Numeric-only projection for job logs; never serialize DOM identity or text. */
+export function projectReplyLayoutEvidence(
+  snapshot:
+    | {
+        supported: boolean;
+        total: number | null;
+        windowStart: number;
+        measuredAt: number;
+        entries: readonly ClaimLayoutShiftEntry[];
+      }
+    | undefined
+) {
+  if (!snapshot) return { available: false };
+  const numberOrNull = (value: number | null) =>
+    Number.isFinite(value) ? value : null;
+  const rect = (value: ClaimLayoutShiftSource['previous']) =>
+    value
+      ? {
+          x: numberOrNull(value.x),
+          y: numberOrNull(value.y),
+          width: numberOrNull(value.width),
+          height: numberOrNull(value.height),
+          finite: [value.x, value.y, value.width, value.height].every(
+            Number.isFinite
+          ),
+        }
+      : null;
+  return {
+    available: true,
+    supported: snapshot.supported,
+    total: numberOrNull(snapshot.total),
+    totalFinite: Number.isFinite(snapshot.total),
+    windowStart: numberOrNull(snapshot.windowStart),
+    windowStartFinite: Number.isFinite(snapshot.windowStart),
+    measuredAt: numberOrNull(snapshot.measuredAt),
+    measuredAtFinite: Number.isFinite(snapshot.measuredAt),
+    entries: snapshot.entries.map(entry => ({
+      value: numberOrNull(entry.value),
+      valueFinite: Number.isFinite(entry.value),
+      startTime: numberOrNull(entry.startTime),
+      startTimeFinite: Number.isFinite(entry.startTime),
+      hadRecentInput: entry.hadRecentInput,
+      counted: entry.counted,
+      sources: entry.sources.map(source => ({
+        previous: rect(source.previous),
+        current: rect(source.current),
+      })),
+    })),
+  };
+}
+
 export type ClaimSignInFrame = {
   startTime: number;
   text: string | null;
@@ -67,7 +118,11 @@ type GuidanceLayoutShiftEntry = {
 
 declare global {
   interface Window {
-    __claimLayout?: { supported: boolean; total: number | null };
+    __claimLayout?: {
+      supported: boolean;
+      total: number | null;
+      windowStart: number;
+    };
     __claimLayoutEntries?: ClaimLayoutShiftEntry[];
     /** Diagnostic: composer child heights, one entry per change, first 4s. */
     __claimComposerFrames?: string[];
@@ -251,13 +306,14 @@ export function installReplyLayoutProbe(): void {
   const metric = {
     supported,
     total: supported ? 0 : (null as number | null),
+    windowStart: 0,
   };
   const entries: ClaimLayoutShiftEntry[] = [];
   // `since` is the open edge of the measured window. It stays at navigation
   // until the settled handoff arms the reply window. Entries are kept, and
   // total is recomputed from startTime, so a late callback cannot add a
   // pre-window shift back after the window opens.
-  let since = 0;
+  let since = metric.windowStart;
   window.__claimLayout = metric;
   window.__claimLayoutEntries = entries;
 
@@ -288,6 +344,7 @@ export function installReplyLayoutProbe(): void {
   window.__armClaimLayout = () => {
     if (!supported) return;
     since = performance.now();
+    metric.windowStart = since;
     recompute();
   };
 

@@ -132,7 +132,34 @@ export function unknownJsonPropertyRepair(diagnosticLines) {
 }
 
 /** @param {readonly string[]} diagnosticLines */
+export function defaultOptionsPropertyRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property '.+' does not exist on type '\{ [^']*\?: [^']+ \}'\./.test(
+        line
+      )
+    )
+  ) {
+    return 'TS2339 on an inferred optional-property object: check defaulted options parameters and declare all supported properties with JSDoc. Do not grow the baseline to absorb the error.';
+  }
+  return null;
+}
+
+/** @param {readonly string[]} diagnosticLines */
 function tupleInferenceRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property 'test' does not exist on type '(?:string \| RegExp|RegExp \| string)'/.test(
+        line
+      )
+    )
+  ) {
+    return (
+      'TS2339 on string | RegExp: inspect pattern/reason table rows. ' +
+      'Declare a JSDoc tuple on the table (ReadonlyArray<readonly [RegExp, string]>) ' +
+      'so destructuring preserves each column type. Do not grow scripts/typecheck-baseline.json to absorb these.'
+    );
+  }
   const { counts } = parseTscOutput(diagnosticLines.join('\n'));
   for (const byCode of counts.values()) {
     if (byCode.has('TS2769') && byCode.has('TS2698')) {
@@ -425,7 +452,11 @@ export function evaluateTypecheckBaseline({
     for (const { file, code } of newErrors) {
       diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+    for (const diagnose of [
+      unknownJsonPropertyRepair,
+      defaultOptionsPropertyRepair,
+      tupleInferenceRepair,
+    ]) {
       const repair = diagnose(diagnosticLines);
       if (repair) console.error(repair);
     }

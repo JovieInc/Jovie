@@ -69,8 +69,8 @@ function JovieWorkEmptyState({
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
       <EmptyState
-        heading='Jovie has not shipped autonomous work in this window yet.'
-        description='Release autopilot, fan notifications, and agent runs will show up here.'
+        heading='Nothing Shipped In This Window'
+        description='Release autopilot, fan notifications, and agent runs show up here when Jovie finishes them.'
         className='min-h-45 py-8'
         testId='jovie-work-empty-state'
       />

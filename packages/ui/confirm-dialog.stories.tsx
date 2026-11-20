@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { type ReactNode, useLayoutEffect } from 'react';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { ConfirmDialog } from './confirm-dialog';
 
@@ -61,5 +62,116 @@ export const ConfirmationRequired: Story = {
         />
       </label>
     ),
+  },
+};
+
+export const ErrorState: Story = {
+  args: {
+    title: 'Disconnect Spotify?',
+    body: 'Jovie stops syncing new releases from Spotify. Synced data stays in your library.',
+    cancelLabel: 'Keep connected',
+    confirmLabel: 'Disconnect',
+    onError: fn(),
+    onConfirm: async () => {
+      throw new Error('Request failed');
+    },
+  },
+  play: async () => {
+    const screen = within(document.body);
+    await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed. Please try again.'
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'When onConfirm rejects, the dialog stays open, re-enables both actions and announces a retry message in an alert.',
+      },
+    },
+  },
+};
+
+export const Partial: Story = {
+  render: args => (
+    <ConfirmDialog
+      open={args.open}
+      onOpenChange={args.onOpenChange}
+      onConfirm={args.onConfirm}
+      title='Discard unsaved changes?'
+    />
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required props: no body, default Confirm and Cancel labels, and the default variant.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    variant: 'destructive',
+    title:
+      'Delete the summer single, its extended club mix and every smart link shared with fans?',
+    body: 'This permanently removes the release from your public profile, disables every smart link already shared with playlist curators, press contacts and fans, and stops new pre-saves. Analytics history for the release stays available in your dashboard for future reporting.',
+    cancelLabel: 'Keep the release and its links',
+    confirmLabel: 'Delete release and disable all links',
+  },
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'A long title, body and action labels wrap inside the dialog on a narrow viewport without horizontal overflow.',
+      },
+    },
+  },
+};
+
+/**
+ * ConfirmDialog portals to document.body, so it takes its direction from the
+ * document like a real right-to-left app; the story sets it on the docs iframe.
+ */
+function DocumentDirectionRtl({ children }: { readonly children: ReactNode }) {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const previous = root.getAttribute('dir');
+    root.setAttribute('dir', 'rtl');
+    return () => {
+      if (previous === null) root.removeAttribute('dir');
+      else root.setAttribute('dir', previous);
+    };
+  }, []);
+  return <div dir='rtl'>{children}</div>;
+}
+
+export const Rtl: Story = {
+  args: {
+    variant: 'destructive',
+    title: 'هل تريد حذف جهة الاتصال من جمهورك نهائيًا؟',
+    body: 'لن تظهر جهة الاتصال بعد الآن في قائمة الجمهور، وستتوقف رسائل البريد المجدولة لها. يبقى سجل الزيارات متاحًا في الإحصائيات.',
+    cancelLabel: 'الإبقاء على جهة الاتصال',
+    confirmLabel: 'حذف جهة الاتصال',
+  },
+  decorators: [
+    Story => (
+      <DocumentDirectionRtl>
+        <Story />
+      </DocumentDirectionRtl>
+    ),
+  ],
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      story: { inline: false, height: '28rem' },
+      description: {
+        story:
+          'In a right-to-left document the Arabic title and body wrap inside the dialog and the footer actions follow the reading direction.',
+      },
+    },
   },
 };

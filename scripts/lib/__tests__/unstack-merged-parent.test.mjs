@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdtempSync,
@@ -9,6 +8,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const script = resolve(repoRoot, 'scripts/unstack-merged-parent.sh');
@@ -16,6 +16,16 @@ const workflow = readFileSync(
   resolve(repoRoot, '.github/workflows/unstack-merged-parent.yml'),
   'utf8'
 );
+
+// Synthetic repositories must not inherit host signing, hooks, or Git routing.
+// Repository-local hooks remain active for the behavioral controls below.
+const fixtureEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  ),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+};
 
 const dirs = [];
 afterEach(() => {
@@ -28,7 +38,7 @@ function git(cwd, ...args) {
     cwd,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...fixtureEnv,
       GIT_AUTHOR_NAME: 't',
       GIT_AUTHOR_EMAIL: 't@example.com',
       GIT_COMMITTER_NAME: 't',
@@ -233,7 +243,7 @@ function run(fx, env = {}) {
     cwd: fx.work,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...fixtureEnv,
       PATH: `${fx.dir}:${process.env.PATH}`,
       REPO: 'JovieInc/Jovie',
       CHILD_PR: '11',

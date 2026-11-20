@@ -6,10 +6,14 @@ import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
-import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
+import {
+  COMPANY_RESPONSES,
+  INBOX,
+  snapshot,
+} from './OvieHomeCanvas.test-fixtures';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -46,73 +50,6 @@ vi.mock('./useHudShippingStateQuery', () => ({
       : { isPending: true, isFetching: true, refetch: shipping.refetch },
 }));
 
-const INBOX: OvieInbox = {
-  issues: [],
-  cases: [
-    {
-      contract: INTERACTION_CASE_CONTRACT,
-      id: 'summer:card-1',
-      kind: 'spend',
-      source: { system: 'summer', id: 'card-1', revision: null },
-      title: 'Vercel on-demand concurrency',
-      recommendation: 'Approve about $6 a month',
-      owner: null,
-      state: 'needs_you',
-      priority: 1,
-      createdAt: '2026-10-20T18:00:00.000Z',
-      nextAction: null,
-      waitingUntil: null,
-      confidence: null,
-      evidence: [],
-      body: 'Preview floods stalled production for five hours.',
-      decisionTarget: { kind: 'summer', id: 'card-1' },
-    },
-  ],
-};
-
-function snapshot() {
-  const delivery = emptyDeliverySummary();
-  return {
-    operationalRequestState: 'idle',
-    view: {
-      connection: 'connected',
-      delivery: {
-        ...delivery,
-        merges: {
-          ...delivery.merges,
-          since: '2026-10-20T07:00:00.000Z',
-          today: { state: 'measured-nonzero', value: 3 },
-        },
-      },
-    },
-    operationalTasks: {
-      canonicalSource: 'linear',
-      cacheMode: 'local-reconciled',
-      syncState: 'fresh',
-      sourceId: 'lane-pull-requests',
-      observedAt: null,
-      lastSyncedAt: null,
-      freshnessDeadline: null,
-      deltas: [],
-      tasks: [
-        {
-          id: 'linear:JOV-1',
-          linearIdentifier: 'JOV-1',
-          linearUrl: null,
-          title: 'Blocked task',
-          workflowState: 'blocked',
-          priority: 'high',
-          attempt: null,
-          retryAt: null,
-          sourceRevision: null,
-          updatedAt: '2026-10-20T18:00:00.000Z',
-          pullRequest: null,
-        },
-      ],
-    },
-  };
-}
-
 function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -139,34 +76,6 @@ function renderThenAsk(chat: HomeCanvasState) {
   view.rerenderChat(chat);
   return view;
 }
-
-const COMPANY_RESPONSES: Record<string, unknown> = {
-  '/api/hud/metrics': {
-    overview: {
-      mrrUsd: 0,
-      activeSubscribers: 0,
-      balanceUsd: 22.96,
-      burnRateUsd: 110,
-      runwayMonths: 0.2,
-      defaultStatus: 'dead',
-      defaultStatusDetail: '',
-      financialDataAvailable: true,
-      weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
-    },
-  },
-  '/api/admin/hud/founder-funnel?range=7d': {
-    stages: [{ key: 'accounts_created', count: 2, drillDownHref: null }],
-  },
-  '/api/ovie/certifications': {
-    rows: [
-      {
-        domain: 'flows',
-        state: 'working',
-        tiers: { runtime_dogfood: 'passed' },
-      },
-    ],
-  },
-};
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
   return {
@@ -221,21 +130,33 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 }
 
 describe('OvieHomeCanvas', () => {
+  it('reserves the same shipping provenance layout before and after data arrives', () => {
+    shipping.data = undefined;
+    const loading = renderCanvas();
+    const layout = screen.getByTestId('home-loop-pulse').className;
+    loading.unmount();
+    shipping.data = snapshot();
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-pulse').className).toBe(layout);
+  });
+
   const fetchMock = vi.fn();
   let inbox: OvieInbox;
+  let companyResponses: Record<string, unknown>;
 
   beforeEach(() => {
     readyTiming.mockReset();
     panelAlert.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
+    companyResponses = COMPANY_RESPONSES;
     toastMock.mockClear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
         return new Response(JSON.stringify(inbox), { status: 200 });
-      if (url in COMPANY_RESPONSES)
-        return new Response(JSON.stringify(COMPANY_RESPONSES[url]), {
+      if (url in companyResponses)
+        return new Response(JSON.stringify(companyResponses[url]), {
           status: 200,
         });
       if (init?.method === 'POST')
@@ -337,6 +258,12 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
+      // A failed read never claims the all-clear; the banner names the
+      // failure beside the sections that could not load (JOV-9019).
+      const banner = screen.getByTestId('home-loop-constraint');
+      expect(banner).toHaveTextContent('Shipping data could not load.');
+      expect(banner).not.toHaveTextContent('Shipping is on target');
+      expect(banner).toHaveAttribute('data-tone', 'unknown');
       expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
         'data-state',
         'error'
@@ -356,6 +283,36 @@ describe('OvieHomeCanvas', () => {
       );
     }
   );
+
+  it('preserves the named unknown shipping health when no metric is measured', async () => {
+    const base = snapshot();
+    companyResponses = {
+      '/api/hud/metrics': { overview: { financialDataAvailable: false } },
+      '/api/admin/hud/founder-funnel?range=7d': { stages: [] },
+      '/api/ovie/certifications': { rows: [] },
+    };
+    shipping.data = {
+      ...base,
+      view: { ...base.view, delivery: emptyDeliverySummary() },
+      operationalTasks: { ...base.operationalTasks, tasks: [] },
+    };
+    renderCanvas();
+    await screen.findByTestId('home-loop-tile-runway');
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent(
+      'Shipping health unknown: merges, queue ejections, production, lanes not measured'
+    );
+    expect(banner).not.toHaveTextContent('Shipping is on target');
+    expect(banner).toHaveAttribute('data-tone', 'warn');
+    expect(
+      within(banner).getByRole('link', { name: 'Details' })
+    ).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
+    // Current main renders six shipping metrics and four company metrics.
+    expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(10);
+    for (const tile of screen.getAllByTestId(/^home-loop-tile-/)) {
+      expect(tile).toHaveAttribute('data-measured', 'false');
+    }
+  });
 
   it('raises no panel alert when every section is ready', async () => {
     shipping.data = snapshot();

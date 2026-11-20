@@ -50,7 +50,7 @@ const itemClasses = (item: StackableBadgeItem) =>
     badgeVariants({ size: 'sm', tone: item.tone ?? 'neutral' }),
     'h-5 shrink-0 justify-center border-2 border-surface-0 transition-colors duration-fast ease-interactive motion-reduce:transition-none',
     item.selected && 'ring-1 ring-accent/40',
-    item.disabled && 'opacity-50',
+    item.disabled && 'text-tertiary-token',
     'group-hover/badge-stack:bg-surface-2 group-focus-within/badge-stack:bg-surface-2'
   );
 
@@ -152,7 +152,12 @@ export function StackableBadgeGroup({
               +{overflowCount} more
             </Button>
           </PopoverTrigger>
-          <PopoverContent align='end' className='w-56 p-1' side='bottom'>
+          <PopoverContent
+            align='end'
+            aria-label='All badges'
+            className='w-56 p-1'
+            side='bottom'
+          >
             <ul aria-label='All badges' className='grid gap-0.5'>
               {items.map(item => (
                 <li
@@ -162,7 +167,7 @@ export function StackableBadgeGroup({
                   className={cn(
                     'flex min-h-8 items-center gap-2 rounded-lg px-2 text-xs text-secondary-token',
                     item.selected && 'bg-surface-1 text-primary-token',
-                    item.disabled && 'opacity-50'
+                    item.disabled && 'text-tertiary-token'
                   )}
                 >
                   <span

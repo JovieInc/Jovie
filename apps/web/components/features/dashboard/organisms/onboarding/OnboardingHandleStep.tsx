@@ -137,6 +137,7 @@ export function OnboardingHandleStep({
             </div>
             <button
               data-testid='onboarding-handle-submit'
+              aria-label='Continue'
               type='submit'
               disabled={!canSubmit}
               aria-describedby={

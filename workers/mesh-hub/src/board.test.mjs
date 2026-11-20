@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOARD, BoardStore, taskIdFromRef } from './board.ts';
+import { BOARD, BoardStore, parseBoardSend, taskIdFromRef } from './board.ts';
 import { sqlite } from './core.test.mjs';
 
 const ACTIVE = ['summer', 'claude', 'codex', 'aeon', 'grokbot'];
@@ -161,6 +161,13 @@ test('fan-out: children, then one merge task with every result, then the parent 
   const parent = store.get('deck');
   assert.equal(parent.status, 'done');
   assert.equal(parent.result, 'final');
+  const m = store.metrics(3_600_000, 60);
+  assert.equal(m.agents.claude.done, 1);
+  assert.equal(m.agents.summer.done, 1); // the merge only, not the parent
+  assert.equal(m.agents.claude.workMs.p50, 10);
+  assert.equal(m.agents.claude.pickupMs.p50, 10);
+  assert.equal(m.agents.aeon.failed, 1);
+  assert.equal(m.agents.grokbot.workMs.p50, 0);
   assert.ok(
     store
       .stages('deck.2')
@@ -236,6 +243,10 @@ test('post is idempotent per poster; cancel closes children; validation rejects 
     /invalid_fanout/
   );
   assert.throws(
+    () => store.apply('summer', 'nope', {}, ACTIVE, 1),
+    /invalid_op/
+  );
+  assert.throws(
     () => store.claim('aeon', { id: 'missing' }, 1),
     /task_not_found/
   );
@@ -265,4 +276,114 @@ test('done replays for the same result; a closed task rejects a different one', 
     .filter(n => n.to === 'summer')
     .map(n => JSON.parse(n.body).event);
   assert.deepEqual(toPoster, ['task.done']);
+});
+
+test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', () => {
+  const store = board();
+  store.post('summer', { id: 'm', title: 't' }, ACTIVE, 1);
+  store.post('summer', { id: 'mq', type: 'question', title: 'q' }, ACTIVE, 1);
+  const lookup = id => store.get(id);
+  assert.deepEqual(parseBoardSend('{"op":"claim","id":"m"}', null, lookup), {
+    op: 'claim',
+    input: { op: 'claim', id: 'm' },
+  });
+  assert.deepEqual(
+    parseBoardSend('All 3 claims verified.', 'board:t:m:4', lookup),
+    {
+      op: 'done',
+      input: { id: 'm', result: 'All 3 claims verified.' },
+    }
+  );
+  // Summer's reply form: `${to}:${correlationId}`.
+  assert.equal(parseBoardSend('yes', 'board:t:mq:7', lookup).op, 'answer');
+  assert.throws(
+    () => parseBoardSend('hello', null, lookup),
+    /board_needs_op_or_reply/
+  );
+  assert.throws(
+    () => parseBoardSend('{not json', 'x', lookup),
+    /board_needs_op_or_reply/
+  );
+});
+
+test('reassign: poster or orchestrator moves an open task and only the new assignee hears', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'ra-1', title: 'Check', caps: ['research'] },
+    ACTIVE,
+    1
+  );
+  for (const n of notices(store)) store.markSent(n.correlationId, n.to, 1);
+  const out = store.reassign('summer', { id: 'ra-1', to: 'grokbot' }, 5);
+  assert.equal(out.task.assignee, 'grokbot');
+  const fresh = notices(store);
+  assert.deepEqual(
+    fresh.map(n => n.to),
+    ['grokbot']
+  );
+  const body = JSON.parse(fresh[0].body);
+  assert.equal(body.event, 'task.open');
+  assert.deepEqual(body.reassigned, {
+    from: null,
+    to: 'grokbot',
+    by: 'summer',
+  });
+  const stage = store.stages('ra-1').find(s => s.stage === 'reassigned');
+  assert.equal(stage.actor, 'summer');
+  assert.equal(stage.note, 'from=pool to=grokbot');
+  // The poster may reassign its own task; a repeat is a replay with no new notice.
+  store.reassign('codex', { id: 'ra-1', to: 'aeon' }, 6);
+  assert.equal(store.get('ra-1').assignee, 'aeon');
+  const before = notices(store).length;
+  assert.equal(
+    store.apply('codex', 'reassign', { id: 'ra-1', to: 'aeon' }, ACTIVE, 7)
+      .replay,
+    true
+  );
+  assert.equal(notices(store).length, before);
+  // A new claim goes to the assignee only.
+  assert.throws(
+    () => store.claim('claude', { id: 'ra-1' }, 8),
+    /assigned_elsewhere/
+  );
+});
+
+test('reassign refuses non-poster non-orchestrators, claimed tasks and bad targets', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'ra-2', title: 'Check', caps: ['research'] },
+    ACTIVE,
+    1
+  );
+  assert.throws(
+    () => store.reassign('aeon', { id: 'ra-2', to: 'grokbot' }, 2),
+    /only_poster_or_orchestrator_reassigns/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'Not A Kind' }, 2),
+    /invalid_to/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'board' }, 2),
+    /invalid_to/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2' }, 2),
+    /invalid_to/
+  );
+  store.claim('aeon', { id: 'ra-2' }, 3);
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'grokbot' }, 4),
+    /task_not_open/
+  );
+  assert.throws(
+    () => store.reassign('claude', { id: 'missing', to: 'grokbot' }, 4),
+    /task_not_found/
+  );
+  assert.equal(
+    store.stages('ra-2').some(s => s.stage === 'reassigned'),
+    false
+  );
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
   defaultCssFiles,
@@ -9,9 +10,12 @@ import {
   resolveValue,
 } from '@/lib/a11y-gates/contrast-engine';
 import { contrastRatio } from '@/lib/utils/color';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   buildSmartLinkReportHref,
+  SmartLinkArtistName,
   SmartLinkArtworkCard,
+  SmartLinkPageFrame,
   SmartLinkPoweredByFooter,
 } from './SmartLinkPagePrimitives';
 
@@ -43,13 +47,14 @@ describe('SmartLinkArtworkCard', () => {
 });
 
 describe('SmartLinkPoweredByFooter', () => {
-  it('tracks the Powered by Jovie link with the via-jovie-footer loop id', () => {
+  it('tracks the Made with Jovie link with the via-jovie-footer loop id', () => {
     render(<SmartLinkPoweredByFooter />);
     const href = screen
-      .getByRole('link', { name: /Powered by/i })
+      .getByRole('link', { name: /Made with Jovie/i })
       .getAttribute('href');
     expect(href).toContain('utm_campaign=via-jovie-footer');
     expect(href).toContain('utm_source=via_jovie');
+    expect(href).toContain('utm_medium=footer');
   });
 
   it('keeps every dark footer link above AA on the real base tokens', () => {
@@ -97,7 +102,9 @@ describe('SmartLinkPoweredByFooter', () => {
     const { rerender } = render(<SmartLinkPoweredByFooter />);
     const link = screen.getByRole('link', { name: 'Report' });
     expect(link).toHaveAttribute('href', '/report?type=smart_link');
-    expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: /Made with Jovie/i })
+    ).toHaveAttribute(
       'href',
       '/?utm_source=via_jovie&utm_medium=footer&utm_campaign=via-jovie-footer'
     );
@@ -109,14 +116,25 @@ describe('SmartLinkPoweredByFooter', () => {
     );
   });
 
-  it('gives every footer link a 44px hit container and keeps the separator outside the Report link', () => {
+  it('gives every footer link a 44px hit container and has brand-first hierarchy with no separators', () => {
     render(<SmartLinkPoweredByFooter />);
     for (const link of screen.getAllByRole('link')) {
       expect(link.className).toContain('before:h-11');
       expect(link.className).toContain('before:min-w-11');
     }
+    const brand = screen.getByRole('link', { name: /Made with Jovie/i });
+    const report = screen.getByRole('link', { name: 'Report' });
+    expect(brand.className).toContain('text-sm');
+    expect(report.className).toContain('text-xs');
+    expect(
+      screen.getByRole('contentinfo').textContent?.includes('\u00b7')
+    ).toBe(false);
     expect(screen.getByRole('link', { name: 'Report' }).textContent).toBe(
       'Report'
+    );
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
     );
   });
 
@@ -126,5 +144,81 @@ describe('SmartLinkPoweredByFooter', () => {
     );
     expect(buildSmartLinkReportHref('  ')).toBe('/report?type=smart_link');
     expect(buildSmartLinkReportHref(null)).toBe('/report?type=smart_link');
+  });
+});
+
+describe('SmartLink page states', () => {
+  it('keeps the card tint and light footer colours on tokens', () => {
+    render(
+      <>
+        <SmartLinkArtworkCard title='Never Say A Word' artworkUrl={null} />
+        <SmartLinkPoweredByFooter />
+      </>
+    );
+    const brand = screen.getByRole('link', { name: /Made with Jovie/i });
+    expect(brand).toHaveClass(
+      'text-(--color-smart-link-footer-text)',
+      'hover:text-(--color-smart-link-footer-text-hover)'
+    );
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveClass(
+      'hover:text-(--color-smart-link-footer-text-hover)'
+    );
+    expect(document.querySelector('.bg-on-media\\/5')).not.toBeNull();
+  });
+
+  it('renders the empty-artwork card without axe violations', async () => {
+    const { container } = render(
+      <SmartLinkArtworkCard title='Never Say A Word' artworkUrl={null} />
+    );
+    expect(container.querySelector('svg.lucide-audio-lines')).toBeTruthy();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders an artist without a handle as plain text inside the frame without axe violations', async () => {
+    const { container } = render(
+      <SmartLinkPageFrame centered mainId='smart-link-main'>
+        <SmartLinkArtworkCard title='Never Say A Word' artworkUrl={null} />
+        <SmartLinkArtistName name='Tim White' handle={null} />
+      </SmartLinkPageFrame>
+    );
+    expect(screen.getByText('Tim White').tagName).toBe('P');
+    expect(screen.queryByRole('link', { name: 'Tim White' })).toBeNull();
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'smart-link-main');
+    await expectNoA11yViolations(container);
+  });
+
+  it('links a long artist name to its profile and keeps focus order, without axe violations', async () => {
+    const user = userEvent.setup();
+    const name =
+      'Tim White, The Midnight Strings Orchestra, Ava Lune and Friends';
+    const { container } = render(
+      <SmartLinkPageFrame>
+        <SmartLinkArtistName name={name} handle='tim' />
+      </SmartLinkPageFrame>
+    );
+    const artist = screen.getByRole('link', { name });
+    expect(artist).toHaveAttribute('href', '/tim');
+    await user.tab();
+    expect(artist).toHaveFocus();
+    await user.tab();
+    expect(
+      screen.getByRole('link', { name: /Made with Jovie/i })
+    ).toHaveFocus();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders the frame in a right-to-left page without axe violations', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <SmartLinkPageFrame centered>
+          <SmartLinkArtistName name='تيم وايت' handle='tim' />
+        </SmartLinkPageFrame>
+      </div>
+    );
+    expect(screen.getByRole('link', { name: 'تيم وايت' })).toHaveAttribute(
+      'href',
+      '/tim'
+    );
+    await expectNoA11yViolations(container);
   });
 });

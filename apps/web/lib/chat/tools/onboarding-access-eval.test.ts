@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import { QUALIFICATION_RULE_VERSION } from '@/lib/waitlist/decision';
 import {
   decideOnboardingAccess,
   evaluateAccessSignal,
@@ -76,15 +77,36 @@ describe('evaluateAccessSignal', () => {
     expect(result.rationale).toBe('insufficient_signal');
   });
 
-  it('forces waitlist after the max-turn cap with weak signal', () => {
-    const result = evaluateAccessSignal({
-      signal: { audienceBand: 'under_500' },
-      spotifyFollowers: null,
-      turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
-    });
-    expect(result.kind).toBe('waitlist');
-    expect(result.rationale).toContain('max_turns_reached');
-  });
+  it.each([
+    MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+    MAX_INTERVIEW_TURNS_BEFORE_FORCE + 1,
+  ])(
+    'preserves the cap rationale and incomplete-capture decision at %i turns',
+    turnCount => {
+      const result = evaluateAccessSignal({
+        signal: { audienceBand: 'under_500' },
+        spotifyFollowers: null,
+        turnCount,
+      });
+      expect(result.kind).toBe('waitlist');
+      expect(result.rationale).toBe(`max_turns_reached_${turnCount}`);
+      expect(result.score).toBe(30);
+      expect(result.qualificationDecision).toMatchObject({
+        ruleVersion: QUALIFICATION_RULE_VERSION,
+        outcome: 'queued',
+        reason: 'needs_capture_incomplete',
+        wants: [],
+      });
+      expect(result.qualification?.missingDimensions).toEqual([
+        'current_behavior',
+        'pain',
+        'spend',
+        'urgency',
+        'alternatives',
+        'desired_outcome',
+      ]);
+    }
+  );
 
   it('still grants instant access even at the turn cap if signal qualifies', () => {
     const result = evaluateAccessSignal({

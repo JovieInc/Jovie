@@ -125,7 +125,7 @@ function renderShell() {
 }
 
 describe('canonical shell slot parity', () => {
-  it('renders all six AppShellFrame slots through the single production path', () => {
+  it('renders all six AppShellFrame slots through the single production path', async () => {
     renderShell();
 
     const frame = screen
@@ -149,7 +149,9 @@ describe('canonical shell slot parity', () => {
       screen.getByTestId('fixture-right-panel')
     );
 
-    expect(screen.getByTestId('fixture-audio-player')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('fixture-audio-player')
+    ).toBeInTheDocument();
 
     expect(screen.getByTestId('fixture-mobile-tabs')).toBeInTheDocument();
   });

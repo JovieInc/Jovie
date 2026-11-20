@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseCLI } from 'vitest/node';
+import './fixtures/structural-command-receipts.mjs';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
@@ -28,6 +29,7 @@ import {
   formatStructuralTimings,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_COVERAGE_COMMAND,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
@@ -35,6 +37,7 @@ import {
   runMergeGroupGuards,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_COMMAND,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -46,6 +49,32 @@ import {
   VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+it('selects capacity behavior and coverage on collector, fixture and registry changes', () => {
+  for (const file of [
+    'scripts/capacity/forecast.py',
+    'scripts/tests/test_capacity_forecast.py',
+    'scripts/tests/test_neon_collector.py',
+    'ops/registry/capacity-resources.json',
+  ]) {
+    const guards = selectSourceGuards('pull_request', [file]);
+    const guard = guards.find(item => item.id === 'capacity-forecast');
+    expect(guard, file).toBeDefined();
+    expect(guard.command).toContain('coverage run --branch -m unittest');
+    expect(guard.command).toContain('scripts.tests.test_capacity_forecast');
+    expect(guard.command).toContain('scripts.tests.test_neon_collector');
+    expect(guard.command).toContain('--fail-under=60');
+    expect(guard.command).toContain('python3 -m venv');
+    expect(guard.command).toContain(
+      '--require-hashes -r .github/requirements/pytest.txt'
+    );
+  }
+  expect(
+    selectSourceGuards('pull_request', ['docs/unrelated.md']).some(
+      item => item.id === 'capacity-forecast'
+    )
+  ).toBe(false);
+});
 
 it('selects writing readiness regressions and the evaluator coverage command', async () => {
   const names = [
@@ -137,11 +166,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     'validation-sync',
     'linear-sync-on-merge',
     'founder-taste-order',
+    'ordinary-issue-validation-closure-replay',
   ]) {
     expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
       `lib/__tests__/${test}.test.mjs`
     );
   }
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    'outcome-residual-policy'
+  );
   // An explicit '=true' becomes a string in Vitest 5 and silently checks
   // aggregate coverage. Exercise its actual parser at this runner boundary.
   expect(
@@ -170,6 +203,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
     expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain('scripts/tests/test_board_intake.py');
+    expect(command).toContain(
+      '*/scripts/lanes/board_intake.py" --fail-under=85'
+    );
     expect(command).toContain(
       '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
     );
@@ -181,6 +218,8 @@ describe('Shared fenced-attempt coverage contract', () => {
       '*/scripts/lanes/remediation.py" --fail-under=85'
     );
     expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(command).toContain('scripts/tests/test_reason_publication.py');
     expect(command).toContain('scripts/tests/test_design_gate.py');
     expect(command).toContain('scripts/tests/test_disk_guard.py');
     expect(command).toContain('scripts/tests/test_qualification_guard.py');
@@ -216,7 +255,7 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain(
-      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/reason_dispatch.py,*/scripts/lanes/reason_publication.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
     );
     expect(command).toContain(
       '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
@@ -252,7 +291,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -452,28 +491,36 @@ describe('runStructural screenshot contract discovery', () => {
     120_000
   );
 
+  const LEADS_CHANGED = ['apps/web/lib/leads/constants.ts'];
   it.each([
-    ['web', ['apps/web/lib/leads/constants.ts'], true],
-    ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
-    ['web', ['apps/web/app/page.tsx'], false],
+    ['pull_request', 'web', LEADS_CHANGED, true],
+    ['pull_request', 'web,operations', LEADS_CHANGED, false],
+    ['pull_request', 'web', ['apps/web/app/page.tsx'], false],
+    ['merge_group', 'web', LEADS_CHANGED, true],
+    ['push', 'web', LEADS_CHANGED, true],
   ])(
-    'runs script contracts that read a changed file without operations (%s)',
-    async (lanes, changed, expected) => {
+    'runs the script contracts a changed file reads; landing events run the full lists (%s)',
+    async (event, lanes, changed, expected) => {
       // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
-      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
-      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran. Source
+      // PRs keep the derived selection; landing events run the FULL lists.
+      process.env.GITHUB_EVENT_NAME = event;
       process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
       const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
       await runStructural({ execute, changedFileList: changed });
       const commands = execute.mock.calls.map(([command]) => String(command));
+      const landing = event !== 'pull_request';
       const dependent = commands.filter(
         command =>
           command.startsWith('node --test ') &&
           command.includes('scripts/funnel-judge/rubric.test.mjs') &&
-          !command.includes('scripts/agent-context/check.test.mjs')
+          command.includes('scripts/agent-context/check.test.mjs') === landing
       );
       expect(dependent).toHaveLength(expected ? 1 : 0);
+      expect(commands.includes(SCRIPT_CONTRACT_VITEST_COMMAND)).toBe(
+        landing || lanes.includes('operations')
+      );
     }
   );
 
@@ -715,7 +762,7 @@ describe('runStructural screenshot contract discovery', () => {
     expect(new Set(all).size).toBe(all.length);
     expect(web).toContain('pnpm component-ship-gate');
     expect(web).toContain(
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs lib/__tests__/component-story-workers.test.mjs lib/__tests__/component-story-inventory.test.mjs'
     );
     // Merge-group-only guards gate PRs in their own web lane (component-family
     // ratchet is inside tests/unit/design-system), not a structural command.
@@ -1357,6 +1404,7 @@ describe('structural command pool', () => {
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
     vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'skip');
     const started = [];
     await runStructural({
       concurrency: 3,
@@ -1365,11 +1413,64 @@ describe('structural command pool', () => {
         return { code: 0, output: '' };
       },
     });
-    // Merge group 38247843089: the 174.5s lanes pytest started last and set
-    // the 260s remaining wall; it must hold a slot from the start.
-    const head = started.slice(0, 2).join('\n');
-    expect(head).toContain('scripts/tests/test_lane_runner.py');
-    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
+    // The lanes pytest left for ci-fast (structural lanes); the next pole
+    // (merge-group-failure-hold, 249s in 41250311104) holds a slot first.
+    expect(started.join('\n')).not.toContain(
+      'scripts/tests/test_lane_runner.py'
+    );
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
+    expect(started.slice(0, 2).join('\n')).toContain(
+      'lib/__tests__/merge-group-failure-hold.test.mjs'
+    );
+  });
+
+  it('runs only the lanes coverage pytest in ci-fast (structural lanes)', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started).toEqual([LANES_COVERAGE_COMMAND]);
+    // Every per-module coverage floor still runs, after the shards combine.
+    expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane*.py" --fail-under=90');
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'priority_admission.py" --fail-under=80'
+    );
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'board_intake.py" --fail-under=85'
+    );
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toBe(
+      LANES_COVERAGE_COMMAND
+    );
+  });
+
+  it('does not also run lanes coverage in the structural python job', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'only');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', '');
+    const started = [];
+    await runStructural({
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started.length).toBeGreaterThan(0);
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
   });
 
   it('starts the slowest web commands first', async () => {
@@ -1559,16 +1660,17 @@ describe('structural command pool', () => {
     // Later commands finish first; output must not follow completion order.
     const delayed = failing => command => {
       const index = order.indexOf(command);
-      return new Promise(resolveCall =>
-        setTimeout(
-          () =>
-            resolveCall({
-              code: failing.includes(index) ? 40 + index : 0,
-              output: `out-${index}\n`,
-            }),
-          Math.max(0, 4 - index) * 5
-        )
-      );
+      // Completion order is set by microtask ticks (index 0 waits longest),
+      // never by wall-clock delays that a loaded runner can reorder.
+      return (async () => {
+        for (let tick = Math.max(0, 4 - index); tick > 0; tick -= 1) {
+          await Promise.resolve();
+        }
+        return {
+          code: failing.includes(index) ? 40 + index : 0,
+          output: `out-${index}\n`,
+        };
+      })();
     };
 
     const pass = await runStructural({ execute: delayed([]), concurrency: 3 });
@@ -1607,10 +1709,10 @@ describe('structural command pool', () => {
         active.set(command, locks);
         started.push(command);
         maxActive = Math.max(maxActive, active.size);
-        setTimeout(() => {
+        setImmediate(() => {
           active.delete(command);
           resolveCall({ code: 0, output: '' });
-        }, 1);
+        });
       });
     const result = await runStructural({ execute });
     expect(result.code).toBe(0);
@@ -2162,43 +2264,20 @@ describe('source-read guard selection', () => {
 
   it.each([
     [
-      'pull_request',
-      [
-        'web-source-read-tests',
-        'script-contracts',
-        'merged-with-base-invariants',
-        'gate-weakening-detector',
-      ],
+      'scripts/lib/ci-schedule-inventory.mjs',
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['merge_group', []],
-    ['push', []],
-  ])(
-    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
-    (event, pr) => {
-      expect(
-        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual([
-        'ci-schedule-inventory',
-        'automation-registry',
-        'external-api-guard',
-        ...pr,
-      ]);
-    }
-  );
-
-  it.each([
-    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
-    ['canon/automation-registry.jsonl', ['automation-registry']],
-    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
+    ['canon/automation-registry.jsonl', ['automation-registry', 'anti-slop']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry', 'anti-slop']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
-      ['ci-schedule-inventory'],
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['.github/workflows/nested/not-loaded.yml', []],
-    ['.github/scripts/run-actionlint.sh', []],
+    ['.github/workflows/nested/not-loaded.yml', ['anti-slop']],
+    ['.github/scripts/run-actionlint.sh', ['anti-slop']],
     [
       'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/app/api/cron/example/route.test.ts',
@@ -2208,23 +2287,24 @@ describe('source-read guard selection', () => {
         'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
+        'anti-slop',
       ],
     ],
     [
       'apps/web/eslint-rules/rule.test.js',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/scripts/tool.test.mjs',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/node-environment-files.json',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/setup-optimized.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/vitest.config.fast.mts',
@@ -2232,6 +2312,7 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2240,6 +2321,7 @@ describe('source-read guard selection', () => {
         'artist-profile-conformance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2252,6 +2334,7 @@ describe('source-read guard selection', () => {
         'static-revalidate-policy',
         'art-direction',
         'icp-language',
+        'anti-slop',
         'marketing-rounded-media',
         'marketing-container-width',
       ],
@@ -2262,16 +2345,17 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
-    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
-    ['apps/ios/Jovie/App.swift', ['native-design-system']],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', ['anti-slop']],
+    ['apps/ios/Jovie/App.swift', ['native-design-system', 'anti-slop']],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      ['merge-group-unit-guards', 'static-revalidate-policy', 'anti-slop'],
     ],
-    ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
+    ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
@@ -2290,6 +2374,9 @@ describe('source-read guard selection', () => {
         ? ['lanes-selftest-changed-tests']
         : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
+      ...(/\.(?:test|spec)\.(?:ts|tsx|mjs|js)$/u.test(path)
+        ? ['test-hygiene']
+        : []),
       'gate-weakening-detector',
     ]);
   });
@@ -2351,11 +2438,12 @@ describe('source-read guard selection', () => {
       const expected = path.startsWith('apps/web/lib/')
         ? [
             'artist-profile-conformance',
+            'anti-slop',
             ...apiGuard(path),
             ...domainGuard(path),
             'copy-leak',
           ]
-        : ['copy-leak'];
+        : ['anti-slop', 'copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }
@@ -2377,7 +2465,8 @@ describe('source-read guard selection', () => {
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
-    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+    const failClosed = [
+      'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
@@ -2394,32 +2483,37 @@ describe('source-read guard selection', () => {
       'external-api-guard',
       'domain-write-guard',
       'copy-leak',
-    ]);
+      'jump-policy-pin',
+      'test-hygiene',
+    ];
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual(failClosed);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
-    expect(selected('merge_group', null)).toEqual([
-      'native-design-system',
-      'artist-launch-contract',
-      'privacy-input-route-trackers',
-      'privacy-compliance',
-      'artist-profile-conformance',
-      'ci-schedule-inventory',
-      'automation-registry',
-      'growth-registry',
-      'outcome-verifier',
-      'synthetic-canary-liveness',
-      'playbook-authoring',
-      'icp-language',
-      'anti-slop',
-      'external-api-guard',
-      'domain-write-guard',
-      'copy-leak',
-    ]);
+    expect(selected('merge_group', null)).toEqual(failClosed);
   });
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'capacity-forecast') {
+        const modules = [
+          ...guard.command.matchAll(/scripts\.tests\.test_[a-z_]+/gu),
+        ].map(match => match[0]);
+        expect(modules.join(' ')).toBe(
+          'scripts.tests.test_capacity_forecast scripts.tests.test_capacity_collectors ' +
+            'scripts.tests.test_neon_collector'
+        );
+        for (const module of modules) {
+          expect(
+            readFileSync(
+              join(REPO_ROOT, `${module.replaceAll('.', '/')}.py`),
+              'utf8'
+            ),
+            module
+          ).toContain('unittest.TestCase');
+        }
+        continue;
+      }
       if (guard.id === 'native-design-system') {
         expect(guard.command).toContain('native-design-system.mjs');
         expect(guard.command).toContain('native-spacing-scale.mjs');

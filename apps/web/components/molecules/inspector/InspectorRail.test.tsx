@@ -27,6 +27,21 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('InspectorShell', () => {
+  it('renders definition metadata with paired terms and descriptions', async () => {
+    const { container } = render(
+      <dl>
+        <InspectorRow definitionList label='Lifecycle' value='Released' />
+      </dl>
+    );
+    expect(container.querySelector('dl > div > dt')).toHaveTextContent(
+      'Lifecycle'
+    );
+    expect(container.querySelector('dl > div > dd')).toHaveTextContent(
+      'Released'
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it.each([false, true])(
     'hands focused content to its tab and respects subsequent focus movement (%s)',
     moved => {
@@ -108,6 +123,8 @@ describe('InspectorShell', () => {
     const header = screen.getByTestId('entity-sidebar-entity-header');
     const tabs = screen.getByRole('tablist', { name: 'Inspector tabs' });
     const panel = screen.getByTestId('inspector-tab-panel');
+    // The internal scroll surface is keyboard-reachable (axe scrollable-region-focusable).
+    expect(panel).toHaveAttribute('tabindex', '0');
 
     expect(header).toContainElement(screen.getByTestId('object-header'));
     expect(
@@ -120,7 +137,7 @@ describe('InspectorShell', () => {
     const selected = screen.getByRole('tab', { name: 'Details' });
     expect(selected).toHaveAttribute('aria-selected', 'true');
     expect(selected.className).toContain('rounded-full');
-    expect(selected.className).toContain('bg-(--surface-2)');
+    expect(selected.className).toContain('bg-surface-3');
     expect(selected.className).not.toContain('border-b-2');
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(

@@ -11,10 +11,10 @@ import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { applyProfileUpdate } from '@/lib/domain/profile';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
 
 /**
  * Schema for validating the edit request body
@@ -104,18 +104,14 @@ export async function POST(req: Request) {
     // Get the old value for audit logging
     const oldValue = profile[field];
 
-    // Apply the update
-    await db
-      .update(creatorProfiles)
-      .set({
-        [field]: sanitizedValue,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profileId));
-
-    if (field === 'displayName') {
-      await refreshAppleWalletProfilePassForProfileId(profileId);
-    }
+    // Apply the update through the same domain function as the settings form:
+    // field validation, profileEditVersion bump, Clerk name sync, caches.
+    const applied = await applyProfileUpdate({
+      appUserId: userId,
+      profileId,
+      updates: { [field]: sanitizedValue },
+    });
+    if (!applied.ok) return applied.response;
 
     // Log to audit table with full traceability
     const ipAddress = getClientIP(req);

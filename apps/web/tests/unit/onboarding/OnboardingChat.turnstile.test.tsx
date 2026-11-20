@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import type { UIMessage } from 'ai';
 import { type FormEvent, forwardRef, type ReactNode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
@@ -12,11 +13,7 @@ import type { OnboardingTurnstileStatus } from '@/components/features/onboarding
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 const chatMocks = vi.hoisted(() => ({
-  messages: [] as Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
-  }>,
+  messages: [] as UIMessage[],
   onError: undefined as undefined | ((error: Error) => void),
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
@@ -145,6 +142,9 @@ vi.mock('@/components/jovie/components', () => ({
       </form>
     );
   }),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({ id }: { readonly id: string }) => (
     <div data-testid='chat-message'>{id}</div>
   ),

@@ -67,9 +67,6 @@
     ".github/scripts/dependency-parity-evidence.mjs": {
       "gh-subprocess": 1
     },
-    ".github/scripts/internal-pr-review.mjs": {
-      "provider-host": 2
-    },
     ".github/scripts/mac-lane.sh": {
       "gh-shell": 1
     },
@@ -116,7 +113,7 @@
       "gh-shell": 1
     },
     ".github/workflows/ci.yml": {
-      "gh-shell": 3,
+      "gh-shell": 2,
       "github-script": 1,
       "provider-host": 1
     },
@@ -165,12 +162,6 @@
     ".github/workflows/pr-conflict-handler.yml": {
       "gh-shell": 25
     },
-    ".github/workflows/pr-review-learn.yml": {
-      "gh-shell": 2
-    },
-    ".github/workflows/pr-review.yml": {
-      "gh-shell": 2
-    },
     ".github/workflows/pr-size-guard-label-override.yml": {
       "gh-shell": 1
     },
@@ -184,7 +175,7 @@
       "gh-shell": 6
     },
     ".github/workflows/production-controller.yml": {
-      "gh-shell": 17
+      "gh-shell": 16
     },
     ".github/workflows/production-marker-recovery.yml": {
       "gh-shell": 4
@@ -203,9 +194,6 @@
     },
     ".github/workflows/security-suppression-audit.yml": {
       "gh-shell": 1
-    },
-    ".github/workflows/sentry-autofix.yml": {
-      "gh-shell": 3
     },
     ".github/workflows/shipping-slo.yml": {
       "gh-shell": 6
@@ -336,9 +324,6 @@
     "apps/web/scripts/fetch-sentry-issues.mjs": {
       "provider-host": 1
     },
-    "apps/web/scripts/golden-path-visual-review.ts": {
-      "provider-host": 1
-    },
     "apps/web/scripts/handle-multiple-migrations.sh": {
       "gh-shell": 6
     },
@@ -437,9 +422,6 @@
     },
     "scripts/golden-path-lock.mjs": {
       "gh-subprocess": 1
-    },
-    "scripts/hold-contract.mjs": {
-      "gh-subprocess": 2
     },
     "scripts/invariants/jev-gateway.mjs": {
       "provider-host": 1
@@ -610,9 +592,6 @@
     "scripts/pr-conflict-handler.mjs": {
       "gh-subprocess": 1
     },
-    "scripts/pr-review/cli.mjs": {
-      "provider-host": 1
-    },
     "scripts/pr-size-guard-label-override.mjs": {
       "gh-subprocess": 1
     },
@@ -639,9 +618,6 @@
     },
     "scripts/security/security-gate.mjs": {
       "provider-host": 3
-    },
-    "scripts/sentry-autofix-recurrence.mjs": {
-      "provider-host": 2
     },
     "scripts/setup.sh": {
       "provider-host": 1

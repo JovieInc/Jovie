@@ -25,6 +25,19 @@ const hoisted = vi.hoisted(() => {
   };
 });
 
+// The write is the shared domain function (also used by the settings form);
+// here it stands in as the observable write through `updateMock`.
+vi.mock('@/lib/domain/profile', () => ({
+  applyProfileUpdate: async (input: {
+    appUserId: string;
+    profileId: string;
+    updates: Record<string, unknown>;
+  }) => {
+    await hoisted.updateMock().set(input).where();
+    return { ok: true, profile: {} };
+  },
+}));
+
 // --- Module mocks ---
 let mockUserId: string | null = 'user_abc';
 
@@ -222,8 +235,14 @@ describe('POST /api/chat/confirm-edit', () => {
       newValue: 'New Name',
     });
 
-    // Verify DB update was called
+    // Saved through the shared domain function, with the caller's identity
+    // and exactly the edited field (same function the settings form uses).
     expect(hoisted.updateMock).toHaveBeenCalled();
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith({
+      appUserId: 'user_abc',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+      updates: { displayName: 'New Name' },
+    });
   });
 
   it('returns 200 and updates bio in database', async () => {

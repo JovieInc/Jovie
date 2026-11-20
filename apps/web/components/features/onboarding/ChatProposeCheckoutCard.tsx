@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -37,33 +38,49 @@ function planLabel(plan: NonNullable<CheckoutCardPayload['plan']>): string {
   return `${claim.displayName} · ${formatPublicPriceDisplay(claim)}`;
 }
 
+/**
+ * Trust the handoffUrl from the server if present, but bound it to the
+ * onboarding checkout route so a future tool-result tweak can't redirect us
+ * to an unrelated path. Pressing Continue is artist-initiated checkout, so it
+ * always carries source=intent: without it the checkout page treats the visit
+ * as an organic upsell and sends an artist whose page isn't live yet back to
+ * /start.
+ */
+export function checkoutHref(handoffUrl: string | null | undefined): string {
+  const url = new URL(APP_ROUTES.ONBOARDING_CHECKOUT, 'https://jov.ie');
+  if (handoffUrl?.startsWith(APP_ROUTES.ONBOARDING_CHECKOUT)) {
+    const given = new URL(handoffUrl, 'https://jov.ie');
+    if (given.pathname === APP_ROUTES.ONBOARDING_CHECKOUT) {
+      url.search = given.search;
+    }
+  }
+  url.searchParams.set('source', 'intent');
+  return `${url.pathname}${url.search}`;
+}
+
 export function ChatProposeCheckoutCard({
   payload,
 }: ChatProposeCheckoutCardProps) {
   const label = payload.plan ? planLabel(payload.plan) : 'Pick a plan';
-  // Trust the handoffUrl from the server if present, but bound it to the
-  // canonical onboarding checkout route family so a future tool-result tweak
-  // can't redirect us to an unrelated path.
-  const href =
-    payload.handoffUrl && payload.handoffUrl.startsWith('/onboarding/checkout')
-      ? payload.handoffUrl
-      : APP_ROUTES.ONBOARDING_CHECKOUT;
+  const href = checkoutHref(payload.handoffUrl);
 
   return (
-    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+    <div
+      className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-1 px-4 py-3'
+      data-testid='chat-propose-checkout-card'
+    >
       <div className='min-w-0'>
         <p className='text-app text-secondary-token'>Continue to checkout</p>
-        <p className='truncate text-mid font-semibold text-primary-token'>
+        <p className='truncate text-mid font-semibold tabular-nums text-primary-token'>
           {label}
         </p>
       </div>
-      <Link
-        href={href}
-        className='inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-ring-themed'
-      >
-        Continue
-        <ArrowRight className='h-4 w-4' aria-hidden />
-      </Link>
+      <Button asChild variant='primary' size='lg' className='shrink-0'>
+        <Link href={href} data-testid='chat-propose-checkout-cta'>
+          Continue
+          <ArrowRight className='h-3.5 w-3.5' aria-hidden />
+        </Link>
+      </Button>
     </div>
   );
 }

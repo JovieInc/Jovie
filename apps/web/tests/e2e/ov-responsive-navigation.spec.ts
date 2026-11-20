@@ -212,7 +212,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           (async () => {
             if (entry === 'selector') {
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .click();
               await page
                 .getByRole('menuitem', {
@@ -231,7 +231,7 @@ test.describe('OV responsive navigation exclusivity', () => {
             } else {
               // The shortcut intentionally ignores focused text inputs.
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .focus();
               await page.keyboard.press('Alt+Shift+KeyW');
             }
@@ -239,7 +239,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         ]);
         await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
         await expect(
-          page.getByRole('button', { name: 'Switch Workspace' })
+          page.getByRole('button', { name: /^Switch Workspace: / })
         ).toHaveText(destination.label);
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();
@@ -365,12 +365,12 @@ test.describe('OV responsive navigation exclusivity', () => {
           new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
         );
         // Desktop OV has no page-level Sign Out. The control is the Account
-        // menu item, sentence case, inside the identity group.
+        // menu item, Title Case like every other row, inside the identity group.
         const account = page.getByRole('group', { name: 'Account' });
         await expect(account).toBeVisible();
         await account.getByRole('button').click();
         await expect(
-          page.getByRole('menuitem', { name: 'Sign out' })
+          page.getByRole('menuitem', { name: 'Sign Out' })
         ).toBeVisible();
       }
     });

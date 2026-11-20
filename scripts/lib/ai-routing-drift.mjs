@@ -44,6 +44,16 @@ export function usdPerDayByKey(rows, days) {
   return out;
 }
 
+/** Requests/day by report key — separates call-count growth from cost per call. */
+export function requestsPerDayByKey(rows, days) {
+  const out = {};
+  for (const row of rows) {
+    const key = reportKey(row);
+    out[key] = (out[key] ?? 0) + (row.request_count ?? 0) / days;
+  }
+  return out;
+}
+
 export function usdPerDayByModel(rows, days) {
   const out = {};
   for (const row of rows) {
@@ -94,6 +104,139 @@ export function workersAiUsdByDay(groups) {
   return out;
 }
 
+/** The executor that leases subscription aliases on the host (CODEX_LANE_SUBSCRIPTION_PROFILES). */
+export const CODEX_POOL_EXECUTOR = 'scripts/lanes/codex_lane.py';
+/** The only fields a host subscription profile may carry: no email, token or key. */
+const PROFILE_FIELDS = ['emailSha256', 'home', 'slots'];
+const FLOOR_PERCENT_MAX = 5;
+
+/**
+ * Subsidy pool ledger drift: the burn policy in routing.json must be the one Tim set
+ * (floor at or under 5% and 1% today, no auto-redeem, no paid fallback), pools must not
+ * carry identities, and when the host profiles are given (`profiles`: alias ->
+ * {home, slots, emailSha256}) every alias signed in on the host must be a ledgered pool
+ * and every ledgered codex pool must be signed in.
+ */
+export function evaluateSubsidyPools({ routing, profiles = null }) {
+  const findings = [];
+  const ledger = routing.subsidyPools;
+  const policy = ledger?.policy;
+  const invalid = (subject, message) =>
+    findings.push(finding('high', 'subsidy-policy-invalid', subject, message));
+  if (!ledger || !policy || !Array.isArray(ledger.pools)) {
+    invalid(
+      'subsidyPools',
+      'routing.json has no subsidyPools.policy and pools list; executors fall back to defaults nobody reviewed.'
+    );
+    return findings;
+  }
+  const floor = policy.floorPercent;
+  if (
+    typeof floor !== 'number' ||
+    !Number.isFinite(floor) ||
+    floor < 0 ||
+    floor > FLOOR_PERCENT_MAX
+  )
+    invalid(
+      'floorPercent',
+      `subsidyPools.policy.floorPercent is ${JSON.stringify(floor)}; it must be a number from 0 to ${FLOOR_PERCENT_MAX} (Tim: burn to 1% before asking for a reset).`
+    );
+  if (policy.autoRedeemResets !== false)
+    invalid(
+      'autoRedeemResets',
+      'subsidyPools.policy.autoRedeemResets must be false: a banked reset is proposed to Tim, never redeemed by an executor.'
+    );
+  if (policy.paidFallback !== 'never-without-tim')
+    invalid(
+      'paidFallback',
+      'subsidyPools.policy.paidFallback must be never-without-tim.'
+    );
+  if (policy.resetProposal !== 'only-when-every-pool-at-floor')
+    invalid(
+      'resetProposal',
+      'subsidyPools.policy.resetProposal must be only-when-every-pool-at-floor.'
+    );
+  const ids = new Set();
+  for (const pool of ledger.pools) {
+    if (!pool?.id || ids.has(pool.id))
+      invalid(
+        pool?.id ?? '(missing id)',
+        'Every subsidy pool needs a unique id.'
+      );
+    ids.add(pool?.id);
+    if (/@/u.test(JSON.stringify(pool ?? {})))
+      findings.push(
+        finding(
+          'critical',
+          'subsidy-pool-identity',
+          pool?.id ?? '(missing id)',
+          `Subsidy pool ${pool?.id} carries an email-like value; the ledger names pools by alias only.`
+        )
+      );
+  }
+  if (!profiles) return findings;
+  const ledgered = new Set(
+    ledger.pools
+      .filter(pool => pool?.executor === CODEX_POOL_EXECUTOR)
+      .map(pool => pool.alias)
+  );
+  for (const [alias, profile] of Object.entries(profiles)) {
+    const fields = Object.keys(profile ?? {}).sort();
+    if (fields.join(',') !== PROFILE_FIELDS.join(','))
+      findings.push(
+        finding(
+          'critical',
+          'subsidy-profile-fields',
+          alias,
+          `Host profile ${alias} has fields ${fields.join(', ')}; only ${PROFILE_FIELDS.join(', ')} are allowed (no credentials or emails).`
+        )
+      );
+    if (!ledgered.has(alias))
+      findings.push(
+        finding(
+          'high',
+          'subsidy-pool-unledgered',
+          alias,
+          `Subscription alias ${alias} is signed in on the host but routing.json subsidyPools does not list it, so its window is not measured or burned by policy.`
+        )
+      );
+  }
+  for (const alias of ledgered)
+    if (!(alias in profiles))
+      findings.push(
+        finding(
+          'high',
+          'subsidy-pool-not-signed-in',
+          alias,
+          `routing.json lists subscription pool ${alias} but the host profiles do not sign it in; the ledger overstates capacity.`
+        )
+      );
+  return findings;
+}
+
+/**
+ * CODEX_LANE_SUBSCRIPTION_PROFILES from systemd drop-in text (the last assignment wins,
+ * as in systemd). Returns null when no drop-in sets it.
+ */
+export function profilesFromDropIns(texts) {
+  let raw = null;
+  for (const text of texts)
+    for (const line of text.split('\n')) {
+      const match = /^\s*Environment=(?:"((?:[^"\\]|\\.)*)"|(\S+))\s*$/u.exec(
+        line
+      );
+      if (!match) continue;
+      const assignment =
+        match[1] !== undefined
+          ? match[1].replace(/\\(.)/gu, '$1')
+          : (match[2] ?? '');
+      const eq = assignment.indexOf('=');
+      if (assignment.slice(0, eq) === 'CODEX_LANE_SUBSCRIPTION_PROFILES')
+        raw = assignment.slice(eq + 1);
+    }
+  return raw === null ? null : JSON.parse(raw);
+}
+
 export function evaluateRouting({
   routing,
   keyRows = [],
@@ -103,9 +246,11 @@ export function evaluateRouting({
   health = {},
   envNames = null,
   workersAiByDay = null,
+  profiles = null,
 }) {
-  const findings = [];
+  const findings = evaluateSubsidyPools({ routing, profiles });
   const keyUsd = usdPerDayByKey(keyRows, days);
+  const keyRequests = requestsPerDayByKey(keyRows, days);
   const modelUsd = usdPerDayByModel(modelRows, days);
   const ceilings = declaredCeilings(routing);
   const knownKeys = new Set(Object.keys(ceilings));
@@ -130,7 +275,11 @@ export function evaluateRouting({
           'gateway-over-ceiling',
           key,
           `Gateway key ${key} spends $${round(usd)}/day, over the $${round(ceiling)}/day its declared routing allows. The documented route (workers-first or workers-ai-only) is not what is running.`,
-          { usdPerDay: round(usd), ceilingUsdPerDay: round(ceiling) }
+          {
+            usdPerDay: round(usd),
+            ceilingUsdPerDay: round(ceiling),
+            requestsPerDay: round(keyRequests[key] ?? 0, 1),
+          }
         )
       );
     }
@@ -201,6 +350,7 @@ export function evaluateRouting({
 
   return {
     schema: ROUTING_CHECK_SCHEMA,
+    budgetExhausted: false,
     days,
     gatewayUsdPerDay: round(Object.values(keyUsd).reduce((a, b) => a + b, 0)),
     workersAiUsdByDay: workersAiByDay
@@ -214,11 +364,43 @@ export function evaluateRouting({
     byKey: Object.fromEntries(
       Object.entries(keyUsd).map(([k, v]) => [
         k,
-        { usdPerDay: round(v), ceilingUsdPerDay: round(ceilings[k] ?? null) },
+        {
+          usdPerDay: round(v),
+          ceilingUsdPerDay: round(ceilings[k] ?? null),
+          requestsPerDay: round(keyRequests[k] ?? 0, 1),
+        },
       ])
     ),
     unreferencedCeilings: [...knownKeys].filter(key => !(key in keyUsd)),
     runwayDays: round(runway, 1),
     findings,
+  };
+}
+
+/**
+ * The Gateway answered budget_exhausted (HTTP 402 or the local spend cap), so
+ * its spend report is unreadable and drift cannot be measured. That is a known
+ * runway fact, reported as a gateway-runway finding, never a crash.
+ */
+export function budgetExhaustedResult({ days, reason }) {
+  return {
+    schema: ROUTING_CHECK_SCHEMA,
+    budgetExhausted: true,
+    days,
+    gatewayUsdPerDay: null,
+    workersAiUsdByDay: null,
+    workersAiUsdPerDay: null,
+    byKey: {},
+    unreferencedCeilings: [],
+    runwayDays: 0,
+    findings: [
+      finding(
+        'critical',
+        'gateway-runway',
+        'vercel-ai-gateway-budget',
+        `AI Gateway budget exhausted (${reason}); spend report unreadable, routing drift not evaluated this run. Traffic fails over to Workers AI where a twin exists.`,
+        { runwayDays: 0 }
+      ),
+    ],
   };
 }

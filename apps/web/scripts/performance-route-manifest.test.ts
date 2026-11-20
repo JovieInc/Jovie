@@ -112,8 +112,8 @@ describe('performance route manifest', () => {
       expect(route?.warmupStrategy).toBe('authenticated-shell');
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
       if (item.id === 'home') {
-        // /app is shared with the header inbox bell. The warm probe must
-        // click the rail item, which carries navigation id `home`.
+        // The customer rail drops Inbox. The warm probe clicks the header
+        // bell, which carries navigation id `home`.
         expect(route?.readySelectors.navTrigger).toEqual([
           '[data-navigation-item-id="home"]',
         ]);

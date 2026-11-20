@@ -44,12 +44,12 @@ describe('JOV-5466 token retire', () => {
 });
 
 describe('JOV-6773 red drift', () => {
-  it('renders the danger tone with the error token, not raw red-*', () => {
+  it('renders the danger tone with primary-token text for contrast', () => {
     const { container } = render(
       <ShellMetadataChip tone='danger'>Overdue</ShellMetadataChip>
     );
     const chip = container.firstElementChild as HTMLElement;
-    expect(chip.className).toContain('text-error');
+    expect(chip.className).toContain('text-primary-token');
     expect(chip.className).not.toMatch(/\bred-\d/);
   });
 
@@ -59,5 +59,18 @@ describe('JOV-6773 red drift', () => {
       'utf8'
     );
     expect(source).not.toMatch(/\bred-\d/);
+  });
+});
+
+describe('semantic tone tokens', () => {
+  it('draws the soon and warning tones with accent and warning tokens', () => {
+    const { container, rerender } = render(
+      <ShellMetadataChip tone='soon'>Soon</ShellMetadataChip>
+    );
+    const chip = () => container.firstElementChild as HTMLElement;
+    expect(chip()).toHaveClass('border-accent/40', 'bg-accent/10');
+    rerender(<ShellMetadataChip tone='warning'>Late</ShellMetadataChip>);
+    expect(chip()).toHaveClass('border-warning/20', 'bg-warning/5');
+    expect(chip().className).not.toMatch(/(cyan|amber)-\d/);
   });
 });

@@ -96,11 +96,11 @@ slice changes no public copy.
 
 Imagery:
 
-- hero: photo
+- hero: matte page surface
 - content-prose: callout
 
-The hero uses the existing editorial photo
-(`/images/hero/changelog-index.webp`); entries are text cards.
+Superseded 2026-11-02 (JOV-9829): the hero uses the matte page surface;
+the retired editorial photograph is removed. Entries remain text cards.
 
 ## 8. Art direction
 

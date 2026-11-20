@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight, Pause, Play } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
@@ -161,7 +162,7 @@ export function ReleaseTrackList({
   if (hasError) {
     return (
       <DrawerInlineNote
-        className='min-h-12 px-0'
+        inset='flush'
         message='Failed to load tracks.'
         tone='error'
       />
@@ -170,10 +171,7 @@ export function ReleaseTrackList({
 
   if (!tracks || tracks.length === 0) {
     return (
-      <DrawerInlineNote
-        className='min-h-12 px-0'
-        message='No track data available.'
-      />
+      <DrawerInlineNote inset='flush' message='No track data available.' />
     );
   }
 
@@ -327,7 +325,7 @@ function TrackListRow({
       )}
       data-testid={`release-track-row-${track.id}`}
     >
-      <button
+      <PlainButton
         type='button'
         onClick={handleTogglePlayback}
         disabled={!playableUrl && !isActiveTrack}
@@ -340,14 +338,14 @@ function TrackListRow({
             !isActiveTrack &&
             'cursor-not-allowed text-quaternary-token hover:bg-transparent hover:text-quaternary-token'
         )}
-        aria-label={controlLabel}
+        aria-label={`Track ${trackLabel}: ${controlLabel}`}
         data-testid={`release-track-control-${track.id}`}
       >
         {trackButtonContent}
-      </button>
+      </PlainButton>
 
       {onSelect ? (
-        <button
+        <PlainButton
           type='button'
           onClick={onSelect}
           className='group/track-open flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left transition-[color,background-color] duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
@@ -359,7 +357,7 @@ function TrackListRow({
             className='h-3.5 w-3.5 shrink-0 text-quaternary-token opacity-0 transition-opacity duration-subtle group-hover/track-open:opacity-100'
             aria-hidden='true'
           />
-        </button>
+        </PlainButton>
       ) : (
         <div className='min-w-0 flex-1'>{titleNode}</div>
       )}

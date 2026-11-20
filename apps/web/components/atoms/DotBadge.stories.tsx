@@ -37,3 +37,31 @@ export const ConstrainedDestructiveLabel: Story = {
     ),
   ],
 };
+
+/** A long label wraps inside its badge instead of clipping. */
+export const LongContent: Story = {
+  args: {
+    label: 'Awaiting Distributor Approval For Every Territory',
+    size: 'sm',
+  },
+  decorators: [
+    StoryComponent => (
+      <div className='w-36'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};
+
+export const Rtl: Story = {
+  args: {
+    label: 'نشط',
+  },
+  decorators: [
+    StoryComponent => (
+      <div dir='rtl' lang='ar'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};

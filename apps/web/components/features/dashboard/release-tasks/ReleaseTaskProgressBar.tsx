@@ -32,7 +32,7 @@ export function ReleaseTaskProgressBar({
       <p className='text-2xs text-tertiary-token mb-1 tabular-nums'>
         {isComplete ? (
           <span className='text-accent'>
-            Campaign complete! All {total} tasks done.
+            Campaign complete. All {total} tasks done.
           </span>
         ) : (
           <>
@@ -49,6 +49,7 @@ export function ReleaseTaskProgressBar({
       <div
         className='h-1 w-full rounded-full bg-surface-1'
         role='progressbar'
+        aria-label={`${done} of ${total} tasks done`}
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}

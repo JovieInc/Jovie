@@ -56,6 +56,41 @@ describe('AskJovieWidget', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('leaves existing page focus alone when initially rendered', () => {
+    render(<button type='button'>Before widget</button>);
+    const priorControl = screen.getByRole('button', { name: 'Before widget' });
+    priorControl.focus();
+    render(WIDGET);
+    expect(priorControl).toHaveFocus();
+  });
+
+  it('focuses the composer after keyboard opening', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch(() => Promise.resolve({}));
+    render(WIDGET);
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('textbox')).toHaveFocus();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the launcher after keyboard closing', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch(() => Promise.resolve({}));
+    render(WIDGET);
+    await user.tab();
+    await user.keyboard('{Enter}');
+    screen.getByRole('button', { name: 'Close Ask Jovie' }).focus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.queryByRole('dialog', { name: 'Ask Jovie about Test Artist' })
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie about Test Artist' })
+    ).toHaveFocus();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('opens the dialog with a greeting and suggested questions', () => {
     render(WIDGET);
     openWidget();

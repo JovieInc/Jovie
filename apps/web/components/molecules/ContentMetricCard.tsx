@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 export const contentMetricCardVariants = cva('', {
   variants: {
     layout: {
-      default: 'p-3.5',
+      default: 'p-4',
       'icon-chip': 'p-4',
       'icon-chip-inline': 'flex items-center gap-3 bg-surface-0 px-4 py-3',
     },
@@ -26,6 +26,19 @@ export const contentMetricCardVariants = cva('', {
     appearance: 'card',
   },
 });
+
+/** Default text slots also reserve the skeleton's exact line boxes. */
+export const contentMetricCardDefaultClasses = {
+  bodyClassName: 'space-y-1',
+  headerClassName: 'flex items-center gap-1.5',
+  labelGroupClassName: 'min-w-0 flex items-center gap-1.5',
+  iconClassName: 'size-3.5 shrink-0 text-tertiary-token',
+  labelClassName:
+    'truncate text-2xs font-semibold tracking-normal text-tertiary-token',
+  valueClassName:
+    'text-2xl font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+  subtitleClassName: 'text-xs leading-4 text-secondary-token',
+} as const;
 
 const iconTones = {
   accent: { icon: 'text-accent', chip: 'bg-accent/10' },
@@ -199,20 +212,30 @@ export function ContentMetricCard({
       )}
       {...props}
     >
-      <div className={cn('space-y-1', bodyClassName)}>
-        <div className={cn('flex items-center gap-1.5', headerClassName)}>
-          <div className='min-w-0 flex items-center gap-1.5'>
+      <div
+        className={cn(
+          contentMetricCardDefaultClasses.bodyClassName,
+          bodyClassName
+        )}
+      >
+        <div
+          className={cn(
+            contentMetricCardDefaultClasses.headerClassName,
+            headerClassName
+          )}
+        >
+          <div className={contentMetricCardDefaultClasses.labelGroupClassName}>
             {Icon ? (
               <Icon
                 className={cn(
-                  'size-3.5 shrink-0 text-tertiary-token',
+                  contentMetricCardDefaultClasses.iconClassName,
                   iconClassName
                 )}
               />
             ) : null}
             <p
               className={cn(
-                'truncate text-2xs font-semibold tracking-normal text-tertiary-token',
+                contentMetricCardDefaultClasses.labelClassName,
                 labelClassName
               )}
             >
@@ -225,7 +248,7 @@ export function ContentMetricCard({
         </div>
         <p
           className={cn(
-            'text-2xl font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+            contentMetricCardDefaultClasses.valueClassName,
             valueClassName
           )}
         >
@@ -234,7 +257,7 @@ export function ContentMetricCard({
         {subtitle ? (
           <div
             className={cn(
-              'text-xs leading-4 text-secondary-token',
+              contentMetricCardDefaultClasses.subtitleClassName,
               subtitleClassName
             )}
           >

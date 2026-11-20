@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -13,6 +14,9 @@ import {
   classifyBlogContentDiff,
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
+
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
+import { KNOWN_VITEST_FIXTURE_PRODUCERS } from './lib/onboarding-test-producers.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -34,6 +38,15 @@ const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
+    'apps/web/data/designSystem/surfaceCensus.json',
+    [
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
+    ],
+  ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
+  [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
@@ -49,6 +62,10 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   ],
   // Homepage copy modules live under data/, outside the component/app import
   // graph. Bind each one to the unit tests that import it.
+  [
+    'apps/web/data/homepageSearchCopy.ts',
+    ['apps/web/components/homepage/HomepageNameSearch.test.tsx'],
+  ],
   [
     'apps/web/data/homepageFrontDoorCta.ts',
     [
@@ -85,13 +102,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
-  [
-    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
-    [
-      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
-      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
-    ],
-  ],
+  ...KNOWN_VITEST_FIXTURE_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
@@ -111,6 +122,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
+// Census evidence entries (surfaceCensus.evidence/) select the census validator.
+const CENSUS =
+  /^apps\/web\/data\/designSystem\/surfaceCensus\.(json$|evidence\/)/;
+const touchesCensus = files => files.some(file => CENSUS.test(file));
+const fixtureTestsFor = file =>
+  CENSUS.test(file) && !file.endsWith('surfaceCensus.json')
+    ? ['scripts/lib/__tests__/design-surface-census.test.mjs']
+    : KNOWN_VITEST_FIXTURE_TESTS.get(file);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
@@ -329,7 +348,6 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -458,11 +476,13 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
   'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/golden-path-lock.test.mjs',
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/golden-path-source-scope.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
@@ -517,21 +537,24 @@ const MERGE_GROUP_ADMISSION_LANE = new Set([
 const MERGE_GROUP_ADMISSION_WEB_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
-// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
-// ownership contract failed. Keep it in the cheap structural selector so
-// coverage-lane drift fails before an expensive changed-surface collection.
+// Run 32547855063 spent 3180.55s on V8 before this static contract failed.
+// Keep ownership drift in the cheap structural selector.
 // Control-plane node:test suites, each with its own per-module coverage gate:
 // [test file, coverage include (null = no coverage gate), thresholds].
 const CI_CONTROL_NODE_COVERAGE_TESTS = [
-  [
-    '.github/scripts/production-continuity.test.mjs',
-    '.github/scripts/production-continuity.mjs',
+  ...['', '-arrival'].map(suffix => [
+    [
+      '.github/scripts/production-continuity.test.mjs',
+      '.github/scripts/production-continuity-arrival.test.mjs',
+      '.github/scripts/production-continuity-limits.test.mjs',
+    ],
+    `.github/scripts/production-continuity${suffix}.mjs`,
     [
       '--test-coverage-lines=95',
       '--test-coverage-branches=90',
       '--test-coverage-functions=90',
     ],
-  ],
+  ]),
   [
     '.github/scripts/production-continuity-dedupe.test.mjs',
     '.github/scripts/production-continuity-dedupe.mjs',
@@ -621,15 +644,6 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=100',
       '--test-coverage-branches=100',
       '--test-coverage-functions=100',
-    ],
-  ],
-  [
-    '.github/scripts/internal-pr-review.test.mjs',
-    '.github/scripts/internal-pr-review.mjs',
-    [
-      '--test-coverage-lines=85',
-      '--test-coverage-branches=80',
-      '--test-coverage-functions=85',
     ],
   ],
   [
@@ -1178,6 +1192,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'pr_events',
     'remediation',
     'reason_lane',
+    'reason_dispatch',
+    'reason_publication',
     'doctor',
     'hud',
     'disk_guard',
@@ -1229,6 +1245,26 @@ const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+
+// The ejector driver has no product import edge. Qualify its complete repair
+// signature with its behavior suites and the CI plumbing/inventory contracts.
+// Partial signatures and unknown peers retain the existing full fallback.
+const MAIN_RED_EJECT_DRIVER = 'scripts/main-red-eject.mjs';
+// The quota regression arrives in the caller's PR. Discover that changed test,
+// then require its file and live CI registration before selecting it. Fixed
+// selector references continue to obey the existing-test inventory guard.
+const MAIN_RED_EJECT_QUOTA_TEST =
+  /^scripts\/lib\/__tests__\/main-red-eject-quota-failover\.test\.mjs$/;
+const MAIN_RED_EJECT_BEHAVIOR_TESTS = [
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+];
+const MAIN_RED_EJECT_PLUMBING_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+];
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1284,6 +1320,17 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: touchesCensus(files),
+    ...(touchesCensus(files) &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -1333,12 +1380,64 @@ function planAffectedTests(
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
     blogContentReceipt = undefined,
+    scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const ejectorQuotaTest = files.find(file =>
+    MAIN_RED_EJECT_QUOTA_TEST.test(file)
+  );
+  const ejectorInputs = [
+    MAIN_RED_EJECT_DRIVER,
+    CI_CANCELLATION_HEALER_COMPANION,
+    ejectorQuotaTest,
+  ];
+  const ejectorSelectorInputs = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const isExactEjectorQualification =
+    Boolean(ejectorQuotaTest) &&
+    ejectorInputs.every(file => files.includes(file)) &&
+    files.length === ejectorInputs.length + ejectorSelectorInputs.length &&
+    (ejectorSelectorInputs.length === 0 ||
+      ejectorSelectorInputs.length === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (
+    (files.includes(MAIN_RED_EJECT_DRIVER) || ejectorQuotaTest) &&
+    !isExactEjectorQualification
+  ) {
+    return fullSuitePlan(
+      'main-red ejector change exceeds its complete qualification closure'
+    );
+  }
+  if (isExactEjectorQualification) {
+    const behaviorTests = [...MAIN_RED_EJECT_BEHAVIOR_TESTS, ejectorQuotaTest];
+    const qualificationTests = [
+      ...behaviorTests,
+      ...MAIN_RED_EJECT_PLUMBING_TESTS,
+    ];
+    if (
+      !qualificationTests.every(isFileAvailable) ||
+      !behaviorTests.every(test => scriptContractVitestTests.includes(test))
+    ) {
+      return fullSuitePlan(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: qualificationTests,
+    };
   }
   const sentryGateInputs = new Set([
     '.github/actions/sentry-error-gate/action.yml',
@@ -2167,9 +2266,10 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  for (const file of files) {
-    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
-  }
+  const fixtureProducers = files.flatMap(file => fixtureTestsFor(file) ?? []);
+  mandatoryTests.push(
+    ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
+  );
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -2263,6 +2363,7 @@ function planAffectedTests(
   ]);
   const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
+    ...fixtureProducers.filter(test => test.startsWith('scripts/')),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -2311,7 +2412,7 @@ function planAffectedTests(
       CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
     )
       return true;
-    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    const fixtureTests = fixtureTestsFor(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
@@ -2683,10 +2784,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')
@@ -2914,6 +3012,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/git-base-ref.mjs',
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
@@ -2980,6 +3079,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (
+    plan.censusValidation ||
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  ) {
+    commands.push(['node', ['scripts/design-surface-census.mjs', base]]);
+  }
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.
@@ -3228,21 +3335,16 @@ export function buildControlTestCommands() {
             '--experimental-test-coverage',
             `--test-coverage-include=${include}`,
             ...thresholds,
-            file,
+            ...[file].flat(),
           ]
-        : ['--test', file],
+        : ['--test', ...[file].flat()],
     ]),
     ['pnpm', ['run', 'test:rolling-ci-fx:coverage']],
   ];
 }
 
-// The control stages are independent processes, so a bounded pool overlaps
-// the long native-queue Vitest coverage run (the critical path, ~20s) with
-// the ~25s of short, mostly single-threaded stages instead of serializing
-// ~45s of work. Three slots finish the short stages before the long run on a
-// 4-vCPU runner (two slots left them as the tail). Every Vitest coverage
-// stage owns a distinct reports directory so concurrent runs cannot clean
-// each other's coverage temp files.
+// Three control slots on a four-vCPU runner overlap the ~20s native-queue
+// coverage run with ~25s short stages, replacing ~45s serial execution.
 export const CONTROL_TEST_CONCURRENCY = 3;
 
 export async function runControlTestCommands(
@@ -3275,7 +3377,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (args.includes('--control')) {
     process.exit(await runControlTestCommands());
   }
-  const base = argValue(args, '--base', 'origin/main');
+  let base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const shardTimeoutMs = positiveDurationMs(
@@ -3296,6 +3398,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
+  if (!explicitFiles) {
+    const resolved = resolveBaseRef(REPO_ROOT, base);
+    if (!resolved) {
+      console.error(
+        `[affected-tests] base ref '${base}' does not resolve to a commit (tried ${baseRefCandidates(base).join(', ')})`
+      );
+      process.exit(1);
+    }
+    // Use one snapshot for selection, blog classification and coverage.
+    base = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${resolved}^{commit}`],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }
+    ).trim();
+  }
   const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
   const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
     existsSync(resolve(REPO_ROOT, file))

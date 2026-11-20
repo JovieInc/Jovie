@@ -61,6 +61,23 @@
       "liveAuthority": "Stripe prices"
     },
     {
+      "id": "person-price-lock",
+      "title": "A person's price (price lock)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/billing/price-versions.ts",
+        "note": "Price versions name each list price; the price_locks table holds the snapshot each person signed up at. A person's price is resolveLockedPrice(lock), never the list price."
+      },
+      "derived": [
+        "apps/web/lib/billing/price-lock-checkout.ts",
+        "apps/web/lib/billing/price-lock-view.ts",
+        "apps/web/lib/billing/price-lock.server.ts",
+        "apps/web/app/api/billing/price-lock/route.ts",
+        "apps/web/lib/queries/usePricingOptionsQuery.ts"
+      ],
+      "liveAuthority": "Stripe subscriptions (daily price lock reconcile)"
+    },
+    {
       "id": "entitlements-limits",
       "title": "Entitlements and plan limits",
       "owner": {
@@ -108,10 +125,14 @@
       "owner": {
         "kind": "file",
         "ref": "apps/web/lib/ai/routing.json",
-        "note": "Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling. Runtime routing reads it; docs, memory and prose must not restate it."
+        "note": "Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling, plus the subsidy pool ledger (subscription windows and credits, 1% floor, burn order, reset proposals only when every pool is at the floor). Runtime routing and the Codex lane read it; docs, memory and prose must not restate it."
       },
-      "derived": ["apps/web/lib/ai/routing.ts", "apps/web/lib/ai/sdk.ts"],
-      "liveAuthority": "(Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs"
+      "derived": [
+        "apps/web/lib/ai/routing.ts",
+        "apps/web/lib/ai/sdk.ts",
+        "scripts/lanes/codex_lane.py"
+      ],
+      "liveAuthority": "(Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs; subscription aliases signed in on Gem (CODEX_LANE_SUBSCRIPTION_PROFILES) proven by scripts/ai-routing-check.mjs --pools-only"
     },
     {
       "id": "credentials-spend",

@@ -7,6 +7,29 @@
 > `ziawi-color-sot-v1`). `oklch-palette.json` and `design-system.css` project
 > that node — they are not a parallel React-only color root.
 
+## Write-path freeze (Drift W1 / T0.1)
+
+**Invariant:** one canonical token set; components consume tokens only.
+
+| Role | Path | Status |
+|---|---|---|
+| Phase 2 write SoT (target) | repo-root `design.tokens.json` | Export today; Tim owns flip timing |
+| Live semantic emitter | `apps/web/styles/design-system.css` | Write here for unmigrated families |
+| Compiler-owned families | `apps/web/design/tokens.json` | Write here when the family is compiler-owned |
+| Color SoT | `apps/web/design/ziawi-color-sot.json` | Pen ZiaWI projection only |
+
+**Frozen bans (ship without Phase 2 flip):**
+
+1. Do not hand-edit `design.tokens.json` or any generated CSS/TS export.
+2. Do not add new `--linear-*` definitions or consumer references (shrink-only
+   `linear-namespace` ratchet).
+3. Do not add carbon shell / profile / desktop hex overrides beside ZiaWI /
+   `--noir-ion-*` / semantic surfaces.
+4. Do not add feature-local token packs or one-off profile radius literals;
+   extend or alias System B scales.
+
+Skill detail: [`.claude/skills/design-system/guides/tokens.md`](../.claude/skills/design-system/guides/tokens.md).
+
 ## Overview
 
 Jovie uses one token system across three surface families:
@@ -55,17 +78,19 @@ have not yet moved into the compiler. Color hexes project Pen node ZiaWI
 
 It imports the generated CSS. Do not redefine generated brand, gray, or radius
 tokens here. A new token belongs in its existing canonical registry; if its
-family is compiler-owned, extend `tokens.json` and rebuild the outputs.
+family is compiler-owned, extend `tokens.json` and rebuild the outputs. Do not
+open a third write root (feature packs, carbon overrides, or new `--linear-*`).
 
 ### `apps/web/styles/theme.css`
 
 This file is for:
 
-- feature accent tokens
+- feature accent tokens that extend the base system (not a second palette)
 - animation keyframes
 - scoped visual effects that extend the base token system
 
-Do not duplicate base surface or text tokens here.
+Do not duplicate base surface or text tokens here. Do not grow this file into a
+feature token pack.
 
 ### `apps/web/app/globals.css`
 
@@ -178,6 +203,9 @@ Both are live marketing pages, not canonical design-system review surfaces.
 - Do not add route-specific token files for a single marketing page or a single
   public surface.
 - Do not treat redirect routes as canonical surfaces.
+- Honor the [write-path freeze](#write-path-freeze-drift-w1--t01): no new
+  `--linear-*`, carbon shell overrides, or feature token packs; Phase 2 flip
+  stays Tim-gated.
 
 ## Naming
 

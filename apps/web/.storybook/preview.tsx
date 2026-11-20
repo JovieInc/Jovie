@@ -1,9 +1,12 @@
 import { TooltipProvider } from '@jovie/ui/atoms/tooltip';
-import type { Preview } from '@storybook/nextjs-vite';
+import type { Preview, StoryContext } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionGlobalConfig } from 'motion/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
-import { ToastProvider } from '../components/providers/ToastProvider';
+// Direct module, not the feedback barrel: every story renders through this
+// decorator, so the barrel would bind every receipt to all of @jovie/ui.
+import { FeedbackProvider as ToastProvider } from '../components/feedback/FeedbackProvider';
 import { STORYBOOK_A11Y_PARAMETERS } from '../lib/a11y-gates/wcag-22-aa.ts';
 import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';
@@ -87,6 +90,12 @@ function installDeterministicFixtures(): void {
     }
   `;
   document.head.appendChild(style);
+
+  // JS-driven (motion) enter animations start at opacity 0 and are still
+  // mid-fade when the axe pass runs, so axe measures a half-transparent
+  // foreground and reports false color-contrast failures. Settle them at once,
+  // exactly like the CSS freeze above; real UI motion is untouched.
+  MotionGlobalConfig.skipAnimations = true;
 
   // Keep responsive media queries real; only motion is deterministic.
   const nativeMatchMedia = window.matchMedia.bind(window);
@@ -196,7 +205,32 @@ if (typeof window !== 'undefined') {
   };
 }
 
+/**
+ * The theme a story explicitly requests, if any: story `parameters.themes.`
+ * `themeOverride` wins over the `themes` global, which wins over a bare
+ * `theme` global. `undefined` means "no request" — the story then renders
+ * whatever the harness seeded into storage (Surface Matrix seeds the theme
+ * per variant) or `defaultTheme` when nothing was seeded.
+ */
+export function resolveStoryTheme(
+  context: Pick<StoryContext, 'globals' | 'parameters'> | undefined
+): 'light' | 'dark' | undefined {
+  const parameterOverride = context?.parameters?.themes?.themeOverride;
+  if (parameterOverride === 'light' || parameterOverride === 'dark') {
+    return parameterOverride;
+  }
+  const themesGlobal =
+    (context?.globals as
+      | { themes?: { value?: unknown }; theme?: unknown }
+      | undefined) ?? {};
+  const globalValue = themesGlobal.themes?.value ?? themesGlobal.theme;
+  if (globalValue === 'light' || globalValue === 'dark') return globalValue;
+  return undefined;
+}
+
 const preview: Preview = {
+  // Explicit story themes are applied through forcedTheme below. Keep them
+  // out of storage so later stories retain their harness seed or default.
   parameters: {
     controls: {
       matchers: {
@@ -227,7 +261,7 @@ const preview: Preview = {
   tags: ['autodocs'],
   decorators: [
     (Story, context) => {
-      const themeOverride = context.parameters?.themes?.themeOverride;
+      const themeOverride = resolveStoryTheme(context);
       const [queryClient] = React.useState(
         () =>
           new QueryClient({

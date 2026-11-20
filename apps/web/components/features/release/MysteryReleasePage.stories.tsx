@@ -29,3 +29,41 @@ export const Minimal: Story = {
     minimal: true,
   },
 };
+
+/** Free plan: the countdown and sign-up are locked to a quiet teaser card. */
+export const PermissionDeniedFreePlan: Story = {
+  args: {
+    minimal: true,
+  },
+};
+
+/** A long artist name wraps under the art without crowding the countdown. */
+export const LongContentArtistName: Story = {
+  args: {
+    artist: {
+      id: 'artist-1',
+      name: 'Tim White, The Midnight Strings Orchestra and Friends',
+      handle: TIM_WHITE_PROFILE.handle,
+      avatarUrl: TIM_WHITE_PROFILE.avatarSrc,
+    },
+  },
+};
+
+/** The reveal page inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    artist: {
+      id: 'artist-1',
+      name: 'تيم وايت',
+      handle: TIM_WHITE_PROFILE.handle,
+      avatarUrl: TIM_WHITE_PROFILE.avatarSrc,
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -3,9 +3,9 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { OnboardingSessionBoundary } from '@/components/features/onboarding/OnboardingSessionBoundary';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
-import { auth } from '@/lib/auth/better-auth';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 import { resolveUserState } from '@/lib/auth/gate';
+import { getRequestSession } from '@/lib/auth/request-session';
 import { captureWarning } from '@/lib/error-tracking';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
@@ -13,6 +13,14 @@ import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.s
 import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
+import {
+  recordWinbackResumeClick,
+  resolveWinbackResumeToken,
+} from '@/lib/waitlist/winback-resume.server';
 
 /**
  * Canonical onboarding chat entry point.
@@ -50,8 +58,8 @@ async function resolveSyntheticTurnstileTestMode(
   isSignedIn: boolean
 ): Promise<boolean> {
   try {
-    const requestHeaders = await headers();
     if (!isSignedIn) {
+      const requestHeaders = await headers();
       // Production certification canary token (JOV-9625). Verify-only here;
       // /api/chat consumes it before accepting a test-mode token.
       return (
@@ -60,7 +68,9 @@ async function resolveSyntheticTurnstileTestMode(
         })) !== null
       );
     }
-    const session = await auth.api.getSession({ headers: requestHeaders });
+    // Same cookie-mode read the auth gate already made for this request, so
+    // this reuses its result instead of asking Better Auth a second time.
+    const session = await getRequestSession('cookie');
     return (await resolveSyntheticPassage(session, 'onboarding_chat')) !== null;
   } catch (error) {
     await captureWarning(
@@ -84,6 +94,20 @@ export default async function StartPage(
     typeof params.intent_id === 'string' ? params.intent_id : undefined;
   const starterHandoff = resolveStartEntryHandoff(params);
 
+  // Win-back resume link (founder dispatch 2026-11-09):
+  // /start?resume=winback&w=<signed token> lands in setup even while public
+  // signup is closed — the token is a high-entropy value minted with the
+  // held win-back draft and verified against the operating ledger here.
+  // Best-effort: a failed lookup never blocks the page, it only keeps the
+  // closed-signup redirect in force.
+  const winbackResume =
+    params.resume === 'winback' && typeof params.w === 'string'
+      ? await resolveWinbackResumeToken(params.w)
+      : null;
+  if (winbackResume) {
+    await recordWinbackResumeClick(winbackResume);
+  }
+
   // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
   // visitor's real page first. Explicit prompts and intents keep their flow.
   // A taken handle is the exception: it must say so even when a starter prompt
@@ -104,6 +128,18 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02): anonymous visitors
+  // join the waitlist. Signed-in users (including redeemed invitees) keep the
+  // golden path, and the production certification canary (verified passage
+  // token) still exercises anonymous /start.
+  if (
+    !isSignedIn &&
+    !turnstileTestMode &&
+    !winbackResume &&
+    isPublicSignupClosed()
+  ) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
+  }
   // No account and no onboarding cookie: there is nothing to restore, so the
   // client does not need to fetch an empty snapshot before showing the chat.
   const freshAnonymous =

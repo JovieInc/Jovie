@@ -1,11 +1,14 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import {
-  HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
-} from '@/components/homepage/HomepageArtistProfile';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
+  HomepageInviteClose,
+  HomepageProfileChapter,
+  HomepageReleasesChapter,
+  HomepageStoryHero,
+} from '@/components/homepage/HomepageEditorial';
+import { SpecsChapter } from '@/components/homepage/v3/SpecsChapter';
+import { StageMotion } from '@/components/homepage/v3/StageMotion';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_PRODUCT_UI } from '@/data/homepageProductUi';
 import type {
   MarketingPageSection,
   MarketingPageSections,
@@ -14,56 +17,35 @@ import type {
 /**
  * Renders a homepage spec (`lib/content-records/marketing-page.ts`) with the
  * registered DS section components. A spec only fills copy slots and picks
- * order; components, layout, offer facts, and locked lines stay in code.
+ * order; components, layout, imagery, links and the locked headline stay in
+ * code.
  */
-
 function renderSection(
   entry: MarketingPageSection,
-  headingId: string,
-  claimAction: string
+  headingId: string
 ): ReactNode {
   switch (entry.section) {
     case 'hero':
       return (
-        <HomepageArtistHero
+        <HomepageStoryHero
           key='hero'
           headingId={headingId}
-          copy={{
-            ...HOMEPAGE_COPY.hero,
-            subhead: entry.copy.subhead,
-            claim: {
-              ...HOMEPAGE_COPY.hero.claim,
-              action: entry.copy.claimAction,
-            },
-          }}
+          copy={{ ...HOMEPAGE_EDITORIAL_COPY.hero, ...entry.copy }}
         />
       );
+    case 'feature-split':
+      return <HomepageProfileChapter key='feature-split' copy={entry.copy} />;
     case 'product-gallery':
+      // The specs chapter is code-owned (its numbers derive from the DSP
+      // registry, so it has no copy slots) and follows the releases chapter.
       return (
-        <HomepageFanStates
-          key='product-gallery'
-          copy={{ ...HOMEPAGE_FAN_STATES_COPY, headline: entry.copy.headline }}
-        />
+        <Fragment key='product-gallery'>
+          <HomepageReleasesChapter copy={entry.copy} />
+          <SpecsChapter />
+        </Fragment>
       );
     case 'cta':
-      return (
-        <HomepageOfferClose
-          key='cta'
-          offer={{
-            ...HOMEPAGE_COPY.offer,
-            headline: entry.copy.headline,
-            plansLink: {
-              ...HOMEPAGE_COPY.offer.plansLink,
-              label: entry.copy.plansLinkLabel,
-            },
-          }}
-          close={{ subhead: entry.copy.subhead }}
-          claim={{
-            ...HOMEPAGE_COPY.hero.claim,
-            action: claimAction,
-          }}
-        />
-      );
+      return <HomepageInviteClose key='cta' copy={entry.copy} />;
   }
 }
 
@@ -74,13 +56,13 @@ export function HomepageSpecSections({
   sections: MarketingPageSections;
   headingId?: string;
 }>) {
-  // The closing claim reuses the hero's claim label so the two stay identical.
-  const hero = sections.find(s => s.section === 'hero');
-  const claimAction =
-    hero?.section === 'hero'
-      ? hero.copy.claimAction
-      : HOMEPAGE_COPY.hero.claim.action;
   return (
-    <>{sections.map(entry => renderSection(entry, headingId, claimAction))}</>
+    <>
+      {sections.map(entry => renderSection(entry, headingId))}
+      <StageMotion
+        paletteQuery={HOMEPAGE_PRODUCT_UI.palette.query}
+        paletteTarget={HOMEPAGE_PRODUCT_UI.palette.queryTarget}
+      />
+    </>
   );
 }

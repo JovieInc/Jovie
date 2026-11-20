@@ -158,8 +158,8 @@ Profile is historical ledger drift, not a reason to change the current code.
 ## macOS screen and state registry
 
 `apps/macos` contains one macOS **Swift** target: `MenuMonitor`, a
-menu-bar-only operator tool. The shipped Mac product / Ovie shell is Electron
-in `apps/desktop`. The [native Mac direction](../macos/ADR-swift-native-mac.md)
+menu-bar-only operator tool. The shipped Mac product is Electron
+in `apps/desktop`; Ovie is web at `/app/ov`, never native. The [native Mac direction](../macos/ADR-swift-native-mac.md)
 plans a separate `apps/ios/JovieMac` product target on shared iOS foundations;
 this registry does not certify that planned target or its parity. MenuMonitor
 is not a public artist
@@ -210,7 +210,7 @@ the source contract to verify, not a claim that each viewport has passed.
 | Medium iPhone / large portrait | Same shell composition with wider drawer; grids remain readable; long labels use minimum scale/truncation where source provides it | Preserve semantic hierarchy; do not add a second navigation rail or duplicate tab bar. |
 | iPad / wide iOS | No dedicated size-class branch is present in the inspected native surfaces; SwiftUI flexible stacks/grids are the source behavior | Treat any tablet-specific layout as `proposal` until source owner and test evidence exist. Do not infer a Pen tablet frame from iPhone code. |
 | Web compact | Shell body reserves safe-area top and mobile bottom surface; mobile nav is capacity-derived, `AppShellFrame.tsx:L60-L80,L156-L163`; nav partition in `dashboard-nav/config.ts:L226-L260` | Verify compact nav, safe area, keyboard/composer, and route loading geometry. |
-| Web desktop | Sidebar mount and raised main plane share coordinated shell motion; `AppShellFrame.tsx:L71-L143` | Main content remains one raised plane; right rail is in-flow and may narrow the route. |
+| Web desktop | Sidebar mount and raised main plane share coordinated shell motion; `AppShellFrame.tsx:L71-L143` | Main content remains one raised plane; right rail renders as an overlay (`AppShellRightRail`) that never narrows the route — verify last-column reachability under it. |
 | macOS menu bar | Accessory menu only; no window or adaptive product shell | Verify menu readability and action feedback, not iOS/web visual parity. |
 | Text scaling / reduce motion | iOS uses SwiftUI environment in drawer, audience, chat, Talk; web uses `motion-reduce`; examples `AppShellLeftDrawer.swift:L59-L64,L132-L146`, `JovieTheme.swift:L95-L122` | Preserve reserved layout; remove movement under reduce motion while keeping accessible opacity/state changes. |
 
@@ -255,13 +255,10 @@ merch, composer, and filled/icon geometry variants retain distinct semantics.
    “opacity-only (no offset)” at `AppShellLeftDrawer.swift:L150-L153` but applies
    `.offset(x: ... -8)` at `L159-L163`. `StatTileRevealModifier` repeats the
    same comment/code mismatch at `AudienceHighlightsView.swift:L250-L263`.
-2. **Press token mismatch and stale inventory.** iOS names
-   `JovieMotion.pressScale` the canonical `--scale-press` at
-   `JovieTheme.swift:L120-L122` and sets it to `0.96`. The current web CSS token
-   is `0.98` at `apps/web/styles/design-system.css:L2021-L2024`, while the
-   historical state matrix still documents `active:scale-[0.96]` at
-   `docs/design-system/state-matrix.md:L42`. Keep the token under one owner
-   when a migration is authorized; do not silently alter locked Chat/Calendar.
+2. **Press token (resolved).** `JovieMotion.pressScale` projects web
+   `--scale-press` (`0.98`) via `native-design-system` `motionBindings`;
+   `state-matrix.md` documents `active:scale-press`. Do not silently alter
+   locked Chat/Calendar press behavior.
 3. **Local token ownership.** iOS hard-codes its `Color(hex:)` values in
    `JovieTheme.swift:L4-L24`; web resolves CSS variables in `tokens.ts:L17-L30`.
    The semantic names overlap, but no cross-platform generated token contract

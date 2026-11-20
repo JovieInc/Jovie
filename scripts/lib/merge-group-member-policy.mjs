@@ -6,7 +6,7 @@ import { isSizeExcluded } from './pr-size-exclusions.mjs';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
   HYGIENE_LIMITS,
-  trackedBytesBudgetWarning,
+  logTrackedBytesBudgetWarnings,
 } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -34,9 +34,9 @@ const MAX_API_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_API_REQUEST_MS = 10_000;
 // Short requests still give up inside a minute. Rate-limit holds and 5xx
 // backoff use MERGE_GROUP_JOB_BUDGET_MS so a reset inside the Size Guard job
-// can finish as a pass. The job clock includes provisioning (69s observed);
-// 100s of in-script hold still ends before the 3-minute killer. A cancelled
-// required check ejects the group the same way a red one does.
+// can finish as a pass. The outer job clock also includes checkout, the
+// separately bounded fetch, and provisioning. A cancelled required check
+// ejects the group the same way a red one does.
 export const MERGE_GROUP_POLICY_DEADLINE_MS = 45_000;
 export const MERGE_GROUP_JOB_BUDGET_MS = 100_000;
 
@@ -940,8 +940,7 @@ function syntheticRateLimitedPull(member, headSha) {
 }
 
 function logTrackedPayload(payload, log) {
-  const warning = trackedBytesBudgetWarning(payload.bytes);
-  if (warning) log(`::warning::Combined tree: ${warning}`);
+  logTrackedBytesBudgetWarnings(payload.bytes, log, 'Combined tree: ');
   log(
     `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
   );

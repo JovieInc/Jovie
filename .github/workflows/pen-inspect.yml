@@ -1,0 +1,76 @@
+name: Pen inspect frames
+
+# Read-only look into the Pen workspace for agents that cannot open Pen:
+# exports every frame whose name matches the query and dumps its node tree,
+# so a screen can be built to match its Pen design. Never writes a .pen file.
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Case-insensitive regex matched against frame names'
+        required: true
+        default: 'auth|sign ?in|sign ?up|log ?in|otp|verif|code'
+      log_png:
+        description: 'Regex of matched frame names to print into the log as base64 PNG and tree JSON (for agents that cannot download artifacts)'
+        required: false
+        default: ''
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'scripts/design/pen-inspect.mjs'
+      - 'scripts/design/pen-inspect.test.mjs'
+      - '.github/workflows/pen-inspect.yml'
+
+permissions: {}
+
+concurrency:
+  group: pen-inspect-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    name: Pen inspect frames
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Unit tests
+        run: node --test scripts/design/pen-inspect.test.mjs
+
+      - name: Inspect matching frames
+        env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+          QUERY: ${{ inputs.query || 'auth|sign ?in|sign ?up|log ?in|otp|verif|code' }}
+          LOG_PNG: ${{ inputs.log_png || '' }}
+        run: |
+          set -euo pipefail
+          args=(--out "$RUNNER_TEMP/pen-inspect" --query "$QUERY")
+          if [ -n "$LOG_PNG" ]; then args+=(--log-png "$LOG_PNG"); fi
+          node scripts/design/pen-inspect.mjs "${args[@]}"
+
+      - name: Upload frames
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pen-inspect
+          path: |
+            ${{ runner.temp }}/pen-inspect/png/
+            ${{ runner.temp }}/pen-inspect/*.json
+            ${{ runner.temp }}/pen-inspect/*.log
+          if-no-files-found: warn
+          retention-days: 14

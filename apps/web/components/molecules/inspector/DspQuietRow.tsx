@@ -28,7 +28,7 @@ export function displayDspUrl(href: string): string {
 }
 
 const DSP_QUIET_ROW_CLASS =
-  'group flex min-h-8 items-center gap-2 rounded-md px-2 transition-colors duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55';
+  'group flex min-h-8 items-center gap-2 rounded-md px-0 transition-colors duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55';
 
 /** Track/release DSP row: name + ↗, or Find when the provider is not found. */
 export function DspQuietRow({

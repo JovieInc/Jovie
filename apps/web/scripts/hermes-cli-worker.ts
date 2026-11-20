@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
+import { toolRoutePolicySchema } from '@jovie/action-contracts';
 import {
   assertOwnedTreeBudget,
   DESIGN_LAB_ARTIFACT_BUDGET,
@@ -13,6 +14,10 @@ import {
 } from '../lib/agent-os/artifact-budget';
 import { normalizeHermesAllowedPaths } from '../lib/hermes/allowed-paths';
 import type { HermesCliRuntime, HermesDispatchPayload } from '../types/ai-ops';
+import {
+  RUNTIME_EXECUTABLE,
+  runHermesWorkerWithRouteReceipt,
+} from './hermes-tool-route';
 
 export interface RuntimeCommand {
   readonly executable: string;
@@ -36,12 +41,6 @@ interface CliArgs {
   readonly workspace: string;
   readonly dryRun: boolean;
 }
-
-const RUNTIME_EXECUTABLE: Record<HermesCliRuntime, string> = {
-  'codex-cli': 'codex',
-  'claude-code': 'claude',
-  ruflo: 'ruflo',
-};
 
 const VALID_RUNTIMES = new Set<HermesCliRuntime>([
   'codex-cli',
@@ -129,6 +128,10 @@ export function parseHermesPayload(input: unknown): HermesDispatchPayload {
   }
 
   return {
+    routePolicy:
+      input.routePolicy === undefined
+        ? undefined
+        : toolRoutePolicySchema.parse(input.routePolicy),
     dispatchId: requireString(input.dispatchId, 'dispatchId'),
     source: requireString(
       input.source,
@@ -326,15 +329,24 @@ async function terminateDesignLabProcessGroup(
   await waitForProcessGroupExit(processGroupId, 2_000);
 }
 
-export async function runHermesCliWorker({
-  payload,
-  workspace,
-  dryRun,
-  designLabArtifactBudget = DESIGN_LAB_ARTIFACT_BUDGET,
-  monitorIntervalMs = DESIGN_LAB_MONITOR_INTERVAL_MS,
-  runtimeAvailableCheck = runtimeAvailable,
-  runtimeCommand,
-}: WorkerRunOptions): Promise<number> {
+export async function runHermesCliWorker(
+  options: WorkerRunOptions
+): Promise<number> {
+  return runHermesWorkerWithRouteReceipt(options, runUnattestedWorker);
+}
+
+async function runUnattestedWorker(
+  {
+    payload,
+    workspace,
+    dryRun,
+    designLabArtifactBudget = DESIGN_LAB_ARTIFACT_BUDGET,
+    monitorIntervalMs = DESIGN_LAB_MONITOR_INTERVAL_MS,
+    runtimeAvailableCheck = runtimeAvailable,
+    runtimeCommand,
+  }: WorkerRunOptions,
+  onSpawn: (command: RuntimeCommand) => void
+): Promise<number> {
   const prompt = buildHermesWorkerPrompt(payload);
   const command =
     runtimeCommand ?? buildRuntimeCommand(payload.runtime, prompt, workspace);
@@ -347,8 +359,7 @@ export async function runHermesCliWorker({
           dryRun: true,
           dispatchId: payload.dispatchId,
           runtime: payload.runtime,
-          executable: command.executable,
-          args: command.args.map(arg => (arg === prompt ? '<prompt>' : arg)),
+          executable: runtimeCommand ? 'unrecognized' : command.executable,
           branchName: payload.branchName,
         },
         null,
@@ -398,6 +409,7 @@ export async function runHermesCliWorker({
     },
     stdio: command.stdin ? ['pipe', 'inherit', 'inherit'] : 'inherit',
   });
+  child.once('spawn', () => onSpawn(command));
   if (command.stdin) child.stdin?.end(command.stdin);
   const childExited = waitForChild(child);
 

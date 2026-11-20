@@ -25,12 +25,17 @@ interface TourDatesManagerProps {
   readonly profileId: string;
   readonly initialTourDates: TourDateViewModel[];
   readonly connectionStatus: BandsintownConnectionStatus;
+  /** Failure reporter for the owning surface (ProfileSidebarHeader
+   * convention): toasts cannot render in every embedding surface, so the
+   * sync failure is also handed to the owner verbatim. */
+  readonly onSyncError?: (message: string) => void;
 }
 
 export function TourDatesManager({
   profileId,
   initialTourDates,
   connectionStatus,
+  onSyncError,
 }: Readonly<TourDatesManagerProps>) {
   const [tourDates, setTourDates] =
     useState<TourDateViewModel[]>(initialTourDates);
@@ -82,8 +87,9 @@ export function TourDatesManager({
       }
     } catch {
       toast.error('Failed to sync tour dates');
+      onSyncError?.('Failed to sync tour dates');
     }
-  }, [syncMutation]);
+  }, [onSyncError, syncMutation]);
 
   const handleDisconnectClick = useCallback(() => {
     setDisconnectDialogOpen(true);
@@ -185,11 +191,11 @@ export function TourDatesManager({
       {isConnected && connectionStatus.artistName && (
         <div className='flex shrink-0 items-center justify-between border-b border-subtle bg-surface-1 px-4 py-2'>
           <div className='flex items-center gap-2'>
-            <div className='flex h-6 w-6 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30'>
-              <Icon
-                name='Check'
-                className='h-4 w-4 text-teal-600 dark:text-teal-400'
-              />
+            <div
+              className='flex h-6 w-6 items-center justify-center rounded-lg bg-success-subtle'
+              data-testid='tour-dates-connected-mark'
+            >
+              <Icon name='Check' className='h-4 w-4 text-success' />
             </div>
             <span className='text-app text-secondary-token'>
               Connected to{' '}

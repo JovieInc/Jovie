@@ -2,7 +2,7 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
 function toAbsolutePublicUrl(href: string): string {
@@ -12,35 +12,35 @@ function toAbsolutePublicUrl(href: string): string {
   return `${BASE_URL}${href}`;
 }
 
-function renderFreeOffer(): string {
-  const { offer } = HOMEPAGE_COPY;
-  return [
-    `### ${offer.includedLabel}`,
-    '',
-    ...offer.included.map(item => `- ${item.label}`),
-  ].join('\n');
-}
-
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
- * Machine-readable identity stays general (company definition first); the
- * homepage's artist-profile offer follows as a labeled section. Visual-only
- * fan-moment copy is not projected here.
+ * It follows the page: the locked headline, the profile and releases
+ * chapters, then the invitation (signup is invite-only), with the general
+ * company definition kept for machine-readable identity.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero } = HOMEPAGE_COPY;
+  const { hero, profile, releases, invite } = HOMEPAGE_EDITORIAL_COPY;
 
-  return `# ${COMPANY_IDENTITY.headline}
-
-${COMPANY_IDENTITY.definition}
-
-## Artist profiles
+  return `# ${hero.headline}
 
 ${hero.subhead}
 
-${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
+${COMPANY_IDENTITY.definition}
 
-${renderFreeOffer()}
+## ${profile.headline}
+
+${profile.body}
+
+## ${releases.headline}
+
+${releases.body}
+
+## ${invite.headline}
+
+${invite.subhead}
+
+- Request an invitation: ${toAbsolutePublicUrl(APP_ROUTES.WAITLIST)}
+- ${hero.secondaryAction}: ${toAbsolutePublicUrl(hero.secondaryHref)}
 
 ${buildSiteLlmsGuidance()}
 ## Recovery links

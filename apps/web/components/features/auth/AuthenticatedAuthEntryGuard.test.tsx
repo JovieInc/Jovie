@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { replaceMock, searchParamsState, authState } = vi.hoisted(() => ({
@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 /**
  * Colocated contract coverage for AuthenticatedAuthEntryGuard. The route-level
@@ -41,27 +42,60 @@ describe('AuthenticatedAuthEntryGuard', () => {
       '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   });
 
-  it('renders children until a confirmed session redirects', () => {
-    render(
+  it('renders children until a confirmed session redirects', async () => {
+    const { container } = render(
       <AuthenticatedAuthEntryGuard>
-        <div>Sign-up form</div>
+        <main>
+          <h1>Sign up</h1>
+          <p>Sign-up form</p>
+        </main>
       </AuthenticatedAuthEntryGuard>
     );
 
     expect(screen.getByText('Sign-up form')).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
+    // The guard adds no markup of its own; axe audits the children it passes through.
+    await expectNoA11yViolations(container);
   });
 
-  it('redirects a confirmed signed-in session via the canonical route redirect', () => {
+  it('redirects a confirmed signed-in session via the canonical route redirect', async () => {
     authState.isSignedIn = true;
 
-    render(
+    const { container } = render(
       <AuthenticatedAuthEntryGuard>
         <div>Sign-up form</div>
       </AuthenticatedAuthEntryGuard>
     );
 
     expect(screen.queryByText('Sign-up form')).not.toBeInTheDocument();
+    expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    // While redirecting the guard renders null, so axe audits the empty container.
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('re-checks the session when the page is restored from the back-forward cache', () => {
+    const { rerender } = render(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-up form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+
+    authState.isSignedIn = true;
+    rerender(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-up form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+    replaceMock.mockClear();
+
+    const restore = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(restore, 'persisted', { value: true });
+    act(() => {
+      globalThis.dispatchEvent(restore);
+    });
+
     expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 

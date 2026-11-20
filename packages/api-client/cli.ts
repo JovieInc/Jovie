@@ -2,9 +2,10 @@
 /**
  * node packages/api-client/cli.ts status [--json]
  *   Per-provider budgets, breakers and last-hour usage for lanes-status/doctor.
- * node packages/api-client/cli.ts gh [--priority P] [--credential ID] -- <gh args>
+ * node packages/api-client/cli.ts gh [--priority P] [--credential ID] [--once] -- <gh args>
  *   Run gh through the shared ledger; exit 75 when the call is deferred.
  */
+import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { PRIORITIES, PROVIDERS, type PriorityName } from './contract.ts';
@@ -140,6 +141,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = await runGh(rest.slice(split + 1), {
       priority,
       credential: flag('--credential'),
+      ...(flags.includes('--once') ? { maxAttempts: 1, maxWaitMs: 0 } : {}),
     });
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
@@ -153,7 +155,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  // realpath: a copy under macOS tmpdir is reached through the /var symlink,
+  // so argv and the module URL disagree and the CLI exits 0 without running.
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 ) {
   main().then(
     code => {

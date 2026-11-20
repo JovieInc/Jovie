@@ -6,8 +6,8 @@ import AppKit
 import CoreText
 #endif
 
-/// Native projection of ZiaWI palette + the product semantic emitter.
-/// Regenerate/check with apps/ios/scripts/native-design-system.mjs; never hand-tune hexes.
+/// Native projection of ZiaWI palette + the product semantic emitter + motion scalars.
+/// Regenerate/check with apps/ios/scripts/native-design-system.mjs; never hand-tune hexes or pressScale.
 enum JovieColor {
   // BEGIN GENERATED NATIVE COLORS
   /// Source: elevations.dark.canvas
@@ -194,10 +194,11 @@ enum JovieRadius {
   static let pill: CGFloat = 999
 }
 
-/// System B motion tokens, ported from apps/web/styles/design-system.css.
+/// System B motion tokens from apps/web/styles/design-system.css.
 /// SUBTLE for micro-interactions (press, color, toast); CINEMATIC for
 /// high-impact reveals (drawer, modal, surface morph). Movement (offset/scale)
 /// must be dropped under Reduce Motion; opacity transitions may remain.
+/// `pressScale` is generated from `--scale-press` (see motionBindings).
 enum JovieMotion {
   static let instantDuration: Double = 0.05
   static let fastDuration: Double = 0.10
@@ -223,8 +224,10 @@ enum JovieMotion {
     .timingCurve(0.34, 1.56, 0.64, 1, duration: duration)
   }
 
-  /// --scale-press — canonical press-down scale for pressable elements.
-  static let pressScale: CGFloat = 0.96
+  // BEGIN GENERATED NATIVE MOTION
+  /// Source: --scale-press
+  static let pressScale: CGFloat = 0.98
+  // END GENERATED NATIVE MOTION
 }
 
 enum JovieQRCodePlate {
@@ -287,6 +290,7 @@ extension View {
 
 struct JoviePillButtonStyle: ButtonStyle {
   static let visibleHeight: CGFloat = 28
+  /// 44pt hit target on the padded control. The frame is applied after the pill is painted, so it adds no paint.
   static let minimumHitHeight: CGFloat = 44
   static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8
@@ -318,6 +322,10 @@ struct JoviePillButtonStyle: ButtonStyle {
       .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
       .padding(.vertical, JoviePillButtonStyle.hitInset)
+      .frame(
+        minWidth: JoviePillButtonStyle.minimumHitHeight,
+        minHeight: JoviePillButtonStyle.minimumHitHeight
+      )
       .contentShape(Rectangle())
   }
 }

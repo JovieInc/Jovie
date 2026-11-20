@@ -1,7 +1,9 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { JovieO } from './JovieO';
+import { JOVIE_O_STATES } from './jovie-o-motion';
 
 const svg = (c: HTMLElement) => c.querySelector('svg') as SVGSVGElement;
 
@@ -32,11 +34,11 @@ describe('JovieO', () => {
 
   it('fills the counter at rest so a blink closes it, and not while busy', () => {
     const { container, rerender } = render(<JovieO state='idle' />);
-    const whiteEllipses = () =>
-      container.querySelectorAll('mask ellipse[fill="#fff"]').length;
-    expect(whiteEllipses()).toBe(1);
+    const revealedCounters = () =>
+      container.querySelectorAll('mask ellipse:not(.jo-iris)').length;
+    expect(revealedCounters()).toBe(1);
     rerender(<JovieO state='loading' />);
-    expect(whiteEllipses()).toBe(0);
+    expect(revealedCounters()).toBe(0);
   });
 
   it('keeps mask ids unique per instance', () => {
@@ -62,4 +64,43 @@ describe('JovieO', () => {
     expect(w / h).toBeGreaterThan(1.8);
     expect(container.querySelectorAll('polygon')).toHaveLength(2);
   });
+
+  it('uses fixed luminance tokens with standalone fallbacks for both masks', () => {
+    const { container } = render(<JovieO variant='ov' still />);
+    expect(container.querySelector('.jo-tail')).toHaveAttribute(
+      'stroke',
+      'var(--brand-mask-reveal, white)'
+    );
+    expect(container.querySelector('mask rect')).toHaveAttribute(
+      'fill',
+      'var(--brand-mask-reveal, white)'
+    );
+    for (const cutout of container.querySelectorAll('.jo-iris, .jo-lid')) {
+      expect(cutout).toHaveAttribute(
+        'fill',
+        'var(--brand-mask-conceal, black)'
+      );
+    }
+  });
+});
+
+describe.each(['jovie', 'ov'] as const)('JovieO %s accessibility', variant => {
+  it.each(JOVIE_O_STATES)(
+    'supports named and decorative %s marks',
+    async state => {
+      const { container, rerender } = render(
+        <JovieO
+          variant={variant}
+          state={state}
+          still
+          label={`Jovie ${state}`}
+        />
+      );
+      expect(svg(container)).toHaveAttribute('role', 'img');
+      await expectNoA11yViolations(container);
+      rerender(<JovieO variant={variant} state={state} still />);
+      expect(svg(container)).toHaveAttribute('aria-hidden', 'true');
+      await expectNoA11yViolations(container);
+    }
+  );
 });

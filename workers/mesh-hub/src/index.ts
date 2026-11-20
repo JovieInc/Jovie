@@ -13,10 +13,14 @@ import {
   validateSend,
 } from './core.ts';
 import type { Env } from './env.ts';
+import { MCP_IDENTITY } from './mcp.ts';
+import { type Api, handleMcpHttp } from './mcp-http.ts';
 import { type AgentEntry } from './registry.ts';
 import { scanBody } from './scan.ts';
 
+export { Board } from './board-do.ts';
 export { Mailbox } from './mailbox.ts';
+export { McpAuth } from './mcp-oauth-do.ts';
 export { Registry } from './registry.ts';
 
 const AUTH_CACHE_MS = 60_000;
@@ -37,6 +41,17 @@ const failure = (status: number, code: string, retryable = false) =>
 
 function registry(env: Env) {
   return env.REGISTRY.get(env.REGISTRY.idFromName('registry'));
+}
+function board(env: Env) {
+  return env.BOARD.get(env.BOARD.idFromName('board'));
+}
+function mcpApi(env: Env): Api {
+  return (async (method, ...args) => {
+    const stub = env.MCP_AUTH.get(env.MCP_AUTH.idFromName('mcp-auth'));
+    const out = await stub.call(method, args);
+    if (!out.ok) throw new HubError(out.status, out.code);
+    return out.value;
+  }) as Api;
 }
 function mailbox(env: Env, kind: string) {
   return env.MAILBOX.get(env.MAILBOX.idFromName(kind));
@@ -101,6 +116,21 @@ async function send(
     `${input.body}\n${(input.refs as string[]).join('\n')}`
   );
   if (!verdict.ok) return failure(422, verdict.code);
+  if (input.to === 'board') {
+    // Task board op over the mesh (canon MESH-SWARM.md): the response carries the result.
+    const result = await board(env).fromMesh(
+      from,
+      input.body,
+      (input.inReplyTo as string | null) ?? null
+    );
+    if (!result.ok) return failure(result.status, result.code);
+    return json(202, {
+      ok: true,
+      status: 'accepted',
+      to: 'board',
+      board: result,
+    });
+  }
   const active = await registry(env).activeKinds();
   let recipients: string[];
   if (input.to === 'all') recipients = active.filter(kind => kind !== from);
@@ -161,6 +191,72 @@ function parseIds(body: unknown): string[] {
   return ids as string[];
 }
 
+const BOARD_OPS = new Set([
+  'caps',
+  'post',
+  'claim',
+  'update',
+  'done',
+  'answer',
+  'cancel',
+  'reassign',
+]);
+
+async function boardRoute(
+  request: Request,
+  env: Env,
+  kind: string,
+  url: URL
+): Promise<Response> {
+  const path = url.pathname;
+  if (
+    request.method === 'GET' &&
+    (path === '/v1/board' || path === '/v1/board/task')
+  ) {
+    const limit = Number(url.searchParams.get('limit') ?? 50);
+    return json(200, {
+      ok: true,
+      self: kind,
+      dataNotInstructions: true,
+      ...((await board(env).read({
+        id: url.searchParams.get('id'),
+        status: url.searchParams.get('status'),
+        limit: Number.isFinite(limit) ? limit : 50,
+      })) as Record<string, unknown>),
+    });
+  }
+  if (request.method === 'GET' && path === '/v1/board/metrics') {
+    const hours = Math.min(
+      Math.max(Number(url.searchParams.get('hours') ?? 24) || 24, 1),
+      24 * 30
+    );
+    return json(200, {
+      ok: true,
+      ...((await board(env).metrics(hours * 3_600_000)) as Record<
+        string,
+        unknown
+      >),
+    });
+  }
+  const op = path.slice('/v1/board/'.length);
+  if (request.method === 'POST' && BOARD_OPS.has(op)) {
+    const input = await readJson(request, 32_768);
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+      return failure(400, 'invalid_json');
+    const text = JSON.stringify(input);
+    const verdict = scanBody(text);
+    if (!verdict.ok) return failure(422, verdict.code);
+    const result = await board(env).op(
+      kind,
+      op,
+      input as Record<string, unknown>
+    );
+    if (!result.ok) return failure(result.status, result.code);
+    return json(200, result);
+  }
+  return failure(404, 'not_found');
+}
+
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -189,11 +285,72 @@ async function route(request: Request, env: Env): Promise<Response> {
         return failure(422, 'invalid_registration');
       }
     }
+    if (path === '/v1/admin/mcp/grants' && request.method === 'GET') {
+      const out = await mcpApi(env)('grants');
+      return json(200, { ok: true, grants: out });
+    }
+    if (path === '/v1/admin/mcp/revoke' && request.method === 'POST') {
+      const body = (await readJson(request)) as {
+        grantId?: string;
+        all?: boolean;
+      };
+      const api = mcpApi(env);
+      const out =
+        body?.all === true
+          ? await api('revokeAll')
+          : typeof body?.grantId === 'string'
+            ? await api('revokeGrant', body.grantId)
+            : null;
+      if (out !== null) return json(200, { ok: true, revoked: out });
+      return failure(422, 'invalid_revoke');
+    }
     if (path === '/v1/admin/sweep' && request.method === 'POST')
       return json(200, { ok: true, ...(await registry(env).sweep()) });
     return failure(404, 'not_found');
   }
-  const kind = await authenticate(request, env);
+  const mcp = await handleMcpHttp(request, url, {
+    api: mcpApi(env),
+    backend: (method, apiPath, body) =>
+      asTim(env, url.origin, method, apiPath, body),
+  });
+  if (mcp) return mcp;
+  return authed(request, env, await authenticate(request, env), url);
+}
+
+/** One hub call made as the founder identity, through the same routes agents use. */
+async function asTim(
+  env: Env,
+  origin: string,
+  method: 'GET' | 'POST',
+  apiPath: string,
+  body?: unknown
+): Promise<{ status: number; json: unknown }> {
+  const target = new URL(apiPath, origin);
+  const request = new Request(target, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  let response: Response;
+  try {
+    response = await authed(request, env, MCP_IDENTITY, target);
+  } catch (error) {
+    response =
+      error instanceof HubError
+        ? failure(error.status, error.code, error.retryable)
+        : failure(503, 'hub_unavailable', true);
+  }
+  return { status: response.status, json: await response.json() };
+}
+
+/** Routes that need an authenticated agent kind. */
+async function authed(
+  request: Request,
+  env: Env,
+  kind: string,
+  url: URL
+): Promise<Response> {
+  const path = url.pathname;
   if (path === '/v1/send' && request.method === 'POST')
     return send(request, env, kind);
   if (path === '/v1/mailbox' && request.method === 'GET') {
@@ -243,6 +400,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   if (path === '/v1/stream' && request.method === 'GET')
     return mailbox(env, kind).fetch(request);
+  if (path.startsWith('/v1/board')) return boardRoute(request, env, kind, url);
   if (path === '/v1/agents' && request.method === 'GET')
     return json(200, {
       ok: true,
@@ -285,6 +443,12 @@ export default {
     ctx: ExecutionContext
   ) {
     ctx.waitUntil(registry(env).sweep());
+    // Dead-man for board leases and undelivered notices.
+    ctx.waitUntil(
+      board(env)
+        .sweep()
+        .catch(() => undefined)
+    );
   },
 } satisfies ExportedHandler<Env>;
 

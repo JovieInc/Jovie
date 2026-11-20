@@ -9,10 +9,18 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 | Artifact | What it is |
 |---|---|
 | [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) | Hand-curated taxonomy of high-risk surfaces with blast radius, reversibility, visibility, and target coverage. Source of truth. |
-| [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) | Auto-generated nightly. Joins the register with measured v8 coverage and Stryker mutation scores. Priority queue at the top is the action list. |
+| [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) | Generated daily into the Test Coverage Audit Actions artifact. The committed file is a bootstrap copy; restore the current report as shown below. Joins the register with measured v8 coverage and Stryker mutation scores. Priority queue at the top is the action list. |
 | `scripts/audit-test-coverage.ts` | Generator. Regenerate locally with `pnpm exec tsx scripts/audit-test-coverage.ts`. |
-| `apps/web/reports/test-coverage-snapshot.json` | Machine-readable snapshot committed by the nightly audit; the heatmap Δ7d baseline. |
-| `.github/workflows/test-coverage-audit.yml` | Nightly cron at 18:30 UTC, after the deterministic nightly lanes. Runs `test:coverage:diff` against the committed snapshot, then commits the heatmap when values change. Slack on failure. Merge-queue unit shards stay coverage-off. |
+| `apps/web/reports/test-coverage-snapshot.json` | Machine-readable snapshot retained with the daily artifact and restored before audit/quality-gap checks; the committed copy seeds local/offline checks. |
+| `.github/workflows/test-coverage-audit.yml` | Daily dispatch and manual audit. Restores the artifact baseline before `test:coverage:diff`, uploads the generated reports, and alerts Slack on failure. Merge-queue unit shards stay coverage-off. |
+
+Restore the latest successful main-run heatmap and snapshot before reading coverage evidence locally (requires GitHub Actions read access):
+
+```sh
+GITHUB_REPOSITORY=JovieInc/Jovie node --input-type=module -e "import { restoreCoverageBaseline } from './scripts/lib/publish-coverage-report.mjs'; console.log(restoreCoverageBaseline());"
+```
+
+The daily audit and Quality Gap Finder run this restore automatically. Reports are retained for 14 days in the existing [Test Coverage Audit artifacts](https://github.com/JovieInc/Jovie/actions/workflows/test-coverage-audit.yml); failed, expired, foreign or malformed evidence fails the restore rather than silently falling back to a stale copy.
 
 **When you add or modify code in a critical surface,** check the heatmap's priority queue and aim for the surface's `target_coverage`. The register fields drive everything: change `blast_radius` / `reversibility` / `visibility` to recalibrate, change `target_coverage` to move the goal post.
 

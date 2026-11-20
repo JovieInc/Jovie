@@ -1,3 +1,9 @@
+import { defaultCopyText, defaultOpenUrl } from './library-browser-actions';
+import { buildLibraryAskJovieDraft } from './library-chat-context';
+import { buildPrivatePromotionAction } from './library-promotion-action';
+
+export { buildLibraryAskJovieDraft } from './library-chat-context';
+
 import {
   Archive,
   ArchiveRestore,
@@ -14,6 +20,7 @@ import {
   Pause,
   PlayCircle,
   Share2,
+  Sparkles,
   Video,
 } from 'lucide-react';
 import { createElement, isValidElement, type ReactNode } from 'react';
@@ -29,6 +36,7 @@ import {
   getUTMShareActionMenuItems,
 } from '@/lib/utm/share-menu-items';
 import type { LibraryReleaseAsset } from './library-data';
+import { isLibraryTakeAsset } from './library-take-assets';
 
 export const LIBRARY_ENTITY_ACTION_ORDER = [
   'approval-status',
@@ -38,6 +46,8 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-artwork',
   'open-primary',
   'copy',
+  'ask-jovie',
+  'draft-promotion',
   'archive',
   'restore',
 ] as const;
@@ -96,6 +106,7 @@ export interface BuildLibraryEntityActionsOptions {
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
   ) => Promise<void>;
+  readonly onAskJovie?: (draft: string, profileId: string) => void;
   readonly openUrl?: (url: string) => void;
   readonly copyText?: (value: string) => void | Promise<void>;
 }
@@ -174,14 +185,6 @@ function buildProfileVisibilityAction({
       } satisfies LibraryEntityAction;
     }),
   };
-}
-
-function defaultOpenUrl(url: string): void {
-  globalThis.open(url, '_blank', 'noopener,noreferrer');
-}
-
-function defaultCopyText(value: string): void {
-  void globalThis.navigator?.clipboard?.writeText(value);
 }
 
 function buildApprovalActions({
@@ -338,6 +341,7 @@ function buildCopyAction({
   };
 }
 
+/** Editable context only; labels never substitute for authoritative object identity. */
 export function buildLibraryEntityActions({
   asset,
   profileId,
@@ -347,10 +351,24 @@ export function buildLibraryEntityActions({
   lifecycle,
   onTogglePreview,
   onApprovalStatusChange,
+  onAskJovie,
   openUrl = defaultOpenUrl,
   copyText = defaultCopyText,
 }: BuildLibraryEntityActionsOptions): LibraryEntityAction[] {
   const primaryHref = asset.primaryActionHref ?? asset.smartLinkPath;
+  const openPrimary: LibraryEntityAction = {
+    id: 'open-primary',
+    label: asset.primaryActionLabel ?? 'Open Smart Link',
+    icon: ExternalLink,
+    authority: 'none',
+    disabled: false,
+    destructive: false,
+    onExecute: () => openUrl(primaryHref),
+  };
+  // A private take has no approval, profile or archive state to change.
+  if (isLibraryTakeAsset(asset)) {
+    return [openPrimary, buildCopyAction({ asset, copyText })];
+  }
   const actions: LibraryEntityAction[] = [
     buildApprovalActions({
       asset,
@@ -406,18 +424,32 @@ export function buildLibraryEntityActions({
     });
   }
 
-  actions.push(
-    {
-      id: 'open-primary',
-      label: asset.primaryActionLabel ?? 'Open Smart Link',
-      icon: ExternalLink,
-      authority: 'none',
-      disabled: false,
-      destructive: false,
-      onExecute: () => openUrl(primaryHref),
+  actions.push(openPrimary, buildCopyAction({ asset, copyText }));
+
+  actions.push({
+    id: 'ask-jovie',
+    label: 'Ask Jovie',
+    icon: Sparkles,
+    authority: 'none',
+    disabled: !profileId || !onAskJovie,
+    disabledReason: !profileId
+      ? 'Select a creator profile'
+      : !onAskJovie
+        ? 'Chat is unavailable'
+        : undefined,
+    destructive: false,
+    onExecute: () => {
+      if (!profileId || !onAskJovie) return;
+      onAskJovie(buildLibraryAskJovieDraft(asset, profileId), profileId);
     },
-    buildCopyAction({ asset, copyText })
+  });
+
+  const promotionAction = buildPrivatePromotionAction(
+    asset,
+    profileId,
+    openUrl
   );
+  if (promotionAction) actions.push(promotionAction);
 
   const lifecycleAction = buildLifecycleAction({
     asset,
@@ -456,9 +488,7 @@ function toContextMenuItem(action: LibraryEntityAction): ContextMenuItemType {
     disabled: action.disabled,
     subText: action.disabledReason,
     destructive: action.destructive,
-    onClick: () => {
-      void action.onExecute?.();
-    },
+    onClick: () => void action.onExecute?.(),
   };
 }
 

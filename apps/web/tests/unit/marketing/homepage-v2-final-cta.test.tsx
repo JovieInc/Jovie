@@ -19,7 +19,7 @@ describe('HomepageV2FinalCta', () => {
     );
     expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
       'href',
-      '/signup'
+      '/start'
     );
     expect(
       screen.queryByTestId('homepage-v2-final-cta-secondary')

@@ -80,6 +80,7 @@ export async function mcpCall<T>(
       params: { name: toolName, arguments: args },
     };
 
+    let raw = '';
     const response = await serverFetch(resolveMcpUrl(apiUrl), {
       method: 'POST',
       headers: {
@@ -95,9 +96,11 @@ export async function mcpCall<T>(
         : undefined,
       signal: options.signal,
       timeoutMs: GBRAIN_REQUEST_TIMEOUT_MS,
+      consumeResponseBody: async response => {
+        raw = await response.text();
+      },
     });
 
-    const raw = await response.text();
     if (!response.ok) {
       return { ok: false, reason: `gbrain HTTP ${response.status}` };
     }
@@ -137,7 +140,7 @@ async function mcpCallWithLegacyAlias<T>(
   const primary = await mcpCall<T>(toolNames[0], args, options);
   if (
     primary.ok ||
-    !/unknown[_ ]?(?:tool|operation)|(?:tool|method|operation).*not found/i.test(
+    !/^gbrain error: (?:unknown[_ ]?(?:tool|operation)|(?:tool|method|operation).*not found)/i.test(
       primary.reason
     )
   ) {

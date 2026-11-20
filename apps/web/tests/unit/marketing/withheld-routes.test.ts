@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  isIndexableCapabilityPath,
+  isNavigationEligiblePath,
+} from '@/data/marketing/featureAvailability';
 import { WITHHELD_MARKETING_ROUTES } from '@/data/marketing/withheldRoutes';
 import {
   getMarketingToolsFlyoutLinks,
@@ -17,6 +21,7 @@ import {
 
 const PAGE_LOADERS: Record<string, () => Promise<{ metadata?: unknown }>> = {
   '/card': () => import('@/app/(marketing)/card/page'),
+  '/voice': () => import('@/app/(marketing)/voice/page'),
   '/demovideo': () => import('@/app/(marketing)/demovideo/page'),
   '/demo/video': () => import('@/app/(marketing)/demo/video/page'),
   '/youtube-thumbnails': () =>
@@ -46,6 +51,7 @@ describe('withheld marketing routes', () => {
     expect([...withheld].sort()).toEqual(
       [
         APP_ROUTES.CARD,
+        APP_ROUTES.VOICE,
         '/demovideo',
         '/demo/video',
         APP_ROUTES.YOUTUBE_THUMBNAILS,
@@ -60,6 +66,25 @@ describe('withheld marketing routes', () => {
       expect(entry.returnsWhen.length).toBeGreaterThan(10);
       expect(entry.note.length).toBeGreaterThan(10);
     }
+  });
+
+  it('withholds voice discovery until a real sample or UI capture exists', () => {
+    const voice = WITHHELD_MARKETING_ROUTES.find(
+      entry => entry.route === APP_ROUTES.VOICE
+    );
+    expect(voice?.returnsWhen).toBe(
+      'a real voice sample or voice UI capture exists'
+    );
+    for (const href of [
+      '/voice',
+      '/voice/',
+      '/voice?source=footer',
+      '/voice#sample',
+    ]) {
+      expect(isNavigationEligiblePath(href), href).toBe(false);
+      expect(isIndexableCapabilityPath(href), href).toBe(false);
+    }
+    expect(allNavHrefs()).not.toContain(APP_ROUTES.VOICE);
   });
 
   it('keeps withheld routes out of header, flyout, and footer navigation', () => {
@@ -81,20 +106,18 @@ describe('withheld marketing routes', () => {
 
   const LEAF_PUBLISHING_HUBS = new Set(['/compare', '/alternatives']);
 
-  it('serves every withheld page with noindex metadata', async () => {
-    for (const route of withheld) {
-      const load = PAGE_LOADERS[route];
-      expect(load, `no page loader for ${route}`).toBeDefined();
-      const { metadata } = (await load()) as {
-        metadata?: { robots?: { index?: boolean; follow?: boolean } };
-      };
-      expect(metadata?.robots?.index, `${route} must be noindex`).toBe(false);
-      // Hubs keep follow so crawlers still reach their published leaf pages.
-      const expectFollow = LEAF_PUBLISHING_HUBS.has(route);
-      expect(
-        metadata?.robots?.follow,
-        `${route} must be ${expectFollow ? 'follow' : 'nofollow'}`
-      ).toBe(expectFollow);
-    }
+  it.each([...withheld])('serves %s with noindex metadata', async route => {
+    const load = PAGE_LOADERS[route];
+    expect(load, `no page loader for ${route}`).toBeDefined();
+    const { metadata } = (await load()) as {
+      metadata?: { robots?: { index?: boolean; follow?: boolean } };
+    };
+    expect(metadata?.robots?.index, `${route} must be noindex`).toBe(false);
+    // Hubs keep follow so crawlers still reach their published leaf pages.
+    const expectFollow = LEAF_PUBLISHING_HUBS.has(route);
+    expect(
+      metadata?.robots?.follow,
+      `${route} must be ${expectFollow ? 'follow' : 'nofollow'}`
+    ).toBe(expectFollow);
   });
 });

@@ -54,7 +54,7 @@ export function ChatActionCard({
           type='button'
           onClick={onAct}
           className='system-b-chat-action-card-primary'
-          aria-label={ariaLabel ?? actionLabel}
+          aria-label={ariaLabel ? `${actionLabel} — ${ariaLabel}` : undefined}
         >
           {actionLabel}
           <ArrowRight

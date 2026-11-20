@@ -155,8 +155,11 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI Crawler Read Details'
     >
+      {/* No aria-label: the visible row text must be part of the accessible
+          name (axe label-content-name-mismatch). The sr-only prefix keeps the
+          action first; the row's own text follows it. */}
+      <span className='sr-only'>View AI Crawler Read Details:</span>
       {rowContent}
       <ChevronRight
         className='h-4 w-4 shrink-0 text-tertiary-token'

@@ -1,3 +1,9 @@
+import {
+  buildClaimProfileStarterPrompt,
+  CLAIM_PROFILE_STARTER_PROMPT,
+} from '@/data/marketingCtaIntents';
+import { readStartEntryHandle } from './start-entry-profile';
+
 const STARTER_PROMPT_MAX_CHARS = 140;
 const ARTIST_NAME_MAX_CHARS = 80;
 const SPOTIFY_ARTIST_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
@@ -77,8 +83,14 @@ export function resolveStartEntryHandoff(
   const rawPrompt = readSingleParam(params, 'starter_prompt');
   if (!rawPrompt) return null;
 
-  const prompt = sanitizeText(rawPrompt, STARTER_PROMPT_MAX_CHARS);
-  if (!prompt) return null;
+  const sanitizedPrompt = sanitizeText(rawPrompt, STARTER_PROMPT_MAX_CHARS);
+  if (!sanitizedPrompt) return null;
+
+  const entryHandle = readStartEntryHandle(params);
+  const prompt =
+    sanitizedPrompt === CLAIM_PROFILE_STARTER_PROMPT && entryHandle
+      ? buildClaimProfileStarterPrompt(entryHandle)
+      : sanitizedPrompt;
 
   const rawSpotifyUrl = readSingleParam(params, 'spotify_url');
   const spotifyUrl = rawSpotifyUrl

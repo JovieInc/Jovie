@@ -321,6 +321,25 @@ describe('formatPublicContactSubtitle', () => {
     ).toBe('Kelly Strickland · Maverick');
   });
 
+  it('collapses a company that repeats the person name', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Jovie',
+        primaryContactLabel: 'Jovie',
+        companyLabel: 'Jovie Technology Inc',
+        secondaryLabel: 'Jovie Technology Inc',
+      })
+    ).toBe('Jovie Technology Inc');
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Jo',
+        primaryContactLabel: 'Jo',
+        companyLabel: 'Jovie',
+        secondaryLabel: 'Jovie',
+      })
+    ).toBe('Jo · Jovie');
+  });
+
   it('returns an empty string when both sides are missing', () => {
     expect(
       formatPublicContactSubtitle({

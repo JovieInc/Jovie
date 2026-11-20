@@ -17,6 +17,18 @@ const VIEWPORTS = [
     height: 720,
   },
   {
+    id: 'desktop',
+    story: 'side-clearance',
+    width: 1280,
+    height: 800,
+  },
+  {
+    id: 'desktop',
+    story: 'side-clearance',
+    width: 1280,
+    height: 900,
+  },
+  {
     id: 'mobile',
     story: 'inline-clearance',
     width: 390,
@@ -60,7 +72,7 @@ async function readBox(locator: Locator): Promise<Box> {
 for (const viewport of VIEWPORTS) {
   test(`keeps the DSP match strip clear of Listen now at ${viewport.id} (${viewport.width}x${viewport.height})`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height,
@@ -89,10 +101,24 @@ for (const viewport of VIEWPORTS) {
     if (viewport.id === 'desktop') {
       // As rendered in the golden-path keyframe: no scrolling, the whole
       // CTA is on screen and clear of the strip.
+      expect(ctaBox.x).toBeGreaterThanOrEqual(screenBox.x);
+      expect(ctaBox.y).toBeGreaterThanOrEqual(screenBox.y);
+      expect(ctaBox.x + ctaBox.width).toBeLessThanOrEqual(
+        screenBox.x + screenBox.width
+      );
       expect(
         ctaBox.y + ctaBox.height,
         `Listen now is cut off by the phone at ${viewport.id}`
       ).toBeLessThanOrEqual(screenBox.y + screenBox.height + 1);
+      const railBox = await readBox(
+        page.getByTestId('onboarding-profile-rail')
+      );
+      expect(
+        ctaBox.y + ctaBox.height,
+        'Listen now is cut off by the visible desktop preview'
+      ).toBeLessThanOrEqual(
+        Math.min(railBox.y + railBox.height, viewport.height) + 1
+      );
     } else {
       // The inline phone is shorter than the home card; bring the CTA into
       // the phone before measuring.
@@ -116,6 +142,11 @@ for (const viewport of VIEWPORTS) {
       stripBox.y + stripBox.height,
       `DSP strip reaches the profile identity at ${viewport.id}`
     ).toBeLessThanOrEqual(nameBox.y);
+
+    await testInfo.attach(`preview-${viewport.width}x${viewport.height}.png`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
   });
 }
 

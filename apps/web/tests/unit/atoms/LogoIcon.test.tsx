@@ -32,7 +32,7 @@ describe('LogoIcon', () => {
 
   it('uses the white tone', () => {
     const { container } = render(<LogoIcon variant='white' />);
-    expect(container.querySelector('span')).toHaveClass('text-white');
+    expect(container.querySelector('span')).toHaveClass('text-on-media');
   });
 
   it('passes a custom className to the brand mark wrapper', () => {

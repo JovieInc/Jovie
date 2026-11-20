@@ -222,6 +222,40 @@ describe('loadAppShellRouteContext', () => {
     );
   });
 
+  it('returns the route error surface when the shell data read wedges past the bound', async () => {
+    // JOV-8791 / resilience.spec.ts: a hung read must become the named error
+    // surface, not a document parked on the loading skeleton forever.
+    vi.useFakeTimers();
+    try {
+      getDashboardShellDataMock.mockReturnValue(new Promise(() => {}));
+
+      const pending = loadAppShellRouteContext({
+        route: '/app/tasks',
+        dashboardErrorLogMessage: 'Dashboard data load failed on tasks page',
+        dashboardErrorMessage: 'Failed to load tasks data.',
+      });
+      await vi.advanceTimersByTimeAsync(10_001);
+      const result = await pending;
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        render(result.error);
+        expect(screen.getByTestId('page-error')).toHaveTextContent(
+          'Failed to load tasks data.'
+        );
+      }
+      expect(captureErrorMock).toHaveBeenCalledWith(
+        'Dashboard data load failed on tasks page',
+        expect.objectContaining({
+          message: expect.stringContaining('timed out'),
+        }),
+        { route: '/app/tasks' }
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('redirects incomplete profiles through onboarding before route prefetches', async () => {
     getDashboardShellDataMock.mockResolvedValue(
       shellData({ needsOnboarding: true })

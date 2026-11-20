@@ -17,6 +17,14 @@ import {
   dependencyInputDigest,
   validateDependencyWorkspace,
 } from '../ci-dependency-workspace.mjs';
+import { SOURCE_GUARD_POOL_SERIAL_STUB } from './fixtures/source-guard-pool-serial-stub.mjs';
+import {
+  expression,
+  interpolate,
+  runInstallAndStamp,
+  stepEnabled,
+  stepOutputs,
+} from './source-guard-composite.test-support.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const workflow = load(
@@ -28,6 +36,98 @@ const actionHelper = 'scripts/lib/source-guard-action-snapshot.mjs';
 const fixtureEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
+
+test('merged guards occupy only the existing fourth unit shard after exact-head tests', () => {
+  const steps = workflow.jobs.unit.steps;
+  const prepare = steps.findIndex(step => step.id === 'source_guard_merge');
+  const unit = steps.findIndex(
+    step => step.name === 'Run web unit tests related to the exact PR diff'
+  );
+  assert.ok(
+    prepare > unit,
+    'merged qualification must follow exact-head unit tests in their runner'
+  );
+  assert.equal(
+    workflow.jobs.deterministic.steps.some(
+      step => step.id === 'source_guard_merge'
+    ),
+    false
+  );
+  assert.equal(workflow.jobs.unit.permissions['pull-requests'], 'read');
+  assert.deepEqual(workflow.jobs.unit.strategy.matrix.shard, [
+    '1/4',
+    '2/4',
+    '3/4',
+    '4/4',
+  ]);
+  for (const step of steps.slice(prepare)) {
+    assert.match(step.if, /matrix\.shard == '4\/4'/, step.name);
+  }
+  assert.ok(workflow.jobs.ready.needs.includes('unit'));
+});
+
+test('metadata reuse and no unit diff still provision the guard shard only', () => {
+  const steps = workflow.jobs.unit.steps;
+  const names = [
+    'Checkout exact source head for unit and merged guard proofs',
+    'Fetch head and base history only',
+    'Setup Node.js and pnpm',
+    'Setup Playwright warm path',
+    'Prepare merged source guard generation',
+    guardName,
+  ];
+  for (const shard of workflow.jobs.unit.strategy.matrix.shard) {
+    for (const reuse of ['true', 'false']) {
+      for (const web of ['true', 'false']) {
+        const context = {
+          matrix: { shard },
+          steps: {
+            reuse: { outputs: { reuse } },
+            scope: { outputs: { web, ui: 'false', ovie: 'false' } },
+          },
+        };
+        for (const name of names) {
+          const step = steps.find(item => item.name === name);
+          assert.ok(step, name);
+          const transactionStep = name === guardName || name === names[4];
+          const setup = name === names[2] || name === names[3];
+          const expected =
+            shard === '4/4' ||
+            (!transactionStep &&
+              reuse !== 'true' &&
+              (!setup || web === 'true'));
+          assert.equal(
+            expression(step.if, context),
+            expected,
+            `${name}: ${shard}/${reuse}/${web}`
+          );
+        }
+        const unit = steps.find(
+          item =>
+            item.name === 'Run web unit tests related to the exact PR diff'
+        );
+        assert.equal(
+          expression(unit.if, context),
+          reuse !== 'true' && web === 'true'
+        );
+      }
+    }
+  }
+});
+
+test('other unit shards never mutate the checkout or execute merged guards', t => {
+  for (const shard of ['1/4', '2/4', '3/4']) {
+    const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
+    const result = transaction(f, { shard });
+    assert.equal(result.failed, false, result.text);
+    assert.equal(f.guards().length, 0);
+    assert.deepEqual(
+      f.installs().map(row => row.phase),
+      ['initial']
+    );
+    assert.equal(f.git('status', '--porcelain'), '');
+  }
+});
 
 // Only the network/toolchain installation boundary is simulated. Every Git
 // transaction, workflow condition, guard shell and dependency receipt check
@@ -67,7 +167,7 @@ function fixture(
       encoding: 'utf8',
     }).trim();
   const bash = (script, extra = {}) =>
-    spawnSync('bash', ['-c', script], {
+    spawnSync('bash', ['--norc', '-c', script], {
       cwd: repo,
       env: { ...env, ...extra },
       encoding: 'utf8',
@@ -186,6 +286,8 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
     "export const listAllChangedFiles = () => ['feature.txt'];\n" +
       "export const selectSourceGuards = () => [{id:'exact-dependency-probe',command:'node scripts/dependency-probe.mjs'}];\n"
   );
+  // Fixture archive ships a serial pool stub (same run-all / first-failure).
+  write('scripts/lib/ci-source-guard-pool.mjs', SOURCE_GUARD_POOL_SERIAL_STUB);
   git('add', '.');
   git('commit', '-qm', 'shared dependency fork');
   git('switch', '-qc', 'source-head');
@@ -238,27 +340,8 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
   };
 }
 
-function expression(value, context) {
-  const code = value
-    .trim()
-    .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-    .replace(/\.([\w]+-[\w-]+)/g, (_, key) => `[${JSON.stringify(key)}]`);
-  // GitHub's expression subset used by this local transaction consists of
-  // property reads, comparisons, boolean operators and status functions.
-  return Function(
-    ...Object.keys(context),
-    `return (${code});`
-  )(...Object.values(context));
-}
-
-function interpolate(value, context) {
-  return String(value).replace(/\$\{\{([\s\S]*?)\}\}/g, (_, code) =>
-    String(expression(code, context) ?? '')
-  );
-}
-
 function transaction(f, options = {}) {
-  const steps = workflow.jobs.deterministic.steps;
+  const steps = workflow.jobs.unit.steps;
   const start = steps.findIndex(step => step.id === 'source_guard_merge');
   const end = steps.findIndex(step => step.id === 'source_guard_proof');
   assert.ok(
@@ -274,6 +357,7 @@ function transaction(f, options = {}) {
   const posts = [];
   let failed = false;
   const context = {
+    matrix: { shard: options.shard ?? '4/4' },
     steps: state,
     github: {
       base_ref: 'main',
@@ -285,13 +369,6 @@ function transaction(f, options = {}) {
     success: () => !failed,
     failure: () => failed,
     cancelled: () => false,
-  };
-  const enabled = (step, scope = context) => {
-    if (!step.if) return scope.success();
-    const explicitStatus = /\b(?:always|failure|success|cancelled)\s*\(/.test(
-      step.if
-    );
-    return (explicitStatus || scope.success()) && expression(step.if, scope);
   };
   // The runner saves a local action's path, then reloads its metadata at job
   // cleanup. Exercise that lifetime with small provider payloads; the composite
@@ -318,11 +395,11 @@ function transaction(f, options = {}) {
   for (const [index, step] of steps.slice(start, end + 1).entries()) {
     const id = step.id ?? (step.name === guardName ? 'guard' : `step_${index}`);
     state[id] = {
-      outputs: new Proxy({}, { get: (target, key) => target[key] ?? '' }),
+      outputs: stepOutputs(),
       outcome: 'skipped',
       conclusion: 'skipped',
     };
-    if (!enabled(step)) continue;
+    if (!stepEnabled(step, context)) continue;
     options.beforeStep?.(id, f);
     const extra = Object.fromEntries(
       Object.entries(step.env ?? {}).map(([key, value]) => [
@@ -360,42 +437,11 @@ function transaction(f, options = {}) {
       assert.ok(actionReference.endsWith('/setup-node-pnpm'));
       // Provisioning is the only seam: use the real composite's frozen install
       // shell and receipt stamping, with a local pnpm artifact fixture.
-      const setupContext = {
-        ...context,
-        success: () => true,
-        failure: () => false,
-        github: { ...context.github, event_name: 'pull_request' },
-        inputs: {
-          package_cache: 'true',
-          reuse_merge_group_workspace: 'false',
-          ...step.with,
-        },
-        steps: {
-          'runner-prereqs': { outputs: { dependencies_warm: 'false' } },
-        },
-      };
-      const install = action.runs.steps.find(
-        item => item.name === 'Install dependencies'
-      );
-      const stamp = action.runs.steps.find(
-        item => item.name === 'Stamp installed workspace receipt'
-      );
-      assert.ok(install && stamp, 'use the normal installed-tree producer');
-      const scripts = [install, stamp]
-        .filter(item => enabled(item, setupContext))
-        .map(item => interpolate(item.run, setupContext));
-      result = f.bash(`set -euo pipefail\n${scripts.join('\n')}`, extra);
+      result = runInstallAndStamp(f, action, step.with, context, extra);
     } else {
       result = f.bash(interpolate(step.run, context), extra);
     }
-    const output = existsSync(extra.GITHUB_OUTPUT)
-      ? readFileSync(extra.GITHUB_OUTPUT, 'utf8')
-      : '';
-    for (const line of output.trim().split('\n')) {
-      const split = line.indexOf('=');
-      if (split > 0)
-        state[id].outputs[line.slice(0, split)] = line.slice(split + 1);
-    }
+    state[id].outputs = stepOutputs(extra.GITHUB_OUTPUT);
     if (existsSync(extra.GITHUB_ENV)) {
       for (const line of readFileSync(extra.GITHUB_ENV, 'utf8')
         .trim()
@@ -431,6 +477,39 @@ function transaction(f, options = {}) {
     text: results.map(r => r.stdout + r.stderr).join('\n'),
   };
 }
+
+test('the receipt condition reads install outputs only inside the same setup invocation', t => {
+  const f = fixture(t, () => {});
+  const action = load(
+    readFileSync('.github/actions/setup-node-pnpm/action.yml', 'utf8')
+  );
+  const install = action.runs.steps.find(
+    step => step.name === 'Install dependencies'
+  );
+  const stamp = action.runs.steps.find(
+    step => step.name === 'Stamp installed workspace receipt'
+  );
+  // Exercise the real env, step ID and stamp predicate with a controlled producer.
+  install.run = [
+    'test "$USE_PREPARED_WORKSPACE" = false',
+    'if [[ "$EMIT_REUSE" == true ]]; then echo "prepared-workspace-reused=true" >> "$GITHUB_OUTPUT"; fi',
+  ].join('\n');
+  stamp.run = 'echo stamped';
+  const parentOutput = join(f.root, 'parent-output');
+  writeFileSync(parentOutput, 'parent=untouched\n');
+  for (const reuse of ['true', 'false']) {
+    const result = runInstallAndStamp(
+      f,
+      action,
+      { package_cache: 'true' },
+      { runner: { environment: 'github-hosted' } },
+      { EMIT_REUSE: reuse, GITHUB_OUTPUT: parentOutput }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, reuse === 'true' ? '' : 'stamped\n');
+    assert.equal(readFileSync(parentOutput, 'utf8'), 'parent=untouched\n');
+  }
+});
 
 function restored(f) {
   assert.equal(f.git('rev-parse', 'HEAD'), f.head);
@@ -712,13 +791,14 @@ test('merge conflict is named without installing or qualifying a conflicted tree
   restored(f);
 });
 
-test('local tracked edits and untracked files survive without a merge or reinstall', t => {
+test('tracked edits left by unit tests fail closed and survive without a merge or reinstall', t => {
   const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
   f.write('feature.txt', 'local work not committed\n');
   f.write('untracked.txt', 'local untracked work\n');
   const before = f.git('status', '--porcelain');
   const result = transaction(f);
-  assert.equal(result.failed, false, result.text);
+  assert.equal(result.failed, true, result.text);
+  assert.match(result.text, /Exact-head tests modified tracked source/);
   assert.equal(f.git('status', '--porcelain'), before);
   assert.equal(
     readFileSync(join(f.repo, 'feature.txt'), 'utf8'),
@@ -732,7 +812,7 @@ test('local tracked edits and untracked files survive without a merge or reinsta
     f.installs().map(row => row.phase),
     ['initial']
   );
-  assert.equal(f.guards()[0].dependencyInputDigest, f.headDigest);
+  assert.equal(f.guards().length, 0);
   assert.equal(
     validateDependencyWorkspace(f.repo).dependencyInputDigest,
     f.headDigest

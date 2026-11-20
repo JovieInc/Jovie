@@ -7,6 +7,8 @@ import {
   isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableLoopbackBetterAuthHostIssue,
+  isNonActionableOwnerIdentityVerifiedMergeGuardEvent,
+  isNonActionableOwnerIdentityVerifiedMergeGuardIssue,
   isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
@@ -15,6 +17,7 @@ import {
   isNonActionableVercelIpcEvent,
   isNonActionableVercelIpcIssue,
   isOpaqueUpstashErrorJsonBag,
+  isOwnerIdentityVerifiedMergeGuardCapture,
   isSpotifyReleaseCreditBoundCapture,
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
@@ -23,6 +26,7 @@ import {
   LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
   MUSICFETCH_CUTOVER_IGNORE_ERRORS,
   MUSICFETCH_REMEDIATION_ISSUE,
+  OWNER_IDENTITY_VERIFIED_MERGE_GUARD_IGNORE_ERRORS,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
   VERCEL_IPC_SOCK_IGNORE_ERRORS,
@@ -616,6 +620,70 @@ describe('non-actionable Sentry issues', () => {
               },
             ],
           },
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('owner verified-merge guard (JOV-10124 / Sentry 7822218012)', () => {
+    const guardTitle =
+      'Error: Owner identity requires an explicit verified profile merge';
+
+    it('matches the Sentry/Linear title', () => {
+      expect(
+        isNonActionableOwnerIdentityVerifiedMergeGuardIssue({
+          title: guardTitle,
+        })
+      ).toBe(true);
+      expect(
+        OWNER_IDENTITY_VERIFIED_MERGE_GUARD_IGNORE_ERRORS.some(pattern =>
+          pattern.test(guardTitle)
+        )
+      ).toBe(true);
+    });
+
+    it('matches the capture message string and Error form', () => {
+      expect(
+        isOwnerIdentityVerifiedMergeGuardCapture(
+          'Owner identity requires an explicit verified profile merge'
+        )
+      ).toBe(true);
+      expect(
+        isOwnerIdentityVerifiedMergeGuardCapture(new Error(guardTitle))
+      ).toBe(true);
+      expect(isOwnerIdentityVerifiedMergeGuardCapture(undefined)).toBe(false);
+    });
+
+    it('matches a Sentry exception event', () => {
+      expect(
+        isNonActionableOwnerIdentityVerifiedMergeGuardEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value:
+                  'Owner identity requires an explicit verified profile merge',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated reconciliation captures', () => {
+      expect(
+        isNonActionableOwnerIdentityVerifiedMergeGuardIssue({
+          title: 'Error: Credited artist profile identity conflicts detected',
+        })
+      ).toBe(false);
+      expect(
+        isOwnerIdentityVerifiedMergeGuardCapture(
+          'Credited artist profile reconciliation failed closed'
+        )
+      ).toBe(false);
+      expect(
+        isNonActionableOwnerIdentityVerifiedMergeGuardEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
         })
       ).toBe(false);
     });

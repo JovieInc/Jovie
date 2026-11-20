@@ -30,6 +30,10 @@ const cert = (over: Record<string, unknown> = {}) => ({
   base: 'https://jov.ie/api/mcp',
   at: iso(-60_000),
   toolsListHash: HASH,
+  checks: [
+    { check: 'claim outcome persisted', status: 'PASS' },
+    { check: 'run-owned fixtures cleaned up', status: 'PASS' },
+  ],
   ...over,
 });
 const visual = (severeAt?: [string, number]) => ({
@@ -172,6 +176,30 @@ describe('listing readiness gate', () => {
       'base is not'
     );
   });
+
+  it.each(
+    [
+      undefined,
+      [],
+      [{ check: 'claim_url resolves', status: 'PASS' }],
+      [
+        { check: 'claim outcome persisted', status: 'SKIP' },
+        { check: 'run-owned fixtures cleaned up', status: 'PASS' },
+      ],
+      [
+        { check: 'claim outcome persisted', status: 'PASS' },
+        { check: 'run-owned fixtures cleaned up', status: 'FAIL' },
+      ],
+      [...cert().checks, { check: 'identity', status: 'FAIL' }],
+    ].map(checks => ({ checks }))
+  )(
+    'rejects an ok:true receipt without complete outcome checks: $checks',
+    ({ checks }) => {
+      const out = evaluate({ ...allPass, agentPathCert: cert({ checks }) });
+      expect(out.ready).toBe(false);
+      expect(out.gates.agentPathCert.status).toBe('fail');
+    }
+  );
 
   it('defers time checks when no clock is given', () => {
     const out = evaluate(

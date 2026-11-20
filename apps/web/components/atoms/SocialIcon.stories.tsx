@@ -59,3 +59,44 @@ export const UnknownPlatform: Story = {
     'aria-label': 'Unknown platform',
   },
 };
+
+/** Partial: some saved links have no icon data and fall back to the link glyph. */
+export const PartialMixedPlatforms: Story = {
+  render: () => (
+    <ul className='flex items-center gap-4'>
+      {[
+        ['spotify', 'Spotify'],
+        ['my-band-website', 'Band website'],
+        ['instagram', 'Instagram'],
+        ['local-radio-station', 'Local radio station'],
+      ].map(([platform, label]) => (
+        <li key={platform}>
+          <SocialIcon
+            platform={platform}
+            size={24}
+            aria-hidden={false}
+            aria-label={label}
+          />
+        </li>
+      ))}
+    </ul>
+  ),
+};
+
+/** Right-to-left: brand glyphs keep their orientation beside Arabic labels. */
+export const Rtl: Story = {
+  render: () => (
+    <ul dir='rtl' className='flex flex-col gap-3 text-sm text-secondary-token'>
+      {[
+        ['spotify', 'استمع على سبوتيفاي'],
+        ['apple_music', 'استمع على آبل ميوزك'],
+        ['youtube', 'شاهد على يوتيوب'],
+      ].map(([platform, label]) => (
+        <li className='flex items-center gap-2' key={platform}>
+          <SocialIcon platform={platform} size={20} />
+          <span>{label}</span>
+        </li>
+      ))}
+    </ul>
+  ),
+};

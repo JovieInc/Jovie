@@ -13,7 +13,6 @@ import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 
 const mockSetTheme = vi.fn();
 
-// Mock next-themes
 vi.mock('next-themes', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: mockSetTheme }),
 }));
@@ -69,7 +68,6 @@ describe('DevToolbar', () => {
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     mockSetTheme.mockClear();
 
-    // Mock clipboard API
     Object.assign(navigator, {
       clipboard: {
         writeText: vi.fn().mockResolvedValue(undefined),
@@ -124,6 +122,8 @@ describe('DevToolbar', () => {
     it('shows the full toolbar when no localStorage key is set (first visit)', () => {
       renderToolbar();
       expect(screen.getByText('development')).toBeInTheDocument();
+      // Name contains the visible "SW" (WCAG 2.5.3 label-content-name-mismatch).
+      expect(screen.getByLabelText('Enable SW').textContent).toContain('SW');
     });
 
     it('defaults chat usage to the minimally intrusive Dev pill', () => {

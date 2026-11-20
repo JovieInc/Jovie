@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { ContentReviewIdentity } from './publication';
 
 /**
  * A content kind is one schema-validated shape that ships as data instead of
@@ -22,6 +23,14 @@ export interface ContentKindDefinition<T> {
    */
   readonly defaultRecord: (key: string) => T;
   /**
+   * Read-time migration for a retired shape within the same schema revision.
+   * Pure: returns a record valid under the current schema, or null when not
+   * recognizable. A successful migration is served in place of the stale
+   * record without the "no longer validates" warning (JOV-12824). The
+   * supplied code default carries the renderer’s existing mode selection.
+   */
+  readonly migrate?: (stored: unknown, codeDefault?: T) => T | null;
+  /**
    * Cross-record rules a schema cannot express (registry membership, locked
    * fields, legal guards). Returns human-readable violations; empty = valid.
    */
@@ -32,6 +41,22 @@ export interface ContentKindDefinition<T> {
    * record that throws or drops content cannot be stored.
    */
   readonly smoke?: (data: T, key: string) => readonly string[];
+  /**
+   * Same-version evidence from the real preview renderer. Structural/resolver
+   * checks above are not rendering evidence. No hook means no publication.
+   * Implementations must honor cancellation and return their observed binding.
+   */
+  readonly renderSmoke?: (input: {
+    readonly data: T;
+    readonly key: string;
+    readonly identity: ContentReviewIdentity;
+    readonly signal: AbortSignal;
+  }) => Promise<{
+    readonly reviewDigest: string;
+    readonly versionId: string;
+    readonly renderBuildId: string;
+    readonly errors: readonly string[];
+  }>;
   /** Paths to revalidate after the live pointer moves for `key`. */
   readonly livePaths: (key: string) => readonly string[];
   /**

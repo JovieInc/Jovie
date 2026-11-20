@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Column Definitions Factory
  *
@@ -5,8 +7,9 @@
  * Uses refs for selection state to prevent column recreation on every selection change.
  */
 
-import type { RefObject } from 'react';
+import { type RefObject, useState } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import {
   convertContextMenuItems,
@@ -22,6 +25,37 @@ import {
 } from './column-renderers';
 
 const columnHelper = createColumnHelper<AdminCreatorProfileRow>();
+
+/**
+ * Row action menu whose contextual slot carries the open state. The
+ * system-b CSS contract keeps the affordance interactive while a row's menu
+ * is open (`[data-menu-open='true']`); without it the modal dropdown's
+ * portal steals the row's :hover and the trigger reverts to
+ * pointer-events: none, so the menuitem interaction dies mid-flight.
+ */
+function CreatorRowActionMenu({
+  profileId,
+  items,
+}: {
+  readonly profileId: string;
+  readonly items: TableActionMenuItem[];
+}) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const open = openMenuId === profileId;
+  return (
+    <div
+      className='system-b-table-contextual-action flex items-center justify-end'
+      data-menu-open={open || undefined}
+    >
+      <TableActionMenu
+        items={items}
+        align='end'
+        open={open}
+        onOpenChange={next => setOpenMenuId(next ? profileId : null)}
+      />
+    </div>
+  );
+}
 
 export interface ColumnFactoryParams {
   readonly page: number;
@@ -113,9 +147,10 @@ export function createCreatorProfileColumns({
         const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
         return (
-          <div className='flex items-center justify-end'>
-            <TableActionMenu items={actionMenuItems} align='end' />
-          </div>
+          <CreatorRowActionMenu
+            profileId={profile.id}
+            items={actionMenuItems}
+          />
         );
       },
       size: 64,

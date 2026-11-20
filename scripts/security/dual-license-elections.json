@@ -1,0 +1,14 @@
+{
+  "schema": "jovie.dual-license-elections/v1",
+  "policy": "Dependency review treats an SPDX OR as forbidden when any disjunct is on deny-licenses. An election records the permissive disjunct we distribute under. allow-dependencies-licenses then skips only the license check; vulnerability review still runs. The action matches package names and ignores versions, so an election covers every version of that name.",
+  "elections": [
+    {
+      "purl": "pkg:npm/node-forge",
+      "package": "node-forge",
+      "expression": "(BSD-3-Clause OR GPL-2.0)",
+      "elected": "BSD-3-Clause",
+      "deniedDisjunct": "GPL-2.0",
+      "reason": "Transitive APNs and PassKit parser via @parse/node-apn and passkit-generator. npm 1.4.0 (already on main) and 1.4.3 publish the same OR expression. We distribute under BSD-3-Clause."
+    }
+  ]
+}

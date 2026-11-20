@@ -225,6 +225,11 @@ describe('ReleaseDspLinks interactions', () => {
     expect(
       screen.queryByRole('button', { name: 'Add DSP link' })
     ).not.toBeInTheDocument();
+    // The provider picker trigger carries an accessible name and the info
+    // popover label is Title Case (UI-label lint contract).
+    expect(
+      screen.getByRole('button', { name: 'About Adding A DSP Link' })
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(onAddLink).toHaveBeenCalledTimes(1);
   });

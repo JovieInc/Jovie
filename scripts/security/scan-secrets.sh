@@ -9,38 +9,20 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
+# shellcheck source=scripts/security/scan-secrets-sonar-pin.sh
+. "$REPO_ROOT/scripts/security/scan-secrets-sonar-pin.sh"
 
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
-TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
+TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.99.8}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
-# Release downloads hit transient network resets (curl 35 connection resets on
-# ubuntu-latest, JOV-6809); a single failed attempt must not fail the scan.
-# Download to a temp file before extracting so a restarted transfer never
-# streams a concatenated response into tar.
-SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
-fetch_release_tarball() {
-  local url="$1" dest_dir="$2" member="$3"
-  local tmp attempt
-  tmp="$(mktemp)"
-  for attempt in 1 2 3; do
-    if curl -sSfL -o "$tmp" "$url" \
-      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
-      chmod +x "$dest_dir/$member"
-      rm -f "$tmp"
-      return 0
-    fi
-    if [[ $attempt -lt 3 ]]; then
-      echo "scanner download attempt $attempt failed; retrying" >&2
-      sleep "$SCAN_SECRETS_RETRY_DELAY"
-    fi
-  done
-  rm -f "$tmp"
-  echo "::error title=Secret scanner download failed::Could not fetch $member after 3 attempts ($url)." >&2
-  return 1
-}
+# Scanner binaries come from fetch-scanner.sh: warm cache, then the GitHub
+# release, then a container-image fallback (release CDN 504s, JOV-11689), with
+# the binary sha256 pinned in scanner-pins.txt on every path.
+# shellcheck source=scripts/security/fetch-scanner.sh
+source "$REPO_ROOT/scripts/security/fetch-scanner.sh"
 
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
@@ -51,22 +33,7 @@ ensure_gitleaks() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="x64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/gitleaks-${GITLEAKS_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/gitleaks" ]]; then
-    fetch_release_tarball \
-      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
-      "$cache_dir" gitleaks
-  fi
-  GITLEAKS_BIN="$cache_dir/gitleaks"
+  GITLEAKS_BIN="$(fetch_scanner gitleaks "$GITLEAKS_VERSION")" || exit 1
 }
 
 ensure_trufflehog() {
@@ -78,22 +45,7 @@ ensure_trufflehog() {
     return
   fi
 
-  local os arch cache_dir tarball
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) arch="amd64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-  esac
-  cache_dir="${TMPDIR:-/tmp}/trufflehog-${TRUFFLEHOG_VERSION}"
-  mkdir -p "$cache_dir"
-  tarball="trufflehog_${TRUFFLEHOG_VERSION}_${os}_${arch}.tar.gz"
-  if [[ ! -x "$cache_dir/trufflehog" ]]; then
-    fetch_release_tarball \
-      "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
-      "$cache_dir" trufflehog
-  fi
-  TRUFFLEHOG_BIN="$cache_dir/trufflehog"
+  TRUFFLEHOG_BIN="$(fetch_scanner trufflehog "$TRUFFLEHOG_VERSION")" || exit 1
 }
 
 trufflehog_exclude_args() {
@@ -145,11 +97,32 @@ run_gitleaks_checked() {
 }
 
 run_gitleaks_pre_commit() {
+  # These exact findings are public source/artifact SHA-256 values already on
+  # main, not credentials. A forward merge can stage those evidence records
+  # again. Gitleaks compares each baseline finding's path, rule, match, secret,
+  # and position; all other findings remain blocking. CI/history scans do not
+  # use this baseline.
+  local encoded baseline status
+  encoded="$(mktemp)"
+  baseline="$(mktemp)"
+  # Store the public baseline encoded because its literal match strings would
+  # themselves trigger the scanner. Decode only the pinned staged bytes.
+  if ! git show ':scripts/security/gitleaks-staged-public-digests.b64' >"$encoded" \
+    || ! node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); const text = fs.readFileSync(process.argv[1], "utf8").trim(); const bytes = Buffer.from(text, "base64"); if (bytes.toString("base64") !== text || crypto.createHash("sha256").update(bytes).digest("hex") !== "940e3fe1b1e76ced4011368f5a94d3fc4abc6016f22d2a6a458e4277141e0b75") process.exit(1); fs.writeFileSync(process.argv[2], bytes, {mode: 0o600});' "$encoded" "$baseline"; then
+    rm -f "$encoded" "$baseline"
+    echo '::error title=Secret scan baseline invalid::The staged public-digest baseline is missing or modified.' >&2
+    return 1
+  fi
+  rm -f "$encoded"
   echo "Running gitleaks protect on staged changes..."
+  status=0
   run_gitleaks_checked staged protect \
     --staged \
     --config "$REPO_ROOT/.gitleaks.toml" \
-    --verbose
+    --baseline-path "$baseline" \
+    --verbose || status=$?
+  rm -f "$baseline"
+  return "$status"
 }
 
 run_gitleaks_ci_pr() {
@@ -183,7 +156,7 @@ is_trufflehog_excluded() {
   return 1
 }
 
-# Filter only the known GitHubOauth2 false positive inside an action SHA.
+# Filter known false positives inside an action SHA.
 # Git findings must use the attributed commit's source, never the current file.
 # Keep the Commit lines consumed by the existing exact-range classifiers.
 filter_trufflehog_findings() {
@@ -224,6 +197,7 @@ filter_trufflehog_findings() {
         fi
       fi
     fi
+    skip_recorded_sonar_pin "$source" "$file" "$raw" "$commit" "$finding" && continue
     kept=$((kept + 1))
     printf 'Found result: %q:%q (detector %q)\n' "$file" "$line" "$(jq -r '.DetectorName' <<<"$finding")"
     [[ -z "$commit" ]] || printf 'Commit: %s\n' "$commit"
@@ -235,7 +209,7 @@ trufflehog_filesystem_scan() {
   local out log status=0 filtered_status=0
   out="$(mktemp)"
   log="$(mktemp)"
-  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json --fail >"$out" 2>"$log" || status=$?
+  "$TRUFFLEHOG_BIN" filesystem "$@" --no-update --no-verification --json --fail >"$out" 2>"$log" || status=$?
   cat "$log" >&2
   if grep -q 'encountered errors during scan' "$log"; then
     echo '::error title=Secret scan incomplete::TruffleHog aborted its filesystem scan; failing closed.' >&2
@@ -397,7 +371,7 @@ run_trufflehog_git() {
   out="$(mktemp)"
   status=0
   # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
     >"$out" 2>"$log" || status=$?
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
     echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
@@ -413,7 +387,7 @@ run_trufflehog_git() {
     : >"$log"
     : >"$out"
     # shellcheck disable=SC2046
-    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
       >"$out" 2>"$log" || status=$?
   fi
   cat "$log"

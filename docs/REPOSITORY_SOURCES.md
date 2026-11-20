@@ -15,11 +15,11 @@ Repository: `JovieInc/Jovie`
 
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
-- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33`)
+- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `584f19ccde29925286e32f566a2aa06c89efb4e2eb2bb2fc9ea5d56e2d190ac4`)
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a44a810c60e53213e6d3720322c545cb93c523a5ed8b68e27bdf031c66fc87b9`)
-- `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `3de175a6cf430cdb3868d7a4f63adc157a2892ceb9657c7e698ef46a79e08260`)
-- `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `0d08b2e18374c5a26ab2afc23beeef3580893530b26bf20de2b5e6576c1d3b2f`)
-- `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `3c2c00af57bad96eb27a90d2f0b42a879ec99aa14325bd57d521eeab3500a1e2`)
+- `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `0c966dcfe30be0c49a4e3b132eb6f64e9f447c2fb019bfa1c2254f8d5002aa2c`)
+- `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `c0ad92618ec7cb0bb4b0300e6af3b85a5443c42f44654f0cb5a5b926f66ff3f9`)
+- `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `8d21b8870a4660ea1d44c3ba8833b25460f6f2f2c72ee69bee3da01cef1ceeb6`)
 - `docs/company/REPOSITORY_SOURCE_CONTRACT.md` — Portable shared source; independently update pinned consumers after review (SHA-256 `f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f`)
 
 ## Pinned shared sources

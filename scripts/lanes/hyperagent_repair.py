@@ -21,8 +21,8 @@ Priority: revenue and golden-path PRs, then compounding PRs, then oldest first.
   hyperagent_repair.py status            # cap usage and the ranked queue (read-only)
   hyperagent_repair.py run [--pr N]      # one repair, end to end, with a ledger receipt
 
-api-budget: github-user-core 80/hr - per repair (about 1/90 min at the 24/day cap): up to 25 head-commit reads, claim read/post/delete, one compare, job-log reads, then a 2-min PR + required-check poll for up to 90 min
-api-budget: github-user-graphql 60/hr - one open-PR list per lane turn, up to 25 required-check reads, and the 2-min verification poll
+api-budget: github-user-core 80/hr - per repair (about 1/90 min at the 24/day cap): up to 25 head-commit reads, claim read/post/delete, one compare, job-log reads, then a backing-off PR + required-check poll (JOV-13097: 2 -> 4 -> 8 -> 15 min cap, ~10 polls over 90 min instead of ~45 at the old flat 2-min beat)
+api-budget: github-user-graphql 60/hr - one open-PR list per lane turn, up to 25 required-check reads, and the backing-off verification poll
 api-budget: hyperagent 30/hr - one create_thread per repair (shared 24/day cap), list_agents proof, get_thread every 15 s while it runs
 """
 from __future__ import annotations
@@ -45,7 +45,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hyperagent_lane  # noqa: E402
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 import pr_events  # noqa: E402
 
 REPO = "JovieInc/Jovie"
@@ -398,7 +398,7 @@ def verify(deps: Deps, number: int, base: str, attempt: str, stamps: dict) -> tu
     tip = head_commit(deps, head) or {}
     if f"{TRAILER}: {attempt}" not in (tip.get("message") or ""):
         return "unattributed-push", head
-    deadline = deps.clock() + deps.check_wait
+    poll_s, deadline = POLL_S, deps.clock() + deps.check_wait
     while True:
         live = gh_json(deps, ["pr", "view", str(number), "--repo", REPO, "--json", "state,headRefOid,mergeStateStatus"], {}) or {}
         if live.get("headRefOid") != head:
@@ -413,7 +413,8 @@ def verify(deps: Deps, number: int, base: str, attempt: str, stamps: dict) -> tu
             return ("repaired", head) if live.get("mergeStateStatus") != "DIRTY" else ("still-dirty", head)
         if deps.clock() >= deadline:
             return "checks-timeout", head
-        deps.sleep(POLL_S)
+        deps.sleep(min(poll_s, max(deadline - deps.clock(), 1)))  # JOV-13097: backoff bounded by the deadline
+        poll_s = min(poll_s * 2, 15 * 60)
 
 
 def pick(deps: Deps, only: int | None = None) -> tuple[dict | None, str | None, list, list[dict]]:
@@ -511,8 +512,7 @@ def repair(deps: Deps, only: int | None = None) -> dict:
         stamps["endedAt"] = now_iso(deps.clock())
         receipt["durationS"] = round(deps.clock() - started, 1)
         receipt.setdefault("success", False)
-        with (deps.runs / "ledger.jsonl").open("a") as ledger:
-            ledger.write(json.dumps(receipt) + "\n")
+        append_json_object(deps.runs / "ledger.jsonl", receipt)
         if pushed:
             deps.gh(["pr", "comment", str(number), "--repo", REPO, "--body",
                      f"🤖 hyperagent repair verdict={receipt['verdict']} kind={kind} run={run_id} "

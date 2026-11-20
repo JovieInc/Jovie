@@ -1045,7 +1045,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         def raced(coord, method, endpoint, body=None):
             if method == "POST" and "/append-" in str(body.get("ref", "")) and not triggered:
                 triggered.append(True)
-                result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
+                result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(wallSeconds=5), {}, now=self.now, coordination=self.coord)
                 self.assertEqual(result["reason"], "wallSeconds_budget_exhausted")
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()

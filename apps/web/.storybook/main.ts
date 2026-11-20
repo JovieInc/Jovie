@@ -14,10 +14,10 @@ const LIVE_CERT_STORIES = [
 ] as const;
 
 const FULL_CATALOG_STORIES = [
-  // Local story matrices (e.g. the surface-elevation visual-regression
-  // matrix, JOV-2156) that are not tied to a single component directory.
+  // Local story matrices not tied to one component directory (JOV-2156).
   './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  '../app/claim/ClaimArtistSearch.stories.tsx',
   // packages/ui atoms — highest-reuse surface; must enter Storybook
   // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
@@ -170,10 +170,6 @@ const config: StorybookConfig = {
           replacement: require.resolve('./next-themes-mock.tsx'),
         },
         {
-          find: '@/app/app/(shell)/dashboard/DashboardLayoutClient',
-          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
-        },
-        {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
           customResolver: resolvePrivacyBoundaryShellAlias,
@@ -191,6 +187,10 @@ const config: StorybookConfig = {
           // homepage Recently Shipped section; serve fixture releases instead.
           find: '@/lib/recent-releases',
           replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
+          find: '@/lib/cookies/consent',
+          replacement: require.resolve('./cookie-consent-mock.ts'),
         },
         {
           // lib/observability/revenue-spine imports node:crypto at module
@@ -391,9 +391,8 @@ const config: StorybookConfig = {
       target: 'esnext',
     };
 
-    // Keep optimizeDeps on, but never hold browser requests until crawl end.
-    // In this monorepo the crawl is huge; holding deps leaves the iframe spinner
-    // forever while /sb-vite/deps/* never materializes.
+    // Keep optimizeDeps on, but never hold browser requests until crawl end:
+    // the huge crawl would leave the iframe spinner with no /sb-vite/deps/*.
     config.optimizeDeps = {
       ...config.optimizeDeps,
       exclude: [...(config.optimizeDeps?.exclude || [])],
@@ -417,6 +416,7 @@ const config: StorybookConfig = {
           'react-dom/client',
           // Sentry's browser entry imports this CommonJS module by name.
           'next/constants.js',
+          'qrcode', // dynamic dep (QRCode.tsx): cold discovery reloads the iframe
         ]),
       ],
       esbuildOptions: {

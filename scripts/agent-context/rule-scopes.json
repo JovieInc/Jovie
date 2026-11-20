@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "9c9c6f8e5771a1c18794a77ae8ddba4aa914a2d785a143cf54bb4c8545f8446d"
+    "bodySha256": "1446014ed54249c991905ac56b9551be78a2f9fa86b2d569f1db048c5bda50e7"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "906cb63c08cbdaf6eb1fd6988470fc5f706896c3421485337a921e0d6333e67e"
+    "bodySha256": "a8260d3292af576dbc5e17b74b4ecae43c177d82c56a575650180016d1fbdec2"
   },
   {
     "file": ".claude/rules/db.md",
@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+    "bodySha256": "f0601db128861684e7e5defaaaa541e9d7e0a34d9ea119ccdbeb7cc025bffeae"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -51,7 +51,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "20b2194cdea5e41ae73fa440530de8bbb766af2fba4b168365bd2ce6d44b825f"
+    "bodySha256": "a76df58a1cfe405e9df2ef9e78e7a5150a4056a8a177ac27443005aa5fd0b428"
   },
   {
     "file": ".claude/rules/external-apis.md",
@@ -72,12 +72,27 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "4591abc2c1aa6e310d88ec278463142cfcdd413441bd1bd04998482b22793d01"
+    "bodySha256": "81ffe4da6cf4f869dd5d627f2beeb5188a982b8088b3df6b63b429c5fb29fe66"
   },
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
+    "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
+  },
+  {
+    "file": ".claude/rules/hermetic-ci.md",
+    "paths": [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**",
+      "**/test_*.py",
+      "**/vitest.config.*",
+      "**/playwright.config.*",
+      ".github/workflows/**",
+      ".github/actions/**",
+      ".github/scripts/**"
+    ],
+    "bodySha256": "bc62cf8f075ebef2862467117d0fa78d1483e27b8a82c8ccf7fc44771c24b737"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -87,7 +102,16 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
+    "bodySha256": "3e33ca26cafebfe4eb860bc67273bbe5b1d8d1af72accefcf79a34047d8f39d8"
+  },
+  {
+    "file": ".claude/rules/investor-deck.md",
+    "paths": [
+      "scripts/investor-deck/**",
+      "apps/web/lib/investors/**",
+      "apps/web/components/features/pitch/**"
+    ],
+    "bodySha256": "ebd4fe95307adefcf3ce0f8bf7ad5e5ff7ed876aa58a3ea6182b26d88daebabd"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -101,7 +125,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "196fc8918b6923e4d1b4d67430c4dc91b2bf7e88b85f92e1e833ad103971d3d0"
+    "bodySha256": "edf613bccb1ef6b81e36d48242e66668595380cf0218c0a8b4c3dca433bd9c8b"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -113,7 +137,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
+    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -124,12 +148,12 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "d923a03cbc44bea8b7104790889662c61a0f0da0117d1398630b02a6b8b361e7"
+    "bodySha256": "4b84d3552a7aa3bb2709d3d64850bf7e8b368407f4b2c9a3bbf57a50ff4a496a"
   },
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "6dcfcd4b052bd71873bfd431fdc265a7452384f4823f41575924c08598c53582"
+    "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
@@ -146,7 +170,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "e6284b5f534708944ad49285fdf6e02e3992001a1f34edfb3fd80eaca1fe60dd"
+    "bodySha256": "c7da1fd3f6b8e7274425e421cfcc49d402b247f44246fdcbd96ffaa2837236f7"
   },
   {
     "file": ".claude/rules/release.md",
@@ -157,7 +181,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "ca459e3269b5bae49e476b18e8d104ecde98d6e6de1bedd49e29d7b39f8b22cd"
+    "bodySha256": "f566f0df3d70659a7146b7388695f74745fef4fd459484e86dd9707d5b2c76e4"
   },
   {
     "file": ".claude/rules/security.md",
@@ -194,7 +218,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
+    "bodySha256": "85ca0524f0c139b54e2e5b7e9d6992d287ecab2ac27b68c9352d90b0a2f1f68a"
   },
   {
     "file": ".claude/rules/testing.md",
@@ -205,7 +229,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "2de4743474d59b6c724837d470568f896f811368f79f2e5b83d84f71880909f0"
+    "bodySha256": "44e87934ad88433f125cae3c7666c7eece49b4043e2d459ebffb60a91e0c6383"
   },
   {
     "file": ".claude/rules/ui.md",

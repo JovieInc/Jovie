@@ -20,7 +20,11 @@ import {
 } from './version-stamp.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
+// The desktop-release workflow runs this tooling from a trusted main checkout
+// (stamp-tools/) over the certified release tree; JOVIE_RELEASE_ROOT points
+// the fan-out reads/writes there while git evidence stays cwd-based. Unset =
+// the historical behavior: operate on the tree this script is checked out in.
+const ROOT = process.env.JOVIE_RELEASE_ROOT ?? join(__dirname, '..');
 const DESKTOP_PATH_PREFIX = 'apps/desktop/';
 const DESKTOP_PACKAGE_PATH = 'apps/desktop/package.json';
 const CHANGELOG_PATH = 'CHANGELOG.md';
@@ -260,6 +264,11 @@ function gitRaw(args) {
   return execFileSync('git', args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    // CHANGELOG.md carries the daily-changelog receipt comments and exceeds the
+    // 1 MiB execFileSync default (1.3 MB on main as of 2026-11); without this
+    // `git show <base>:CHANGELOG.md` throws ENOBUFS and the guard reads it as
+    // missing promoted release evidence.
+    maxBuffer: 64 * 1024 * 1024,
   });
 }
 
