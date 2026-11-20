@@ -24,7 +24,24 @@ import {
 } from '@/lib/dial/dial-layout';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
+import {
+  dialBrowserScheduler,
+  DIAL_HINT_SEEN_KEY,
+  type DialGesture,
+  isWheelNotch,
+  MIN_HAPTIC_GAP_MS,
+  MIN_PULSE_GAP_MS,
+  NO_HAPTIC,
+  normalizeWheel,
+  PAGE_STEP,
+  readHintSeen,
+  TAP_SLOP_PX,
+  TYPEAHEAD_RESET_MS,
+  writeHintSeen,
+} from './action-dial-helpers';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
+
+export { DIAL_HINT_SEEN_KEY };
 
 export interface ActionDialOption {
   readonly id: string;
@@ -40,68 +57,12 @@ interface ActionDialProps {
   readonly actionLabel: string;
   readonly groupLabel: string;
   readonly onActivate?: (id: string) => void;
-  /**
-   * Remembered destination id (cookie / prior choice). When it matches the
-   * centered option the dial surfaces a quiet "Remembered" state — clearer
-   * preferred-DSP feedback without a second control.
-   */
+  /** Cookie / prior choice id; quiet "Remembered" when it matches the center. */
   readonly preferredId?: string | null;
   readonly hint?: string | null;
   readonly className?: string;
   readonly disabled?: boolean;
 }
-
-const TAP_SLOP_PX = 6;
-const PAGE_STEP = 5;
-const MIN_HAPTIC_GAP_MS = 24;
-const MIN_PULSE_GAP_MS = 90;
-const TYPEAHEAD_RESET_MS = 700;
-const NO_HAPTIC = Symbol('no-haptic');
-export const DIAL_HINT_SEEN_KEY = 'jovie:dial-hint-seen';
-
-function readHintSeen(): boolean {
-  try {
-    return globalThis.localStorage.getItem(DIAL_HINT_SEEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeHintSeen(): void {
-  try {
-    globalThis.localStorage.setItem(DIAL_HINT_SEEN_KEY, '1');
-  } catch {}
-}
-
-interface Gesture {
-  readonly id: number;
-  readonly startY: number;
-  moved: boolean;
-  readonly caught: boolean;
-}
-
-function normalizeWheel(event: WheelEvent): number {
-  if (event.deltaMode === 1) return event.deltaY * ROW_STEP_PX;
-  if (event.deltaMode === 2) return event.deltaY * ROW_STEP_PX * 3;
-  return event.deltaY;
-}
-
-function isWheelNotch(event: WheelEvent): boolean {
-  if (event.deltaMode === 1) return true;
-  const magnitude = Math.abs(event.deltaY);
-  return (
-    Number.isInteger(event.deltaY) &&
-    magnitude >= 100 &&
-    (magnitude % 100 === 0 || magnitude % 120 === 0)
-  );
-}
-
-const browserScheduler = {
-  now: () => performance.now(),
-  request: (callback: (time: number) => void) =>
-    requestAnimationFrame(callback),
-  cancel: (handle: number) => cancelAnimationFrame(handle),
-};
 
 export function ActionDial({
   options,
@@ -126,7 +87,6 @@ export function ActionDial({
 
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [restIndex, setRestIndex] = useState(selectedIndex);
-  // Hidden until storage says this device has not used the dial yet (no flash).
   const [showHint, setShowHint] = useState(false);
   const hintId = `${uid}-hint`;
   const hintGlyphRef = useRef<HTMLSpanElement | null>(null);
@@ -140,7 +100,7 @@ export function ActionDial({
   const iconRefs = useRef(new Map<number, HTMLElement>());
   const tappableRef = useRef(new WeakMap<HTMLElement, boolean>());
   const positionRef = useRef(selectedIndex);
-  const gestureRef = useRef<Gesture | null>(null);
+  const gestureRef = useRef<DialGesture | null>(null);
   const suppressClickRef = useRef(false);
   const suppressHapticRef = useRef<symbol | null>(null);
   const lastHapticRef = useRef(0);
@@ -203,10 +163,8 @@ export function ActionDial({
     }
     for (const [index, icon] of iconRefs.current) {
       const distance = index - position;
-      const abs = Math.abs(distance);
       icon.style.transform = `translate3d(0, ${distance * 100}%, 0)`;
-      // Fractional crossfade keeps the CTA icon settling coupled to the reel.
-      icon.style.opacity = String(Math.max(0, 1 - abs));
+      icon.style.opacity = String(Math.max(0, 1 - Math.abs(distance)));
     }
   }, []);
 
@@ -236,7 +194,7 @@ export function ActionDial({
       count,
       position: positionRef.current,
       reducedMotion,
-      scheduler: browserScheduler,
+      scheduler: dialBrowserScheduler,
       onFrame: paint,
       onIndexChange: index => {
         activeIndexRef.current = index;
@@ -491,8 +449,7 @@ export function ActionDial({
       <div
         className={cn(
           'relative overflow-hidden',
-          // Tighter vertical stack with 52px row steps; keep one composition.
-          count === 1 ? 'h-19 min-h-19' : 'h-50 min-h-50'
+          count === 1 ? 'h-19 min-h-19' : 'h-53 min-h-53'
         )}
       >
         {count > 1 ? (
@@ -528,7 +485,7 @@ export function ActionDial({
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
                   data-preferred={preferredRow ? 'true' : undefined}
-                  className='absolute inset-x-3 top-19 flex h-12 min-h-12 items-center justify-center gap-2 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
+                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
                   style={{
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
@@ -562,7 +519,7 @@ export function ActionDial({
           ref={actionRef}
           className={cn(
             'absolute inset-x-3 z-10',
-            count === 1 ? 'top-3' : 'top-19'
+            count === 1 ? 'top-3' : 'top-20'
           )}
         >
           <SmartLinkProviderButton
@@ -584,11 +541,6 @@ export function ActionDial({
           />
         </div>
       </div>
-      {/* JOV-INV-019 image-contrast: text-muted-foreground resolves to
-          text-secondary-token, which measures 4.48:1 against a real photo
-          background on the pay hint (just under the 4.5:1 floor); bump one
-          rung to text-primary-token for margin, same fix as the tab-bar
-          scrim label. */}
       {count > 1 ? (
         <p id={hintId} className='sr-only'>
           {hint}
@@ -632,7 +584,7 @@ export function ActionDial({
                 className='h-3.5 w-3.5'
                 aria-hidden='true'
               >
-                {/* Lucide chevrons-up-down geometry; inlined so the dial has no icon-package dependency. */}
+                {/* Lucide chevrons-up-down; inlined (no icon package). */}
                 <path d='m7 15 5 5 5-5' />
                 <path d='m7 9 5-5 5 5' />
               </svg>
