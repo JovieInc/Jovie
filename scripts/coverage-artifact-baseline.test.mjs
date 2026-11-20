@@ -12,8 +12,17 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { restoreCoverageBaseline } from './lib/publish-coverage-report.mjs';
 
+/**
+ * @typedef {Error & {
+ *   status?: number,
+ *   stderr?: string,
+ *   exitCode?: number,
+ * }} QuotaError
+ */
+
+/** @returns {QuotaError} */
 function quotaDeferred(message = 'primary after 1 attempt(s)') {
-  const error = new Error(message);
+  const error = /** @type {QuotaError} */ (new Error(message));
   error.status = 75;
   error.stderr =
     '::warning::github-quota-deferred: gh api repos/JovieInc/Jovie/actions/workflows/test-coverage-audit.yml/runs?branch=main&status=success&per_page=1 primary after 1 attempt(s) until 2026-11-19T19:52:53.000Z; not a verdict on this change.\n';
@@ -309,7 +318,14 @@ test('a GitHub quota deferral is not a verdict and does not replace the baseline
 
   assert.throws(
     () => restoreCoverageBaseline({ ...f, gh: quota }),
-    error => error.status === 75 && /github-quota-deferred/.test(error.message)
+    error => {
+      if (!(error instanceof Error)) return false;
+      const quotaError = /** @type {QuotaError} */ (error);
+      return (
+        quotaError.status === 75 &&
+        /github-quota-deferred/.test(quotaError.message)
+      );
+    }
   );
   assert.equal(warnings.length, 0);
   assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
@@ -372,7 +388,7 @@ test('a GitHub quota deferral is not a verdict and does not replace the baseline
     );
   };
   const exitCodeOnly = () => {
-    const error = new Error('shed');
+    const error = /** @type {QuotaError} */ (new Error('shed'));
     error.exitCode = 75;
     throw error;
   };
