@@ -6,13 +6,17 @@ const mockRecordEngagement = vi.hoisted(() => vi.fn());
 const mockScheduleAfter = vi.hoisted(() => vi.fn());
 const mockSafeEqualString = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/email/tracking', () => ({
-  verifyTrackingToken: mockVerifyTrackingToken,
-  recordEngagement: mockRecordEngagement,
-  hashIP: vi.fn(() => 'iphash'),
-  inferDeviceType: vi.fn(() => 'desktop'),
-  safeEqualString: mockSafeEqualString,
-}));
+vi.mock('@/lib/email/tracking', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/email/tracking')>();
+  return {
+    ...actual,
+    verifyTrackingToken: mockVerifyTrackingToken,
+    recordEngagement: mockRecordEngagement,
+    hashIP: vi.fn(() => 'iphash'),
+    inferDeviceType: vi.fn(() => 'desktop'),
+    safeEqualString: mockSafeEqualString,
+  };
+});
 
 vi.mock('@/lib/next/schedule-after', () => ({
   scheduleAfter: mockScheduleAfter,
@@ -98,7 +102,7 @@ describe('GET /api/email/track/click (SEC-18)', () => {
     expect(mockScheduleAfter).not.toHaveBeenCalled();
   });
 
-  it('fails closed when a valid token has no bound clickUrl', async () => {
+  it('allows first-party destinations for legacy unbound tokens', async () => {
     mockVerifyTrackingToken.mockReturnValue({
       emailType: 'claim_invite',
       referenceId: 'ref-1',
@@ -109,12 +113,33 @@ describe('GET /api/email/track/click (SEC-18)', () => {
     const response = await GET(
       clickRequest({
         t: 'legacy-token-without-url',
-        u: 'https://jov.ie/claim',
+        u: 'https://jov.ie/claim/abc',
+      })
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('https://jov.ie/claim/abc');
+    expect(mockScheduleAfter).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed for unbound tokens pointing at non-first-party hosts', async () => {
+    mockVerifyTrackingToken.mockReturnValue({
+      emailType: 'claim_invite',
+      referenceId: 'ref-1',
+      email: 'fan@example.com',
+    });
+
+    const { GET } = await import('@/app/api/email/track/click/route');
+    const response = await GET(
+      clickRequest({
+        t: 'legacy-token-without-url',
+        u: 'https://evil.example/phish',
       })
     );
 
     expect(response.status).toBe(400);
     expect(response.headers.get('location')).toBeNull();
+    expect(mockScheduleAfter).not.toHaveBeenCalled();
   });
 
   it('redirects to the HMAC-bound destination on a valid token', async () => {

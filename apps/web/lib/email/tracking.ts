@@ -144,6 +144,31 @@ export function safeEqualString(a: string, b: string): boolean {
 }
 
 /**
+ * First-party hosts used in historical email click destinations
+ * (claim-invite / recovery). Used only as a legacy unbound-token fallback —
+ * never as a substitute for HMAC binding of arbitrary destinations.
+ */
+const FIRST_PARTY_CLICK_HOST_SUFFIXES = ['jov.ie', 'meetjovie.com'] as const;
+
+/**
+ * True when `url` is http(s) to a Jovie product host.
+ * Rejects lookalikes like `jov.ie.evil.com`.
+ */
+export function isFirstPartyClickDestination(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    return FIRST_PARTY_CLICK_HOST_SUFFIXES.some(
+      suffix => host === suffix || host.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Build a tracking pixel URL for open tracking.
  */
 export function buildOpenTrackingUrl(

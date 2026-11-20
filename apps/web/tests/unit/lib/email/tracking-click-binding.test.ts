@@ -91,4 +91,24 @@ describe('email click tracking URL binding (SEC-18)', () => {
     const payload = verifyTrackingToken(token!);
     expect(payload?.clickUrl).toBeUndefined();
   });
+
+  it('classifies first-party click destinations for legacy fallback', async () => {
+    const { isFirstPartyClickDestination } = await import(
+      '@/lib/email/tracking'
+    );
+
+    expect(isFirstPartyClickDestination('https://jov.ie/claim/x')).toBe(true);
+    expect(isFirstPartyClickDestination('https://staging.jov.ie/start')).toBe(
+      true
+    );
+    expect(isFirstPartyClickDestination('https://meetjovie.com/claim/x')).toBe(
+      true
+    );
+    expect(isFirstPartyClickDestination('https://jov.ie.evil.example/x')).toBe(
+      false
+    );
+    expect(
+      isFirstPartyClickDestination('https://evil.example/?host=jov.ie')
+    ).toBe(false);
+  });
 });

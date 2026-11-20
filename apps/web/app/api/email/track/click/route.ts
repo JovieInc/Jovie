@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   hashIP,
   inferDeviceType,
+  isFirstPartyClickDestination,
   recordEngagement,
   safeEqualString,
   verifyTrackingToken,
@@ -83,9 +84,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Destination must be HMAC-bound into the token — reject swapped `u`.
-    if (!payload.clickUrl || !safeEqualString(payload.clickUrl, targetUrl)) {
-      logger.warn('[Email Click Track] Click URL does not match token');
+    // Resolve redirect destination without reintroducing open redirects:
+    // - New tokens: `clickUrl` is HMAC-bound; query `u` must match.
+    // - Legacy unbound tokens: allow only first-party hosts (claim/recovery).
+    let redirectUrl: string;
+    if (payload.clickUrl) {
+      if (!safeEqualString(payload.clickUrl, targetUrl)) {
+        logger.warn('[Email Click Track] Click URL does not match token');
+        return NextResponse.json(
+          { error: 'Invalid tracking token' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      redirectUrl = payload.clickUrl;
+    } else if (isFirstPartyClickDestination(targetUrl)) {
+      redirectUrl = targetUrl;
+    } else {
+      logger.warn(
+        '[Email Click Track] Unbound token with non-first-party destination'
+      );
       return NextResponse.json(
         { error: 'Invalid tracking token' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -98,9 +115,6 @@ export async function GET(request: NextRequest) {
     const ipAddress = extractClientIP(headersList);
     const country = headersList.get('x-vercel-ip-country') ?? undefined;
     const city = headersList.get('x-vercel-ip-city') ?? undefined;
-
-    // Prefer the HMAC-bound destination over the query string.
-    const redirectUrl = payload.clickUrl;
 
     // Record the click event after response is sent (survives serverless teardown)
     const engagementData = {
