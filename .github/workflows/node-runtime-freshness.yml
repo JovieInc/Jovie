@@ -36,9 +36,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/apple-prior"
           # api-client writes artifact /zip bodies to a real file (not a pipe) and
           # returns raw bytes — UTF-8 pipe decode would corrupt the archive.
+          # Fail closed on list errors (network/rate-limit/5xx/exit 75 deferred);
+          # only a successful empty jq result means "no prior yet".
+          set +e
           id="$(node packages/api-client/cli.ts gh --priority poll -- api \
             "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=apple-change-receipt&per_page=100" \
-            --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+            --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty')"
+          list_status=$?
+          set -e
+          if [ "$list_status" -ne 0 ]; then
+            echo "::error::Failed to list apple-change-receipt artifacts (exit ${list_status})."
+            exit "$list_status"
+          fi
           if [ -z "${id}" ]; then
             echo "No prior apple-change-receipt artifact yet; revision detection starts next run."
             exit 0
