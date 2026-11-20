@@ -89,6 +89,50 @@ test('enriched clean stamp is in-flight', async () => {
   assert.match(result.reason, /mergeable_state=clean/);
 });
 
+test('blocked keep-owned stamp within dwell grace stays in-flight', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 2 * 60 * 60 * 1000).toISOString();
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    nowMs,
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      return {
+        ok: true,
+        json: async () =>
+          stampListRow({ mergeable_state: 'blocked', created_at: created }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.match(result.reason, /mergeable_state=blocked/);
+});
+
+test('blocked keep-owned stamp past dwell max is not in-flight', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 7 * 60 * 60 * 1000).toISOString();
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    nowMs,
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      return {
+        ok: true,
+        json: async () =>
+          stampListRow({ mergeable_state: 'blocked', created_at: created }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /stamp-dwell-exceeded/);
+});
+
 test('paginates open PRs so stamp past first page is found', async () => {
   const page2 =
     'https://api.github.com/repos/JovieInc/Jovie/pulls?state=open&base=main&per_page=100&page=2';

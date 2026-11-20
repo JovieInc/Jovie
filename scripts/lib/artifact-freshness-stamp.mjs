@@ -3,6 +3,7 @@
  *
  * Keep-owned cursor/stable-desktop-publish-* means publish is in the normal
  * path — suppress Summer page, still block resolve. DIRTY/exhausted do not.
+ * Keep-owned stamps older than STAMP_IN_FLIGHT_MAX_AGE_MS escalate (page).
  */
 import {
   findOpenDesktopStampPr,
@@ -12,6 +13,24 @@ import {
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_REPO = 'JovieInc/Jovie';
 const MAX_PULL_PAGES = 10;
+/** Ship now: 6h grace. Re-evaluate when queue dwell norms change. */
+export const STAMP_IN_FLIGHT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * @param {string | null | undefined} createdAt
+ * @param {number} [nowMs]
+ * @param {number} [maxAgeMs]
+ */
+export function stampDwellExceeded(
+  createdAt,
+  nowMs = Date.now(),
+  maxAgeMs = STAMP_IN_FLIGHT_MAX_AGE_MS
+) {
+  if (typeof createdAt !== 'string' || createdAt.length === 0) return false;
+  const createdMs = Date.parse(createdAt);
+  if (!Number.isFinite(createdMs)) return false;
+  return nowMs - createdMs > maxAgeMs;
+}
 
 /** @param {string | null | undefined} link */
 export function nextLinkUrl(link) {
@@ -27,11 +46,15 @@ export function nextLinkUrl(link) {
  *   readonly repo?: string;
  *   readonly token?: string | null;
  *   readonly fetchImpl?: typeof fetch;
+ *   readonly nowMs?: number;
+ *   readonly maxAgeMs?: number;
  * }} [input]
  */
 export async function fetchDesktopPublishInFlight(input = {}) {
   const repo = input.repo ?? DEFAULT_REPO;
   const fetchImpl = input.fetchImpl ?? fetch;
+  const nowMs = input.nowMs ?? Date.now();
+  const maxAgeMs = input.maxAgeMs ?? STAMP_IN_FLIGHT_MAX_AGE_MS;
   const headers = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'jovie-artifact-freshness',
@@ -111,8 +134,20 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       html_url: detail.html_url ?? listed.html_url,
       head: detail.head ?? listed.head,
       labels: detail.labels ?? listed.labels,
+      created_at: detail.created_at ?? listed.created_at,
     };
     const decision = stampOwnershipDecision(pr);
+    if (
+      decision.action === 'keep' &&
+      stampDwellExceeded(pr.created_at, nowMs, maxAgeMs)
+    ) {
+      return {
+        inFlight: false,
+        reason: `stamp-dwell-exceeded:${decision.reason}`,
+        number: decision.number ?? null,
+        url: decision.url ?? null,
+      };
+    }
     return {
       inFlight: decision.action === 'keep',
       reason: decision.reason,
