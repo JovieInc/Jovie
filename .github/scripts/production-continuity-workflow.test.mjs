@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 
 import { normalizeDeliveryEvent } from '../../scripts/backlog-orchestrator/delivery-state-machine.mjs';
 
@@ -11,6 +13,79 @@ const workflow = readFileSync(
   ),
   'utf8'
 );
+
+function assertRuntimePinned(source) {
+  const { jobs } = load(source);
+  for (const name of ['observe', 'remediation']) {
+    const { steps } = jobs[name];
+    const checkout = steps.findIndex(step =>
+      step.uses?.startsWith('actions/checkout@')
+    );
+    const prime = steps.findIndex(
+      step => step.uses === './.github/actions/prime-node-toolcache'
+    );
+    const setup = steps.findIndex(
+      step =>
+        step.uses?.startsWith('actions/setup-node@') &&
+        step.with?.['node-version-file'] === '.nvmrc'
+    );
+    const firstNode = steps.findIndex(step => /\bnode\s/.test(step.run ?? ''));
+    assert.ok(
+      checkout >= 0 && checkout < prime && prime < setup && setup < firstNode,
+      `${name} must prime and select pinned Node before executing policy code`
+    );
+  }
+}
+
+it('selects the TypeScript-capable repository Node before both continuity entrypoints', () => {
+  assertRuntimePinned(workflow);
+});
+
+it('rejects missing, late or unprimed Node setup in either workflow job', () => {
+  for (const name of ['observe', 'remediation']) {
+    for (const mutation of ['missing', 'late', 'unprimed']) {
+      const policy = load(workflow);
+      const steps = policy.jobs[name].steps;
+      const index = steps.findIndex(step =>
+        step.uses?.startsWith('actions/setup-node@')
+      );
+      if (mutation === 'missing') steps.splice(index, 1);
+      if (mutation === 'late') steps.push(...steps.splice(index, 1));
+      if (mutation === 'unprimed')
+        steps.splice(
+          steps.findIndex(
+            step => step.uses === './.github/actions/prime-node-toolcache'
+          ),
+          1
+        );
+      assert.throws(
+        () => assertRuntimePinned(JSON.stringify(policy)),
+        new RegExp(name)
+      );
+    }
+  }
+});
+
+it('loads the real remediation entrypoint with the selected repository runtime', () => {
+  const child = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(new URL('./production-continuity.mjs', import.meta.url)),
+      '--remediation-conclusion',
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        OBSERVE_RESULT: 'success',
+        OBSERVE_STATUS: 'healthy',
+      },
+      timeout: 10_000,
+    }
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), 'success');
+});
 
 it('keeps the external guard bounded, ordered, deduplicated, and credential-free', () => {
   for (const required of [
