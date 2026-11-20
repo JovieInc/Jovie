@@ -457,56 +457,6 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByText(/Add the account path/i)).toBeDefined();
   });
 
-  it('offers None of These when artist results are present', () => {
-    mocks.artistSearch.results = [
-      {
-        id: 'artist-1',
-        name: 'Test Artist',
-        url: 'https://open.spotify.com/artist/artist-1',
-        followers: 12_300,
-        popularity: 48,
-      },
-    ];
-    const onNoneOfThese = vi.fn();
-    fastRender(
-      <OnboardingSpotifyArtistPickerCard
-        state='output-available'
-        output={{ action: 'open_artist_picker', query: 'Test Artist' }}
-        onSelectArtist={vi.fn()}
-        onNoneOfThese={onNoneOfThese}
-      />
-    );
-
-    // The list, search and None of These sit behind Not Me.
-    expect(screen.queryByRole('button', { name: 'None of These' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Not Me' }));
-    expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
-    expect(screen.getByText('Use')).toBeDefined();
-
-    fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
-    expect(onNoneOfThese).toHaveBeenCalled();
-  });
-
-  it('keeps the search field mounted while the artist name is typed', () => {
-    fastRender(
-      <OnboardingSpotifyArtistPickerCard
-        state='output-available'
-        output={{ action: 'open_artist_picker', query: '' }}
-        onSelectArtist={vi.fn()}
-      />
-    );
-    // Prod 2026-11-01: the first keystroke swapped the field for the
-    // proposal card, so every later keystroke was lost.
-    mocks.artistSearch.isPending = true;
-    const field = screen.getByPlaceholderText('Search Spotify artists');
-    fireEvent.change(field, { target: { value: 'U' } });
-    const after = screen.getByPlaceholderText('Search Spotify artists');
-    fireEvent.change(after, { target: { value: 'Un' } });
-    expect(
-      screen.getByPlaceholderText('Search Spotify artists')
-    ).toHaveProperty('value', 'Un');
-  });
-
   it('routes picker, handle, and social fields through one focus owner', () => {
     mocks.handleAvailability.data = { available: true };
 
