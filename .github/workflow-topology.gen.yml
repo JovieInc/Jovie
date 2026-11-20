@@ -413,8 +413,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:publish
-    jobCount: 2
+    terminalReceipt: job:rebuild-deferred-desktop
+    jobCount: 4
   - name: desktop-release
     path: .github/workflows/desktop-release.yml
     active: true
