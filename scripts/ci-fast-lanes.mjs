@@ -37,7 +37,6 @@ import {
   lanesCoverageRun,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
-
 export {
   LANES_COVERAGE_FLOORS,
   LANES_COVERAGE_GROUP_SHARDS,
@@ -1033,6 +1032,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/design/pen-data-backed-ship.test.mjs',
+  'scripts/design-write-swarm/design-write-swarm.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
