@@ -43,6 +43,14 @@ To keep a WIP draft parked, pass `--park`: it writes
 `<!-- jovie-auto-ready: park -->`, and a refreshed body keeps it until
 `--on-green` replaces it. Holds, parks and controlled-proof markers still win.
 
+A draft that must wait on a designated outside review — or must not be readied
+at all — pins itself deterministically (JOV-13139): the writer or an agent adds
+the `needs-outside-review` (or `do-not-ready`) label, or writes the park
+marker; prose like "stays DRAFT" in the body is not machine-readable and never
+holds the flip. Both undraft controllers also refuse the flip while GitHub's
+`reviewDecision` is `CHANGES_REQUESTED` (an unresolved must-fix review); an
+approving review or a re-read clears it without a label.
+
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
