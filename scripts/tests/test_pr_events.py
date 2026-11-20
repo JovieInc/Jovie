@@ -2009,11 +2009,26 @@ class GapTest(unittest.TestCase):
         shell = Shell({("gh", "api", "graphql"): page})
         events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "the breaker's hold is not the sweep's to lift")
-        # A record for a moved head (or none) puts the label back in ordinary repair.
+        # A record for a moved head (or none) puts the label back in ordinary repair when the
+        # episode was applied by the relay (github-actions), not jovie-bot.
         (self.host.state / "queue-breaker.json").write_text(json.dumps({"8": {"head": "b" * 40, "at": NOW}}))
-        shell = Shell({("gh", "api", "graphql"): page})
+        shell = Shell({("gh", "api", "graphql"): red_episode_route(page)})
         events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
         self.assertIn(["gh", "api", "-X", "DELETE", f"repos/{events.REPO}/issues/8/labels/lane-fix-red"], shell.calls)
+
+    def test_reconcile_does_not_unlabel_jovie_bot_merge_group_red(self):
+        # main-red-eject failing-head applies lane-fix-red as jovie-bot without a
+        # queue-breaker.json row; provenance alone must protect the episode.
+        row = {**self.node(9, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid="c" * 40),
+               "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+               "labels": {"nodes": [{"name": "lane-fix-red"}]}}
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                         "nodes": [row]}}}}
+        linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}})
+        shell = Shell({("gh", "api", "graphql"): red_episode_route(page, login="jovie-bot[bot]")})
+        events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
+                         "jovie-bot merge-group hold is not the sweep's to lift")
 
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")

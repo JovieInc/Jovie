@@ -101,6 +101,15 @@ describe('decideFailingHead', () => {
     expect(body).toContain('lane-fix-red');
     expect(body).not.toContain('re-admits it when checks pass');
   });
+
+  it('does not claim lane-fix-red when label apply failed', () => {
+    const body = failingHeadComment({ sha: 'abc' }, ['PR Ready'], {
+      labeled: false,
+    });
+    expect(body).toContain('JOV-6620');
+    expect(body).toContain('repair-label apply failed');
+    expect(body).not.toContain('`lane-fix-red` keeps');
+  });
 });
 
 describe('stuckHead failing-head pass', () => {

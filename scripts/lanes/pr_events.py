@@ -2591,9 +2591,15 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if not set(failing) & set(incidents) and add_label(number, "red", lane.sh):
             labeled.append((number, "red"))
     for number, kind in plan["unlabel"]:
-        # JOV-8492: the breaker still holds this head (merge-group reds invisible to the check above).
-        if kind == "red" and (breaker_held.get(str(number)) or {}).get("head") == (by_number.get(number) or {}).get("headRefOid"):
-            continue
+        # JOV-8492: merge-group holds (queue breaker + main-red-eject failing-head) are
+        # jovie-bot episodes. The required-green rollup cannot see those reds; clearing the
+        # label re-arms silent same-head dead-ends. Protect by breaker state OR provenance.
+        if kind == "red":
+            held_head = (breaker_held.get(str(number)) or {}).get("head")
+            if held_head == (by_number.get(number) or {}).get("headRefOid"):
+                continue
+            if label_episode_applier(number, LANE_FIX_RED, lane.sh) != RELAY_RED_LABELLER:
+                continue
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}
