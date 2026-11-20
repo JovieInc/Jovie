@@ -92,6 +92,11 @@ function readListenCookie(): string | undefined {
  * Hop runs in `useLayoutEffect` (before paint) with a fire-and-forget beacon
  * so preferred-DSP fans never wait on `/api/track` or see a blank pre-hop
  * beat. Never await tracking on this path.
+ *
+ * Craft lock: this hop is the speed path for remembered preference / `?dsp=`.
+ * It does not replace the DSP dial (`MusicServiceDial` / `ActionDial`). First
+ * visits, Back, same-session revisits, and `noredirect=1` still render the
+ * dial on the smartlink page — never a button wall.
  */
 export function PreferredDspRedirect({
   providerLinks,

@@ -262,10 +262,15 @@ describe('GET /s/[code]', () => {
   });
 
   it('flushes the 302 before the rate limiter resolves (redirect latency budget)', async () => {
-    let releaseLimit: (result: { success: boolean }) => void = () => undefined;
+    let releaseLimit: (result: {
+      success: boolean;
+      limit: number;
+      remaining: number;
+      reset: Date;
+    }) => void = () => undefined;
     vi.mocked(publicClickLimiter.limit).mockImplementationOnce(
       () =>
-        new Promise<{ success: boolean }>(resolve => {
+        new Promise(resolve => {
           releaseLimit = resolve;
         })
     );
@@ -285,7 +290,12 @@ describe('GET /s/[code]', () => {
     );
     expect(mocks.withSystemIngestionSession).not.toHaveBeenCalled();
 
-    releaseLimit({ success: true });
+    releaseLimit({
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date(Date.now() + 60_000),
+    });
     await Promise.all(mocks.afterTasks.splice(0));
     expect(mocks.withSystemIngestionSession).toHaveBeenCalled();
   });
