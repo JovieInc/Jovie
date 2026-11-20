@@ -84,9 +84,7 @@ describe('GET /go/[id]', () => {
     });
 
     expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/out/sens1'
-    );
+    expect(response.headers.get('location')).toBe('http://localhost/out/sens1');
     expect(mocks.afterTasks).toHaveLength(0);
     expect(mocks.incrementClickCount).not.toHaveBeenCalled();
   });
