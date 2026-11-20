@@ -180,8 +180,8 @@ one click.
    (at most every 5 minutes), and via the 03:17 LaunchAgent when closed. It
    downloads in the background and installs on quit. A menu item and the
    renderer pill offer "Restart to install update". A running app also
-   restarts into a downloaded update between 01:00 and 06:00 local time
-   after 20 idle minutes, never while audio plays or a composer holds text.
+   restarts into a downloaded update after 20 idle minutes at any local hour,
+   never while audio plays or a composer holds text.
 
 Hosted Ovie (`/app`, `/hud`) loads live from `jov.ie`, so web deploys need no
 native release. The app polls `/api/health/build-info` every minute. The HUD
