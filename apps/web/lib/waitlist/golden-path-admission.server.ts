@@ -39,7 +39,8 @@ async function readVerdict(): Promise<GoldenPathVerdict | null> {
   try {
     const report = await readCachedAcquisitionEligibility();
     if (!report) return null;
-    return report.eligible === true ? report.verdict : 'UNKNOWN';
+    if (report.eligible === true) return report.verdict;
+    return report.verdict === 'BLOCKED' ? 'BLOCKED' : 'UNKNOWN';
   } catch (error) {
     await captureError('Golden path verdict unreadable for admission', error, {
       route: 'lib/waitlist/golden-path-admission.server',

@@ -17,6 +17,7 @@ import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
 } from '@/lib/waitlist/state-machine';
+import { isStatusUpgrade } from '@/lib/waitlist/status-precedence';
 
 export type WaitlistApprovalResult =
   | { outcome: 'not_found' }
@@ -28,6 +29,7 @@ export type WaitlistApprovalResult =
       profileId: string | null;
       email: string;
       fullName: string | null;
+      userId: string;
       clerkId: string | null;
       /** A held profile was marked proof-only; the operator card is filed after commit. */
       proofRequest?: {
@@ -41,7 +43,11 @@ export type WaitlistDisapprovalResult =
   | { outcome: 'not_found' }
   | { outcome: 'already_new' }
   | { outcome: 'terminal'; status: string }
-  | { outcome: 'disapproved'; clerkId: string | null };
+  | {
+      outcome: 'disapproved';
+      userId: string | null;
+      clerkId: string | null;
+    };
 
 export async function approveWaitlistEntryInTx(
   tx: DbOrTransaction,
@@ -74,7 +80,12 @@ export async function approveWaitlistEntryInTx(
   }
 
   const [user] = await tx
-    .select({ id: users.id, clerkId: users.clerkId })
+    .select({
+      id: users.id,
+      clerkId: users.clerkId,
+      userStatus: users.userStatus,
+      activeProfileId: users.activeProfileId,
+    })
     .from(users)
     .where(
       drizzleSql`lower(trim(${users.email})) = lower(trim(${entry.email}))`
@@ -92,6 +103,7 @@ export async function approveWaitlistEntryInTx(
       profileId: null,
       email: entry.email,
       fullName: entry.fullName,
+      userId: user.id,
       clerkId: user.clerkId,
     };
   }
@@ -217,12 +229,16 @@ export async function approveWaitlistEntryInTx(
     reason: options.reason ?? 'approved',
   });
 
+  const nextUserStatus = isStatusUpgrade(user.userStatus, 'waitlist_approved')
+    ? 'waitlist_approved'
+    : user.userStatus;
+
   await tx
     .update(users)
     .set({
-      userStatus: 'waitlist_approved',
+      userStatus: nextUserStatus,
       waitlistEntryId: entry.id,
-      activeProfileId: profile?.id ?? null,
+      activeProfileId: profile?.id ?? user.activeProfileId ?? null,
       updatedAt: now,
     })
     .where(eq(users.id, user.id));
@@ -233,6 +249,7 @@ export async function approveWaitlistEntryInTx(
     profileId: profile?.id ?? null,
     email: entry.email,
     fullName: entry.fullName,
+    userId: user.id,
     clerkId: user.clerkId,
     ...(proofRequest ? { proofRequest } : {}),
   };
@@ -272,9 +289,21 @@ export async function stampWaitlistAcquisitionId(
   return result.rows[0]?.eligible === true;
 }
 
+async function invalidateProxyCacheForUser(
+  userId: string | null,
+  clerkId: string | null
+) {
+  const keys = new Set(
+    [userId, clerkId].filter((key): key is string => Boolean(key))
+  );
+  await Promise.all(
+    Array.from(keys, key => invalidateProxyUserStateCache(key))
+  );
+}
+
 export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {
-  if (result.outcome === 'approved' && result.clerkId) {
-    await invalidateProxyUserStateCache(result.clerkId);
+  if (result.outcome === 'approved') {
+    await invalidateProxyCacheForUser(result.userId, result.clerkId);
   }
   if (result.outcome === 'approved' && result.proofRequest) {
     // After commit and lazy: the review module pulls in billing and the Ovie
@@ -316,7 +345,11 @@ export async function disapproveWaitlistEntryInTx(
   }
 
   const [user] = await tx
-    .select({ id: users.id, clerkId: users.clerkId })
+    .select({
+      id: users.id,
+      clerkId: users.clerkId,
+      userStatus: users.userStatus,
+    })
     .from(users)
     .where(
       drizzleSql`lower(trim(${users.email})) = lower(trim(${entry.email}))`
@@ -368,23 +401,33 @@ export async function disapproveWaitlistEntryInTx(
   });
 
   if (user) {
+    const preserveTerminalOrActive =
+      user.userStatus === 'active' ||
+      user.userStatus === 'suspended' ||
+      user.userStatus === 'banned';
     await tx
       .update(users)
       .set({
-        userStatus: 'waitlist_pending',
+        userStatus: preserveTerminalOrActive
+          ? user.userStatus
+          : 'waitlist_pending',
         activeProfileId: profile ? null : undefined,
         updatedAt: now,
       })
       .where(eq(users.id, user.id));
   }
 
-  return { outcome: 'disapproved', clerkId: user?.clerkId ?? null };
+  return {
+    outcome: 'disapproved',
+    userId: user?.id ?? null,
+    clerkId: user?.clerkId ?? null,
+  };
 }
 
 export async function finalizeWaitlistDisapproval(
   result: WaitlistDisapprovalResult
 ) {
-  if (result.outcome === 'disapproved' && result.clerkId) {
-    await invalidateProxyUserStateCache(result.clerkId);
+  if (result.outcome === 'disapproved') {
+    await invalidateProxyCacheForUser(result.userId, result.clerkId);
   }
 }
