@@ -12,6 +12,14 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { restoreCoverageBaseline } from './lib/publish-coverage-report.mjs';
 
+function quotaDeferred(message = 'primary after 1 attempt(s)') {
+  const error = new Error(message);
+  error.status = 75;
+  error.stderr =
+    '::warning::github-quota-deferred: gh api repos/JovieInc/Jovie/actions/workflows/test-coverage-audit.yml/runs?branch=main&status=success&per_page=1 primary after 1 attempt(s) until 2026-11-19T19:52:53.000Z; not a verdict on this change.\n';
+  return error;
+}
+
 const heatmapPath = 'docs/TEST_COVERAGE_HEATMAP.md';
 const snapshotPath = 'apps/web/reports/test-coverage-snapshot.json';
 const snapshot = {
@@ -283,4 +291,103 @@ test('an invalid heatmap does not partially replace valid baseline data', t => {
     readFileSync(join(f.cwd, heatmapPath), 'utf8'),
     'seed heatmap\n'
   );
+});
+
+test('a GitHub quota deferral is not a verdict and does not replace the baseline', t => {
+  const f = fixture(t);
+  const warnings = [];
+  const original = console.error;
+  console.error = line => {
+    warnings.push(String(line));
+  };
+  t.after(() => {
+    console.error = original;
+  });
+  const quota = () => {
+    throw quotaDeferred();
+  };
+
+  assert.throws(
+    () => restoreCoverageBaseline({ ...f, gh: quota }),
+    error => error.status === 75 && /github-quota-deferred/.test(error.message)
+  );
+  assert.equal(warnings.length, 0);
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
+  assert.equal(
+    readFileSync(join(f.cwd, heatmapPath), 'utf8'),
+    'seed heatmap\n'
+  );
+
+  assert.deepEqual(
+    restoreCoverageBaseline({ ...f, gh: quota, onQuota: 'defer' }),
+    { status: 'deferred', baseline: snapshotPath }
+  );
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
+  assert.equal(
+    readFileSync(join(f.cwd, heatmapPath), 'utf8'),
+    'seed heatmap\n'
+  );
+  assert.match(
+    readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'),
+    /deferred on GitHub quota/
+  );
+  assert.match(warnings.at(-1) ?? '', /::warning::github-quota-deferred:/);
+
+  const downloadQuota = args => {
+    if (args[0] === 'api') return f.gh(args);
+    throw quotaDeferred('shed');
+  };
+  assert.deepEqual(
+    restoreCoverageBaseline({ ...f, gh: downloadQuota, onQuota: 'defer' }),
+    { status: 'deferred', baseline: snapshotPath }
+  );
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
+  assert.equal(
+    f.calls.some(args => args[0] === 'api'),
+    true
+  );
+
+  assert.throws(
+    () =>
+      restoreCoverageBaseline({
+        ...f,
+        onQuota: 'defer',
+        gh: () => {
+          throw new Error('403');
+        },
+      }),
+    /403/
+  );
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
+
+  delete f.env.GITHUB_STEP_SUMMARY;
+  assert.equal(
+    restoreCoverageBaseline({ ...f, gh: quota, onQuota: 'defer' }).status,
+    'deferred'
+  );
+
+  const markerOnly = () => {
+    throw new Error(
+      'github-quota-deferred: gh api primary after 1 attempt(s); not a verdict on this change.'
+    );
+  };
+  const exitCodeOnly = () => {
+    const error = new Error('shed');
+    error.exitCode = 75;
+    throw error;
+  };
+  assert.equal(
+    restoreCoverageBaseline({ ...f, gh: markerOnly, onQuota: 'defer' }).status,
+    'deferred'
+  );
+  assert.equal(
+    restoreCoverageBaseline({ ...f, gh: exitCodeOnly, onQuota: 'defer' })
+      .status,
+    'deferred'
+  );
+  assert.throws(
+    () => restoreCoverageBaseline({ ...f, onQuota: 'keep', gh: quota }),
+    /quota policy/
+  );
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
 });
