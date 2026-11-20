@@ -60,7 +60,7 @@ describe('DspServiceIcon', () => {
       'd',
       DSP_LOGO_CONFIG.spotify.iconPath
     );
-    expect(svg).toHaveStyle({ color: 'var(--color-brand-spotify)' });
+    expect(svg).toHaveClass('text-brand-spotify');
   });
 
   it('renders nothing for an unmapped provider', () => {

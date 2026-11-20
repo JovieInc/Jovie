@@ -1829,7 +1829,7 @@
       "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
     },
     "apps/web/components/atoms/DspLogo.tsx": {
-      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (UnmappedProvider)."
+      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (EmptyUnmappedProvider)."
     },
     "apps/web/components/atoms/Icon.tsx": {
       "empty": "Icon renders one named glyph and takes no collection; the detector matched the .map( over name segments in resolveIconName. An unknown name renders nothing, which Icon.test.tsx covers.",

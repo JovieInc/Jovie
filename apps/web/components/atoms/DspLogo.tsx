@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import type { ProviderKey, VideoProviderKey } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 interface DspLogoProps {
   readonly provider: ProviderKey;
@@ -178,6 +179,20 @@ interface DspServiceIconProps {
   readonly className?: string;
 }
 
+/** Tokenized text classes for DSP_LOGO_CONFIG colors (avoids inline style growth). */
+const DSP_BRAND_TEXT_CLASS: Readonly<Record<string, string>> = {
+  'var(--color-brand-spotify)': 'text-brand-spotify',
+  'var(--color-brand-apple)': 'text-brand-apple',
+  'var(--color-brand-youtube)': 'text-brand-youtube',
+  'var(--color-brand-soundcloud)': 'text-brand-soundcloud',
+  'var(--color-brand-deezer)': 'text-brand-deezer',
+  'var(--color-brand-tidal)': 'text-brand-tidal',
+  'var(--color-brand-amazon)': 'text-brand-amazon',
+  'var(--color-brand-pandora)': 'text-brand-pandora',
+  'var(--color-brand-audiomack)': 'text-brand-audiomack',
+  'var(--color-text-primary-token)': 'text-primary-token',
+};
+
 /**
  * Icon-only brand glyph from `DSP_LOGO_CONFIG` — the same path/color source
  * MusicServiceDial and SmartLinkProviderButton use on live smart links.
@@ -194,8 +209,10 @@ export function DspServiceIcon({
     <svg
       viewBox='0 0 24 24'
       fill='currentColor'
-      className={className}
-      style={{ color: config.color }}
+      className={cn(
+        DSP_BRAND_TEXT_CLASS[config.color] ?? 'text-primary-token',
+        className
+      )}
       aria-hidden='true'
       data-dsp-icon={provider}
     >

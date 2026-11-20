@@ -61,7 +61,8 @@ export const Tall: Story = {
   },
 };
 
-export const UnmappedProvider: Story = {
+/** Empty: an unmapped provider key renders nothing. */
+export const EmptyUnmappedProvider: Story = {
   args: {
     provider: 'amazon',
   },
