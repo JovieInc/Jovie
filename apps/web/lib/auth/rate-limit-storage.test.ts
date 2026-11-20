@@ -21,6 +21,7 @@ vi.mock('@/lib/utils/logger', () => ({
 
 import {
   AUTH_RATE_LIMIT_CONSUME_SCRIPT,
+  authRateLimitMemorySizeForTests,
   authRateLimitStorage,
   pathFromAuthRateLimitKey,
   resetAuthRateLimitMemoryForTests,
@@ -206,5 +207,27 @@ describe('Better Auth rate-limit storage (intentional memory store)', () => {
       allowed: false,
       retryAfter: expect.any(Number),
     });
+  });
+
+  it('evicts expired memory windows so counters do not grow without bound', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // force cleanup path
+    for (let i = 0; i < 5; i += 1) {
+      await authRateLimitStorage.consume(`ip-${i}|/sign-in/email-otp`, {
+        window: 1,
+        max: 100,
+      });
+    }
+    expect(authRateLimitMemorySizeForTests()).toBe(5);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 2_000);
+    await authRateLimitStorage.consume('fresh|/sign-in/email-otp', {
+      window: 60,
+      max: 100,
+    });
+    // Probabilistic sweep dropped the five expired keys; only the fresh one remains.
+    expect(authRateLimitMemorySizeForTests()).toBe(1);
+    vi.useRealTimers();
+    vi.mocked(Math.random).mockRestore();
   });
 });

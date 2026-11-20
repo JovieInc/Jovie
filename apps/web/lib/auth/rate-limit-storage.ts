@@ -77,6 +77,39 @@ type MemoryEntry = { count: number; resetAtMs: number };
 /** Process-local counters for intentional non-prod memory store only. */
 const memoryCounters = new Map<string, MemoryEntry>();
 
+/** Soft cap so a pathological high-cardinality spray cannot pin the process. */
+const MEMORY_COUNTER_MAX_ENTRIES = 10_000;
+
+/**
+ * Drop expired windows. Same probabilistic pattern as
+ * `MemoryRateLimiter` — non-security Math.random for cleanup sampling.
+ */
+function cleanupExpiredMemoryCounters(now: number): void {
+  for (const [key, entry] of memoryCounters) {
+    if (now >= entry.resetAtMs) {
+      memoryCounters.delete(key);
+    }
+  }
+}
+
+function maybeCleanupMemoryCounters(now: number): void {
+  // NOSONAR (S2245) - Non-security use: probabilistic in-memory cleanup
+  if (Math.random() < 0.1) {
+    cleanupExpiredMemoryCounters(now);
+  }
+  if (memoryCounters.size <= MEMORY_COUNTER_MAX_ENTRIES) {
+    return;
+  }
+  // Hard overflow: drop oldest-reset entries until under the cap.
+  const overflow = memoryCounters.size - MEMORY_COUNTER_MAX_ENTRIES;
+  const byReset = [...memoryCounters.entries()].sort(
+    (a, b) => a[1].resetAtMs - b[1].resetAtMs
+  );
+  for (let i = 0; i < overflow; i += 1) {
+    memoryCounters.delete(byReset[i]![0]);
+  }
+}
+
 /** Better Auth keys are `${ip}|${pathname}`. */
 export function pathFromAuthRateLimitKey(key: string): string {
   const sep = key.indexOf('|');
@@ -120,6 +153,7 @@ function consumeFromMemory(
   rule: AuthRateLimitRule
 ): AuthRateLimitDecision {
   const now = Date.now();
+  maybeCleanupMemoryCounters(now);
   const windowMs = rule.window * 1000;
   const redisKey = `${KEY_PREFIX}${key}`;
   const existing = memoryCounters.get(redisKey);
@@ -141,6 +175,11 @@ function consumeFromMemory(
 /** Test-only: clear intentional-memory counters between cases. */
 export function resetAuthRateLimitMemoryForTests(): void {
   memoryCounters.clear();
+}
+
+/** Test-only: inspect process-local counter cardinality. */
+export function authRateLimitMemorySizeForTests(): number {
+  return memoryCounters.size;
 }
 
 export const authRateLimitStorage = {
