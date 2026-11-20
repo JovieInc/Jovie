@@ -188,6 +188,19 @@ export async function collectCiCommands(repoRoot, options = {}) {
       text: readFileSync(join(repoRoot, source), 'utf8'),
     });
   }
+  // Same spread pattern as the planner group: follow the security contract
+  // helper so SCRIPT_CONTRACT_SECURITY_TESTS entries count as wired.
+  const securitySource = 'scripts/lib/script-contract-security-tests.mjs';
+  if (
+    existsSync(join(repoRoot, securitySource)) &&
+    laneText.includes("from './lib/script-contract-security-tests.mjs'") &&
+    /\.\.\.SCRIPT_CONTRACT_SECURITY_TESTS\b/u.test(laneText)
+  ) {
+    sources.push({
+      source: securitySource,
+      text: readFileSync(join(repoRoot, securitySource), 'utf8'),
+    });
+  }
   /** @type {CiCommand[]} */
   const seeds = sources.flatMap(({ source, text }) =>
     text

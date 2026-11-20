@@ -344,7 +344,14 @@ class CadenceClocksTest(unittest.TestCase):
         for c in clock.CLOCKS:
             with self.subTest(workflow=c.workflow):
                 text = (ROOT / ".github/workflows" / c.workflow).read_text()
-                self.assertIn(f"  repository_dispatch:\n    types: [{c.event_type}]\n", text)
+                # Clock event must be listed; extra primary wake types (e.g.
+                # dependabot_alert next to clock_security_advisory_loop) are OK.
+                match = re.search(
+                    r"  repository_dispatch:\n    types: \[([^\]]+)\]\n", text
+                )
+                self.assertIsNotNone(match, f"{c.workflow} missing repository_dispatch types")
+                types = [t.strip() for t in match.group(1).split(",")]
+                self.assertIn(c.event_type, types)
                 self.assertEqual(text.count("repository_dispatch:"), 1)
                 if not c.github_cron:
                     self.assertNotIn("  schedule:\n", text, "github_cron=False means no backstop cron")

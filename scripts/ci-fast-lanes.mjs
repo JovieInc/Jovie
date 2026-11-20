@@ -99,6 +99,7 @@ import {
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
+import { SCRIPT_CONTRACT_SECURITY_TESTS } from './lib/script-contract-security-tests.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -1114,9 +1115,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/deprecation-clearance.test.mjs',
-  'scripts/security-advisory-intake.test.mjs',
-  'scripts/security-advisory-intake.close-scan.test.mjs',
-  'scripts/security-advisory-event-wake.test.mjs',
+  ...SCRIPT_CONTRACT_SECURITY_TESTS,
   'scripts/sonar-token-validation.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/artist-identity.test.mjs',
