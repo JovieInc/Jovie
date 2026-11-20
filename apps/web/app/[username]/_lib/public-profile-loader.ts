@@ -390,7 +390,18 @@ function normalizeCreatorPixelPlan(
   trialEndsAt?: Date | string | null
 ): string | null {
   if (!plan) return null;
-  return resolveEffectivePlan(plan, trialEndsAt);
+  const parsedTrialEndsAt =
+    trialEndsAt instanceof Date
+      ? trialEndsAt
+      : typeof trialEndsAt === 'string'
+        ? new Date(trialEndsAt)
+        : null;
+  return resolveEffectivePlan(
+    plan,
+    parsedTrialEndsAt && !Number.isNaN(parsedTrialEndsAt.getTime())
+      ? parsedTrialEndsAt
+      : null
+  );
 }
 
 async function withFreshEntitlements(

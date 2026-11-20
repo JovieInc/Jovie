@@ -12,19 +12,10 @@ const mocks = vi.hoisted(() => ({
   inserts: [] as unknown[],
   updates: [] as unknown[],
   consumed: [{ id: 'draft' }] as unknown[],
-  claim: vi.fn(),
-  assertIdentity: vi.fn(),
   reach: vi.fn(),
   scheduleCard: vi.fn(),
-  blacklisted: vi.fn(),
-  handle: vi.fn(),
-  track: vi.fn(),
-  upsertRelease: vi.fn(),
-  upsertLink: vi.fn(),
-  capture: vi.fn(),
   sessionUser: 'user-1',
   gate: vi.fn(),
-  markWaitlist: vi.fn(),
 }));
 
 vi.mock('@/lib/env-server', () => ({ env: config }));
@@ -56,6 +47,7 @@ const fakeDb = vi.hoisted(() => {
     return self;
   }
   return {
+    execute: async () => ({ rows: [] }),
     select: () => chain(() => mocks.selects.shift() ?? []),
     insert: () =>
       chain(
@@ -75,11 +67,7 @@ vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: (op: (tx: unknown, userId: string) => unknown) =>
     op(fakeDb, mocks.sessionUser),
 }));
-vi.mock('@/lib/auth/proxy-state', () => ({
-  invalidateProxyUserStateCache: vi.fn(),
-}));
 vi.mock('@/lib/cache/profile', () => ({ invalidateProfileCache: vi.fn() }));
-vi.mock('@/lib/cache/releases', () => ({ invalidateReleaseCaches: vi.fn() }));
 vi.mock('@/lib/claim/claim-verification.server', () => ({
   lookupArtistReach: mocks.reach,
   scheduleClaimVerificationCard: mocks.scheduleCard,
@@ -87,27 +75,11 @@ vi.mock('@/lib/claim/claim-verification.server', () => ({
 vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.gate,
 }));
-vi.mock('@/lib/waitlist/signup', () => ({
-  markWaitlistSignedUpInTx: mocks.markWaitlist,
-}));
 vi.mock('@/lib/claim/finalize', () => ({
-  claimPrebuiltProfileForUser: mocks.claim,
+  claimPrebuiltProfileForUser: vi.fn(),
 }));
-vi.mock('@/lib/discography/queries', () => ({
-  upsertRelease: mocks.upsertRelease,
-  upsertProviderLink: mocks.upsertLink,
-}));
-vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.capture }));
-vi.mock('@/lib/ingestion/flows/profile-operations', () => ({
-  findAvailableHandle: mocks.handle,
-}));
-vi.mock('@/lib/profile/spotify-profile-identity', () => ({
-  assertSpotifyProfileIdentityAvailable: mocks.assertIdentity,
-  SpotifyProfileIdentityConflictError: class extends Error {},
-}));
-vi.mock('@/lib/server-analytics', () => ({ trackServerEventTx: mocks.track }));
-vi.mock('@/lib/spotify/blacklist', () => ({
-  isBlacklistedSpotifyId: mocks.blacklisted,
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEventTx: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 import {
@@ -156,15 +128,13 @@ describe('claimAgentDraft — proofOnly enforcement and reserved handle privacy'
     mocks.sessionUser = 'user-1';
     mocks.reach.mockResolvedValue({ followers: 1_200, name: 'Signal Artist' });
     mocks.gate.mockResolvedValue(false);
-    mocks.blacklisted.mockReturnValue(false);
-    mocks.handle.mockResolvedValue('signalartist');
-    mocks.track.mockResolvedValue({ ok: true });
-    mocks.upsertRelease.mockResolvedValue({ id: 'release-1' });
   });
 
   it('writes proofOnly claimVerification in the same Spotify attach update and schedules operator review', async () => {
     const row = draftRow();
-    mocks.selects = [[row], [], [], []];
+    // 1. draftRow lookup, 2. existing profile for user, 3. existing spotify profile,
+    // 4. findAvailableHandle check, 5. assertSpotifyProfileIdentityAvailable check
+    mocks.selects = [[row], [], [], [], []];
 
     const result = await claimAgentDraft(
       draftId,

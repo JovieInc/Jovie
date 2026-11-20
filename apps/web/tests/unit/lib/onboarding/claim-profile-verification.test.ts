@@ -10,23 +10,6 @@ const claimVerification = vi.hoisted(() => ({
   getReach: vi.fn().mockResolvedValue(null),
   request: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@/lib/claim/claim-verification.server', () => ({
-  getClaimVerificationReach: claimVerification.getReach,
-  requestClaimVerification: claimVerification.request,
-}));
-vi.mock('@/lib/observability/revenue-spine', () => ({
-  captureRevenueSpineFailure: vi.fn(),
-}));
-vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
-  recordArtistOfferStage: vi.fn(),
-}));
-vi.mock('next/headers', () => ({
-  cookies: async () => ({ get: () => undefined }),
-}));
-vi.mock('@/lib/analytics/signup-funnel.server', () => ({
-  recordFunnelStep: vi.fn().mockResolvedValue(undefined),
-}));
-
 const {
   mockDbSelect,
   mockIdentityConflict,
@@ -34,7 +17,6 @@ const {
   mockDbUpdate,
   mockDbInsert,
   mockReserveOnboardingHandle,
-  mockDeriveClaimedOnboardingStateFromMessageRows,
 } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
   mockIdentityConflict: vi.fn(),
@@ -42,9 +24,15 @@ const {
   mockDbUpdate: vi.fn(),
   mockDbInsert: vi.fn(),
   mockReserveOnboardingHandle: vi.fn(),
-  mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
 }));
 
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  getClaimVerificationReach: claimVerification.getReach,
+  requestClaimVerification: claimVerification.request,
+}));
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: async (callback: (tx: unknown) => Promise<unknown>) =>
     callback({
@@ -62,7 +50,6 @@ vi.mock('@/lib/auth/session', () => ({
       insert: mockDbInsert,
     }),
 }));
-
 vi.mock('@/lib/profile/spotify-profile-identity', async importOriginal => ({
   ...(await importOriginal<
     typeof import('@/lib/profile/spotify-profile-identity')
@@ -70,36 +57,87 @@ vi.mock('@/lib/profile/spotify-profile-identity', async importOriginal => ({
   assertSpotifyProfileIdentityAvailable: mockIdentityConflict,
   lockSpotifyProfileIdentity: mockLockIdentity,
 }));
-
 vi.mock('@/lib/db', () => ({
   db: {
+    execute: vi.fn().mockResolvedValue({ rows: [] }),
     select: mockDbSelect,
     update: mockDbUpdate,
     insert: mockDbInsert,
   },
 }));
-vi.mock('@/lib/dsp-enrichment/providers/musicfetch', () => ({
+vi.mock('@/lib/dsp-enrichment/providers/musicfetch', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/dsp-enrichment/providers/musicfetch')
+  >()),
   fetchArtistBySpotifyUrl: vi.fn().mockResolvedValue(null),
-}));
-vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
-vi.mock('@/lib/onboarding/claimed-state', () => ({
-  deriveClaimedOnboardingStateFromMessageRows:
-    mockDeriveClaimedOnboardingStateFromMessageRows,
 }));
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
   reserveOnboardingHandle: mockReserveOnboardingHandle,
-}));
-vi.mock('@/lib/onboarding/catalog-import.server', () => ({
-  scheduleOnboardingCatalogImport: vi.fn(() => true),
-}));
-vi.mock('@/lib/tasks/chat-work-record', () => ({
-  ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
 }));
 
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 import { SpotifyProfileIdentityConflictError } from '@/lib/profile/spotify-profile-identity';
 
-function setupQueries() {
+function buildOnboardingToolRows(options: {
+  artist: {
+    id: string;
+    name: string;
+    url: string;
+    followers: number;
+    popularity?: number;
+  };
+  catalogPreview?: {
+    total: number;
+    releases: Array<{
+      id: string;
+      title: string;
+      releaseType: 'album' | 'single' | 'ep' | 'compilation';
+      releaseDate: string | null;
+      artworkUrl: string | null;
+      spotifyUrl: string;
+    }>;
+  };
+  handle?: string | null;
+}) {
+  const toolCalls: Array<Record<string, unknown>> = [
+    {
+      schemaVersion: 2,
+      toolCallId: `confirm-${options.artist.id}`,
+      toolName: 'confirmSpotifyArtist',
+      state: 'succeeded',
+      uiHint: 'artifact',
+      output: {
+        action: 'spotify_artist_confirmed',
+        spotifyArtistId: options.artist.id,
+        artist: {
+          id: options.artist.id,
+          name: options.artist.name,
+          url: options.artist.url,
+          imageUrl: null,
+          followers: options.artist.followers,
+          popularity: options.artist.popularity ?? 25,
+          genres: [],
+        },
+        ...(options.catalogPreview
+          ? { catalogPreview: options.catalogPreview }
+          : {}),
+      },
+    },
+  ];
+  if (options.handle) {
+    toolCalls.push({
+      schemaVersion: 2,
+      toolCallId: `handle-${options.handle}`,
+      toolName: 'checkHandle',
+      state: 'succeeded',
+      uiHint: 'artifact',
+      output: { action: 'handle_confirmed', handle: options.handle },
+    });
+  }
+  return [{ role: 'assistant', toolCalls }];
+}
+
+function setupQueries(messageRows: Array<Record<string, unknown>>) {
   const convLimit = vi
     .fn()
     .mockResolvedValue([{ id: 'conv_1', userId: 'user_1' }]);
@@ -111,13 +149,14 @@ function setupQueries() {
   mockDbSelect.mockReturnValueOnce({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
-        orderBy: vi.fn().mockResolvedValue([{ toolCalls: [] }]),
+        orderBy: vi.fn().mockResolvedValue(messageRows),
       }),
     }),
   });
   mockDbSelect.mockReturnValue({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([]),
         orderBy: vi.fn().mockReturnValue({
           limit: vi
             .fn()
@@ -139,7 +178,7 @@ function setupWrites(profileId = 'profile_held') {
         onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
       }),
     })
-    .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) });
+    .mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
 
   mockDbUpdate
     .mockReturnValueOnce({
@@ -151,7 +190,7 @@ function setupWrites(profileId = 'profile_held') {
         }),
       }),
     })
-    .mockReturnValueOnce({
+    .mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       }),
@@ -167,21 +206,17 @@ describe('materializeClaimedOnboardingProfile — held artist handle fallback & 
   });
 
   it('materializes a held artist when state.handle is null and writes claimVerification atomically', async () => {
-    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
-      artist: {
-        id: 'spotify_held',
-        name: 'Signal Artist',
-        url: 'https://open.spotify.com/artist/spotify_held',
-        imageUrl: null,
-        followers: 3_200,
-        popularity: 25,
-        genres: [],
-      },
-      handle: null,
-      socialLinks: [],
-      interviewSignals: [],
-    });
-    setupQueries();
+    setupQueries(
+      buildOnboardingToolRows({
+        artist: {
+          id: 'spotify_held',
+          name: 'Signal Artist',
+          url: 'https://open.spotify.com/artist/spotify_held',
+          followers: 3_200,
+        },
+        handle: null,
+      })
+    );
     const insertProfileValues = setupWrites();
 
     const result = await materializeClaimedOnboardingProfile({
@@ -243,22 +278,19 @@ describe('materializeClaimedOnboardingProfile — held artist handle fallback & 
         },
       ],
     };
-    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValueOnce({
-      artist: {
-        id: 'spotify_small',
-        name: 'Small Indie Artist',
-        url: 'https://open.spotify.com/artist/spotify_small',
-        imageUrl: null,
-        followers: 620,
-        popularity: 18,
-        genres: [],
-      },
-      catalogPreview,
-      handle: 'smallindie',
-      socialLinks: [],
-      interviewSignals: [],
-    });
-    setupQueries();
+    setupQueries(
+      buildOnboardingToolRows({
+        artist: {
+          id: 'spotify_small',
+          name: 'Small Indie Artist',
+          url: 'https://open.spotify.com/artist/spotify_small',
+          followers: 620,
+          popularity: 18,
+        },
+        catalogPreview,
+        handle: 'smallindie',
+      })
+    );
     const lowInsert = setupWrites('profile_low');
     await materializeClaimedOnboardingProfile({
       userId: 'user_1',
@@ -274,21 +306,18 @@ describe('materializeClaimedOnboardingProfile — held artist handle fallback & 
     expect(lowRow.displayName).toBe('Small Indie Artist');
     expect(lowRow.settings.onboarding?.catalogPreview).toEqual(catalogPreview);
 
-    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValueOnce({
-      artist: {
-        id: 'spotify_famous',
-        name: 'Famous Artist',
-        url: 'https://open.spotify.com/artist/spotify_famous',
-        imageUrl: null,
-        followers: 90_000,
-        popularity: 80,
-        genres: [],
-      },
-      handle: 'famoushandle',
-      socialLinks: [],
-      interviewSignals: [],
-    });
-    setupQueries();
+    setupQueries(
+      buildOnboardingToolRows({
+        artist: {
+          id: 'spotify_famous',
+          name: 'Famous Artist',
+          url: 'https://open.spotify.com/artist/spotify_famous',
+          followers: 90_000,
+          popularity: 80,
+        },
+        handle: 'famoushandle',
+      })
+    );
     const highInsert = setupWrites('profile_high');
     await materializeClaimedOnboardingProfile({
       userId: 'user_1',
@@ -318,21 +347,18 @@ describe('materializeClaimedOnboardingProfile — held artist handle fallback & 
   });
 
   it('rejects a held artist claim when Spotify identity already belongs to another profile', async () => {
-    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
-      artist: {
-        id: 'spotify_taken',
-        name: 'Taken Artist',
-        url: 'https://open.spotify.com/artist/spotify_taken',
-        imageUrl: null,
-        followers: 120_000,
-        popularity: 70,
-        genres: [],
-      },
-      handle: 'takenartist',
-      socialLinks: [],
-      interviewSignals: [],
-    });
-    setupQueries();
+    setupQueries(
+      buildOnboardingToolRows({
+        artist: {
+          id: 'spotify_taken',
+          name: 'Taken Artist',
+          url: 'https://open.spotify.com/artist/spotify_taken',
+          followers: 120_000,
+          popularity: 70,
+        },
+        handle: 'takenartist',
+      })
+    );
     mockIdentityConflict.mockRejectedValueOnce(
       new SpotifyProfileIdentityConflictError()
     );
