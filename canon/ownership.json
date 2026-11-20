@@ -43,6 +43,7 @@
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
+    {"id": "workflow:ejection-classifier", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ejection-classifier.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},
     {"id": "workflow:flake-ledger", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/flake-ledger.yml", "note": "Workflow header names Eve as accountable writer; the routine owner is the agent role here. JOV-13105 event-driven collector hop."},

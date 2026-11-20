@@ -42,7 +42,6 @@ import {
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
-
 import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -127,7 +126,6 @@ const EVENT = JSON.parse(
     'utf8'
   )
 );
-
 function getJobBlock(workflow, jobKey) {
   const lines = workflow.split('\n');
   const start = lines.findIndex(line => line === `  ${jobKey}:`);
@@ -4677,15 +4675,15 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(ENROLL).toContain(
       "failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval"
     );
-    // Only a manual removal with a later blocking-label release, and no
-    // revision failure hold, may re-enroll an unchanged removed head.
+    // A later blocking-label release can re-enroll a manual removal without a revision hold.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
-    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
-    // failure hold is re-admitted (bounded); a failure hold still blocks first
-    // and admission never runs from a cron (JOV-INV-042).
+    // JOV-13053: existing failure holds own classification; retry evidence caps
+    // same-head infrastructure retries and stays advisory when unavailable.
     expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
-    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain('if (!retryDecision.allow) {');
+    expect(ENROLL).toContain('failure.reason = retryDecision.reason');
+    expect(ENROLL).toContain('await promotion.retry({');
     expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
     expect(ENROLL).toContain('!humanDequeued');
     expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);

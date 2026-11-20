@@ -1,9 +1,8 @@
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Summer
+# accountable-writer: Eve-Runtime-Owner
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
-# removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
+# removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Eve Runtime Owner's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
-
 # Tim 2026-09-26: production holds never stall merging. A held production
 # promote and a red main are separate issues from source admission, so green
 # PRs keep entering the native queue while promotion is held.
@@ -35,7 +34,6 @@ name: Merge Queue Green Enroll
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
 # Automatic wakes inspect only the signaled PR. The push-to-main sweep and
 # manual dispatch scan the complete roster.
-
 on:
   # Fork PR Gate is not subscribed: Source Validation completed last on 84 of 85
   # PR heads measured 2026-10-25, and a straggler is re-armed by the main-push
@@ -78,9 +76,7 @@ on:
         description: 'Follow-up attempt after a required-green head stayed BLOCKED (0-4)'
         required: false
         default: '0'
-
 permissions: {}
-
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR. Successful pull_request completions share one
@@ -93,7 +89,6 @@ concurrency:
   # must not replace a failure hold. Receipts with no head stay on their run ID.
   group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' && format('success-{0}-{1}', github.event.workflow_run.pull_requests[0].number || 'unattributed', github.event.workflow_run.head_sha || github.event.workflow_run.id)) || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
-
 jobs:
   # CI failures, plus PR Size Guard's "Require combined-head workflows to
   # load" step: a ci.yml GitHub cannot load reports no CI check at all
@@ -134,7 +129,6 @@ jobs:
             .github/actions/prime-node-toolcache/action.yml
             .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
-
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
         uses: ./.github/actions/prime-node-toolcache
@@ -142,7 +136,6 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-
       # This job's only credential is the Jovie Bot installation token below.
       # It is minted with actions, contents, pull-requests, and statuses — not
       # merge_queues. dequeuePullRequest then returns "Resource not accessible by integration".
@@ -161,13 +154,11 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
-
       - name: Persist exact-head failure hold and remove merge intent
         id: failure-hold
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"
-
   enroll:
     name: Enqueue green PRs
     needs: [hold-failed-revision]
@@ -198,7 +189,6 @@ jobs:
           github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.event != 'merge_group'
         run: sleep 20
-
       # The in-job re-read is a few seconds. GitHub left #22618 BLOCKED for
       # minutes after PR Ready, so the follow-up waits here, before the app
       # token is minted, and only on a dispatch this job itself requested.
@@ -216,7 +206,6 @@ jobs:
             3|4) sleep 180 ;;
             *) exit 0 ;;
           esac
-
       - name: Checkout trusted failure policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -226,15 +215,12 @@ jobs:
             .nvmrc
             packages/api-client
             scripts/merge-group-failure-hold.mjs
-            scripts/lib/merge-group-ahead-attribution.mjs
-            scripts/lib/merge-group-admission.mjs
+            scripts/version-fanout-guard.mjs
+            scripts/lib
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
-            scripts/version-fanout-guard.mjs
             scripts/lib/admission-hold-labels.json
-            scripts/lib/merge-queue-guard-hold.mjs
           sparse-checkout-cone-mode: false
-
       - name: Generate Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -247,7 +233,6 @@ jobs:
           # A head that edits .github/workflows cannot be enqueued without it
           # ("`workflows` scope may be required"); the installation grants it.
           permission-workflows: write
-
       # JOV-8754: sample both REST buckets this fleet shares. GET /rate_limit
       # costs no quota. 2026-10-21 03:25-03:52Z the repo GITHUB_TOKEN bucket ran
       # dry and Merge Group Admission waited out the reset, so every group
@@ -267,7 +252,6 @@ jobs:
               || core="unavailable"
             echo "::notice title=api-quota::bucket=${bucket} ${core} at=$(date -u +%s)"
           done
-
       - name: Enqueue green PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -276,6 +260,9 @@ jobs:
           BLOCKED_RECHECK: ${{ inputs.blocked_recheck || '0' }}
           RECHECK_TOKEN: ${{ github.token }}
           MERGE_STATE_RETRY_MS: '3000'
+          PROMOTION_BAR_MODE: shadow
+          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
+          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
         with:
@@ -288,6 +275,10 @@ jobs:
             const guardPolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/merge-queue-guard-hold.mjs`
             ));
+            const { createEnrollPromotion } = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/scripts/lib/promotion-enroll.mjs`
+            ));
+            const promotion = createEnrollPromotion({ core, env: process.env, repository: context.repo, github });
             // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
             // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
             // deletes a stale lane-fix-red; this token cannot remove labels.
@@ -693,30 +684,21 @@ jobs:
               const removalActor = pr.timelineItems.nodes[0]?.actor;
               const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
                 removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
-              // Ejection re-enroll (2026-10-29): a head GitHub or a bot removed from
-              // the queue with no revision-failure hold on record (failure was
-              // 'allow' before the recovery-intent check) is still green and
-              // CLEAN, so it is admitted again instead of waiting for a human.
-              // Bounded: never a human dequeue, at most REENROLL_MAX_REMOVALS
-              // removals on this head, and REENROLL_DWELL_MS after the last
-              // removal. A merge-group failure at the head writes a failure
-              // hold, which still blocks above (JOV-6620 is untouched).
+              // Preserve the removal cap and dwell. Existing holds classify failures;
+              // candidate-only evidence below caps only same-head infra retries.
               const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
               const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
                 event.__typename === 'RemovedFromMergeQueueEvent' &&
                 (!headCommittedAt || event.createdAt > headCommittedAt)).length;
-              const automaticRemoval = removalReason === 'failed_checks' ||
+              const automaticRemoval = ['failed_checks', 'base_branch_changed', 'base_branch_updated'].includes(removalReason) ||
                 (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
               const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
                 failureBeforeReenroll === 'allow' && failure.action === 'block' &&
                 ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
                 removalsOnHead < REENROLL_MAX_REMOVALS &&
                 Date.now() - Date.parse(lastRemoval) >= REENROLL_DWELL_MS;
-              // JOV-12617: Company guards is required on the group but has no
-              // failure hold of its own, so check an unheld automatic ejection
-              // for a guard verdict on this head before re-admitting it. Only a
-              // proven verdict holds (receipt + one comment per head); runner,
-              // network, exit 75, cancelled or unreadable evidence still re-enrolls.
+              // JOV-12617: Company Guards attribution precedes retry evidence;
+              // an unreadable guard verdict never substitutes for infra proof.
               if (Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
                   failureBeforeReenroll === 'allow' && failure.action === 'block' &&
                   ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
@@ -833,6 +815,16 @@ jobs:
                 // A source SHA cannot attest merge intent or a later manual removal.
                 // Re-read after statuses before spending a recovery reservation.
                 if (admissionRecovery && !await recoveryStillCurrent()) continue;
+                // Evidence reads are candidate-only, after all ordinary eligibility/hold checks.
+                const retryDecision = await promotion.retry({ pr: pr.number, head: pr.headRefOid,
+                  labels: pr.labels.nodes.map(l => l.name), removed: Boolean(removedUnchangedHead),
+                  manual: humanDequeued || releasedAfterManualRemoval, released: releasedAfterManualRemoval,
+                  cascade: ['base_branch_changed', 'base_branch_updated'].includes(removalReason), failure });
+                if (!retryDecision.allow) {
+                  receipt(pr, 'skip', retryDecision.reason);
+                  continue;
+                }
+                if (ejectionReenroll) failure.reason = retryDecision.reason;
                 if (failure.action === 'retry-once') {
                   await writeRetry(failurePolicy.retrySpentDescription(failure.latest));
                   core.notice(`RESERVED bounded retry for #${pr.number}@${pr.headRefOid}`);
@@ -858,6 +850,10 @@ jobs:
                 }
                 // Append through native exact-head admission. Even an empty queue
                 // snapshot can race a build start, so automatic admission never jumps.
+                await promotion.logPromotion(pr);
+                if (retryDecision.retry && failure.action !== 'retry-once') {
+                  await promotion.reserveRetry(pr.headRefOid, retryDecision);
+                }
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
@@ -896,7 +892,6 @@ jobs:
                 .write()
                 .catch(error => core.warning(`enroll receipt summary not written: ${error.message}`));
             }
-
   # Conversion to draft does not remove GitHub's native queue entry. Reuse the
   # existing exact-head/entry guard under the same admission owner, even during
   # a queue freeze. Never run PR code or grant new installation permissions.
@@ -1095,8 +1090,8 @@ jobs:
   # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
   # that still cannot enqueue names the PR with ::error:: and the step
   # summary. Two rearms per SHA; the enroll job is not involved. A failure with
-  # no implicated path (a flake) re-enqueues a green head that github-merge-queue[bot]
-  # removed within 30 minutes, tagged why=unattributed in the receipt (#23562: 24 min lag).
+  # no implicated path requires a trusted infra receipt and gets at most one
+  # retry on that SHA. Positive cascade victims retain the JOV-7589 rearm path.
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]
@@ -1122,7 +1117,10 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
-            scripts/lib/merge-group-ahead-attribution.mjs
+            scripts/merge-group-failure-hold.mjs
+            scripts/version-fanout-guard.mjs
+            packages/api-client
+            scripts/lib
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             .github/actions/prime-node-toolcache/action.yml

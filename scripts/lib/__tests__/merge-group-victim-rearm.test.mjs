@@ -17,7 +17,6 @@ import {
   REARM_CAP,
   REARM_CONTEXT,
   RearmPermissionError,
-  rearmDescription,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -91,7 +90,7 @@ test('another PR in the group is rearmed once, then capped, and the culprit is n
       item.reason,
     ]),
     [
-      [10, 'rearm', 'another-pr', 1, undefined],
+      [10, 'rearm', 'another-pr', 1, 'cascade-rearm'],
       [11, 'skip', undefined, undefined, 'own-failure'],
     ]
   );
@@ -715,40 +714,6 @@ const flake = (overrides, extra = {}) =>
     ...extra,
   })[0];
 
-test('flake requeue: a green head GitHub just dropped is re-enqueued', () => {
-  const decision = flake({});
-  assert.equal(decision.action, 'rearm');
-  assert.equal(decision.classification, 'unattributed');
-  assert.equal(decision.n, 1);
-  assert.match(
-    rearmDescription({
-      n: Number(decision.n),
-      headSha: String(decision.headSha),
-      runId: Number(decision.runId),
-      classification: decision.classification,
-    }),
-    new RegExp(`^n=1;sha=${sha};run=800;why=unattributed$`)
-  );
-  assert.equal(trustedRearmRecords([]).length, 0);
-});
-
-test('flake requeue: a head that moved is a new candidate, so the old strikes do not follow it', () => {
-  const decision = flake({
-    headSha: other,
-    statuses: [status(1, sha, 1), status(2, sha, 2)],
-  });
-  assert.equal(decision.action, 'rearm');
-  assert.equal(decision.n, 1);
-});
-
-test('flake requeue: the per-head strike cap is honoured', () => {
-  const decision = flake({
-    statuses: [status(1, sha, 11), status(REARM_CAP, sha, 12)],
-  });
-  assert.equal(decision.action, 'skip');
-  assert.equal(decision.reason, 'cap');
-});
-
 test('flake requeue: a human or bot dequeue is never reversed', () => {
   assert.equal(
     flake({ dequeue: dequeue('timwhite', 2) }).reason,
@@ -892,7 +857,7 @@ test('the front entry is not re-armed as base-branch when its failing jobs passe
   assert.equal(plan(false)[0].classification, 'base-branch');
 });
 
-test('the guard never blocks another PR in the group or a flake with no implicated path', () => {
+test('the guard preserves another PR cascade but holds an unattributed flake', () => {
   const group = [
     candidate({ prNumber: 10, files: ['docs/guide.md'] }),
     candidate({ prNumber: 11, headSha: other, files: ['apps/web/story.tsx'] }),
@@ -919,6 +884,6 @@ test('the guard never blocks another PR in the group or a flake with no implicat
     frontFailureOwn: true,
     now: 2_000,
   });
-  assert.equal(flake[0].action, 'rearm');
-  assert.equal(flake[0].classification, 'unattributed');
+  assert.equal(flake[0].action, 'skip');
+  assert.equal(flake[0].reason, 'head-unchanged-non-infra');
 });

@@ -6,6 +6,7 @@ import {
   successfulPrWake,
   workflowConcurrency,
 } from './lib/__tests__/helpers/green-enroll-concurrency.mjs';
+import { withPromotionNetwork } from './lib/__tests__/helpers/green-enroll-promotion.mjs';
 import {
   ADMISSION_STEP,
   applyMergeGroupFailure,
@@ -29,8 +30,7 @@ const run = new AsyncFunction(
 /**
  * Deterministic stand-ins for wall-clock time (JOV-10086). Tests must never
  * assert on how long a run took: a loaded runner turns that into a flake.
- * `recordTimers` captures every delay the script under test asks for, so a
- * "must not sleep" check asserts on the requested delay, not elapsed time.
+ * `recordTimers` asserts requested delays rather than elapsed time.
  * Date-only mock timers advance the sweep budget without delaying the event loop.
  */
 async function recordTimers(fn) {
@@ -81,7 +81,6 @@ const current = number => ({
   commits: { nodes: [{ commit: { committedDate: '2026-10-02T12:00:00Z' } }] },
   timelineItems: { nodes: [] },
 });
-
 async function fixture(
   /** @type {any} */ {
     roster = [candidate(1)],
@@ -104,6 +103,7 @@ async function fixture(
     effectSink,
     env = {},
     queueEntries = [],
+    promotionRuns = [],
     files = [{ filename: 'apps/web/page.tsx' }],
   } = {}
 ) {
@@ -116,7 +116,9 @@ async function fixture(
   const gets = [];
   const mainReads = [];
   const labelRemovals = [];
+  const promotionReads = [];
   const effects = {
+    promotionReads,
     labelRemovals,
     mainReads,
     reads,
@@ -227,29 +229,33 @@ async function fixture(
       return { repository: { pullRequest: structuredClone(snapshot) } };
     },
   };
-  await run(
-    github,
-    { repo: { owner: 'JovieInc', repo: 'Jovie' }, eventName, payload },
-    {
-      info() {},
-      notice: message => notices.push(message),
-      warning: message => warnings.push(message),
-    },
-    {
-      env: {
-        DRY_RUN: String(dry),
-        GITHUB_WORKSPACE: process.cwd(),
-        FAILURE_HOLD_RECEIPT: failureReceipt,
-        ADMISSION_RECOVERY_RECEIPT: admissionRecoveryReceipt,
-        MERGE_STATE_RETRY_MS: '0',
-        ...env,
-      },
-    },
-    createRequire(import.meta.url)
+  await withPromotionNetwork(
+    { statuses, statusWrites, reads: promotionReads, runs: promotionRuns },
+    () =>
+      run(
+        github,
+        { repo: { owner: 'JovieInc', repo: 'Jovie' }, eventName, payload },
+        {
+          info() {},
+          notice: message => notices.push(message),
+          warning: message => warnings.push(message),
+        },
+        {
+          env: {
+            RECHECK_TOKEN: 'offline-enroll-token',
+            DRY_RUN: String(dry),
+            GITHUB_WORKSPACE: process.cwd(),
+            FAILURE_HOLD_RECEIPT: failureReceipt,
+            ADMISSION_RECOVERY_RECEIPT: admissionRecoveryReceipt,
+            MERGE_STATE_RETRY_MS: '0',
+            ...env,
+          },
+        },
+        createRequire(import.meta.url)
+      )
   );
   return effects;
 }
-
 test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue head', async () => {
   const roster = Array.from({ length: 113 }, (_, i) => ({
     ...candidate(i + 1),
@@ -258,11 +264,16 @@ test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue hea
   const result = await fixture({ roster });
   assert.deepEqual(result.reads, [111, 112, 113]);
   assert.deepEqual(
+    result.promotionReads
+      .filter(r => r.branch)
+      .map(r => Number(/pr-(\d+)-/.exec(r.branch)[1])),
+    [] // Fresh candidates never read the retry ledger.
+  );
+  assert.deepEqual(
     result.mutations,
     [111, 112, 113].map(n => ({ id: `PR_${n}`, oid: sha }))
   );
 });
-
 test('a proven admission-quota ejection authorizes one unchanged-head retry without a source hold', async () => {
   const statuses = [];
   const runId = 789;
@@ -426,7 +437,6 @@ test('a proven admission-quota ejection authorizes one unchanged-head retry with
   });
   assert.deepEqual(otherPr.mutations, []);
 });
-
 test('preserves live holds, rejected heads, conflicts, drafts, queue membership and source leases', async () => {
   const roster = Array.from({ length: 11 }, (_, i) => candidate(i + 1));
   roster[0].labels = [{ name: 'hold' }];
@@ -449,7 +459,6 @@ test('preserves live holds, rejected heads, conflicts, drafts, queue membership 
   };
   assert.deepEqual((await fixture({ roster, overrides })).mutations, []);
 });
-
 test('admits every required-green merge state and refuses blocked or conflicting ones', async () => {
   // Live 2026-10-11: #21202 and #20203 sat UNSTABLE for a day with all four
   // required checks green; only lane jovie-execution receipts were pending.
@@ -472,7 +481,6 @@ test('admits every required-green merge state and refuses blocked or conflicting
     ['PR_1', 'PR_2', 'PR_3']
   );
 });
-
 test('an UNKNOWN merge state after main moves is re-read instead of dropping the wake', async () => {
   // Live 2026-10-11 18:57Z: every open PR read UNKNOWN right after main moved
   // and settled within seconds; a single read skipped the PR until the next
@@ -505,7 +513,6 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   });
   assert.deepEqual(settled.reads, [1]);
 });
-
 const greenCommit = (state = 'SUCCESS') => ({
   nodes: [
     {
@@ -544,7 +551,6 @@ async function withFetch(run) {
     globalThis.fetch = previous;
   }
 }
-
 test('a required-green BLOCKED head is re-read and, if it stays BLOCKED, dispatched once', async () => {
   // 2026-10-22: enroll 39795233391 skipped #22618 BLOCKED at 14:23Z, nine
   // minutes after PR Ready. The rollup was already SUCCESS. The state later
@@ -616,7 +622,6 @@ test('a required-green BLOCKED head is re-read and, if it stays BLOCKED, dispatc
   );
   assert.deepEqual(followUp.result.mutations, []);
 });
-
 test('a BLOCKED head is not rechecked unless its check rollup is already green', async () => {
   const pending = await withFetch(() =>
     fixture({
@@ -651,7 +656,6 @@ test('a BLOCKED head is not rechecked unless its check rollup is already green',
   assert.deepEqual(dirty.result.reads, [1]);
   assert.deepEqual(dirty.calls, []);
 });
-
 test('a required-green BLOCKED recheck stops at four follow-ups and ignores drafts, holds, and sweeps', async () => {
   const exhausted = await withFetch(() =>
     fixture({
@@ -713,7 +717,6 @@ test('a required-green BLOCKED recheck stops at four follow-ups and ignores draf
   assert.deepEqual(sweep.result.mutations, []);
   assert.deepEqual(sweep.calls, []);
 });
-
 test('the BLOCKED follow-up uses the job token, not the Jovie Bot app token', () => {
   const enroll = workflow.jobs.enroll;
   assert.equal(enroll.permissions.actions, 'write');
@@ -751,7 +754,6 @@ test('the BLOCKED follow-up uses the job token, not the Jovie Bot app token', ()
   );
   assert.equal(uses.length, 1);
 });
-
 test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async () => {
   // 2026-10-12 22:31Z onward: every push-to-main sweep (45-70 PRs, ~3 s per
   // read, 3 s + 6 s UNKNOWN re-read sleeps) was cancelled at the 5-minute
@@ -804,7 +806,6 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
     cleanNumbers.map(n => `PR_${n}`).sort()
   );
 });
-
 test('a sweep goes longest-waiting first and stops at its budget', async context => {
   const roster = [
     { ...candidate(3), updated_at: '2026-10-12T12:00:00Z' },
@@ -840,7 +841,6 @@ test('a sweep goes longest-waiting first and stops at its budget', async context
     spent.warnings.some(w => w.includes('sweep budget spent after 2/3'))
   );
 });
-
 test('a queue-breaker dequeue is re-admitted after the freeze and its marker removed', async () => {
   // 2026-10-13: four quota storms each ended with queue-watch restoring every
   // circuit-breaker dequeue by hand (manual removal, unchanged head).
@@ -1011,7 +1011,6 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
     'normal admission clears the stale breaker marker after enqueue'
   );
 });
-
 test('a queue-breaker restore is fenced against revocation and a new hold', async () => {
   const runRace = async labels => {
     const live = {
@@ -1062,7 +1061,6 @@ test('a queue-breaker restore is fenced against revocation and a new hold', asyn
   assert.deepEqual(held.mutations, []);
   assert.deepEqual(held.labelRemovals, []);
 });
-
 test('does not remove lane-fix-red and does not enroll while the label remains', async () => {
   for (const mergeStateStatus of [
     'CLEAN',
@@ -1085,7 +1083,6 @@ test('does not remove lane-fix-red and does not enroll while the label remains',
     assert.deepEqual(result.mutations, [], mergeStateStatus);
   }
 });
-
 test('a skip behind a blocking label names the label, not the CLEAN merge state', async () => {
   const labeled = {
     pageInfo: { hasNextPage: false },
@@ -1106,7 +1103,6 @@ test('a skip behind a blocking label names the label, not the CLEAN merge state'
   assert.ok(script.includes('merge-state-not-admissible:'));
   assert.ok(!script.includes('`mergeStateStatus=${pr.mergeStateStatus}`'));
 });
-
 test('enrolls a required-green head once lane-fix-red is gone', async () => {
   const result = await fixture({
     roster: [{ ...candidate(1), labels: [] }],
@@ -1119,7 +1115,6 @@ test('enrolls a required-green head once lane-fix-red is gone', async () => {
   assert.deepEqual(result.labelRemovals, []);
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
-
 test('a released manual dequeue and unheld automatic ejection re-enroll; source failure holds block', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
@@ -1174,7 +1169,6 @@ test('a released manual dequeue and unheld automatic ejection re-enroll; source 
   });
   assert.deepEqual(held.mutations, []);
 });
-
 test('ejection re-enrollment admits bots within bounds and preserves human dequeues', async () => {
   const removal = {
     createdAt: new Date(Date.now() - 600_000).toISOString(),
@@ -1190,6 +1184,16 @@ test('ejection re-enrollment admits bots within bounds and preserves human deque
   ];
   for (const [event, count, expected] of cases) {
     const result = await fixture({
+      promotionRuns: [
+        {
+          id: 99,
+          event: 'merge_group',
+          run_attempt: 1,
+          conclusion: 'failure',
+          head_branch: `gh-readonly-queue/main/pr-1-${sha}`,
+          updated_at: '2026-10-02T13:00:00Z',
+        },
+      ],
       overrides: {
         1: {
           timelineItems: { nodes: [event] },
@@ -1209,7 +1213,6 @@ test('ejection re-enrollment admits bots within bounds and preserves human deque
     );
   }
 });
-
 test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {
   // 2026-10-11: ~47 enroll runs/h; most wakes land before the head is green.
   const blocked = await fixture({
@@ -1236,7 +1239,6 @@ test('main is read only to resolve a held candidate, never on an ineligible wake
   });
   assert.deepEqual(held.mainReads, ['heads/main']);
 });
-
 test('queue mutation tokens can act on heads that edit workflow files', () => {
   for (const job of ['enroll', 'rearm-green-victims']) {
     const token = workflow.jobs[job].steps.find(
@@ -1245,7 +1247,6 @@ test('queue mutation tokens can act on heads that edit workflow files', () => {
     assert.equal(token.with['permission-workflows'], 'write', job);
   }
 });
-
 test('permits a repaired head committed after rejection, and dry runs never mutate', async () => {
   const overrides = {
     1: { timelineItems: { nodes: [{ createdAt: '2026-10-02T11:00:00Z' }] } },
@@ -1253,7 +1254,6 @@ test('permits a repaired head committed after rejection, and dry runs never muta
   assert.equal((await fixture({ overrides })).mutations.length, 1);
   assert.deepEqual((await fixture({ overrides, dry: true })).mutations, []);
 });
-
 test('read failures abort without enqueue and a raced mutation does not stop the next PR', async () => {
   await assert.rejects(fixture({ failRead: true }), /Resource limits/);
   const result = await fixture({

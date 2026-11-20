@@ -194,6 +194,7 @@ nodes:
       - iOS CI
       - Mac CI
       - Component Certificate
+      - Ejection Classifier
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Main Red Eject
@@ -275,7 +276,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Ejection Classifier
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -439,6 +441,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 3
+  - name: Ejection Classifier
+    path: .github/workflows/ejection-classifier.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:classify
+    jobCount: 1
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true
@@ -1093,6 +1106,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Ejection Classifier
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
@@ -1747,6 +1761,15 @@ edges:
     type: workflow_run
   - from: Source Validation
     to: Flake Ledger
+    type: workflow_run
+  - from: CI
+    to: Ejection Classifier
+    type: workflow_run
+  - from: PR Size Guard
+    to: Ejection Classifier
+    type: workflow_run
+  - from: Company Guards
+    to: Ejection Classifier
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh

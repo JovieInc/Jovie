@@ -1,0 +1,72 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Eve-Runtime-Owner
+# capability-gap: GitHub records merge-queue ejections only as failed merge_group runs; nothing classifies the failure or labels the PR head, so the same head is re-enqueued blind (JOV-7589 loop, JOV-13053).
+# removal-trigger: Remove when GitHub merge queue exposes a classified ejection reason per PR head, or when JOV-13053 promotion-bar enforce mode has 30 consecutive days with no same-head non-infra re-enqueue and the classifier is folded into the enroll controller.
+# Event-driven feedback: label + receipt artifact, and rate-limited repeat-class Linear upserts.
+# Never re-enqueues, never edits required checks, never fails another workflow.
+name: Ejection Classifier
+on:
+  workflow_run:
+    workflows: ['CI', 'PR Size Guard', 'Company Guards']
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+  issues: write
+concurrency:
+  group: ejection-classifier-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+jobs:
+  classify:
+    if: >-
+      github.event.workflow_run.event == 'merge_group' &&
+      contains(fromJSON('["failure","timed_out","startup_failure","action_required"]'), github.event.workflow_run.conclusion) &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      vars.EJECTION_CLASSIFIER_OFF != '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/lib
+            scripts/merge-group-failure-hold.mjs
+            scripts/version-fanout-guard.mjs
+            packages/api-client
+            .github/actions/prime-node-toolcache
+            .github/actions/ejection-artifact
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # github-token-budget: 120 calls/run - event-driven ejection evidence and labels; no roster polling
+      - name: Classify and record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          node scripts/lib/ejection-classifier.mjs || echo "::notice::Ejection classifier unavailable; admission is unchanged"
+      # Run the pinned uploader in a child process so artifact service errors
+      # are observations; merge gates keep their existing failure behavior.
+      - name: Stage pinned artifact uploader
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: actions/upload-artifact
+          ref: ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          path: .ejection-upload
+          persist-credentials: false
+          sparse-checkout: dist/upload
+      - name: Upload advisory receipt
+        if: always()
+        uses: ./.github/actions/ejection-artifact
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}

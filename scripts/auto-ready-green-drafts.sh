@@ -215,6 +215,18 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     return 0
   fi
 
+  # JOV-13053: protected-main observation only. No enforce mode in this change.
+  # A missing module or collector failure must preserve today's undraft flow.
+  if ! PROMOTION_BAR_MODE="${PROMOTION_BAR_MODE:-shadow}" PROMOTION_PR="$n" \
+    PROMOTION_HEAD="$live_head" REPO="$REPO" \
+    node "$SCRIPT_DIR/lib/promotion-readiness-collect.mjs"; then
+    local shadow_failure='{"schema":"promotion-bar/v1","mode":"shadow","ready":false,"failures":["collector unavailable"]}'
+    printf '%s\n' "$shadow_failure"
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+      printf '%s\n' "$shadow_failure" >> "$GITHUB_STEP_SUMMARY" || true
+    fi
+  fi
+
   # Ready has no expected-head CAS. Never replay an uncertain mutation against
   # a head that may have advanced while a transport retry was sleeping.
   if ! gh pr ready "$n" -R "$REPO" >/dev/null 2>&1; then
