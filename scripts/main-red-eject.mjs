@@ -24,12 +24,9 @@ import {
   checkKey,
   classifyEvidence,
   decideEject,
-  decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
-  failingHeadComment,
-  failingRequiredChecks,
   failureSignature,
   HEAD_STUCK_ALERT_MIN,
   headDwell,
@@ -47,6 +44,11 @@ import {
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
+import {
+  applyFailingHeadEpisode,
+  decideFailingHead,
+  failingRequiredChecks,
+} from './lib/main-red-eject-failing-head.mjs';
 import {
   remediateUnrevertable,
   unattributedPlan,
@@ -293,7 +295,9 @@ function commandProbe(cmd) {
 // ---- queue -----------------------------------------------------------------
 
 async function queueEntries() {
-  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
+  // headCommit = merge-group synthetic SHA (check-runs live here).
+  // pullRequest.headRefOid = PR tip — eject-hold status + reconcile use this.
+  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number headRefOid labels(first:30){nodes{name}}}}}}}}`;
   const [o, r] = REPO.split('/');
   const out = JSON.parse(
     await gh(
@@ -305,6 +309,7 @@ async function queueEntries() {
     number: n.pullRequest.number,
     position: n.position,
     sha: n.headCommit?.oid ?? null,
+    headRefOid: n.pullRequest.headRefOid ?? null,
     state: n.state,
     enqueuedAt: n.enqueuedAt,
     compounding: n.pullRequest.labels.nodes.some(
@@ -657,33 +662,15 @@ async function failingHead(head, doApply) {
   });
   if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
   await dequeue(head.number);
-  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py): the
-  // Lane Fix Relay will not clear it on source-green alone, so the PR cannot
-  // look healthy while JOV-6620 blocks same-head re-enroll.
-  await gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${REPO}/issues/${head.number}/labels`,
-    '-f',
-    `labels[]=${FIX_RED_LABEL}`,
-  ]).catch(error =>
-    console.error(
-      `::warning::failing-head ${FIX_RED_LABEL} failed: ${error.message}`
-    )
-  );
-  // The dequeue is the fix; a failed comment must not undo or retry it.
-  await gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${REPO}/issues/${head.number}/comments`,
-    '-f',
-    `body=${failingHeadComment(head, failing)}`,
-  ]).catch(error =>
-    console.error(`::warning::failing-head comment failed: ${error.message}`)
-  );
-  return { failingHead: true, ...decision, dequeued: true };
+  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py). Eject
+  // job mints the Jovie Bot app token, so label+status are a jovie-bot episode.
+  const { labeled } = await applyFailingHeadEpisode({
+    gh,
+    repo: REPO,
+    head,
+    failing,
+  });
+  return { failingHead: true, ...decision, dequeued: true, labeled };
 }
 
 // ---- stuck head ------------------------------------------------------------
