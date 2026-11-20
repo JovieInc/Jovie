@@ -69,6 +69,43 @@ describe('testPathMatchesSurface', () => {
     ).toBe(false);
   });
 
+  it('matches kebab/snake tokens after - or _ without bare-substring hits', () => {
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/integration/middleware-proxy.test.ts',
+        proxy
+      )
+    ).toBe(true);
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/unit/lib/auth_proxy_gate.test.ts',
+        proxy
+      )
+    ).toBe(true);
+
+    const onboarding = {
+      id: 'claim-onboarding',
+      glob: 'apps/web/app/onboarding/**',
+    };
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/e2e/canary-auth-signup-onboarding.spec.ts',
+        onboarding
+      )
+    ).toBe(true);
+    expect(
+      testPathMatchesSurface(
+        'apps/web/tests/unit/lib/contact-limit-entitlements.test.ts',
+        onboarding
+      )
+    ).toBe(false);
+
+    // Prefix still blocks other apps even when kebab would otherwise match.
+    expect(
+      testPathMatchesSurface('apps/ovie/middleware-proxy.test.ts', proxy)
+    ).toBe(false);
+  });
+
   it('still matches stripe webhook tests under apps/web', () => {
     const surface = {
       id: 'stripe-webhooks',

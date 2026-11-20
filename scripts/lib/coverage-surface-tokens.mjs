@@ -3,8 +3,9 @@
 // (`proxy`), not extension-qualified ones (`proxy.ts`), or E2E inventory
 // stays at 0 forever.
 //
-// Matching is scoped to the surface's apps/<pkg>/ prefix and uses path-segment
-// boundaries so bare ids like `proxy` cannot hit apps/ovie/proxy.test.ts.
+// Matching is scoped to the surface's apps/<pkg>/ prefix and uses symmetric
+// path-token boundaries (`/`, `.`, `_`, `-`) so bare ids like `proxy` cannot
+// hit apps/ovie/proxy.test.ts, while kebab/snake inventory names still match.
 
 /** @type {ReadonlySet<string>} */
 export const GENERIC_PATH_SEGMENTS = Object.freeze(
@@ -114,10 +115,12 @@ export function testPathMatchesSurface(
     if (token.includes('/')) {
       return path.includes(token);
     }
-    // Segment boundary: /token/ or /token.ext or /token-… — not "…proxy…" midword
-    // outside a segment start. Requires the token to begin a path segment.
+    // Symmetric path-token boundaries: token may sit between `/`, `.`, `_`, or
+    // `-` (kebab/snake inventory names like middleware-proxy.test.ts). Still
+    // rejects mid-word substrings (approxy). Cross-app false hits stay blocked
+    // by the apps/<pkg>/ prefix above.
     return new RegExp(
-      `(?:^|/)${escapeRegex(token)}(?:$|[./_-])`,
+      `(?:^|[/._-])${escapeRegex(token)}(?:$|[./_-])`,
       'u'
     ).test(path);
   });
