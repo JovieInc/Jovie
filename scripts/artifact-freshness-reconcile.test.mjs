@@ -356,6 +356,43 @@ test('pageSummerForFreshness keeps empty-string spacers in the Linear descriptio
   assert.doesNotMatch(calls[0].description, /heartbeat\.## Done when/);
 });
 
+test('keep-owned stamp suppresses Summer page but still blocks resolve', async () => {
+  const receipt = await collectArtifactFreshness({
+    shipped: {
+      production: {
+        version: '26.11.4',
+        publishedAt: '2026-11-15T00:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+      staging: {
+        version: '26.11.4-staging.1.1',
+        publishedAt: '2026-11-15T01:00:00Z',
+        sourceRevision: SHA_A,
+        publicationIdentityVerified: true,
+        publicationError: null,
+      },
+    },
+    certified: {
+      status: 'known',
+      sourceRevision: SHA_B,
+      verified: true,
+      at: '2026-11-20T00:00:00Z',
+    },
+    desktopRelevant: true,
+    publishInFlight: true,
+  });
+  assert.equal(receipt.red, false);
+  assert.equal(
+    receipt.channels
+      .find(c => c.channel === 'production')
+      ?.mismatches.some(m => m.code === 'certified-unpublished-inflight'),
+    true
+  );
+  assert.equal(canResolveSummerForFreshness(receipt), false);
+});
+
 test('null desktop relevance with differing SHAs blocks Summer resolve without paging', async () => {
   const receipt = await collectArtifactFreshness({
     shipped: {

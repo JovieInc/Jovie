@@ -65,6 +65,7 @@ function isKnownSha(stage) {
  *   readonly installed?: StageReceipt | null;
  *   readonly running?: StageReceipt | null;
  *   readonly desktopRelevantSincePublished?: boolean | null;
+ *   readonly publishInFlight?: boolean | null;
  * }} input
  * @returns {ChannelGraph}
  */
@@ -150,13 +151,24 @@ export function reconcileArtifactFreshness(input) {
     stages.certified.sourceRevision !== stages.published.sourceRevision
   ) {
     if (desktopRelevantSincePublished === true) {
-      mismatches.push({
-        from: 'certified',
-        to: 'published',
-        code: 'certified-unpublished',
-        reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}.`,
-        pagesSummer: true,
-      });
+      // Stamp PR keep-owned = normal publish path; record without paging Summer.
+      if (input.publishInFlight === true) {
+        mismatches.push({
+          from: 'certified',
+          to: 'published',
+          code: 'certified-unpublished-inflight',
+          reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}; desktop stamp PR is in flight.`,
+          pagesSummer: false,
+        });
+      } else {
+        mismatches.push({
+          from: 'certified',
+          to: 'published',
+          code: 'certified-unpublished',
+          reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}.`,
+          pagesSummer: true,
+        });
+      }
     } else if (desktopRelevantSincePublished === null) {
       // git diff failed / unobserved — never treat as green for Summer close.
       mismatches.push({

@@ -59,6 +59,34 @@ test('certified desktop-relevant ahead of published pages Summer', () => {
   assert.equal(graph.mismatches[0].pagesSummer, true);
 });
 
+test('stamp publish-in-flight records non-paging certified-unpublished-inflight', () => {
+  const graph = reconcileArtifactFreshness({
+    channel: 'production',
+    certified: { status: 'known', sourceRevision: SHA_B, verified: true },
+    published: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      version: '26.11.4',
+      verified: true,
+    },
+    feed: {
+      status: 'known',
+      sourceRevision: SHA_A,
+      version: '26.11.4',
+      verified: true,
+    },
+    desktopRelevantSincePublished: true,
+    publishInFlight: true,
+  });
+  assert.equal(graph.mismatches[0].code, 'certified-unpublished-inflight');
+  assert.equal(graph.mismatches[0].pagesSummer, false);
+  const receipt = buildArtifactFreshnessReceipt({
+    generatedAt: '2026-11-20T22:00:00.000Z',
+    channels: [graph],
+  });
+  assert.equal(receipt.red, false);
+});
+
 test('null desktop relevance with differing SHAs is incomplete observation', () => {
   const graph = reconcileArtifactFreshness({
     channel: 'production',
