@@ -98,10 +98,7 @@ test('findOpenDesktopStampPr reads slurped pull pages', () => {
 });
 
 test('list-endpoint rows without mergeable_state need enrichment (JOV-13856)', () => {
-  assert.equal(
-    needsMergeableEnrichment({ number: 25802, labels: [] }),
-    true
-  );
+  assert.equal(needsMergeableEnrichment({ number: 25802, labels: [] }), true);
   assert.equal(
     needsMergeableEnrichment({ number: 1, mergeable_state: 'dirty' }),
     false
