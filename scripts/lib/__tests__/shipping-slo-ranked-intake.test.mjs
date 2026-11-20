@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   deliverReport,
+  listOpenRankedSloMetrics,
   pickRankedSloIntake,
   rankSloIntakeCandidates,
   sloFingerprint,
@@ -165,6 +166,48 @@ describe('ranked shipping SLO intake', () => {
     });
     expect(state.issues).toHaveLength(1);
     expect(state.issues[0].title).toContain('merge_queue.wait.p95');
+  });
+
+  it('fails open-children lookup when pagination exceeds the page cap', async () => {
+    let page = 0;
+    const fetchImpl = async (_url, init) => {
+      const { query } = JSON.parse(init.body);
+      if (query.includes('ShippingSloOwnerId')) {
+        return new Response(
+          JSON.stringify({ data: { issue: { id: 'slo-parent' } } })
+        );
+      }
+      if (query.includes('ShippingSloOpenChildren')) {
+        page += 1;
+        return new Response(
+          JSON.stringify({
+            data: {
+              issue: {
+                children: {
+                  nodes: [],
+                  pageInfo: {
+                    hasNextPage: true,
+                    endCursor: `cursor-${page}`,
+                  },
+                },
+              },
+            },
+          })
+        );
+      }
+      throw new Error(`unexpected query: ${query}`);
+    };
+    await expect(
+      listOpenRankedSloMetrics(
+        {
+          repo,
+          metrics: ['merge_queue.wait.p95'],
+          ownerIssueId: 'slo-parent',
+        },
+        { apiKey: 'slo-test-key', fetchImpl }
+      )
+    ).rejects.toMatchObject({ reason: 'open_children_lookup_incomplete' });
+    expect(page).toBe(20);
   });
 
   it('re-ranks to the new top after the previous ranked issue is completed', async () => {

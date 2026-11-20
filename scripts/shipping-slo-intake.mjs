@@ -105,12 +105,13 @@ export async function listOpenRankedSloMetrics(
         if (description.includes(marker)) openMetrics.push(metric);
       }
     }
-    if (!connection.pageInfo.hasNextPage) break;
+    if (!connection.pageInfo.hasNextPage) return [...new Set(openMetrics)];
     after = connection.pageInfo.endCursor;
     if (!after || cursors.has(after)) fail('open_children_lookup_incomplete');
     cursors.add(after);
   }
-  return [...new Set(openMetrics)];
+  // Same exhaustion guard as upsertSloFinding pages(): never silently truncate.
+  fail('open_children_lookup_incomplete');
 }
 
 export async function upsertSloFinding(
