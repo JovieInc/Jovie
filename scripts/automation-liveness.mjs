@@ -31,7 +31,6 @@ import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
-import { observeSecurityAdvisoryDwell } from './lib/security-advisory-dwell.mjs';
 import {
   evaluateLiveness,
   isQuotaDeferredRow,
@@ -61,6 +60,7 @@ import {
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 import { lostStatePrevious } from './lib/liveness-lost-state.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
+import { observeSecurityAdvisoryDwell } from './lib/security-advisory-dwell.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 10_000;

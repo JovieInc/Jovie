@@ -42,6 +42,7 @@ record is a defect, even when it exits 0.
 | Security advisory detect → owned | `repository_dispatch` `dependabot_alert` → Security Advisory Loop (Summer Linear labels) | Gem 4h `clock_security_advisory_loop` | 300 min | `github:jovie:security-detect-owned` |
 | Security finding owned → fix PR linked | Linear secadv issue create/update (no PR link yet) | automation-liveness + intake `--check` severity SLAs | 48 h critical-floor dead-man | `github:jovie:security-finding-pr` |
 | Security fix PR → production verify | PR merge + Production deploy → intake close-scan | automation-liveness on linked-PR open issues | 24 h | `github:jovie:security-pr-production` |
+| Security / CSO Linear or SARIF high → investigate packet (close requires fix PR) | Linear security label create/update; high SARIF alert | Summer catch-up + `security-finding-pr` dwell | 48 h critical-floor | `summer:security-cso-bus` |
 
 Summer's `summerCatchUpJobs` owns the recovery cadence; read the linked source
 instead of copying its interval here. Verify the running generation and observed
