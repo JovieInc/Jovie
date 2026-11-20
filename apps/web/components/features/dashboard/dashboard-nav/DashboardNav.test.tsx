@@ -44,7 +44,7 @@ function CollapseFixture() {
 }
 
 describe('Linear-scale density (founder lock 2026-09-25)', () => {
-  it('retains creation and destination order when the shared header owns Inbox', () => {
+  it('retains creation and destination order when the shared header owns Home', () => {
     renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
     const destinations = Array.from(
       document.querySelectorAll('[data-navigation-item-id]')
@@ -74,7 +74,7 @@ describe('DashboardNav route warming', () => {
   });
 
   it('leaves home attention to the brand row and retains destinations', () => {
-    const label = 'Inbox';
+    const label = 'Home';
     const destinations = () =>
       screen.getAllByRole('link').map(link => ({
         label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
@@ -98,7 +98,7 @@ describe('DashboardNav route warming', () => {
       headerOwnsInbox: true,
     });
     expect(document.querySelector('[data-inbox-attention]')).toBeNull();
-    // The header bell is the Inbox entry, so the rail's Inbox row goes too;
+    // The header bell is the Home entry, so the rail's Home row goes too;
     // every other destination is retained.
     expect(destinations()).toEqual(
       retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
@@ -107,7 +107,7 @@ describe('DashboardNav route warming', () => {
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
-  it('gives New Chat a labeled row on the icon column when the header owns inbox and search', () => {
+  it('gives New Chat a labeled row on the icon column when the header owns Home and search', () => {
     renderDashboardNav({
       renderFn: render,
       headerOwnsInbox: true,
@@ -143,7 +143,7 @@ describe('DashboardNav route warming', () => {
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
+    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
@@ -216,7 +216,7 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it.each(['inbox', 'chat', 'home'] as const)(
+  it.each(['chat', 'home'] as const)(
     'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
     itemId => {
       vi.useFakeTimers();
@@ -259,8 +259,8 @@ describe('DashboardNav route warming', () => {
     expect(link).not.toHaveAttribute('aria-busy');
   });
 
-  it('keeps opportunity counts on the Inbox bell and leaves app updates to the shell pill', () => {
-    // The update now lives in the shell's corner pill; the Inbox page shows
+  it('keeps opportunity counts on the Home bell and leaves app updates to the shell pill', () => {
+    // The update now lives in the shell's corner pill; Home shows
     // no update, so the bell must not point there for one.
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
@@ -270,9 +270,9 @@ describe('DashboardNav route warming', () => {
       },
     });
     const pendingLink = pending.container.querySelector(
-      '[data-navigation-item-id="inbox"]'
+      '[data-navigation-item-id="home"]'
     );
-    expect(pendingLink).toHaveAccessibleName('Inbox');
+    expect(pendingLink).toHaveAccessibleName('Home');
     expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -295,21 +295,21 @@ describe('DashboardNav route warming', () => {
       updateOnly.queryByRole('link', { name: /App Update Available/ })
     ).toBeNull();
     const link = updateOnly.container.querySelector(
-      '[data-navigation-item-id="inbox"]'
+      '[data-navigation-item-id="home"]'
     );
-    expect(link).toHaveAccessibleName('Inbox');
+    expect(link).toHaveAccessibleName('Home');
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link?.querySelector('[data-inbox-runtime-update]')).toBeNull();
     runtimeUpdateState.available = false;
   });
 
-  it('labels the header bell Inbox without a rollout override', () => {
+  it('labels the header bell Home without a rollout override', () => {
     const view = renderDashboardNav({
       renderFn: render,
     });
     expect(
-      view.container.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Inbox');
+      view.container.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAccessibleName('Home');
   });
 
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
@@ -359,7 +359,7 @@ describe('DashboardNav route warming', () => {
     );
     expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(
-      secondary?.querySelector('[data-navigation-item-id="inbox"]')
+      secondary?.querySelector('[data-navigation-item-id="home"]')
     ).not.toBeNull();
   });
 

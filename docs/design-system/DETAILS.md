@@ -824,7 +824,7 @@ or mutually exclusive surfaces, not additions to the four-item root IA.
 | Primary | Identity | `/app/presence` | Owns bio, profile, social, contact, and search representation |
 | Primary | Work | `/app/library` | Owns releases, videos, merch, products, events, writing, campaigns, and shareable links |
 | Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace (sole Audience door; C3) |
-| Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
+| Utility | Home (bell) | `/app` | Compact shell action for pending opportunities and runtime attention; same Home root as the rail row |
 | Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
 | Contextual | Links | `/app/chat?panel=profile` and existing destination routes | Represents or distributes Identity and Work without becoming a third top-level concept |
 | Contextual | Insights | Existing insights routes / chat cards | Same Audience job as contextual views — not an alternate root (C3) |
@@ -841,7 +841,7 @@ are completing; they do not need to understand Jovie's internal entity graph.
 
 | Type | Canonical scaffold | First action contract | Route rule |
 |------|--------------------|-----------------------|------------|
-| Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
+| Home / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in Home |
 | Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
 | Collection / workspace | `PageShell` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
 | Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |

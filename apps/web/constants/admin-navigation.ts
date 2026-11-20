@@ -110,9 +110,9 @@ const ADMIN_NAV_ITEMS: readonly Omit<AdminNavRegistryItem, 'section'>[] = [
   },
   {
     id: 'inbox',
-    label: 'Inbox',
+    label: 'Operator Inbox',
     href: APP_ROUTES.ADMIN_INBOX,
-    description: 'Decision requests that need your attention',
+    description: 'Operator decision requests that need your attention',
   },
   {
     id: 'growth',

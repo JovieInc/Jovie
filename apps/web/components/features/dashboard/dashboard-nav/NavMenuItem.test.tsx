@@ -121,12 +121,12 @@ describe('NavMenuItem', () => {
   it('lets the nav owner withhold the selected paint from the current page while another row is pending', () => {
     render(
       <NavMenuItem
-        item={{ id: 'home', name: 'Inbox', href: '/app', icon: Music }}
+        item={{ id: 'home', name: 'Home', href: '/app', icon: Music }}
         isActive
         highlighted={false}
       />
     );
-    const row = screen.getByRole('link', { name: 'Inbox' });
+    const row = screen.getByRole('link', { name: 'Home' });
     // Still the page for assistive tech...
     expect(row).toHaveAttribute('aria-current', 'page');
     // ...but it does not paint selected next to the pending destination.

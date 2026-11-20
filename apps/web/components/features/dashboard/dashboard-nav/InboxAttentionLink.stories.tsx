@@ -6,7 +6,7 @@ const meta: Meta<typeof InboxAttentionLink> = {
   component: InboxAttentionLink,
   parameters: { layout: 'centered' },
   args: {
-    label: 'Inbox',
+    label: 'Home',
     itemId: 'home',
     attention: 'empty',
     pendingCount: 0,

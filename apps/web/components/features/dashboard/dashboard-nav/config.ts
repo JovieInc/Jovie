@@ -7,7 +7,6 @@ import {
   HandCoins,
   Home,
   IdCard,
-  Inbox,
   Layers,
   Link,
   Lock,
@@ -33,16 +32,25 @@ import type { NavItem } from './types';
 // Shared navigation items – single source of truth for sidebar + mobile
 // ---------------------------------------------------------------------------
 
-/** Named Inbox home. `/app` renders the opportunity card stack. */
-export const inboxNavItem: NavItem = {
-  name: 'Inbox',
+/**
+ * Creator root (Drift T0.2 / JOV-7159): visible label Home, stable id `home`.
+ * `/app` still renders the opportunity card stack; chrome never says Inbox.
+ */
+export const homeNavItem: NavItem = {
+  name: 'Home',
   href: APP_ROUTES.DASHBOARD,
-  id: 'inbox',
-  icon: Inbox,
-  iconName: 'Inbox',
+  id: 'home',
+  icon: Home,
+  iconName: 'Home',
   tier: 'core',
-  description: 'Review pending opportunities',
+  description: 'Review attention, approvals, and replies',
 };
+
+/**
+ * @deprecated Alias of {@link homeNavItem}. Kept for warm-probe / legacy
+ * imports; do not introduce a second root id or Inbox label.
+ */
+export const inboxNavItem: NavItem = homeNavItem;
 
 export const chatNavItem: NavItem = {
   name: 'New Chat',
@@ -53,16 +61,6 @@ export const chatNavItem: NavItem = {
   tone: 'primary',
   tier: 'core',
   description: 'Start a new conversation',
-};
-
-export const homeNavItem: NavItem = {
-  name: 'Inbox',
-  href: APP_ROUTES.DASHBOARD,
-  id: 'home',
-  icon: Home,
-  iconName: 'Home',
-  tier: 'core',
-  description: 'Review attention, approvals, and replies',
 };
 
 export const libraryNavItem: NavItem = {
