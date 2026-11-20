@@ -362,7 +362,14 @@ export async function disapproveWaitlistEntryInTx(
     .where(eq(creatorProfiles.waitlistEntryId, entry.id))
     .limit(1);
 
-  if (profile) {
+  const preserveTerminalOrActive = Boolean(
+    user &&
+      (user.userStatus === 'active' ||
+        user.userStatus === 'suspended' ||
+        user.userStatus === 'banned')
+  );
+
+  if (profile && !preserveTerminalOrActive) {
     await tx
       .update(creatorProfiles)
       .set({
@@ -401,17 +408,14 @@ export async function disapproveWaitlistEntryInTx(
   });
 
   if (user) {
-    const preserveTerminalOrActive =
-      user.userStatus === 'active' ||
-      user.userStatus === 'suspended' ||
-      user.userStatus === 'banned';
     await tx
       .update(users)
       .set({
         userStatus: preserveTerminalOrActive
           ? user.userStatus
           : 'waitlist_pending',
-        activeProfileId: profile ? null : undefined,
+        activeProfileId:
+          preserveTerminalOrActive || !profile ? undefined : null,
         updatedAt: now,
       })
       .where(eq(users.id, user.id));

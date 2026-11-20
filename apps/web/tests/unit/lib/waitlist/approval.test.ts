@@ -388,4 +388,41 @@ describe('disapproveWaitlistEntryInTx', () => {
     expect(result).toEqual({ outcome: 'terminal', status: 'claimed' });
     expect(updateSet).not.toHaveBeenCalled();
   });
+
+  it('does not unclaim linked profiles or clear activeProfileId for active users', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'approved',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123', userStatus: 'active' }],
+      [{ id: 'profile-1' }],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toMatchObject({
+      outcome: 'disapproved',
+      userId: 'user-1',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: null,
+        isClaimed: false,
+        isPublic: false,
+      })
+    );
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userStatus: 'active',
+      })
+    );
+    expect(updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ activeProfileId: null })
+    );
+  });
 });
