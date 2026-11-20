@@ -56,7 +56,7 @@ describe('funnel SQL, onboarding continuity, and local debug-bypass closed-loop 
       'utf8'
     );
     expect(source).toContain('INNER JOIN acquisition_journeys j');
-    expect(source).toContain('realJourneyJ');
+    expect(source).toContain('realJourneyJ()');
     expect(source).toContain('j.consent_revoked_at IS NULL');
     expect(source).not.toContain("turn_index')::int) + 1");
   });

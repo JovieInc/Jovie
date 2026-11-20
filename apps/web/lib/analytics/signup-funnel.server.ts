@@ -351,7 +351,7 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
           WHERE s.stage IN ('start', 'catalog-preview')
             AND s.occurred_at >= ${since}
             AND j.consent_revoked_at IS NULL
-            AND ${realJourneyJ}
+            AND ${realJourneyJ()}
           GROUP BY s.acquisition_id
         ), timed AS (
           SELECT extract(epoch FROM wow_at - started_at) AS seconds
