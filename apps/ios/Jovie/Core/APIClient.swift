@@ -100,6 +100,27 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     return try await tokenProvider.requestAuthorization(forceRefresh: forceRefresh)
   }
 
+  /// Legacy 401 retries keep the original request fence so a suspended refresh
+  /// cannot adopt a replacement login as the terminal owner (JOV-12807).
+  private func resolveLegacyRequestCredentials(
+    forceRefresh: Bool,
+    tokenOverride: String?,
+    inheritedFence: NativeSessionRequestFence?
+  ) async throws -> (
+    authorization: NativeRequestAuthorization,
+    token: String,
+    fence: NativeSessionRequestFence
+  ) {
+    let authorization = try await resolveAuthorization(
+      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    )
+    if let tokenOverride, let inheritedFence {
+      return (authorization, tokenOverride, inheritedFence)
+    }
+    let captured = APIClientSessionFence.capture(for: authorization)
+    return (authorization, captured.token, captured.fence)
+  }
+
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
   }
@@ -202,17 +223,22 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     body: Body,
     forceRefresh: Bool,
     tokenOverride: String? = nil,
-    pinnedAuthorization: NativeRequestAuthorization? = nil
+    pinnedAuthorization: NativeRequestAuthorization? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws {
     let authorization: NativeRequestAuthorization
+    let token: String
+    let sessionFence: NativeSessionRequestFence
     if let pinnedAuthorization {
       authorization = pinnedAuthorization
+      (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     } else {
-      authorization = try await resolveAuthorization(
-        forceRefresh: forceRefresh, tokenOverride: tokenOverride
+      (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+        forceRefresh: forceRefresh,
+        tokenOverride: tokenOverride,
+        inheritedFence: inheritedFence
       )
     }
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/push-devices"))
     request.httpMethod = method
     request.timeoutInterval = requestTimeout
@@ -245,7 +271,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
         method: method,
         body: body,
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -268,12 +295,14 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     decision: SummerCardDecision,
     comment: String?,
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> SummerCardDecisionResult {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride,
+      inheritedFence: inheritedFence
     )
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(
       url: baseURL.appending(path: "/api/ovie/summer-cards/\(cardID)/decision")
     )
@@ -312,7 +341,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
         decision: decision,
         comment: comment,
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
 
@@ -354,16 +384,25 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     tokenOverride: String? = nil,
     ownership: NativeSessionOwnership? = nil,
     userID: String? = nil,
-    authorizationOverride: NativeRequestAuthorization? = nil
+    authorizationOverride: NativeRequestAuthorization? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws {
     let authorization: NativeRequestAuthorization
+    let token: String
+    let sessionFence: NativeSessionRequestFence
     if let authorizationOverride {
       authorization = authorizationOverride
+      (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     } else if let ownership, let userID {
       try Task.checkCancellation()
       authorization = try await tokenProvider.ownedRequestAuthorization(for: userID, ifOwnedBy: ownership)
+      (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     } else {
-      authorization = try await resolveAuthorization(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+      (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+        forceRefresh: forceRefresh,
+        tokenOverride: tokenOverride,
+        inheritedFence: inheritedFence
+      )
     }
     func validateOwner() throws {
       guard let ownership else { return }
@@ -372,7 +411,6 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       }
       _ = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: userID)
     }
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/profile/complete")
     )
@@ -426,7 +464,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
         displayName: displayName,
         username: username,
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -454,21 +493,27 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
     tokenOverride: String? = nil,
     ifOwnedBy ownership: NativeSessionOwnership? = nil,
     userID: String? = nil,
-    authorizationOverride: NativeRequestAuthorization? = nil
+    authorizationOverride: NativeRequestAuthorization? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> MobileMeResponse {
     let authorization: NativeRequestAuthorization
+    let token: String
+    let sessionFence: NativeSessionRequestFence
     if let authorizationOverride {
       authorization = authorizationOverride
+      (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     } else if let ownership {
       guard let userID else { throw NativeSessionRequestError.superseded }
       try Task.checkCancellation()
       authorization = try await tokenProvider.ownedRequestAuthorization(for: userID, ifOwnedBy: ownership)
+      (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     } else {
-      authorization = try await resolveAuthorization(
-        forceRefresh: forceRefresh, tokenOverride: tokenOverride
+      (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+        forceRefresh: forceRefresh,
+        tokenOverride: tokenOverride,
+        inheritedFence: inheritedFence
       )
     }
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/me"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -519,7 +564,11 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
         after: token, fence: sessionFence, provider: tokenProvider
       )
       MobileAuthDiagnostics.record("mobile_me_retrying", detail: "status=401")
-      return try await sendMeRequest(forceRefresh: true, tokenOverride: refreshed)
+      return try await sendMeRequest(
+        forceRefresh: true,
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
+      )
     }
     if httpResponse.statusCode == 401, forceRefresh {
       APIClientSessionFence.terminalIfCurrent(sessionFence)
@@ -551,12 +600,14 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
 
   private func sendAppleWalletProfilePassRequest(
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> Data {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride,
+      inheritedFence: inheritedFence
     )
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(url: baseURL.appending(path: "/api/wallet/apple/profile-pass"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -584,7 +635,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       )
       return try await sendAppleWalletProfilePassRequest(
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -602,12 +654,14 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
 
   private func sendAudienceHighlightsRequest(
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> MobileAudienceHighlightsResponse {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride,
+      inheritedFence: inheritedFence
     )
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/audience/highlights")
     )
@@ -637,7 +691,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       )
       return try await sendAudienceHighlightsRequest(
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -660,12 +715,14 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
   private func sendActionLoopInboxRequest(
     workspace: MobileWorkspaceMode,
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> MobileActionLoopInboxResponse {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride,
+      inheritedFence: inheritedFence
     )
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var components = URLComponents(
       url: baseURL.appending(path: "/api/mobile/v1/inbox"),
       resolvingAgainstBaseURL: false
@@ -704,7 +761,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       return try await sendActionLoopInboxRequest(
         workspace: workspace,
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -726,12 +784,14 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
 
   private func sendActionLoopCalendarRequest(
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    inheritedFence: NativeSessionRequestFence? = nil
   ) async throws -> MobileActionLoopCalendarResponse {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
+    let (authorization, token, sessionFence) = try await resolveLegacyRequestCredentials(
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride,
+      inheritedFence: inheritedFence
     )
-    let (token, sessionFence) = APIClientSessionFence.capture(for: authorization)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/calendar"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -759,7 +819,8 @@ struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
       )
       return try await sendActionLoopCalendarRequest(
         forceRefresh: true,
-        tokenOverride: refreshed
+        tokenOverride: refreshed.token,
+        inheritedFence: refreshed.fence
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {

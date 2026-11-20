@@ -39,6 +39,17 @@ struct NativeSessionOwnership: Hashable, Sendable {
   fileprivate let generation: UUID
 }
 
+/// Request-scoped fence for legacy 401 handling (JOV-12807).
+///
+/// Managed authorizations pin login generation **and** the bearer revision that
+/// was sent. Unmanaged tokens pin only the store generation observed at start.
+/// A delayed 401 whose revision or login was replaced must not clear the
+/// session that replaced it.
+struct NativeSessionRequestFence: Equatable, Sendable {
+  let ownership: NativeSessionOwnership
+  fileprivate let bearerRevision: UUID?
+}
+
 struct NativeSessionContext: Equatable, Sendable {
   let ownership: NativeSessionOwnership
   let authorization: NativeRequestAuthorization?
@@ -443,6 +454,46 @@ enum NativeSessionTokenStore {
     withLock {
       guard matchesUserLocked(userID) else { return nil }
       return NativeSessionOwnership(generation: state.generation)
+    }
+  }
+
+  /// Fence a request against the authorization it actually sent.
+  static func requestFence(for authorization: NativeRequestAuthorization) -> NativeSessionRequestFence {
+    NativeSessionRequestFence(
+      ownership: authorization.ownership ?? captureOwnership(),
+      bearerRevision: authorization.bearerRevision
+    )
+  }
+
+  static func isCurrent(_ fence: NativeSessionRequestFence) -> Bool {
+    withLock { isCurrentLocked(fence) }
+  }
+
+  private static func isCurrentLocked(_ fence: NativeSessionRequestFence) -> Bool {
+    guard state.generation == fence.ownership.generation else { return false }
+    if let revision = fence.bearerRevision, state.bearerRevision != revision {
+      return false
+    }
+    _ = loadLocked()
+    guard state.generation == fence.ownership.generation else { return false }
+    if let revision = fence.bearerRevision {
+      return state.bearerRevision == revision
+    }
+    return true
+  }
+
+  /// Atomically clear only while the request fence still matches. Never rotates
+  /// auth intent for a superseded fence (unlike `claimCleanup(invalidatingAuthIntent:)`
+  /// followed by a late generation check).
+  @discardableResult
+  static func clearIfCurrent(_ fence: NativeSessionRequestFence) -> Bool {
+    withLock {
+      guard isCurrentLocked(fence) else { return false }
+      state.intent = UUID()
+      state.pendingAuth = nil
+      state.delivery = nil
+      clearLocked()
+      return true
     }
   }
 
