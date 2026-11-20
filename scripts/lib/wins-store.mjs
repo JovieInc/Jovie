@@ -103,7 +103,25 @@ export async function listWinsFromStore(env = process.env, fetchImpl = fetch) {
 }
 
 /**
- * Merge ledger wins with store overlays (store receipts win by id).
+ * Union receipts from ledger + store. Store entries win on metric/at/value
+ * collisions. An empty store `[]` (ingest create) must not erase ledger-only
+ * receipts from a local `receipt` without `--store`.
+ * @param {unknown} ledgerReceipts
+ * @param {unknown} storeReceipts
+ */
+export function mergeReceipts(ledgerReceipts, storeReceipts) {
+  const ledger = Array.isArray(ledgerReceipts) ? ledgerReceipts : [];
+  const store = Array.isArray(storeReceipts) ? storeReceipts : [];
+  if (store.length === 0) return ledger;
+  if (ledger.length === 0) return store;
+  const key = r => `${r?.metric ?? ''}\0${r?.at ?? ''}\0${r?.value ?? ''}`;
+  const byKey = new Map(ledger.map(r => [key(r), r]));
+  for (const r of store) byKey.set(key(r), r);
+  return [...byKey.values()];
+}
+
+/**
+ * Merge ledger wins with store overlays (store fields win by id; receipts union).
  * @param {object[]} ledgerWins
  * @param {object[]} storeWins
  */
@@ -114,7 +132,11 @@ export function mergeWins(ledgerWins, storeWins) {
     byId.set(
       w.id,
       prior
-        ? { ...prior, ...w, receipts: w.receipts ?? prior.receipts ?? [] }
+        ? {
+            ...prior,
+            ...w,
+            receipts: mergeReceipts(prior.receipts, w.receipts),
+          }
         : w
     );
   }

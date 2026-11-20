@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  mergeReceipts,
   mergeWins,
   overwriteWinInStore,
   putMeasureReportToStore,
@@ -111,6 +112,40 @@ test('mergeWins: store receipts overlay ledger rows by id', () => {
   assert.equal(merged.find(w => w.id === 'a').receipts.length, 1);
   assert.ok(merged.find(w => w.id === 'b'));
   assert.ok(merged.find(w => w.id === 'c'));
+});
+
+test('mergeWins: empty store receipts must not erase ledger receipts', () => {
+  // Ingest writes receipts: [] to the store. A later local `receipt` (no
+  // --store) can put receipts only in the ledger. `[]` is not nullish, so a
+  // naive `store ?? ledger` wipe would drop them and flip status back.
+  const ledgerReceipt = {
+    metric: 'wait',
+    value: 12,
+    at: '2026-10-30T00:00:00Z',
+    evidence: 'e',
+  };
+  const merged = mergeWins(
+    [{ id: 'a', receipts: [ledgerReceipt], claim: 'ledger' }],
+    [{ id: 'a', receipts: [], claim: 'store' }]
+  );
+  assert.equal(merged.find(w => w.id === 'a').claim, 'store');
+  assert.deepEqual(merged.find(w => w.id === 'a').receipts, [ledgerReceipt]);
+});
+
+test('mergeReceipts: unions both sides; store wins on collision', () => {
+  const ledger = [
+    { metric: 'a', value: 1, at: 't1', evidence: 'L' },
+    { metric: 'b', value: 2, at: 't2', evidence: 'L' },
+  ];
+  const store = [
+    { metric: 'b', value: 2, at: 't2', evidence: 'S' },
+    { metric: 'c', value: 3, at: 't3', evidence: 'S' },
+  ];
+  const out = mergeReceipts(ledger, store);
+  assert.equal(out.length, 3);
+  assert.equal(out.find(r => r.metric === 'b').evidence, 'S');
+  assert.deepEqual(mergeReceipts(ledger, []), ledger);
+  assert.deepEqual(mergeReceipts([], store), store);
 });
 
 test('receipt --store must merge store receipts before overwrite (not ledger-only)', async () => {
