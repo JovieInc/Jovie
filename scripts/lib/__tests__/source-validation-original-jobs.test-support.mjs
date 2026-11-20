@@ -4,6 +4,46 @@ import assert from 'node:assert/strict';
 /** @typedef {{steps: Step[], 'runs-on'?: string}} Job */
 /** @typedef {{jobs: Record<string, Job>, permissions: unknown, on: unknown}} Workflow */
 
+const DISK_READ_GUARD = 'Validate disk-read source contracts from trusted base';
+
+/** Serial → pooled disk-read step is an owned migration (same guards, first
+ * failure wins). Normalize both sides so the deepEqual still pins everything
+ * else on the unit job.
+ * @param {Step} step
+ */
+function normalizeDiskReadStep(step) {
+  if (!step?.run?.includes('SOURCE_GUARD_MODULE')) return step;
+  assert.match(step.run, /selectSourceGuards/);
+  assert.match(step.run, /listAllChangedFiles/);
+  if (step.run.includes('runSourceGuards')) {
+    assert.match(step.run, /ci-source-guard-pool\.mjs/);
+    assert.match(step.run, /process\.exitCode\s*=\s*code/);
+  } else {
+    assert.match(step.run, /spawnSync\(guard\.command/);
+    assert.match(step.run, /process\.exitCode\s*=\s*exitCode/);
+  }
+  return {
+    ...step,
+    // Drop concurrency export noise; pooling is opt-in via SOURCE_GUARD_CONCURRENCY.
+    run: 'SOURCE_GUARDS_NORMALIZED',
+    env: Object.fromEntries(
+      Object.entries(step.env ?? {}).filter(
+        ([key]) => key !== 'SOURCE_GUARD_CONCURRENCY'
+      )
+    ),
+  };
+}
+
+/** @param {Job} job */
+function normalizeUnitJob(job) {
+  return {
+    ...job,
+    steps: job.steps.map(step =>
+      step.name === DISK_READ_GUARD ? normalizeDiskReadStep(step) : step
+    ),
+  };
+}
+
 /** Exact preservation of existing jobs, with only validated owned additions.
  * @param {Workflow} current
  * @param {Workflow} baseline
@@ -23,7 +63,9 @@ export function assertOriginalJobsRetained(current, baseline) {
   for (const [id, job] of Object.entries(baseline.jobs)) {
     if (id === 'cancel-superseded') continue;
     const actual = current.jobs[id];
-    assert.deepEqual(strip(actual), strip(job), id);
+    const left = id === 'unit' ? normalizeUnitJob(actual) : actual;
+    const right = id === 'unit' ? normalizeUnitJob(job) : job;
+    assert.deepEqual(strip(left), strip(right), id);
     for (const name of owned) {
       const added = actual.steps.filter(step => step.name === name);
       const kept = job.steps.filter(step => step.name === name);
