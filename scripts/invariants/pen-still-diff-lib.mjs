@@ -81,21 +81,29 @@ const points = [0, (image.width - 1) * 4, (image.height - 1) * image.width * 4, 
 const bg = [0, 0, 0]; for (const p of points) { bg[0] += image.data[p]; bg[1] += image.data[p + 1];
 bg[2] += image.data[p + 2]; } return bg.map(v => v / points.length); }
 function largestComponent(mask, width, height) { const seen = new Uint8Array(mask.length); let best = null;
+const frameArea = width * height; const minPixels = Math.max(8, Math.round(frameArea * 0.005));
 for (let start = 0; start < mask.length; start++) { if (!mask[start] || seen[start]) continue;
 const stack = [start]; seen[start] = 1; let minX = width, minY = height, maxX = 0, maxY = 0, count = 0;
 while (stack.length) { const p = stack.pop(); const x = p % width; const y = (p - x) / width; count += 1;
 if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y;
-const next = [x > 0 ? p - 1 : -1, x + 1 < width ? p + 1 : -1, y > 0 ? p - width : -1, y + 1 < height ? p + width : -1];
-for (const n of next) { if (n >= 0 && mask[n] && !seen[n]) { seen[n] = 1; stack.push(n); } } }
-if (count >= 8 && (!best || count > best.count)) best = { minX, minY, maxX, maxY, count }; }
+for (let dy = -1; dy <= 1; dy++) { const ny = y + dy; if (ny < 0 || ny >= height) continue;
+for (let dx = -1; dx <= 1; dx++) { if (dx === 0 && dy === 0) continue; const nx = x + dx;
+if (nx < 0 || nx >= width) continue; const n = ny * width + nx;
+if (mask[n] && !seen[n]) { seen[n] = 1; stack.push(n); } } } }
+const w = maxX - minX + 1; const h = maxY - minY + 1;
+if (count >= minPixels && (w * h) / frameArea >= 0.015 && (!best || count > best.count))
+best = { minX, minY, maxX, maxY, count }; }
 if (!best) return null;
 return { x: best.minX, y: best.minY, w: best.maxX - best.minX + 1, h: best.maxY - best.minY + 1 }; }
-function textBands(text, width, height) { const rows = []; for (let y = 0; y < height; y++) {
+function textBands(text, width, height) { const minRow = Math.max(2, Math.round(width * 0.0025));
+const minBand = height >= 200 ? Math.max(4, Math.round(height * 0.004)) : 2; const rows = [];
+for (let y = 0; y < height; y++) {
 let minX = width, maxX = 0, count = 0; for (let x = 0; x < width; x++) { if (!text[y * width + x]) continue;
-count += 1; if (x < minX) minX = x; if (x > maxX) maxX = x; } if (count >= 2) rows.push({ y, minX, maxX }); }
+count += 1; if (x < minX) minX = x; if (x > maxX) maxX = x; } if (count >= minRow) rows.push({ y, minX, maxX }); }
 const groups = []; for (const row of rows) { const current = groups.at(-1);
 if (!current || row.y - current.at(-1).y > 2) groups.push([row]); else current.push(row); }
-return groups.map(group => { const minX = Math.min(...group.map(row => row.minX));
+return groups.filter(group => group.at(-1).y - group[0].y + 1 >= minBand).map(group => {
+const minX = Math.min(...group.map(row => row.minX));
 const maxX = Math.max(...group.map(row => row.maxX)); const y0 = group[0].y; const y1 = group.at(-1).y + 1;
 return { x: minX / width, y: (y0 + y1) / 2 / height, width: (maxX - minX + 1) / width,
 height: (y1 - y0) / height, }; }); }
@@ -123,10 +131,17 @@ textBlocks: (textBlocks ?? []).map(block => ({ x: block.x / section.width,
 y: (block.y + block.height / 2) / section.height, width: block.width / section.width,
 height: block.height / section.height, })), }; } function relativeError(left, right) {
 return Math.abs(left - right) / Math.max(Math.abs(left), Math.abs(right), 1e-6); }
-function pairTextBlocks(penBlocks, renderBlocks) { if (penBlocks.length !== renderBlocks.length) return 1;
+function pairTextBlocks(penBlocks, renderBlocks) {
+if (penBlocks.length === 0 && renderBlocks.length === 0) return 0;
+if (penBlocks.length === 0 || renderBlocks.length === 0) return 1;
 const penSorted = [...penBlocks].sort((a, b) => a.y - b.y);
 const renderSorted = [...renderBlocks].sort((a, b) => a.y - b.y);
-return penSorted.reduce((max, block, i) => Math.max(max, Math.abs(block.y - renderSorted[i].y)), 0); }
+if (penSorted.length === renderSorted.length)
+return penSorted.reduce((max, block, i) => Math.max(max, Math.abs(block.y - renderSorted[i].y)), 0);
+if (Math.min(penSorted.length, renderSorted.length) / Math.max(penSorted.length, renderSorted.length) < 0.5) return 1;
+const nearest = (src, dst) => src.reduce((max, a) =>
+Math.max(max, dst.reduce((best, b) => Math.min(best, Math.abs(a.y - b.y)), 1)), 0);
+return Math.max(nearest(penSorted, renderSorted), nearest(renderSorted, penSorted)); }
 export function judgePair(pen, render, ssimScore, tolerances = PEN_STILL_TOLERANCES) {
 const sectionHeightRatio = render.sectionAspect / pen.sectionAspect;
 const sectionPass = Math.abs(sectionHeightRatio - 1) <= tolerances.sectionHeightRatio;

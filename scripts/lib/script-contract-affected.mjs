@@ -53,6 +53,8 @@ const FULL_RUN_INPUT =
 // FULL_RUN_INPUT), selects the inventory contract without the full lists.
 export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
 export const SHELL_IA_TEST = 'scripts/invariants/shell-ia.test.mjs';
+export const PEN_GOLDEN_PATH_TEST =
+  'scripts/invariants/pen-golden-path.test.mjs';
 // Stay aligned with CHROME_SCAN_ROOTS and isScannable in shell-ia.mjs.
 // Importing that module here would pull the layout walker into every selection.
 export const SHELL_IA_SCAN_ROOTS = Object.freeze([
@@ -162,13 +164,23 @@ export function selectScriptContracts(changed, options = {}) {
     COPY_INVENTORY_TEST,
     changedFiles.some(copyInventoryScanPath)
   );
+  const withShellIa = unionAffectedContract(
+    node,
+    nodeSelected,
+    SHELL_IA_TEST,
+    changedFiles.some(shellIaScanPath)
+  );
   return {
     full: false,
     node: unionAffectedContract(
       node,
-      nodeSelected,
-      SHELL_IA_TEST,
-      changedFiles.some(shellIaScanPath)
+      withShellIa,
+      PEN_GOLDEN_PATH_TEST,
+      changedFiles.some(
+        file =>
+          file.startsWith('docs/pen-stills/') ||
+          file.startsWith('docs/design-system/pen-briefs/')
+      )
     ),
     vitest: unionAffectedContract(
       vitest,
