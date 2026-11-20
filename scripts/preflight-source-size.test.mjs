@@ -24,7 +24,7 @@ test('preflight catches the JOV-12153 growth before pushing', () => {
   assert.equal(item.done, false);
   assert.equal(item.trigger, source);
   assert.match(item.hint, /560.*542/);
-  assert.match(item.hint, /extract/);
+  assert.match(item.hint, /exceeds 542 by 18; extract at least 18 lines/);
 });
 
 test('baselined files may stay the same size or shrink', () => {
