@@ -86,11 +86,27 @@ describe('admin investor shell normalization', () => {
   });
 
   it('uses the canonical table action menu instead of a bespoke row dropdown', () => {
+    const rowActionsSource = readFileSync(
+      findSourceFile(
+        resolve(
+          process.cwd(),
+          'app/app/(shell)/admin/investors/links/InvestorLinkRowActions.tsx'
+        ),
+        resolve(
+          process.cwd(),
+          'apps/web/app/app/(shell)/admin/investors/links/InvestorLinkRowActions.tsx'
+        )
+      ),
+      'utf8'
+    );
     const managerSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
 
-    expect(managerSource).toContain('TableActionMenu');
+    expect(rowActionsSource).toContain('TableActionMenu');
+    expect(managerSource).toContain('InvestorLinkRowActions');
     expect(managerSource).not.toContain('absolute right-0 top-full');
     expect(managerSource).not.toContain('document.addEventListener');
+    expect(rowActionsSource).not.toContain('absolute right-0 top-full');
+    expect(rowActionsSource).not.toContain('document.addEventListener');
   });
 
   it('does not style investor table headers with all-caps tracking chrome', () => {

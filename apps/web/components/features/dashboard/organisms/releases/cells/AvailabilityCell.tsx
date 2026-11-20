@@ -2,7 +2,13 @@
 
 // @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.test.tsx
 
-import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  IconButton,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import {
   type FormEvent,
   memo,
@@ -15,10 +21,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
-import {
-  DrawerButton,
-  DrawerInlineIconButton,
-} from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -311,7 +314,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   if (provider?.url) {
                     return (
                       <div className='flex min-w-35 items-center justify-end gap-1'>
-                        <DrawerInlineIconButton
+                        <IconButton
+                          size='lg'
+                          variant='inline'
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
                             globalThis.open(
@@ -327,8 +332,10 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </DrawerInlineIconButton>
-                        <DrawerInlineIconButton
+                        </IconButton>
+                        <IconButton
+                          size='lg'
+                          variant='inline'
                           aria-label={
                             isCopied
                               ? `Copied ${config.label} link`
@@ -345,7 +352,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </DrawerInlineIconButton>
+                        </IconButton>
                       </div>
                     );
                   }

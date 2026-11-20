@@ -51,7 +51,7 @@ function makeStableContext(
   };
 }
 
-// The action is a canonical TableIconButton with a tooltip, as in the app shell.
+// The action is a canonical IconButton (dense xs) with a tooltip.
 const withTooltips = { wrapper: TooltipProvider };
 
 describe('AudienceActionCell', () => {

@@ -113,7 +113,8 @@ describe('ShareableLinkRow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/tim');
     const copied = await screen.findByRole('button', { name: 'Copied' });
-    expect(copied).toHaveClass('text-success');
+    // Success chrome lives on the glyph (IconButton owns color; no restyle).
+    expect(copied.querySelector('svg')).toHaveClass('text-success');
     expect(onCopySuccess).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
     await waitFor(() =>
