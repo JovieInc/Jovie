@@ -12,6 +12,7 @@ import {
   hashIP,
   inferDeviceType,
   recordEngagement,
+  safeEqualString,
   verifyTrackingToken,
 } from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
@@ -72,14 +73,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fail closed: never redirect on an invalid/missing token (SEC-18).
     const payload = verifyTrackingToken(token);
     if (!payload) {
       logger.warn('[Email Click Track] Invalid tracking token');
-      // Still redirect to avoid broken UX, but don't track
-      return NextResponse.redirect(targetUrl, {
-        status: 302,
-        headers: NO_STORE_HEADERS,
-      });
+      return NextResponse.json(
+        { error: 'Invalid tracking token' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Destination must be HMAC-bound into the token — reject swapped `u`.
+    if (!payload.clickUrl || !safeEqualString(payload.clickUrl, targetUrl)) {
+      logger.warn('[Email Click Track] Click URL does not match token');
+      return NextResponse.json(
+        { error: 'Invalid tracking token' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Extract metadata
@@ -89,6 +99,9 @@ export async function GET(request: NextRequest) {
     const country = headersList.get('x-vercel-ip-country') ?? undefined;
     const city = headersList.get('x-vercel-ip-city') ?? undefined;
 
+    // Prefer the HMAC-bound destination over the query string.
+    const redirectUrl = payload.clickUrl;
+
     // Record the click event after response is sent (survives serverless teardown)
     const engagementData = {
       emailType: payload.emailType,
@@ -97,7 +110,7 @@ export async function GET(request: NextRequest) {
       recipientEmail: payload.email,
       providerMessageId: payload.messageId,
       metadata: {
-        clickUrl: targetUrl,
+        clickUrl: redirectUrl,
         linkId,
         userAgent: userAgent ?? undefined,
         ipHash: hashIP(ipAddress),
@@ -117,8 +130,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Redirect to the target URL
-    return NextResponse.redirect(targetUrl, {
+    // Redirect to the HMAC-bound target URL
+    return NextResponse.redirect(redirectUrl, {
       status: 302,
       headers: NO_STORE_HEADERS,
     });
