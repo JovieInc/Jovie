@@ -11,7 +11,6 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
@@ -31,6 +30,7 @@ import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
 import { assertSidebarClickNavigation } from './utils/dashboard-click-navigation';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { assertChatResponseOk } from './utils/prod-cert-chat-response';
+import { assertProdCertCheckoutEntry } from './utils/prod-cert-checkout-entry';
 import {
   certStep,
   certStepBlocked,
@@ -84,7 +84,7 @@ recordCertCapabilities({
     'profile-edit-save-readback',
   ],
   chat: ['composer-ready', 'first-reply'],
-  checkout: ['checkout-entry-renders'],
+  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
 });
 /** Saved signed-in session for the chat cert test (serial same-worker). */
 let signedInStatePath: string | null = null;
@@ -938,56 +938,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     await certStep(
       'checkout',
       'checkout-entry-renders',
-      async () => {
-        // JOV-10066: the checkout entry is the real /onboarding/checkout
-        // surface (explicit paid intent, so the organic-offer gates cannot
-        // redirect), not the billing settings page. The step stops before
-        // the Stripe handoff — it asserts the upgrade entry rendered.
-        await page.goto(
-          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro&interval=month`,
-          {
-            waitUntil: 'domcontentloaded',
-            timeout: SMOKE_TIMEOUTS.NAVIGATION,
-          }
-        );
-        assertExactNavigationUrl(
-          page.url(),
-          expectedOrigin,
-          'Onboarding checkout navigation'
-        );
-        // The receipt labels this surface web.onboarding-checkout, so the cert
-        // must actually LAND on the registered screen: the origin check above
-        // alone would pass a soft redirect to pricing or billing (JOV-9625).
-        expect(
-          new URL(page.url()).pathname,
-          'the checkout cert must land on the registered /onboarding/checkout screen'
-        ).toBe(APP_ROUTES.ONBOARDING_CHECKOUT);
-        await waitForHydration(page);
-        await expect(
-          page.getByRole('heading', { name: /upgrade to/i }).first()
-        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-        // The CTA is `Upgrade to ${planMarketing.displayName}`
-        // (OnboardingCheckoutClient); derive the plan name from the registry
-        // instead of pinning old copy ("Pro" became "Artist Presence" and
-        // blocked every production promotion on 2026-10-31, #24015).
-        const upgradeButton = page.getByRole('button', {
-          name: `Upgrade to ${getPlanDisplayName('pro')}`,
-        });
-        await expect(upgradeButton).toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-        await expect(upgradeButton).toBeEnabled();
-        const checkoutText = (
-          await page.locator('main').first().innerText()
-        ).toLowerCase();
-        expect(checkoutText).not.toMatch(
-          /application error|something went wrong/
-        );
-        expect(checkoutText).toMatch(/pro/);
-        // The paid plan is presented with its per-interval price; the cert
-        // navigates with interval=month, so the monthly price must render.
-        expect(checkoutText).toMatch(/\/mo/);
-      },
+      () => assertProdCertCheckoutEntry(page, expectedOrigin),
       () =>
         'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
     );
@@ -1479,74 +1430,95 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           ? 'SYNTHETIC_PASSAGE_KEY is not provided to this run'
           : 'EXPECTED_COMMIT_SHA is not provided to this run'
       );
-      return;
-    }
-    const onboardingToken = mintPassageToken(
-      Buffer.from(passageKey, 'base64url'),
-      {
-        sub: email,
-        scp: 'onboarding_chat',
-        run: runTag().slice(0, 64),
-        ttlSeconds: 300,
-      }
-    );
-    recordPlaywrightSensitiveValues([onboardingToken]);
-    await page.route('**/*', async route => {
-      const request = route.request();
-      if (new URL(request.url()).origin !== expectedOrigin) {
-        await route.continue();
-        return;
-      }
-      await route.continue({
-        headers: {
-          ...request.headers(),
-          [PASSAGE_TOKEN_HEADER]: onboardingToken,
-          'x-synthetic-monitoring': 'prod-cert',
-        },
-      });
-    });
-
-    const telemetry = createSurfaceTelemetry(page);
-    await certStep(
-      'onboarding',
-      'fresh-user-onboarding-first-value',
-      async () => {
-        assertExactNavigationUrl(page.url(), expectedOrigin, 'Onboarding chat');
-        const input = page.locator('[aria-label="Chat message input" i]');
-        const sendButton = page.getByRole('button', { name: 'Send message' });
-        await expect(input).toBeVisible({ timeout: 30_000 });
-        await fillControlledInputUntilEnabled(
-          input,
-          sendButton,
-          'Help me set up my artist profile'
-        );
-        const [response] = await Promise.all([
-          page.waitForResponse(
-            candidate =>
-              candidate.request().method() === 'POST' &&
-              new URL(candidate.url()).pathname === '/api/chat',
-            { timeout: 60_000 }
-          ),
-          sendButton.click(),
-        ]);
-        if (response.status() !== 200) {
-          const body = await response.text().catch(() => '');
-          throw new Error(
-            `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
-          );
+    } else {
+      const onboardingToken = mintPassageToken(
+        Buffer.from(passageKey, 'base64url'),
+        {
+          sub: email,
+          scp: 'onboarding_chat',
+          run: runTag().slice(0, 64),
+          ttlSeconds: 300,
         }
-        await expect(
-          page.locator("[data-testid='chat-message-reply']").first()
-        ).toBeVisible({ timeout: 60_000 });
-        // The reply element is also where a quota wall renders (the weekly
-        // limit streams its notice as an assistant message); a visible
-        // element alone is a false pass (JOV-9625). Require real content.
-        await assertAssistantReply(page, 'fresh-user onboarding first value');
-        return 'first assistant reply';
-      },
-      () => 'fresh user reached first value: onboarding chat first reply'
+      );
+      recordPlaywrightSensitiveValues([onboardingToken]);
+      await page.route('**/*', async route => {
+        const request = route.request();
+        if (new URL(request.url()).origin !== expectedOrigin) {
+          await route.continue();
+          return;
+        }
+        await route.continue({
+          headers: {
+            ...request.headers(),
+            [PASSAGE_TOKEN_HEADER]: onboardingToken,
+            'x-synthetic-monitoring': 'prod-cert',
+          },
+        });
+      });
+
+      const telemetry = createSurfaceTelemetry(page);
+      try {
+        await certStep(
+          'onboarding',
+          'fresh-user-onboarding-first-value',
+          async () => {
+            assertExactNavigationUrl(
+              page.url(),
+              expectedOrigin,
+              'Onboarding chat'
+            );
+            const input = page.locator('[aria-label="Chat message input" i]');
+            const sendButton = page.getByRole('button', {
+              name: 'Send message',
+            });
+            await expect(input).toBeVisible({ timeout: 30_000 });
+            await fillControlledInputUntilEnabled(
+              input,
+              sendButton,
+              'Help me set up my artist profile'
+            );
+            const [response] = await Promise.all([
+              page.waitForResponse(
+                candidate =>
+                  candidate.request().method() === 'POST' &&
+                  new URL(candidate.url()).pathname === '/api/chat',
+                { timeout: 60_000 }
+              ),
+              sendButton.click(),
+            ]);
+            if (response.status() !== 200) {
+              const body = await response.text().catch(() => '');
+              throw new Error(
+                `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
+              );
+            }
+            await expect(
+              page.locator("[data-testid='chat-message-reply']").first()
+            ).toBeVisible({ timeout: 60_000 });
+            // The reply element is also where a quota wall renders (the weekly
+            // limit streams its notice as an assistant message); a visible
+            // element alone is a false pass (JOV-9625). Require real content.
+            await assertAssistantReply(
+              page,
+              'fresh-user onboarding first value'
+            );
+            return 'first assistant reply';
+          },
+          () => 'fresh user reached first value: onboarding chat first reply'
+        );
+        telemetry.record('onboarding');
+        await telemetry.capture(page, 'onboarding');
+      } finally {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+      }
+    }
+
+    await certStep(
+      'checkout',
+      'fresh-user-checkout-entry',
+      () => assertProdCertCheckoutEntry(page, expectedOrigin),
+      () =>
+        'fresh synthetic user reached onboarding/checkout upgrade CTA; stopped before payment'
     );
-    telemetry.record('onboarding');
-    await telemetry.capture(page, 'onboarding');
   });
 });
