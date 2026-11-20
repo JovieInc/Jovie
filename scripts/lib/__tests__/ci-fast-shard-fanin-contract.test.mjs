@@ -63,7 +63,7 @@ const ALLOWED_RUNNERS = new Set([
     "${{ 'jovie-runner-image-canary' }}",
   ]),
   JSON.stringify(
-    "${{ vars.MERGE_GATE_POOL == 'fixed' && fromJSON('[\"self-hosted\",\"Linux\",\"X64\",\"jovie-fixed\"]') || 'ubuntu-latest' }}"
+    '${{ vars.MERGE_GATE_POOL == \'fixed\' && fromJSON(\'["self-hosted","Linux","X64","jovie-fixed"]\') || \'ubuntu-latest\' }}'
   ),
 ]);
 const REMAINING_ONCE = [
@@ -90,7 +90,8 @@ const STRUCTURAL_DECISION_JOBS = [
 ];
 
 describe('ci-fast shard fan-in contracts', () => {
-  const jobs = /** @type {{ jobs: Record<string, any> }} */ (loadYaml(WORKFLOW)).jobs;
+  const jobs = /** @type {{ jobs: Record<string, any> }} */ (loadYaml(WORKFLOW))
+    .jobs;
   const script = (job, name) =>
     jobs[job].steps.find(step => step.name === name).run;
   const run = (code, env) =>
