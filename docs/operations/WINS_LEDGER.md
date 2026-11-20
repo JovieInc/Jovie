@@ -20,7 +20,7 @@ writes the record to the runtime store (`summer-company/wins-ledger/<id>.json`, 
 
 - **Required.** A PR labeled `compounding`, or titled as ci, perf, build, queue, throughput or preflight work, fails Fleet Rules until its `## Win` section has a measured win. `n/a` does not satisfy it. The failure message prints a paste-ready template.
 - **Fields.** Metric name, before, after, delta (computed), method (the `query`), source and evidence (`Verify` plus receipts).
-- **No number yet.** Use `?` for the after-value and add `- Pending: yes`. The win is `pending-measure` and never counted. `node scripts/wins-ledger.mjs due` lists merged wins 24 hours past merge that still need their receipt. Wiring that list to a production-deploy trigger is the next step.
+- **No number yet.** Use `?` for the after-value and add `- Pending: yes`. The win is `pending-measure` and never counted. `node scripts/wins-ledger.mjs due` lists merged wins 24 hours past merge that still need their receipt. `measure-due` runs at the end of `shipping-slo.yml` (daily + dispatch) and auto-measures machine-queryable sources (committed metrics JSON field paths, Gateway report feature tags), writing receipts to the runtime store only. Unqueryable dues are explicit `needs-probe` skips — no fragile scrapers in v1.
 - **On merge.** `wins-ledger.yml` writes the record to the store. `summary --write` and `rollup --write` are derived views run on demand, never committed by automation.
 - **Weekly rollup.** `rollup` gives, per week: wins, verified, claimed, merges per day, lead time p50 (PR created to merged), and seconds saved per merge for metrics tagged `Per-merge: yes`, split by verified and claimed. CI minutes and cost per merged PR are not measured here. Dollars never go in this repo; they belong in the private ops store.
 - **Proof-stats.** Decks, applications and posts read aggregates from the proof-stats registry. Posting the rollup to its intake endpoint follows once #23697 merges.
@@ -37,8 +37,13 @@ writes the record to the runtime store (`summer-company/wins-ledger/<id>.json`, 
 | `verified` | Every metric has a receipt taken after the last merge that keeps at least half the claimed gain (20% of `before` when no after is claimed). |
 | `not-reproduced` | A post-merge receipt exists and the gain did not hold. |
 
-Record a re-measurement with `node scripts/wins-ledger.mjs receipt --id ID --metric NAME --value N --evidence URL [--sha SHA]`.
-Only machine-readable evidence (a run, a query result) counts.
+Record a re-measurement with `node scripts/wins-ledger.mjs receipt --id ID --metric NAME --value N --evidence URL [--sha SHA] [--store]`.
+Only machine-readable evidence (a run, a query result) counts. CI always passes `--store` so receipts never mirror into `canon/wins/wins.jsonl`.
+
+Queryable metric shapes for `measure-due` v1:
+
+- JSON file: `source`/`query` like `docs/metrics/shipping-slo-latest.json#queueEjectionRate` (or source = file, query = dotted path).
+- Gateway: `source: Gateway report feature:<tag>` and `query: node scripts/ai-gateway-report.mjs`.
 
 ## Clustering and posts
 
