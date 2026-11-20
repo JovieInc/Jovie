@@ -37,6 +37,7 @@ export const STAGES = Object.freeze([
  *     readonly reason: string;
  *     readonly pagesSummer: boolean;
  *   }>;
+ *   readonly desktopRelevantSincePublished?: boolean | null;
  * }} ChannelGraph
  */
 
@@ -136,19 +137,36 @@ export function reconcileArtifactFreshness(input) {
     }
   }
 
+  const desktopRelevantSincePublished =
+    input.desktopRelevantSincePublished === true
+      ? true
+      : input.desktopRelevantSincePublished === false
+        ? false
+        : null;
+
   if (
     isKnownSha(stages.certified) &&
     isKnownSha(stages.published) &&
-    stages.certified.sourceRevision !== stages.published.sourceRevision &&
-    input.desktopRelevantSincePublished === true
+    stages.certified.sourceRevision !== stages.published.sourceRevision
   ) {
-    mismatches.push({
-      from: 'certified',
-      to: 'published',
-      code: 'certified-unpublished',
-      reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}.`,
-      pagesSummer: true,
-    });
+    if (desktopRelevantSincePublished === true) {
+      mismatches.push({
+        from: 'certified',
+        to: 'published',
+        code: 'certified-unpublished',
+        reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} is desktop-relevant ahead of published ${stages.published.sourceRevision.slice(0, 12)}.`,
+        pagesSummer: true,
+      });
+    } else if (desktopRelevantSincePublished === null) {
+      // git diff failed / unobserved — never treat as green for Summer close.
+      mismatches.push({
+        from: 'certified',
+        to: 'published',
+        code: 'certified-relevance-unknown',
+        reason: `${channel}: certified ${stages.certified.sourceRevision.slice(0, 12)} differs from published ${stages.published.sourceRevision.slice(0, 12)} but desktop relevance was not observed.`,
+        pagesSummer: false,
+      });
+    }
   }
 
   if (
@@ -179,7 +197,7 @@ export function reconcileArtifactFreshness(input) {
     });
   }
 
-  return { channel, stages, mismatches };
+  return { channel, stages, mismatches, desktopRelevantSincePublished };
 }
 
 /**

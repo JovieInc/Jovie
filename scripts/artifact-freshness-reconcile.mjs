@@ -317,9 +317,10 @@ export async function pageSummerForFreshness(input) {
 }
 
 /**
- * Summer may close only when production certified was actually observed.
- * Unknown/missing certified skips certified-unpublished checks; closing on
- * that green would bury an open stall the next successful lookup would catch.
+ * Summer may close only when production certified was actually observed and
+ * desktop relevance between certified/published is not an unobserved null.
+ * Unknown certified or null git-diff relevance skips certified-unpublished;
+ * closing on that green would bury an open stall.
  *
  * @param {ReturnType<typeof buildArtifactFreshnessReceipt>} receipt
  */
@@ -328,7 +329,28 @@ export function canResolveSummerForFreshness(receipt) {
   const production = (receipt?.channels ?? []).find(
     channel => channel.channel === 'production'
   );
-  const certified = production?.stages?.certified;
+  if (!production) return false;
+  if (
+    (production.mismatches ?? []).some(
+      mismatch => mismatch.code === 'certified-relevance-unknown'
+    )
+  ) {
+    return false;
+  }
+  const certified = production.stages?.certified;
+  const published = production.stages?.published;
+  if (
+    certified?.status === 'known' &&
+    published?.status === 'known' &&
+    typeof certified.sourceRevision === 'string' &&
+    typeof published.sourceRevision === 'string' &&
+    FULL_SHA.test(certified.sourceRevision) &&
+    FULL_SHA.test(published.sourceRevision) &&
+    certified.sourceRevision !== published.sourceRevision &&
+    production.desktopRelevantSincePublished == null
+  ) {
+    return false;
+  }
   return (
     certified?.status === 'known' &&
     certified.verified === true &&
