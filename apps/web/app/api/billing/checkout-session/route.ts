@@ -93,13 +93,47 @@ function isSettledCheckoutPaymentStatus(
   return paymentStatus === 'paid' || paymentStatus === 'no_payment_required';
 }
 
+function normalizeStripeCheckoutUrl(
+  url: string | null | undefined
+): string | null {
+  return typeof url === 'string' &&
+    url.startsWith('https://checkout.stripe.com/')
+    ? url
+    : null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
+    const rawSessionId = request.nextUrl.searchParams.get('session_id');
+    if (rawSessionId === null) {
+      const profileState = await buyerProfileState(userId);
+      const proofPending = await hasProofPendingProfile(
+        userId,
+        profileState.activeProfileId
+      );
+      const profileLive =
+        !profileState.needsProfile && profileState.isPublic && !proofPending;
+      return NextResponse.json(
+        {
+          plan: null,
+          priceId: null,
+          needsProfile: profileState.needsProfile,
+          proofPending,
+          profileLive,
+          profileShareUrl:
+            profileLive && profileState.username
+              ? getProfileUrl(profileState.username)
+              : null,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const parsedQuery = checkoutSessionQuerySchema.safeParse({
-      session_id: request.nextUrl.searchParams.get('session_id'),
+      session_id: rawSessionId,
     });
     if (!parsedQuery.success) {
       return jsonError('Invalid checkout session ID', 400);
@@ -129,6 +163,17 @@ export async function GET(request: NextRequest) {
       session.status !== 'complete' ||
       !isSettledCheckoutPaymentStatus(session.payment_status)
     ) {
+      if (session.mode === 'subscription' && session.status === 'open') {
+        return NextResponse.json(
+          {
+            plan: null,
+            priceId: null,
+            sessionStatus: 'open',
+            checkoutUrl: normalizeStripeCheckoutUrl(session.url),
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
       return NextResponse.json(
         { plan: null, priceId: null },
         { headers: NO_STORE_HEADERS }

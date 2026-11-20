@@ -24,6 +24,10 @@ import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
+import {
+  getAnnualSavingsPercent,
+  getCheckoutHeaderHint,
+} from './checkout-copy';
 import { OnboardingCheckoutColumn } from './OnboardingCheckoutColumn';
 import { OnboardingCheckoutFrame } from './OnboardingCheckoutFrame';
 
@@ -39,39 +43,10 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
-  /** Computed claim-time proof; empty hides the card (JOV-7794). */
+  readonly profileLive?: boolean;
   readonly proofFindings?: readonly ClaimTimeFinding[];
-  /** Free-admission page waiting for ownership proof: say so before paying. */
   readonly proofPending?: boolean;
-  /** JOV-9758: the artist's real catalog, shown above the price. */
   readonly catalog?: OnboardingCatalogPreview | null;
-}
-
-function getAnnualSavingsPercent(
-  monthlyAmount: number,
-  annualAmount: number
-): number {
-  const yearlyAtMonthly = monthlyAmount * 12;
-  return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
-}
-
-function getCheckoutHeaderHint(params: {
-  readonly isDefaultUpsell: boolean;
-  readonly username: string;
-  readonly displayName: string;
-  readonly proofPending: boolean;
-}): string {
-  const { isDefaultUpsell, username, displayName, proofPending } = params;
-  if (proofPending) {
-    return `Here's what ${displayName} adds once your profile is verified.`;
-  }
-  if (isDefaultUpsell && username) {
-    return `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${displayName} adds on top.`;
-  }
-  if (username) {
-    return `Your profile is live and stays free either way. Here's what ${displayName} adds on top.`;
-  }
-  return `Here's what ${displayName} adds on top of the free plan.`;
 }
 
 const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
@@ -100,25 +75,22 @@ function releaseYear(releaseDate: string | null): string | null {
   return releaseDate?.slice(0, 4) || null;
 }
 
-/**
- * JOV-9758: value before price. The artist sees their own releases on their
- * page before the plan and price render.
- */
 function CatalogPreviewCard({
   catalog,
+  canClaimLive,
 }: {
   readonly catalog: OnboardingCatalogPreview;
+  readonly canClaimLive: boolean;
 }) {
   const visible = catalog.releases.slice(0, 3);
   if (visible.length === 0) return null;
+  const suffix = canClaimLive ? 'on your page' : 'ready for your page';
   return (
     <div className='mb-6' data-testid='checkout-catalog-preview'>
       <ContentSurfaceCard>
         <div className='p-4'>
           <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
-            {catalog.total === 1
-              ? '1 release on your page'
-              : `${catalog.total} releases on your page`}
+            {`${catalog.total} ${catalog.total === 1 ? 'release' : 'releases'} ${suffix}`}
           </p>
           <ul className='space-y-2'>
             {visible.map((release, index) => (
@@ -342,10 +314,12 @@ export function OnboardingCheckoutClient({
   avatarUrl,
   spotifyFollowers,
   isDefaultUpsell,
+  profileLive,
   proofFindings = [],
   proofPending = false,
   catalog = null,
 }: OnboardingCheckoutClientProps) {
+  const canClaimLive = Boolean((profileLive ?? !proofPending) && !proofPending);
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
   const hasAnnualOption = annualPriceId !== null && annualAmount !== null;
@@ -460,6 +434,7 @@ export function OnboardingCheckoutClient({
               isDefaultUpsell,
               username,
               displayName: planMarketing.displayName,
+              canClaimLive,
               proofPending,
             })}
           </p>
@@ -475,7 +450,9 @@ export function OnboardingCheckoutClient({
           />
         ) : null}
 
-        {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
+        {catalog ? (
+          <CatalogPreviewCard catalog={catalog} canClaimLive={canClaimLive} />
+        ) : null}
 
         {proofPending ? (
           <p
@@ -562,7 +539,7 @@ export function OnboardingCheckoutClient({
             {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
           </button>
         </div>
-        {isDefaultUpsell && !proofPending ? (
+        {isDefaultUpsell && canClaimLive ? (
           <p className='mt-2 text-center text-xs text-tertiary-token'>
             Your public profile stays live and free forever.
           </p>

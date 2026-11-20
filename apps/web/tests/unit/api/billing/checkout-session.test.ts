@@ -201,4 +201,48 @@ describe('GET /api/billing/checkout-session', () => {
     expect(body.plan).toBe('pro');
     expect(body.profileShareUrl).toMatch(/\/migratedartist$/);
   });
+
+  it('surfaces open Stripe session status and valid Stripe checkoutUrl for recovery without activating a plan', async () => {
+    mocks.session = {
+      ...mocks.session,
+      status: 'open',
+      payment_status: 'unpaid',
+      url: 'https://checkout.stripe.com/c/pay/cs_test_open_123',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body).toEqual({
+      plan: null,
+      priceId: null,
+      sessionStatus: 'open',
+      checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_open_123',
+    });
+    expect(mocks.recordedStages).toEqual([]);
+  });
+
+  it('returns fresh buyer profile visibility and proofPending when session_id is omitted', async () => {
+    mocks.proofPending = true;
+    mocks.profileRows = [
+      {
+        activeProfileId: 'profile-1',
+        isClaimed: true,
+        isPublic: false,
+        username: 'privateartist',
+      },
+    ];
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (
+      await GET(
+        new NextRequest('http://localhost/api/billing/checkout-session')
+      )
+    ).json();
+    expect(body).toEqual({
+      plan: null,
+      priceId: null,
+      needsProfile: false,
+      proofPending: true,
+      profileLive: false,
+      profileShareUrl: null,
+    });
+  });
 });
