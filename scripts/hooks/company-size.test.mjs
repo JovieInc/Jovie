@@ -122,7 +122,8 @@ test('a cold guard cache cannot modify the committing repository index or Git st
     const before = readFileSync(index);
     const head = git(parent, 'rev-parse', 'HEAD');
     const script = new URL('./company-size-local.sh', import.meta.url).pathname;
-    for (const [label, extra] of [
+    /** @type {Array<[string, Record<string, string>]>} */
+    const cases = [
       ['index', { GIT_INDEX_FILE: index }],
       [
         'repository',
@@ -133,7 +134,8 @@ test('a cold guard cache cannot modify the committing repository index or Git st
           GIT_COMMON_DIR: join(parent, '.git'),
         },
       ],
-    ]) {
+    ];
+    for (const [label, extra] of cases) {
       const cache = join(scratch, label);
       const run = spawnSync('bash', [script, '--warm'], {
         cwd: parent,
