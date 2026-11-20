@@ -514,7 +514,7 @@ export function ActionDial({
                       {option.icon}
                     </span>
                   ) : null}
-                  <span className='text-secondary-token'>{option.label}</span>
+                  <span>{option.label}</span>
                 </div>
               );
             })}
