@@ -495,4 +495,4 @@ export function decideFailingHead({ head, failing, mainGreen }) {
 }
 
 export const failingHeadComment = (head, failing) =>
-  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. Fix and push; Merge Queue Green Enroll re-admits it when checks pass.`;
+  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. This exact head will not re-enter the queue (JOV-6620). Push a new commit that fixes the merge-group failure; \`lane-fix-red\` keeps the repair lane owning it until that new head is green.`;
