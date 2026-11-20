@@ -2339,7 +2339,7 @@ describe('ci-fast bounded parallel workflow', () => {
       });
       expect(selected.status, path).toBe(0);
     }
-    for (const path of ['README.md', 'docs/native-queue-eval.mjs']) {
+    for (const path of ['docs/REVIEW_BAR.md', 'docs/native-queue-eval.mjs']) {
       const selected = spawnSync('grep', ['-qE', pattern], {
         input: `${path}\n`,
       });
@@ -3347,10 +3347,15 @@ it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
     '.github/actions/setup-playwright/action.yml',
     'scripts/lib/playwright-png.mjs',
     'apps/web/playwright.config.ts',
+    // unit/ci asserts these docs; docs_only must not skip structural (JOV-12618).
+    'README.md',
+    'CONTRIBUTING.md',
+    'docs/REPO-POLICY.md',
+    'docs/SYNTHETIC_MONITORING.md',
   ]) {
     expect(selects(path), path).toBe(true);
   }
-  expect(selects('README.md')).toBe(false);
+  expect(selects('docs/REVIEW_BAR.md')).toBe(false);
 });
 
 describe('invariant-scanned PR structural selection', () => {
@@ -3719,7 +3724,7 @@ it('selects hosted structural coverage for doctor census fixture-only edits', ()
     'scripts/tests/test_design_gate.py'
   );
   const unrelated = spawnSync('grep', ['-qE', pattern], {
-    input: 'README.md\n',
+    input: 'docs/REVIEW_BAR.md\n',
   });
   expect(unrelated.status).toBe(1);
 });
@@ -3749,5 +3754,7 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
     .split('\n')
     .filter(path => new RegExp(structuralControlPattern()).test(path));
   expect(selected).toContain('.github/workflows/ci.yml');
-  expect(selected).not.toContain('README.md');
+  expect(selected).toContain('README.md');
+  expect(selected).toContain('docs/SYNTHETIC_MONITORING.md');
+  expect(selected).not.toContain('docs/REVIEW_BAR.md');
 });
