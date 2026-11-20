@@ -28,7 +28,6 @@ export function RuntimeUpdatePill({
   return (
     <section
       aria-label='App Updates'
-      aria-live='polite'
       data-testid='runtime-update-pill'
       className='pointer-events-none fixed end-4 bottom-4 z-banner'
     >

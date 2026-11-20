@@ -6859,10 +6859,10 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       'const generated = await generateAlbumArtBackgrounds',
     ]),
     checksProviderBeforeReleaseFetchAndRateLimits: sourceHasOrderedFragments(
-      chatRouteSource,
+      chatRouteSource.replaceAll(/\s+/g, ' '),
       [
         'if (!isAlbumArtGatewayConfigured())',
-        'const target = resolveAlbumArtReleaseTarget(params.releases, {',
+        'const target = await resolveAlbumArtReleaseTarget( params.profileId, params.releases, {',
         'const burstLimit = await albumArtGenerationBurstLimiter.limit',
         'const generated = await generateAlbumArtBackgrounds',
       ]

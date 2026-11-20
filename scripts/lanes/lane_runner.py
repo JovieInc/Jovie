@@ -67,7 +67,7 @@ import migration_renumber  # noqa: E402  (no-model fix for migration number coll
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
-import fix_red_compose, fix_red_mixed_repairs  # noqa: E401,E402
+import fix_red_compose, fix_red_mixed_repairs, fix_red_size_split  # noqa: E401,E402
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -153,7 +153,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py", "scripts/tests/test_cert_stub_sync.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
@@ -162,6 +162,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
               "scripts/tests/test_quota_rerun.py",
               "scripts/tests/test_git_housekeeping.py",
+              "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
@@ -7147,6 +7148,10 @@ def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, l
         "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
 
 
+def split_size_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Keep annotated size failures on the strict fixer and support older plain logs."""
+    return fix_red_size_split.bind(sh, failed_logs)(host, pr, route, worktree, log, receipt)
+
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
@@ -7173,12 +7178,7 @@ def _publish_pr_body(host: Host, pr: dict, name: str, text: str) -> bool:
 
 
 def stamp_changelog_decision(host: Host, pr: dict) -> bool:
-    """Write the internal customer-changelog note onto the PR body. False when the body cannot
-    take one or GitHub rejects the edit (the model then gets the head)."""
-    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
-    if stamped is None:
-        return False
-    return _publish_pr_body(host, pr, "changelog", stamped)
+    return fix_red_mixed_repairs.stamp_changelog_decision(THIS, host, pr)
 
 
 def stamp_fleet_body(host: Host, pr: dict) -> str | None:
