@@ -108,8 +108,9 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,
   artworkUpload: advisoryDeny,
-  api: advisoryDenyFixed,
-  handleCheck: advisoryDenyFixed,
+  api: mandatoryDenyFixed,
+  // Enumeration surface: durable Redis + deny on outage (SEC-04).
+  handleCheck: mandatoryDenyFixed,
   dashboardLinks: advisoryDenyFixed,
   headerSearch: advisoryDenyFixed,
   adminFitScores: advisoryDeny,
@@ -118,11 +119,11 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   publicProfile: advisoryAllow,
   publicVisit: advisoryAllow,
   spotifySearch: advisoryDenyFixed,
-  spotifySearchApi: advisoryDenyFixed,
+  spotifySearchApi: mandatoryDenyFixed,
   spotifyClaim: advisoryDeny,
   spotifyRefresh: advisoryDeny,
   appleMusicLookup: advisoryDeny,
-  appleMusicSearch: advisoryDenyFixed,
+  appleMusicSearch: mandatoryDenyFixed,
   appleMusicBulkIsrc: advisoryDeny,
   deezerLookup: advisoryDeny,
   dspDiscovery: advisoryDeny,
@@ -134,7 +135,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   releaseRefreshPaid: advisoryDeny,
   bandsintownSync: advisoryDeny,
   wrapLink: advisoryDeny,
-  wrapLinkAnonymous: advisoryDeny,
+  wrapLinkAnonymous: mandatoryDenyFixed,
   accountExport: advisoryDeny,
   accountEmail: advisoryDeny,
   verificationRequest: advisoryDeny,
@@ -144,6 +145,8 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   inspectPressSourceHourly: advisoryDeny,
 
   navigationTelemetry: optionalDrop,
+  // Durable Redis (requireRedis) + caller drop on outage — never memory
+  // fallback and never mislabel an outage as quota 429 (SEC-04).
   trackingClicks: optionalDrop,
   trackingVisits: optionalDrop,
   trackingIpClicks: optionalDrop,
