@@ -51,6 +51,7 @@ describe('public URL policy (GSC recovery)', () => {
       action: 'hold',
       owner: 'summer',
     });
+    expect(getPublicUrlPolicyEntry('/you')?.note).toMatch(/you-proof:seed/);
   });
 
   it('leaves /product Design Ready and does not reserve /product or /you', () => {
