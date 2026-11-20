@@ -60,7 +60,7 @@ describe('design-write-swarm', () => {
     assert.ok(plan.steps.every(s => s.mutatesPen === false));
   });
 
-  it('rejects invent-and-rubber-stamp and mutate-without-lease', () => {
+  it('rejects invent-and-rubber-stamp, missing identities, mutate-without-lease', () => {
     const stamped = validateWriteSwarmReceipt({
       ...liveBase,
       inventAndRubberStamp: true,
@@ -72,6 +72,15 @@ describe('design-write-swarm', () => {
     });
     assert.equal(stamped.ok, false);
     assert.ok(stamped.blockers.some(b => b.code === 'invent_and_rubber_stamp'));
+
+    const missingIds = validateWriteSwarmReceipt({
+      ...liveBase,
+      mutate: { performed: true, writer: '' },
+      system1: { ...liveBase.system1, judge: '' },
+    });
+    assert.equal(missingIds.ok, false);
+    assert.ok(missingIds.blockers.some(b => b.code === 'system1_judge'));
+    assert.ok(missingIds.blockers.some(b => b.code === 'mutate_writer'));
 
     const noLease = validateWriteSwarmReceipt({
       ...liveBase,

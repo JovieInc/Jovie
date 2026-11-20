@@ -161,9 +161,17 @@ export function validateWriteSwarmReceipt(receipt) {
         block('system1_verdict', 'system1.verdict must be pass|fail|pending.');
       const writer = t(mutate?.writer);
       const judge = t(system1.judge);
+      // Fail closed: missing identities must not bypass anti-rubber-stamp.
+      if (!judge)
+        block('system1_judge', 'system1.judge is required in live mode.');
+      if (mutate?.performed === true && !writer)
+        block(
+          'mutate_writer',
+          'mutate.writer is required when mutate.performed.'
+        );
       if (
-        (writer && judge && writer === judge) ||
-        system1.selfApproved === true
+        system1.selfApproved === true ||
+        (writer && judge && writer === judge)
       )
         block(
           'invent_and_rubber_stamp',
