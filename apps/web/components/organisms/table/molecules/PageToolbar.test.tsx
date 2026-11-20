@@ -1,3 +1,4 @@
+import { ACTION_BUTTON_FACE_CLASSNAME, ACTION_BUTTON_PRESET } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -43,6 +44,10 @@ describe('PageToolbar control geometry', () => {
     );
     expect(tabHeights).toEqual(['h-7']);
     expect(actionHeights).toEqual(['h-7']);
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
+      ACTION_BUTTON_FACE_CLASSNAME
+    );
+    expect(ACTION_BUTTON_PRESET.visibleHeightPx).toBe(28);
   });
 });
 
