@@ -40,6 +40,7 @@ import {
 } from '@/components/shell/EntityPopover';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatStreams } from '@/lib/format-streams';
@@ -344,7 +345,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     [release.releaseDate]
   );
   const status = releaseStatusToShell(release.status);
-  const artistLabel = release.artistNames?.join(', ') ?? '';
+  const artistLabel = formatReleaseArtistLine(release.artistNames) ?? '';
   const typeLabel = RELEASE_TYPE_BADGE_LABEL[release.releaseType] ?? 'Single';
   const syncLabel = syncStatus ? SHELL_RELEASE_SYNC_LABEL[syncStatus] : null;
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
@@ -424,7 +425,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               'inline-flex min-w-0 hover:no-underline'
             )}
           >
-            {release.title}
+            <span className='min-w-0 truncate'>{release.title}</span>
           </EntityHoverLink>
           <TypeBadge label={typeLabel} />
           {artistLabel ? (
@@ -438,7 +439,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               <span
                 className={cn(
                   shellReleaseRowTypography.subtitleClassName,
-                  'min-w-0'
+                  'min-w-0 shrink-9999'
                 )}
               >
                 {artistLabel}

@@ -10,23 +10,12 @@ interface ArtistNotificationsHeroProps {
   readonly hero: ArtistNotificationsLandingCopy['hero'];
 }
 
-const CARD_POSITIONS: Record<
-  ArtistNotificationsLandingCopy['hero']['floatingCards'][number]['kind'],
-  string
-> = {
-  capture: 'system-b-artist-notifications-card-capture',
-  subscribe: 'system-b-artist-notifications-card-subscribe',
-  email: 'system-b-artist-notifications-card-email',
-  click: 'system-b-artist-notifications-card-click',
-  outcome: 'system-b-artist-notifications-card-outcome',
-};
-
 export function ArtistNotificationsHero({
   hero,
 }: Readonly<ArtistNotificationsHeroProps>) {
   return (
     <section
-      className='marketing-hero-dock relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'
+      className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'
       data-testid='marketing-section-hero'
       data-marketing-variant='split-screenshot-right'
       data-marketing-owner='apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx'
@@ -97,7 +86,7 @@ export function ArtistNotificationsHero({
             {hero.floatingCards.map(card => (
               <div
                 key={card.id}
-                className={`system-b-artist-notifications-card-position ${CARD_POSITIONS[card.kind]}`}
+                className='system-b-artist-notifications-card-position'
               >
                 <ArtistNotificationFloatingCardView card={card} />
               </div>

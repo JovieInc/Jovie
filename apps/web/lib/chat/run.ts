@@ -29,15 +29,16 @@ import {
   downloadChatAttachments,
   validateChatMessageParts,
 } from '@/lib/chat/attachment-policy';
-import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
+import { copyFloorRepairTransform } from '@/lib/chat/copy-floor-repair';
+import {
+  buildGroundingFacts,
+  wrapStreamResultWithGroundingGuard,
+} from '@/lib/chat/grounding-guard';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
-import {
-  buildPinnedOpportunityBlock,
-  type PinnedOpportunityContext,
-} from '@/lib/chat/pinned-opportunity';
+import type { PinnedOpportunityContext } from '@/lib/chat/pinned-opportunity';
 import {
   createStaticTextLanguageModel,
   detectSystemPromptLeak,
@@ -48,7 +49,6 @@ import {
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
 import {
-  buildSystemPromptParts,
   joinSystemPromptParts,
   type SystemPromptParts,
 } from '@/lib/chat/system-prompt';
@@ -56,9 +56,11 @@ import {
   isChatToolStepCapExhausted,
   resolveChatToolStepLimit,
 } from '@/lib/chat/tool-step-limit';
+import { assembleAppModeSystemPrompt } from '@/lib/chat/turn-app-prompt';
 import type {
   ArtistContext,
   ChatTelemetry,
+  ReleaseCatalogMeta,
   ReleaseContext,
 } from '@/lib/chat/types';
 import {
@@ -75,13 +77,13 @@ import {
 } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
-import {
-  applyEveIdentityToSystemPrompt,
-  type EveIdentityId,
-} from '@/lib/ovie/identity';
+import type { EveIdentityId } from '@/lib/ovie/identity';
 import { OvieProgramError } from '@/lib/ovie/program';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
+
+/** Reasoning effort for the user-facing chat stream (latency sensitive). */
+export const CHAT_REASONING_EFFORT = 'low' as const;
 
 /**
  * Regex patterns for messages that can be handled by the lightweight model.
@@ -221,6 +223,10 @@ export interface ExecuteChatTurnInput {
    */
   artistContext: ArtistContext | null;
   releases: ReleaseContext[];
+  /** Catalog read health + total; omitted = loaded slice is the whole catalog. */
+  releaseCatalog?: ReleaseCatalogMeta;
+  /** Recording titles for the grounding guard; null/undefined = unknown (title rule skipped). */
+  catalogTrackTitles?: readonly string[] | null;
   /** Internal creator-profile UUID. Null when anonymous (`mode='onboarding'`). */
   resolvedProfileId: string | null;
   resolvedConversationId: string | null;
@@ -337,6 +343,7 @@ export async function executeChatTurn(
     uiMessages,
     artistContext,
     releases,
+    catalogTrackTitles,
     resolvedConversationId,
     userId,
     userPlan,
@@ -400,40 +407,27 @@ export async function executeChatTurn(
     if (!artistContext) {
       throw new Error('artistContext is required when mode is "app"');
     }
-    // Resolve `@kind:id[label]` entity tokens from the recent user turns against
-    // the artist's own catalog (the same `releases` rows that feed the
-    // right-rail entity panel) so the model recognises owned assets instead of
-    // mis-attributing them to another artist (JOV-3537).
-    const referencedEntities = buildReferencedEntitiesBlock({
-      userTexts: recentUserTexts(uiMessages),
-      ownedReleases: releases,
-      artist: {
-        displayName: artistContext.displayName,
-        username: artistContext.username,
-        spotifyUrl: artistContext.spotifyUrl,
-      },
-    });
-    const pinnedOpportunityBlock =
-      buildPinnedOpportunityBlock(pinnedOpportunity);
+    const userTexts = recentUserTexts(uiMessages);
     const knowledgeContext = blockedForDisclosure
       ? ''
-      : await knowledgeRetriever(recentUserTexts(uiMessages).join(' '), signal);
-    const parts = buildSystemPromptParts(artistContext, releases, {
+      : await knowledgeRetriever(userTexts.join(' '), signal);
+    // App-mode assembly (entity hydration incl. beyond-slice release tokens,
+    // catalog meta threading) lives in turn-app-prompt.ts.
+    systemPromptParts = await assembleAppModeSystemPrompt({
+      artistContext,
+      releases,
+      releaseCatalog: input.releaseCatalog,
+      profileId: resolvedProfileId,
+      userTexts,
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
-      knowledgeContext: knowledgeContext || undefined,
-      accountContext,
-      referencedEntities,
-      pinnedOpportunity: pinnedOpportunityBlock,
+      knowledgeContext,
+      pinnedOpportunity,
+      identity,
       lockedTools,
+      accountContext,
     });
-    systemPromptParts = identity
-      ? {
-          stable: applyEveIdentityToSystemPrompt(parts.stable, identity),
-          dynamic: parts.dynamic,
-        }
-      : parts;
   }
   if (writingPilot) {
     systemPromptParts = { ...systemPromptParts, dynamic: writingPilot.prompt };
@@ -640,6 +634,10 @@ export async function executeChatTurn(
             return {};
           },
     abortSignal: signal,
+    // First text, not hidden thinking, is what an artist waits on. The
+    // provider default on glm-5.3 spent ~45s reasoning before any visible
+    // word (prod walk 2026-11-02, 1,561 reasoning deltas).
+    reasoning: CHAT_REASONING_EFFORT,
     providerOptions: {
       gateway: {
         ...(writingPilot ? { models: [] } : {}),
@@ -649,7 +647,12 @@ export async function executeChatTurn(
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
     // experimental_throttle in useJovieChat.
-    experimental_transform: smoothStream({ delayInMs: 15, chunking: 'word' }),
+    // Copy floor first (canon/VOICE.md): rewrite dashes in flight so the
+    // streamed reply and the persisted reply are the same clean text.
+    experimental_transform: [
+      copyFloorRepairTransform(),
+      smoothStream({ delayInMs: 15, chunking: 'word' }),
+    ],
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
       identity: {
@@ -821,9 +824,29 @@ export async function executeChatTurn(
     },
   });
 
-  const streamResult = blockedForDisclosure
+  const leakGuarded = blockedForDisclosure
     ? rawStreamResult
     : wrapStreamResultWithLeakGuard(rawStreamResult);
+  // Post-generation grounding check: claims about the artist's own data must
+  // match the facts the server loaded this turn (JOV grounding guard).
+  const streamResult =
+    blockedForDisclosure || mode !== 'app' || !artistContext
+      ? leakGuarded
+      : wrapStreamResultWithGroundingGuard(
+          leakGuarded,
+          buildGroundingFacts(artistContext, releases, catalogTrackTitles),
+          violation => {
+            telemetry?.setTags?.({
+              chat_grounding_violation: violation.kind,
+            });
+            telemetry?.addBreadcrumb?.({
+              category: 'ai-chat',
+              message: 'chat_grounding_violation',
+              level: 'warning',
+              data: { requestId, kind: violation.kind, mode },
+            });
+          }
+        );
 
   return {
     ...(writingPilot

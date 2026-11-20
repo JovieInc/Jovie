@@ -107,6 +107,25 @@ describe('DemoTimWhiteProfileSurface', () => {
     SLOW_DEMO_SURFACE_TIMEOUT_MS
   );
 
+  it('keeps a local portrait in the explicitly selected compact preview', async () => {
+    const props = await renderSurface('presentation=compact-preview');
+
+    expect(props).toMatchObject({
+      presentation: 'compact-preview',
+      mode: 'profile',
+      artist: expect.objectContaining({
+        name: TIM_WHITE_PROFILE.name,
+        image_url: TIM_WHITE_PROFILE.avatarSrc,
+      }),
+    });
+  });
+
+  it('retains the public presentation for unsupported presentation values', async () => {
+    const props = await renderSurface('presentation=embedded');
+
+    expect(props?.presentation).toBe('full-public');
+  });
+
   it('provides executable coverage-via evidence for the demo surface', () => {
     const source = readFileSync(
       'components/features/demo/DemoTimWhiteProfileSurface.tsx',
@@ -125,6 +144,27 @@ describe('DemoTimWhiteProfileSurface', () => {
     },
     SLOW_DEMO_SURFACE_TIMEOUT_MS
   );
+
+  it('pins the share state to the open share sheet for the setup product shot', async () => {
+    const { HOMEPAGE_PROFILE_SHOWCASE_STATES } = await import(
+      '@/features/home/homepage-profile-preview-fixture'
+    );
+    const source = readFileSync(
+      'components/features/demo/DemoTimWhiteProfileSurface.tsx',
+      'utf8'
+    );
+
+    // `setup-share-profile` (lib/screenshots/product-shots.ts) captures
+    // /demo/showcase/tim-white-profile?state=share with the drawer open.
+    expect(HOMEPAGE_PROFILE_SHOWCASE_STATES.share.drawerView).toBe('share');
+    const { isProfileShowcaseStateId } = await import(
+      '@/features/demo/demo-profile-showcase-states'
+    );
+    expect(isProfileShowcaseStateId('share')).toBe(true);
+    expect(source).toContain(
+      "showcaseState === 'more-menu' || showcaseState === 'share'"
+    );
+  });
 
   it('accepts releases mode from the screenshot route query string', async () => {
     const props = await renderSurface('mode=releases');
@@ -168,5 +208,36 @@ describe('DemoTimWhiteProfileSurface', () => {
       showPayButton: false,
       showTourButton: false,
     });
+  });
+
+  it('renders the homepage template archetype with no person and one fresh release', async () => {
+    const props = await renderSurface('archetype=template');
+
+    expect(props).toMatchObject({
+      artist: expect.objectContaining({
+        id: 'homepage-template-profile',
+        handle: 'you',
+        image_url: undefined,
+      }),
+      contacts: [],
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+      latestRelease: expect.objectContaining({
+        id: 'demo-template-first-light',
+        creatorProfileId: 'homepage-template-profile',
+      }),
+    });
+    expect(screen.queryByTestId('demo-template-hero-capture')).toBeNull();
+  });
+
+  it('adds the hero crop target for the homepage capture', async () => {
+    await renderSurface('archetype=template&capture=hero');
+
+    expect(screen.getByTestId('demo-template-hero-capture')).toHaveClass(
+      'absolute',
+      'h-158'
+    );
   });
 });

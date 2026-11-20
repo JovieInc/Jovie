@@ -38,6 +38,13 @@ const START_CTA = {
   label: 'Find yourself',
 } as const;
 
+// Open signup (2026-11-09): the homepage's one action is the shared
+// claim-profile intent into /start (Tim, 2026-11-12 23:46Z: "Switch it").
+const HOME_CLAIM_CTA = {
+  href: APP_ROUTES.START,
+  label: 'Claim your profile',
+} as const;
+
 const CLAIM_PROFILE_CTA = {
   href: APP_ROUTES.SIGNUP,
   label: 'Claim your profile',
@@ -48,10 +55,10 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(home)/page.tsx',
     copyScope: 'shared',
     url: APP_ROUTES.HOME,
-    job: 'help visitors understand their public presence and start with their profile',
-    proof: 'published profile and relationship examples',
-    successEvent: 'visitor starts the onboarding handoff',
-    primaryCta: START_CTA,
+    job: 'tell the Jovie story and start a profile claim',
+    proof: 'the template profile and the real releases workspace',
+    successEvent: 'visitor starts a profile claim',
+    primaryCta: HOME_CLAIM_CTA,
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',

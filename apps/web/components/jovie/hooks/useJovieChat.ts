@@ -13,14 +13,18 @@ import {
   useRef,
   useState,
 } from 'react';
-import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
+import {
+  CHAT_STREAM_FAILED_USER_MESSAGE,
+  CHAT_STREAM_STALLED_USER_MESSAGE,
+} from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
-  type ComposerRecoveryContext,
   clearComposerDraft,
   clearSummerTurnRecovery,
+  currentComposerDraftScope,
   readComposerDraft,
+  readComposerDraftScope,
   readSummerTurnRecovery,
   saveComposerDraft,
   saveSummerTurnRecovery,
@@ -30,9 +34,13 @@ import {
   readModelRotationStep,
   recordAssistantTurnClean,
 } from '@/lib/chat/model-rotation-store';
-import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
+import {
+  consumePendingChatDraft,
+  consumePendingChatPrompt,
+} from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
+import { splitLeadingEntityMentions } from '@/lib/chat/tokens';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
@@ -44,10 +52,8 @@ import {
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { subscribeCacheFence } from '@/lib/queries/cache-isolation';
-import { FetchError } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
-
 import { hydratePersistedMessageParts } from '../message-parts';
 import {
   type ChatTimelineEvent,
@@ -72,6 +78,17 @@ import {
   getPreferredErrorMessage,
   shouldSuppressChatPauseForToolFailure,
 } from '../utils';
+import {
+  extractChatTurnMetadata,
+  getTitlePollIntervalMs,
+  inferToolIntentFromPrompt,
+  inferToolIntentFromSkill,
+  isRecord,
+  isRecoverableSummerHistoryFailure,
+  readRecoveryError,
+  TITLE_POLL_MAX_DURATION_MS,
+  toError,
+} from './chat-controller-helpers';
 import { composeMessage, useChipTray } from './useChipTray';
 import { createComposerDraft, useComposerDraft } from './useComposerDraft';
 
@@ -107,18 +124,13 @@ interface UseJovieChatOptions {
   readonly chatMode?: 'ov';
 }
 
-/** Fast interval (ms) to poll for auto-generated title after first message. */
-const TITLE_POLL_FAST_INTERVAL_MS = 2_000;
-
-/** Slower interval (ms) used once title polling appears stalled. */
-const TITLE_POLL_BACKOFF_INTERVAL_MS = 5_000;
-
-/** Max duration (ms) to keep polling before giving up. */
-const TITLE_POLL_MAX_DURATION_MS = 15_000;
-
-/** Number of fast poll intervals to allow before backing off. */
-const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
 const TIMELINE_CACHE_LIMIT = 20;
+/**
+ * Longest a turn may show typing dots with no streamed progress. Above the
+ * server-side stall bounds (lib/ai/stream-stall-guard.ts) so the server's
+ * terminal error wins, and below the route's 60s maxDuration.
+ */
+export const CHAT_CLIENT_STALL_TIMEOUT_MS = 50_000;
 const timelineStateCache = new Map<string, ChatTimelineState>();
 
 type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
@@ -130,15 +142,11 @@ interface SubmitChatMessageOptions {
   readonly interrupt?: boolean;
   /** Resend an unrecorded Summer turn under its original id (idempotent replay). */
   readonly clientTurnId?: string;
-  /** A retry can submit a failed message while a newer draft stays in the composer. */
+  /**
+   * Keep the composer as it is: a retry under a newer draft, or a quick
+   * action tapped while the person has typed text or staged chips.
+   */
   readonly preserveComposerDraft?: boolean;
-}
-
-interface ChatTurnMetadata {
-  readonly conversationId?: string;
-  readonly turnId?: string;
-  readonly requestId?: string;
-  readonly toolStepCapExhausted?: boolean;
 }
 
 interface ActiveChatLatency {
@@ -150,103 +158,6 @@ interface ActiveChatLatency {
 
 function uxLatencyNowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isRecoverableSummerHistoryFailure(error: unknown): boolean {
-  return (
-    error instanceof FetchError && (error.status === 404 || error.isRetryable())
-  );
-}
-
-function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
-  if (!isRecord(value)) return null;
-  const conversationId =
-    typeof value.conversationId === 'string' ? value.conversationId : undefined;
-  const turnId = typeof value.turnId === 'string' ? value.turnId : undefined;
-  const requestId =
-    typeof value.requestId === 'string' ? value.requestId : undefined;
-  const toolStepCapExhausted =
-    value.toolStepCapExhausted === true ? true : undefined;
-
-  if (!conversationId && !turnId && !requestId && !toolStepCapExhausted) {
-    return null;
-  }
-  return { conversationId, turnId, requestId, toolStepCapExhausted };
-}
-
-function inferToolIntentFromPrompt(text: string): string | null {
-  const normalized = text.trim().toLowerCase();
-  const mentionsAlbumArt =
-    /\balbum\s+art\b/.test(normalized) ||
-    /\bcover\s+art\b/.test(normalized) ||
-    /\bartwork\b/.test(normalized);
-  const asksForGeneration = /\b(generate|create|make|design|produce)\b/.test(
-    normalized
-  );
-  const asksForBrief =
-    /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
-
-  if (mentionsAlbumArt && asksForGeneration && !asksForBrief) {
-    return 'album_art_generation';
-  }
-
-  const mentionsImage =
-    /\b(photo|image|picture|shot|pic|selfie|portrait|press)\b/.test(normalized);
-  const asksForRetouch =
-    /\b(retouch|touch[\s-]?up|enhance|polish|clean\s+up)\b/.test(normalized);
-
-  if (mentionsImage && asksForRetouch) {
-    return 'image_retouch';
-  }
-
-  return null;
-}
-
-function inferToolIntentFromSkill(id: string): string | null {
-  return id === 'generateAlbumArt' ? 'album_art_generation' : id;
-}
-
-function getTitlePollIntervalMs(
-  titlePollingSince: number | null,
-  currentTime: number
-): number | false {
-  if (titlePollingSince === null) {
-    return false;
-  }
-
-  const elapsed = currentTime - titlePollingSince;
-
-  if (elapsed >= TITLE_POLL_MAX_DURATION_MS) {
-    return false;
-  }
-
-  return elapsed < TITLE_POLL_FAST_WINDOW_MS
-    ? TITLE_POLL_FAST_INTERVAL_MS
-    : TITLE_POLL_BACKOFF_INTERVAL_MS;
-}
-
-function toError(value: unknown): Error {
-  return value instanceof Error ? value : new Error('Chat send failed');
-}
-
-function readRecoveryError(context: ComposerRecoveryContext): ChatError | null {
-  const recovery = readSummerTurnRecovery(context);
-  if (!recovery) return null;
-  return {
-    type: 'server',
-    message: summerRetryExplanation(recovery.retry),
-    errorCode: recovery.errorCode,
-    ...recovery.error,
-    requestId: recovery.requestId,
-    failedMessage: recovery.retry === 'none' ? undefined : recovery.message,
-    ...(recovery.retry === 'same-turn'
-      ? { retryClientTurnId: recovery.clientTurnId }
-      : {}),
-  };
 }
 
 function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
@@ -367,6 +278,7 @@ export function useJovieChatController({
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
+  const lastAttemptedDraftScopeRef = useRef<string | undefined>(undefined);
   const activeClientTurnIdRef = useRef<string | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
   const pendingSendRef = useRef<Promise<void> | null>(null);
@@ -388,10 +300,18 @@ export function useJovieChatController({
   const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [draft] = useState(() =>
-    createComposerDraft(readComposerDraft(conversationId ?? null))
+    createComposerDraft(
+      chatMode === 'ov' && readComposerDraftScope(conversationId ?? null)
+        ? ''
+        : readComposerDraft(conversationId ?? null)
+    )
   );
   const inputDraftConversationIdRef = useRef(conversationId ?? null);
+  const inputDraftScopeRef = useRef(
+    readComposerDraftScope(conversationId ?? null)
+  );
   const chipTray = useChipTray();
+  const addEntityChip = chipTray.addEntity;
   const [chatError, setChatErrorState] = useState<ChatError | null>(() =>
     readRecoveryError(recoveryContext)
   );
@@ -423,6 +343,17 @@ export function useJovieChatController({
       }
     },
     [draft, setChatError]
+  );
+  const editInput = useCallback(
+    (update: SetStateAction<string>) => {
+      const previous = draft.getSnapshot();
+      const next = typeof update === 'function' ? update(previous) : update;
+      // A deliberate clear or fresh edit after clearing starts an ordinary draft.
+      // Automatic fence cleanup uses draft.set directly and retains stale ownership.
+      if (!previous || !next) inputDraftScopeRef.current = undefined;
+      setInput(next);
+    },
+    [draft, setInput]
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
@@ -457,12 +388,17 @@ export function useJovieChatController({
   }, [invalidateTurnContext]);
   useEffect(() => {
     if (timelineMode === chatMode) return;
+    if (inputDraftScopeRef.current) {
+      draft.set('');
+      clearComposerDraft(inputDraftConversationIdRef.current);
+      inputDraftScopeRef.current = undefined;
+    }
     setTimelineMode(chatMode);
     setTimelineState(createInitialChatTimelineState(conversationId ?? null));
     inputDraftConversationIdRef.current = conversationId ?? null;
     setActiveConversationId(conversationId ?? null);
     resetTurnContext();
-  }, [chatMode, conversationId, resetTurnContext, timelineMode]);
+  }, [chatMode, conversationId, resetTurnContext, timelineMode, draft]);
   const timelineStateRef = useRef(timelineState);
   useEffect(() => {
     timelineStateRef.current = timelineState;
@@ -787,7 +723,13 @@ export function useJovieChatController({
 
       if (lastAttemptedMessageRef.current) {
         const failedMessage = lastAttemptedMessageRef.current;
-        setInput(current => current || failedMessage);
+        if (!draft.getSnapshot()) {
+          const failedScope = lastAttemptedDraftScopeRef.current;
+          if (!failedScope || failedScope === currentComposerDraftScope()) {
+            inputDraftScopeRef.current = failedScope;
+            setInput(failedMessage);
+          }
+        }
       }
 
       if (clientTurnId) {
@@ -808,6 +750,7 @@ export function useJovieChatController({
       activeConversationId,
       chatMode,
       dispatchTimelineEvent,
+      draft,
       profileId,
       recoveryContext,
       setChatError,
@@ -1024,18 +967,29 @@ export function useJovieChatController({
     },
   });
 
+  const clearChips = chipTray.clear;
+  const clearScopedDraft = useCallback(() => {
+    // Chips reference the previous creator's entities; never carry them over.
+    clearChips();
+    if (!inputDraftScopeRef.current) return;
+    draft.set('');
+    // Keep ownership until this instance finishes cleanup, so a late save can
+    // never relabel the previous creator's text with the new current scope.
+  }, [clearChips, draft]);
   const previousProfileIdRef = useRef(profileId);
   useEffect(() => {
     if (previousProfileIdRef.current !== profileId) {
       previousProfileIdRef.current = profileId;
+      clearScopedDraft();
       rawStop();
       resetTurnContext();
     }
     return subscribeCacheFence(() => {
+      clearScopedDraft();
       rawStop();
       resetTurnContext();
     });
-  }, [profileId, rawStop, resetTurnContext]);
+  }, [profileId, rawStop, resetTurnContext, clearScopedDraft]);
 
   // Query data merges into the canonical timeline. It must never replace the
   // rendered list wholesale because optimistic/streaming rows may be newer.
@@ -1214,6 +1168,29 @@ export function useJovieChatController({
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
 
+  // No-progress watchdog: the server bounds a silent provider (~30s) and ends
+  // the stream with an error, but a dropped connection or a killed function
+  // can leave `useChat` in submitted/streaming with nothing arriving. Never
+  // leave the typing dots up forever: cancel and show the honest retry state.
+  const awaitingReply = isLoading || isSubmitting;
+  useEffect(() => {
+    if (!awaitingReply) return;
+    const clientTurnId = activeClientTurnIdRef.current;
+    if (!clientTurnId) return;
+    // `sdkMessages` is a dependency so every streamed delta re-arms the timer.
+    void sdkMessages;
+    const timer = setTimeout(() => {
+      if (activeClientTurnIdRef.current !== clientTurnId) return;
+      rawStop();
+      handleChatFailure(
+        new Error(CHAT_STREAM_STALLED_USER_MESSAGE),
+        'stream',
+        clientTurnId
+      );
+    }, CHAT_CLIENT_STALL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingReply, sdkMessages, handleChatFailure, rawStop]);
+
   useEffect(() => {
     if (status !== 'ready') return;
     queryClient.invalidateQueries({
@@ -1252,7 +1229,8 @@ export function useJovieChatController({
     () => () => {
       saveComposerDraft(
         inputDraftConversationIdRef.current,
-        draft.getSnapshot()
+        draft.getSnapshot(),
+        inputDraftScopeRef.current
       );
     },
     [draft]
@@ -1264,7 +1242,11 @@ export function useJovieChatController({
       globalThis.clearTimeout(handle);
       handle = globalThis.setTimeout(() => {
         if (inputDraftConversationIdRef.current === activeConversationId) {
-          saveComposerDraft(activeConversationId, draft.getSnapshot());
+          saveComposerDraft(
+            activeConversationId,
+            draft.getSnapshot(),
+            inputDraftScopeRef.current
+          );
         }
       }, 250);
     };
@@ -1310,9 +1292,14 @@ export function useJovieChatController({
       return;
     }
 
-    saveComposerDraft(activeConversationId, draft.getSnapshot());
+    saveComposerDraft(
+      activeConversationId,
+      draft.getSnapshot(),
+      inputDraftScopeRef.current
+    );
     inputDraftConversationIdRef.current = nextConversationId;
     setInput(readComposerDraft(nextConversationId));
+    inputDraftScopeRef.current = readComposerDraftScope(nextConversationId);
 
     setActiveConversationId(nextConversationId);
     resetTurnContext();
@@ -1352,6 +1339,7 @@ export function useJovieChatController({
         now: Date.now(),
       });
       clearComposerDraft(activeConversationId);
+      inputDraftScopeRef.current = undefined;
       setInput('');
       command.execute(commandCtx);
       return true;
@@ -1422,6 +1410,10 @@ export function useJovieChatController({
 
       // Store the message before sending (in case of error)
       lastAttemptedMessageRef.current = trimmedText;
+      lastAttemptedDraftScopeRef.current =
+        chatError?.failedMessage === trimmedText
+          ? lastAttemptedDraftScopeRef.current
+          : inputDraftScopeRef.current;
 
       setChatError(null);
       setIsSubmitting(true);
@@ -1494,6 +1486,7 @@ export function useJovieChatController({
         const result = sendMessage(payload, sendOptions);
         if (!options?.preserveComposerDraft) {
           clearComposerDraft(activeConversationId);
+          inputDraftScopeRef.current = undefined;
           setInput('');
         }
         const pendingSend = Promise.resolve(result)
@@ -1548,9 +1541,14 @@ export function useJovieChatController({
       files,
       source,
       toolIntent,
+      preserveComposerDraft,
     }: { text: string; files?: FileUIPart[] } & SubmitChatMessageOptions) => {
-      const submitted = await doSubmit(text, files, { source, toolIntent });
-      if (submitted) {
+      const submitted = await doSubmit(text, files, {
+        source,
+        toolIntent,
+        preserveComposerDraft,
+      });
+      if (submitted && !preserveComposerDraft) {
         chipTray.clear();
       }
     },
@@ -1602,6 +1600,8 @@ export function useJovieChatController({
         text: prompt,
         source: 'quick_action',
         toolIntent: inferToolIntentFromPrompt(prompt),
+        // A tapped quick action never discards what the person typed or staged.
+        preserveComposerDraft: true,
       });
     },
     [rateLimitedSubmitter]
@@ -1627,13 +1627,29 @@ export function useJovieChatController({
     let canceled = false;
     queueMicrotask(() => {
       if (canceled) return;
+      if (chatMode !== 'ov' && !conversationId) {
+        const pendingDraft = consumePendingChatDraft(profileId);
+        if (pendingDraft) {
+          // Entity context rides as composer chips, never as raw text.
+          const { mentions, text } = splitLeadingEntityMentions(pendingDraft);
+          for (const { kind, id, label } of mentions) {
+            addEntityChip({ kind, id, label });
+          }
+          inputDraftScopeRef.current = currentComposerDraftScope();
+          if (text) {
+            setInput(previous => (previous ? `${previous}\n\n${text}` : text));
+          }
+          inputRef.current?.focus();
+          return;
+        }
+      }
       const pendingPrompt = consumePendingChatPrompt();
       if (pendingPrompt) void doSubmit(pendingPrompt);
     });
     return () => {
       canceled = true;
     };
-  }, [doSubmit]);
+  }, [addEntityChip, chatMode, conversationId, doSubmit, profileId, setInput]);
 
   useEffect(() => {
     const handlePromptEvent = (event: Event) => {
@@ -1689,7 +1705,7 @@ export function useJovieChatController({
   return {
     // State
     draft,
-    setInput,
+    setInput: editInput,
     chipTray,
     messages,
     chatError: blocksOvieConversation

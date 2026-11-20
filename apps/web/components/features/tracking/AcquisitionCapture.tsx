@@ -1,19 +1,21 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { stageForFunnelPath } from '@/lib/acquisition/artist-offer-funnel';
 import { publicEnv } from '@/lib/env-public';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import {
   clearAcquisitionId,
   getOrCreateAcquisitionId,
   isAnalyticsAllowed,
   rememberAcquisitionId,
 } from '@/lib/tracking/consent';
+import { isTipCheckoutReturn } from '@/lib/tracking/is-tip-checkout-return';
 
 const FIRST_TOUCH_KEY = 'jovie_acquisition_first_touch_v1';
 
 function captureAcquisition(): void {
+  if (isTipCheckoutReturn(globalThis.location.pathname)) return;
   if (!isAnalyticsAllowed()) return;
   const acquisitionId = getOrCreateAcquisitionId();
   if (!acquisitionId) return;
@@ -62,7 +64,7 @@ function captureAcquisition(): void {
 }
 
 export function AcquisitionCapture() {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const initialPathname = useRef<string | null>(pathname);
 
   // Client-side navigation into a funnel page (e.g. /pricing) records its

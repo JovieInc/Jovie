@@ -1,0 +1,135 @@
+// Pure helpers for the test-quality loop: per-surface aggregation, floors that
+// only ratchet up, survivors-killed deltas and the model-change fingerprint.
+import { createHash } from 'node:crypto';
+import { tierFor } from './test-quality-rank.mjs';
+
+/** Aggregate sweep state (modules map) by surface tier. */
+export function aggregateByTier(state, surfaces) {
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const [file, m] of Object.entries(state.modules ?? {})) {
+    if (m.status !== 'scored' || !(m.valid > 0)) continue;
+    // Tiers map apps/web paths; @jovie/ui modules share the sweep state under
+    // their packages/ui/ key and are certified per component instead.
+    if (file.startsWith('packages/')) continue;
+    const t = tierFor(file, surfaces).name;
+    const a = (out[t] ??= {
+      modules: 0,
+      valid: 0,
+      killed: 0,
+      survived: 0,
+      minutes: 0,
+    });
+    a.modules += 1;
+    a.valid += m.valid;
+    a.killed += m.killed ?? m.valid - m.survived;
+    a.survived += m.survived;
+    a.minutes += (m.durationMs ?? 0) / 60000;
+  }
+  for (const a of Object.values(out)) {
+    a.score = Math.round((a.killed / a.valid) * 1000) / 10;
+    a.minutes = Math.round(a.minutes * 10) / 10;
+  }
+  return out;
+}
+
+/** Survivors killed since the previous report (never negative per module). */
+export function survivorsKilled(prevByModule, state) {
+  let killed = 0;
+  for (const [file, m] of Object.entries(state.modules ?? {})) {
+    if (m.status !== 'scored') continue;
+    const before = prevByModule?.[file];
+    if (typeof before === 'number' && m.survived < before)
+      killed += before - m.survived;
+  }
+  return killed;
+}
+
+export const survivorMap = state =>
+  Object.fromEntries(
+    Object.entries(state.modules ?? {})
+      .filter(([, m]) => m.status === 'scored')
+      .map(([f, m]) => [f, m.survived])
+  );
+
+/** Floors only move up: returns {floors, violations}. null floor = unset. */
+export function evaluateFloors(byTier, floors) {
+  const violations = [];
+  const next = { ...floors };
+  for (const [tier, agg] of Object.entries(byTier)) {
+    const floor = floors?.[tier];
+    if (typeof floor === 'number' && agg.score < floor)
+      violations.push({ tier, score: agg.score, floor });
+    const proposed = Math.floor(agg.score - 1);
+    if (agg.valid >= 100 && (typeof floor !== 'number' || proposed > floor))
+      next[tier] = proposed;
+  }
+  return { violations, next };
+}
+
+/** Latest model id per family from capacity.json modelFamilies. */
+export function modelIds(capacity) {
+  const ids = {};
+  for (const [name, fam] of Object.entries(
+    capacity?.modelFamilies?.families ?? {}
+  ))
+    if (fam?.latest) ids[name] = fam.latest;
+  return ids;
+}
+export const modelFingerprint = ids =>
+  createHash('sha1')
+    .update(JSON.stringify(Object.entries(ids).sort()))
+    .digest('hex')
+    .slice(0, 16);
+
+/**
+ * Mark the top-touch scored modules stale so the sweep re-scores them first. The
+ * epoch `at` orders them first; `rearmedAt` tells a state merge the re-arm is new.
+ */
+export function rearmTop(state, ranked, n, now = new Date().toISOString()) {
+  let armed = 0;
+  for (const r of ranked) {
+    if (armed >= n) break;
+    const m = state.modules?.[r.file];
+    if (m?.status === 'scored') {
+      m.at = new Date(0).toISOString();
+      m.rearmedAt = now;
+      armed += 1;
+    }
+  }
+  return armed;
+}
+
+/**
+ * Markdown summary of a whole sweep state: the repo-wide mutation score (apps/web
+ * and packages alike), how many modules were scored, untested or errored, and the
+ * per-tier scores. Used by the one-off baseline run's job summary.
+ */
+export function baselineSummary(state, surfaces) {
+  const counts = { scored: 0, untested: 0, error: 0, other: 0 };
+  let valid = 0;
+  let killed = 0;
+  for (const m of Object.values(state.modules ?? {})) {
+    if (m.status in counts) counts[m.status] += 1;
+    else counts.other += 1;
+    if (m.status !== 'scored' || !(m.valid > 0)) continue;
+    valid += m.valid;
+    killed += m.killed ?? m.valid - m.survived;
+  }
+  const score = valid ? Math.round((killed / valid) * 1000) / 10 : 0;
+  const tiers = aggregateByTier(state, surfaces);
+  const lines = [
+    '## Mutation baseline',
+    '',
+    `Overall: **${score}%** (${killed} of ${valid} mutants killed) across ${counts.scored} scored modules.`,
+    `Untested modules: ${counts.untested}. Errored: ${counts.error}.`,
+    '',
+    '| Tier | Modules | Score |',
+    '|---|---:|---:|',
+    ...Object.entries(tiers)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([t, a]) => `| ${t} | ${a.modules} | ${a.score}% |`),
+    '',
+  ];
+  return { score, valid, killed, counts, tiers, markdown: lines.join('\n') };
+}

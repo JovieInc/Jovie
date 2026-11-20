@@ -3,12 +3,10 @@
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { toast } from '@/components/feedback';
 import { buildReleaseTasksRoute } from '@/constants/routes';
-import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import {
   deriveWorkPrimaryAction,
   launchesForWork,
@@ -134,7 +132,9 @@ export function WorkInspectorActions({
   canPublish,
   disabled = false,
   onSharePrivately,
+  onAskJovie,
   onRetryLaunchKit,
+  preview = null,
 }: {
   readonly asset: LibraryReleaseAsset;
   /** Canonical launches for any work; only entries scoped to `asset.id` render. */
@@ -143,9 +143,12 @@ export function WorkInspectorActions({
   readonly disabled?: boolean;
   /** Opens private file sharing in place, on the link row it belongs to. */
   readonly onSharePrivately: () => void;
+  /** Same selected-entity action used by the row and inspector menus. */
+  readonly onAskJovie?: () => void;
   readonly onRetryLaunchKit?: (launch: WorkLaunchSummary) => void;
+  /** Preview playback control; rendered in the same button style as the rest. */
+  readonly preview?: ReactNode;
 }) {
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const action = useMemo(
     () => deriveWorkPrimaryAction({ asset, canPublish }),
@@ -174,18 +177,6 @@ export function WorkInspectorActions({
       toast.error('Could not copy link');
     }
   }, [pageUrl]);
-
-  const handleAskJovie = useCallback(() => {
-    openChatWithPrompt(
-      `Help me with this work.\n${JSON.stringify({
-        workId: asset.id,
-        workTitle: asset.title,
-        artist: asset.artist,
-        revision: asset.updatedAt ?? null,
-      })}`,
-      router
-    );
-  }, [asset, router]);
 
   return (
     <div className='space-y-2' data-testid={`work-actions-${asset.id}`}>
@@ -238,28 +229,32 @@ export function WorkInspectorActions({
 
         <div className='flex max-w-full shrink-0 flex-wrap items-center gap-1.5'>
           {action.kind === 'share_page' && pageUrl ? (
-            <a
-              href={pageUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className={QUIET_LINK_CLASS}
+            <Button
+              asChild
+              variant='secondary'
+              size='sm'
               data-testid='work-action-preview-page'
             >
-              <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
-              Preview page
-            </a>
+              <a href={pageUrl} target='_blank' rel='noopener noreferrer'>
+                <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
+                Preview Page
+              </a>
+            </Button>
           ) : null}
 
-          <button
+          {preview}
+
+          <Button
             type='button'
-            onClick={handleAskJovie}
-            className={QUIET_LINK_CLASS}
-            disabled={disabled}
+            variant='secondary'
+            size='sm'
+            onClick={onAskJovie}
+            disabled={disabled || !onAskJovie}
             data-testid='work-action-ask-jovie'
           >
             <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
             Ask Jovie
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -14,6 +14,65 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+describe('PII encryption key visibility (JOV-9038)', () => {
+  it('warns in production/preview when PII_ENCRYPTION_KEY is missing and stays silent otherwise', async () => {
+    const { RUNTIME_VALIDATION_RULES } = await import(
+      '@/lib/env-validation-rules'
+    );
+    const piiRule = RUNTIME_VALIDATION_RULES.find(
+      rule => rule.name === 'checkPIIEncryptionKey'
+    );
+    expect(piiRule).toBeDefined();
+
+    for (const mode of ['production', 'preview']) {
+      const missing = piiRule!({
+        server: {
+          ...environment(),
+          PII_ENCRYPTION_KEY: undefined,
+        } as Parameters<NonNullable<typeof piiRule>>[0]['server'],
+        vercelEnv: mode,
+      });
+      expect(missing).toEqual({
+        type: 'warning',
+        message: expect.stringContaining('PII_ENCRYPTION_KEY'),
+      });
+      expect(missing?.message).toContain('openssl rand -base64 32');
+
+      const configured = piiRule!({
+        server: {
+          ...environment(),
+          PII_ENCRYPTION_KEY: 'fixture-pii-key',
+        } as Parameters<NonNullable<typeof piiRule>>[0]['server'],
+        vercelEnv: mode,
+      });
+      expect(configured).toBeNull();
+    }
+
+    for (const mode of ['development', 'test', '']) {
+      const local = piiRule!({
+        server: {
+          ...environment(),
+          PII_ENCRYPTION_KEY: undefined,
+        } as Parameters<NonNullable<typeof piiRule>>[0]['server'],
+        vercelEnv: mode,
+      });
+      expect(local).toBeNull();
+    }
+  });
+
+  it('keeps the PII rule out of the critical set so /api/health/deploy stays 200 while the key is provisioned', async () => {
+    const { checkPIIEncryptionKeyPolicy } = await import(
+      '@/lib/env-configuration-policy'
+    );
+    expect(
+      checkPIIEncryptionKeyPolicy({
+        key: undefined,
+        vercelEnv: 'production',
+      })
+    ).toEqual({ type: 'warning', message: expect.any(String) });
+  });
+});
+
 describe('shared canonical configuration constraints', () => {
   it('preserves existing runtime secret and encryption classifications without adding strength rules', async () => {
     const { RUNTIME_VALIDATION_RULES } = await import(

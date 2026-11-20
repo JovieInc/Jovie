@@ -39,6 +39,9 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
+vi.mock('@/components/features/admin/OvieRouteUsageBeacon', () => ({
+  OvieRouteUsageBeacon: () => null,
+}));
 vi.mock('@/components/organisms/AppShellSkeleton', () => ({
   AppShellSkeleton: ({ main }: { readonly main?: ReactNode }) => (
     <div data-testid='app-shell-skeleton'>{main}</div>
@@ -87,6 +90,21 @@ vi.mock('./dashboard/releases/loading', () => ({
 }));
 vi.mock('./library/LibraryLoadingState', () => ({
   LibraryLoadingState: () => null,
+}));
+vi.mock('./calendar/CalendarRouteSkeleton', () => ({
+  CalendarRouteSkeleton: () => null,
+}));
+vi.mock('./links/LinksRouteSkeleton', () => ({
+  LinksRouteSkeleton: () => null,
+}));
+vi.mock('./profiles/ProfilesRouteSkeleton', () => ({
+  ProfilesRouteSkeleton: () => null,
+}));
+vi.mock('./settings/SettingsRouteSkeleton', () => ({
+  SettingsRouteSkeleton: () => <div data-testid='settings-route-skeleton' />,
+}));
+vi.mock('./tour-dates/TourDatesRouteSkeleton', () => ({
+  TourDatesRouteSkeleton: () => null,
 }));
 vi.mock('./DashboardShellContent', () => ({
   DashboardShellContent: (props: {
@@ -185,6 +203,22 @@ describe('AppShellLayout OV mode', () => {
     render(await AppShellLayout({ children: <div>Library content</div> }));
 
     expect(screen.getAllByTestId('app-shell-skeleton')).toHaveLength(2);
+  });
+
+  it('boots settings into its own route-shaped skeleton', async () => {
+    headersMock.mockResolvedValue(
+      new Headers({
+        'next-url': APP_ROUTES.SETTINGS_ACCOUNT,
+        'x-jovie-app-shell-mode': 'customer',
+      })
+    );
+    suspendShellContentMock.value = true;
+
+    render(await AppShellLayout({ children: <div>Settings content</div> }));
+
+    expect(screen.getByTestId('app-shell-skeleton')).toContainElement(
+      screen.getByTestId('settings-route-skeleton')
+    );
   });
 
   it('keeps unknown loading routes neutral instead of flashing chat', async () => {

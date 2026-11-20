@@ -143,3 +143,12 @@ Exit `0` = `verdict: go`. Exit `1` = `verdict: blocked`. Exit `2` = script error
 | `AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS` | Ownership hard ceiling (default 10000) |
 | `AGENT_PREFLIGHT_LEDGER_PAGE` | Ledger page slug (default `coordination/agent-job-ledger`) |
 | `GSTACK_STATE_DIR` | Override `~/.gstack` for the cached update-check read |
+
+## Remote preflight (`pnpm preflight:remote`)
+
+When the laptop is saturated (`preflight:changed` prints a hint above 2x cores of load), run
+`pnpm preflight:remote` with the same args. `scripts/preflight-remote.mjs` pushes the branch and runs
+`pnpm preflight:changed` in `~/wt/remote-preflight/<branch>` on Gem (a private clone, never `~/Jovie`),
+using the `.nvmrc` Node through Gem's nvm and a shared pnpm store. `--body-file` is shipped inline and the
+exit status is propagated. Concurrency is capped by flock slots (`JOVIE_REMOTE_PREFLIGHT_SLOTS`, default 4);
+host is `JOVIE_REMOTE_PREFLIGHT_HOST` (default `gem`). Only the pushed commit is checked.

@@ -18,6 +18,11 @@ export const WEB_BIND_REASONS = Object.freeze({
   liveUnbound: 'live_unbound',
 });
 
+export const WEB_EVIDENCE_SOURCES = Object.freeze({
+  historicalExact: 'historical-exact-ci-receipt',
+  laterTipCarryover: 'later-tip-carryover-receipt',
+});
+
 export const PRODUCTION_BASE_EVIDENCE = Object.freeze({
   verifiedMarker: 'verified-marker',
   canonicalBootstrap: 'canonical-live-bootstrap',
@@ -428,14 +433,21 @@ function hasExactGate(jobs, runRecord, sha, gateName) {
   return exact.length === 1;
 }
 
-export function resolveHistoricalLaneEvidence({
+function isMissingExactReceiptError(error, sha, lane = 'web') {
+  return (
+    error instanceof Error &&
+    error.message ===
+      `expected one exact passing ${lane} receipt for ${sha}; found 0`
+  );
+}
+
+function discoverExactCiReceiptCandidates({
   repository,
   sha,
-  lane,
+  validateReceipt,
   ghJsonImpl = ghJson,
   downloadFinalReceiptImpl = downloadFinalReceipt,
 }) {
-  exactSha(sha, 'historical evidence SHA');
   const candidates = [];
   for (const [event, gateName] of [
     ['merge_group', 'PR Ready'],
@@ -477,38 +489,225 @@ export function resolveHistoricalLaneEvidence({
         repository,
         matchingArtifacts[0].id
       );
+      candidates.push({
+        sha,
+        event,
+        runId: runRecord.id,
+        runAttempt: runRecord.run_attempt,
+        artifactId: matchingArtifacts[0].id,
+        artifactName: matchingArtifacts[0].name,
+        validated: validateReceipt(receipt, runRecord),
+      });
+    }
+  }
+  return candidates;
+}
+
+function preferMainPush(candidates) {
+  // Main-push evidence is canonical after landing. A merge-group proof is
+  // the fallback when that exact SHA never received a passing main push.
+  const mainCandidates = candidates.filter(
+    candidate => candidate.event === 'push'
+  );
+  return mainCandidates.length ? mainCandidates : candidates;
+}
+
+export function resolveHistoricalLaneEvidence({
+  repository,
+  sha,
+  lane,
+  ghJsonImpl = ghJson,
+  downloadFinalReceiptImpl = downloadFinalReceipt,
+}) {
+  exactSha(sha, 'historical evidence SHA');
+  const candidates = discoverExactCiReceiptCandidates({
+    repository,
+    sha,
+    validateReceipt: (receipt, runRecord) =>
       validateLaneEvidenceReceipt({
         receipt,
         expectedSha: sha,
         expectedRunId: runRecord.id,
         expectedRunAttempt: runRecord.run_attempt,
         lane,
-      });
-      candidates.push({
-        sha,
-        lane,
-        event,
-        runId: runRecord.id,
-        runAttempt: runRecord.run_attempt,
-        artifactId: matchingArtifacts[0].id,
-        artifactName: matchingArtifacts[0].name,
-      });
-    }
-  }
-  // Main-push evidence is canonical after landing. A merge-group proof is
-  // the fallback when that exact SHA never received a passing main push.
-  const mainCandidates = candidates.filter(
-    candidate => candidate.event === 'push'
-  );
-  const preferredCandidates = mainCandidates.length
-    ? mainCandidates
-    : candidates;
+      }),
+    ghJsonImpl,
+    downloadFinalReceiptImpl,
+  }).map(({ validated, ...candidate }) => ({ ...candidate, ...validated }));
+  const preferredCandidates = preferMainPush(candidates);
   if (preferredCandidates.length !== 1) {
     throw new Error(
       `expected one exact passing ${lane} receipt for ${sha}; found ${preferredCandidates.length}`
     );
   }
   return preferredCandidates[0];
+}
+
+/**
+ * Validate a later tip's sealed product-lane receipt as full exact green
+ * evidence: exact provenance, aggregate admission passed, and at least one
+ * selected lane that ran with every result successful. Lanes the receipt did
+ * not select are never asserted as run — a carryover carrier is recorded with
+ * its own receipt lanes, so a skipped Web lane is visible, not implied.
+ */
+export function validateLaterTipGreenReceipt({ receipt, expectedSha }) {
+  exactSha(expectedSha, 'later tip evidence SHA');
+  if (
+    !receipt ||
+    typeof receipt !== 'object' ||
+    receipt.provenance?.sha !== expectedSha
+  ) {
+    throw new Error(
+      'later tip receipt provenance does not match the exact evidence run'
+    );
+  }
+  const runId = positiveInteger(
+    receipt.provenance?.runId,
+    'later tip receipt runId'
+  );
+  const runAttempt = positiveInteger(
+    receipt.provenance?.runAttempt,
+    'later tip receipt runAttempt'
+  );
+  if (receipt.aggregatePassed !== true) {
+    throw new Error('later tip receipt aggregate admission did not pass');
+  }
+  const selectedLanes = uniqueStrings(
+    receipt.selectedLanes,
+    'later tip receipt selectedLanes'
+  );
+  if (selectedLanes.length === 0) {
+    throw new Error('later tip receipt selected no product lanes');
+  }
+  for (const lane of selectedLanes) {
+    const admission = receipt.admissions?.[lane];
+    if (
+      admission?.selected !== true ||
+      admission?.passed !== true ||
+      !Array.isArray(admission.results) ||
+      admission.results.length === 0 ||
+      admission.results.some(result => result !== 'success')
+    ) {
+      throw new Error(
+        `later tip ${lane} admission did not pass with exact results`
+      );
+    }
+  }
+  return { sha: expectedSha, runId, runAttempt, selectedLanes };
+}
+
+/**
+ * Resolve one later tip's full exact green evidence: a single preferred
+ * (main-push first) exact CI run at that SHA whose sealed product-lane
+ * receipt passed everything it selected. Zero, ambiguous or failing
+ * evidence at this SHA throws, exactly like the lane-bound resolver.
+ */
+export function resolveExactGreenEvidence({
+  repository,
+  sha,
+  ghJsonImpl = ghJson,
+  downloadFinalReceiptImpl = downloadFinalReceipt,
+}) {
+  exactSha(sha, 'later tip evidence SHA');
+  const candidates = discoverExactCiReceiptCandidates({
+    repository,
+    sha,
+    validateReceipt: receipt =>
+      validateLaterTipGreenReceipt({ receipt, expectedSha: sha }),
+    ghJsonImpl,
+    downloadFinalReceiptImpl,
+  }).map(({ validated, ...candidate }) => ({ ...candidate, ...validated }));
+  const preferredCandidates = preferMainPush(candidates);
+  if (preferredCandidates.length !== 1) {
+    throw new Error(
+      `expected one exact passing green receipt for ${sha}; found ${preferredCandidates.length}`
+    );
+  }
+  return preferredCandidates[0];
+}
+
+/**
+ * Route Web evidence for a release range. The anchored Web head (the newest
+ * first-parent commit selecting Web) is resolved exactly, as today. Only when
+ * that exact SHA has ZERO passing receipts — a dropped push event, or a queue
+ * run that died before sealing its lane receipt — does the range fall back to
+ * a later tip carrying full exact green evidence of its own. Any LATER
+ * first-parent tip's combined head contains the anchor's Web delta, and the
+ * planner already proves commits after the anchor do not touch Web. Evidence
+ * for the commit actually promoted is never consulted here and never
+ * weakened: this resolver only selects the historical Web carrier.
+ *
+ * Fail-closed shape is preserved: an ambiguous anchor, or an anchor receipt
+ * that exists and failed its lane admission, still throws — the fallback
+ * never overrides evidence that the anchored Web run actually failed. When no
+ * later tip holds green evidence the original anchor error is rethrown.
+ */
+export function resolveRangeWebEvidence({
+  repository,
+  anchorSha,
+  currentSha,
+  laterTipShas,
+  ghJsonImpl = ghJson,
+  downloadFinalReceiptImpl = downloadFinalReceipt,
+  resolveExactImpl = resolveHistoricalLaneEvidence,
+  resolveGreenImpl = resolveExactGreenEvidence,
+}) {
+  exactSha(anchorSha, 'anchorSha');
+  exactSha(currentSha, 'currentSha');
+  const laterTips = uniqueStrings(laterTipShas, 'laterTipShas').filter(
+    tip => tip !== anchorSha && tip !== currentSha
+  );
+  let anchorError;
+  try {
+    const evidence = resolveExactImpl({
+      repository,
+      sha: anchorSha,
+      lane: 'web',
+      ghJsonImpl,
+      downloadFinalReceiptImpl,
+    });
+    return {
+      webEvidence: {
+        ...evidence,
+        source: WEB_EVIDENCE_SOURCES.historicalExact,
+      },
+      webEvidenceSha: anchorSha,
+      fallback: null,
+    };
+  } catch (error) {
+    if (!isMissingExactReceiptError(error, anchorSha)) throw error;
+    anchorError = error;
+  }
+  // Newest tip first: the promoted head's own green receipt is the strongest
+  // carrier; intermediate tips only when newer tips hold no green evidence.
+  for (const tip of [currentSha, ...laterTips]) {
+    try {
+      const evidence = resolveGreenImpl({
+        repository,
+        sha: tip,
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      });
+      return {
+        webEvidence: {
+          ...evidence,
+          lane: 'web',
+          source: WEB_EVIDENCE_SOURCES.laterTipCarryover,
+          carryoverAnchorSha: anchorSha,
+          receiptLanes: evidence.selectedLanes,
+        },
+        webEvidenceSha: tip,
+        fallback: {
+          anchorSha,
+          resolvedSha: tip,
+          reason: 'anchor-exact-receipt-missing',
+        },
+      };
+    } catch {
+      continue;
+    }
+  }
+  throw anchorError;
 }
 
 function parseArgs(argv) {
@@ -544,6 +743,7 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
   }
   let currentReceipt;
   let plan;
+  let laterTipShas = [];
   if (mode === 'marker-recovery') {
     collectProductionGitRange(args['deployed-sha'], args['current-sha']);
     currentReceipt = JSON.parse(readFileSync(args['current-receipt'], 'utf8'));
@@ -568,9 +768,22 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       ...gitRange,
     });
     plan.productionBaseEvidence = baseEvidence;
+    // Tips strictly newer than the Web evidence anchor, newest first (the
+    // promoted head is index 0). Empty unless the anchor is a historical head.
+    const anchorIndex = gitRange.commitsNewestFirst.findIndex(
+      commit => commit.sha === plan.webEvidenceSha
+    );
+    laterTipShas =
+      anchorIndex > 0
+        ? gitRange.commitsNewestFirst
+            .slice(0, anchorIndex)
+            .map(commit => commit.sha)
+        : [];
   }
 
   let webEvidence = null;
+  let webEvidenceFallback = null;
+  let reportedWebEvidenceSha = plan.webEvidenceSha;
   if (plan.runWeb && plan.webBindReason === WEB_BIND_REASONS.liveUnbound) {
     webEvidence = {
       sha: plan.currentSha,
@@ -598,18 +811,30 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
             : 'current-main-release-receipt',
       };
     } else {
-      webEvidence = {
-        ...resolveHistoricalLaneEvidence({
-          repository: args.repo,
-          sha: plan.webEvidenceSha,
-          lane: 'web',
-        }),
-        source: 'historical-exact-ci-receipt',
-      };
+      const resolved = resolveRangeWebEvidence({
+        repository: args.repo,
+        anchorSha: plan.webEvidenceSha,
+        currentSha: plan.currentSha,
+        laterTipShas,
+      });
+      webEvidence = resolved.webEvidence;
+      webEvidenceFallback = resolved.fallback;
+      if (webEvidenceFallback) {
+        reportedWebEvidenceSha = resolved.webEvidenceSha;
+      }
     }
   }
 
-  const output = { ...plan, webEvidence };
+  const output = {
+    ...plan,
+    webEvidence,
+    ...(webEvidenceFallback
+      ? {
+          webEvidenceSha: reportedWebEvidenceSha,
+          webEvidenceFallback,
+        }
+      : {}),
+  };
   writeFileSync(args['json-out'], `${JSON.stringify(output, null, 2)}\n`);
   if (args['github-output']) {
     writeFileSync(
@@ -619,13 +844,13 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
         `run_web=${plan.runWeb}`,
         `web_bind_reason=${plan.webBindReason}`,
         `deployed_sha=${plan.deployedSha}`,
-        `web_evidence_sha=${plan.webEvidenceSha ?? 'none'}`,
+        `web_evidence_sha=${reportedWebEvidenceSha ?? 'none'}`,
       ].join('\n') + '\n',
       { flag: 'a' }
     );
   }
   process.stdout.write(
-    `Production lane range ${plan.deployedSha}..${plan.currentSha}: ${plan.selectedLanes.join(',') || 'none'}; Web=${plan.runWeb}; bind=${plan.webBindReason}; evidence=${plan.webEvidenceSha ?? 'none'}\n`
+    `Production lane range ${plan.deployedSha}..${plan.currentSha}: ${plan.selectedLanes.join(',') || 'none'}; Web=${plan.runWeb}; bind=${plan.webBindReason}; evidence=${reportedWebEvidenceSha ?? 'none'}${webEvidenceFallback ? ` (carryover from ${webEvidenceFallback.anchorSha})` : ''}\n`
   );
   return output;
 }

@@ -54,7 +54,6 @@ describe('POST /api/webhooks/sentry', () => {
   });
 
   it('releases a previous open-event lock on resolution and dedupes late resolution retries', async () => {
-    vi.stubEnv('SUMMER_SENTRY_INTAKE_LIVE', 'true');
     const acquired = new Set<string>();
     mockAcquireRecentDispatch.mockImplementation(
       async (_source: string, key: string) => {
@@ -509,6 +508,44 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for the owner verified-merge guard receipt (JOV-10124)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7822218012',
+          title:
+            'Error: Owner identity requires an explicit verified profile merge',
+          culprit: 'captureWarning',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'owner-verified-merge-guard',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('returns deduplicated response when a recent dispatch exists', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: false,
@@ -744,11 +781,11 @@ describe('POST /api/webhooks/sentry', () => {
     const firstDispatch = JSON.parse(
       String(mockServerFetch.mock.calls[0]?.[1]?.body)
     );
-    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(10);
+    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(9);
+    expect('linear_identifier' in firstDispatch.client_payload).toBe(false);
     expect(firstDispatch.client_payload).toMatchObject({
       issue_id: '101',
       short_id: '',
-      linear_identifier: '',
       dedupe_key: dedupeKeys[0],
       context: {
         root_cause_fingerprint: dedupeKeys[0],

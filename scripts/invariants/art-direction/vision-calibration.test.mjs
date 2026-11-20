@@ -6,6 +6,7 @@ import {
   MIN_NEGATIVES,
   MIN_POSITIVES,
   measure,
+  tasteJudgeLabels,
   verdict,
   wilsonLower,
 } from './vision-calibration.mjs';
@@ -70,4 +71,36 @@ test('a large, accurate sample earns promotion; a precise-but-leaky one does not
 test('wilsonLower is conservative for small n', () => {
   assert.ok(wilsonLower(3, 3) < 0.5);
   assert.ok(wilsonLower(90, 100) < 0.9);
+});
+
+test('frame IDs retain label joins and the same calibration as legacy keys', () => {
+  const legacy = [
+    ...frames(40, 'unpolished', 'd'),
+    ...frames(40, 'polished', 'c'),
+  ];
+  const labels = legacy.map((o, i) => ({
+    key: o.key,
+    judge: 'polish',
+    truth: i < 40 ? 'defect' : 'ok',
+  }));
+  const observations = legacy.map(({ key, ...o }) => ({ frameId: key, ...o }));
+  assert.deepEqual(measure(observations, labels), measure(legacy, labels));
+  assert.equal(
+    verdict(measure(observations, labels).polish, FLOORS).mayBlock,
+    true
+  );
+});
+
+test('taste labels from Tim verdicts feed calibration and wait for a judge run', () => {
+  const labels = tasteJudgeLabels(process.cwd());
+  assert.ok(
+    labels.some(
+      l =>
+        l.key === 'release-hero-blurred' &&
+        l.judge === 'text_on_busy' &&
+        l.truth === 'defect'
+    )
+  );
+  const { judges } = checkCalibration(process.cwd(), readVisionConfig());
+  assert.ok(judges.text_on_busy.unmatched >= 2);
 });

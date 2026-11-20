@@ -79,7 +79,6 @@ import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -139,12 +138,14 @@ import {
   TASK_PRIORITY_OPTIONS,
   TASK_STATUS_OPTIONS,
 } from './task-action-registry';
-import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
+import { taskSearchFromPills } from './task-header-search';
 import {
+  getReleasePanelStatus,
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
+  type ReleasePanelStatus,
   TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
@@ -178,7 +179,6 @@ const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
 const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
-type ReleasePanelStatus = 'loading' | 'error' | 'empty';
 type TaskEditorSaveStatus =
   | 'idle'
   | 'dirty'
@@ -688,7 +688,7 @@ function TaskDocumentPanel({
             <div className='flex min-h-full items-center justify-center px-6 py-6'>
               <EmptyState
                 icon={<FileText className='h-4 w-4' strokeWidth={2} />}
-                heading='Select a task'
+                heading='No Task Selected'
                 description='Choose a task from the list to view its details.'
                 className='max-w-sm py-8'
                 testId='task-document-empty-state'
@@ -1774,9 +1774,8 @@ export function TasksPageClient() {
 
   const handleGenerateTaskPitch = useCallback(
     (task: TaskView) => {
-      if (!task.releaseId || !task.releaseTitle) {
-        return;
-      }
+      if (!task.releaseId || !task.releaseTitle)
+        return void toast.error('Link a release to generate its pitch.');
 
       openChatWithPrompt(
         buildTaskPitchChatPrompt({
@@ -2099,12 +2098,12 @@ export function TasksPageClient() {
     };
   }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
-  const closeReleaseSidebar = useCallback(() => {
-    setSelectedReleaseId(null);
-  }, []);
-
-  const sidebarPanel = selectedReleaseId ? (
-    selectedRelease ? (
+  const closeReleaseSidebar = useCallback(() => setSelectedReleaseId(null), []);
+  const releasePanelStatus = getReleasePanelStatus(selectedReleaseQuery);
+  const refetchRelease = selectedReleaseQuery.refetch;
+  const sidebarPanel = useMemo(() => {
+    if (!selectedReleaseId) return null;
+    return selectedRelease ? (
       <ReleaseSidebar
         release={selectedRelease}
         mode='admin'
@@ -2116,52 +2115,20 @@ export function TasksPageClient() {
       />
     ) : (
       <TaskReleasePanelStatus
-        status={
-          selectedReleaseQuery.isError
-            ? 'error'
-            : selectedReleaseQuery.isLoading
-              ? 'loading'
-              : 'empty'
-        }
+        status={releasePanelStatus}
         onClose={closeReleaseSidebar}
-        onRetry={() => {
-          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
-        }}
+        onRetry={() => void Promise.resolve(refetchRelease()).catch(() => {})}
       />
-    )
-  ) : null;
+    );
+  }, [
+    artistName,
+    closeReleaseSidebar,
+    refetchRelease,
+    releasePanelStatus,
+    selectedRelease,
+    selectedReleaseId,
+  ]);
   useRegisterRightPanel(sidebarPanel);
-
-  const taskTitleOptions = useMemo(
-    () => distinctTaskTitles(taskSubviewBaseTasks),
-    [taskSubviewBaseTasks]
-  );
-
-  const headerSearchAdapter = useMemo(
-    () =>
-      taskSubviewBaseTasks.length === 0
-        ? null
-        : {
-            key: 'tasks',
-            pills,
-            onPillsChange: setPills,
-            artistOptions: [],
-            titleOptions: taskTitleOptions,
-            albumOptions: [],
-            totalCount: taskSubviewBaseTasks.length,
-            visibleCount: tasks.length,
-            triggerLabel:
-              pills.length > 0
-                ? `Filter Tasks (${pills.length})`
-                : 'Filter Tasks',
-            ariaLabel: 'Filter Tasks',
-            placeholder: 'Search tasks',
-            allowedFields: ['title'] as const,
-          },
-    [pills, taskSubviewBaseTasks.length, taskTitleOptions, tasks.length]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
 
   const showAssigneeInListRows = assigneeFilter === 'all';
   const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);

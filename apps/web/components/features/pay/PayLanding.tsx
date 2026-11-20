@@ -12,37 +12,20 @@ import {
 import {
   MarketingContainer,
   MarketingHero,
-  MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
 /*  Hero                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const PAY_HERO_PHOTO = {
-  src: '/images/marketing-hero/pay.webp',
-  width: 1600,
-  height: 901,
-} as const;
-
-function TipsHero() {
+/** Hero copy: kicker, headline, lede and the one claim action. */
+function PayHeroCopy() {
   return (
-    <section
-      className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
-      data-testid='marketing-section-hero'
-      data-marketing-variant='split-claim-card'
-      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
-    >
-      <MarketingHeroPhoto {...PAY_HERO_PHOTO} />
-      <div className='hero-glow pointer-events-none absolute inset-0' />
-      <MarketingHero
-        variant='centered'
-        className='items-start text-left'
-        headingId='pay-hero-heading'
-        testId='pay-hero'
-      >
+    <div className='flex flex-col items-start'>
+      <div className='w-full'>
         <p className='marketing-kicker'>Pay</p>
         {/* ui-casing-allow: marketing display headline */}
         {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
@@ -66,6 +49,43 @@ function TipsHero() {
         <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
           Free forever. No credit card required.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function TipsHero() {
+  return (
+    <section
+      className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
+      data-testid='marketing-section-hero'
+      data-marketing-variant='split-claim-card'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+    >
+      <div className='hero-glow pointer-events-none absolute inset-0' />
+      <MarketingHero
+        variant='split'
+        className='items-center text-left'
+        headingId='pay-hero-heading'
+        testId='pay-hero'
+      >
+        <PayHeroCopy />
+
+        {/* The real pay sheet from the profile (?mode=pay), cropped to the
+            sheet so its amount chips and Venmo action read at hero size. */}
+        <div
+          data-testid='pay-hero-product'
+          className='relative mx-auto aspect-4/5 w-full max-w-sm overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-card md:mr-0'
+        >
+          <MarketingPhoneImage
+            scenarioId='tim-white-profile-pay-mobile'
+            altOverride='Pay sheet on a Jovie profile: pick $5, $10 or $20 and continue with Venmo'
+            fill
+            priority
+            sizes='(min-width: 768px) 24rem, 90vw'
+            className='rounded-none object-cover object-bottom'
+          />
+        </div>
       </MarketingHero>
     </section>
   );
@@ -123,27 +143,28 @@ function HowItWorksSection() {
             </div>
           </div>
 
-          <div className='homepage-section-stack grid grid-cols-1 gap-6 md:grid-cols-3'>
+          <ol className='homepage-section-stack grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3'>
             {STEPS.map((step, i) => (
-              <div
+              <li
                 key={step.title}
                 className='homepage-surface-card relative flex flex-col rounded-[1rem] p-7 text-left'
               >
-                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <step.icon className='h-6 w-6 text-secondary-token' />
-                </div>
-                <span className='mt-5 text-[length:var(--linear-label-size)] text-tertiary-token'>
-                  Step {i + 1}
-                </span>
-                <h3 className='mt-2 text-lg font-medium tracking-tight text-primary-token'>
+                {/* Order is carried by the <ol>; the count stays in the DOM for
+                    assistive tech and is never visible text. */}
+                <span className='sr-only'>Step {i + 1}</span>
+                <step.icon
+                  className='h-6 w-6 text-secondary-token'
+                  aria-hidden='true'
+                />
+                <h3 className='mt-5 text-balance text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                   {step.description}
                 </p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </MarketingContainer>
     </section>
@@ -210,9 +231,10 @@ function BenefitsSection() {
                 key={benefit.title}
                 className='homepage-surface-card flex flex-col rounded-[1rem] p-7'
               >
-                <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <benefit.icon className='h-5 w-5 text-secondary-token' />
-                </div>
+                <benefit.icon
+                  className='h-5 w-5 text-secondary-token'
+                  aria-hidden='true'
+                />
                 <h3 className='mt-5 text-base font-medium tracking-tight text-primary-token'>
                   {benefit.title}
                 </h3>
@@ -278,9 +300,10 @@ function SocialProofSection() {
                 key={uc.label}
                 className='homepage-surface-card flex flex-col items-center gap-3 rounded-[1rem] p-6'
               >
-                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <uc.icon className='h-5 w-5 text-secondary-token' />
-                </div>
+                <uc.icon
+                  className='h-5 w-5 text-secondary-token'
+                  aria-hidden='true'
+                />
                 <span className='text-sm font-medium text-primary-token'>
                   {uc.label}
                 </span>

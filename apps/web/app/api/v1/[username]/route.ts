@@ -22,13 +22,15 @@ import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import {
   createRateLimitHeaders,
   getClientIP,
   publicArtistApiLimiter,
 } from '@/lib/rate-limit';
-import { getProfileByUsername } from '@/lib/services/profile';
+import { getProfileWithUser } from '@/lib/services/profile';
 import { getActiveLinksForProfile } from '@/lib/services/social-links/queries';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
 export const dynamic = 'force-dynamic';
@@ -158,9 +160,16 @@ export async function GET(
     return addPublicApiHeaders(requestExclusion, rateLimitHeaders);
   }
 
-  const profile = await getProfileByUsername(username);
+  const profile = await getProfileWithUser(username);
 
-  if (!profile?.isPublic) {
+  if (
+    !profile?.isPublic ||
+    shouldHideTestProfileFromDirectUrl({
+      handle: username,
+      ownerEmail: profile.userEmail,
+      settings: profile.settings,
+    })
+  ) {
     return NextResponse.json(
       { error: 'Artist not found' },
       {
@@ -244,7 +253,12 @@ export async function GET(
           displayText: link.displayText,
         })),
         platformIds: {
-          spotify: profile.spotifyId ?? null,
+          // Legacy profiles keep only spotify_url; derive the exact ID.
+          spotify:
+            profile.spotifyId ??
+            (profile.spotifyUrl
+              ? extractSpotifyArtistId(profile.spotifyUrl)
+              : null),
           appleMusic: profile.appleMusicId ?? null,
           youtube: youtubeChannelId,
           deezer: profile.deezerId ?? null,

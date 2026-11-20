@@ -4,11 +4,93 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { SOURCE_GUARDS, selectSourceGuards } from '../../ci-fast-lanes.mjs';
-import { selectScriptContracts } from '../script-contract-affected.mjs';
+import {
+  SCRIPT_CONTRACT_NODE_COMMAND,
+  SCRIPT_CONTRACT_NODE_TESTS,
+  SOURCE_GUARDS,
+  scriptContractNodeArgs,
+  selectSourceGuards,
+} from '../../ci-fast-lanes.mjs';
+import { CHROME_SCAN_ROOTS } from '../../invariants/shell-ia.mjs';
+import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
+import {
+  COPY_INVENTORY_TEST,
+  copyInventoryScanPath,
+  SHELL_IA_SCAN_ROOTS,
+  SHELL_IA_TEST,
+  selectScriptContracts,
+  shellIaScanPath,
+} from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('package source changes select sparse checkout closure in CI and local scope', () => {
+  const closure =
+    'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs';
+  const options = { root: ROOT, node: [], vitest: [closure] };
+  for (const path of [
+    'packages/api-client/client.ts',
+    'packages/api-client/types.ts',
+    'packages/another-client/removed.ts',
+  ]) {
+    for (const derivedOnly of [false, true]) {
+      assert.deepEqual(
+        selectScriptContracts([path], { ...options, derivedOnly }),
+        {
+          full: false,
+          node: [],
+          vitest: [closure],
+        }
+      );
+    }
+  }
+  assert.deepEqual(
+    selectScriptContracts(['apps/ios/Jovie/App.swift'], options).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts(['packages/api-client/types.ts'], {
+      ...options,
+      vitest: [],
+    }).vitest,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts([closure, 'packages/api-client/types.ts'], {
+      ...options,
+      derivedOnly: true,
+    }).vitest,
+    [closure]
+  );
+});
+
+test('a non-JS scripts path does not force the full contract lists', () => {
+  const root = mkdtempSync(join(tmpdir(), 'script-contract-affected-'));
+  const write = (path, body) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), body);
+  };
+  try {
+    write('scripts/unrelated.test.mjs', 'export {};\n');
+    const options = {
+      root,
+      node: ['scripts/unrelated.test.mjs'],
+      vitest: [],
+    };
+    for (const path of [
+      'scripts/lanes/lane_runner.py',
+      'scripts/tests/test_lane_runner.py',
+    ])
+      assert.deepEqual(selectScriptContracts([path], options), {
+        full: false,
+        node: [],
+        vitest: [],
+      });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('script, workflow and toolchain diffs run both full contract lists', () => {
   const node = ['scripts/lib/__tests__/script-contract-affected.test.mjs'];
@@ -108,6 +190,86 @@ test('is a PR-only source guard resolved beside ci-fast-lanes', () => {
   assert.ok(!ids('merge_group').includes('script-contracts'));
 });
 
+test('a marketing copy source selects the inventory contract without the full lists', () => {
+  const landing =
+    'apps/web/components/features/waitlist/WaitlistPublicLanding.tsx';
+  const catalog = [COPY_INVENTORY_TEST, 'scripts/agent-context/check.test.mjs'];
+  const options = { root: ROOT, node: catalog, vitest: [] };
+  assert.deepEqual(testsAffectedBy([COPY_INVENTORY_TEST], [landing], ROOT), []);
+  assert.equal(copyInventoryScanPath(landing), true);
+  assert.equal(copyInventoryScanPath('apps/web/lib/leads/constants.ts'), false);
+  assert.equal(copyInventoryScanPath('apps/web/data/marketing/copy.ts'), false);
+  assert.equal(
+    copyInventoryScanPath('apps/web/lib/content-records/home.ts'),
+    false
+  );
+  assert.equal(copyInventoryScanPath('apps/web/lib/marketing/copy.ts'), true);
+  assert.deepEqual(selectScriptContracts([landing], options), {
+    full: false,
+    node: [COPY_INVENTORY_TEST],
+    vitest: [],
+  });
+  assert.deepEqual(
+    selectScriptContracts([landing], { ...options, derivedOnly: true }).node,
+    [COPY_INVENTORY_TEST]
+  );
+  assert.deepEqual(
+    selectScriptContracts(['scripts/copy-inventory/ids.gen.json'], options),
+    { full: false, node: [COPY_INVENTORY_TEST], vitest: [] }
+  );
+  assert.deepEqual(
+    selectScriptContracts(['apps/web/data/marketing/copy.ts'], options).node,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts(['apps/web/lib/leads/constants.ts'], options).node,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts([landing], {
+      root: ROOT,
+      node: ['scripts/agent-context/check.test.mjs'],
+      vitest: [],
+    }).node,
+    []
+  );
+});
+
+test('a scannable route or feature tsx selects the shell IA contract without the full lists', () => {
+  const rail = 'apps/web/components/features/admin/outbound/OutboundRail.tsx';
+  const catalog = [SHELL_IA_TEST, 'scripts/agent-context/check.test.mjs'];
+  const options = { root: ROOT, node: catalog, vitest: [] };
+  assert.deepEqual(SHELL_IA_SCAN_ROOTS, CHROME_SCAN_ROOTS);
+  assert.equal(shellIaScanPath(rail), true);
+  assert.equal(shellIaScanPath('apps/web/app/(app)/dashboard/page.tsx'), true);
+  assert.equal(shellIaScanPath(rail.replace(/\.tsx$/u, '.test.tsx')), false);
+  assert.equal(shellIaScanPath(rail.replace(/\.tsx$/u, '.stories.tsx')), false);
+  assert.equal(
+    shellIaScanPath('apps/web/components/organisms/Sidebar.tsx'),
+    false
+  );
+  assert.deepEqual(testsAffectedBy([SHELL_IA_TEST], [rail], ROOT), []);
+  assert.deepEqual(selectScriptContracts([rail], options), {
+    full: false,
+    node: [SHELL_IA_TEST],
+    vitest: [],
+  });
+  assert.deepEqual(
+    selectScriptContracts([rail], { ...options, derivedOnly: true }).node,
+    [SHELL_IA_TEST]
+  );
+  const landing =
+    'apps/web/components/features/waitlist/WaitlistPublicLanding.tsx';
+  assert.deepEqual(
+    selectScriptContracts([landing], {
+      root: ROOT,
+      node: [COPY_INVENTORY_TEST, SHELL_IA_TEST],
+      vitest: [],
+    }).node,
+    [COPY_INVENTORY_TEST, SHELL_IA_TEST]
+  );
+});
+
 test('the CLI lists the selection for explicit paths', () => {
   const result = spawnSync(
     process.execPath,
@@ -123,4 +285,115 @@ test('the CLI lists the selection for explicit paths', () => {
     result.stdout,
     /^\[script-contracts\] affected: 0 node, 0 vitest$/m
   );
+});
+
+test('Node contract coverage isolates the original behavior suites and preserves every selection once', () => {
+  const focused = [
+    'scripts/preflight.test.mjs',
+    'scripts/verify-workflow-references.test.mjs',
+  ];
+  const hosted =
+    'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs';
+  for (const selection of [
+    [],
+    focused,
+    [hosted],
+    [focused[0], hosted, focused[1]],
+    SCRIPT_CONTRACT_NODE_TESTS,
+  ]) {
+    const batches = scriptContractNodeArgs(selection);
+    const selected = batches.flatMap(args =>
+      args.filter(arg => !arg.startsWith('--'))
+    );
+    assert.deepEqual([...selected].sort(), [...selection].sort());
+    for (const args of batches) {
+      const tests = args.filter(arg => !arg.startsWith('--'));
+      if (args.includes('--experimental-test-coverage')) {
+        assert.ok(tests.every(test => focused.includes(test)));
+        assert.ok(
+          args.includes('--test-coverage-include=scripts/preflight.mjs')
+        );
+        assert.ok(
+          args.includes(
+            '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs'
+          )
+        );
+      } else {
+        assert.deepEqual(args, ['--test', ...tests]);
+        assert.ok(tests.every(test => !focused.includes(test)));
+      }
+    }
+  }
+  for (const file of [...focused, hosted]) {
+    assert.ok(SCRIPT_CONTRACT_NODE_TESTS.includes(file));
+    assert.ok(
+      selectScriptContracts(['scripts/preflight.mjs']).node.includes(file)
+    );
+    assert.equal(SCRIPT_CONTRACT_NODE_COMMAND.split(file).length, 2);
+  }
+});
+
+/** @type {Array<[string, string[]]>} */
+const waitlistBindings = [
+  [
+    'apps/web/lib/waitlist/role-entry.ts',
+    ['apps/web/lib/waitlist/role-entry.test.ts'],
+  ],
+  [
+    'apps/web/lib/waitlist/roles.ts',
+    [
+      'apps/web/components/features/waitlist/WaitlistRoleForm.test.tsx',
+      'apps/web/lib/waitlist/role-entry.test.ts',
+      'apps/web/tests/unit/api/waitlist/join.test.ts',
+    ],
+  ],
+  [
+    'apps/web/lib/admin/waitlist-gate-funnel.ts',
+    ['apps/web/lib/admin/waitlist-gate-funnel.test.ts'],
+  ],
+];
+for (const [source, producers] of waitlistBindings) {
+  test(`binds ${source} to its real behavior producers`, () => {
+    const plan = buildAffectedTestPlan([source]);
+    assert.equal(plan.mode, 'selected');
+    for (const producer of producers)
+      assert.ok(plan.selectedTests.includes(producer));
+    assert.equal(plan.fallbackReason, undefined);
+  });
+  test(`fails closed when a producer for ${source} is absent`, () => {
+    const plan = buildAffectedTestPlan([source], {
+      isFileAvailable: file => file !== producers[0],
+    });
+    assert.equal(plan.mode, 'full');
+    assert.ok(plan.fallbackReason?.includes(source));
+  });
+}
+test('waitlist producer selection keeps global flags on the broad lane', () => {
+  const plan = buildAffectedTestPlan([
+    waitlistBindings[0][0],
+    'apps/web/lib/flags/code-flags.ts',
+  ]);
+  assert.equal(plan.mode, 'full');
+  assert.ok(plan.fallbackReason?.includes('apps/web/lib/flags/code-flags.ts'));
+});
+test('waitlist producer selection keeps unknown neighbors fail-closed', () => {
+  assert.equal(
+    buildAffectedTestPlan([
+      waitlistBindings[0][0],
+      'apps/web/lib/waitlist/unmapped.ts',
+    ]).mode,
+    'full'
+  );
+});
+test('waitlist producer mapping edits require the complete selector regression pair', () => {
+  const selector = [
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const files = waitlistBindings.map(([source]) => source);
+  const complete = buildAffectedTestPlan([...files, ...selector]);
+  assert.equal(complete.mode, 'selected');
+  assert.ok(complete.scriptVitestTests.includes(selector[1]));
+  assert.equal(buildAffectedTestPlan([...files, selector[0]]).mode, 'full');
+  assert.equal(buildAffectedTestPlan([...files, selector[1]]).mode, 'full');
 });

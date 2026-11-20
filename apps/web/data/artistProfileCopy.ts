@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export interface ArtistProfileMode {
   readonly id: 'upcoming-release' | 'release-day' | 'touring' | 'live-support';
@@ -396,9 +397,8 @@ export interface ArtistProfileLandingCopy {
 }
 
 /**
- * The animated audience visual is also used by the notifications landing page.
- * Keep its contract limited to the fields that visual actually renders so the
- * artist-profile narrative can evolve without forcing unrelated page copy.
+ * Shared with notifications; expose only fields the audience visual renders
+ * so artist-profile narrative edits do not require unrelated copy changes.
  */
 export type ArtistProfileCaptureVisualCopy = Omit<
   ArtistProfileLandingCopy['capture'],
@@ -434,7 +434,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
     phoneCaption: 'One profile.',
-    phoneSubcaption: 'Adapts to every fan.',
+    phoneSubcaption: 'Leads with your latest release or show.',
   },
   adaptive: {
     eyebrow: '',
@@ -464,7 +464,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         label: 'Pre-save',
         headline: 'Collect release alerts before it lands.',
         description: 'Collect release alerts before it lands.',
-        pathLabel: 'jov.ie/you',
+        pathLabel: 'jov.ie/yourname',
         drawer: {
           title: 'The Deep End',
           subtitle: 'New release arriving soon.',
@@ -473,7 +473,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             {
               id: 'release-alerts',
               label: 'Release alerts',
-              detail: 'Fans hear from you when it lands',
+              detail: 'Listeners hear from you when it lands',
               action: 'On',
             },
             {
@@ -494,7 +494,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'tim-white-profile-subscribe-mobile'
         ).publicUrl,
         screenshotAlt:
-          'Jovie artist profile inviting fans to get release updates.',
+          'Jovie profile inviting listeners to get release updates.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
@@ -502,10 +502,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'release-day',
         label: 'Out now',
         headline:
-          'When the song is live, fans go straight to the right service.',
+          'When the song is live, listeners go straight to the right service.',
         description:
-          'When the song is live, fans go straight to the right service.',
-        pathLabel: 'jov.ie/you/listen',
+          'When the song is live, listeners go straight to the right service.',
+        pathLabel: 'jov.ie/yourname/listen',
         drawer: {
           title: 'Listen',
           subtitle: 'The latest release stays front and center.',
@@ -544,7 +544,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         label: 'On tour',
         headline: "When you're on the road, nearby dates come first.",
         description: "When you're on the road, nearby dates come first.",
-        pathLabel: 'jov.ie/you/tour',
+        pathLabel: 'jov.ie/yourname/tour',
         drawer: {
           title: 'Tour dates',
           subtitle: 'Nearby dates rise to the top.',
@@ -583,7 +583,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'At the merch table, one scan becomes support and capture.',
         description:
           'At the merch table, one scan becomes support and capture.',
-        pathLabel: 'jov.ie/you/pay',
+        pathLabel: 'jov.ie/yourname/pay',
         drawer: {
           title: 'Support',
           subtitle: 'Choose an amount.',
@@ -604,7 +604,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             {
               id: 'twenty',
               label: '$20',
-              detail: 'Top fan',
+              detail: 'Top listener',
               action: 'USD',
             },
           ],
@@ -618,8 +618,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   outcomes: {
-    headline: 'Built around fan outcomes.',
-    body: 'Every state removes a choice and moves the fan toward one useful action.',
+    headline: 'Built around audience outcomes.',
+    body: 'Every state removes a choice and moves the listener toward one useful action.',
     cards: [
       {
         id: 'drive-streams',
@@ -650,13 +650,13 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'straight-to-listen',
         title: 'Listen',
         description:
-          'Fans land on the right release and the right platform without hunting through a stack of links.',
+          'Listeners land on the right release and the right platform without hunting through a stack of links.',
       },
       {
         id: 'local-dates-first',
         title: 'Show Up',
         description:
-          'Touring fans see the show that matters to them instead of scrolling through cities that do not.',
+          'Touring listeners see the show that matters to them instead of scrolling through cities that do not.',
       },
       {
         id: 'support-without-friction',
@@ -668,7 +668,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'capture-the-fan',
         title: 'Stay Close',
         description:
-          'A listen, a signup, or a support moment can become a real fan relationship instead of an anonymous click.',
+          'A listen, a signup, or a support moment can become a real audience relationship instead of an anonymous click.',
       },
       {
         id: 'one-link-everywhere',
@@ -757,22 +757,22 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
       },
       shareAnywhere: {
-        url: 'jov.ie/tim',
+        url: TIM_WHITE_PROFILE.publicProfileDisplay,
         title: 'Share-ready',
         subtitle: 'Bio, QR, stories, and shows.',
       },
       captureFan: {
         inputLabel: 'Email address',
-        inputValue: 'fan@example.com',
+        inputValue: 'you@email.com',
         ctaLabel: 'Get updates',
-        confirmedLabel: 'Fan captured',
+        confirmedLabel: 'Audience captured',
         followUpLabel: 'Release alerts enabled',
       },
     },
   },
   opinionated: {
     headline: 'Stop designing your link-in-bio.',
-    body: 'Jovie leads with the next action a fan needs. You get a clear path without redesigning the page. Make music. Jovie turns attention into action.',
+    body: 'Jovie leads with the next action a listener needs. You get a clear path without redesigning the page. Jovie turns attention into action.',
     principle: 'One profile. Built to convert.',
   },
   outcomeDuo: {
@@ -861,8 +861,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
     captureCard: {
       textAnchor: 'bottom',
-      title: 'Capture the fan',
-      body: 'A cashless street payment should become a reachable fan, not a dead-end receipt.',
+      title: 'Capture the listener',
+      body: 'A cashless street payment should become a reachable listener, not a dead-end receipt.',
       fanName: 'Jessica',
       fanLocation: 'Los Angeles',
       fanAmount: '$10',
@@ -872,7 +872,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     thanksCard: {
       textAnchor: 'top',
       title: 'Say thanks',
-      body: 'One clean thank-you can feel personal and send the fan straight back to the music.',
+      body: 'One clean thank-you can feel personal and send the listener straight back to what you released.',
       appName: 'Jovie',
       sender: 'Jovie for Tim White',
       visualSide: 'right',
@@ -883,7 +883,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     reengageCard: {
       textAnchor: 'bottom',
       title: 'Re-engage every release',
-      body: 'One payment can turn into a fan who comes back again and again.',
+      body: 'One payment can turn into a listener who comes back again and again.',
       visualSide: 'left',
       outputs: [
         {
@@ -898,16 +898,16 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
         {
           id: 'spotify',
-          title: 'Fan activity',
+          title: 'Audience activity',
           detail: 'Clicked through to Spotify',
         },
       ],
     },
   },
   capture: {
-    headline: 'Capture every fan.',
+    headline: 'Capture every listener.',
     subhead: 'One opt-in can become the next release listen.',
-    body: 'Jovie turns each opt-in into a fan you can reach for the next release or nearby show.',
+    body: 'Jovie turns each opt-in into a listener you can reach for the next release or nearby show.',
     action: {
       title: 'Get updates',
       detail: 'Release and nearby-show alerts.',
@@ -922,13 +922,13 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       detail: 'Listen on your favorite service.',
     },
     journey: {
-      inputEyebrow: 'Fan action',
+      inputEyebrow: 'Listener action',
       inputPreviewLabel:
-        'Example fan opt-in with an email or phone field and a confirmed subscription state.',
+        'Example listener opt-in with an email or phone field and a confirmed subscription state.',
       notificationEyebrow: 'The next right moment',
       notificationHeadline: 'Timely, not noisy.',
       notificationBody:
-        'The fan asked to hear from you. Jovie keeps that promise when there is something worth opening.',
+        'The listener asked to hear from you. Jovie keeps that promise when there is something worth opening.',
     },
     audienceRails: [
       [
@@ -1002,14 +1002,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   reactivation: {
     headline: 'Notify them automatically.',
     subhead:
-      'When new music drops or a nearby show is coming up, Jovie brings the right fans back.',
+      'When a new release drops or a nearby show is coming up, Jovie brings the right listeners back.',
     workflow: {
       columns: ['Trigger', 'Audience', 'Message', 'Destination'],
       rows: [
         {
           id: 'release',
           trigger: 'New music',
-          audience: 'Fans who asked for music',
+          audience: 'Listeners who asked for updates',
           message: 'New release alert',
           destination: 'Latest release page',
         },
@@ -1032,7 +1032,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'thank-you',
-        label: 'Bring fans back',
+        label: 'Bring listeners back',
         title: 'Support turns into the next listen.',
         detail: 'Thanks for the support tonight',
         destination: 'Message -> release page',
@@ -1042,7 +1042,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   specWall: {
     headline: 'Your music stays together. The right action leads.',
     subhead:
-      'Fans can choose where to listen, find shows, follow, and support you from one profile.',
+      'Listeners can choose where to listen, find shows, follow, and support you from one profile.',
     callouts: [
       {
         id: 'identity',
@@ -1052,7 +1052,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'release',
         title: 'New Music Is Ready',
-        body: 'Your current release is ready to play without making fans search for it.',
+        body: 'Your current release is ready to play without making listeners search for it.',
       },
       {
         id: 'action',
@@ -1075,14 +1075,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'audience-quality',
         title: 'Audience Quality Filtering',
-        body: 'Use source, segment, consent, and engagement signals to identify the fans most likely to act.',
+        body: 'Use source, segment, consent, and engagement signals to identify the listeners most likely to act.',
       },
       {
         id: 'fan-notifications',
-        title: 'Instant Fan Notifications',
-        body: 'Turn profile visits into opted-in fans, then bring the right people back for releases, shows, and support moments.',
+        title: 'Instant audience notifications',
+        body: 'Turn profile visits into opted-in listeners, then bring the right people back for releases, shows, and support moments.',
         href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        ctaLabel: 'See Fan Notifications',
+        ctaLabel: 'See audience notifications',
       },
       {
         id: 'instant-merch',
@@ -1119,7 +1119,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       searchValue: 'Tim White',
       resultName: 'Tim White',
       resultSubtitle: 'Spotify artist',
-      profilePath: 'jov.ie/tim',
+      profilePath: TIM_WHITE_PROFILE.publicProfileDisplay,
       ctaLabel: 'Claim',
     },
     sync: {
@@ -1146,7 +1146,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
     share: {
       url: 'https://jov.ie/tim',
-      displayValue: 'jov.ie/tim',
+      displayValue: TIM_WHITE_PROFILE.publicProfileDisplay,
       qrLabel: 'QR code',
       deepLinksLabel: 'Deep links',
       deepLinks: [
@@ -1193,7 +1193,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   finalCta: {
     headline: 'Claim your profile.',
-    subhead: 'One adaptive profile for every release, show, and fan action.',
+    subhead:
+      'One adaptive profile for every release, show, and listener action.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
   },

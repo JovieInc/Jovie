@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 export const RUNTIME_DATA_FILES = Object.freeze([
   'CHANGELOG.md',
   'docs/FEATURE_REGISTRY.md',
+  'canon/invariants.jsonl',
   'apps/eve-pilot/identities/jovie/instructions.md',
   'apps/eve-pilot/identities/summer/instructions.md',
   // Funnel judge trend for the Ovie outbound readiness checklist.

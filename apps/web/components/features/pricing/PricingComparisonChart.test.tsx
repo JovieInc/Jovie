@@ -1,9 +1,58 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import {
+  getPaidPlanAdditionNames,
+  PUBLIC_PRICING_COMPARISON,
+} from '@/lib/billing/public-pricing-features';
+import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
+const COMPARISON = PUBLIC_PRICING_COMPARISON;
+const PUBLIC_NAMES = new Set(
+  COMPARISON.flatMap(category => category.features.map(f => f.name))
+);
+const PUBLIC_ROWS = COMPARISON.flatMap(category => category.features);
+
 describe('PricingComparisonChart', () => {
+  it('renders every public registry row on desktop, by registry category', () => {
+    render(<PricingComparisonChart />);
+    const desktopTable = screen.getByRole('table', {
+      name: 'Feature comparison by plan',
+    });
+
+    // Only certified rows are public (claims stay literally true).
+    expect(PUBLIC_ROWS.length).toBeGreaterThan(0);
+    expect(within(desktopTable).getAllByRole('rowheader')).toHaveLength(
+      PUBLIC_ROWS.length
+    );
+    for (const feature of PUBLIC_ROWS) {
+      expect(
+        within(desktopTable).getByRole('rowheader', { name: feature.name })
+      ).toBeInTheDocument();
+    }
+    for (const category of COMPARISON) {
+      expect(
+        within(desktopTable).getByText(category.category)
+      ).toBeInTheDocument();
+    }
+  });
+
+  it('keeps roadmap, Max-only and unproven registry rows off public pricing', () => {
+    const { container } = render(<PricingComparisonChart />);
+    const hidden = PRICING_COMPARISON.flatMap(
+      category => category.features
+    ).filter(feature => !PUBLIC_NAMES.has(feature.name));
+
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const feature of hidden) {
+      expect(screen.queryAllByText(feature.name)).toHaveLength(0);
+    }
+    expect(container.textContent).not.toMatch(/\bsoon\b/i);
+    expect(container.textContent).not.toMatch(/\bfans?\b/i);
+  });
+
   it('names the profile feature as a Jovie profile, not an artist profile', () => {
     const { container } = render(<PricingComparisonChart />);
 
@@ -32,10 +81,18 @@ describe('PricingComparisonChart', () => {
         expect(header).toHaveClass('whitespace-nowrap');
         expect(header).not.toHaveAttribute('data-wrap', 'feature-label');
       }
+      const longFeature = within(table).getByRole('rowheader', {
+        name: 'Release notifications (email to your audience)',
+      });
+      expect(longFeature).toHaveAttribute('scope', 'row');
+      expect(longFeature).toHaveAttribute('data-wrap', 'feature-label');
+      expect(longFeature.className).not.toMatch(
+        /line-clamp|truncate|whitespace-nowrap/
+      );
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Contact / subscriber capture',
+      name: 'Audience email capture',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
@@ -50,8 +107,14 @@ describe('PricingComparisonChart', () => {
     expect(
       within(mobileTable).getByText('Artist Presence')
     ).toBeInTheDocument();
-    expect(within(desktopTable).getAllByText('Included')).toHaveLength(2);
-    expect(within(mobileTable).getAllByText('Included')).toHaveLength(1);
+    const included = (plan: 'free' | 'pro') =>
+      PUBLIC_ROWS.filter(feature => feature[plan] === true).length;
+    expect(within(desktopTable).getAllByText('Included')).toHaveLength(
+      included('free') + included('pro')
+    );
+    expect(within(mobileTable).getAllByText('Included')).toHaveLength(
+      included('pro')
+    );
     expect(desktopTable.querySelector('svg')).toBeNull();
     expect(mobileTable.querySelector('svg')).toBeNull();
     expect(
@@ -80,7 +143,9 @@ describe('PricingComparisonChart', () => {
     expect(selector).toHaveValue('free');
     expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
     expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Up to 100')).toBeInTheDocument();
+    expect(
+      within(mobileTable).getAllByText('Unlimited').length
+    ).toBeGreaterThan(0);
     expect(within(mobileTable).queryByText('/mo')).not.toBeInTheDocument();
 
     fireEvent.change(selector, { target: { value: 'unknown-plan' } });
@@ -94,6 +159,35 @@ describe('PricingComparisonChart', () => {
     ).toBeInTheDocument();
     expect(within(mobileTable).getByText('$12')).toBeInTheDocument();
     expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
+    expect(
+      within(mobileTable).getAllByText('Unlimited').length
+    ).toBeGreaterThan(0);
+  });
+
+  it('renders every paid-plan addition the pricing card lists', () => {
+    render(<PricingComparisonChart />);
+    for (const name of getPaidPlanAdditionNames()) {
+      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('has no axe violations with Pro or Free picked for comparison', async () => {
+    const { container } = render(<PricingComparisonChart />);
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Select Plan To Compare' }),
+      { target: { value: 'free' } }
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <PricingComparisonChart />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

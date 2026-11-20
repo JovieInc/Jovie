@@ -200,7 +200,46 @@ function approvalCard(
   };
 }
 
-export function evaluateSpendIntent(input: SpendIntentRequest) {
+/**
+ * Tim's standing rule (iMessage to Summer, 2026-11-01 04:33Z, verbatim): "Hold until we have capital
+ * for it. Never trigger spend without my approval when the bank balance can't cover it AND anything
+ * higher priorities. I must approve unless cash is abundant." A pre-authorized envelope therefore only
+ * spends autonomously when cash is abundant: Mercury balance is at least ABUNDANT_MIN_BALANCE_USD, covers
+ * ABUNDANT_RUNWAY_MONTHS of the 30-day burn, and the exposure is at most ABUNDANT_MAX_SHARE of the balance. Unknown cash is never
+ * abundant, so an unreadable bank always routes to Tim.
+ */
+export const ABUNDANT_RUNWAY_MONTHS = 12;
+export const ABUNDANT_MAX_SHARE = 0.02;
+/** Burn runs on Tim's personal cards today, so Mercury burn reads near zero; abundance also needs a real floor. */
+export const ABUNDANT_MIN_BALANCE_USD = 25_000;
+export type CashPosition = {
+  balanceUsd: number;
+  burnUsdPer30d: number | null;
+} | null;
+
+export function cashIsAbundant(
+  cash: CashPosition,
+  exposureUsd: number
+): boolean {
+  if (
+    !cash ||
+    !Number.isFinite(cash.balanceUsd) ||
+    cash.balanceUsd < ABUNDANT_MIN_BALANCE_USD
+  )
+    return false;
+  if (exposureUsd > cash.balanceUsd * ABUNDANT_MAX_SHARE) return false;
+  if (cash.burnUsdPer30d === null || !Number.isFinite(cash.burnUsdPer30d))
+    return false;
+  return (
+    cash.burnUsdPer30d <= 0 ||
+    cash.balanceUsd / cash.burnUsdPer30d >= ABUNDANT_RUNWAY_MONTHS
+  );
+}
+
+export function evaluateSpendIntent(
+  input: SpendIntentRequest,
+  cash: CashPosition = null
+) {
   const id = receiptId('spf', input.idempotencyKey);
   const valid = input.alternatives.filter(route =>
     validRoute(route, input.decidedAt)
@@ -233,10 +272,18 @@ export function evaluateSpendIntent(input: SpendIntentRequest) {
   } else if (selected && selected.kind !== 'paid') {
     disposition = 'use-valid-alternative';
     reason = 'A valid owned/free/build route avoids new spend.';
-  } else if (selected && envelopeCovers(input, selected)) {
+  } else if (
+    selected &&
+    envelopeCovers(input, selected) &&
+    cashIsAbundant(cash, selected.hardMaximumExposureUsd)
+  ) {
     disposition = 'autonomous-within-envelope';
     reason =
-      'The minimum valid experiment fits an exact pre-authorized envelope.';
+      'The minimum valid experiment fits an exact pre-authorized envelope and cash is abundant.';
+  } else if (selected && envelopeCovers(input, selected)) {
+    disposition = 'request-founder-approval';
+    reason =
+      "Fits a pre-authorized envelope, but cash is not abundant: Tim's standing rule (2026-11-01) requires his approval.";
   } else if (selected) {
     disposition = 'request-founder-approval';
     reason =

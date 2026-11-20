@@ -18,3 +18,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const IconMark: Story = {};
+
+export const BrandMark: Story = {
+  args: {
+    mark: 'brand',
+    variant: 'linear',
+    artistHandle: 'test-artist',
+  },
+};

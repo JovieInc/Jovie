@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -331,7 +332,9 @@ function writeExecutable(path, body) {
  * local stand-ins so the proof does not touch production or GitHub.
  */
 function runTrustedGate(candidateCli, candidateSha) {
-  const workspace = mkdtempSync(join(tmpdir(), 'promo-gate-step-'));
+  const workspace = mkdtempSync(
+    join(realpathSync(tmpdir()), 'promo-gate-step-')
+  );
   const paths = toolingPaths();
   copyRepoFiles(workspace, paths);
   writeFileSync(join(workspace, 'scripts/promotion-gate-ci.mjs'), candidateCli);
@@ -445,7 +448,7 @@ describe('trusted gate tooling grades older and current candidates', () => {
   const shown = spawnSync(
     'git',
     ['show', `${OLD_CANDIDATE}:scripts/promotion-gate-ci.mjs`],
-    { cwd: root, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
   );
 
   it.skipIf(shown.status !== 0)(
@@ -463,7 +466,9 @@ describe('trusted gate tooling grades older and current candidates', () => {
   });
 
   it('reproduces the production usage failure from the e806124 CLI', () => {
-    const workspace = mkdtempSync(join(tmpdir(), 'promo-old-cli-'));
+    const workspace = mkdtempSync(
+      join(realpathSync(tmpdir()), 'promo-old-cli-')
+    );
     try {
       copyRepoFiles(workspace, toolingPaths());
       const script = join(workspace, 'scripts/promotion-gate-ci.mjs');
@@ -484,7 +489,7 @@ describe('trusted gate tooling grades older and current candidates', () => {
     const mainBlob = spawnSync(
       'git',
       ['show', `${CURRENT_MAIN}:scripts/promotion-gate-ci.mjs`],
-      { cwd: root, encoding: 'utf8' }
+      { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
     );
     if (mainBlob.status === 0) expect(mainBlob.stdout).toBe(current);
     const result = resolveBase(

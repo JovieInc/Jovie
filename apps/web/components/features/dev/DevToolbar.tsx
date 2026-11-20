@@ -241,7 +241,7 @@ function getSwButtonProps(enabled: boolean) {
         ? 'text-accent bg-accent/10'
         : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
     }`,
-    'aria-label': enabled ? 'Disable service worker' : 'Enable service worker',
+    'aria-label': enabled ? 'Disable SW' : 'Enable SW',
   };
 }
 

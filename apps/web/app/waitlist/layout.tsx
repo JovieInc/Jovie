@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 
 // Gated access-state pages (like /signup): named in the tab, never indexed.
 export const metadata: Metadata = {
-  title: 'Join the waitlist',
+  title: 'Reserve your spot',
+  description:
+    'Reserve your handle and we will email you when your spot opens.',
   robots: NOINDEX_ROBOTS,
 };
 

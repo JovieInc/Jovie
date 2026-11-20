@@ -2,8 +2,8 @@
  * POST /api/admin/set-plan
  *
  * Regression coverage for JOV-4228: the session userId is the app `users.id`
- * UUID post-cutover, so the plan update must key on `users.id`, never
- * `users.clerkId`.
+ * UUID post-cutover, so the plan update must be keyed on that id (resolved by
+ * the shared billing writer), never on a separate clerk id.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,10 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
   getCachedAuthMock: vi.fn(),
-  updateWhereMock: vi.fn(),
-  updateSetMock: vi.fn(),
-  dbUpdateMock: vi.fn(),
-  eqMock: vi.fn((column: unknown, value: unknown) => ({ column, value })),
+  updateBillingMock: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/middleware', () => ({
@@ -25,30 +22,16 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: { update: hoisted.dbUpdateMock },
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  updateUserBillingStatus: hoisted.updateBillingMock,
 }));
-
-vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'users.id', clerkId: 'users.clerk_id' },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  eq: hoisted.eqMock,
-}));
-
-function mockUpdateChain() {
-  hoisted.updateWhereMock.mockResolvedValue(undefined);
-  hoisted.updateSetMock.mockReturnValue({ where: hoisted.updateWhereMock });
-  hoisted.dbUpdateMock.mockReturnValue({ set: hoisted.updateSetMock });
-}
 
 describe('POST /api/admin/set-plan', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.requireAdminMock.mockResolvedValue(null);
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-1' });
-    mockUpdateChain();
+    hoisted.updateBillingMock.mockResolvedValue({ success: true });
   });
 
   it('updates the plan keyed on users.id (app UUID), not clerk_id', async () => {
@@ -68,13 +51,13 @@ describe('POST /api/admin/set-plan', () => {
       plan: 'pro',
       isPro: true,
     });
-    expect(hoisted.eqMock).toHaveBeenCalledWith('users.id', 'db-user-1');
-    expect(hoisted.eqMock).not.toHaveBeenCalledWith(
-      'users.clerk_id',
-      expect.anything()
-    );
-    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ plan: 'pro', isPro: true })
+    expect(hoisted.updateBillingMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        clerkUserId: 'db-user-1',
+        plan: 'pro',
+        isPro: true,
+        eventType: 'admin_override',
+      })
     );
   });
 
@@ -91,7 +74,7 @@ describe('POST /api/admin/set-plan', () => {
     );
 
     expect(response.status).toBe(401);
-    expect(hoisted.dbUpdateMock).not.toHaveBeenCalled();
+    expect(hoisted.updateBillingMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 on an invalid plan value', async () => {
@@ -105,6 +88,6 @@ describe('POST /api/admin/set-plan', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(hoisted.dbUpdateMock).not.toHaveBeenCalled();
+    expect(hoisted.updateBillingMock).not.toHaveBeenCalled();
   });
 });

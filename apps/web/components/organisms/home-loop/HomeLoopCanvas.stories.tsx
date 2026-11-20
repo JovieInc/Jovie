@@ -143,3 +143,48 @@ export const FullScreenBusy: Story = {
     inFlightMoreHref: '/app/ov/shipping',
   },
 };
+
+/** Ovie: "are we winning" above the shipping verdict, with targets. */
+export const WithCompanyRow: Story = {
+  args: {
+    company: [
+      {
+        key: 'runway',
+        label: 'Runway',
+        value: '6 days',
+        was: null,
+        tone: 'bad',
+        measured: true,
+        target: 'Default dead · $23 cash',
+      },
+      {
+        key: 'mrr',
+        label: 'MRR',
+        value: '$0',
+        was: '$0 7d ago',
+        tone: 'bad',
+        measured: true,
+        target: '0 paying',
+      },
+      {
+        key: 'users',
+        label: 'New accounts (7d)',
+        value: '3',
+        was: null,
+        tone: 'good',
+        measured: true,
+        target: '1 reached first value',
+      },
+      {
+        key: 'golden-path',
+        label: 'Golden path',
+        value: '6 of 6 pass in prod',
+        was: null,
+        tone: 'warn',
+        measured: true,
+        target: '0 of 6 founder-certified',
+      },
+    ],
+    pulseCaption: 'Shipping · compared with your visit 3h ago',
+  },
+};

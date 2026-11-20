@@ -5,14 +5,17 @@ import { z } from 'zod';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { sendNotification } from '@/lib/notifications/service';
+import { getEmailSendBlockReason } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import {
   buildWaitlistConfirmationEmail,
   buildWaitlistInviteEmail,
   buildWaitlistWelcomeEmail,
+  NO_PROFILE_INVITE_COPY_APPROVED,
 } from '@/lib/waitlist/invite';
 import {
   isWaitlistInviteRedeemableStatus,
@@ -201,6 +204,23 @@ function getEmailError(result: NotificationChannelResult): string | null {
   return null;
 }
 
+/**
+ * The send gateway refuses reserved/canary/test recipients by design (code
+ * `reserved-test-recipient`, via getEmailSendBlockReason). That refusal is a
+ * terminal skip, not a failure: the job must complete without error and
+ * without retries, or every test/canary waitlist entry burns its attempts and
+ * pages Sentry on every cron run.
+ */
+function isReservedRecipientSkip(params: {
+  recipientEmail: string;
+  result: NotificationChannelResult;
+}): boolean {
+  return (
+    params.result.status === 'skipped' &&
+    getEmailSendBlockReason(params.recipientEmail) !== null
+  );
+}
+
 async function markEntryEmailResult(params: {
   tx: DbOrTransaction;
   entryId: string;
@@ -351,6 +371,7 @@ async function sendAndRecordWaitlistEmail(params: {
   tx: DbOrTransaction;
   entryId: string;
   type: 'waitlist_confirmation' | 'approval_invite';
+  recipientEmail: string;
   message: Parameters<typeof sendNotification>[0];
   target: Parameters<typeof sendNotification>[1];
 }): Promise<WaitlistEmailJobResult> {
@@ -365,6 +386,18 @@ async function sendAndRecordWaitlistEmail(params: {
 
   if (emailResult.status !== 'sent') {
     const error = getEmailError(emailResult) ?? 'Waitlist email failed';
+    if (
+      isReservedRecipientSkip({
+        recipientEmail: params.recipientEmail,
+        result: emailResult,
+      })
+    ) {
+      return skippedWaitlistEmailResult({
+        entryId: params.entryId,
+        type: params.type,
+        detail: error,
+      });
+    }
     logger.warn('[waitlist] Email job failed', {
       entryId: params.entryId,
       type: params.type,
@@ -429,6 +462,7 @@ async function processWaitlistConfirmationEmail(params: {
     tx,
     entryId: entry.id,
     type: 'waitlist_confirmation',
+    recipientEmail: entry.email,
     message,
     target,
   });
@@ -575,6 +609,11 @@ async function processApprovalInviteEmail(params: {
     fullName: entry.fullName,
     token: tokenResult,
     dedupKey: `waitlist_invite:${entry.id}`,
+    // Profile state picks the copy variant once the founder approves it;
+    // until then the read is skipped and every invite keeps approved copy.
+    hasProfile: NO_PROFILE_INVITE_COPY_APPROVED
+      ? await entryHasCreatorProfile(tx, entry.id)
+      : undefined,
   });
   message.idempotencyKey = `waitlist_invite:${entry.id}:${hashWaitlistInviteToken(tokenResult)}`;
 
@@ -582,6 +621,7 @@ async function processApprovalInviteEmail(params: {
     tx,
     entryId: entry.id,
     type: 'approval_invite',
+    recipientEmail: entry.email,
     message,
     target,
   });
@@ -593,6 +633,18 @@ async function processApprovalInviteEmail(params: {
   });
 
   return result;
+}
+
+async function entryHasCreatorProfile(
+  tx: DbOrTransaction,
+  entryId: string
+): Promise<boolean> {
+  const [profile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.waitlistEntryId, entryId))
+    .limit(1);
+  return Boolean(profile);
 }
 
 async function processWelcomeEmail(params: {
@@ -662,11 +714,23 @@ async function processWelcomeEmail(params: {
     };
   }
 
+  const error = getEmailError(emailResult) ?? 'Welcome email failed';
+  if (
+    isReservedRecipientSkip({
+      recipientEmail: entry.email,
+      result: emailResult,
+    })
+  ) {
+    return skippedWaitlistEmailResult({
+      entryId: entry.id,
+      type: payload.type,
+      detail: error,
+    });
+  }
   await tx
     .update(users)
     .set({ welcomeFailedAt: now, updatedAt: now })
     .where(eq(users.id, user.id));
-  const error = getEmailError(emailResult) ?? 'Welcome email failed';
   throw new Error(error);
 }
 

@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TranscriberCallbacks } from '@/lib/chat/transcriber';
 import {
+  fixtureJudgeReceipt,
   fixturePacket,
   fixtureReceipt,
   fixtureRow,
@@ -261,6 +262,7 @@ describe('CertificationWalkthrough', () => {
         packet: fixturePacket('video', {
           visualProof: [
             fixtureReceipt('visual_proof', 'video', 'passed', '/proof.webm'),
+            fixtureJudgeReceipt('video'),
           ],
         }),
       }),

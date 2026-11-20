@@ -99,3 +99,19 @@ describe('ReleaseCreditsDrawer', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe('ReleaseCreditsDrawer text contrast contract (JOV-8873)', () => {
+  it('raises credit section labels to on-media/50', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/release/ReleaseCreditsDrawer.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tracking-[0.06em] text-on-media/50');
+    expect(source).not.toContain('text-on-media/35');
+  });
+});

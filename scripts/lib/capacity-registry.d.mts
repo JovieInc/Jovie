@@ -115,6 +115,10 @@ export interface ProviderMetrics {
   readonly prsCreated: number;
   readonly mergedCreated: number;
   readonly mergedRepaired: number;
+  readonly mergedUnreceipted?: number;
+  readonly mergedAgentProven?: number;
+  readonly mergedAgentInferred?: number;
+  readonly costScope?: string;
   readonly costUsd: number | null;
   readonly costBasis: string;
   readonly costPerMergedUsd: number | null;

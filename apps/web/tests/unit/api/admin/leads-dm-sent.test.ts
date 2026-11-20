@@ -45,6 +45,7 @@ vi.mock('@/lib/db/schema/leads', () => ({
   leads: {
     id: 'id',
     firstContactedAt: 'first-contacted-at',
+    bio: 'bio',
   },
 }));
 
@@ -55,6 +56,10 @@ vi.mock('@/lib/ovie/privacy-lock/access', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
   getSafeErrorMessage: () => 'safe-error',
+}));
+
+vi.mock('@/lib/leads/lead-claim-token', () => ({
+  resolveLeadClaimToken: vi.fn().mockResolvedValue('tok'),
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
@@ -207,6 +212,25 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
     });
     expect(mockDb.update).not.toHaveBeenCalled();
     expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it('reads the bio so a management credit there holds the record', async () => {
+    mockSelectLimit.mockResolvedValue([
+      { ...LEAD, bio: 'Mgmt: Sorted Management', firstContactedAt: null },
+    ]);
+
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: 'lead-1' }),
+    });
+
+    expect(mockDb.select).toHaveBeenCalledWith(
+      expect.objectContaining({ bio: 'bio' })
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      reason: 'existing_relationship',
+    });
+    expect(mockDb.update).not.toHaveBeenCalled();
   });
 
   it('refuses when the lead changed after Tim approved it', async () => {

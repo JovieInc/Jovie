@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,7 +11,7 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
@@ -113,6 +114,84 @@ test('the tally counts gh invocations by token and reports github.token separate
       encoding: 'utf8',
     });
     assert.match(empty.stdout, /calls=0 github_token=0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the actual tally CLI uses the shared report ledger and never rates incomplete observations', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gh-tally-cli-'));
+  try {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin);
+    const gh = join(bin, 'gh');
+    const calls = join(dir, 'calls');
+    writeFileSync(
+      gh,
+      '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$TALLY_CALLS"\nprintf \'{"workflow_runs":[]}\'\n'
+    );
+    chmodSync(gh, 0o755);
+    const env = {
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_TOKEN: 'fixture-test-token',
+      JOVIE_API_STATE_DIR: join(dir, 'ledger'),
+      TALLY_CALLS: calls,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+    };
+    const staged = join(dir, 'release');
+    const paths = spawnSync(
+      process.env.PYTHON3 || 'python3',
+      [
+        '-c',
+        'import ast,json,pathlib; tree=ast.parse(pathlib.Path("scripts/lanes/lane_runner.py").read_text()); print(json.dumps(next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="RELEASE_EXTRAS" for t in n.targets))))',
+      ],
+      { cwd: root, encoding: 'utf8', timeout: 15000 }
+    );
+    assert.equal(paths.status, 0, paths.stderr);
+    for (const relative of JSON.parse(paths.stdout)) {
+      const destination = join(staged, relative);
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(join(root, relative), destination);
+    }
+    const run = () =>
+      spawnSync(
+        process.execPath,
+        ['scripts/lib/api-quota-report.mjs', 'tally', '--json'],
+        {
+          cwd: staged,
+          env,
+          encoding: 'utf8',
+          timeout: 15000,
+        }
+      );
+    const complete = run();
+    assert.equal(complete.status, 0, complete.stderr);
+    assert.ok(complete.stdout, JSON.stringify(complete));
+    assert.deepEqual(JSON.parse(complete.stdout).rows, []);
+    assert.equal(JSON.parse(complete.stdout).complete, true);
+    const observed = readFileSync(calls, 'utf8').trim().split('\n');
+    assert.equal(observed.length, 2);
+    assert.ok(
+      observed.every(line =>
+        line.startsWith('api --include repos/JovieInc/Jovie/actions/workflows/')
+      )
+    );
+    const ledger = readFileSync(
+      join(dir, 'ledger/api-ledger/github.json'),
+      'utf8'
+    );
+    assert.equal(JSON.parse(ledger).provider, 'github');
+    assert.match(ledger, /"report"/);
+    writeFileSync(
+      gh,
+      '#!/bin/sh\necho "private provider detail" >&2\nexit 1\n'
+    );
+    const failed = run();
+    assert.equal(failed.status, 0, failed.stderr);
+    assert.equal(JSON.parse(failed.stdout).complete, false);
+    assert.equal(JSON.parse(failed.stdout).reason, 'read-failed');
+    assert.deepEqual(JSON.parse(failed.stdout).rows, []);
+    assert.doesNotMatch(failed.stdout, /private provider detail/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

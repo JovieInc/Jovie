@@ -96,7 +96,7 @@ RULES:
 4. Use absolute paths: /tmp/jovie-worktrees/jov-<NUMBER>/apps/web/...
 
 SETUP (do this first):
-cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install
+cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install --offline --frozen-lockfile
 
 CODEBASE RULES:
 - Node 24.x, pnpm 9.15.9 only
@@ -114,7 +114,7 @@ LINEAR ISSUE DETAILS:
 - Labels: <LABELS>
 
 WORKFLOW:
-1. Run: cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install
+1. Run: cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install --offline --frozen-lockfile
 2. Read and understand the issue
 3. Explore relevant code in the worktree
 4. Implement the minimal fix/feature
@@ -187,7 +187,7 @@ Shipped: X/Y | Failed: Z | Skipped (dupes): W
 - **Worktree creation fails:** Clean up and retry once, then skip issue
 - **Agent crashes:** Read output file for error, retry once with fresh worktree
 - **Branch conflict:** Delete local branch, recreate worktree from origin/main
-- **pnpm install fails in worktree:** `rm -rf node_modules` in worktree and retry
+- **pnpm install fails in worktree:** `rm -rf node_modules` in worktree and retry with `pnpm install --prefer-offline --frozen-lockfile`
 
 ## Stop Commands
 

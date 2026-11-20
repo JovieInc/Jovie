@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { credentialHash } from '../../lib/linear-cooldown.mjs';
 import { LinearTransportError } from '../linear-client.mjs';
 import { requestSummerAssessment } from '../summer-triage-assessment-client.mjs';
 
@@ -14,6 +22,7 @@ import {
   escalationBlockOf,
   parseTriageEvent,
   assessTriageSweep as sweepWithRealClient,
+  triageSweepReceiptForError,
   triageSweepThrottle,
 } from '../triage-event-assess.mjs';
 
@@ -1917,4 +1926,189 @@ test('Backlog catch-up cannot exceed three attempts and reserves the complete 18
     ).assessed,
     0
   );
+});
+
+test('a cooling Linear credential defers the catch-up sweep with a truthful receipt', () => {
+  const resetAt = Date.now() + 10 * 60_000;
+  const receipt = triageSweepReceiptForError(
+    new LinearTransportError('Linear credential budget is cooling down', {
+      code: 'RATE_LIMITED',
+      attempts: 0,
+      metadata: { retryable: false, resetAt },
+    })
+  );
+  assert.equal(receipt.schema, 'linear-triage-catch-up/v1');
+  assert.equal(receipt.triageSweep.status, 'deferred');
+  assert.equal(receipt.triageSweep.reason, 'RATE_LIMITED');
+  assert.equal(receipt.triageSweep.resetAt, resetAt);
+  assert.equal(receipt.triageSweep.retryAt, new Date(resetAt).toISOString());
+  assert.equal(receipt.triageSweep.inventoryObserved, false);
+  assert.equal(receipt.issueCount, 0);
+  assert.equal(receipt.assessed, 0);
+  assert.equal(receipt.deferred, 0);
+  assert.equal(receipt.failed, 0);
+  assert.equal(receipt.blocked, 0);
+  assert.equal(receipt.providerBlocked, 0);
+  assert.equal(receipt.wakeSymphony, false);
+  assert.deepEqual(receipt.results, []);
+});
+
+test('a real sweep error still fails: non-cooldown transport, schema, and expired cooldowns rethrow', () => {
+  assert.throws(
+    () =>
+      triageSweepReceiptForError(
+        new LinearTransportError('Linear request failed after 3 attempts', {
+          code: 'NETWORK',
+          attempts: 3,
+          metadata: { retryable: false },
+        })
+      ),
+    /Linear request failed after 3 attempts/
+  );
+  assert.throws(
+    () => triageSweepReceiptForError(new Error('schema drift')),
+    /schema drift/
+  );
+  // A cooldown whose resetAt already passed authorizes no deferral.
+  assert.throws(
+    () =>
+      triageSweepReceiptForError(
+        new LinearTransportError('Linear credential budget is cooling down', {
+          code: 'RATE_LIMITED',
+          attempts: 0,
+          metadata: { retryable: false, resetAt: Date.now() - 1_000 },
+        })
+      ),
+    /cooling down/
+  );
+});
+
+test('the real sweep CLI defers on an active Linear credential cooldown without spending the credential', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'triage-cooldown-cli-'));
+  const cacheFile = join(directory, 'cache.json');
+  const bootstrap = join(directory, 'bootstrap.mjs');
+  const callsFile = join(directory, 'calls.json');
+  writeFileSync(
+    bootstrap,
+    `
+    import { appendFileSync } from 'node:fs';
+    globalThis.fetch = async (url, init) => {
+      appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify({ url, init }) + '\\n');
+      throw new Error('fixture-unexpected-paid-call');
+    };
+  `
+  );
+  // Seed a real future cooldown for the fixture credential. Both the root and
+  // the scope directory must be private (0700) and the record 0600: the
+  // transport reads its backoff state strictly.
+  const root = join(directory, 'cooldown');
+  const scope = join(root, credentialHash('fixture-key'));
+  mkdirSync(scope, { recursive: true, mode: 0o700 });
+  const resetAt = Date.now() + 10 * 60_000;
+  writeFileSync(
+    join(scope, `${resetAt}-${'a'.repeat(8)}.json`),
+    JSON.stringify({ schema: 1, resetAt }),
+    { mode: 0o600 }
+  );
+  const run = () =>
+    spawnSync(
+      process.execPath,
+      [
+        '--import',
+        bootstrap,
+        new URL('../triage-event-assess.mjs', import.meta.url).pathname,
+        '--sweep',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          HOME: directory,
+          LINEAR_API_KEY: 'fixture-key',
+          JOVIE_ORCHESTRATOR_CACHE: cacheFile,
+          LINEAR_COOLDOWN_STATE_DIR: join(directory, 'cooldown'),
+          LINEAR_BACKOFF_STATE_DIR: join(directory, 'legacy-cooldown'),
+        },
+      }
+    );
+  try {
+    const child = run();
+    assert.equal(child.status, 0, child.stderr);
+    const receipt = JSON.parse(child.stdout);
+    assert.equal(receipt.triageSweep.status, 'deferred');
+    assert.equal(receipt.triageSweep.reason, 'RATE_LIMITED');
+    assert.equal(receipt.triageSweep.resetAt, resetAt);
+    assert.equal(receipt.triageSweep.retryAt, new Date(resetAt).toISOString());
+    assert.equal(receipt.triageSweep.inventoryObserved, false);
+    assert.equal(receipt.failed, 0);
+    assert.equal(receipt.wakeSymphony, false);
+    assert.deepEqual(receipt.results, []);
+    // The Backlog sweep is skipped on a cooling credential — no second key.
+    assert.ok(!('backlog' in receipt));
+    // The receipt must not spill private transport detail; none exists here.
+    assert.ok(!JSON.stringify(receipt).includes('fixture-key'));
+    // Zero paid Linear calls: the transport defers before any request.
+    assert.ok(!existsSync(callsFile), 'the sweep must defer before any fetch');
+    // The warning annotation names the retry time visibly.
+    assert.ok(
+      child.stderr.includes('::warning title=Triage catch-up deferred::')
+    );
+    assert.ok(child.stderr.includes(new Date(resetAt).toISOString()));
+    // A deferred sweep is not a successful one: the throttle floor is not renewed.
+    assert.ok(
+      !existsSync(cacheFile),
+      'deferred sweep must not renew the throttle'
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the real sweep CLI still fails on a genuine transport error behind no cooldown', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'triage-outage-cli-'));
+  const cacheFile = join(directory, 'cache.json');
+  const bootstrap = join(directory, 'bootstrap.mjs');
+  writeFileSync(
+    bootstrap,
+    `
+    globalThis.fetch = async () => {
+      throw new Error('fixture-real-outage');
+    };
+  `
+  );
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      bootstrap,
+      new URL('../triage-event-assess.mjs', import.meta.url).pathname,
+      '--sweep',
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: {
+        ...process.env,
+        HOME: directory,
+        LINEAR_API_KEY: 'fixture-key',
+        JOVIE_ORCHESTRATOR_CACHE: cacheFile,
+        LINEAR_COOLDOWN_STATE_DIR: join(directory, 'cooldown'),
+        LINEAR_BACKOFF_STATE_DIR: join(directory, 'legacy-cooldown'),
+      },
+    }
+  );
+  try {
+    assert.notEqual(child.status, 0, child.stdout);
+    // The genuine error surfaces as a non-RATE_LIMITED transport failure —
+    // it must not be converted into a deferred receipt.
+    assert.ok(child.stderr.includes('Linear GraphQL request failed'));
+    assert.ok(child.stderr.includes("code: 'API'"));
+    assert.ok(
+      !child.stderr.includes('::warning title=Triage catch-up deferred::')
+    );
+    assert.equal(JSON.parse(child.stdout || '{}').triageSweep, undefined);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

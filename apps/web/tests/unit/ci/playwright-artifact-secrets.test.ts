@@ -40,6 +40,8 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import { allowanceEnabled } from './artifact-allowance';
+import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -116,7 +118,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -130,34 +132,34 @@ const producerStageRequired = [
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
 ];
-// Image and Markdown evidence widen what an artifact may carry; each job
-// that opts in is reviewed here.
-// An expression-valued flag can evaluate true, so anything but an explicit
-// false counts as an allowance.
-const allowanceEnabled = (value: unknown) =>
-  value !== undefined &&
-  value !== false &&
-  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
+  'product-crawl.yml:crawl',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
+  // Founder-approved homepage-*.png only, same render as the compare job.
+  'visual-regression.yml:approved-homepage-baselines',
 ]);
 const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
   'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   'e2e-full-matrix.yml:e2e-full-matrix',
   'nightly-testing-agent.yml:report',
   'postdeploy-probes.yml:auth-smoke',
@@ -168,7 +170,14 @@ const markdownAllowedJobs = new Set([
   'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
-const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const inheritedSecretAllowlist = new Set([
+  'TURBO_TOKEN',
+  'TURBO_TEAM',
+  'CF_TURBO_CACHE_URL',
+  'CF_TURBO_CACHE_RO_TOKEN',
+  'CF_TURBO_CACHE_RW_TOKEN',
+  'CF_TURBO_SIGNATURE_KEY',
+]);
 const policyWorkflow = (file: string) =>
   parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
@@ -1265,6 +1274,14 @@ ${fixtureCheckout}
           ].map(name => `${file}:${id}:${name}`)
     );
     expect(violations).toEqual([]);
+    expect([...inheritedSecretAllowlist].sort()).toEqual([
+      'CF_TURBO_CACHE_RO_TOKEN',
+      'CF_TURBO_CACHE_RW_TOKEN',
+      'CF_TURBO_CACHE_URL',
+      'CF_TURBO_SIGNATURE_KEY',
+      'TURBO_TEAM',
+      'TURBO_TOKEN',
+    ]);
     expect(
       secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
     ).toEqual(['OPENAI_API_KEY']);
@@ -1307,26 +1324,24 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    const reportToken = reportJob?.steps?.find(
-      step => step.id === 'report-token'
-    );
-    expect(reportToken?.with).toMatchObject({
-      'permission-contents': 'write',
-      'permission-pull-requests': 'write',
-    });
-    const commitReport = reportJob?.steps?.find(
-      step => step.name === 'Open nightly evidence PR'
-    );
-    expect(commitReport?.env?.GH_TOKEN).toBe(
-      '${{ steps.report-token.outputs.token }}'
-    );
-    expect(String(commitReport?.run)).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    // Evidence is data: the nightly report ships as a run artifact, never as
+    // a PR (#23906). The report job must not mint a publication token at all,
+    // so no bot credentials can reach it in any order.
+    expect(
+      reportJob?.steps?.some(step =>
+        /create-github-app-token@/.test(step.uses ?? '')
+      )
+    ).toBe(false);
+    expect(
+      reportJob?.steps?.some(step => step.name === 'Open nightly evidence PR')
+    ).toBe(false);
+    expect(JSON.stringify(reportJob)).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(reportJob?.env?.GH_TOKEN).toBeUndefined();
     for (const [file, jobId, stepName] of [
       ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
       [
         'visual-regression.yml',
-        'visual-regression',
+        'publish-baselines',
         'Create or update baseline PR (refresh only)',
       ],
     ] as const) {
@@ -1348,10 +1363,7 @@ ${fixtureCheckout}
       Object.entries(generate?.env ?? {})
         .filter(([name]) => isCredentialBearingName(name))
         .map(([name, value]) => `${name}: ${value}`)
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
+    ).toEqual(['DATABASE_URL: postgresql://localhost/noop']);
     const publishSteps = publish?.steps ?? [];
     const tokenIndex = publishSteps.findIndex(step =>
       /create-github-app-token@/.test(step.uses ?? '')
@@ -1551,11 +1563,7 @@ ${fixtureCheckout}
   );
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
-    const expected = [
-      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
-      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
-      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
-    ];
+    const expected = productionSmokeProducers;
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {

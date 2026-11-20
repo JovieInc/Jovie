@@ -243,7 +243,7 @@ def idle_while_ready(state: Path, since: float) -> dict:
 
 
 GATE_LABELS = frozenset({"needs-human-decision", "needs-human", "needs:human", "human-review-required",
-                         "quality-gap:needs-tim", "tim-hold", "hold", "gated"})
+                         "quality-gap:needs-tim", "hold", "gated"})
 APPROVED_LABELS = frozenset({"tim-approved"})   # an approved gate is no gate
 DEADLINE = re.compile(r"^\s*(?:\*\*)?deadline\s*:\s*(?:\*\*)?\s*(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2})?)?", re.I | re.M)
 DEFAULT = re.compile(r"^\s*(?:\*\*)?default\s*:\s*(?:\*\*)?\s*(\S.*)$", re.I | re.M)

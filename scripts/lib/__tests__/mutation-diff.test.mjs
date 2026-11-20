@@ -22,9 +22,12 @@ import {
   readTargetExecution,
   renderSummary,
   resolveSpecifier,
-  scoreMutants,
   selectHighRiskSources,
 } from '../mutation-diff.mjs';
+import {
+  commitMutationFixture,
+  copyMutationFixtureFiles,
+} from './fixtures/mutation-git-receipt.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 
@@ -72,10 +75,6 @@ describe('selectHighRiskSources', () => {
     'import "./setup"; export interface Actor { id: string }',
     'import {} from "./setup";',
     'import { type Actor } from "./actor";',
-    'export { type Actor } from "./actor";',
-    'export {} from "./setup";',
-    'export { allowed } from "./policy";',
-    'export * from "./policy";',
     'export enum Role { Admin }',
     'export namespace Roles { export const admin = true; }',
     'export abstract class Actor {}',
@@ -170,25 +169,6 @@ describe('findRelatedTests', () => {
   });
 });
 
-describe('scoreMutants', () => {
-  it('counts timeouts as detected and no-coverage as undetected', () => {
-    expect(
-      scoreMutants([
-        mutant('Killed'),
-        mutant('Killed'),
-        mutant('Timeout'),
-        mutant('Survived'),
-        mutant('NoCoverage'),
-        mutant('CompileError'),
-      ])
-    ).toEqual({ detected: 3, undetected: 2, valid: 5, score: 60 });
-  });
-
-  it('returns a null score when no mutant is valid', () => {
-    expect(scoreMutants([mutant('CompileError')]).score).toBeNull();
-  });
-});
-
 describe('renderSummary', () => {
   it('reports scores, flags low files, and caps survivors', () => {
     const summary = renderSummary({
@@ -279,12 +259,12 @@ describe('stryker.diff.config.mjs', () => {
 });
 
 describe('mutation-diff.yml', () => {
-  it('path-filters exactly the high-risk prefixes the CLI mutates', () => {
+  it('path-filters the high-risk prefixes plus the capacity.json re-arm', () => {
     const expected = HIGH_RISK_PREFIXES.map(prefix =>
       prefix.endsWith('/') ? `apps/web/${prefix}**` : `apps/web/${prefix}`
     ).sort();
-
-    expect([...workflow.on.push.paths].sort()).toEqual(expected);
+    expected.push('ops/registry/capacity.json');
+    expect([...workflow.on.push.paths].sort()).toEqual(expected.sort());
   });
 
   /**
@@ -541,18 +521,10 @@ describe('mutation CLI result semantics', () => {
       writeFileSync(join(root, path), text);
     };
     try {
-      for (const path of [
+      copyMutationFixtureFiles(root, repoRoot, [
         'scripts/mutation-diff.mjs',
-        'scripts/lib/mutation-diff.mjs',
-        'scripts/lib/mutation-score-floor.mjs',
-        'scripts/lib/mutation-floor-intake.mjs',
-        'scripts/lib/linear-issue-intake.mjs',
-        'scripts/lib/linear-cooldown.mjs',
-        'scripts/lib/ratchet-core.mjs',
         'scripts/mutation-score-baseline.json',
-      ]) {
-        put(path, readFileSync(join(repoRoot, path), 'utf8'));
-      }
+      ]);
       if (mode === 'below-floor' || mode === 'at-floor') {
         const baseline = JSON.parse(
           readFileSync(
@@ -583,7 +555,9 @@ describe('mutation CLI result semantics', () => {
               ? 'export type Broken = ;'
               : mode === 'mixed-unrelated'
                 ? 'export type Actor = string; export const allowed = true;'
-                : 'export const allowed = true;'
+                : mode === 'unresolved-import'
+                  ? 'export const allowed = true; import(process.env.MODULE);'
+                  : 'export const allowed = true;'
         );
       }
       if (mode === 'distance-cap') {
@@ -633,11 +607,12 @@ describe('mutation CLI result semantics', () => {
           mutatorName: 'BooleanLiteral', replacement: 'false', location: { start: { line: 1 } }
         }];
         fs.writeFileSync(process.env.STRYKER_REPORT_FILE, JSON.stringify({ files: {
-          'lib/auth/policy.ts': { mutants }
+          'lib/auth/policy.ts': { source: fs.readFileSync('lib/auth/policy.ts', 'utf8'), mutants }
         }}));
       `
       );
       chmodSync(join(root, 'apps/web/node_modules/.bin/stryker'), 0o755);
+      commitMutationFixture(root);
       return spawnSync(
         process.execPath,
         [
@@ -677,6 +652,7 @@ describe('mutation CLI result semantics', () => {
     ['mixed-unrelated', 'Selection failed: no runtime test import path'],
     ['malformed-source', 'Cannot parse mutation import graph'],
     ['missing-source', 'Mutation source is missing'],
+    ['unresolved-import', 'Unresolved mutation inputs: lib/auth/policy.ts'],
     ['empty-tests', 'Vitest baseline executed zero passing tests'],
     [
       'unexecuted-target',
@@ -684,7 +660,10 @@ describe('mutation CLI result semantics', () => {
     ],
     ['missing-target', 'V8 did not report the selected target'],
     ['zero-mutants', 'Stryker generated zero mutants'],
-    ['invalid-mutants', 'Stryker reported zero valid mutants'],
+    [
+      'invalid-mutants',
+      'Stryker evidence is unknown: unresolved or zero valid mutants',
+    ],
     ['missing-report', 'Stryker did not report the selected source'],
     ['failed', 'Stryker process failed'],
   ])('fails an incomplete selected run: %s', (mode, reason) => {
@@ -717,8 +696,6 @@ describe('mutation CLI result semantics', () => {
   });
 
   it('attempts the deduped Linear intake on a floor breach and keeps exit 1 (JOV-8857)', () => {
-    // Hermetic: without a key the intake degrades to a logged no-op and
-    // never reaches the network or changes the exit code.
     const previousKey = process.env.LINEAR_API_KEY;
     delete process.env.LINEAR_API_KEY;
     try {

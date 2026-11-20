@@ -316,6 +316,33 @@ describe('cached auth utilities', () => {
       expect(mockGetSession.mock.calls[0]?.[0]?.query).toBeUndefined();
     });
 
+    it.each([true, false, undefined])(
+      'projects trusted email verification %s from a fresh session',
+      async emailVerified => {
+        mockGetSession.mockResolvedValue({
+          user: {
+            id: 'ba_reader',
+            email: 'reader@example.com',
+            emailVerified,
+            name: 'Reader',
+          },
+          session: { id: 'sess_reader' },
+        });
+        mockGetAppUserByBetterAuthId.mockResolvedValue({
+          id: 'user_reader',
+          userStatus: 'active',
+          deletedAt: null,
+        });
+        const { getCachedCurrentUser } = await import('@/lib/auth/cached');
+        expect(
+          (await getCachedCurrentUser({ session: 'fresh' }))?.emailVerified
+        ).toBe(emailVerified === true);
+        expect(mockGetSession.mock.calls[0]?.[0]?.query).toEqual({
+          disableCookieCache: true,
+        });
+      }
+    );
+
     it('returns the effective Better Auth identity during impersonation', async () => {
       mockGetSession.mockResolvedValue({
         user: {

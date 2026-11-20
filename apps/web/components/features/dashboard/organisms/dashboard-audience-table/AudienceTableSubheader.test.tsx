@@ -5,34 +5,44 @@ import {
   render as renderComponent,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AudienceMember } from '@/types';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 const { download, success, error } = vi.hoisted(() => ({
   download: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock('@/components/organisms/table', async () => ({
-  PageToolbar: ({
-    start,
-    end,
-  }: {
-    start: React.ReactNode;
-    end: React.ReactNode;
-  }) => (
-    <div>
-      {start}
-      {end}
-    </div>
-  ),
-  ExportCSVButton: (
-    await import('@/components/organisms/table/molecules/ExportCSVButton')
-  ).ExportCSVButton,
-}));
+vi.mock('@/components/organisms/table', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/components/organisms/table')>();
+  return {
+    ...actual,
+    PageToolbar: ({
+      start,
+      end,
+    }: {
+      start: React.ReactNode;
+      end: React.ReactNode;
+    }) => (
+      <div>
+        {start}
+        {end}
+      </div>
+    ),
+  };
+});
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success, error }),
 }));
@@ -43,7 +53,6 @@ vi.mock('@/lib/utils/download', () => ({
 vi.mock('./AudienceFilterDropdown', () => ({
   AudienceFilterDropdown: () => null,
 }));
-vi.mock('./AudienceHeaderBadge', () => ({ AudienceHeaderBadge: () => null }));
 
 const render = (ui: ReactElement) =>
   renderComponent(ui, {
@@ -103,6 +112,76 @@ function renderSubscribers(
     />
   );
 }
+
+describe('audience identity select', () => {
+  it('keeps one workspace tab row and a quiet identity select', async () => {
+    const user = userEvent.setup();
+    const onViewChange = vi.fn();
+    render(
+      <AudienceTableSubheader
+        {...base}
+        onViewChange={onViewChange}
+        subscriberCount={312}
+        total={1204}
+        totalAudienceCount={1204}
+      />
+    );
+
+    expect(screen.getAllByRole('tablist')).toHaveLength(1);
+    expect(
+      screen.queryByRole('button', { name: 'All' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Identified' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Anonymous' })
+    ).not.toBeInTheDocument();
+
+    const trigger = screen.getByRole('button', {
+      name: 'Identity: All People',
+    });
+    expect(trigger).toHaveTextContent('All People');
+    expect(trigger).not.toHaveTextContent('1,204');
+
+    await user.click(trigger);
+    const menu = screen.getByRole('menu');
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'All People (1,204)' })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Identified (312)' })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Anonymous (892)' })
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(menu).getByRole('menuitemradio', { name: 'Identified (312)' })
+    );
+    expect(onViewChange).toHaveBeenCalledExactlyOnceWith('identified');
+  });
+
+  it('omits identity counts when the count queries were skipped', async () => {
+    const user = userEvent.setup();
+    render(
+      <AudienceTableSubheader
+        {...base}
+        subscriberCount={null}
+        total={null}
+        totalAudienceCount={null}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Identity: All People' })
+    );
+    const labels = screen
+      .getAllByRole('menuitemradio')
+      .map(item => item.textContent);
+    expect(labels).toEqual(['All People', 'Identified', 'Anonymous']);
+  });
+});
 
 describe('subscriber export preparation', () => {
   afterEach(() => vi.unstubAllGlobals());

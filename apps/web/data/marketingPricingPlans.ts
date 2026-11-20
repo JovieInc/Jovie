@@ -1,4 +1,5 @@
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 
 /**
  * Canonical plan IDs for the marketing pricing page.
@@ -65,7 +66,7 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
     cadence: PRO_CLAIM.cadence ?? undefined,
     badge: PRO_CLAIM.badge,
     body: PRO_CLAIM.note,
-    features: ['Public Jovie profile and audience capture'],
+    features: getPaidPlanAdditionNames(),
     accent: 'blue',
     ctaLabel: PRO_CLAIM.ctaLabel,
     ctaHref: PRO_CLAIM.ctaHref,

@@ -19,6 +19,10 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
+import { collectTally, summarizeTally } from './api-quota-tally.mjs';
+
+export { parseTallyNotice, summarizeTally } from './api-quota-tally.mjs';
+
 const REPOSITORY = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const NOTICE =
   /bucket=(github-token|jovie-bot) remaining=(\d+) limit=(\d+) used=(\d+) reset=(\d+) at=(\d+)/;
@@ -88,7 +92,12 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
   const rows = new Map();
   for (const sample of samples) {
     if (!sample) continue;
-    const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
+    // A GitHub token's rate-limit window ends at its own x-ratelimit-reset (the
+    // installation's windows run :23 to :23, not on the hour), so key on that.
+    // Samples without a reset fall back to the hour they were taken in.
+    const windowStart = Number.isFinite(sample.reset)
+      ? sample.reset - windowSeconds
+      : Math.floor(sample.at / windowSeconds) * windowSeconds;
     const key = `${sample.bucket}@${windowStart}`;
     const row = rows.get(key) ?? {
       bucket: sample.bucket,
@@ -137,18 +146,31 @@ export function projectDrain(samples, nowSeconds, options = {}) {
     minSamples = 3,
     minSpanSeconds = 120,
   } = options;
-  const windowStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
-  const resetAt = windowStart + windowSeconds;
+  // Each bucket's window ends at the x-ratelimit-reset its newest sample reports
+  // (not on the hour: the installation's windows run :23 to :23). Samples without
+  // a reset fall back to the hour boundary.
   const byBucket = new Map();
   for (const sample of samples) {
-    if (!sample || sample.at < windowStart || sample.at > nowSeconds) continue;
+    if (!sample || sample.at > nowSeconds) continue;
     const list = byBucket.get(sample.bucket) ?? [];
     list.push(sample);
     byBucket.set(sample.bucket, list);
   }
   const alerts = [];
-  for (const [bucket, list] of byBucket) {
-    list.sort((a, b) => a.at - b.at);
+  for (const [bucket, all] of byBucket) {
+    all.sort((a, b) => a.at - b.at);
+    const newest = all[all.length - 1];
+    const hourStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
+    const resetAt = Number.isFinite(newest.reset)
+      ? newest.reset
+      : hourStart + windowSeconds;
+    if (resetAt <= nowSeconds) continue;
+    const windowStart = resetAt - windowSeconds;
+    const list = all.filter(sample =>
+      Number.isFinite(newest.reset)
+        ? sample.reset === newest.reset
+        : sample.at >= windowStart
+    );
     const first = list[0];
     const last = list[list.length - 1];
     const span = last.at - first.at;
@@ -169,60 +191,6 @@ export function projectDrain(samples, nowSeconds, options = {}) {
   return alerts.sort((a, b) => a.bucket.localeCompare(b.bucket));
 }
 
-const TALLY_NOTICE =
-  /workflow=(.+?) job=(\S+) calls=(\d+) github_token=(\d+) other=(\d+) top=(.*)$/;
-
-/** @param {string} message */
-export function parseTallyNotice(message) {
-  const match = TALLY_NOTICE.exec(String(message ?? ''));
-  if (!match) return null;
-  return {
-    workflow: match[1],
-    job: match[2],
-    calls: Number(match[3]),
-    githubToken: Number(match[4]),
-    other: Number(match[5]),
-    top: match[6],
-  };
-}
-
-/**
- * gh invocations per workflow and job from `gh-tally` job notices: runs, calls and
- * github.token calls, and each job's mean github.token calls per run. `hours` turns
- * the totals into per-hour rates.
- *
- * @param {Array<ReturnType<typeof parseTallyNotice>>} records
- * @param {number} hours
- */
-export function summarizeTally(records, hours = 1) {
-  const rows = new Map();
-  for (const record of records) {
-    if (!record) continue;
-    const key = `${record.workflow} / ${record.job}`;
-    const row = rows.get(key) ?? {
-      key,
-      runs: 0,
-      calls: 0,
-      githubToken: 0,
-      other: 0,
-    };
-    row.runs += 1;
-    row.calls += record.calls;
-    row.githubToken += record.githubToken;
-    row.other += record.other;
-    rows.set(key, row);
-  }
-  return [...rows.values()]
-    .map(row => ({
-      ...row,
-      githubTokenPerRun: Math.round((row.githubToken / row.runs) * 10) / 10,
-      githubTokenPerHour: Math.round(row.githubToken / hours),
-    }))
-    .sort(
-      (a, b) => b.githubToken - a.githubToken || a.key.localeCompare(b.key)
-    );
-}
-
 /** Seconds a job ran, or null when it never started or finished. */
 export function jobSeconds(job) {
   const started = Date.parse(job?.started_at);
@@ -231,13 +199,27 @@ export function jobSeconds(job) {
   return Math.max(0, (completed - started) / 1000);
 }
 
-function ghJson(path) {
-  return JSON.parse(
-    execFileSync('gh', ['api', path], {
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    })
-  );
+function ghJson(path, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return JSON.parse(
+        execFileSync('gh', ['api', path], {
+          encoding: 'utf8',
+          maxBuffer: 32 * 1024 * 1024,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+      );
+    } catch (error) {
+      // A transient GitHub 5xx must not crash a report that runs from the doctor.
+      if (attempt >= attempts) throw error;
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        attempt * 1500
+      );
+    }
+  }
 }
 
 function flag(argv, name, fallback) {
@@ -319,50 +301,53 @@ function drain(argv) {
   if (alerts.length) process.exitCode = 3;
 }
 
-const TALLY_WORKFLOWS = ['lane-fix-relay.yml', 'fleet-rules-evidence.yml'];
-
-function collectTally(argv) {
-  const hours = flag(argv, 'hours', 1);
-  const maxRuns = flag(argv, 'max-runs', 60);
-  const since = new Date(Date.now() - hours * 3600_000).toISOString();
-  const records = [];
-  for (const workflow of TALLY_WORKFLOWS) {
-    const runs = ghJson(
-      `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=>=${since}&per_page=100`
-    )
-      .workflow_runs.filter(
-        run => run.conclusion && run.conclusion !== 'skipped'
-      )
-      .slice(0, maxRuns);
-    for (const run of runs) {
-      const jobs = ghJson(
-        `repos/${REPOSITORY}/actions/runs/${run.id}/jobs?per_page=50`
-      ).jobs;
-      for (const job of jobs) {
-        if (job.conclusion === 'skipped') continue;
-        for (const annotation of ghJson(
-          `repos/${REPOSITORY}/check-runs/${job.id}/annotations?per_page=50`
-        ))
-          if (annotation.title === 'gh-tally')
-            records.push(parseTallyNotice(annotation.message));
+function tallyJson(path) {
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        'packages/api-client/cli.ts',
+        'gh',
+        '--priority',
+        'report',
+        '--once',
+        '--',
+        'api',
+        path,
+      ],
+      {
+        cwd: new URL('../../', import.meta.url),
+        encoding: 'utf8',
+        timeout: 15_000,
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
       }
-    }
-  }
-  return { hours, records };
+    )
+  );
 }
 
 function tally(argv) {
-  const { hours, records } = collectTally(argv);
-  const rows = summarizeTally(records, hours);
+  const { hours, records, complete, reason, reads } = collectTally(
+    argv,
+    tallyJson
+  );
+  const rows = complete ? summarizeTally(records, hours) : [];
   if (argv.includes('--json')) {
     console.log(
       JSON.stringify({
         schema: 'jovie-gh-call-tally/v1',
+        complete,
+        reason,
+        reads,
         generatedAt: new Date().toISOString(),
         hours,
         rows,
       })
     );
+    return;
+  }
+  if (!complete) {
+    console.log(`gh tally incomplete: ${reason}; reads=${reads}`);
     return;
   }
   for (const row of rows)

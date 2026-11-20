@@ -889,6 +889,14 @@ const ANNOTATION_MAX_TITLE_LENGTH = 250;
 const ANNOTATION_MAX_ERROR_LINES = 4;
 const ANNOTATION_MAX_MESSAGE_LENGTH = 2000;
 const ANNOTATION_FAILURE_HEADER = /^\s*\d+\)\s+(.+)$/;
+// CI tee'd reporter output prefixes lines with cursor-control escapes
+// (\x1B[1A\x1B[2K) even under CI=true; strip before matching (JOV-8805).
+const ANSI_CONTROL = /\x1B\[[0-9;?]*[A-Za-z]/g;
+const FAILURE_TAIL_LINE_COUNT = 30;
+const FAILURE_TAIL_MAX_LENGTH = 2800;
+const DIAGNOSTIC_LINE_PATTERNS = [/returned \d{3}:/, /\[claim-dogfood\]/];
+const DIAGNOSTIC_MAX_LINES = 4;
+const DIAGNOSTIC_MAX_LINE_LENGTH = 1200;
 
 function truncateAnnotation(value, maxLength) {
   if (value.length <= maxLength) return value;
@@ -896,15 +904,14 @@ function truncateAnnotation(value, maxLength) {
 }
 
 /**
- * Parse one line-reporter output stream into failure records.
- * Summary lines ("N flaky", "N passed", "N skipped", "N failed") and their
- * indented project/test echoes are deliberately not failures — only the
- * numbered `N)` blocks that the reporter prints for tests that exhausted
- * their retries.
+ * Parse numbered failure blocks for tests that exhausted retries; summary
+ * lines and their indented echoes are not failures.
  */
 export function parsePlaywrightFailures(output) {
+  const lines = String(output ?? '')
+    .replace(ANSI_CONTROL, '')
+    .split('\n');
   const failures = [];
-  const lines = String(output ?? '').split('\n');
   let current = null;
   for (const line of lines) {
     const header = line.match(ANNOTATION_FAILURE_HEADER);
@@ -997,6 +1004,70 @@ export function collectPlaywrightFailureAnnotations(
   return { annotations, total: failures.length, omitted };
 }
 
+/**
+ * Bounded, redacted tail annotation for runs that exited non-zero with no
+ * parseable failure block (JOV-8805): crashes before/around the reporter
+ * otherwise leave only "Process completed with exit code 1" on an
+ * admin-gated job log no remediation sandbox can read.
+ */
+export function formatPlaywrightFailureTailAnnotation(
+  output,
+  {
+    redact,
+    lineCount = FAILURE_TAIL_LINE_COUNT,
+    maxLength = FAILURE_TAIL_MAX_LENGTH,
+  } = {}
+) {
+  const tail = String(output ?? '')
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .slice(-lineCount)
+    .join('\n')
+    .trim();
+  if (!tail) return null;
+  const safe = redact ?? (value => value);
+  const message = safe(truncateAnnotation(tail, maxLength)).replaceAll(
+    '\n',
+    '%0A'
+  );
+  return `::error title=E2E run failed without parseable test failures ::${message}`;
+}
+
+/**
+ * Lines from the captured output that name the actual failure even when no
+ * per-test failure block was parseable (JOV-8805): the spec's assertion
+ * message (`... returned 500: {"error":"... <cause>"}`) and the server's
+ * `[claim-dogfood]` console sink can sit thousands of lines above the tail,
+ * inside the JSON reporter blob, which hides the surfaced cause.
+ */
+export function collectDiagnosticLines(
+  output,
+  { patterns = DIAGNOSTIC_LINE_PATTERNS, limit = DIAGNOSTIC_MAX_LINES } = {}
+) {
+  const hits = [];
+  const stripped = String(output ?? '').replace(ANSI_CONTROL, '');
+  for (const line of stripped.split('\n')) {
+    if (!patterns.some(pattern => pattern.test(line))) continue;
+    if (hits.includes(line)) continue;
+    hits.push(line);
+    if (hits.length >= limit) break;
+  }
+  return hits;
+}
+
+/** Format captured diagnostic lines as one bounded `::error` annotation. */
+export function formatDiagnosticLinesAnnotation(
+  hits,
+  { redact, maxLength = DIAGNOSTIC_MAX_LINE_LENGTH } = {}
+) {
+  if (!hits.length) return null;
+  const safe = redact ?? (value => value);
+  const message = hits
+    .map(line => safe(truncateAnnotation(line.trim(), maxLength)))
+    .join('%0A%0A');
+  return `::error title=E2E checkout failure diagnostics ::${message}`;
+}
+
 async function runProducer(command) {
   // Runs the wrapped Playwright command under the producer's artifact
   // policy. The captured child output is parsed into bounded, secret-redacted
@@ -1032,7 +1103,24 @@ async function runProducer(command) {
     });
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
+    const { total: parsedFailures } = collectPlaywrightFailureAnnotations(
+      childResult.stdout,
+      { redact: text => redactSecretValues(text, scanEnvironment) }
+    );
     reportPlaywrightFailureAnnotations(childResult.stdout, scanEnvironment);
+    if (childStatus !== 0) {
+      const diagnostics = formatDiagnosticLinesAnnotation(
+        collectDiagnosticLines(childResult.stdout),
+        { redact: text => redactSecretValues(text, scanEnvironment) }
+      );
+      if (diagnostics) writeSync(process.stdout.fd, `${diagnostics}\n`);
+      else if (parsedFailures === 0) {
+        const tail = formatPlaywrightFailureTailAnnotation(childResult.stdout, {
+          redact: text => redactSecretValues(text, scanEnvironment),
+        });
+        if (tail) writeSync(process.stdout.fd, `${tail}\n`);
+      }
+    }
     const configured = configuredPaths();
     const producerOptions = options();
     // Producer stages omit images by default, even when a job permits image

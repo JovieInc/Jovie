@@ -1,5 +1,6 @@
 'use client';
 
+import { OtpDigitInput } from '@jovie/ui';
 import { useId } from 'react';
 import { SegmentedDigitBox } from '@/components/atoms/SegmentedDigitBox';
 import { cn } from '@/lib/utils';
@@ -60,7 +61,7 @@ export function OtpInput({
     hero: {
       fieldset: 'flex justify-center gap-1 border-0 p-0 m-0 relative z-10',
       boxSize:
-        'h-8 w-7 rounded-lg border-white/14 bg-white/[0.06] text-app text-white dark:text-white shadow-none',
+        'h-8 w-7 rounded-lg border-on-media/14 bg-on-media/[0.06] text-app text-on-media dark:text-on-media shadow-none',
       textSize: 'text-app',
     },
     compact: {
@@ -110,21 +111,15 @@ export function OtpInput({
       <label className='sr-only' htmlFor={autofillInputId}>
         {ariaLabel}
       </label>
-      <input
+      <OtpDigitInput
+        variant='autofill'
         ref={autofillInputRef}
         id={autofillInputId}
-        type='text'
-        inputMode='numeric'
         autoComplete='one-time-code'
         value={currentValue}
         onChange={handleAutofillChange}
         onFocus={handleAutofillFocus}
         disabled={disabled}
-        className={cn(
-          'absolute inset-0 w-full h-full opacity-0 cursor-text text-base',
-          'z-0',
-          'bg-transparent border-none outline-none'
-        )}
         tabIndex={-1}
         aria-label='Autofill Verification Code'
         data-testid='otp-autofill-input'

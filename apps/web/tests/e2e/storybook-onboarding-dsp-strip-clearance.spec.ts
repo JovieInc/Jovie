@@ -17,6 +17,18 @@ const VIEWPORTS = [
     height: 720,
   },
   {
+    id: 'desktop',
+    story: 'side-clearance',
+    width: 1280,
+    height: 800,
+  },
+  {
+    id: 'desktop',
+    story: 'side-clearance',
+    width: 1280,
+    height: 900,
+  },
+  {
     id: 'mobile',
     story: 'inline-clearance',
     width: 390,
@@ -60,7 +72,7 @@ async function readBox(locator: Locator): Promise<Box> {
 for (const viewport of VIEWPORTS) {
   test(`keeps the DSP match strip clear of Listen now at ${viewport.id} (${viewport.width}x${viewport.height})`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height,
@@ -89,10 +101,24 @@ for (const viewport of VIEWPORTS) {
     if (viewport.id === 'desktop') {
       // As rendered in the golden-path keyframe: no scrolling, the whole
       // CTA is on screen and clear of the strip.
+      expect(ctaBox.x).toBeGreaterThanOrEqual(screenBox.x);
+      expect(ctaBox.y).toBeGreaterThanOrEqual(screenBox.y);
+      expect(ctaBox.x + ctaBox.width).toBeLessThanOrEqual(
+        screenBox.x + screenBox.width
+      );
       expect(
         ctaBox.y + ctaBox.height,
         `Listen now is cut off by the phone at ${viewport.id}`
       ).toBeLessThanOrEqual(screenBox.y + screenBox.height + 1);
+      const railBox = await readBox(
+        page.getByTestId('onboarding-profile-rail')
+      );
+      expect(
+        ctaBox.y + ctaBox.height,
+        'Listen now is cut off by the visible desktop preview'
+      ).toBeLessThanOrEqual(
+        Math.min(railBox.y + railBox.height, viewport.height) + 1
+      );
     } else {
       // The inline phone is shorter than the home card; bring the CTA into
       // the phone before measuring.
@@ -116,5 +142,98 @@ for (const viewport of VIEWPORTS) {
       stripBox.y + stripBox.height,
       `DSP strip reaches the profile identity at ${viewport.id}`
     ).toBeLessThanOrEqual(nameBox.y);
+
+    await testInfo.attach(`preview-${viewport.width}x${viewport.height}.png`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}
+
+for (const viewport of [
+  { id: 'desktop', height: 720, fontSize: 16 },
+  { id: 'short desktop', height: 407, fontSize: 16 },
+  { id: 'enlarged text', height: 720, fontSize: 24 },
+]) {
+  test(`keeps preview details reachable by scrolling at ${viewport.id}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: viewport.height });
+    await page.goto(
+      `/iframe.html?id=${STORY_PREFIX}--side-clearance&viewMode=story`,
+      { waitUntil: 'domcontentloaded' }
+    );
+    const rail = page.getByTestId('onboarding-profile-rail');
+    const followers = rail.getByText('12.3K Spotify followers');
+    await expect(followers).toBeVisible();
+    await page.evaluate(fontSize => {
+      document.documentElement.style.fontSize = `${fontSize}px`;
+    }, viewport.fontSize);
+
+    const railBox = await readBox(rail);
+    // The phone has its own scroll area. Use the rail's persistent gutter so
+    // both gestures target the outer preview before and after it scrolls.
+    await page.mouse.move(railBox.x + railBox.width - 4, railBox.y + 4);
+    // A wheel gesture exercises user reachability. scrollIntoView can move an
+    // overflow:hidden element programmatically and hide the actual defect.
+    await page.mouse.wheel(0, 3000);
+    await expect
+      .poll(
+        async () => {
+          const details = await readBox(followers);
+          const visibleRail = intersects(await readBox(rail), {
+            x: 0,
+            y: 0,
+            width: 1280,
+            height: viewport.height,
+          });
+          const visibleDetails = intersects(details, visibleRail);
+          return visibleDetails.height >= details.height - 1;
+        },
+        {
+          message:
+            'Follower details remain clipped after scrolling the preview',
+        }
+      )
+      .toBe(true);
+
+    await page.mouse.move(railBox.x + railBox.width - 4, railBox.y + 4);
+    await page.mouse.wheel(0, -3000);
+    const badge = rail.getByTestId('onboarding-profile-preview-badge');
+    await expect
+      .poll(
+        async () => {
+          const badgeBox = await readBox(badge);
+          const visible = intersects(badgeBox, await readBox(rail));
+          return visible.height >= badgeBox.height - 1 && badgeBox.y >= 0;
+        },
+        {
+          message:
+            'Preview header cannot be reached after returning to the top',
+        }
+      )
+      .toBe(true);
+
+    await rail.focus();
+    await expect(rail).toBeFocused();
+    await page.keyboard.press('End');
+    await expect
+      .poll(
+        () =>
+          rail.evaluate(element =>
+            Math.abs(
+              element.scrollHeight - element.clientHeight - element.scrollTop
+            )
+          ),
+        { message: 'Preview bottom remains unreachable after pressing End' }
+      )
+      .toBeLessThanOrEqual(1);
+    await expect(followers).toBeInViewport({ ratio: 1 });
+    const screenshot = testInfo.outputPath('rail-keyboard-end.png');
+    await page.screenshot({ path: screenshot });
+    await testInfo.attach('rail-keyboard-end.png', {
+      path: screenshot,
+      contentType: 'image/png',
+    });
   });
 }

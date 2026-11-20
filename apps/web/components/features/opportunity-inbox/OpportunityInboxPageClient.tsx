@@ -17,12 +17,7 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
-import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  OPPORTUNITY_SIGNAL_TYPE_META,
-  type OpportunitySignalType,
-} from '@/lib/connectors/opportunity-inbox-signal-type';
 import {
   EMPTY_OPPORTUNITY_INBOX_TOUR_DATES,
   type OpportunityInboxData,
@@ -33,7 +28,6 @@ import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxM
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
 import { getRovingFocusIndex } from '@/lib/utils/keyboard';
-import { InboxRuntimeNotification } from './InboxRuntimeNotification';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -41,6 +35,11 @@ import {
   OpportunityInboxConfirmedTourDates,
   OpportunityInboxRejectedTourDates,
 } from './OpportunityInboxTourDateSections';
+import {
+  SIGNAL_TYPE_FILTERS,
+  type SignalTypeFilter,
+} from './signalTypeFilters';
+import { useHomeSetup } from './useHomeSetup';
 
 const PreviewDataHydrator = dynamic(
   () =>
@@ -73,35 +72,6 @@ export interface OpportunityInboxPageClientProps {
   readonly initialLinks?: readonly ProfileSocialLink[];
 }
 
-type SignalTypeFilter = OpportunitySignalType | 'all';
-
-const SIGNAL_TYPE_FILTERS: readonly {
-  readonly value: SignalTypeFilter;
-  readonly label: string;
-}[] = [
-  { value: 'all', label: 'All' },
-  {
-    value: 'new_song',
-    label: OPPORTUNITY_SIGNAL_TYPE_META.new_song.filterLabel,
-  },
-  {
-    value: 'new_event',
-    label: OPPORTUNITY_SIGNAL_TYPE_META.new_event.filterLabel,
-  },
-  {
-    value: 'new_profile_match',
-    label: OPPORTUNITY_SIGNAL_TYPE_META.new_profile_match.filterLabel,
-  },
-  {
-    value: 'brand_deal',
-    label: OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.filterLabel,
-  },
-  {
-    value: 'fan_reply',
-    label: OPPORTUNITY_SIGNAL_TYPE_META.fan_reply.filterLabel,
-  },
-];
-
 function sortByStartDate(
   items: readonly OpportunityInboxTourDateItem[]
 ): OpportunityInboxTourDateItem[] {
@@ -120,7 +90,6 @@ export function OpportunityInboxPageClient({
   const [notesOpen, setNotesOpen] = useState(false);
   const notesButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setInboxView(initialView), [initialView]);
-  const runtimeUpdate = useRuntimeUpdate();
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -445,7 +414,25 @@ export function OpportunityInboxPageClient({
     []
   );
 
+  const hasReviewableItems = cards.length > 0 || pendingTourDates.length > 0;
+  const { setup, requestHomeFocus } = useHomeSetup({
+    profileId,
+    connectedDSPs,
+    initialLinks,
+    inboxView,
+    inboxPageRef,
+    hasReviewableItems,
+    hasTourHistory:
+      confirmedTourDates.length > 0 || rejectedTourDates.length > 0,
+    inboxReadUnavailable,
+    hasNotes: notesOpen || Boolean(notes),
+  });
+  const showHomeSetup = Boolean(setup);
+  // Notes annotate real queue items; with nothing to review they are a stray
+  // control under the tabs. Typed notes stay visible until cleared.
+  const showNotes = hasReviewableItems || notes.length > 0;
   const selectInboxView = (view: 'needs' | 'done') => {
+    if (view === 'needs') requestHomeFocus();
     setInboxView(view);
     const params = new URLSearchParams(globalThis.location?.search ?? '');
     if (view === 'done') params.set('view', 'done');
@@ -455,8 +442,6 @@ export function OpportunityInboxPageClient({
     });
   };
 
-  const hasReviewableItems = cards.length > 0 || pendingTourDates.length > 0;
-
   useEffect(() => {
     if (stackActionNeedsFocusRecoveryRef.current === null) return;
 
@@ -464,7 +449,7 @@ export function OpportunityInboxPageClient({
       stackKeyboardControlRef.current ??
       signalFilterRefs.current[signalFilterFocusIndex] ??
       inboxPageRef.current?.querySelector<HTMLElement>(
-        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
+        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
       );
 
     recoveryTarget?.focus();
@@ -492,69 +477,81 @@ export function OpportunityInboxPageClient({
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div
           ref={inboxPageRef}
-          className='system-b-opportunity-inbox-page'
+          className={
+            showHomeSetup
+              ? 'min-h-full w-full px-3 py-5'
+              : 'system-b-opportunity-inbox-page'
+          }
           data-testid='opportunity-inbox-content'
         >
-          <div
-            className='mb-4 flex min-h-7 items-center justify-center gap-1'
-            role='toolbar'
-            aria-label='Inbox View'
-          >
-            <Button
-              size='sm'
-              variant={inboxView === 'needs' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'needs'}
-              onClick={() => selectInboxView('needs')}
-            >
-              Needs You
-            </Button>
-            <Button
-              size='sm'
-              variant={inboxView === 'done' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'done'}
-              onClick={() => selectInboxView('done')}
-            >
-              Done For You
-            </Button>
-          </div>
-          <div className='mb-4' data-testid='opportunity-inbox-notes'>
-            {notes.length === 0 ? (
-              <Button
-                ref={notesButtonRef}
-                size='sm'
-                variant='ghost'
-                aria-expanded={notesOpen}
-                aria-controls='opportunity-inbox-notes-panel'
-                onClick={() => setNotesOpen(open => !open)}
+          {!showHomeSetup ? (
+            <>
+              <div
+                className='mb-4 flex min-h-7 items-center justify-center gap-1'
+                role='toolbar'
+                aria-label='Inbox View'
               >
-                {notesOpen ? 'Hide Notes' : 'Add Notes'}
-              </Button>
-            ) : null}
-            <div
-              id='opportunity-inbox-notes-panel'
-              hidden={!notesOpen && !notes}
-            >
-              <label
-                htmlFor='opportunity-inbox-notes-field'
-                className='mb-1 block text-xs font-medium text-secondary-token'
-              >
-                Notes
-              </label>
-              <textarea
-                id='opportunity-inbox-notes-field'
-                rows={3}
-                value={notes}
-                onChange={event => setNotes(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Escape' && !notes) {
-                    setNotesOpen(false);
-                    notesButtonRef.current?.focus();
-                  }
-                }}
-                className='system-b-opportunity-inbox-comment-input'
-              />
-            </div>
-          </div>
+                <Button
+                  size='sm'
+                  variant={inboxView === 'needs' ? 'secondary' : 'ghost'}
+                  aria-pressed={inboxView === 'needs'}
+                  onClick={() => selectInboxView('needs')}
+                >
+                  Needs You
+                </Button>
+                <Button
+                  size='sm'
+                  variant={inboxView === 'done' ? 'secondary' : 'ghost'}
+                  aria-pressed={inboxView === 'done'}
+                  onClick={() => selectInboxView('done')}
+                >
+                  Done For You
+                </Button>
+              </div>
+              {showNotes ? (
+                <div className='mb-4' data-testid='opportunity-inbox-notes'>
+                  {notes.length === 0 ? (
+                    <div className='flex justify-center'>
+                      <Button
+                        ref={notesButtonRef}
+                        size='sm'
+                        variant='ghost'
+                        aria-expanded={notesOpen}
+                        aria-controls='opportunity-inbox-notes-panel'
+                        onClick={() => setNotesOpen(open => !open)}
+                      >
+                        {notesOpen ? 'Hide Notes' : 'Add Notes'}
+                      </Button>
+                    </div>
+                  ) : null}
+                  <div
+                    id='opportunity-inbox-notes-panel'
+                    hidden={!notesOpen && !notes}
+                  >
+                    <label
+                      htmlFor='opportunity-inbox-notes-field'
+                      className='mb-1 block text-xs font-medium text-secondary-token'
+                    >
+                      Notes
+                    </label>
+                    <textarea
+                      id='opportunity-inbox-notes-field'
+                      rows={3}
+                      value={notes}
+                      onChange={event => setNotes(event.target.value)}
+                      onKeyDown={event => {
+                        if (event.key === 'Escape' && !notes) {
+                          setNotesOpen(false);
+                          notesButtonRef.current?.focus();
+                        }
+                      }}
+                      className='system-b-opportunity-inbox-comment-input'
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           {inboxView === 'done' ? (
             profileId ? (
               <JovieWorkFeed
@@ -573,7 +570,6 @@ export function OpportunityInboxPageClient({
             )
           ) : null}
           <div hidden={inboxView !== 'needs'}>
-            <InboxRuntimeNotification />
             {pendingTourDates.length > 0 ? (
               <section
                 className='system-b-opportunity-inbox-feed'
@@ -583,7 +579,7 @@ export function OpportunityInboxPageClient({
                 <div className='system-b-opportunity-inbox-section-label'>
                   Tour Dates To Review
                 </div>
-                <div className='system-b-opportunity-inbox-feed-list'>
+                <ul className='system-b-opportunity-inbox-feed-list'>
                   {pendingTourDates.map(item => (
                     <OpportunityInboxTourDateRow
                       key={item.id}
@@ -593,7 +589,7 @@ export function OpportunityInboxPageClient({
                       isBusy={pendingTourDateActionId === item.id}
                     />
                   ))}
-                </div>
+                </ul>
               </section>
             ) : null}
 
@@ -666,12 +662,8 @@ export function OpportunityInboxPageClient({
               )
             ) : null}
 
-            {!hasReviewableItems &&
-            !runtimeUpdate?.available &&
-            !inboxReadUnavailable ? (
-              <OpportunityInboxEmptyState
-                actionCards={inbox.emptyActionCards}
-              />
+            {!hasReviewableItems && !inboxReadUnavailable ? (
+              <OpportunityInboxEmptyState setup={setup} />
             ) : null}
 
             <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />

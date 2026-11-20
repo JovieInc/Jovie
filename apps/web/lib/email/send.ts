@@ -1,28 +1,24 @@
 /**
  * Email Send Utility
  *
- * Thin wrapper around the Resend email provider for sending
- * transactional emails from services.
+ * Result-object wrapper over the send gateway (lib/email/gateway). Every
+ * call declares its stream, purpose and consent basis; the gateway decides
+ * the provider, sender address and policy from the stream registry.
  */
 
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { sendStreamEmail } from '@/lib/email/gateway';
 import { logger } from '@/lib/utils/logger';
+import type { EmailRoute } from '@/types/notifications';
 
-/** Singleton email provider instance */
-let providerInstance: ResendEmailProvider | null = null;
-
-function getProvider(): ResendEmailProvider {
-  providerInstance ??= new ResendEmailProvider();
-  return providerInstance;
-}
-
-export interface SendEmailOptions {
+export interface SendEmailOptions extends EmailRoute {
   to: string;
   subject: string;
   text: string;
   html: string;
-  from?: string;
+  /** Display name only; the address comes from the stream registry. */
+  fromName?: string;
   replyTo?: string;
+  headers?: Record<string, string>;
   idempotencyKey?: string;
 }
 
@@ -33,7 +29,7 @@ export interface SendEmailResult {
 }
 
 /**
- * Send a transactional email via Resend.
+ * Send one email through the gateway.
  *
  * Returns a result object instead of throwing, so callers can
  * decide how to handle failures (log-and-continue, retry, etc.).
@@ -41,35 +37,47 @@ export interface SendEmailResult {
 export async function sendEmail(
   options: SendEmailOptions
 ): Promise<SendEmailResult> {
-  const provider = getProvider();
-
-  const result = await provider.sendEmail({
+  const result = await sendStreamEmail({
+    stream: options.stream,
+    purpose: options.purpose,
+    consent: { basis: options.consent },
+    ...(options.approvalCardId && {
+      approval: { cardId: options.approvalCardId },
+    }),
     to: options.to,
     subject: options.subject,
     text: options.text,
     html: options.html,
-    from: options.from,
-    replyTo: options.replyTo,
-    idempotencyKey: options.idempotencyKey,
+    ...(options.fromName !== undefined && { fromName: options.fromName }),
+    ...(options.replyTo !== undefined && { replyTo: options.replyTo }),
+    ...(options.headers && { headers: options.headers }),
+    ...(options.idempotencyKey && { idempotencyKey: options.idempotencyKey }),
   });
 
   if (result.status === 'sent') {
-    return { success: true, messageId: result.detail };
+    return { success: true, messageId: result.messageId ?? undefined };
   }
 
+  const domain = options.to.split('@')[1]; // domain only for PII
   if (result.status === 'skipped') {
     logger.info('Email send skipped', {
-      to: options.to.split('@')[1], // domain only for PII
-      reason: result.detail,
+      to: domain,
+      stream: options.stream,
+      reason: result.code,
     });
-    return { success: false, error: result.detail || 'Email sending skipped' };
+    return { success: false, error: `${result.code}: ${result.detail}` };
   }
 
+  const error =
+    result.status === 'rejected'
+      ? `${result.code}: ${result.detail}`
+      : result.error;
   logger.error('Email send failed', {
-    to: options.to.split('@')[1],
-    error: result.error,
+    to: domain,
+    stream: options.stream,
+    error,
   });
-  return { success: false, error: result.error || 'Email send failed' };
+  return { success: false, error };
 }
 
 /**
@@ -113,6 +121,9 @@ export async function sendTipThankYouEmail(options: {
   });
 
   return sendEmail({
+    stream: 'transactional',
+    purpose: 'tip-thank-you',
+    consent: 'account-transaction',
     to: options.to,
     subject: emailContent.subject,
     text: emailContent.text,

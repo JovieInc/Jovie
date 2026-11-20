@@ -7,11 +7,13 @@ const {
   mockCostsTable,
   mockGetAdminCosts,
   mockGetLastRefreshed,
+  mockRequireAdminAccess,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockCostsTable: vi.fn(() => <div data-testid='admin-costs-table-probe' />),
   mockGetAdminCosts: vi.fn(),
   mockGetLastRefreshed: vi.fn(),
+  mockRequireAdminAccess: vi.fn(),
 }));
 
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
@@ -39,7 +41,7 @@ vi.mock('@/lib/admin/costs', () => ({
 }));
 
 vi.mock('@/lib/admin/page-access', () => ({
-  requireCurrentAdminPageAccess: vi.fn().mockResolvedValue('user_admin'),
+  requireCurrentAdminPageAccess: mockRequireAdminAccess,
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -55,8 +57,40 @@ vi.mock('@/app/app/(shell)/admin/costs/CostsTable', () => ({
 describe('AdminCostsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireAdminAccess.mockResolvedValue('user_admin');
     mockGetAdminCosts.mockResolvedValue([]);
     mockGetLastRefreshed.mockResolvedValue(null);
+  });
+
+  it('starts no cost reads before the admin access gate resolves', async () => {
+    mockRequireAdminAccess.mockRejectedValueOnce(new Error('NEXT_REDIRECT'));
+
+    const { default: AdminCostsPage } = await import(
+      '@/app/app/(shell)/admin/costs/page'
+    );
+
+    await expect(AdminCostsPage()).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockGetAdminCosts).not.toHaveBeenCalled();
+    expect(mockGetLastRefreshed).not.toHaveBeenCalled();
+    expect(mockCostsTable).not.toHaveBeenCalled();
+  });
+  it('keeps a step-up-locked admin from cost reads without rendering an empty state', async () => {
+    mockRequireAdminAccess.mockRejectedValueOnce(
+      new Error('PRIVACY_UNLOCK_REQUIRED')
+    );
+
+    const { default: AdminCostsPage } = await import(
+      '@/app/app/(shell)/admin/costs/page'
+    );
+
+    await expect(AdminCostsPage()).rejects.toThrow('PRIVACY_UNLOCK_REQUIRED');
+    expect(mockGetAdminCosts).not.toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalledWith(
+      'Admin costs page failed to load cost items',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mockCostsTable).not.toHaveBeenCalled();
   });
 
   it('shows unknown spend without rendering a zero total when cost loading fails', async () => {

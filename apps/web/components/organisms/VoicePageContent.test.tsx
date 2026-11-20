@@ -31,7 +31,9 @@ describe('VoicePageContent source contract', () => {
     const stepArticles = screen.getAllByRole('article');
     expect(stepArticles).toHaveLength(VOICE_PAGE_STEPS.length);
     for (const [index, step] of VOICE_PAGE_STEPS.entries()) {
-      expect(within(stepArticles[index]).getByText(step.n)).toBeInTheDocument();
+      expect(
+        within(stepArticles[index]).queryByText(/^0\d$/)
+      ).not.toBeInTheDocument();
       expect(
         within(stepArticles[index]).getByRole('heading', {
           level: 3,
@@ -81,11 +83,14 @@ describe('VoicePageContent source contract', () => {
     expect(container.textContent).not.toMatch(/PR #?\d{3,}/);
   });
 
-  it('docks the hero over its own abstract photo', () => {
+  it('docks the hero on the matte page background with no photo', () => {
     const { container } = render(<VoicePageContent />);
-    const photo = container.querySelector('.marketing-hero-photo img');
-    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fvoice.webp');
-    expect(photo).toHaveAttribute('alt', '');
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero).not.toBeNull();
+    expect(hero?.querySelector('[class*="hero-photo"]')).toBeNull();
+    expect(container.innerHTML).not.toContain('marketing-hero%2F');
   });
 
   it('binds the route and Storybook to the one shared body', () => {

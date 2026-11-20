@@ -17,7 +17,7 @@ Last audited: 2026-10-24. Owner of the audit: the golden-path blocking stream (l
 
 "Blocks merge" means the check is in the merge-queue `PR Ready` aggregate (or another required context) and a failure keeps the change out of `main`. "Blocks release" means a failure stops promotion to jov.ie or withholds the Production Verified marker. "Rolls back" means the controller reverts production on failure. "Alerts on drift" means something pages when production changes without a deploy (data edits, provider changes, expired secrets).
 
-Required contexts on `main`: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard`. `PR Ready` on a pull request is a light aggregate (path changes, risk classifier, `ci-fast`, exact-head coverage, secret scan, Golden Path Lock, visual compare). `PR Ready` on a merge group adds unit tests, build and layout, Lighthouse for launch-gate paths, and database certification. Before this work, no browser journey was in either aggregate.
+Required contexts on `main`: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard`, `Company guards`. `PR Ready` on a pull request is a light aggregate (path changes, risk classifier, `ci-fast`, exact-head coverage, secret scan, Golden Path Lock, visual compare). `PR Ready` on a merge group adds unit tests, build and layout, Lighthouse for launch-gate paths, and database certification. Before this work, no browser journey was in either aggregate.
 
 ### Before (main at 2026-10-24)
 
@@ -55,7 +55,7 @@ The path is launch-ready when all of these hold.
 2. **Every blocking check has a deliberate-red proof.** A recorded run (or test) in which the regression is injected and the gate fails. The proof is linked from the PR that introduced the gate.
 3. **Green in production for 7 consecutive days.** Proposal: N = 7. During the window, every scheduled synthetic run is green (4 per day), every Production Controller run ends Production Verified, and the real-auth nightly lane is green. A single red run resets the count to zero. Seven days covers a full weekly cycle of merges and data edits; shorter windows missed the Oct 20 to Oct 22 failures that were only caught after two days.
 4. **Zero open P0 or P1 golden-path defects** in Linear, including the release-slug defects (#23027, #23029) deployed and verified on production.
-5. **No warn-only golden-path gate.** The public-profile alias performance gate (JOV-8737, currently WARN) is either graduated to blocking or removed from the golden path.
+5. **No warn-only golden-path gate.** The public-profile alias performance gate (JOV-8737) graduated to blocking on the 2026-10-31 receipt (14/14); keep it blocking or remove it from the golden path.
 6. **Alerting reaches a human.** A failed synthetic run opens or updates one Linear issue and posts to `#alerts-production`; verified by a deliberate-red run of the monitor.
 
 ## Taste items for Tim

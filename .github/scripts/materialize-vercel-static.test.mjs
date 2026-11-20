@@ -45,6 +45,7 @@ function fixture(t) {
 test('real canonical public exports survive Vercel relocation and bind exact image bytes', t => {
   const f = fixture(t);
   const names = execFileSync('git', ['ls-files', '-s', 'apps/web/public'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repo,
     encoding: 'utf8',
   })
@@ -320,6 +321,7 @@ test('dereferences file-symlink trace targets that break Vercel tgz extraction',
 test('dereferences every checked-in public export link a trace can include', t => {
   const f = fixture(t);
   const names = execFileSync('git', ['ls-files', '-s', 'apps/web/public'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repo,
     encoding: 'utf8',
   })

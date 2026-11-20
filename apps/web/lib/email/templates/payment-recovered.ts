@@ -44,7 +44,6 @@ Great news! Your payment of ${amount} for ${planName} was successful.
 
 Your ${planName} access has been fully restored. All your ${planName} features are available again:
 
-✓ Branding removed from your profile
 ✓ Advanced analytics enabled
 ✓ Contact export available
 
@@ -107,7 +106,6 @@ export function getPaymentRecoveredHtml(
         Your Pro access is fully restored:
       </p>
       <ul style="margin: 0; padding-left: 20px; color: #15803d;">
-        <li>Branding removed from your profile</li>
         <li>Advanced analytics enabled</li>
         <li>Contact export available</li>
       </ul>

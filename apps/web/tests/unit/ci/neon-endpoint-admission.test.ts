@@ -112,9 +112,24 @@ describe('Neon endpoint admission', () => {
       if (url.includes('/branches?')) {
         return {
           branches: [
-            { id: 'br-done', name: 'visual-regression-29202024696' },
-            { id: 'br-live', name: 'e2e-smoke-29202024722-1' },
-            { id: 'br-manual', name: 'tim-dev' },
+            {
+              id: 'br-done',
+              name: 'visual-regression-29202024696',
+              default: false,
+              protected: false,
+            },
+            {
+              id: 'br-live',
+              name: 'e2e-smoke-29202024722-1',
+              default: false,
+              protected: false,
+            },
+            {
+              id: 'br-manual',
+              name: 'tim-dev',
+              default: false,
+              protected: false,
+            },
           ],
         };
       }
@@ -164,7 +179,12 @@ describe('Neon endpoint admission', () => {
       if (url.includes('/branches?')) {
         return {
           branches: [
-            { id: 'br-unknown', name: 'visual-regression-29202024696' },
+            {
+              id: 'br-unknown',
+              name: 'visual-regression-29202024696',
+              default: false,
+              protected: false,
+            },
           ],
         };
       }
@@ -199,7 +219,12 @@ describe('Neon endpoint admission', () => {
       if (url.includes('/branches?')) {
         return {
           branches: [
-            { id: 'br-arbitrary', name: 'customer-data-29202024696-1' },
+            {
+              id: 'br-arbitrary',
+              name: 'customer-data-29202024696-1',
+              default: false,
+              protected: false,
+            },
           ],
         };
       }
@@ -243,6 +268,8 @@ describe('Neon endpoint admission', () => {
             {
               id: 'br-legacy',
               name: 'gem-prescope-13826-29202843688-1',
+              default: false,
+              protected: false,
             },
           ],
         };
@@ -284,7 +311,16 @@ describe('Neon endpoint admission', () => {
   it('does not charge dormant unknown branches against active endpoint capacity', async () => {
     const request = vi.fn(async (url: string) => {
       if (url.includes('/branches?')) {
-        return { branches: [{ id: 'br-dormant', name: 'tim-dev' }] };
+        return {
+          branches: [
+            {
+              id: 'br-dormant',
+              name: 'tim-dev',
+              default: false,
+              protected: false,
+            },
+          ],
+        };
       }
       if (url.includes('/endpoints?')) {
         return {
@@ -656,7 +692,10 @@ describe('Neon endpoint admission', () => {
     try {
       writeFileSync(
         connectionFile,
-        JSON.stringify({ db_url: databaseUrl, branch_name: 'ci-neon-run-42-1' })
+        JSON.stringify({
+          db_url: databaseUrl,
+          branch_name: 'ci-neon-run-42-1',
+        })
       );
       writeFileSync(
         probePath,

@@ -33,7 +33,7 @@ describe('sender policy', () => {
     const policy = await loadSenderPolicy();
     expect(policy.getSenderPolicy('system')).toEqual({
       fromEmail: 'notifications@send.jov.ie',
-      replyToEmail: 'notifications@send.jov.ie',
+      replyToEmail: 'tim@jov.ie',
     });
   });
 
@@ -44,14 +44,14 @@ describe('sender policy', () => {
     );
   });
 
-  it('honors system env overrides for from/reply-to', async () => {
+  it('derives every sender from the stream registry, not env', async () => {
     const policy = await loadSenderPolicy({
       resendFromEmail: 'custom@example.com',
       resendReplyToEmail: 'support@jov.ie',
     });
     expect(policy.getSenderPolicy('system')).toEqual({
-      fromEmail: 'custom@example.com',
-      replyToEmail: 'support@jov.ie',
+      fromEmail: 'notifications@send.jov.ie',
+      replyToEmail: 'tim@jov.ie',
     });
   });
 });

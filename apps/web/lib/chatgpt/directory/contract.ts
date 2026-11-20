@@ -175,6 +175,7 @@ export interface PublicArtistSource {
   youtubeUrl: string | null;
   isPublic: boolean | null;
   settings?: unknown;
+  ownerEmail?: string | null;
 }
 
 export interface PublicReleaseSource {
@@ -261,6 +262,7 @@ export function toPublicArtistProfile(
         displayName: row.displayName,
         isPublic: true,
         settings: row.settings,
+        ownerEmail: row.ownerEmail,
       },
       options
     )

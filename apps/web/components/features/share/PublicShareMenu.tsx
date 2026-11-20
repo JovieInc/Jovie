@@ -1,6 +1,10 @@
 'use client';
 
-import { CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import {
+  CommonDropdown,
+  type CommonDropdownItem,
+  PlainButton,
+} from '@jovie/ui';
 import { Copy, Mail } from 'lucide-react';
 import {
   cloneElement,
@@ -24,8 +28,8 @@ import {
 import type { PublicShareDestination, ShareContext } from '@/lib/share/types';
 
 export const PUBLIC_SHARE_MENU_ITEM_CLASS =
-  'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
-export const PUBLIC_SHARE_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
+  'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-on-media/88 transition-colors duration-subtle active:bg-on-media/6';
+export const PUBLIC_SHARE_MENU_ICON_CLASS = 'h-4 w-4 text-on-media/40';
 
 function renderDestinationIcon(icon: string) {
   switch (icon) {
@@ -56,14 +60,35 @@ function renderDestinationIcon(icon: string) {
   }
 }
 
+/**
+ * Rows on the profile drawer header grid. secondary: icons centred under the
+ * 44px back button (x=42 from the body edge), labels on the title edge
+ * (x=74). direct (no back button): icons start on the title edge (x=20).
+ */
+export const PUBLIC_SHARE_DRAWER_ITEM_CLASS =
+  PUBLIC_SHARE_MENU_ITEM_CLASS.replace('gap-3', 'gap-6').replace(
+    'px-4',
+    'px-3.5'
+  );
+export const PUBLIC_SHARE_DIRECT_ITEM_CLASS =
+  PUBLIC_SHARE_MENU_ITEM_CLASS.replace('px-4', '-mx-3 px-3');
+
+const DRAWER_ITEM_CLASS = {
+  secondary: PUBLIC_SHARE_DRAWER_ITEM_CLASS,
+  direct: PUBLIC_SHARE_DIRECT_ITEM_CLASS,
+} as const;
+
 interface PublicShareActionListProps {
   readonly context: ShareContext;
   readonly onActionComplete?: () => void;
+  /** Align rows to the ProfileDrawerShell header they sit under. */
+  readonly drawerHeader?: keyof typeof DRAWER_ITEM_CLASS;
 }
 
 export function PublicShareActionList({
   context,
   onActionComplete,
+  drawerHeader,
 }: PublicShareActionListProps) {
   const [helperText, setHelperText] = useState<string | null>(null);
 
@@ -107,22 +132,26 @@ export function PublicShareActionList({
     <div className='space-y-3'>
       <div className='flex flex-col gap-0.5'>
         {PUBLIC_SHARE_DESTINATIONS.map(destination => (
-          <button
+          <PlainButton
             key={destination.id}
             type='button'
-            className={PUBLIC_SHARE_MENU_ITEM_CLASS}
+            className={
+              drawerHeader
+                ? DRAWER_ITEM_CLASS[drawerHeader]
+                : PUBLIC_SHARE_MENU_ITEM_CLASS
+            }
             onClick={() => {
               handleAction(destination);
             }}
           >
             {renderDestinationIcon(destination.icon)}
             {destination.label}
-          </button>
+          </PlainButton>
         ))}
       </div>
 
       {helperText ? (
-        <p className='px-4 text-xs leading-[1.45] text-white/45'>
+        <p className='px-4 text-xs leading-[1.45] text-on-media/45'>
           {helperText}
         </p>
       ) : null}
@@ -216,28 +245,32 @@ export function PublicShareMenu({
 
   const defaultTrigger =
     triggerVariant === 'text' ? (
-      <button
+      <PlainButton
         type='button'
         className='text-sm font-medium text-tertiary-token transition-colors duration-slow hover:text-primary-token'
       >
         {title}
-      </button>
+      </PlainButton>
     ) : (
-      <button
+      <PlainButton
         type='button'
         className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
       >
         {title}
-      </button>
+      </PlainButton>
     );
   const resolvedTrigger = trigger ?? defaultTrigger;
 
   const mobileTrigger = useMemo(() => {
     if (!isValidElement(resolvedTrigger)) {
       return (
-        <button type='button' onClick={() => setOpen(true)} aria-label={title}>
+        <PlainButton
+          type='button'
+          onClick={() => setOpen(true)}
+          aria-label={title}
+        >
           {resolvedTrigger}
-        </button>
+        </PlainButton>
       );
     }
 

@@ -1,8 +1,14 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistsDirectory } from '@/components/organisms/ArtistsDirectory';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  ARTISTS_DIRECTORY_FALLBACK_HREF,
+  isArtistsDirectoryPublishable,
+} from '@/lib/profile/artists-directory-gate';
 import {
   loadArtistsDirectoryCount,
   loadArtistsDirectoryProfiles,
@@ -15,6 +21,18 @@ interface ArtistsPageProps {
   readonly searchParams?: Promise<
     Record<string, string | string[] | undefined>
   >;
+}
+
+// The root layout sets no canonical, so this page owns its own. Cursor pages
+// are not canonical URLs: they stay crawlable but out of the index.
+export async function generateMetadata({
+  searchParams = Promise.resolve({}),
+}: ArtistsPageProps): Promise<Metadata> {
+  const { cursor } = await searchParams;
+  if (cursor !== undefined) {
+    return { title: 'Artists', robots: { index: false, follow: true } };
+  }
+  return { title: 'Artists', alternates: { canonical: APP_ROUTES.ARTISTS } };
 }
 
 export default async function ArtistsPage({
@@ -31,6 +49,12 @@ export default async function ArtistsPage({
 
   if (catalog.status === 'unavailable') {
     return renderFallback();
+  }
+
+  // A directory of a few profiles is a dead end that advertises we have no
+  // users: unpublished (redirect, not indexed, not linked) until it is real.
+  if (!isArtistsDirectoryPublishable(total)) {
+    redirect(ARTISTS_DIRECTORY_FALLBACK_HREF);
   }
 
   // A stale or exhausted cursor must never render a "0 PUBLIC PROFILES"

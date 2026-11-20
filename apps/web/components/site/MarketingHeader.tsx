@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/marketing/support-route-header-contract.test.ts
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import {
@@ -9,6 +8,7 @@ import {
   HeaderNav,
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import './MarketingHeader.css';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -20,6 +20,7 @@ import {
   type MarketingHeaderBrand,
   resolveMarketingHeaderBrand,
 } from '@/data/marketing/headerBrand';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   MARKETING_CUSTOMERS_FLYOUT,
@@ -27,7 +28,11 @@ import {
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { track } from '@/lib/analytics';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
+export interface MarketingHeaderChromeNav {
+  readonly primary: readonly MarketingNavLink[];
+  readonly customers: readonly MarketingNavLink[];
+}
 
 export type MarketingHeaderVariant = 'landing' | 'minimal' | 'homepage';
 export interface MarketingHeaderNavLink extends MarketingNavLink {
@@ -52,7 +57,7 @@ const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[]
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
-  getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary;
+  getHomepageFrontDoorCtaContract().primary;
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
@@ -61,25 +66,20 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   // The label names the homepage's one action, the artist-profile claim
   // (EVENT 2026-10-20); marketing-header-cta-consistency pins it to the
   // shared claim-profile CTA intent label.
-  // ui-casing-allow: shared CTA intent copy (sentence case, as on /artist-profiles)
-  [APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START },
+  [APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA,
 };
 
 /**
  * Resolve the header's primary CTA for a route. Every marketing-header route
- * shares the single waitlist-mode front-door CTA (JOV-6860); the locked
- * homepage override in MARKETING_HEADER_CTA_BY_PATH is the only divergence.
+ * shares the single front-door CTA (JOV-6860); the locked homepage override
+ * in MARKETING_HEADER_CTA_BY_PATH is the only divergence.
  */
 export function resolveMarketingHeaderPrimaryCta(
-  pathname: string | null,
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
+  pathname: string | null
 ): MarketingHeaderCta {
   const override =
     pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname];
-  if (override) return override;
-  return waitlistEnabled === FEATURE_FLAGS.WAITLIST_ENABLED
-    ? DEFAULT_MARKETING_CTA
-    : getHomepageFrontDoorCtaContract(waitlistEnabled).primary;
+  return override ?? DEFAULT_MARKETING_CTA;
 }
 
 export interface MarketingHeaderProps
@@ -93,7 +93,16 @@ export interface MarketingHeaderProps
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
+    /**
+     * Published site-chrome nav (content record `site-chrome/main`). Replaces
+     * the code-default header links and Customers flyout when present.
+     */
+    readonly chromeNav?: MarketingHeaderChromeNav;
     readonly primaryCta?: MarketingHeaderCta;
+    /** Show Log in only (the invite-only homepage has one CTA, in the hero). */
+    readonly hidePrimaryCta?: boolean;
+    /** Wordmark beside the mark at the left (the homepage); the centre nav drops it. */
+    readonly leftWordmark?: boolean;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
   }> {}
@@ -108,7 +117,8 @@ function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
   simpleNavLinks: readonly MarketingHeaderNavLink[],
-  iconOnly: boolean
+  iconOnly: boolean,
+  chromeNav?: MarketingHeaderChromeNav
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
     return {
@@ -120,6 +130,31 @@ function resolveNavConfig(
   if (centerNavDisabled) {
     return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
   }
+  if (chromeNav) {
+    const primary = plainLinks(chromeNav.primary);
+    const desktop: readonly MarketingHeaderNavLink[] = [
+      ...(iconOnly
+        ? []
+        : [
+            {
+              href: APP_ROUTES.HOME,
+              label: 'Jovie',
+              treatment: 'wordmark' as const,
+            },
+          ]),
+      ...primary,
+    ];
+    return {
+      flyoutMenus: [
+        {
+          ...MARKETING_CUSTOMERS_FLYOUT,
+          links: plainLinks(chromeNav.customers),
+        },
+      ],
+      mobileNavLinks: primary,
+      desktopNavLinks: desktop,
+    };
+  }
   return {
     flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
@@ -129,23 +164,33 @@ function resolveNavConfig(
   };
 }
 
+function plainLinks(
+  links: readonly MarketingNavLink[]
+): readonly MarketingNavLink[] {
+  return links.map(({ href, label }) => ({ href, label }));
+}
+
 export function MarketingHeader({
   brand,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
+  chromeNav,
   primaryCta,
+  hidePrimaryCta = false,
+  leftWordmark = false,
   showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   useEffect(() => {
     track(
       CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,
       CANONICAL_PUBLIC_SHELL_CONTEXT
     );
   }, []);
-  const resolvedNavLinks = navLinks ?? MARKETING_NAV_LINKS;
+  const resolvedNavLinks =
+    navLinks ?? chromeNav?.primary ?? MARKETING_NAV_LINKS;
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const isArtistProfiles =
@@ -178,8 +223,7 @@ export function MarketingHeader({
   }, [presentation]);
 
   const centerNavEnabled =
-    FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
-    (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
+    !usesHomepageChrome || (isHomepage && showHomepageCenterNav);
   const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;
   const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
@@ -189,12 +233,16 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly
+    iconOnly || leftWordmark,
+    chromeNav
   );
   const resolvedPrimaryCta =
     primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
-  const resolvedLogoVariant =
-    presentation === 'marketing-glass' || isArtistProfiles || iconOnly
+  // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
+  // homepage stylesheet keeps that wordmark shown beside the 28px mark.
+  const resolvedLogoVariant = leftWordmark
+    ? 'icon'
+    : presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
       : logoVariant;
 
@@ -206,6 +254,7 @@ export function MarketingHeader({
         presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
       }
       logoVariant={resolvedLogoVariant}
+      logoMarkSize='marketing'
       logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
       hideNav={isMinimal}
@@ -218,6 +267,7 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       publicCta={resolvedPrimaryCta}
+      hidePublicCta={hidePrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
       showContactLink={false}

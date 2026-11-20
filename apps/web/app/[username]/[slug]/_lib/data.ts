@@ -19,6 +19,7 @@ import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { db, doesColumnExist, withRetry } from '@/lib/db';
 import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
+import { users } from '@/lib/db/schema/auth';
 import {
   type ArtistRole,
   artists,
@@ -43,6 +44,7 @@ import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
@@ -527,9 +529,29 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
       .limit(1);
 
+    if (!creator) return null;
+
+    // Test/e2e/golden-path accounts have no public smart-link pages either.
+    if (creator.userId) {
+      const [owner] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, creator.userId))
+        .limit(1);
+      if (
+        shouldHideTestProfileFromDirectUrl({
+          handle: creator.usernameNormalized,
+          ownerEmail: owner?.email,
+          settings: creator.settings,
+        })
+      ) {
+        return null;
+      }
+    }
+
     // Schema-rollout fallback only: this is not canonical profile state.
     // Revisit once these columns exist in every environment.
-    return creator ? { ...fallbacks, ...creator } : null;
+    return { ...fallbacks, ...creator };
   }, `smartLinkCreator(${usernameNormalized})`);
 };
 

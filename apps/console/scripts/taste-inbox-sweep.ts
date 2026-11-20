@@ -122,14 +122,22 @@ export async function runTasteInboxSweep(options?: {
   const indexPath = path.join(publicDir, 'index.html');
   await assertTasteOutputOwnership(publicDir, screenshotDir);
   const apiKey = process.env.LINEAR_API_KEY;
+  const env = {
+    linearApiKey: apiKey,
+    githubToken:
+      process.env.HUD_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? undefined,
+    githubOwner: process.env.HUD_GITHUB_OWNER,
+    githubRepo: process.env.HUD_GITHUB_REPO,
+  };
   const [inbox, factoryHealth] = await Promise.all([
     fetchTasteInbox(apiKey),
     fetchFactoryHealthMetrics({
-      linearApiKey: apiKey,
-      githubToken:
-        process.env.HUD_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? undefined,
-      githubOwner: process.env.HUD_GITHUB_OWNER,
-      githubRepo: process.env.HUD_GITHUB_REPO,
+      ...(env.linearApiKey !== undefined && {
+        linearApiKey: env.linearApiKey,
+      }),
+      ...(env.githubToken !== undefined && { githubToken: env.githubToken }),
+      ...(env.githubOwner !== undefined && { githubOwner: env.githubOwner }),
+      ...(env.githubRepo !== undefined && { githubRepo: env.githubRepo }),
     }),
   ]);
 
@@ -169,10 +177,10 @@ export async function runTasteInboxSweep(options?: {
 
     views.push({
       ...issue,
-      screenshotPath: capture.ok
-        ? `screenshots/${path.basename(capture.outputPath)}`
-        : undefined,
-      screenshotError: capture.ok ? undefined : capture.error,
+      ...(capture.ok && {
+        screenshotPath: `screenshots/${path.basename(capture.outputPath)}`,
+      }),
+      ...(capture.ok ? {} : { screenshotError: capture.error }),
     });
   }
 
@@ -180,7 +188,7 @@ export async function runTasteInboxSweep(options?: {
     issues: views,
     fetchedAt: inbox.fetchedAt,
     available: inbox.available,
-    error: inbox.error,
+    ...(inbox.error !== undefined && { error: inbox.error }),
     factoryHealth,
   });
 

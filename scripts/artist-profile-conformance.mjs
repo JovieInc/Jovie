@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Cheap whole-tree admission check; registry consumers cannot invent readiness. */
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -302,7 +302,9 @@ export function readArtistProfileSources(root) {
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+  // realpath: macOS tmpdir is under the /var symlink, so argv and the module
+  // URL disagree and the CLI never runs.
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 ) {
   const errors = checkArtistProfileConformance(
     readArtistProfileSources(process.cwd())

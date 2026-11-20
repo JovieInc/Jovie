@@ -5,6 +5,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
+import { recordAdmittedForEntry } from '@/lib/waitlist/acquisition-stages';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     }
 
     await finalizeWaitlistApproval(result);
+    await recordAdmittedForEntry(result.entryId);
 
     return NextResponse.json(
       {

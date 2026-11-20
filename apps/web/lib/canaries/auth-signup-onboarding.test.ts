@@ -102,13 +102,25 @@ describe('bodyContainsInitializedInterview', () => {
       )
     ).toBe(false);
   });
+
+  it('fails on a stuck restore-boundary render (JOV-8073 contract)', () => {
+    // The original production break shape: /start renders only the restore
+    // shell and never initializes. This must keep failing the cron check.
+    expect(
+      bodyContainsInitializedInterview(
+        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><h1>Restoring your conversation…</h1></div>'
+      )
+    ).toBe(false);
+  });
 });
 
 describe('bodyContainsOnboardingSessionBoundary', () => {
   it('matches the SSR session-boundary restore shell', () => {
-    // What /start actually emits over HTTP since JOV-7689: the interview
-    // mounts client-side after the restore fetch, so the body contains the
-    // boundary shell, not the init markers.
+    // What /start emits over HTTP only while a restore is on screen (no
+    // server-seeded snapshot, or an identity change mid-restore). Since the
+    // initialSnapshot seeding (PR #25189) a healthy fresh-visitor /start
+    // carries the init markers instead — the cron canary asserts those
+    // (JOV-8073); this predicate stays for the restoring-state contract.
     expect(
       bodyContainsOnboardingSessionBoundary(
         '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><h1>Restoring your conversation…</h1></div>'
@@ -170,6 +182,18 @@ describe('evaluateOnboardingChatProbe', () => {
     ).toEqual({ ok: true });
   });
 
+  it('accepts a 200 admitted on the unverified budget (JOV-10194)', () => {
+    expect(evaluateOnboardingChatProbe(200, '0:"hi"')).toEqual({ ok: true });
+  });
+
+  it('rejects a 200 that carries an error envelope', () => {
+    const result = evaluateOnboardingChatProbe(
+      200,
+      JSON.stringify({ errorCode: 'BOT_GATE_OFF' })
+    );
+    expect(result.ok).toBe(false);
+  });
+
   it('rejects ONBOARDING_CHAT_DISABLED', () => {
     const result = evaluateOnboardingChatProbe(
       503,
@@ -180,7 +204,7 @@ describe('evaluateOnboardingChatProbe', () => {
   });
 
   it('rejects unexpected status codes', () => {
-    const result = evaluateOnboardingChatProbe(200, '{}');
+    const result = evaluateOnboardingChatProbe(500, 'server error');
     expect(result.ok).toBe(false);
     expect(result.detail).toContain('403');
   });

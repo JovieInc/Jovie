@@ -3,7 +3,10 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { publicationEditorialFindings } from './lib/customer-changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
+import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
 import {
   checkPublicationBinding,
   isTrustedControllerRun,
@@ -17,7 +20,7 @@ const markerPath = process.argv.includes('--marker')
   : null;
 if (!markerPath)
   throw new Error(
-    'Usage: publish-daily-changelog.mjs --marker FILE --output DIRECTORY [--seed FILE] [--write]'
+    'Usage: publish-daily-changelog.mjs --marker FILE --output DIRECTORY [--seed FILE] [--catch-up] [--write]'
   );
 const output = resolve(
   process.argv.includes('--output')
@@ -27,7 +30,10 @@ const output = resolve(
 mkdirSync(output, { recursive: true });
 const git = async (args, options = {}) => {
   try {
-    const result = execFileSync('git', args, { encoding: 'utf8' });
+    const result = execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      encoding: 'utf8',
+    });
     return options.status ? 0 : result;
   } catch (error) {
     if (options.status) return error.status;
@@ -38,9 +44,9 @@ const gh = args =>
   JSON.parse(
     execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
   );
-// Never follow redirects outside the allowlisted public evidence origin.
+// Evidence redirects are followed explicitly after same-origin validation.
 const fetchPage = url =>
-  fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+  fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
 const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
 if (
   !/^\d+$/.test(marker.controllerRun ?? '') ||
@@ -187,10 +193,46 @@ const plan = planDailyPublication({
   candidates,
   windowKey: observedAt.slice(0, 10),
   observedAt,
+  catchUp: process.argv.includes('--catch-up'),
 });
+// Check the planned receipt before opening a release PR, using the same
+// overlay contract as source CI without changing any approved customer copy.
+const editorialFindings = publicationEditorialFindings({
+  content: plan.content,
+  overlay: JSON.parse(
+    readFileSync('apps/web/data/customer-changelog-editorial.json', 'utf8')
+  ),
+  migrations: JSON.parse(
+    readFileSync(
+      'apps/web/data/customer-changelog-permalink-migrations.json',
+      'utf8'
+    )
+  ),
+});
+if (editorialFindings.length) {
+  for (const finding of editorialFindings)
+    console.error(`[editorial-preflight] ${finding}`);
+}
+// Customer digest copy must pass @jovie/copy at the jovie-marketing register
+// before the release PR opens: /changelog is certified by seo:certify
+// (copy:copy-lint), and an em dash here used to eject the release PR from
+// the merge queue a day later (PR #25178, 2026-11-12). Fail the writer's
+// output here instead; reword the copy, never waive the gate.
+const copyFindings = lintDailyDigestStories(plan.result?.stories);
+if (copyFindings.length > 0) {
+  writeFileSync(
+    resolve(output, 'copy-lint-failures.json'),
+    `${JSON.stringify(copyFindings, null, 2)}\n`
+  );
+  for (const finding of copyFindings)
+    console.error(`[copy-gate] ${finding.message}`);
+  throw new Error(
+    `Daily digest copy fails @jovie/copy (${copyFindings.length} blocking); reword the story copy at the source note.`
+  );
+}
 writeFileSync(
   resolve(output, 'plan.json'),
-  `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
+  `${JSON.stringify({ ...plan, editorialFindings, content: undefined }, null, 2)}\n`
 );
 writeFileSync(resolve(output, 'CHANGELOG.md'), plan.content);
 process.stdout.write(
@@ -206,4 +248,19 @@ if (process.argv.includes('--write') && plan.status === 'publish') {
   if ((await git(['status', '--porcelain'])).trim())
     throw new Error('Publisher requires a clean release checkout');
   writeFileSync('CHANGELOG.md', plan.content);
+  // Pre-push content gate (JOV-13111): the release PR must not open with an
+  // editorial overlay violation. That used to surface only in Source
+  // Validation's disk-read source contracts — minutes into the run, on every
+  // daily-changelog PR (3 sampled failures at 253-317s, 2026-11). Run the
+  // canonical check against the bytes about to be pushed; the PR-stage
+  // source guard stays the fail-closed backstop either way.
+  execFileSync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL('./check-customer-changelog-editorial.mjs', import.meta.url)
+      ),
+    ],
+    { stdio: 'inherit' }
+  );
 }

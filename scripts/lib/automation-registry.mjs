@@ -16,9 +16,10 @@
  * - evaluateLiveness: compares each entry's last-run receipt to its max
  *   staleness. Silence is an alert: a missing or unreadable receipt is red,
  *   never green (dead-man semantics).
- * - runStageEvents: run receipts in the jovie-stage-event/v1 shape (one
- *   started -> finished pair per run), so every run's start and end land in
- *   the stage-timing pipeline.
+ * - runStageEvents (re-exported from ./liveness-stage-events.mjs, split for
+ *   the shrink-only size-500 budget): run receipts in the jovie-stage-event/v1
+ *   shape (one started -> finished pair per run), so every run's start and end
+ *   land in the stage-timing pipeline.
  *
  * Network reads live in the hosted liveness job (scripts/automation-liveness.mjs).
  */
@@ -33,13 +34,11 @@ export function hasCronSchedule(source = '') {
   return CRON_RE.test(String(source));
 }
 
+export { runStageEvents } from './liveness-stage-events.mjs';
+
 export const REGISTRY_SCHEMA = 'jovie-automation-registry/v1';
 export const REGISTRY_PATH = 'canon/automation-registry.jsonl';
 export const LIVENESS_SCHEMA = 'jovie-automation-liveness/v1';
-// Shared with the stage-instrumentation contract (scripts/lib/stage-events.mjs,
-// docs/metrics/stage-manifest.json entity `automation-run`).
-export const STAGE_EVENT_SCHEMA = 'jovie-stage-event/v1';
-export const RUN_ENTITY_TYPE = 'automation-run';
 
 export const STATUSES = Object.freeze(['live', 'retired']);
 export const TRIGGER_KINDS = Object.freeze([
@@ -61,6 +60,7 @@ export const TRIGGER_KINDS = Object.freeze([
 ]);
 export const RECEIPT_KINDS = Object.freeze([
   'github-workflow',
+  'workflow-failure-streak',
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
@@ -72,6 +72,7 @@ export const RECEIPT_KINDS = Object.freeze([
 // Receipts the hosted liveness job can read without host access.
 export const HOSTED_RECEIPT_KINDS = Object.freeze([
   'github-workflow',
+  'workflow-failure-streak',
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
@@ -151,6 +152,14 @@ export function validateRegistry(registry) {
       errors.push(`${at}: github-workflow receipts need repo and workflow`);
     }
     if (
+      receipt.kind === 'workflow-failure-streak' &&
+      (!nonEmpty(receipt.repo) || !nonEmpty(receipt.workflow))
+    ) {
+      errors.push(
+        `${at}: workflow-failure-streak receipts need repo and workflow`
+      );
+    }
+    if (
       receipt.kind === 'json-timestamp' &&
       (!nonEmpty(receipt.url) || !nonEmpty(receipt.path))
     ) {
@@ -220,6 +229,28 @@ export function parseLanesClocks(source = '') {
   }));
 }
 
+/** Cron expressions from a wrangler.toml `crons = [...]` array. */
+export function parseWranglerCrons(source = '') {
+  const match = String(source).match(/^\s*crons\s*=\s*\[([^\]]*)\]/m);
+  if (!match) return [];
+  return [...match[1].matchAll(/"([^"]+)"|'([^']+)'/g)].map(m => m[1] ?? m[2]);
+}
+
+const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist']);
+
+function findFiles(repoRoot, dir, depth, test, out = []) {
+  if (depth < 0 || !existsSync(join(repoRoot, dir))) return out;
+  for (const entry of readdirSync(join(repoRoot, dir), {
+    withFileTypes: true,
+  })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const rel = dir ? `${dir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) findFiles(repoRoot, rel, depth - 1, test, out);
+    else if (test(entry.name)) out.push(rel);
+  }
+  return out;
+}
+
 /** Cron paths from a vercel.json document. */
 export function parseVercelCrons(source = '') {
   let doc;
@@ -259,6 +290,8 @@ function findVercelFiles(repoRoot) {
  * - github-cron:.github/workflows/<file>
  * - vercel-cron:<cron path>
  * - lanes-clock:<clock name>
+ * - cloudflare-cron:<wrangler file> (any workers/** wrangler.* with crons)
+ * - systemd-timer:<unit file> (any committed *.timer)
  */
 export function discoverScheduledAutomations(repoRoot) {
   const found = new Map();
@@ -284,6 +317,20 @@ export function discoverScheduledAutomations(repoRoot) {
       });
     }
   }
+  for (const file of findFiles(repoRoot, 'workers', 3, name =>
+    /^wrangler\..*\.(toml|jsonc?)$|^wrangler\.(toml|jsonc?)$/.test(name)
+  )) {
+    const crons = parseWranglerCrons(
+      readFileSync(join(repoRoot, file), 'utf8')
+    );
+    if (crons.length) found.set(`cloudflare-cron:${file}`, { file, crons });
+  }
+  for (const file of [
+    ...findFiles(repoRoot, '.github', 3, name => name.endsWith('.timer')),
+    ...findFiles(repoRoot, 'scripts', 3, name => name.endsWith('.timer')),
+  ]) {
+    found.set(`systemd-timer:${file}`, { file });
+  }
   const clockFile = join(repoRoot, 'scripts/lanes/continuity_clock.py');
   if (existsSync(clockFile)) {
     for (const clock of parseLanesClocks(readFileSync(clockFile, 'utf8'))) {
@@ -302,6 +349,16 @@ export function coverageKey(entry) {
     return `vercel-cron:${trigger.path}`;
   if (trigger.kind === 'lanes-clock' && trigger.clock)
     return `lanes-clock:${trigger.clock}`;
+  if (
+    trigger.kind === 'cloudflare-cron' &&
+    /^workers\/.*wrangler/.test(trigger.source ?? '')
+  )
+    return `cloudflare-cron:${trigger.source}`;
+  if (
+    trigger.kind === 'systemd-timer' &&
+    /^[\w./-]+\.timer$/.test(trigger.source ?? '')
+  )
+    return `systemd-timer:${trigger.source}`;
   return null;
 }
 
@@ -401,8 +458,14 @@ export function evaluateEntry(entry, observation, nowMs) {
   if (!observation || observation.ok !== true) {
     return {
       ...base,
-      status: 'unknown',
+      status: observation?.deferred ? 'deferred' : 'unknown',
       reason: observation?.reason ?? 'receipt-unreadable',
+      ...(observation?.quotaEvidence
+        ? { quotaEvidence: observation.quotaEvidence }
+        : {}),
+      ...(observation?.recoveryEvidence
+        ? { recoveryEvidence: observation.recoveryEvidence }
+        : {}),
     };
   }
   const proofMs = Date.parse(observation.lastProofAt ?? '');
@@ -434,7 +497,7 @@ export function evaluateLiveness(registry, observations, nowMs) {
     if (!HOSTED_RECEIPT_KINDS.includes(entry.receipt?.kind)) continue;
     results.push(evaluateEntry(entry, observations.get(entry.id), nowMs));
   }
-  const red = results.filter(row => row.status !== 'fresh');
+  const red = results.filter(r => !['fresh', 'deferred'].includes(r.status));
   return {
     schema: LIVENESS_SCHEMA,
     observedAt: new Date(nowMs).toISOString(),
@@ -465,6 +528,12 @@ export function livenessFingerprint(id) {
     .toLowerCase()}`;
 }
 
+/** A quota-deferred read (lib/github-json-read.mjs, JOV-9993): not a
+ * silence verdict, so it files no red and flips no alert state. */
+export function isQuotaDeferredRow(row) {
+  return row?.status === 'unknown' && row?.reason === 'github-quota-deferred';
+}
+
 /**
  * Alert decisions for the existing remediation-signal intake: one fingerprint
  * per critical loop, red while silent, green once its heartbeat returns.
@@ -476,11 +545,15 @@ export function livenessDecisions(report, previous = {}) {
   for (const row of report.results) {
     if (!row.critical) continue;
     const fingerprint = livenessFingerprint(row.id);
-    if (row.status === 'fresh') {
-      if (previous[fingerprint] === 'red')
+    if (row.status === 'fresh' || row.status === 'deferred') {
+      if (row.status === 'fresh' && previous[fingerprint] === 'red')
         decisions.push({ action: 'green', fingerprint, id: row.id });
       continue;
     }
+    // A quota-deferred read is not a silence verdict: no red filing, and the
+    // persisted alert state keeps its prior color until a readable run files
+    // the true transition (JOV-9993).
+    if (isQuotaDeferredRow(row)) continue;
     decisions.push({
       action: 'red',
       fingerprint,
@@ -494,58 +567,6 @@ export function livenessDecisions(report, previous = {}) {
     });
   }
   return decisions;
-}
-
-// --- Run receipts (stage events) ------------------------------------------------
-
-/**
- * jovie-stage-event/v1 rows for one run: `started` (entered at start, exited
- * at end) and the terminal `finished`. A run without a start or end time
- * yields no rows; timestamps are never invented.
- */
-export function runStageEvents({
-  automationId,
-  runRef,
-  startedAt,
-  endedAt,
-  outcome,
-  sourceReceipt,
-  actor = null,
-}) {
-  const start = Date.parse(startedAt ?? '');
-  const end = Date.parse(endedAt ?? '');
-  if (
-    !Number.isFinite(start) ||
-    !Number.isFinite(end) ||
-    !nonEmpty(sourceReceipt)
-  )
-    return [];
-  const entityId = `${automationId}@${runRef}`;
-  const exit = new Date(Math.max(start, end)).toISOString();
-  return [
-    {
-      schema: STAGE_EVENT_SCHEMA,
-      entityType: RUN_ENTITY_TYPE,
-      entityId,
-      stage: 'started',
-      enteredAt: new Date(start).toISOString(),
-      exitedAt: exit,
-      actor,
-      outcome: 'advanced',
-      sourceReceipt,
-    },
-    {
-      schema: STAGE_EVENT_SCHEMA,
-      entityType: RUN_ENTITY_TYPE,
-      entityId,
-      stage: 'finished',
-      enteredAt: exit,
-      exitedAt: exit,
-      actor,
-      outcome: outcome === 'failed' ? 'failed' : 'completed',
-      sourceReceipt,
-    },
-  ];
 }
 
 /** Read a dotted path (`a.b.c`) from parsed JSON. */
@@ -582,4 +603,161 @@ export function parseRegistry(text = '') {
 
 export function loadRegistry(repoRoot) {
   return parseRegistry(readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8'));
+}
+
+// --- Shared scheduling (compounding: one scheduler per platform) ---------------
+//
+// Tim's rule (memory feedback_event_driven): N jobs polling on the same
+// schedule become one job running N tasks, and every check is event-driven
+// unless no event exists, in which case it is a slow fail-safe. So a live
+// timer-driven entry must (1) name the shared scheduler it registers into
+// (canon/schedulers.json, one per platform) and (2) say why an event cannot do
+// the job. Entries that predate this rule are grandfathered by id; that list
+// only shrinks.
+
+export const SCHEDULERS_PATH = 'canon/schedulers.json';
+export const SCHEDULERS_SCHEMA = 'jovie-shared-schedulers/v1';
+export const TIMER_KINDS = Object.freeze([
+  'github-cron',
+  'vercel-cron',
+  'lanes-clock',
+  'systemd-timer',
+  'launchd',
+  'crontab',
+  'codex-heartbeat',
+  'openclaw-cron',
+  'hermes-cron',
+  'eve-schedule',
+  'cloudflare-cron',
+  'claude-routine',
+]);
+export const WHY_NOT_EVENT_MIN = 30;
+
+export function loadSchedulers(repoRoot) {
+  return JSON.parse(readFileSync(join(repoRoot, SCHEDULERS_PATH), 'utf8'));
+}
+
+function clockProblems(entry, schedulerIds) {
+  const clock = entry.clock ?? {};
+  const problems = [];
+  if (!schedulerIds.has(clock.scheduler))
+    problems.push(
+      `clock.scheduler must be one of ${[...schedulerIds].join('|')} (register into the platform's shared scheduler instead of owning a timer)`
+    );
+  if (
+    !nonEmpty(clock.whyNotEvent) ||
+    clock.whyNotEvent.trim().length < WHY_NOT_EVENT_MIN
+  )
+    problems.push(
+      `clock.whyNotEvent must say why no event (webhook, queue insert, deploy hook, relay connect/disconnect) can do this job (>= ${WHY_NOT_EVENT_MIN} chars)`
+    );
+  return problems;
+}
+
+/** Errors for timer-driven entries that skip the shared scheduler or the event question. */
+export function validateScheduling(registry, schedulers) {
+  const errors = [];
+  if (schedulers?.schema !== SCHEDULERS_SCHEMA)
+    errors.push(`${SCHEDULERS_PATH}: schema must be ${SCHEDULERS_SCHEMA}`);
+  const schedulerIds = new Set(
+    Object.values(schedulers?.platforms ?? {}).map(platform => platform.id)
+  );
+  const grandfathered = new Set(schedulers?.grandfathered ?? []);
+  const live = new Map(
+    (registry?.entries ?? [])
+      .filter(entry => entry?.status === 'live')
+      .map(entry => [entry.id, entry])
+  );
+  for (const entry of live.values()) {
+    if (!TIMER_KINDS.includes(entry.trigger?.kind)) continue;
+    const problems = clockProblems(entry, schedulerIds);
+    if (grandfathered.has(entry.id)) {
+      if (!problems.length)
+        errors.push(
+          `${entry.id}: complies now; remove it from grandfathered in ${SCHEDULERS_PATH} (the list only shrinks)`
+        );
+      continue;
+    }
+    for (const problem of problems) errors.push(`${entry.id}: ${problem}`);
+  }
+  for (const id of grandfathered) {
+    const entry = live.get(id);
+    if (!entry || !TIMER_KINDS.includes(entry.trigger?.kind))
+      errors.push(
+        `${id}: grandfathered but not a live timer entry; remove it from ${SCHEDULERS_PATH}`
+      );
+  }
+  return errors;
+}
+
+function expandField(field, min, max) {
+  const values = new Set();
+  for (const part of field.split(',')) {
+    const [range, step] = part.split('/');
+    let lo = min;
+    let hi = max;
+    if (range !== '*' && range !== '?') {
+      const [a, b] = range.split('-');
+      lo = Number(a);
+      hi = b === undefined ? (step ? max : lo) : Number(b);
+    }
+    const stride = step ? Number(step) : 1;
+    if (![lo, hi, stride].every(Number.isFinite) || stride < 1) return null;
+    for (let value = lo; value <= hi; value += stride) values.add(value);
+  }
+  return values;
+}
+
+const CRON_EXPR_RE =
+  /(?<![\w*/-])([\d*/,?-]+)\s+([\d*/,?-]+)\s+([\d*?]+)\s+([\d*]+)\s+([\d*/,?-]+)(?![\w*/-])/;
+
+/** Runs per day for one schedule phrase; null when it cannot be derived. */
+export function runsPerDay(schedule = '') {
+  const text = String(schedule);
+  let total = 0;
+  let parsed = false;
+  const freq = text.match(/FREQ=(MINUTELY|HOURLY|DAILY)(?:;INTERVAL=(\d+))?/);
+  if (freq) {
+    const every = Number(freq[2] ?? 1);
+    const perDay = { MINUTELY: 1440, HOURLY: 24, DAILY: 1 }[freq[1]];
+    return perDay / every;
+  }
+  for (const segment of text.split(/;|\+|\band\b/)) {
+    const cron = segment.match(CRON_EXPR_RE);
+    if (cron) {
+      const minutes = expandField(cron[1], 0, 59);
+      const hours = expandField(cron[2], 0, 23);
+      const days = expandField(cron[5], 0, 7);
+      if (!minutes || !hours || !days) continue;
+      const weekly = cron[5] === '*' || cron[5] === '?' ? 1 : days.size / 7;
+      total += minutes.size * hours.size * weekly;
+      parsed = true;
+      continue;
+    }
+    const calendar = segment.match(/OnCalendar\s+\*:\d+\/(\d+)/);
+    const every = segment.match(
+      /every\s+(?:(\d+)\s*)?(minute|min|m|hours?|h|days?|d)\b/i
+    );
+    if (calendar) {
+      total += 1440 / Number(calendar[1]);
+      parsed = true;
+    } else if (every) {
+      const n = Number(every[1] ?? 1);
+      const unit = every[2].toLowerCase();
+      const perDay = unit.startsWith('m')
+        ? 1440
+        : unit.startsWith('h')
+          ? 24
+          : 1;
+      total += perDay / n;
+      parsed = true;
+    } else if (/\bhourly\b/i.test(segment)) {
+      total += 24;
+      parsed = true;
+    } else if (/\bdaily\b/i.test(segment)) {
+      total += 1;
+      parsed = true;
+    }
+  }
+  return parsed ? Math.round(total * 100) / 100 : null;
 }

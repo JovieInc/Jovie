@@ -86,14 +86,13 @@ function canvasHtml(fallback: boolean): string {
         padding: 0.55rem 0.9rem;
         font: 500 0.95rem/1 Satoshi, sans-serif;
       }
-      /* Quiet phone mock: bezel-free mobile web screen at the real 402/874
+      /* Quiet phone mock: bezel-free mobile web screen at the crop aspect, filling the proof box
          aspect (components/marketing/device/DeviceScreen.css). Skeleton
          structure only — no invented profile content. */
-      .ap-phone-frame { width: 100%; }
       .mobile-web-screen {
         position: relative;
         width: 100%;
-        aspect-ratio: 402 / 874;
+        height: 100%;
         overflow: hidden;
         border: 1px solid rgba(168, 176, 195, 0.16);
         border-radius: 1.25rem;
@@ -144,13 +143,13 @@ function canvasHtml(fallback: boolean): string {
             <div class="homepage-hero-light__grid"></div>
             <div class="homepage-hero-light__focus"><div class="homepage-hero-light__edge"></div></div>
           </div>
-          <div class="homepage-hero-canvas__copy">
-            <h1 class="homepage-hero-canvas__headline">${HOMEPAGE_COPY.hero.headline}</h1>
-            <p class="homepage-hero-canvas__subhead">${HOMEPAGE_COPY.hero.subhead}</p>
-            <p class="homepage-hero-canvas__support">${HOMEPAGE_COPY.hero.supportNote}</p>
-          </div>
-          <div class="homepage-hero-canvas__proof">
-            <div class="ap-phone-frame homepage-artist-hero__phone">
+          <div class="homepage-hero-canvas__copy" data-has-proof="true">
+            <div class="homepage-hero-canvas__lead">
+              <h1 class="homepage-hero-canvas__headline">${HOMEPAGE_COPY.hero.headline}</h1>
+              <p class="homepage-hero-canvas__subhead">${HOMEPAGE_COPY.hero.subhead}</p>
+              <p class="homepage-hero-canvas__support">${HOMEPAGE_COPY.hero.supportNote}</p>
+            </div>
+            <div class="homepage-hero-canvas__proof">
               <div class="mobile-web-screen">
                 <div class="phone-skel">
                   <div class="phone-skel__bar phone-skel__bar--w60"></div>
@@ -335,7 +334,7 @@ test.describe('homepage hero canvas scroll', () => {
         };
         return {
           field: rect('.homepage-hero-canvas__field'),
-          copy: rect('.homepage-hero-canvas__copy'),
+          lead: rect('.homepage-hero-canvas__lead'),
           headline: rect('.homepage-hero-canvas__headline'),
           proof: rect('.homepage-hero-canvas__proof'),
           screen: rect('.homepage-hero-canvas__proof .mobile-web-screen'),
@@ -350,12 +349,12 @@ test.describe('homepage hero canvas scroll', () => {
         boxes.proof.bottom,
         `${label} phone below the field`
       ).toBeLessThanOrEqual(boxes.field.bottom + 0.5);
-      // The phone is in the field's flow under the copy, so it can never
-      // cover the headline — assert it, do not assume it.
+      // The phone is in the field's flow under the lead (headline, subhead,
+      // claim), so it can never cover them: assert it, do not assume it.
       expect(
         boxes.proof.top,
-        `${label} phone overlaps the copy`
-      ).toBeGreaterThan(boxes.copy.bottom - 1);
+        `${label} phone overlaps the lead`
+      ).toBeGreaterThan(boxes.lead.bottom - 1);
       expect(
         boxes.headline.bottom,
         `${label} headline runs under the phone`
@@ -365,11 +364,9 @@ test.describe('homepage hero canvas scroll', () => {
         boxes.headline.top,
         `${label} headline clipped by the field top`
       ).toBeGreaterThan(boxes.field.top - 1);
-      // The phone keeps the real screen aspect (402/874) at every width.
-      expect(boxes.screen.height / boxes.screen.width).toBeCloseTo(
-        874 / 402,
-        2
-      );
+      // The shot keeps the capture's real aspect (780x1264) at every width.
+      expect(boxes.proof.height / boxes.proof.width).toBeCloseTo(1264 / 780, 2);
+      expect(boxes.screen.height).toBeLessThanOrEqual(boxes.proof.height + 0.5);
     }
   });
 

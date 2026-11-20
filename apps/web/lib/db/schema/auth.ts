@@ -9,6 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { ACCOUNT_CLASSES } from '@/lib/accounts/account-class';
 import { themeModeEnum, userStatusLifecycleEnum } from './enums';
 
 // Users table
@@ -57,6 +58,11 @@ export const users = pgTable(
     trialNotificationsSent: integer('trial_notifications_sent').default(0),
     // Active creator profile (FK added post-create to avoid circular dependency)
     activeProfileId: uuid('active_profile_id'),
+    // Internal-account classification (founder dogfood, E2E, canary, agent).
+    // NULL = external customer. Written at creation from the email tags or the
+    // x-jovie-account-class header; every company metric reads it through
+    // lib/accounts/internal-account.ts together with the email rules.
+    accountClass: text('account_class', { enum: ACCOUNT_CLASSES }),
     // Referral tracking
     referredByCode: text('referred_by_code'), // The referral code used at signup
     deletedAt: timestamp('deleted_at'),

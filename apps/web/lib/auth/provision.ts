@@ -1,6 +1,9 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
@@ -124,6 +127,10 @@ export async function provisionAppUser(
         name: name ?? null,
         userStatus,
         waitlistEntryId: approvedEntryId,
+        accountClass: resolveNewAccountClass({
+          email: normalizedEmail || email,
+          header: await readRequestAccountClassHeader(),
+        }),
       })
       .onConflictDoNothing()
       .returning({ id: users.id });
@@ -135,6 +142,8 @@ export async function provisionAppUser(
       if (userStatus === 'waitlist_pending') {
         await ensureSignupWaitlistEntry(normalizedEmail || email);
       }
+      // Price lock: the price they sign up at is recorded now.
+      await ensurePriceLockForUserSafely(inserted.id, 'signup');
       return inserted.id;
     }
 

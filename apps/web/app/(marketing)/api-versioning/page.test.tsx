@@ -17,7 +17,7 @@ describe('ApiVersioningPage', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'API Versioning And Deprecation Policy',
+        name: 'API versioning and deprecation policy',
       })
     ).toBeInTheDocument();
     const lifecycleSection = screen

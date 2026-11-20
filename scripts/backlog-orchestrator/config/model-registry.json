@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-09",
+  "updated_at": "2026-11-14",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
   "routing_policy": {
@@ -26,6 +26,14 @@
         "approved_by": "Tim White",
         "approved_at": "2026-09-29",
         "ref": "JOV-7248"
+      },
+      {
+        "rule": "no_claude",
+        "scope": "lane_model_pools",
+        "reason": "Lanes may route Anthropic models to the Claude subscription or Hyperagent only, never the Gateway or a metered key, and balance the two by what expires first (scripts/lanes/model-pools.json). This registry's models and route_chains keep no_claude.",
+        "approved_by": "Tim White",
+        "approved_at": "2026-11-11",
+        "ref": "JovieInc/Jovie#24849"
       }
     ],
     "api_burn_fraction_of_sub": 0.15,
@@ -321,13 +329,13 @@
     {
       "id": "codex-luna",
       "provider": "codex",
-      "model": "gpt-5.6-luna",
-      "family": "gpt-5.6",
+      "model": "gpt-6-luna",
+      "family": "gpt-6",
       "channel": "subscription",
       "pool": "codex",
       "quality": 74,
-      "list_price_in": 0.2,
-      "list_price_out": 1.2,
+      "list_price_in": 0.1,
+      "list_price_out": 0.5,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
       "capabilities": ["code", "review", "mechanical", "tests"],
@@ -363,13 +371,13 @@
     {
       "id": "codex-terra",
       "provider": "codex",
-      "model": "gpt-5.6-terra",
-      "family": "gpt-5.6",
+      "model": "gpt-6.1-terra",
+      "family": "gpt-6.1",
       "channel": "subscription",
       "pool": "codex",
       "quality": 82,
-      "list_price_in": 2.0,
-      "list_price_out": 12.0,
+      "list_price_in": 1.0,
+      "list_price_out": 5.0,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
       "capabilities": ["code", "review", "architecture"],
@@ -405,13 +413,55 @@
     {
       "id": "codex-sol",
       "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "family": "gpt-5.6",
+      "model": "gpt-6.1-sol",
+      "family": "gpt-6.1",
       "channel": "subscription",
       "pool": "codex",
       "quality": 88,
-      "list_price_in": 5.0,
-      "list_price_out": 30.0,
+      "list_price_in": 2.0,
+      "list_price_out": 10.0,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "capabilities": ["architecture", "root-cause", "code"],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_PR_DRAIN_CODEX",
+      "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_executable_env": "GEM_PR_DRAIN_CODEX",
+      "agent_executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "exec",
+        "--model",
+        "{model}",
+        "--sandbox",
+        "workspace-write",
+        "--skip-git-repo-check",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "exec",
+        "--model",
+        "{model}",
+        "--sandbox",
+        "read-only",
+        "--skip-git-repo-check",
+        "Reply with exactly: GEM_MODEL_READY"
+      ],
+      "cooldown_seconds": 21600,
+      "strengths": ["terminal-bench", "root-cause", "subsidized-codex-sub"],
+      "weaknesses": ["api-equivalent-is-expensive", "never-buy-as-gateway"]
+    },
+    {
+      "id": "codex-astra",
+      "provider": "codex",
+      "model": "gpt-6-astra",
+      "family": "gpt-6",
+      "channel": "subscription",
+      "pool": "codex",
+      "quality": 94,
+      "list_price_in": 10.0,
+      "list_price_out": 50.0,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
       "capabilities": ["architecture", "root-cause", "code"],
@@ -609,55 +659,6 @@
       ]
     },
     {
-      "id": "gateway-deepseek-v4-flash",
-      "provider": "vercel-ai-gateway",
-      "model": "deepseek/deepseek-v4-flash",
-      "family": "deepseek",
-      "channel": "api",
-      "pool": "vercel-gateway",
-      "quality": 65,
-      "list_price_in": 0.06,
-      "list_price_out": 0.18,
-      "capabilities": ["review", "review-verify"],
-      "cost_tier": "gateway-budgeted-paid",
-      "strengths": ["cheapest-capable-api", "post-included-fallback"],
-      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"],
-      "quality_by_capability": {
-        "review": 54.4,
-        "review-verify": 54.4
-      },
-      "sources": [
-        "https://vercel.com/ai-gateway/models/deepseek-v4-flash",
-        "https://regolo.ai/deepseek-v4-1-flash-vs-v4-flash-which-open-weight-model-should-your-company-run/"
-      ],
-      "notes": "Disabled PR review ranking only; this does not restore a retired agent route."
-    },
-    {
-      "id": "gateway-deepseek-v4.1-flash",
-      "provider": "vercel-ai-gateway",
-      "model": "deepseek/deepseek-v4.1-flash",
-      "family": "deepseek",
-      "channel": "api",
-      "pool": "vercel-gateway",
-      "quality": 65,
-      "list_price_in": 0.075,
-      "list_price_out": 0.3,
-      "capabilities": ["review", "review-verify"],
-      "cost_tier": "gateway-budgeted-paid",
-      "strengths": ["per-call-review-route"],
-      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
-      "notes": "PR review kernel only. Peak list price; quality provisional until replay outcomes exist.",
-      "quality_by_capability": {
-        "review": 74.2,
-        "review-verify": 74.2
-      },
-      "sources": [
-        "https://vercel.com/ai-gateway/models/deepseek-v4.1-flash",
-        "https://www.digitalapplied.com/blog/deepseek-v4-1-flash-pro-routing-prices-early-tests",
-        "https://flowtivity.ai/blog/deepseek-v4-1-flash-benchmarks/"
-      ]
-    },
-    {
       "id": "gateway-glm-5.3",
       "provider": "vercel-ai-gateway",
       "model": "zai/glm-5.3",
@@ -671,7 +672,7 @@
       "cost_tier": "gateway-budgeted-paid",
       "strengths": ["per-call-review-route"],
       "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
-      "notes": "PR review kernel only. Prices and quality mirror hyperagent-glm-5.3.",
+      "notes": "Retired PR review kernel catalog entry; not an active agent route. Prices and quality mirror hyperagent-glm-5.3.",
       "quality_by_capability": {
         "review": 66.9,
         "review-verify": 66.9

@@ -24,12 +24,18 @@ import {
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import {
+  featureRegistryDomain,
+  featureRegistryPacketFile,
+} from './feature-registry-domain.server';
+import {
   countCertificationStates,
   normalizeKernelCertificationRow,
 } from './normalize';
 import {
+  type PacketDecisionLedgerReads,
   type PacketDecisionRecord,
   readPacketDecisionLedger,
+  readPacketDecisionLedgers,
   recordPacketFounderDecision,
 } from './packet-decisions';
 import {
@@ -38,6 +44,10 @@ import {
   PACKET_FILE_DOMAINS,
   readCertificationPacketFiles,
 } from './packet-files.server';
+import {
+  prodGoldenPathPacketFiles,
+  readProdGoldenPathLedger,
+} from './prod-golden-path-ledger';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_INVENTORY_CONTRACT,
@@ -124,11 +134,42 @@ export interface OvieCertificationInventoryDeps {
   >;
 }
 
+/**
+ * Committed packet files plus the production golden-path ledger (JOV-9625).
+ * A ledger read failure is reported as an inventory issue and never hides
+ * the committed packets.
+ */
+export async function readPacketFilesWithGoldenPath(
+  backend: () => CertificationRecordBackend = postgresRecordBackend
+): Promise<CertificationPacketFileRead> {
+  const committed = await readCertificationPacketFiles();
+  try {
+    const ledger = await readProdGoldenPathLedger(backend());
+    if (!ledger) return committed;
+    return {
+      ...committed,
+      files: [...committed.files, ...prodGoldenPathPacketFiles(ledger)],
+    };
+  } catch (error) {
+    return {
+      ...committed,
+      issues: [
+        ...committed.issues,
+        {
+          domain: null,
+          source: 'ledger:prod-golden-path',
+          message: `Production golden-path ledger could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
 export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDeps =
   {
     marketingStore: getMarketingCertificationStore,
     backend: postgresRecordBackend,
-    readPacketFiles: () => readCertificationPacketFiles(),
+    readPacketFiles: () => readPacketFilesWithGoldenPath(),
     featureRegistry: { list: readFeatureRegistrySource },
     acquisitionEligibility: () => getAcquisitionEligibility(),
   };
@@ -178,7 +219,7 @@ function laterTimestamp(a: string, b: string): string {
   return Date.parse(a) >= Date.parse(b) ? a : b;
 }
 
-interface CertificationDomainProjection {
+export interface CertificationDomainProjection {
   readonly rows: OvieCertificationRow[];
   readonly deliveries: CertificationInboxDelivery[];
   readonly summary: OvieCertificationDomainSummary;
@@ -295,7 +336,8 @@ async function packetDomain(
   domain: OvieCertificationDomainId,
   files: readonly CertificationPacketFile[],
   deps: OvieCertificationInventoryDeps,
-  evaluatedAt: string
+  evaluatedAt: string,
+  ledgerReads: Promise<PacketDecisionLedgerReads>
 ): Promise<CertificationDomainProjection> {
   const label = OVIE_CERTIFICATION_DOMAIN_LABELS[domain];
   if (files.length === 0) {
@@ -313,7 +355,12 @@ async function packetDomain(
     };
   }
   try {
-    const ledger = await readPacketDecisionLedger(deps.backend(), domain);
+    const reads = await ledgerReads;
+    const read = reads.get(domain);
+    if (!read || !read.ok) {
+      throw new Error(`Decision ledger read failed for ${domain}.`);
+    }
+    const ledger = read.ledger;
     const projections = files.map(file =>
       packetProjection(
         file,
@@ -355,69 +402,6 @@ async function packetDomain(
       ],
     };
   }
-}
-
-const FEATURE_REGISTRY_SURFACE_LABELS = {
-  behavior: 'Atomic Behavior',
-  capability: 'Feature Capability',
-  component: 'Registry Component',
-} as const;
-
-function featureRegistryPacketFile(
-  item: FounderReviewItem,
-  sourceUpdatedAt: string
-): CertificationPacketFile {
-  return {
-    domain: 'feature_registry',
-    surface: FEATURE_REGISTRY_SURFACE_LABELS[item.scope],
-    packetUpdatedAt: sourceUpdatedAt,
-    links: [],
-    packet: item.certificationPacket,
-    file: item.source,
-  };
-}
-
-/**
- * The Feature Registry projects the same kernel admission and decision ledger
- * as packet-file domains; only the packet source differs (the committed
- * FEATURE_REGISTRY.md instead of worker packet files).
- */
-async function featureRegistryDomain(
-  deps: OvieCertificationInventoryDeps,
-  evaluatedAt: string
-): Promise<CertificationDomainProjection> {
-  const domain = 'feature_registry' as const;
-  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
-  try {
-    source = await deps.featureRegistry.list();
-  } catch {
-    return {
-      rows: [],
-      deliveries: [],
-      summary: {
-        domain,
-        label: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
-        status: 'error',
-        rowCount: 0,
-        note: 'The feature registry source could not be read.',
-      },
-      issues: [
-        {
-          domain,
-          source: 'feature_registry',
-          message: 'Feature registry read failed.',
-        },
-      ],
-    };
-  }
-  return packetDomain(
-    domain,
-    source.items.map(item =>
-      featureRegistryPacketFile(item, source.sourceUpdatedAt)
-    ),
-    deps,
-    evaluatedAt
-  );
 }
 
 /**
@@ -579,16 +563,23 @@ export async function readOvieCertificationInventory(
   generatedAt: string = new Date().toISOString()
 ): Promise<OvieCertificationInventory> {
   const packetRead = await deps.readPacketFiles();
+  // One batched read for every packet domain's decision ledger (JOV-12821):
+  // nine same-shape SELECTs here are what Sentry flagged as the N+1.
+  const ledgerReadsPromise = readPacketDecisionLedgers(
+    deps.backend(),
+    PACKET_FILE_DOMAINS
+  );
   const results = await Promise.all([
     marketingDomain(deps, generatedAt),
     customersDomain(deps, generatedAt),
-    featureRegistryDomain(deps, generatedAt),
+    featureRegistryDomain(deps, generatedAt, packetDomain),
     ...PACKET_FILE_DOMAINS.map(domain =>
       packetDomain(
         domain,
         packetRead.files.filter(file => file.domain === domain),
         deps,
-        generatedAt
+        generatedAt,
+        ledgerReadsPromise
       )
     ),
   ]);

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { createRightMetaCellRenderer } from '@/features/dashboard/organisms/release-provider-matrix/utils/release-table-renderers';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -105,6 +105,9 @@ describe('createRightMetaCellRenderer', () => {
 
     expect(screen.getByText('Scheduled')).toBeInTheDocument();
     expect(screen.getByText('Single')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: /^View DSP Distribution Details/i })
+    );
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('/smart/release-1')).toBeInTheDocument();
   });

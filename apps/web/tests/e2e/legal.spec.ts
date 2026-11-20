@@ -1,4 +1,23 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from './setup';
+
+/**
+ * The legal pages render their "Last updated" line straight out of the
+ * content/legal markdown: `getLegalDocument` parses the same
+ * `_Last updated: …_` line that `LegalHero` paints. Anchor the expectation
+ * to that source of truth so the rendered pages can never drift from the
+ * shipped documents (the policies moved to October 2026 in JOV-9787).
+ */
+const legalLastUpdated = (slug: 'privacy' | 'terms'): string => {
+  const raw = readFileSync(`content/legal/${slug}.md`, 'utf8');
+  const match = raw.match(/^_Last updated: (.+)_$/m);
+  if (!match) {
+    throw new Error(
+      `content/legal/${slug}.md is missing its _Last updated:_ line`
+    );
+  }
+  return match[1];
+};
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const LEGAL_LAYOUT_ROUTES = [
@@ -186,7 +205,9 @@ test.describe('Legal Pages', () => {
 
     test('displays privacy policy page correctly', async ({ page }) => {
       await expect(page.locator('h1')).toContainText('Privacy Policy');
-      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByText(`Last updated: ${legalLastUpdated('privacy')}`)
+      ).toBeVisible();
       await expect(
         page.getByText('We collect only what is essential')
       ).toBeVisible();
@@ -261,7 +282,9 @@ test.describe('Legal Pages', () => {
 
     test('displays terms of service page correctly', async ({ page }) => {
       await expect(page.locator('h1')).toContainText('Terms of Service');
-      await expect(page.getByText('Last updated: February 2026')).toBeVisible();
+      await expect(
+        page.getByText(`Last updated: ${legalLastUpdated('terms')}`)
+      ).toBeVisible();
       await expect(
         page.getByText('Jovie is governed by clear policies')
       ).toBeVisible();

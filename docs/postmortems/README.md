@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-31 | [A missed review deadline failed every merge group for about seven hours](2026-10-31-review-deadline-queue-stall.md) | `unowned-incident`, `evidence-forgery-or-staleness`, `non-convergent-control-loop` | draft |
 | 2026-10-21 | [Unreadable production ancestry became a successful supersession](2026-10-21-production-lineage-unknown-supersession.md) | `green-by-implication`, `pre-merge-parity-gap` | draft |
 | 2026-10-20 | [Screenshot accessibility failures blocked production freshness](2026-10-20-screenshot-accessible-name-freeze.md) | `pre-merge-parity-gap` | draft |
 | 2026-10-16 | [Desktop draft preparation failed on installation quota](2026-10-16-desktop-draft-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
@@ -80,7 +81,8 @@ session ended, Summer assigns the write-up.
 
 Copy [TEMPLATE.md](TEMPLATE.md). Required sections: summary, impact (time to
 detect, time to own, time to repair, what was blocked), timeline, root cause,
-contributing causes, **failure classes and invariants violated**, why
+contributing causes, **revert first** (when the culprit's revert PR opened, or why no
+culprit existed; required in frontmatter from 2026-11-12), **failure classes and invariants violated**, why
 detection failed, the instance fix, **systemic controls** applied to every
 similar surface, action items as Linear issues, and open questions. Mark every
 claim you could not verify from source as `unverified`.
@@ -95,6 +97,7 @@ status: draft | reviewed | controls-verified | closed
 severity: sev1 | sev2 | sev3
 detected: 2026-09-23T21:37Z
 repaired: 2026-09-26T22:45Z
+revert_opened: 2026-09-23T21:52Z | none: <why no culprit commit existed>
 failure_classes: [silent-production-staleness]
 detectable_before_human: false
 detection_gaps: [missing-signal, missing-invariant]

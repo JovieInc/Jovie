@@ -38,9 +38,16 @@ describe('Contacts authenticated-surface evals', () => {
   it('keeps Contacts on one primary workspace surface', () => {
     const page = readWeb('app/app/(shell)/contacts/page.tsx');
 
-    expect(page.match(/<WorkspacePage/g) ?? []).toHaveLength(1);
+    expect(page).not.toContain('<PageToolbar');
+    expect(page).not.toContain('RouteSegmentControl');
     expect(page).toContain("frame='none'");
     expect(page).toContain("contentPadding='none'");
+
+    const table = readWeb(
+      'components/features/dashboard/organisms/contacts-table/ContactsTable.tsx'
+    );
+    expect(table.match(/<PageToolbar/g) ?? []).toHaveLength(1);
+    expect(table).toContain('AudienceWorkspaceSwitch');
   });
 
   it('keeps Contact and Audience details on one shared flat rail surface and reserves elevation for overlays', () => {

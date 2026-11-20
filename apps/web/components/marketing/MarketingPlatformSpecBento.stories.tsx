@@ -8,7 +8,11 @@ const meta: Meta<typeof MarketingPlatformSpecBento> = {
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <MarketingPageShell>
+      // Production marketing routes wrap content in .system-b-marketing (see
+      // app/(marketing)/layout.tsx), which selects the higher-contrast System
+      // B accent ramp (accent-purple #a982ff). Without it the tile titles
+      // fall back to #8e56f5, which fails WCAG AA on the tile surface.
+      <MarketingPageShell className='system-b-marketing'>
         <Story />
       </MarketingPageShell>
     ),

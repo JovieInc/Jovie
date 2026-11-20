@@ -11,6 +11,7 @@ import {
   smokeNavigateWithRetry,
   withRetry,
 } from '../e2e/utils/smoke-test-utils';
+import { waitForShellReadyAfterAuth } from './shell-ready';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 // ============================================================================
@@ -232,45 +233,6 @@ async function enableTestAuthBypass(
   }
 }
 
-async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
-  const main = page.locator('main').first();
-  const chatComposer = page
-    .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
-    .first();
-  const isShellReady = async () =>
-    (await main.isVisible().catch(() => false)) ||
-    (await chatComposer.isVisible().catch(() => false));
-
-  // The `creator` persona keeps onboarding incomplete by design, so the
-  // post-bypass landing can be /start instead of /app. There, the
-  // OnboardingSessionBoundary (JOV-7689) mounts the shell only after a
-  // client-side conversation restore resolves; a failed restore leaves a
-  // static Try Again state with no <main>/composer — a reload is the same
-  // recovery the surface itself offers. Retry the navigation once mid-poll:
-  // /app states always render <main> (shell skeleton included), so the
-  // reload can only fire on a stuck /start boundary.
-  const reloaded = { value: false };
-
-  await expect
-    .poll(
-      async () => {
-        if (await isShellReady()) return true;
-        if (!reloaded.value) {
-          const url = new URL(page.url());
-          if (url.pathname.startsWith('/start')) {
-            reloaded.value = true;
-            await page
-              .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
-              .catch(() => undefined);
-          }
-        }
-        return false;
-      },
-      { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
-    )
-    .toBe(true);
-}
-
 export async function setTestAuthBypassSession(
   page: Page,
   persona: DevTestAuthPersona | null,
@@ -289,16 +251,36 @@ export async function setTestAuthBypassSession(
     persona === null && overrideUserId && !overrideUserId.startsWith('e2e-')
       ? overrideUserId
       : undefined;
-  const response = await page.request.post(
-    `${baseUrl}/api/dev/test-auth/session`,
-    {
-      data: {
-        persona: provisionedPersona,
-        ...(existingUserId ? { existingUserId } : {}),
-        ...(options?.email ? { email: options.email } : {}),
-      },
+  // JOV-12753: the standalone server occasionally resets an idle keep-alive
+  // socket under the visual suites' worker concurrency (apiRequestContext.post
+  // read ECONNRESET, flaky-recovered on retry in run 43944168912). A thrown
+  // network failure here writes a Playwright error-context artifact whose
+  // call log embeds the live session cookie — which the artifact guard then
+  // blocks as credential-text and fails the whole lane. Retry only thrown
+  // connection errors; HTTP error statuses still fail closed on the first
+  // response, and the guard is untouched.
+  const attempts = 3;
+  let response!: Awaited<ReturnType<typeof page.request.post>>;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      response = await page.request.post(
+        `${baseUrl}/api/dev/test-auth/session`,
+        {
+          data: {
+            persona: provisionedPersona,
+            ...(existingUserId ? { existingUserId } : {}),
+            ...(options?.email ? { email: options.email } : {}),
+          },
+        }
+      );
+      break;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      await new Promise(resolve => {
+        setTimeout(resolve, 250 * attempt);
+      });
     }
-  );
+  }
   const body = (await response.json().catch(() => null)) as {
     success?: boolean;
     userId?: string | null;

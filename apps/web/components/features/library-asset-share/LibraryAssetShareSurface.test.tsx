@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FOUNDER_DEMO_PERSONA } from '@/lib/demo-personas';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LibraryAssetShareSurface } from './LibraryAssetShareSurface';
 import { WEB194_PRIVATE_ASSET_VIEW } from './LibraryAssetShareSurface.stories';
 
@@ -22,8 +23,10 @@ describe('web-194 private asset share source contract', () => {
     });
   });
 
-  it('renders the exact production body without a token fixture', () => {
-    render(<LibraryAssetShareSurface view={WEB194_PRIVATE_ASSET_VIEW} />);
+  it('renders the exact production body without a token fixture', async () => {
+    const { container } = render(
+      <LibraryAssetShareSurface view={WEB194_PRIVATE_ASSET_VIEW} />
+    );
 
     expect(
       screen.getByRole('heading', {
@@ -44,6 +47,57 @@ describe('web-194 private asset share source contract', () => {
         name: `${WEB194_PRIVATE_ASSET_VIEW.title} artwork`,
       })
     ).toHaveClass('object-contain');
+    await expectNoA11yViolations(container);
+  });
+
+  it('marks private and public links with the status tokens', () => {
+    const { rerender } = render(
+      <LibraryAssetShareSurface view={WEB194_PRIVATE_ASSET_VIEW} />
+    );
+    const privateBadge = screen.getByText('Private link');
+    expect(privateBadge).toHaveClass('border-warning/30', 'text-warning');
+    expect(privateBadge.className).not.toMatch(/amber|emerald/);
+
+    rerender(
+      <LibraryAssetShareSurface
+        view={{ ...WEB194_PRIVATE_ASSET_VIEW, visibility: 'public' }}
+      />
+    );
+    const publicBadge = screen.getByText('Public link');
+    expect(publicBadge).toHaveClass('border-success/30', 'text-success');
+    expect(publicBadge.className).not.toMatch(/amber|emerald/);
+  });
+
+  it('renders a release with no artwork, preview or smart link axe-clean', async () => {
+    const { container } = render(
+      <LibraryAssetShareSurface
+        view={{
+          ...WEB194_PRIVATE_ASSET_VIEW,
+          artworkUrl: null,
+          previewUrl: null,
+          smartLinkPath: null,
+        }}
+      />
+    );
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long Arabic title axe-clean in a right-to-left document', async () => {
+    const title =
+      'منتصف الليل على الطريق السريع، النسخة الموسعة مع كل المقاطع الإضافية';
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <LibraryAssetShareSurface
+          view={{ ...WEB194_PRIVATE_ASSET_VIEW, title }}
+        />
+      </div>
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: title })
+    ).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 
   it("keeps private-token lookup and metadata in the route's server boundary", () => {
@@ -76,5 +130,13 @@ describe('web-194 private asset share source contract', () => {
     expect(story).toContain('FOUNDER_DEMO_PERSONA.releases[0]');
     expect(story).not.toContain('accessToken');
     expect(story).not.toContain('token:');
+  });
+
+  it('keeps the eyebrow Title Case, never uppercase-transformed', () => {
+    const source = readFileSync(
+      resolve(__dirname, './LibraryAssetShareSurface.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\buppercase\b/);
   });
 });

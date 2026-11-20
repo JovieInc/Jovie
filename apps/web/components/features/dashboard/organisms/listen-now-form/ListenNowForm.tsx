@@ -510,7 +510,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       <FormStatus
         error={error}
-        success={success ? 'Music links saved!' : undefined}
+        success={success ? 'Music links saved' : undefined}
       />
     </form>
   );

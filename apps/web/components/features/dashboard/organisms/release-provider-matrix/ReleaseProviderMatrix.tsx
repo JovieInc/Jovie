@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/ReleaseProviderMatrix.test.tsx
+
 import { ConfirmDialog } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
@@ -30,6 +32,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { buildReleaseAlbumArtChatPrompt } from '@/lib/chat/release-chat-prompts';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import { useAppFlag } from '@/lib/flags/client';
@@ -485,13 +488,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const handleGenerateAlbumArt = useCallback(
     (release: ReleaseViewModel) => {
       openChatWithPrompt(
-        `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
-          {
-            releaseId: release.id,
-            releaseTitle: release.title,
-            instruction: 'Show three options.',
-          }
-        )}`,
+        buildReleaseAlbumArtChatPrompt({
+          releaseId: release.id,
+          releaseTitle: release.title,
+        }),
         router
       );
     },
@@ -1133,6 +1133,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
+          connected={isConnected}
+          connectedArtistName={artistName}
           onConnected={handleArtistConnected}
           onImportStart={handleImportStart}
         />

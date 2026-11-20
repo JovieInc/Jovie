@@ -11,7 +11,6 @@
  * `isDeterministicTestOtpEmail`).
  */
 
-import { env } from '@/lib/env';
 import { escapeHtml } from '../utils';
 
 export interface AuthOtpTemplateData {
@@ -53,12 +52,4 @@ export function getAuthOtpHtml(data: AuthOtpTemplateData): string {
       </p>
     </div>
   `;
-}
-
-/**
- * Resolve the Resend "from" address. Falls back to a sensible default when
- * `RESEND_FROM_EMAIL` is unset (local dev without the env var).
- */
-export function getAuthOtpFromEmail(): string {
-  return env.RESEND_FROM_EMAIL || 'Jovie <no-reply@jov.ie>';
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import {
@@ -61,14 +60,6 @@ export function SmartLinksDemo() {
       className='mx-auto w-full max-w-sm rounded-4xl border border-white/10 bg-surface-0 p-4 shadow-card-elevated sm:p-6'
       data-testid='smart-links-demo'
     >
-      <div className='mb-5 flex items-center justify-between gap-3'>
-        <span className='text-xs font-medium text-tertiary-token'>
-          LIVE DEMO
-        </span>
-        <span className='text-xs text-tertiary-token'>
-          jov.ie/tim/{releaseIndex ? 'the-deep-end' : 'never-say-a-word'}
-        </span>
-      </div>
       <div className='relative mx-auto aspect-square w-full max-w-62 overflow-hidden rounded-xl bg-surface-2'>
         <Image
           src={release.art}
@@ -91,10 +82,10 @@ export function SmartLinksDemo() {
           onSelect={setSelectedId}
           actionLabel='Open live Smart Link'
           groupLabel='Try the streaming service dial'
-          hint='Swipe, tap, or use arrow keys. Your selection follows the next release.'
+          hint='Pick a service. Your choice carries to the next release.'
         />
       </div>
-      <div className='mt-2 flex items-center justify-between gap-3 border-t border-white/10 pt-4'>
+      <div className='mt-2 flex items-center justify-center border-t border-white/10 pt-4'>
         <button
           type='button'
           onClick={() => setReleaseIndex(index => (index === 0 ? 1 : 0))}
@@ -104,13 +95,6 @@ export function SmartLinksDemo() {
             ? 'See the next release →'
             : 'Back to first release'}
         </button>
-        <Link
-          className='text-sm text-secondary-token underline underline-offset-4'
-          href='/tim'
-          prefetch={false}
-        >
-          Artist profile
-        </Link>
       </div>
     </div>
   );

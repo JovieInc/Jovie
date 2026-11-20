@@ -9,20 +9,26 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock('@jovie/ui', async () => {
+  const { PlainButton } = await vi.importActual<
+    typeof import('@jovie/ui/atoms/plain-button')
+  >('@jovie/ui/atoms/plain-button');
+  return {
+    PlainButton,
+    DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
 const workspaces = [
   {
@@ -68,12 +74,24 @@ describe('WorkspaceSelector', () => {
     }
   );
 
+  it('cancels its padding so the brand mark sits on the nav icon column', () => {
+    render(
+      <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
+    );
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
+    // -ml-1.5 cancels px-1.5: the mark starts at the 12px sidebar inset.
+    expect(trigger).toHaveClass('-ml-1.5', 'px-1.5');
+    expect(trigger.className).not.toMatch(/(?:^|\s)px-2\.5(?:\s|$)/);
+    // The collapsed rail centres the mark instead.
+    expect(trigger).toHaveClass('group-data-[collapsible=icon]:ml-0');
+  });
+
   it('renders the active workspace in a stable selector trigger', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
     expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
@@ -87,7 +105,7 @@ describe('WorkspaceSelector', () => {
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     const label = within(trigger).getByText('OV');
     // JOV-4522: max-width + opacity + travel keep the label mounted during
     // the rail collapse instead of popping to display:none at frame one.
@@ -129,7 +147,7 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /^Switch Workspace: / })
     ).toHaveTextContent('Jovie');
   });
 
@@ -142,5 +160,25 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('rests on the brand mark and keeps the workspace name in the reveal box', () => {
+    render(
+      <WorkspaceSelector
+        currentWorkspaceId='customer'
+        workspaces={workspaces}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Switch Workspace: Jovie',
+    });
+    // globals.css hides `.sidebar-wordmark` at rest and grows it on hover,
+    // focus-visible or while the menu is open.
+    expect(trigger).toHaveClass('sidebar-wordmark-reveal');
+    const wordmark = trigger.querySelector('.sidebar-wordmark');
+    expect(wordmark).toHaveClass('overflow-hidden');
+    expect(wordmark).toHaveTextContent('Jovie');
+    // No flex gap: the hidden name must not pad the resting trigger.
+    expect(trigger.className).not.toMatch(/(?:^|\s)gap-/);
   });
 });

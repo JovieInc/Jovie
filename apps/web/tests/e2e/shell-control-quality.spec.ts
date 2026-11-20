@@ -1,10 +1,17 @@
-import { expect, type Page, test } from '@playwright/test';
-import { SHELL_RAIL_PREVIEW_GRACE_MS } from '@/components/shell/rail-motion';
+import { expect, test } from '@playwright/test';
 import {
-  detectReversibleControl,
-  type ReversibleActivation,
-} from '../utils/reversible-control-detector';
+  SHELL_RAIL_PREVIEW_GRACE_MS,
+  SHELL_RAIL_PREVIEW_INTENT_MS,
+} from '@/components/shell/rail-motion';
+import { findClippedFocusRings } from './utils/focus-ring-clipping';
+import {
+  certify,
+  expectAtMostOneSelectedNavRow,
+  homeFocusAnchor,
+  openDraftAnchor,
+} from './utils/shell-control-quality-helpers';
 import { inspectShellMaterial } from './utils/shell-material-detector';
+import { controls, expectRailPushesRoute } from './utils/shell-rail-controls';
 import {
   gotoAuthenticatedChatRoute,
   waitForHydration,
@@ -15,73 +22,6 @@ test.use({
   viewport: { width: 1440, height: 900 },
 });
 
-// Reuse the existing detector with ten COMPLETE cycles, mixing activation
-// methods. Hidden staged controls are mounted but never logical actions.
-const sequence: ReversibleActivation[] = Array.from(
-  { length: 20 },
-  (_, index) => (index % 3 === 0 ? 'keyboard' : 'pointer')
-);
-const controls = (page: Page, side: 'left' | 'right') =>
-  page
-    .locator(`[data-rail-toggle="${side}"]:not([inert] *)`)
-    .filter({ visible: true });
-
-async function certify(page: Page, side: 'left' | 'right') {
-  const toggle = controls(page, side);
-  const count = await toggle.count();
-  if (count !== 1)
-    throw new Error(`expected one logical ${side} rail action, found ${count}`);
-  const initial =
-    (await toggle.getAttribute('aria-expanded')) === 'true' ? 'open' : 'closed';
-  return detectReversibleControl({
-    name: `real composed ${side} rail`,
-    states: initial === 'open' ? ['open', 'closed'] : ['closed', 'open'],
-    activationSequence: sequence,
-    observe: async () => ({
-      pinned:
-        side === 'left'
-          ? await page
-              .locator('#shell-left-rail')
-              .getAttribute('data-rail-pinned')
-          : null,
-      preview: await page
-        .locator(`[data-rail-preview-region="${side}"]`)
-        .getAttribute('data-rail-preview'),
-      state:
-        (await controls(page, side).getAttribute('aria-expanded')) === 'true'
-          ? 'open'
-          : 'closed',
-    }),
-    activate: async via => {
-      if (via === 'pointer') await controls(page, side).click();
-      else await controls(page, side).press(side === 'left' ? '[' : ']');
-      const movingRail = page
-        .locator(
-          side === 'left'
-            ? '[data-state][data-rail-phase]'
-            : '[data-testid="app-shell-right-rail"] [data-rail-phase]'
-        )
-        .first();
-      await expect(movingRail).toHaveAttribute(
-        'data-rail-phase',
-        /^(open|closed)$/
-      );
-    },
-    assertContinuity: async () => {
-      const count = await controls(page, side).count();
-      if (count !== 1)
-        throw new Error(
-          `expected one logical ${side} rail action, found ${count}`
-        );
-      await expect(controls(page, side)).toBeEnabled();
-      await expect(page.locator('[data-app-shell-frame]')).toHaveAttribute(
-        'data-quality-probe',
-        'mounted'
-      );
-    },
-  });
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto(
     '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app',
@@ -89,21 +29,65 @@ test.beforeEach(async ({ page }) => {
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
-  await expect(
-    page.getByRole('textbox', { name: 'Notes', exact: true })
-  ).toBeVisible();
+  // Home's Notes only render beside a real queue item and this persona's
+  // queue can be empty, so the Needs You tab is the settle/focus anchor.
+  await expect(homeFocusAnchor(page)).toBeVisible();
   await expect(controls(page, 'left')).toHaveCount(1);
   await page
     .locator('[data-app-shell-frame]')
     .evaluate(element => element.setAttribute('data-quality-probe', 'mounted'));
 });
 
+test('keyboard focus rings on the app shell are never clipped by an overflow ancestor', async ({
+  page,
+}, testInfo) => {
+  const report = await findClippedFocusRings(page);
+  await testInfo.attach('focus-ring-clipping', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  expect(report.visited).toBeGreaterThan(0);
+  // The sidebar header (bell, search, rail toggle) must be in the tab walk.
+  await expect(
+    page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+  ).toBeVisible();
+  expect(report.findings).toEqual([]);
+});
+
+test('the sidebar logo row and the page title share one center line', async ({
+  page,
+}) => {
+  // Tim, Nov 14: on web the logo row sat 12px below "Home". Every header
+  // row across the sidebar and the content must center on the same line.
+  const centers = await page.evaluate(() => {
+    const center = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) return null;
+      const box = element.getBoundingClientRect();
+      return box.height > 0 ? box.top + box.height / 2 : null;
+    };
+    return {
+      sidebarHeader: center('[data-sidebar="header"]'),
+      sidebarActions: center('[data-sidebar-header-actions]'),
+      contentHeader: center('[data-testid="dashboard-header"]'),
+      contentTitle: center('[data-testid="dashboard-header-title-slot"]'),
+    };
+  });
+  for (const [name, value] of Object.entries(centers)) {
+    expect(value, `${name} is not rendered`).not.toBeNull();
+  }
+  const line = centers.contentTitle ?? 0;
+  for (const [name, value] of Object.entries(centers)) {
+    expect(Math.abs((value ?? 0) - line), name).toBeLessThanOrEqual(1);
+  }
+});
+
 test('composed browser rails survive ten complete mixed-input cycles, preserve drafts, and reject duplicate actions', async ({
   page,
 }, testInfo) => {
+  const notes = await openDraftAnchor(page);
   await certify(page, 'left');
   await certify(page, 'right');
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
   await notes.fill('Shell regression draft [ ]');
   const before = await controls(page, 'left').getAttribute('aria-expanded');
   await notes.press('ControlOrMeta+b');
@@ -192,7 +176,7 @@ test('rapid reversals preserve final intent, attachment and inspector scroll geo
   );
 });
 
-for (const side of ['left', 'right'] as const) {
+for (const side of ['right'] as const) {
   test(`${side} hover and focus preview preserves allocation and saved pinning for ten cycles`, async ({
     page,
   }, testInfo) => {
@@ -213,7 +197,7 @@ for (const side of ['left', 'right'] as const) {
           requestAnimationFrame(() => requestAnimationFrame(resolve))
         )
     );
-    const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+    const notes = homeFocusAnchor(page);
     await notes.focus();
     await page.mouse.move(700, 450);
     const plane = page.locator('main#main-content');
@@ -226,25 +210,9 @@ for (const side of ['left', 'right'] as const) {
         ? '#shell-left-rail [data-sidebar="sidebar"]'
         : '#shell-artist-profile-rail'
     );
-    // Since #22207 the left navigation opens only on explicit activation:
-    // a hover preview moved the toggle before the pointer could click it.
-    // The right inspector keeps its hover/focus preview.
-    const previewsOnHover = side === 'right';
+    // The left flyout has its own spec below (hover intent, pin, Esc).
     for (let cycle = 0; cycle < 10; cycle++) {
       await controls(page, side).hover();
-      if (!previewsOnHover) {
-        await expect(controls(page, side)).toHaveAttribute(
-          'aria-expanded',
-          'false'
-        );
-        await expect(controls(page, side)).toHaveAccessibleName(
-          'Expand sidebar'
-        );
-        await expect(notes).toBeFocused();
-        await expect.poll(async () => plane.boundingBox()).toEqual(initial);
-        await page.mouse.move(700, 450);
-        continue;
-      }
       await expect(controls(page, side)).toHaveAttribute(
         'aria-expanded',
         'true'
@@ -267,25 +235,91 @@ for (const side of ['left', 'right'] as const) {
     expect(
       (await page.context().cookies()).filter(c => c.name === 'sidebar:state')
     ).toEqual(cookies);
-    // Focus is equivalent access; explicit toggle pins the preview (right)
-    // or opens the navigation (left, which has no preview).
+    // Focus is equivalent access; explicit toggle pins the preview.
     await controls(page, side).focus();
-    await expect(controls(page, side)).toHaveAccessibleName(
-      previewsOnHover ? /Pin / : 'Expand sidebar'
-    );
+    await expect(controls(page, side)).toHaveAccessibleName(/Pin /);
     await controls(page, side).press('Enter');
-    await expect(controls(page, side)).toHaveAccessibleName(
-      side === 'left' ? 'Collapse sidebar' : /Hide .* profile/
-    );
+    await expect(controls(page, side)).toHaveAccessibleName(/Hide .* profile/);
     await page.mouse.move(700, 450);
     await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
     await expect(controls(page, side)).toHaveAttribute('aria-expanded', 'true');
+    // Founder call (2026-11-08): the preview floats; a pinned rail pushes.
+    await expectRailPushesRoute(plane, inspector, initial);
     await testInfo.attach(`${side}-preview-after`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
   });
 }
+
+test('left flyout: hover intent peeks, Escape closes, pin pushes, unpin returns, arrows roam', async ({
+  page,
+}, testInfo) => {
+  const rail = page.locator('#shell-left-rail');
+  const plane = page.locator('main#main-content');
+  const railX = 26;
+  const toggle = page
+    .locator('[data-rail-toggle="left"]')
+    .filter({ visible: true });
+  if ((await toggle.first().getAttribute('aria-expanded')) === 'true')
+    await toggle.first().click();
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  await page.mouse.move(700, 450);
+  const initial = await plane.boundingBox();
+
+  // A pass-through shorter than the intent dwell never flickers it open.
+  await page.mouse.move(railX, 300);
+  await page.mouse.move(700, 450);
+  await page.waitForTimeout(SHELL_RAIL_PREVIEW_INTENT_MS + 80);
+  await expect(rail).not.toHaveAttribute('data-rail-preview', 'true');
+
+  // Dwell on the rail peeks: floats over content, never pushes it.
+  await page.mouse.move(railX, 300);
+  await expect(rail).toHaveAttribute('data-rail-preview', 'true');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+  await expect.poll(async () => plane.boundingBox()).toEqual(initial);
+  await testInfo.attach('left-flyout-peek', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+
+  // Escape closes the peek without touching the saved pin.
+  await page.keyboard.press('Escape');
+  await expect(rail).not.toHaveAttribute('data-rail-preview', 'true');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+
+  // Pin from a fresh peek: the content plane yields (pushes), no overlay.
+  await page.mouse.move(700, 450);
+  await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
+  await page.mouse.move(railX, 300);
+  await expect(rail).toHaveAttribute('data-rail-preview', 'true');
+  await rail.getByRole('button', { name: 'Pin sidebar' }).click();
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'true');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+  await expect
+    .poll(async () => (await plane.boundingBox())!.x)
+    .toBeGreaterThan(initial!.x + 100);
+  await page.mouse.move(700, 450);
+  await page.keyboard.press('Escape');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'true');
+  await testInfo.attach('left-flyout-pinned', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+
+  // Arrow keys roam the navigation rows.
+  const rows = rail.locator('nav a[href]');
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  // Unpin returns to the collapsed rail.
+  await rail.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+});
 
 test('rendered Home material detector rejects a deliberate inset seam', async ({
   page,
@@ -321,17 +355,27 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
-    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
-    // the Identity destination is titled `Profiles` since #20953.
-    for (const [linkName, heading, pathname] of [
+    // [sidebar entry, page heading, pathname]. The Identity destination is
+    // titled `Profiles` since #20953. `/app` has no rail row any more: the
+    // header bell (named Inbox) is its entry, and header + tab title say
+    // Inbox to match (Tim 2026-11-14).
+    for (const [entry, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['Inbox', 'Home', '/app'],
+      ['bell', 'Inbox', '/app'],
     ] as const) {
-      await page.getByRole('link', { name: linkName, exact: true }).click();
+      await (entry === 'bell'
+        ? page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+        : page.getByRole('link', { name: entry, exact: true })
+      ).click();
+      // While the destination resolves, at most one row may look selected.
+      await expectAtMostOneSelectedNavRow(page, `${pathname} (loading)`);
       await page.waitForURL(url => url.pathname === pathname);
+      await expectAtMostOneSelectedNavRow(page, pathname);
+      if (pathname === '/app') {
+        await expect(page).toHaveTitle(/^Inbox \| /);
+      }
       await expect(
         page.getByRole('heading', { name: heading, exact: true }).first()
       ).toBeVisible();
@@ -407,7 +451,7 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
 test('resizing through narrow drawers clears stale locks and preserves the desktop pin', async ({
   page,
 }, testInfo) => {
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+  const notes = homeFocusAnchor(page);
   await expect(controls(page, 'left')).toHaveAttribute('aria-pressed', 'true');
   const savedPin = (await page.context().cookies()).filter(
     cookie => cookie.name === 'sidebar:state'

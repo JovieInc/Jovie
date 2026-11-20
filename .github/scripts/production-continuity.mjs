@@ -141,11 +141,16 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
     unknownReasons: unknown.map(item => item.reason ?? 'unknown'),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
-    // A stale production is a release-pipeline failure, not a provider
-    // outage: it pages the founder but never admits a provider-recovery task.
-    requiresAgentIngress: unhealthy.some(
+    // Every unhealthy verdict is admitted to Summer's No Unattended Red queue.
+    // A stale production is a release-pipeline failure, not a provider outage,
+    // so it routes as production-controller-failed (gem investigates) instead
+    // of provider-unavailable. It used to be skipped, so only the founder knew.
+    requiresAgentIngress: unhealthy.length > 0,
+    agentIngressFailure: unhealthy.some(
       item => item.incidentClass !== FRESHNESS_INCIDENT_CLASS
-    ),
+    )
+      ? 'provider-unavailable'
+      : 'production-controller-failed',
   };
 }
 
@@ -311,6 +316,12 @@ export async function observeProductionFreshness({
     unshippedCommits,
     oldestUnshippedAt,
     unshippedAgeSeconds,
+    // Production serves an ancestor of main and is within its freshness bound:
+    // the release FIFO is catching up, not stalled.
+    catchingUp: !stale,
+    summary: stale
+      ? `behind by ${unshippedCommits}, stale`
+      : `behind by ${unshippedCommits}, catching up`,
   };
 }
 
@@ -634,6 +645,7 @@ export async function runCli({
         `unknown_reasons=${result.unknownReasons.join(',')}`,
         `incident_key=${incidentKey}`,
         `requires_agent_ingress=${result.requiresAgentIngress}`,
+        `agent_ingress_failure=${result.agentIngressFailure}`,
       ].join('\n') + '\n',
       'utf8'
     );

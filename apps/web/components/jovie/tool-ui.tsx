@@ -32,20 +32,17 @@ import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard'
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
 import { ChatMerchActionCard } from './components/ChatMerchActionCard';
 import {
-  ChatMerchOptionsCard,
   ChatMerchSelectionCard,
-  isChatMerchGenerationResult,
   isChatMerchSelectionResult,
 } from './components/ChatMerchCard';
-import {
-  ChatMerchDesignCarousel,
-  ChatMerchDesignCarouselLoading,
-  isChatMerchDesignCarouselResult,
-} from './components/ChatMerchDesignCarousel';
 import { ChatOpsDataCard } from './components/ChatOpsDataCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import { ChatPresenceArtifactCard } from './components/ChatPresenceArtifactCard';
 import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
+import {
+  merchOutcomeStatusTitle,
+  renderMerchGenerationArtifact,
+} from './merch-tool-artifacts';
 import { resolveToolStatuses } from './tool-status';
 import type {
   ChatInsightsToolResult,
@@ -165,7 +162,9 @@ function getToolStatusTitle(event: PersistedToolEvent): string {
     case 'needs-approval':
       return `${config.label} needs your OK`;
     case 'succeeded':
-      return config.successTitle ?? config.label;
+      return (
+        merchOutcomeStatusTitle(event) ?? config.successTitle ?? config.label
+      );
   }
 }
 
@@ -239,6 +238,22 @@ function getActivityTimelineEdge(
   return 'middle';
 }
 
+/**
+ * A tool whose completion was never confirmed is internal bookkeeping, not
+ * something to show a user ("Merch source: status unknown / Completion has not
+ * been confirmed" was a reported defect). Hidden unless verbose mode is on.
+ */
+export function isUnconfirmedToolStatus(
+  event: PersistedToolEvent,
+  status: OperationStatus
+): boolean {
+  return (
+    !isLockedToolEvent(event) &&
+    (status === 'unknown' ||
+      (event.state === 'succeeded' && status === 'pending'))
+  );
+}
+
 function ToolActivityRow({
   event,
   status,
@@ -254,10 +269,7 @@ function ToolActivityRow({
   count: number;
   feedback?: ChatToolFeedbackContext;
 }>) {
-  const unconfirmed =
-    !isLockedToolEvent(event) &&
-    (status === 'unknown' ||
-      (event.state === 'succeeded' && status === 'pending'));
+  const unconfirmed = isUnconfirmedToolStatus(event, status);
   const title = unconfirmed
     ? `${getToolUiConfig(event.toolName).label}: ${status === 'pending' ? 'saving result' : 'status unknown'}`
     : getToolStatusTitle(event);
@@ -344,7 +356,7 @@ function ToolActivityRow({
 }
 
 function ToolActivityFeed({
-  events,
+  events: allEvents,
   statuses,
   variant,
   feedback,
@@ -354,6 +366,16 @@ function ToolActivityFeed({
   variant: ToolRendererVariant;
   feedback?: ChatToolFeedbackContext;
 }>) {
+  const showVerbose = isVerboseToolModeEnabled();
+  const events = showVerbose
+    ? allEvents
+    : allEvents.filter(
+        event =>
+          !isUnconfirmedToolStatus(
+            event,
+            statuses.get(event.toolCallId) ?? 'unknown'
+          )
+      );
   if (events.length === 0) {
     return null;
   }
@@ -551,25 +573,6 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
       pitches={event.output.pitches}
     />
   );
-}
-
-function renderMerchGenerationArtifact(
-  event: PersistedToolEvent,
-  profileId?: string
-): ReactNode {
-  if (event.state === 'running') {
-    return <ChatMerchDesignCarouselLoading />;
-  }
-  if (isChatMerchDesignCarouselResult(event.output)) {
-    return (
-      <ChatMerchDesignCarousel result={event.output} profileId={profileId} />
-    );
-  }
-  if (!isChatMerchGenerationResult(event.output)) {
-    return null;
-  }
-
-  return <ChatMerchOptionsCard result={event.output} />;
 }
 
 function renderMerchSelectionArtifact(

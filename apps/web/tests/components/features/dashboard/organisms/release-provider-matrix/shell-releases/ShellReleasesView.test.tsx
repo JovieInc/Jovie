@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
@@ -12,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableActionMenuProps } from '@/components/atoms/table-action-menu/types';
 import { useImportPolling } from '@/components/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
+import { INITIAL_LIST_PAINT_BUDGET_MS } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/useInitialListPaintGate';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import {
   HeaderActionsProvider,
@@ -25,7 +28,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState, testState } =
   vi.hoisted(() => ({
-    testState: { realActionMenu: false },
+    testState: { realActionMenu: false, albumArtFlag: false },
     mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
     mockUsePlanGate: vi.fn(() => ({
       isLoading: false,
@@ -64,7 +67,8 @@ vi.mock('@/contexts/TableMetaContext', () => ({
 }));
 
 vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => false,
+  useAppFlag: (flag: string) =>
+    flag === 'ALBUM_ART_GENERATION' && testState.albumArtFlag,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -100,7 +104,6 @@ vi.mock('sonner', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
@@ -137,9 +140,21 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
-    SpotifyConnectDialog: ({ open }: { open: boolean }) =>
+    SpotifyConnectDialog: ({
+      open,
+      connected,
+      connectedArtistName,
+    }: {
+      open: boolean;
+      connected?: boolean;
+      connectedArtistName?: string | null;
+    }) =>
       open ? (
-        <div data-testid='spotify-connect-dialog'>
+        <div
+          data-testid='spotify-connect-dialog'
+          data-connected={String(connected)}
+          data-artist={connectedArtistName ?? ''}
+        >
           <h2>Connect Spotify</h2>
           <label htmlFor='spotify-search'>
             Search Spotify artists or paste a link
@@ -375,19 +390,18 @@ function RightPanelProbe() {
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
   return (
-    <div
-      data-testid='header-actions-probe'
-      data-search-total={state?.headerSearchAdapter?.totalCount}
-    >
+    <div data-testid='header-actions-probe'>
       <HeaderSearchSurfaceFromContext />
       {state?.headerActions}
     </div>
   );
 }
 
+// Pass the container of an earlier render to re-render into the same root.
 function renderShell(
   releases: readonly ReleaseViewModel[],
-  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {}
+  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {},
+  renderOptions?: { readonly container: HTMLElement }
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -413,12 +427,14 @@ function renderShell(
           <RightPanelProbe />
         </RightPanelProvider>
       </HeaderActionsProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
+    renderOptions
   );
 }
 
 beforeEach(() => {
   testState.realActionMenu = false;
+  testState.albumArtFlag = false;
   navigationState.searchParams = new URLSearchParams();
   mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
@@ -454,7 +470,11 @@ describe('ShellReleasesView', () => {
     );
     const menu = screen.getByRole('menu');
     const focusedControl = document.activeElement;
-    expect(menu).toContainElement(focusedControl as HTMLElement);
+    // Searchable surfaces present as a role="group" (holding the search
+    // input) with the items in an inner role="menu"; the preserved
+    // invariant is focus starting inside that surface.
+    const surface = focusedControl?.closest('[role="group"], [role="menu"]');
+    expect(surface).toContainElement(menu as HTMLElement);
 
     mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
     act(() => {
@@ -519,55 +539,46 @@ describe('ShellReleasesView', () => {
     ).toHaveAttribute('data-selected', 'true');
   });
 
-  it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
-    const rendered = renderShell(
-      [fakeRelease({ id: 'release-1', title: 'Wait for eligibility' })],
-      { spotifyConnected: true }
-    );
+  it('holds the list for Apple eligibility only briefly: banner and rows land together, or rows alone after the budget', () => {
+    vi.useFakeTimers();
+    const release = fakeRelease({
+      id: 'release-1',
+      title: 'Wait for eligibility',
+    });
+    const row = () =>
+      screen.queryByRole('listitem', { name: /Wait for eligibility/ });
+    const banner = () => screen.queryByTestId('apple-music-sync-banner');
+    try {
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      const rendered = renderShell([release], { spotifyConnected: true });
+      expect(row()).not.toBeInTheDocument();
+      expect(banner()).not.toBeInTheDocument();
 
-    expect(
-      screen.queryByRole('listitem', { name: /Wait for eligibility/ })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('apple-music-sync-banner')
-    ).not.toBeInTheDocument();
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
+      renderShell([release], { spotifyConnected: true }, rendered);
+      expect(row()).toBeInTheDocument();
+      expect(banner()).toBeInTheDocument();
+      rendered.unmount();
 
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
-    rendered.rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <HeaderActionsProvider>
-          <RightPanelProvider>
-            <ShellReleasesView
-              releases={[
-                fakeRelease({ id: 'release-1', title: 'Wait for eligibility' }),
-              ]}
-              providerConfig={providerConfig}
-              primaryProviders={primaryProviders}
-              artistName='Bahamas'
-              spotifyConnected
-            />
-            <HeaderActionsProbe />
-            <RightPanelProbe />
-          </RightPanelProvider>
-        </HeaderActionsProvider>
-      </QueryClientProvider>
-    );
-
-    expect(
-      screen.getByRole('listitem', { name: /Wait for eligibility/ })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
+      // A slow read never keeps the catalog off screen past the budget.
+      mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+      renderShell([release], { spotifyConnected: true });
+      act(() => vi.advanceTimersByTime(INITIAL_LIST_PAINT_BUDGET_MS));
+      expect(row()).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the settled no-banner release list mounted', () => {
     mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
+      data: [],
       isLoading: false,
     });
 
     renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
       spotifyConnected: true,
+      appleMusicConnected: true,
     });
 
     expect(
@@ -591,11 +602,11 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // The catalog is a native list (not an ARIA listbox): rows own real
-    // per-cell controls, which an ARIA `option` cannot contain (axe
-    // nested-interactive).
+    // List rows own real per-cell controls and keep their list owner.
     const list = screen.getByRole('list', { name: 'Releases' });
-    expect(list.tagName).toBe('UL');
+    expect(
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
+    ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -650,6 +661,7 @@ describe('ShellReleasesView', () => {
     renderShell([]);
 
     const dialog = screen.getByTestId('spotify-connect-dialog');
+    expect(dialog).toHaveAttribute('data-connected', 'false');
     expect(
       within(dialog).getByRole('heading', { name: 'Connect Spotify' })
     ).toBeInTheDocument();
@@ -746,18 +758,69 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers release filtering behind the shared global search trigger', async () => {
+  it('opens chat with the release chip from the Generate Album Art row action', async () => {
+    const { openChatWithPrompt } = await import(
+      '@/lib/chat/open-chat-with-prompt'
+    );
+    vi.mocked(openChatWithPrompt).mockClear();
+    testState.albumArtFlag = true;
+    mockUsePlanGate.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      smartLinksLimit: null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateAlbumArt: true,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    });
+
+    renderShell([
+      fakeRelease({ id: 'r1', title: 'Lost in the Light' }),
+      fakeRelease({ id: 'r2', title: 'Sunshine Recorder' }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Release actions for Sunshine Recorder',
+      })
+    );
+    const row = screen.getByRole('listitem', { name: /Sunshine Recorder/ });
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Generate Album Art' })
+    );
+
+    expect(openChatWithPrompt).toHaveBeenCalledTimes(1);
+    const [prompt] = vi.mocked(openChatWithPrompt).mock.calls[0];
+    expect(prompt).toContain('@release:r2[Sunshine Recorder]');
+    expect(prompt).not.toContain('{');
+  });
+
+  it('keeps the global search trigger inside the header actions probe', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    expect(probe).toHaveAttribute('data-search-total', '2');
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+      name: /^Search Jovie/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+  });
+
+  it('does not register a retired header search adapter (JOV-8792)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../../../components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('useRegisterHeaderSearch');
+    expect(source).not.toContain('headerSearchAdapter');
   });
 
   it('does not open a second route-filter popup from the shell trigger', async () => {
@@ -768,159 +831,12 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /^Search Jovie/ })
     );
 
     expect(
       screen.queryByRole('combobox', { name: 'Filter releases' })
     ).not.toBeInTheDocument();
-  });
-
-  describe('entitlement gating', () => {
-    it('shows open smart-link affordance for fully entitled users', () => {
-      renderShell([
-        fakeRelease({
-          id: 'r1',
-          title: 'Open Track',
-          releaseDate: '2024-01-01',
-        }),
-      ]);
-
-      expect(
-        screen.getByLabelText('Open smart link for Open Track')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Smart link locked \(Pro\)/)
-      ).not.toBeInTheDocument();
-    });
-
-    it('locks scheduled releases for free users without canAccessFutureReleases', async () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: false,
-      });
-
-      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-
-      renderShell([
-        fakeRelease({
-          id: 'future-1',
-          title: 'Upcoming Drop',
-          releaseDate: future,
-        }),
-      ]);
-
-      expect(
-        screen.getByLabelText('Scheduled smart link (Pro) for Upcoming Drop')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText('Open smart link for Upcoming Drop')
-      ).not.toBeInTheDocument();
-      expect(
-        await screen.findByTestId('smart-link-gate-banner-unreleased')
-      ).toBeInTheDocument();
-    });
-
-    it('locks releases beyond smartLinksLimit with cap reason', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: 1,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: true,
-      });
-
-      renderShell([
-        fakeRelease({
-          id: 'old',
-          title: 'Older Release',
-          releaseDate: '2020-01-01',
-        }),
-        fakeRelease({
-          id: 'new',
-          title: 'Newer Release',
-          releaseDate: '2024-01-01',
-        }),
-      ]);
-
-      // Cap allows oldest first up to limit — newer release is locked.
-      expect(
-        screen.getByLabelText('Smart link locked (Pro) for Newer Release')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText('Open smart link for Older Release')
-      ).toBeInTheDocument();
-    });
-
-    it('gates the row action menu copy item when the smart link is locked', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: false,
-      });
-
-      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-
-      renderShell([
-        fakeRelease({
-          id: 'future-1',
-          title: 'Upcoming Drop',
-          releaseDate: future,
-        }),
-      ]);
-
-      // Row menu should expose the scheduled-lock label, not "Copy smart link".
-      expect(
-        screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('button', { name: 'Copy Smart Link' })
-      ).not.toBeInTheDocument();
-    });
-
-    it('hides the manual create affordance when canCreateManualReleases is false', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: false,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: true,
-      });
-
-      renderShell([], { spotifyConnected: true });
-
-      expect(
-        screen.queryByTestId('create-manual-action')
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId('shell-releases-create-connected-empty')
-      ).not.toBeInTheDocument();
-    });
   });
 
   describe('entitlement gating', () => {

@@ -66,6 +66,15 @@ export const POSTMORTEM_STATUSES = Object.freeze([
 
 export const DEFAULT_POLICY_PATH = '.github/postmortem-linkage-policy.json';
 
+/**
+ * Revert first (canon/MERGE_QUEUE_STEWARD.md): post-mortems dated on or after this
+ * day state when the culprit's revert PR was opened, or `none: <why no culprit>`.
+ * Older records predate the rule and are not rewritten.
+ */
+export const REVERT_OPENED_SINCE = '2026-11-12';
+export const REVERT_OPENED_RE =
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z|none:\s*\S.*)$/;
+
 /** Parse the flat `key: scalar | [a, b]` frontmatter the template uses. */
 export function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
@@ -140,6 +149,15 @@ export function lintPostmortem(path, content) {
   }
 
   if (
+    slug.slice(0, 10) >= REVERT_OPENED_SINCE &&
+    !REVERT_OPENED_RE.test(String(frontmatter.revert_opened ?? ''))
+  ) {
+    errors.push(
+      `${path}: revert_opened must be the revert PR's open time (YYYY-MM-DDTHH:MMZ) or "none: <why no culprit existed>"`
+    );
+  }
+
+  if (
     typeof frontmatter.gbrain !== 'string' ||
     !/^ops\/postmortems\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/.test(frontmatter.gbrain)
   ) {
@@ -201,7 +219,10 @@ export function effectiveMode(policy, now = new Date()) {
 
 function git(args) {
   try {
-    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+    return execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      encoding: 'utf8',
+    }).trim();
   } catch {
     return null;
   }

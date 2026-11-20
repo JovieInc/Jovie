@@ -2,6 +2,8 @@
 
 /**
  * Release DSP list: quiet name+↗ rows, Find when not found, no helper prose.
+ *
+ * @coverage-via apps/web/tests/components/organisms/release-sidebar/ReleaseDspLinks.interaction.test.tsx
  */
 
 import {
@@ -192,7 +194,7 @@ export function ReleaseDspLinks({
           className={cn(LINEAR_SURFACE.drawerCardSm, 'mt-1.5 space-y-2.5 p-3')}
         >
           <div className='flex items-center justify-end'>
-            <InfoPopover label='About adding a DSP link'>
+            <InfoPopover label='About Adding A DSP Link'>
               Choose a provider and paste a valid URL. The draft stays in place
               if the save fails.
             </InfoPopover>
@@ -207,7 +209,10 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'>
+              <SelectTrigger
+                aria-label='Provider'
+                className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'
+              >
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>

@@ -45,7 +45,7 @@ function DefaultLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   const verb = fallback.decision === 'approve' ? 'Approves' : 'Rejects';
   return (
     <p
-      className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-tertiary-token'
+      className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-secondary-token'
       data-testid='home-loop-ask-default'
     >
       <span>
@@ -219,7 +219,7 @@ function AskCard({
   const card = (
     <li
       ref={cardRef}
-      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-75')}
+      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-80')}
       data-answer-state={answer?.state ?? 'open'}
       data-fit-item
       data-testid='home-loop-ask'
@@ -232,8 +232,8 @@ function AskCard({
                 className={cn(
                   'mr-1.5 inline-flex rounded-full px-1.5 align-middle text-2xs font-semibold tabular-nums',
                   ask.escalation.level === 2
-                    ? 'bg-error-subtle text-error'
-                    : 'bg-warning-subtle text-warning'
+                    ? 'bg-error-subtle text-error-text'
+                    : 'bg-warning-subtle text-warning-text'
                 )}
                 data-testid='home-loop-ask-escalation'
               >
@@ -291,7 +291,7 @@ function AskCard({
           <Check aria-hidden='true' className='size-3.5 text-success' />
           <span className='truncate'>{answer.label}</span>
           {answer.state === 'pending' ? (
-            <span className='text-tertiary-token'>Sending</span>
+            <span className='text-secondary-token'>Sending</span>
           ) : null}
           {answer.state === 'sent' && ask.canFeedback && onFeedback ? (
             <Button

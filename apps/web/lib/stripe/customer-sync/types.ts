@@ -138,6 +138,7 @@ export type BillingAuditEventType =
   | 'charge_refunded'
   | 'charge_disputed'
   | 'reconciliation_fix'
+  | 'admin_override'
   | 'customer_created'
   | 'customer_linked';
 
@@ -196,10 +197,8 @@ export interface FetchUserBillingDataWithAuthResult<
 /**
  * Options for updating billing status with event ordering support
  */
-export interface UpdateBillingStatusOptions {
+interface UpdateBillingStatusBase {
   clerkUserId: string;
-  isPro: boolean;
-  plan?: string; // 'free' | 'pro' | 'max'
   stripeCustomerId?: string;
   stripeSubscriptionId?: string | null;
   stripePriceId?: string | null;
@@ -209,6 +208,17 @@ export interface UpdateBillingStatusOptions {
   source?: 'webhook' | 'reconciliation' | 'manual';
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Granting Pro must name the plan ('pro' | 'max'). The old default of 'pro'
+ * silently downgraded Max subscribers whenever a caller forgot the plan
+ * (status mismatch reconciliation, 2026-10-26). Downgrades may omit it.
+ */
+export type UpdateBillingStatusOptions = UpdateBillingStatusBase &
+  (
+    | { isPro: true; plan: 'pro' | 'max' }
+    | { isPro: false; plan?: 'free' } // defaults to 'free'
+  );
 
 /**
  * Result of a billing status update

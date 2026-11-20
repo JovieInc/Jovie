@@ -66,17 +66,18 @@ export function PipelineBottleneckBanner({
           </Badge>
           <div className='min-w-0 flex-1'>
             <p className='truncate text-app text-primary-token'>
-              {data.rank1?.oneLine}
+              {data.rank1?.oneLine ?? 'Bottleneck evidence unavailable'}
               {data.metric ? ` · ${data.metric}` : ''}
             </p>
-            {needsYou && data.cost ? (
+            {needsYou ? (
               <>
                 <p className='truncate text-xs tabular-nums text-secondary-token'>
-                  {dollars.format(data.cost.monthlyUsd).replace(/\.00$/, '')}/mo
-                  · {data.cost.item}
+                  {data.cost
+                    ? `${dollars.format(data.cost.monthlyUsd).replace(/\.00$/, '')}/mo · ${data.cost.item}`
+                    : 'Cost unavailable'}
                 </p>
                 <p className='truncate text-xs text-secondary-token'>
-                  {data.impact}
+                  {data.impact ?? 'Impact unavailable'}
                 </p>
               </>
             ) : (

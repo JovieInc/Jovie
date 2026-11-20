@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 import { SimpleTooltip } from './simple-tooltip';
 import { TooltipProvider } from './tooltip';
 
@@ -35,15 +37,26 @@ describe('SimpleTooltip', () => {
       expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
     });
 
-    it.skip('shows content on hover', () => {
-      // Skipped: userEvent.hover doesn't reliably trigger Radix tooltips in jsdom
-      // This behavior is tested through controlled mode in other tests
-      expect(true).toBe(true);
-    });
+    it('opens on keyboard focus and closes on Escape', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TestWrapper>
+          <SimpleTooltip content='Tooltip text'>
+            <span>Focus me</span>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
 
-    it.skip('hides content on mouse leave', () => {
-      // Skipped: userEvent.unhover doesn't reliably work with Radix in jsdom
-      expect(true).toBe(true);
+      await user.tab();
+      expect(screen.getByText('Focus me')).toHaveFocus();
+      expect(await screen.findByTestId('tooltip-content')).toHaveTextContent(
+        'Tooltip text'
+      );
+
+      await user.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -265,5 +278,36 @@ describe('SimpleTooltip', () => {
 
       expect(screen.getByText('Trigger')).toHaveAttribute('tabindex', '-1');
     });
+  });
+});
+
+describe('SimpleTooltip accessibility', () => {
+  it('has no axe violations with LTR and RTL tooltips open', async () => {
+    const { container } = render(
+      <TestWrapper>
+        <SimpleTooltip content='Copy link' contentVariant='compact' defaultOpen>
+          <button type='button'>Copy</button>
+        </SimpleTooltip>
+        <div dir='rtl'>
+          <SimpleTooltip
+            content={<span dir='rtl'>انسخ رابط الملف الشخصي العام</span>}
+            defaultOpen
+            showArrow
+          >
+            <span>نسخ الرابط</span>
+          </SimpleTooltip>
+        </div>
+      </TestWrapper>
+    );
+    // A non-focusable trigger is made keyboard-reachable by the wrapper.
+    expect(screen.getByText('نسخ الرابط')).toHaveAttribute('tabindex', '0');
+    // Audit the triggers and each portalled tooltip layer in document.body.
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers).toHaveLength(2);
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
   });
 });

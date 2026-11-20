@@ -10,16 +10,13 @@ function getRuntimeHtmlDatasetValue(
 
 function readAuthMockFlag(): string | undefined {
   return (
-    process.env.NEXT_PUBLIC_AUTH_MOCK ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK ||
-    getRuntimeHtmlDatasetValue('authMock')
+    process.env.NEXT_PUBLIC_AUTH_MOCK || getRuntimeHtmlDatasetValue('authMock')
   );
 }
 
 function readAuthProxyDisabledFlag(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED ||
-    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED ||
     getRuntimeHtmlDatasetValue('authProxyDisabled')
   );
 }
@@ -101,21 +98,19 @@ export const publicEnv = {
   get NEXT_PUBLIC_TURNSTILE_SITE_KEY() {
     return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
   },
-  // Feature flags
-  get NEXT_PUBLIC_FEATURE_TIPS() {
-    return process.env.NEXT_PUBLIC_FEATURE_TIPS ?? 'true';
-  },
   get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
     return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
   },
   get NEXT_PUBLIC_FEATURE_VOICE_INPUT() {
     return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT ?? 'true';
   },
-  get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
-    return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN ?? 'true';
-  },
+  /**
+   * Default OFF: Max is not for sale (offer-truth: contact sales), so the
+   * in-app "Request Early Access" Max card was a dead end (JOV-INV-046).
+   * Set 'true' explicitly only when Max is purchasable.
+   */
   get NEXT_PUBLIC_FEATURE_MAX_PLAN() {
-    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN ?? 'true';
+    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN ?? 'false';
   },
   get NEXT_PUBLIC_E2E_MODE() {
     return (
@@ -124,9 +119,6 @@ export const publicEnv = {
   },
   get NEXT_PUBLIC_DEMO_RECORDING() {
     return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
-  },
-  get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
-    return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION ?? 'true';
   },
   // SEO verification
   get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {

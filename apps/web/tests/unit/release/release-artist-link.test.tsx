@@ -180,6 +180,12 @@ describe('release artist links', () => {
     const title = screen.getByRole('heading', { name: 'Future Release' });
     expect(title).toHaveClass('text-2xl', 'tracking-tight');
     expect(title).not.toHaveClass('text-3xl', 'text-4xl');
+    expect(title.className).not.toContain('text-shadow');
+    expect(artistLink.className).not.toContain('text-shadow');
+    expect(
+      title.compareDocumentPosition(artistLink) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('renders a dismissible claim banner for unclaimed creators', () => {

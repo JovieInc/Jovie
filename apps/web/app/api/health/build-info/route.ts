@@ -23,6 +23,12 @@ export async function GET() {
   const worktree = getWorktreeIdentity();
   const build = await getDeployedBuildInfo();
 
+  // No database here (JOV-12766): this is a public identity receipt read by
+  // monitors, controllers and canaries on every probe, so its request path
+  // must stay DB-free. The shipped-fix deploy-time stamp this route used to
+  // fire runs from the server boot hook instead (instrumentation.ts POSTs
+  // /api/internal/ovie/fix-deploy-stamp, which owns the database work).
+
   return NextResponse.json(
     {
       buildId: build.buildId,

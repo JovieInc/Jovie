@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { TooltipProvider } from './tooltip';
 import { TooltipShortcut } from './tooltip-shortcut';
@@ -149,5 +150,47 @@ describe('TooltipShortcut', () => {
       );
       expect(ref.current).toBeInstanceOf(HTMLButtonElement);
     });
+  });
+});
+
+describe('TooltipShortcut accessibility', () => {
+  it('has no axe violations for shortcut, label-only, long and RTL tooltips open', async () => {
+    const { container } = renderWithProvider(
+      <div>
+        <TooltipShortcut label='Open command palette' shortcut='⌘K' defaultOpen>
+          <button type='button'>Command</button>
+        </TooltipShortcut>
+        <TooltipShortcut label='Bold' defaultOpen>
+          <button type='button'>B</button>
+        </TooltipShortcut>
+        <TooltipShortcut
+          label='Share the public profile link with your fans, collaborators and label team'
+          shortcut='⌘⇧S'
+          contentVariant='rich'
+          defaultOpen
+        >
+          <button type='button'>Share</button>
+        </TooltipShortcut>
+        <div dir='rtl'>
+          <TooltipShortcut
+            label='مشاركة رابط الملف الشخصي'
+            shortcut='⌘⇧S'
+            defaultOpen
+          >
+            <button type='button' aria-label='مشاركة'>
+              <svg aria-hidden='true' />
+            </button>
+          </TooltipShortcut>
+        </div>
+      </div>
+    );
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers).toHaveLength(4);
+    // Audit the triggers and each portalled tooltip layer in document.body.
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
   });
 });

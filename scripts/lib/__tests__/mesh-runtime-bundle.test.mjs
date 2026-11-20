@@ -433,6 +433,21 @@ describe('immutable managed mesh dependency closure', () => {
       buildMeshRuntime(archive, dependencies(Buffer.from(lock)))
     ).toThrow('mesh-runtime-dependency-pin-mismatch');
   });
+  it('ignores a stray ancestor node_modules/zod that would shadow the pinned install (mesh-runtime-unpinned-input on Gem, 2026-10-26)', () => {
+    const decoy = join(root, 'node_modules/zod');
+    mkdirSync(decoy, { recursive: true });
+    writeFileSync(
+      join(decoy, 'package.json'),
+      '{"name":"zod","version":"3.25.76","main":"index.js"}'
+    );
+    writeFileSync(join(decoy, 'index.js'), 'exports.z = {};\n');
+    const proof = buildMeshRuntime(archive, dependencies());
+    expect(proof.isolatedImportPassed).toBe(true);
+    for (const name of Object.keys(proof.outputs))
+      expect(readFileSync(join(portable(), name), 'utf8')).not.toContain(
+        'exports.z'
+      );
+  });
   it('refuses a source dependency outside the exact closure', () => {
     writeFileSync(
       join(archive, ports[0]),

@@ -135,7 +135,7 @@ Labels are part of the CI control plane, not just project organization. Apply in
   deterministic combined-head evidence for only the selected product lanes.
 - `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
-- Do not use `needs-human` as a PR enrollment hold. If completion requires a
+- Do not use `needs-human`, `tim-hold` or `do-not-merge` as a PR enrollment hold; they are retired and a scrub deletes them (EVENT 2026-10-28). If completion requires a
   physical action only a human can perform (sign an agreement, rotate a key,
   flip a dashboard toggle), ship the code path disabled or keep the external
   action unsubmitted and track that authority gate separately.
@@ -191,6 +191,13 @@ When evidence is incomplete, keep remediation running until the relevant machine
    A PR the queue ejected for failed checks must not be re-enqueued at the same
    head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
    every merge group behind it (JOV-6620).
+   Never pass `jump: true` to `enqueuePullRequest`, and never dequeue and
+   re-enqueue to change a PR's position. A jump restarts every merge group
+   already building, so its CI starts over. On 2026-10-31, agents jumped 8
+   `compounding` PRs in 24 minutes and no group finished in that window. Only
+   `merge-queue-green-enroll.yml` jumps, under its `MAX_JUMPED` and
+   `JUMP_BATCH_S` limits. If a fix has to land first, ask the queue owner;
+   do not jump it yourself.
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative
@@ -231,8 +238,20 @@ feature/* ──► main (CI deploys to staging, then promotes to production)
 
 ### Bots to check
 
+- `sentry[bot]` (Sentry Seer, `<!-- BUG_PREDICTION -->` comments; retiring
+  into the local gate)
 - `coderabbitai[bot]` (CodeRabbit)
 - `greptile-apps[bot]` (Greptile)
+
+### Resolve bot threads yourself (founder rule, 2026-11-11)
+
+Resolve bot review comments yourself after you fix or answer them; leave
+human comments for their author. Fix a real finding on the same PR, or reply
+with the evidence that it is wrong, then resolve the thread
+(`resolveReviewThread`, or the GitHub MCP `resolve_review_thread` tool).
+Never resolve a thread a human started or replied in. A bot thread never
+holds a green PR: once PR Ready is green on the head, Auto-Ready Agent
+Drafts resolves the bot threads still open (`scripts/lib/bot-review-threads.mjs`).
 
 ### How to check
 
@@ -255,10 +274,7 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 A reply, from a human or an agent, is not evidence of a fix. Close a finding only
 with evidence on the current head: `fixed-and-reverified` (a regression test or
 re-review on the new head) or `dismissed-with-evidence` (code or test shows the
-claim is false). The Jovie review kernel uses the same states
-(`candidate | verified | fixed-and-reverified | dismissed-with-evidence | stale |
-not-assessed`); see [pr-review-kernel](../../docs/evaluations/pr-review-kernel.md).
-The author fixes verified findings on the same PR before requesting merge; none of
+claim is false). The author fixes verified findings on the same PR before requesting merge; none of
 these states is a merge gate.
 
 ### When flagged
@@ -271,6 +287,7 @@ these states is a merge gate.
 
 ```
 BOT REVIEWS
+├─ Sentry:       N open (advisory)
 ├─ CodeRabbit:   N open (advisory)
 └─ Greptile:     N open (advisory)
 ```
@@ -349,7 +366,7 @@ pnpm version:check        # validate consistency
 
 **Implementation PRs must not add or edit `CHANGELOG.md`.** The file is
 release state, not branch state. Branch-local Unreleased notes collide in
-native ALLGREEN merge groups (GitHub's server merge ignores local
+native merge groups (ALLGREEN until 2026-10-29, HEADGREEN now; GitHub's server merge ignores local
 `merge=union`). A user-visible change earns exactly one What's New bullet only
 after land/runtime proof, written through the existing release/UI receipt path
 (`apps/web/components/jovie/feature-intro-catalog.ts` plus the post-land
@@ -416,7 +433,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Visual Snapshot Compare (homepage)` (merge-group), `Visual Snapshot Compare (marketing DOM)` (merge-group), `Visual Snapshot Compare (marketing routes)` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
@@ -439,6 +456,9 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
 | `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (homepage)` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (marketing DOM)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=1 --retries=0 -g 'deliberate-red|certifies every marketing route'` |
+| `Visual Snapshot Compare (marketing routes)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=4 --retries=0` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |
@@ -447,7 +467,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |

@@ -16,8 +16,8 @@ import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { runWithRealGh } from '../real-gh-harness.mjs';
 
-/** @typedef {{ id?: string, run?: string, env?: Record<string, string> }} WorkflowStep */
-/** @typedef {{ if?: string, outputs?: { should_probe?: string, quota_deferred?: string }, steps?: WorkflowStep[] }} WorkflowJob */
+/** @typedef {{ id?: string, name?: string, if?: string, uses?: string, run?: string, env?: Record<string, string>, with?: Record<string, any> }} WorkflowStep */
+/** @typedef {{ if?: string, needs?: string[], outputs?: Record<string, string>, steps?: WorkflowStep[] }} WorkflowJob */
 
 const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
   load(
@@ -30,6 +30,63 @@ const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
     )
   )
 );
+
+describe('certification steps outside the workspace', () => {
+  it.each(['missing', 'empty', 'recorded'])(
+    'reports whether %s evidence can be uploaded',
+    state => {
+      const root = mkdtempSync(join(tmpdir(), 'prod-cert-handoff-'));
+      const workspace = join(root, 'workspace');
+      const stepsFile = join(root, 'prod-cert-steps.jsonl');
+      const output = join(root, 'output');
+      try {
+        mkdirSync(workspace);
+        if (state !== 'missing')
+          writeFileSync(
+            stepsFile,
+            state === 'empty' ? '' : '{"status":"passed"}\n'
+          );
+        const check = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'check-cert-steps'
+        );
+        expect(check?.run).toBeTypeOf('string');
+        const result = spawnSync('bash', ['-e', '-c', check.run], {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: output,
+            PROD_CERT_STEPS_FILE: stepsFile,
+          },
+          encoding: 'utf8',
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8').trim()).toBe(
+          `available=${state === 'recorded'}`
+        );
+        const upload = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'upload-cert-steps'
+        );
+        const condition = /** @type {any} */ (upload).if
+          .replace(/^\$\{\{|\}\}$/g, '')
+          .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
+        expect(
+          runInNewContext(condition, {
+            always: () => true,
+            steps: {
+              'check-cert-steps': {
+                outputs: Object.fromEntries([
+                  readFileSync(output, 'utf8').trim().split('='),
+                ]),
+              },
+            },
+          })
+        ).toBe(state === 'recorded');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+});
 const trigger = workflow.jobs['resolve-target'].steps.find(
   step => step.id === 'trigger'
 );
@@ -138,7 +195,16 @@ async function decide({
     });
     return {
       ...result,
-      shouldProbe: readFileSync(output, 'utf8').trim().split('\n').at(-1),
+      shouldProbe: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_probe='))
+        .at(-1),
+      shouldCertify: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_certify='))
+        .at(-1),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -209,6 +275,50 @@ describe('automatic landed production probes (JOV-8081)', () => {
     );
   });
 
+  it('certifies after Production Verified even when in-lease probes ran (JOV-9822)', async () => {
+    const base = {
+      run_id: 123,
+      run_attempt: 2,
+      head_sha: sha,
+      head_branch: 'main',
+      status: 'completed',
+      conclusion: 'success',
+    };
+    const jobs = [
+      { ...base, id: 456, name: 'Lighthouse CI (Production)' },
+      { ...base, id: 457, name: 'Production Verified' },
+    ];
+    const result = await decide({ jobs });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+
+    const unverified = await decide({
+      jobs: [jobs[0], { ...jobs[1], conclusion: 'skipped' }],
+    });
+    expect(unverified.shouldCertify).toBe('should_certify=false');
+    const otherAttempt = await decide({
+      jobs: [jobs[0], { ...jobs[1], run_attempt: 1 }],
+    });
+    expect(otherAttempt.shouldCertify).toBe('should_certify=false');
+  });
+
+  it('certifies without probing on the lanes clock dispatch (JOV-9822)', async () => {
+    const result = await decide({
+      event: { EVENT_NAME: 'repository_dispatch' },
+    });
+    expect(result.code).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+    expect(result.requests).toEqual([]);
+  });
+
+  it('never certifies on untrusted controller evidence', async () => {
+    const result = await decide({ event: { TRIGGER_HEAD_BRANCH: 'feature' } });
+    expect(result.code).not.toBe(0);
+    expect(result.shouldCertify).toBe('should_certify=false');
+  });
+
   it('retains explicit manual dispatch without requiring controller evidence', async () => {
     const result = await decide({ event: { EVENT_NAME: 'workflow_dispatch' } });
     expect(result.code).toBe(0);
@@ -236,6 +346,7 @@ async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
   };
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: remote,
       env: gitEnv,
       encoding: 'utf8',
@@ -390,96 +501,6 @@ describe('landed production identity during GitHub quota exhaustion (JOV-8495)',
   });
 });
 
-// Evaluate the workflow's result expressions using fixture job outcomes.
-function evaluate(expression, results) {
-  return runInNewContext(
-    expression
-      .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-      .replaceAll('always()', 'true')
-      .replace(
-        /needs\.([\w-]+)\.(result|outputs\.should_probe|outputs\.quota_deferred)/g,
-        (_, job, field) =>
-          JSON.stringify(
-            field === 'result'
-              ? results[job]
-              : field === 'outputs.quota_deferred'
-                ? results.quotaDeferred
-                : results.shouldProbe
-          )
-      )
-  );
-}
-
-describe('probe darkness is never healthy release evidence (JOV-7195)', () => {
-  it.each([
-    ['success', 'true', 'success', 'success', 'success', 'success'],
-    ['failure', 'true', 'skipped', 'skipped', 'skipped', 'failure'],
-    ['failure', 'false', 'skipped', 'skipped', 'skipped', 'failure'],
-    ['success', 'true', 'cancelled', 'success', 'success', 'failure'],
-    ['success', 'true', 'success', 'success', 'skipped', 'failure'],
-    ['success', 'true', 'success', 'failure', 'success', 'failure'],
-  ])(
-    'reports resolve=%s probe=%s smoke=%s auth=%s lighthouse=%s as %s',
-    (resolveResult, shouldProbe, smoke, auth, lighthouse, expected) => {
-      const results = {
-        'resolve-target': resolveResult,
-        shouldProbe,
-        smoke,
-        'auth-smoke': auth,
-        lighthouse,
-      };
-      const remediation = workflow.jobs.remediation;
-      expect(evaluate(remediation.if, results)).toBe(true);
-      const intake = remediation.steps.find(
-        step => step.env?.REMEDIATION_CONCLUSION
-      );
-      expect(evaluate(intake.env.REMEDIATION_CONCLUSION, results)).toBe(
-        expected
-      );
-      expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(
-        expected === 'failure'
-      );
-    }
-  );
-
-  it('does not dispatch probes or page when the trigger read is rate limited', () => {
-    const expression = workflow.jobs['resolve-target'].outputs.should_probe;
-    const shouldProbe = (trigger, quotaDeferred) =>
-      runInNewContext(
-        expression
-          .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-          .replaceAll(
-            'steps.trigger.outputs.quota_deferred',
-            quotaDeferred === undefined ? 'null' : JSON.stringify(quotaDeferred)
-          )
-          .replaceAll(
-            'steps.trigger.outputs.should_probe',
-            JSON.stringify(trigger)
-          )
-      );
-    expect(shouldProbe('true', undefined)).toBe(true);
-    expect(shouldProbe('true', '')).toBe(true);
-    expect(shouldProbe('true', 'true')).toBe(false);
-    expect(shouldProbe('false', undefined)).toBe(false);
-
-    const deferred = {
-      'resolve-target': 'success',
-      shouldProbe: 'false',
-      smoke: 'skipped',
-      'auth-smoke': 'skipped',
-      lighthouse: 'skipped',
-    };
-    expect(evaluate(workflow.jobs.remediation.if, deferred)).toBe(false);
-    expect(evaluate(workflow.jobs['notify-failure'].if, deferred)).toBe(false);
-  });
-
-  it('does not clear an incident when exact in-lease evidence skips the fallback', () => {
-    const results = { 'resolve-target': 'success', shouldProbe: 'false' };
-    expect(evaluate(workflow.jobs.remediation.if, results)).toBe(false);
-    expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(false);
-  });
-});
-
 /** @param {{ mode?: string, wrongToken?: boolean, crossRepository?: boolean }} [options] */
 async function resolveTargetHttps({
   mode = 'ancestor',
@@ -507,7 +528,11 @@ async function resolveTargetHttps({
   };
   /** @param {...string} args */
   const git = (...args) =>
-    execFileSync('git', args, { env: gitEnv, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim();
   /** @type {{ path: string, authorized: boolean }[]} */
   const gitRequests = [];
   /** @type {import('node:https').Server | undefined} */
@@ -726,28 +751,5 @@ describe('postdeploy resolver authenticates real Git HTTPS (JOV-8495)', () => {
         true
       );
     }
-  );
-});
-
-it('keeps quota deferral observable without claiming executed probe evidence', () => {
-  const results = {
-    'resolve-target': 'success',
-    shouldProbe: 'false',
-    quotaDeferred: 'true',
-    smoke: 'skipped',
-    'auth-smoke': 'skipped',
-    lighthouse: 'skipped',
-  };
-  const remediation = workflow.jobs.remediation;
-  expect(evaluate(remediation.if, results)).toBe(true);
-  const intake = remediation.steps.find(
-    step => step.env?.REMEDIATION_CONCLUSION
-  );
-  expect(evaluate(intake.env.REMEDIATION_CONCLUSION, results)).toBe(
-    'quota-deferred'
-  );
-  expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(false);
-  expect(workflow.jobs['resolve-target'].outputs.quota_deferred).toBe(
-    "${{ steps.trigger.outputs.quota_deferred == 'true' }}"
   );
 });

@@ -17,6 +17,7 @@ import {
   type FounderDemoSceneId,
   getFounderDemoSceneAt,
 } from '@/lib/demo-founder-video';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 const USER_PROMPT = 'Show me the EDC opportunity.';
@@ -54,9 +55,11 @@ const CURSOR_PATH = [
 const CLICK_TIMES = [9, 16, 43, 50, 63] as const;
 
 function useDemoElapsedSeconds() {
+  const reducedMotion = useReducedMotion();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const startedAt = performance.now();
     let frameId = 0;
 
@@ -72,7 +75,7 @@ function useDemoElapsedSeconds() {
     frameId = window.requestAnimationFrame(tick);
 
     return () => window.cancelAnimationFrame(frameId);
-  }, []);
+  }, [reducedMotion]);
 
   return elapsedSeconds;
 }

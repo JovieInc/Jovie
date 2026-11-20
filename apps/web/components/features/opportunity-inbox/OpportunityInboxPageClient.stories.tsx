@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLayoutEffect, useState } from 'react';
-import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
+import {
+  DASHBOARD_FIXTURE_PROFILE_ID,
+  DashboardStoryProviders,
+  DEFAULT_DASHBOARD_DATA,
+  withDashboardProviders,
+} from '@/.storybook/dashboard-fixtures';
 import { queryKeys } from '@/lib/queries/keys';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
@@ -9,7 +14,14 @@ const meta = {
   title: 'Dashboard/Opportunity Inbox/Page Client',
   component: OpportunityInboxPageClient,
   parameters: { layout: 'fullscreen' },
-  decorators: [withDashboardProviders],
+  decorators: [
+    withDashboardProviders,
+    Story => (
+      <div className='flex h-screen flex-col bg-base'>
+        <Story />
+      </div>
+    ),
+  ],
 } satisfies Meta<typeof OpportunityInboxPageClient>;
 
 export default meta;
@@ -25,6 +37,7 @@ export const Empty: Story = {
         tourDates: 'not_requested',
       },
     },
+    profileId: DASHBOARD_FIXTURE_PROFILE_ID,
     connectedDSPs: [],
     initialLinks: [],
   },
@@ -155,4 +168,26 @@ export const DoneForYou: Story = {
       </CompletedWorkFixture>
     ),
   ],
+};
+
+export const FirstRun: Story = {
+  args: Empty.args,
+  render: args => (
+    <DashboardStoryProviders
+      dashboardData={{
+        ...DEFAULT_DASHBOARD_DATA,
+        hasSocialLinks: false,
+        hasMusicLinks: false,
+        profileCompletion: {
+          percentage: 25,
+          completedCount: 1,
+          totalCount: 4,
+          steps: [],
+          profileIsLive: false,
+        },
+      }}
+    >
+      <OpportunityInboxPageClient {...args} />
+    </DashboardStoryProviders>
+  ),
 };

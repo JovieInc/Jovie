@@ -14,12 +14,15 @@ import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
 export function ChatUsageAlert() {
-  const { data, isLoading } = useChatUsageQuery({ enabled: !env.IS_E2E });
+  const { data } = useChatUsageQuery({ enabled: !env.IS_E2E });
   const usageState = data ? getChatUsageCopy(data).state : null;
 
+  // Branch on data, not on the loading flag: a refetch or a failed read keeps
+  // the last usage notice in place. Before the first read nothing is reserved,
+  // because most usage shows no notice and a placeholder would itself move
+  // the composer once the read resolved.
   if (
     env.IS_E2E ||
-    isLoading ||
     !data ||
     (usageState !== 'near_limit' && usageState !== 'exhausted')
   ) {
@@ -33,7 +36,7 @@ export function ChatUsageAlert() {
     return (
       <InfoBox
         title="You're out of messages for this week"
-        variant='error'
+        variant='info'
         className='mb-2 rounded-2xl'
       >
         <div className='flex flex-wrap items-center justify-between gap-3'>

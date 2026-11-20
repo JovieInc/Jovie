@@ -31,7 +31,7 @@ export const AudienceActionCell = memo(function AudienceActionCell({
 
   if (!canMessage) {
     return (
-      <span className='sr-only'>No message action for anonymous fans</span>
+      <span className='sr-only'>No message action for anonymous visitors</span>
     );
   }
 

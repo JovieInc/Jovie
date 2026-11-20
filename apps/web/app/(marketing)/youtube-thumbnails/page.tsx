@@ -4,6 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailsLanding } from './YoutubeThumbnailsLanding';
 import './youtube-thumbnails.css';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
 
@@ -11,6 +12,7 @@ const PAGE_URL = `${BASE_URL}${APP_ROUTES.YOUTUBE_THUMBNAILS}`;
 const PAGE_TITLE = `${YOUTUBE_THUMBNAILS_COPY.seo.title} | ${APP_NAME}`;
 
 export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
   title: YOUTUBE_THUMBNAILS_COPY.seo.title,
   description: YOUTUBE_THUMBNAILS_COPY.seo.description,
   metadataBase: new URL(BASE_URL),

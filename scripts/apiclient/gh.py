@@ -2,6 +2,7 @@
 gh's text, headers via `gh api --include`, bounded retries, exit 75 when deferred."""
 from __future__ import annotations
 
+import json
 import os
 import random as _random
 import re
@@ -26,6 +27,15 @@ READ_PORCELAIN = {"list", "view", "checks", "status", "diff"}
 
 def gh_shape(args) -> dict:
     """Which bucket a gh invocation draws on, and whether it mutates."""
+    log_args = args[:2] + args[4:] if (len(args) in (7, 9) and args[2] == "--repo"
+                                     and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args[3])) else args
+    if ((len(log_args) == 5 or (len(log_args) == 7 and log_args[4] == "--attempt"
+                              and re.fullmatch(r"[1-9][0-9]*", log_args[5])))
+            and log_args[:3] == ["run", "view", "--job"]
+            and re.fullmatch(r"[1-9][0-9]*", log_args[3]) and log_args[-1] in ("--log", "--log-failed")):
+        # Per-job logs use REST, returning before the summary's GraphQL PR lookup.
+        # gh 2.103 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
+        return {"resource": "core", "write": False, "idempotent": True, "cost": 5}
     if args and args[0] == "api":
         target = next((a for i, a in enumerate(args) if i > 0 and not a.startswith("-")
                        and args[i - 1] not in WRITE_FLAGS), "")
@@ -40,6 +50,8 @@ def gh_shape(args) -> dict:
         has_fields = any(a in WRITE_FLAGS and a not in ("-X", "--method") for a in args)
         effective = method or ("POST" if has_fields else "GET")
         write = effective not in ("GET", "HEAD")
+        if target in ("rate_limit", "/rate_limit") and effective == "GET":
+            return {"resource": "core", "write": False, "idempotent": True, "cost": 0}
         return {"resource": "search" if target.lstrip("/").startswith("search/") else "core", "write": write,
                 "idempotent": (not write) or effective in ("PUT", "DELETE")}
     read = bool(args) and (args[0] == "search" or (len(args) > 1 and args[1] in READ_PORCELAIN))
@@ -61,9 +73,13 @@ def split_included(stdout: str):
     return headers, stdout[match.end():]
 
 
-def default_run(args, env) -> tuple:
+def default_run(args, env, *, timeout=None, execute: Optional[Callable] = None) -> tuple:
+    """Canonical argv construction; callers may retain their lifecycle runner/time bound."""
+    options = {"env": env, "capture_output": True, "text": True}
+    if timeout is not None:
+        options["timeout"] = timeout
     try:
-        proc = subprocess.run(["gh", *args], env=env, capture_output=True, text=True)
+        proc = (execute or subprocess.run)(["gh", *args], **options)
     except OSError as error:
         return 127, "", str(error)
     return proc.returncode, proc.stdout, proc.stderr
@@ -74,6 +90,27 @@ def gh_credential(env) -> str:
         return env["JOVIE_GITHUB_CREDENTIAL"]
     token = env.get("GH_TOKEN") or env.get("GITHUB_TOKEN")
     return hash_credential("github", token) if token else "gh-cli-login"
+
+
+def _quota_observations(body: str) -> list:
+    """Only the exact rate_limit response can describe other resources."""
+    try:
+        resources = json.loads(body).get("resources", {})
+    except (ValueError, AttributeError):
+        return []
+    if not isinstance(resources, dict):
+        return []
+    observations = []
+    for resource in ("core", "graphql", "search"):
+        row = resources.get(resource)
+        if not isinstance(row, dict):
+            continue
+        if not all(isinstance(row.get(key), int) and not isinstance(row[key], bool) and 0 <= row[key] <= 2**53 - 1
+                   for key in ("limit", "remaining", "reset")) or row["remaining"] > row["limit"]:
+            continue
+        observations.append({"resource": resource, "limit": row["limit"], "remaining": row["remaining"],
+                             "resetAt": row["reset"] * 1000})
+    return observations
 
 
 def run_gh(args, priority: str = "default", credential: Optional[str] = None, store=None, env=None,
@@ -108,14 +145,18 @@ def run_gh(args, priority: str = "default", credential: Optional[str] = None, st
 
     attempt = 0
     while True:
+        unpersisted = getattr(store, "unpersisted", 0)
         def admit(s, at):
-            d = decide(s, priority, {shape["resource"]: 1}, at, write=shape["write"],
+            costs = {} if shape.get("cost") == 0 else {shape["resource"]: shape.get("cost", 1)}
+            d = decide(s, priority, costs, at, write=shape["write"],
                        min_write_interval_ms=spec.get("minWriteIntervalMs"))
             if d["action"] != "go":
                 bump(s, priority, "shed" if d["action"] == "shed" else "waited", at)
             return d
 
         d = ledger(admit)
+        if getattr(store, "unpersisted", 0) != unpersisted:
+            return defer("ledger-admission-unpersisted", now() + 1000)
         if d["action"] == "shed":
             return defer(f"shed ({d['reason']})", d["until"])
         if d["action"] == "wait":
@@ -139,7 +180,11 @@ def run_gh(args, priority: str = "default", credential: Optional[str] = None, st
         # Without HTTP evidence, only gh's known transport wording is transient.
         if fail["kind"] == "transient" and status is None and not GH_TRANSIENT.search(stderr):
             fail = failure("client", fail["retryAtMs"])
-        ledger(lambda s, t: (observe(s, parse_budget(spec, headers, t, shape["resource"]), t),
+        observations = parse_budget(spec, headers, at, shape["resource"])
+        if code == 0 and shape.get("cost") == 0:
+            header_resources = {row["resource"] for row in observations}
+            observations += [row for row in _quota_observations(body) if row["resource"] not in header_resources]
+        ledger(lambda s, t: (observe(s, observations, t, conservative=True),
                              record_outcome(s, priority, shape["resource"], fail, d["probe"], t)))
         result = {"code": code, "stdout": body, "stderr": stderr, "deferred": False}
         if fail["kind"] in ("none", "client"):

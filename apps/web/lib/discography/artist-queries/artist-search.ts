@@ -17,6 +17,7 @@ import {
   or,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   type Artist,
   type ArtistRole,
@@ -31,7 +32,7 @@ import {
   isCanonicalPublicProfileHandle,
   normalizePublicProfileHandle,
 } from '@/lib/profile/opaque-internal-profile-handle';
-import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
+import { isPublicProfileDiscoveryEligible } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
   isPublicArtistCollaboratorRole,
@@ -51,6 +52,8 @@ export interface StructuredReleaseCollaboratorRow {
   readonly profileIsPublic: boolean | null;
   readonly profileIsClaimed: boolean | null;
   readonly profileUsername: string | null;
+  /** Owner email, used only to classify test profiles (never exposed). */
+  readonly profileOwnerEmail?: string | null;
   readonly creditName: string | null;
   readonly role: ArtistRole;
   readonly position: number;
@@ -112,6 +115,7 @@ export async function getCreditedArtistsWithProfiles(
         name: drizzleSql<string>`coalesce(${releaseArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
         profileDisplayName: creatorProfiles.displayName,
+        profileOwnerEmail: users.email,
       })
       .from(releaseArtists)
       .innerJoin(
@@ -123,6 +127,7 @@ export async function getCreditedArtistsWithProfiles(
         creatorProfiles,
         eq(artists.creatorProfileId, creatorProfiles.id)
       )
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(
         and(
           eq(discogReleases.creatorProfileId, creatorProfileId),
@@ -135,6 +140,7 @@ export async function getCreditedArtistsWithProfiles(
         name: drizzleSql<string>`coalesce(${trackArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
         profileDisplayName: creatorProfiles.displayName,
+        profileOwnerEmail: users.email,
       })
       .from(trackArtists)
       .innerJoin(discogTracks, eq(trackArtists.trackId, discogTracks.id))
@@ -143,6 +149,7 @@ export async function getCreditedArtistsWithProfiles(
         creatorProfiles,
         eq(artists.creatorProfileId, creatorProfiles.id)
       )
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(
         and(
           eq(discogTracks.creatorProfileId, creatorProfileId),
@@ -161,7 +168,15 @@ export async function getCreditedArtistsWithProfiles(
     // Shared discovery-eligibility predicate (JOV-6260): public-but-ineligible
     // identities (QA machine handles, reserved fixtures, test display names)
     // never become linked artist mentions.
-    if (!isPublicProfileIndexable(handle, row.profileDisplayName)) continue;
+    if (
+      !isPublicProfileDiscoveryEligible({
+        handle,
+        displayName: row.profileDisplayName,
+        ownerEmail: row.profileOwnerEmail,
+      })
+    ) {
+      continue;
+    }
     const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -191,6 +206,7 @@ export async function getStructuredReleaseCollaborators(
       profileIsPublic: creatorProfiles.isPublic,
       profileIsClaimed: creatorProfiles.isClaimed,
       profileUsername: creatorProfiles.usernameNormalized,
+      profileOwnerEmail: users.email,
       creditName: releaseArtists.creditName,
       role: releaseArtists.role,
       position: releaseArtists.position,
@@ -203,6 +219,7 @@ export async function getStructuredReleaseCollaborators(
     .innerJoin(discogReleases, eq(releaseArtists.releaseId, discogReleases.id))
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
     .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
@@ -260,7 +277,10 @@ function projectStructuredReleaseCollaborator(
   const hasPublicProfile =
     hasBoundProfile &&
     row.profileIsPublic === true &&
-    isPublicProfileIndexable(row.profileUsername ?? '');
+    isPublicProfileDiscoveryEligible({
+      handle: row.profileUsername ?? '',
+      ownerEmail: row.profileOwnerEmail,
+    });
   let profileState: StructuredReleaseCollaborator['profileState'] =
     'unavailable';
   if (hasPublicProfile) {

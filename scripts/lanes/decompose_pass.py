@@ -8,8 +8,9 @@ gets those epics split into PR-sized child issues.
 Trigger (event, not clock): the refill receipt says todo < TRIGGER_RATIO * target and the mirror holds at least one
 splittable epic. The tick only spawns this detached, at most once per team per MIN_INTERVAL_S.
 A split child is `agent-ready` only if the text passes `risk()`: anything touching taste, health or medical claims,
-privacy/location, credentials, pricing/legal or outbound messages becomes `needs-human-decision` with the model's
-one-line question and recommended default (a child without both is dropped). Writes go through the Linear outbox
+privacy/location, credentials, pricing/legal or outbound messages becomes `agent-ready` too (EVENT 2026-10-28: nothing waits on a human) with a "Decision" section carrying the
+model's one-line question and recommended default, which the coder implements behind a flag; a child without
+both is dropped. Writes go through the Linear outbox
 (`create` op: idempotent by title under the parent, paced by the outbox budget). Kill switch:
 BACKLOG_DECOMPOSE_OWNER=none.
 
@@ -161,8 +162,8 @@ def validate(raw) -> list[dict]:
 
 def body(slice_: dict, parent: str) -> str:
     criteria = "\n".join(f"- [ ] {a}" for a in slice_["acceptance"])
-    tail = (f"\n\n## Decision needed\n**Question:** {slice_['question']}\n"
-            f"**Recommended default (ships if unanswered):** {slice_['default']}") if slice_["decision"] else ""
+    tail = (f"\n\n## Non-blocking decision (Ovie card)\n**Question:** {slice_['question']}\n"
+            f"**Recommended default (ships behind a flag if unanswered):** {slice_['default']}") if slice_["decision"] else ""
     return (f"Parent: {parent}. Slice of one reviewable PR (proposed by the decomposition pass).\n\n## Scope\n{slice_['scope']}\n\n"
             f"## Acceptance\n{criteria}\n\n## Test plan\n{slice_['tests']}\n\n## Dependencies and overlap\n{slice_['deps']}\n\n"
             f"## Out of scope\nAnything in {parent} not named above.{tail}")
@@ -228,13 +229,13 @@ def run(state: Path, team: str, now: float | None = None, judge=None, enqueue=No
             if not dry_run:
                 enqueue("create", row["id"], body=json.dumps({
                     "title": s["title"], "description": body(s, identifier), "priority": s["priority"],
-                    "labels": ["needs-human-decision"] if s["decision"] else ["agent-ready"]}))
+                    "labels": ["agent-ready"]}))
         spent += len(slices)
         ready, decisions = sum(1 for s in slices if not s["decision"]), sum(1 for s in slices if s["decision"])
         proposals[identifier] = {"slices": len(slices), "ready": ready, "decisions": decisions, "titles": [s["title"] for s in slices]}
         if not dry_run and slices:
             enqueue("comment", row["id"], body=f"Decomposition pass: {len(slices)} child issues proposed ({ready} agent-ready, "
-                                               f"{decisions} need a human decision) because {team} Todo is below half its target.")
+                                               f"{decisions} carry a non-blocking decision card) because {team} Todo is below half its target.")
     receipt["proposals"] = proposals
     created = dict(previous.get("created") or {})
     created[time.strftime("%F", time.gmtime(now))] = spent

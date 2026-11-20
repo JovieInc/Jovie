@@ -5,12 +5,14 @@ import { readAccountActivation } from '@/lib/db/queries/account-activation';
 
 /** Diagnostic population, not an outreach eligibility or unclaimed-user list. */
 export async function getSummerFounderAccounts(limit: number) {
-  const cohort = await getFounderFunnelStageRows(
-    'accounts_created',
-    '30d',
-    limit
-  );
-  if (cohort.errors.length > 0) {
+  const [cohort, allTime] = await Promise.all([
+    getFounderFunnelStageRows('accounts_created', '30d', limit),
+    // Same predicate and identity exclusion over all time: the number a
+    // "users on Jovie" milestone must use, since the 30d window only counts
+    // recent signups.
+    getFounderFunnelStageRows('accounts_created', 'all', 1),
+  ]);
+  if (cohort.errors.length > 0 || allTime.errors.length > 0) {
     return {
       status: 'unavailable' as const,
       reason: 'founder_cohort_read_failed',
@@ -21,6 +23,7 @@ export async function getSummerFounderAccounts(limit: number) {
   return {
     metricScope: 'customer_only' as const,
     total: cohort.total,
+    allTimeTotal: allTime.total,
     timeRange: cohort.timeRange,
     definitionVersion: cohort.definitionVersion,
     purpose: 'activation_diagnosis' as const,

@@ -1,7 +1,11 @@
 'use client';
 
 import { lazy, memo, Suspense, useMemo } from 'react';
-import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
+import {
+  type ChatToken,
+  type EntityKind,
+  parseTokens,
+} from '@/lib/chat/tokens';
 import { skillById } from '@/lib/commands/registry';
 import { EntityChipPopover } from './EntityChipPopover';
 import { EntityMentionSpan } from './EntityMentionSpan';
@@ -73,9 +77,10 @@ interface AssistantMessageTextProps {
  * Plain markdown segments still flow through `ChatMarkdown`.
  */
 export function AssistantMessageText({
-  content,
+  content: rawContent,
   isStreaming = false,
 }: AssistantMessageTextProps) {
+  const content = rawContent.replace(/\s*\(source:\s*enrichment\)/gi, '');
   const tokens = useMemo(() => parseTokens(content), [content]);
 
   if (tokens.length === 1 && tokens[0]?.type === 'text') {
@@ -113,7 +118,7 @@ export function AssistantMessageText({
 }
 
 interface AssistantEntityMentionProps {
-  readonly kind: 'release' | 'artist' | 'track' | 'event';
+  readonly kind: EntityKind;
   readonly id: string;
   readonly label: string;
 }

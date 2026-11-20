@@ -51,6 +51,8 @@ export interface InteractionLatencyBudget {
   readonly renderToInteractiveP95Ms?: number;
   readonly maxDroppedFrames?: number;
   readonly minimumSampleCount?: number;
+  /** Timing limits default to inclusive; chat uses the epic's strict targets. */
+  readonly timingBoundary?: 'exclusive' | 'inclusive';
   readonly targetLabel: string;
 }
 
@@ -107,8 +109,9 @@ export const INTERACTION_CLASS_BUDGETS = {
     renderToInteractiveP95Ms: 50,
     maxDroppedFrames: 0,
     minimumSampleCount: 5,
+    timingBoundary: 'exclusive',
     targetLabel:
-      'Chat feedback <100ms p50, first reply <300ms p95, interactive <50ms p95, zero dropped scroll frames',
+      'Chat feedback <100ms p50/p95, first reply <300ms p95, interactive <50ms p95, zero dropped scroll frames',
   },
   'cold-view-useful-shell': {
     firstFeedbackP95Ms: 500,
@@ -179,7 +182,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="shared-command-palette"]',
-      usableState: 'input[aria-label="Command palette search"]',
+      usableState: 'input[aria-label="Command Palette Search"]',
     },
     firstSlice: true,
   },
@@ -211,7 +214,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[cmdk-item]',
-      focusOrigin: 'input[aria-label="Command palette search"]',
+      focusOrigin: 'input[aria-label="Command Palette Search"]',
       usableState: '[cmdk-item]',
     },
     firstSlice: true,

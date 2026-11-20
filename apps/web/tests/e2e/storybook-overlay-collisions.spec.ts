@@ -193,7 +193,9 @@ for (const width of [1100, 390]) {
     const header = page.getByTestId('library-asset-entity-header');
     await expect(header).toBeVisible();
     const inset = await header.evaluate(element => {
-      const rail = element.closest('aside')!.getBoundingClientRect();
+      const rail = element
+        .closest('[data-rail-phase]')!
+        .getBoundingClientRect();
       const header = element.getBoundingClientRect();
       const title = element.querySelector('h2')!.getBoundingClientRect();
       return {
@@ -234,7 +236,9 @@ for (const viewport of [
       }
     );
     const inset = await header.evaluate(element => {
-      const rail = element.closest('aside')!.getBoundingClientRect();
+      const rail = element
+        .closest('[data-rail-phase]')!
+        .getBoundingClientRect();
       const title = element.querySelector('h2')!.getBoundingClientRect();
       return { left: title.left - rail.left, right: rail.right - title.right };
     });

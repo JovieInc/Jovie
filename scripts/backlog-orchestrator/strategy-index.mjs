@@ -1,15 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const STRATEGY_INDEX_SCHEMA = 'jovie-strategy-theses/v1';
 export const STRATEGY_INDEX_PATH = 'canon/strategy/theses.jsonl';
-
-const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..'
-);
 
 /**
  * Topics that make a lease strategy-sensitive. Deliberately phrase-level so
@@ -121,10 +114,48 @@ function parseRegistryLine(line) {
 
 const indexCache = new Map();
 
-export function loadStrategyIndex(root = REPO_ROOT) {
+/**
+ * The thesis index is private (JovieInc/Ops jovie-private/). Resolution order:
+ * explicit root, then JOVIE_PRIVATE_DIR, then ~/Ops/jovie-private. The repo
+ * root is not searched; a missing index throws, and the context gate fails
+ * closed with a strategy miss for strategy-sensitive issues.
+ */
+export function resolveStrategyRoot(root) {
+  if (root) return root;
+  return (
+    process.env.JOVIE_PRIVATE_DIR ||
+    path.join(process.env.HOME || '', 'Ops', 'jovie-private')
+  );
+}
+
+const alerted = new Set();
+
+/**
+ * A private index that cannot be read is a host misconfiguration, not "no
+ * strategy". Name the reason and path, and alert once per process on stderr
+ * (the fleet log). The context gate then blocks strategy-sensitive leases with
+ * this reason as the detail instead of an unexplained miss.
+ */
+function strategyIndexUnavailable(indexPath, error) {
+  const message = `strategy-theses-index-unavailable: ${error?.code ?? 'read-failed'} at ${indexPath}; provision a JovieInc/Ops checkout and set JOVIE_PRIVATE_DIR to its jovie-private/ folder`;
+  if (!alerted.has(indexPath)) {
+    alerted.add(indexPath);
+    process.stderr.write(`ALERT ${message}\n`);
+  }
+  return Object.assign(new Error(message), { code: error?.code });
+}
+
+export function loadStrategyIndex(root) {
+  root = resolveStrategyRoot(root);
   const cached = indexCache.get(root);
   if (cached) return cached;
-  const raw = readFileSync(path.join(root, STRATEGY_INDEX_PATH), 'utf8');
+  const indexPath = path.join(root, STRATEGY_INDEX_PATH);
+  let raw;
+  try {
+    raw = readFileSync(indexPath, 'utf8');
+  } catch (error) {
+    throw strategyIndexUnavailable(indexPath, error);
+  }
   const theses = [];
   let header = null;
   for (const line of raw.split('\n')) {

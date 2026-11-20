@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Run pr-fleet-rules.mjs on the dedicated CI App token (falling back to
-# github.token). The job result IS the verdict PR Ready reads (from this
+# github.token for the policy read only). The job result IS the verdict PR Ready reads (from this
 # workflow's own runs, which only main's copy of this file can produce):
 # success = fleet rules passed, 75 = deferred (quota/outage, never a pass),
-# 1 = policy red. After a decisive verdict, the latest completed failed Source
-# Validation run for this head is re-run so PR Ready re-reads it.
+# 1 = policy red. After a passing verdict, the latest completed failed Source
+# Validation run for this head can re-read recovered evidence. A still-red
+# policy cannot be repaired by re-reading it.
 #
 # No commit status is posted. It was informational (nothing read it) and it was
 # written with github.token, so an empty repo-wide GITHUB_TOKEN bucket turned a
@@ -28,6 +29,8 @@ trap 'rm -f "$out"' EXIT
 MAX_DEFERRED_RETRIES="${FLEET_DEFERRED_RETRIES:-3}"
 BACKOFF_STEP_S="${FLEET_DEFERRED_BACKOFF_STEP_S:-20}"
 BACKOFF_CAP_S="${FLEET_DEFERRED_BACKOFF_CAP_S:-80}"
+# Each attempt may also hold inside the script; keep the sum under the job timeout.
+export FLEET_RULES_QUOTA_HOLD_SECONDS="${FLEET_RULES_QUOTA_HOLD_SECONDS:-45}"
 retry=0
 set +e
 while :; do
@@ -47,9 +50,19 @@ case "$rc" in
   *) state=failure ;;
 esac
 
-if [ "$state" != error ]; then
-  run_id="$(ghx repair api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=10" \
+# The read lookups below run on the CI App installation token (FLEET_TOKEN), never on
+# github.token: the repo-wide GITHUB_TOKEN bucket was empty 79% of 02:23-03:23Z on
+# 2026-10-26 and these lookups were where Fleet Rules deferred (exit 75) after a
+# verdict had already been read on the App budget. Without an App token they are
+# skipped (the workflow_run hop re-runs PR Ready once the verdict exists). Only the
+# rerun POST, which needs actions:write, uses github.token.
+if [ "$state" = success ] && [ -n "${FLEET_TOKEN:-}" ]; then
+  run_id="$(GH_TOKEN="$FLEET_TOKEN" ghx repair api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=10" \
     --jq '[.workflow_runs[] | select(.conclusion == "failure" and .run_attempt < 4)] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
-  [ -z "$run_id" ] || bash .github/scripts/fleet-rules-rerun.sh "$run_id" || true
+  [ -z "$run_id" ] || GH_READ_TOKEN="$FLEET_TOKEN" bash .github/scripts/fleet-rules-rerun.sh "$run_id" || true
+elif [ "$state" = success ]; then
+  echo "::notice::No CI App token; skipping the Source Validation re-run lookup (the re-run hop covers it)."
+elif [ "$state" = failure ]; then
+  echo "::notice::Fleet policy remains red; not re-running Source Validation for an unchanged failing verdict."
 fi
 case "$state" in success) exit 0 ;; error) exit 75 ;; *) exit 1 ;; esac

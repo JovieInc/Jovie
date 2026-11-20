@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildEntryProfileBuilderState,
-  OnboardingShell,
-} from './OnboardingShell';
+import { OnboardingShell, OnboardingShellStatus } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
@@ -108,6 +108,35 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
   },
 }));
 
+/** A restored transcript as `readOnboardingMessages` builds it. */
+function nextStepTranscript(
+  kind: 'waitlist' | 'instant_access' | 'needs_more_info'
+) {
+  return [
+    ...STARTED_CONVERSATION,
+    {
+      id: 'm2',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text' as const, text: 'Sign up below to hold your name.' },
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'proposeNextStep',
+          toolCallId: 'call-next-step',
+          state: 'output-available' as const,
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: { kind, rationale: 'test', score: 1 },
+          },
+        },
+      ],
+    },
+  ];
+}
+
+const RAIL_TEST_ID = 'onboarding-profile-rail';
+await import('./OnboardingProfileRail'); // warm the lazy rail chunk
 const STARTED_CONVERSATION = [
   {
     id: 'm1',
@@ -116,8 +145,16 @@ const STARTED_CONVERSATION = [
   },
 ];
 
+async function openOptions() {
+  await vi.waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Onboarding options' })
+  );
+  return screen.findByRole('menu');
+}
+
 describe('OnboardingShell status', () => {
-  it('does not offer Start Over on a first visit with nothing to discard', () => {
+  it('does not offer Start over on a first visit with nothing to discard', async () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -125,11 +162,16 @@ describe('OnboardingShell status', () => {
         onRestart={vi.fn()}
       />
     );
-    expect(screen.queryByRole('button', { name: 'Start Over' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'Sign in' })).toBeNull();
+    await openOptions();
+    expect(screen.queryByRole('menuitem', { name: 'Start over' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
   });
 
-  it('keeps explicit restart/logout visible and prevents them during a pending turn', () => {
+  it('keeps restart/logout in the shared menu and prevents them during a pending turn', async () => {
     const restart = vi.fn();
     const logout = vi.fn();
     const { rerender } = render(
@@ -145,8 +187,10 @@ describe('OnboardingShell status', () => {
       'data-flush-content',
       'true'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
+    await openOptions();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Start over' }));
+    await openOptions();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log out' }));
     expect(restart).toHaveBeenCalledOnce();
     expect(logout).toHaveBeenCalledOnce();
     rerender(
@@ -159,8 +203,15 @@ describe('OnboardingShell status', () => {
         controlsDisabled
       />
     );
-    expect(screen.getByRole('button', { name: 'Start Over' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeDisabled();
+    await openOptions();
+    const restartItem = screen.getByRole('menuitem', { name: 'Start over' });
+    const logoutItem = screen.getByRole('menuitem', { name: 'Log out' });
+    expect(restartItem).toHaveAttribute('aria-disabled', 'true');
+    expect(logoutItem).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(restartItem);
+    fireEvent.click(logoutItem);
+    expect(restart).toHaveBeenCalledOnce();
+    expect(logout).toHaveBeenCalledOnce();
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
   });
   beforeEach(() => {
@@ -211,7 +262,7 @@ describe('OnboardingShell status', () => {
     expect(alert).toHaveTextContent('Sign in with the original account');
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     expect(
-      screen.getByRole('link', { name: 'Sign in with original account' })
+      screen.getByRole('link', { name: 'Sign In with Original Account' })
     ).toHaveAttribute('href', '/signin');
     expect(
       alert.closest('[data-testid=onboarding-identity-recovery-slot]')
@@ -223,7 +274,7 @@ describe('OnboardingShell status', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps recovery below navigation and above the transcript, using existing logout authority', () => {
+  it('keeps recovery below navigation and above the transcript, using existing logout authority', async () => {
     claimState.value = 'identity-conflict';
     const logout = vi.fn();
     render(
@@ -240,7 +291,10 @@ describe('OnboardingShell status', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     fireEvent.click(screen.getByRole('button', { name: 'Switch Account' }));
     expect(logout).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeEnabled();
+    await openOptions();
+    expect(
+      screen.getByRole('menuitem', { name: 'Log out' })
+    ).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByRole('link', { name: /claim/i })).toBeNull();
   });
 
@@ -252,11 +306,11 @@ describe('OnboardingShell status', () => {
     rerender(<OnboardingShell sessionLabel='stable' />);
     expect(screen.getByTestId('onboarding-identity-recovery-slot')).toBe(slot);
     expect(
-      screen.queryByRole('link', { name: 'Sign in with original account' })
+      screen.queryByRole('link', { name: 'Sign In with Original Account' })
     ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
     expect(
-      screen.getByRole('link', { name: 'Sign in with original account' })
+      screen.getByRole('link', { name: 'Sign In with Original Account' })
     ).toBeVisible();
   });
 
@@ -281,19 +335,41 @@ describe('OnboardingShell status', () => {
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
   });
 
-  it('keeps the compact sign-in face inside the canonical 44px hit target (JOV-4411)', () => {
+  it('uses the canonical compact icon button and keeps its accessible name without an icon', () => {
     render(<OnboardingShell sessionLabel='pending' />);
-
-    const signIn = screen.getByRole('link', { name: 'Sign in' });
-    expect(signIn).toHaveAttribute('data-variant', 'link');
-    expect(signIn).toHaveAttribute('data-appearance', 'compact');
-    expect(signIn).toHaveClass('btn-linear-login', 'focus-ring-themed');
-    expect(signIn.className).toContain('before:min-h-11');
-    expect(signIn.className).toContain('before:min-w-11');
-    expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+    const trigger = screen.getByRole('button', { name: 'Onboarding options' });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:w-11');
+    trigger.replaceChildren();
+    expect(screen.getByRole('button', { name: 'Onboarding options' })).toBe(
+      trigger
+    );
+    trigger.focus();
+    expect(trigger).toHaveFocus();
   });
 
-  it('reports a failed chat start without verification jargon or error codes', () => {
+  it('dismisses the menu with Escape and returns focus without resetting the conversation', async () => {
+    const restart = vi.fn();
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        initialMessages={STARTED_CONVERSATION}
+        onRestart={restart}
+      />
+    );
+    const menu = await openOptions();
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await vi.waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Onboarding options' })
+      ).toHaveFocus()
+    );
+    expect(restart).not.toHaveBeenCalled();
+  });
+
+  it('never dead-ends a failed bot check: the chat sends on the unverified path', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     act(() => {
@@ -303,11 +379,8 @@ describe('OnboardingShell status', () => {
       });
     });
 
-    const alert = screen.getByText(
-      "We couldn't start your chat. Refresh the page to try again."
-    );
-    expect(alert).toHaveAttribute('role', 'alert');
-    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+    expect(screen.queryByText(/couldn.t start your chat/i)).toBeNull();
+    expect(chatProps.current?.turnstileToken).toBe('jv-unverified:error');
   });
 
   it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {
@@ -319,7 +392,7 @@ describe('OnboardingShell status', () => {
     );
   });
 
-  it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', () => {
+  it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', async () => {
     builderState.current = {
       artist: null,
       artistConfirmed: false,
@@ -328,19 +401,17 @@ describe('OnboardingShell status', () => {
     };
     render(<OnboardingShell sessionLabel='pending' />);
     builderState.current = null;
-
-    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+    expect(await screen.findByTestId(RAIL_TEST_ID)).toBeInTheDocument();
   });
 
-  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', () => {
+  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', async () => {
     render(
       <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
     );
-
-    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+    expect(await screen.findByTestId(RAIL_TEST_ID)).toBeInTheDocument();
   });
 
-  it('keeps the rail hidden for an open handle with no page yet', () => {
+  it('shows the draft profile for an open handle from the first paint (Pen R6As7U)', async () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -348,16 +419,18 @@ describe('OnboardingShell status', () => {
       />
     );
 
+    const rail = await screen.findByTestId(RAIL_TEST_ID);
     expect(
-      screen.queryByTestId('onboarding-profile-rail')
-    ).not.toBeInTheDocument();
+      within(rail).getByRole('heading', { name: 'Your Draft Profile' })
+    ).toBeInTheDocument();
+    expect(within(rail).getByText('jov.ie/newartist')).toBeInTheDocument();
   });
 
-  it('keeps the profile preview in the chat main rather than the shell overlay', () => {
+  it('keeps the profile preview in the chat main rather than the shell overlay', async () => {
     render(
       <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
     );
-    const preview = screen.getByTestId('onboarding-profile-rail');
+    const preview = await screen.findByTestId(RAIL_TEST_ID);
     expect(screen.getByTestId('onboarding-shell-main')).toContainElement(
       preview
     );
@@ -369,12 +442,13 @@ describe('OnboardingShell status', () => {
     );
   });
 
-  it('retries claim after a completed turn while retaining sign-in access', () => {
+  it('retries claim after a completed turn while retaining sign-in access', async () => {
     render(<OnboardingShell sessionLabel='anonymous' />);
     expect(claimState.trigger).toBe(0);
     act(() => chatProps.current?.onConversationActivity());
     expect(claimState.trigger).toBe(1);
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBeVisible();
+    await openOptions();
+    expect(screen.getByRole('menuitem', { name: 'Sign in' })).toBeVisible();
   });
 
   it('restores owned history without redirecting and retries the existing claim after a genuine turn', () => {
@@ -392,6 +466,43 @@ describe('OnboardingShell status', () => {
 
     expect(claimState.trigger).toBe(1);
     expect(claimState.enabled).toBe(true);
+  });
+
+  // Golden-path cert 2026-10-31 pm (walk-m1..m3): the OTP form hard-navigates
+  // to /start while a claim POST from the pre-navigation page is in flight.
+  // The server commits ownership, the response is lost, and the reloaded page
+  // restores an owned transcript that already ends in the waitlist decision.
+  // That restore must claim on mount (the server's idempotent alreadyClaimed
+  // recovery returns the receipt), or the visitor waits on "Saving your
+  // request…" forever.
+  it.each(['waitlist', 'instant_access'] as const)(
+    'claims on mount when a restored owned transcript already ends in a %s decision',
+    kind => {
+      render(
+        <OnboardingShell
+          sessionLabel='saved'
+          isSignedIn
+          resumeOwnedConversation
+          initialMessages={nextStepTranscript(kind)}
+        />
+      );
+
+      expect(claimState.trigger).toBe(0);
+      expect(claimState.enabled).toBe(true);
+    }
+  );
+
+  it('keeps a restored owned transcript without a terminal decision quiet until a genuine turn', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='saved'
+        isSignedIn
+        resumeOwnedConversation
+        initialMessages={nextStepTranscript('needs_more_info')}
+      />
+    );
+
+    expect(claimState.enabled).toBe(false);
   });
 
   it('clears a rejected challenge token and keeps a fresh verification action available', () => {
@@ -425,24 +536,39 @@ const MEGARAN_ENTRY = {
   linkCount: 1,
 } as const;
 
-describe('buildEntryProfileBuilderState (JOV-7753)', () => {
-  it('maps a prebuilt page to rail preview state and nothing else', () => {
-    expect(buildEntryProfileBuilderState(MEGARAN_ENTRY)).toEqual({
-      artist: {
-        id: 'handle-megaran',
-        name: 'Mega Ran',
-        url: '',
-        imageUrl: 'https://blob.example.com/a.png',
-        genres: ['hip hop'],
-      },
-      artistConfirmed: false,
-      handle: 'megaran',
-      socialLinks: ['https://instagram.com/megaran'],
-    });
-    expect(
-      buildEntryProfileBuilderState({ status: 'available', handle: 'x-y-z' })
-        .artist
-    ).toBeNull();
-    expect(buildEntryProfileBuilderState(null).artist).toBeNull();
+// JOV-7973: the /start shell pane must clip without owning a programmatically
+// scrollable box. overflow:hidden stays scrollable, so a journey scrollIntoView
+// can leave the whole route (profile rail included) shifted under the clip —
+// the golden-path preview badge then reads a stable viewport ratio 0.8125 that
+// keyboard End/Home on the rail can never undo.
+describe('OnboardingShell route pane (JOV-7973)', () => {
+  it('clips the shell content pane instead of owning a scroll box', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/onboarding/OnboardingShell.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("contentClassName='overflow-clip!'");
+    expect(source).not.toContain("contentClassName='overflow-hidden!'");
+  });
+});
+
+describe('OnboardingShellStatus (2026-10-31 golden-path walk)', () => {
+  it('shows the status in words, never a bare skeleton bar', () => {
+    render(
+      <OnboardingShellStatus
+        kind='status'
+        message='Saving this conversation to your account…'
+        visible
+      />
+    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(
+      'Saving this conversation to your account…'
+    );
+    expect(status.querySelector('.sr-only')).toBeNull();
   });
 });

@@ -5,8 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   cacheQueryMock: vi.fn(),
   invalidateCacheMock: vi.fn(),
-  getUserDashboardAnalyticsMock: vi.fn(),
+  getDashboardAnalyticsForProfileMock: vi.fn(),
   getCurrentUserEntitlementsMock: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/authorized-profile', () => ({
+  resolveAuthorizedAnalyticsProfile: async (userId: string) => ({
+    userId,
+    profileId: 'profile-123',
+  }),
 }));
 
 vi.mock('@/lib/db/cache', () => ({
@@ -15,7 +22,7 @@ vi.mock('@/lib/db/cache', () => ({
 }));
 
 vi.mock('@/lib/db/queries/analytics', () => ({
-  getUserDashboardAnalytics: hoisted.getUserDashboardAnalyticsMock,
+  getDashboardAnalyticsForProfile: hoisted.getDashboardAnalyticsForProfileMock,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -42,7 +49,7 @@ describe('readAuthorizedDashboardAnalytics', () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       analyticsRetentionDays: 30,
     });
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue({
       profile_views: 12,
       top_cities: [{ city: 'Austin', count: 2 }],
     });
@@ -52,7 +59,7 @@ describe('readAuthorizedDashboardAnalytics', () => {
     await expect(
       readAuthorizedDashboardAnalytics({ userId: '' })
     ).rejects.toThrow('Unauthorized');
-    expect(hoisted.getUserDashboardAnalyticsMock).not.toHaveBeenCalled();
+    expect(hoisted.getDashboardAnalyticsForProfileMock).not.toHaveBeenCalled();
   });
 
   it('clamps the requested range to plan retention before querying', async () => {
@@ -67,13 +74,13 @@ describe('readAuthorizedDashboardAnalytics', () => {
     });
 
     expect(read.range).toBe('7d');
-    expect(hoisted.getUserDashboardAnalyticsMock).toHaveBeenCalledWith(
-      'user_123',
+    expect(hoisted.getDashboardAnalyticsForProfileMock).toHaveBeenCalledWith(
+      { userId: 'user_123', profileId: 'profile-123' },
       '7d',
       'full'
     );
     expect(hoisted.cacheQueryMock).toHaveBeenCalledWith(
-      'dashboard-analytics:user_123:full:7d',
+      'dashboard-analytics:v2:user_123:profile-123:full:7d',
       expect.any(Function),
       expect.any(Object)
     );
@@ -91,8 +98,8 @@ describe('readAuthorizedDashboardAnalytics', () => {
     });
 
     expect(read.range).toBe('all');
-    expect(hoisted.getUserDashboardAnalyticsMock).toHaveBeenCalledWith(
-      'user_123',
+    expect(hoisted.getDashboardAnalyticsForProfileMock).toHaveBeenCalledWith(
+      { userId: 'user_123', profileId: 'profile-123' },
       'all',
       'full'
     );
@@ -113,7 +120,7 @@ describe('readAuthorizedDashboardAnalytics', () => {
   });
 
   it('normalizes missing leaderboards and invalidates on refresh', async () => {
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue({
       profile_views: 4,
       top_cities: undefined,
       top_countries: null,
@@ -129,7 +136,7 @@ describe('readAuthorizedDashboardAnalytics', () => {
     });
 
     expect(hoisted.invalidateCacheMock).toHaveBeenCalledWith(
-      'dashboard-analytics:user_123:traffic:30d'
+      'dashboard-analytics:v2:user_123:profile-123:traffic:30d'
     );
     expect(read.analytics).toMatchObject({
       profile_views: 4,
@@ -141,7 +148,7 @@ describe('readAuthorizedDashboardAnalytics', () => {
   });
 
   it('quotes agent profile views from the same default window', async () => {
-    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+    hoisted.getDashboardAnalyticsForProfileMock.mockResolvedValue({
       profile_views: 88,
       top_cities: [],
       top_countries: [],
@@ -150,8 +157,8 @@ describe('readAuthorizedDashboardAnalytics', () => {
     });
 
     await expect(readAuthorizedProfileViews('user_123')).resolves.toBe(88);
-    expect(hoisted.getUserDashboardAnalyticsMock).toHaveBeenCalledWith(
-      'user_123',
+    expect(hoisted.getDashboardAnalyticsForProfileMock).toHaveBeenCalledWith(
+      { userId: 'user_123', profileId: 'profile-123' },
       '30d',
       'traffic'
     );
@@ -162,7 +169,7 @@ describe('analytics read parity', () => {
   it('sends dashboard, mobile API, and agent through the authorized read', () => {
     const dashboardRoute = source('app/api/dashboard/analytics/route.ts');
     const mobileHighlights = source('lib/mobile/audience-highlights.ts');
-    const chatRoute = source('app/api/chat/route.ts');
+    const chatContext = source('lib/chat/artist-context.server.ts');
     const mobileAgent = source('lib/mobile/chat/artist-context.ts');
 
     expect(dashboardRoute).toContain('readAuthorizedDashboardAnalytics');
@@ -170,9 +177,8 @@ describe('analytics read parity', () => {
     expect(mobileHighlights).toContain('readAuthorizedDashboardAnalytics');
     expect(mobileHighlights).not.toContain('getUserDashboardAnalytics');
 
-    const chatFetch = chatRoute.slice(
-      chatRoute.indexOf('async function fetchArtistContext('),
-      chatRoute.indexOf('function findReleaseByTitle(')
+    const chatFetch = chatContext.slice(
+      chatContext.indexOf('async function fetchArtistContext(')
     );
     expect(chatFetch).toContain('readAuthorizedProfileViews');
     expect(chatFetch).not.toContain('creatorProfiles.profileViews');

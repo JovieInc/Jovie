@@ -142,11 +142,9 @@
     transparent 248deg
   );
   opacity: 0.7;
-  /* Ambient loop, not a UI transition. The period lives on a custom property
-     so the motion lint treats it as a token (see lint-motion-css). */
+  /* Static by default (animated-background budget). The period lives on a
+     custom property so the motion lint treats it as a token. */
   --hero-light-roll-period: 28s;
-  animation: homepage-hero-light-roll var(--hero-light-roll-period) linear
-    infinite;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -167,6 +165,15 @@
 
 .homepage-hero-light[data-live="true"] .homepage-hero-light__canvas {
   opacity: 1;
+}
+
+/* Ambient loop, not a UI transition. Runs only when the registered budget
+   enables the hero light (data-animate) and the viewer allows motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-hero-light[data-animate="true"] .homepage-hero-light__edge {
+    animation: homepage-hero-light-roll var(--hero-light-roll-period) linear
+      infinite;
+  }
 }
 
 @keyframes homepage-hero-light-roll {

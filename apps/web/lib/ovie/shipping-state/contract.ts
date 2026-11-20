@@ -17,6 +17,36 @@ export const SHIPPING_STATE_FRESHNESS_MS = 10_000;
 export const SHIPPING_STATE_CLOCK_SKEW_MS = 60_000;
 export const MAX_ACCEPTED_SOURCE_SEQUENCE_GAP = 10_000;
 
+/**
+ * Branch prefixes of agent lanes. Every prefix gets one GitHub search (cost 1
+ * point each). The list was `devin|codex` only, so on 2026-10-25 ~50 of ~140
+ * open PRs (glm, opus, grok, cursor) were invisible and Home read "No work in
+ * flight" beside 91 red PRs. Add a prefix here when a new lane ships.
+ */
+export const LANE_BRANCH_PREFIXES = [
+  'codex',
+  'devin',
+  'glm',
+  'grok',
+  'opus',
+  'cursor',
+  'sonnet',
+  'fable',
+] as const;
+/** The agent lane a PR belongs to; one value per {@link LANE_BRANCH_PREFIXES}. */
+export type LaneAgent = (typeof LANE_BRANCH_PREFIXES)[number];
+const LANE_AGENTS: ReadonlySet<string> = new Set(LANE_BRANCH_PREFIXES);
+export function isLaneAgent(value: unknown): value is LaneAgent {
+  return typeof value === 'string' && LANE_AGENTS.has(value);
+}
+const LANE_PREFIX_ALTERNATION = LANE_BRANCH_PREFIXES.join('|');
+export const LANE_BRANCH_RE = new RegExp(`^(?:${LANE_PREFIX_ALTERNATION})/`);
+export const LANE_AGENT_RE = new RegExp(`^(${LANE_PREFIX_ALTERNATION})/`, 'i');
+export const LANE_ISSUE_RE = new RegExp(
+  `^(?:${LANE_PREFIX_ALTERNATION})/(jov-\\d+)(?:-|$)`,
+  'i'
+);
+
 export const SHIPPING_SOURCE_IDS = [
   'lanes-status',
   'lane-pull-requests',
@@ -141,7 +171,7 @@ export type OperationalTaskPullRequest = {
   readonly url: string | null;
   readonly branch: string | null;
   /** Owning agent lane derived from the branch prefix. */
-  readonly agent: 'devin' | 'codex' | null;
+  readonly agent: LaneAgent | null;
   readonly isDraft: boolean;
   readonly checks: OperationalTaskChecks;
   readonly queuePosition: number | null;
@@ -413,10 +443,21 @@ export type DeployHealthRepo = {
   readonly lastSuccessAt: string | null;
 };
 
+/** Merge-to-production lag over the trailing 7 days with its target (the tracked metric CI and quota work should reduce). */
+export type DeployLag = {
+  readonly repo: string;
+  readonly p50Min: number | null;
+  readonly p95Min: number | null;
+  readonly samples: number;
+  readonly targetP50Min: number | null;
+  readonly targetP95Min: number | null;
+};
+
 export type DeployHealth = {
   readonly observedAt: string | null;
   readonly healthy: boolean;
   readonly repos: readonly DeployHealthRepo[];
+  readonly lag?: readonly DeployLag[];
 };
 
 export type DeliveryLanes = {

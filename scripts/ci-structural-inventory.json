@@ -10,9 +10,9 @@
       "kind": "suite"
     },
     {
-      "key": "node --test .github/scripts/dependency-parity-evidence.test.mjs",
+      "key": "node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs",
       "part": "operationsParts",
-      "seconds": 0.6,
+      "seconds": 1.43,
       "kind": "suite"
     },
     {
@@ -67,6 +67,12 @@
       "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-cover",
       "part": "operationsParts",
       "seconds": 15.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-",
+      "part": "operationsParts",
+      "seconds": 1.2,
       "kind": "suite"
     },
     {
@@ -130,9 +136,9 @@
       "kind": "suite"
     },
     {
-      "key": "node --test .github/scripts/update-quarantine.test.js",
+      "key": "node --test .github/scripts/update-quarantine.test.js scripts/linear-team-drift.test.mjs scripts/lib/__tests__/flake-led",
       "part": "operationsParts",
-      "seconds": 0.6,
+      "seconds": 0.18,
       "kind": "suite"
     },
     {
@@ -304,15 +310,21 @@
       "kind": "pr-cheap-scan"
     },
     {
+      "key": "pnpm design:no-dead-ends:check",
+      "part": "webParts",
+      "seconds": 1.2,
+      "kind": "pr-cheap-scan"
+    },
+    {
       "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
       "part": "webParts",
       "seconds": 5.0,
       "kind": "suite"
     },
     {
-      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs",
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/",
       "part": "webParts",
-      "seconds": 4.2,
+      "seconds": 4.4,
       "kind": "suite"
     },
     {

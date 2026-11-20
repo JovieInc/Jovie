@@ -93,6 +93,42 @@ describe('customer publication integrity', () => {
     );
   });
 
+  it('still publishes when some evidence checks failed without a status or hash', () => {
+    // Real receipts keep unreachable or failed checks; they must not hide the post.
+    const receipt = {
+      ...publication(),
+      runtimeEvidence: [
+        { url: 'https://jov.ie/app/chat', passed: false },
+        { passed: false, status: 200, sha256: 'c'.repeat(64) },
+        { passed: true, status: 200, sha256: 'b'.repeat(64) },
+      ],
+    };
+    expect(
+      projectCustomerChangelog(parseChangelog(markdown(receipt)))
+    ).toHaveLength(1);
+  });
+
+  it('shows every published daily post in the real CHANGELOG.md', () => {
+    // Guard: a receipt the parser rejects silently hides a whole day (Oct 2 stayed first for weeks).
+    const raw = readFileSync('../../CHANGELOG.md', 'utf8');
+    const releases = parseChangelog(raw);
+    const published = releases.filter(r => r.customerOutcomes?.length);
+    const receipts = raw.match(/<!-- daily-changelog-receipt\/v1 /g) ?? [];
+    expect(published).toHaveLength(receipts.length);
+    const dates = projectCustomerChangelog(releases).map(e => e.date);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it('does not publish when no evidence check passed', () => {
+    const receipt = {
+      ...publication(),
+      runtimeEvidence: [{ passed: false }],
+    };
+    expect(projectCustomerChangelog(parseChangelog(markdown(receipt)))).toEqual(
+      []
+    );
+  });
+
   it.each([
     'PersistentAudioBar tests: update assertions.',
     'Codex issue shipper hardening: safer dispatch.',
@@ -184,5 +220,20 @@ describe('customer publication integrity', () => {
       outcomes.map(entry => `${entry.title} ${entry.explanation}`).join('\n')
     ).not.toMatch(/PersistentAudioBar|Codex|shipper|unit tests?|JOV-\d+/);
     expect(releases.some(release => release.version === '26.6.50')).toBe(true);
+  });
+});
+
+describe('newest-first ordering', () => {
+  it("lists the newest published day first in the archive and in What's New", () => {
+    const releases = parseChangelog(readFileSync('../../CHANGELOG.md', 'utf8'));
+    const newest = releases
+      .filter(r => r.customerOutcomes?.length)
+      .map(r => r.date)
+      .sort()
+      .at(-1);
+    expect(projectCustomerChangelog(releases)[0]?.date).toBe(newest);
+    expect(projectWhatsNew(releases, 'https://jov.ie').entries[0]?.date).toBe(
+      newest
+    );
   });
 });

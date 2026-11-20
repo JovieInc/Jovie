@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cashIsAbundant,
   evaluateSpendIntent,
   spendIntentRequestSchema,
 } from './spend-preflight';
@@ -115,5 +116,53 @@ describe('spend preflight', () => {
       amountUsd: 50,
       preflightReceiptId: approval.id,
     });
+  });
+
+  it("holds envelope spend for Tim unless cash is abundant (Tim's standing rule, 2026-11-01)", () => {
+    const paid = route('paid', {
+      coversOutcome: true,
+      terms: { ...route('paid').terms, status: 'compatible' },
+      fullyLoadedCostUsd: 50,
+      hardMaximumExposureUsd: 50,
+      costValueReceiptRef: ISSUE,
+    });
+    const alternatives = [route('owned'), route('free'), route('build'), paid];
+    const base = request({ alternatives });
+    const envelope = {
+      sourceRef: ISSUE,
+      validUntil: '2099-01-01T00:00:00.000Z',
+      vendor: paid.vendor,
+      vendorProduct: paid.vendorProduct,
+      maximumExposureUsd: 100,
+      allowedPaymentCredentialActions: [paid.paymentCredentialAction],
+      allowsAutoRenew: true,
+      allowsOverage: true,
+    };
+    const input = { ...base, preAuthorizedEnvelope: envelope } as typeof base;
+    // Unknown cash and tonight's near-empty bank: Tim approves.
+    expect(evaluateSpendIntent(input).disposition).toBe(
+      'request-founder-approval'
+    );
+    expect(
+      evaluateSpendIntent(input, { balanceUsd: 812, burnUsdPer30d: 0 })
+        .disposition
+    ).toBe('request-founder-approval');
+    expect(
+      evaluateSpendIntent(input, { balanceUsd: 812, burnUsdPer30d: 0 }).reason
+    ).toContain('cash is not abundant');
+    // Abundant: a real floor, 12+ months of runway, and a small share of the balance.
+    expect(
+      evaluateSpendIntent(input, { balanceUsd: 200_000, burnUsdPer30d: 10_000 })
+        .disposition
+    ).toBe('autonomous-within-envelope');
+    expect(
+      cashIsAbundant({ balanceUsd: 200_000, burnUsdPer30d: 20_000 }, 50)
+    ).toBe(false);
+    expect(
+      cashIsAbundant({ balanceUsd: 30_000, burnUsdPer30d: null }, 50)
+    ).toBe(false);
+    expect(
+      cashIsAbundant({ balanceUsd: 30_000, burnUsdPer30d: 1_000 }, 5_000)
+    ).toBe(false);
   });
 });

@@ -29,6 +29,10 @@ vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
   loadTourDates: vi.fn(),
 }));
 
+const queryMocks = vi.hoisted(() => ({
+  syncMutateAsync: vi.fn(),
+}));
+
 vi.mock('@/lib/queries', () => ({
   useDeleteTourDateMutation: () => ({
     mutateAsync: vi.fn(),
@@ -39,7 +43,7 @@ vi.mock('@/lib/queries', () => ({
     isPending: false,
   }),
   useSyncFromBandsintownMutation: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: queryMocks.syncMutateAsync,
     isPending: false,
   }),
 }));
@@ -124,7 +128,13 @@ function RightPanelProbe() {
   return <div data-testid='global-right-rail'>{useRightPanel()}</div>;
 }
 
-function Harness({ showManager = true }: { readonly showManager?: boolean }) {
+function Harness({
+  showManager = true,
+  onSyncError,
+}: {
+  readonly showManager?: boolean;
+  readonly onSyncError?: (message: string) => void;
+}) {
   return (
     <RightPanelProvider>
       <ChatEntityPanelProvider resetKey='profile-1'>
@@ -138,6 +148,7 @@ function Harness({ showManager = true }: { readonly showManager?: boolean }) {
               artistName: 'Test Artist',
               lastSyncedAt: null,
             }}
+            onSyncError={onSyncError}
           />
         ) : null}
         <RightPanelProbe />
@@ -190,5 +201,30 @@ describe('TourDatesManager shell rail', () => {
         within(globalRail).queryByTestId('tour-date-right-rail')
       ).toBeNull();
     });
+  });
+
+  it('reports the sync failure verbatim to the owning surface', async () => {
+    const onSyncError = vi.fn();
+    queryMocks.syncMutateAsync.mockRejectedValueOnce(new Error('503'));
+    render(<Harness onSyncError={onSyncError} />);
+
+    fireEvent.click(
+      within(screen.getByTestId('tour-dates-manager')).getAllByRole('button', {
+        name: 'Sync',
+      })[0]
+    );
+
+    await waitFor(() =>
+      expect(onSyncError).toHaveBeenCalledWith('Failed to sync tour dates')
+    );
+  });
+
+  it('marks the Bandsintown connection with the success tokens', () => {
+    render(<Harness />);
+
+    const mark = screen.getByTestId('tour-dates-connected-mark');
+    expect(mark.className).toContain('bg-success-subtle');
+    expect(mark.className).not.toMatch(/teal/);
+    expect(screen.getByText('Test Artist')).toBeInTheDocument();
   });
 });

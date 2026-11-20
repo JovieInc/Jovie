@@ -24,6 +24,9 @@ describe('demo player capture', () => {
       expect(result.current.playbackState).toMatchObject({
         activeTrackId: DEMO_PLAYER_RELEASE.id,
         trackTitle: 'The Deep End',
+        // ds-cert:credit-format: the player byline formats through the
+        // canonical credit formatter, never a local '&' join.
+        artistName: 'Tim White and Cosmic Gate',
         artworkUrl: '/img/releases/the-deep-end.jpg',
         isPlaying: true,
         playbackStatus: 'playing',

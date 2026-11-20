@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import type { UIMessage } from 'ai';
 import { type FormEvent, forwardRef, type ReactNode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
@@ -12,11 +13,7 @@ import type { OnboardingTurnstileStatus } from '@/components/features/onboarding
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 const chatMocks = vi.hoisted(() => ({
-  messages: [] as Array<{
-    id: string;
-    role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
-  }>,
+  messages: [] as UIMessage[],
   onError: undefined as undefined | ((error: Error) => void),
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
@@ -145,6 +142,9 @@ vi.mock('@/components/jovie/components', () => ({
       </form>
     );
   }),
+}));
+
+vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({ id }: { readonly id: string }) => (
     <div data-testid='chat-message'>{id}</div>
   ),
@@ -158,6 +158,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
     scrollContainerRef: { current: null },
+    setStuckToBottom: vi.fn(),
     totalSizeRef: { current: null },
   }),
 }));
@@ -459,6 +460,43 @@ describe('OnboardingChat Turnstile gating', () => {
       ).toBeNull();
     }
   );
+
+  it('holds the starter banner height with an inert spacer after sizing is withdrawn', () => {
+    // jsdom has no layout: report the banner's painted height so the hold
+    // has something to keep.
+    const heightSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(24);
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileHasSiteKey: true,
+      turnstilePanel: <span hidden />,
+    };
+    const { rerender } = render(
+      <OnboardingChat
+        {...props}
+        turnstileStatus='loading'
+        turnstileToken={null}
+      />
+    );
+    expect(screen.queryByTestId('onboarding-starter-banner-space')).toBeNull();
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstileStatus='verified'
+        turnstileToken='fresh-token'
+      />
+    );
+    // Same height as the withdrawn banner, so the bottom-anchored composer
+    // box does not collapse and shift after first paint.
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    const spacer = screen.getByTestId('onboarding-starter-banner-space');
+    expect(spacer).toHaveAttribute('aria-hidden', 'true');
+    expect(spacer).toHaveStyle({ height: '24px' });
+    heightSpy.mockRestore();
+  });
 
   it('withdraws starter sizing when the configured key disappears', () => {
     const props = {

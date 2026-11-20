@@ -228,7 +228,7 @@ export const PUBLIC_SHARE_DESTINATIONS: readonly PublicShareDestination[] = [
   },
   {
     id: 'twitter',
-    label: 'X / Twitter',
+    label: 'X',
     icon: 'x',
     supportsPrefill: true,
     supportsFileShare: false,

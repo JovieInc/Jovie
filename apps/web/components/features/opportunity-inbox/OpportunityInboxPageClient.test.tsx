@@ -28,20 +28,25 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
-const runtimeState = vi.hoisted(() => ({
-  update: null as null | {
-    available: boolean;
-    busy: boolean;
-    title: string;
-    description: string;
-    apply: () => void;
-  },
+const runtimeState = vi.hoisted(() => ({ mismatch: false }));
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
+  useIsElectronRuntime: () => false,
+  useDesktopUpdate: () => ({
+    available: false,
+    downloaded: false,
+    install: vi.fn(async () => true),
+  }),
 }));
-vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
-  useRuntimeUpdate: () => runtimeState.update,
+vi.mock('@/lib/hooks/useVersionMonitor', () => ({
+  useVersionMonitor: () => ({
+    hasMismatch: runtimeState.mismatch,
+    mismatchInfo: { newVersion: '26.9.1' },
+  }),
 }));
 const mutateMock = vi.fn();
 const refreshMock = vi.fn();
@@ -57,42 +62,11 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/founder-review/client', () => ({
-  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
-  deleteFounderReviewAudio: vi.fn(),
-  uploadFounderReviewAudio: vi.fn(),
-  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
-    id: review.segmentId,
-    target: review.target,
-    decision: review.decision,
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status:
-        review.decision === 'approved' || review.decision === 'rejected'
-          ? 'pending'
-          : 'not-applicable',
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: null,
-    },
-  })),
-  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
-    id: input.receiptId,
-    target: {
-      type: 'inbox-card',
-      id: 'card-1',
-      title: 'Saved founder review',
-      sourceKind: 'test.suggestion',
-      category: 'suggestion',
-    },
-    decision: 'approved',
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status: input.status,
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: input.errorCode,
-    },
-  })),
-}));
+vi.mock('@/lib/founder-review/client', async () =>
+  (
+    await import('./opportunity-inbox-page-client-mocks')
+  ).founderReviewClientMock()
+);
 
 vi.mock('@/lib/chat/transcriber', () => ({
   createWebSpeechTranscriber: () => ({
@@ -116,40 +90,11 @@ vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
   ),
 }));
 
-vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
-  useOpportunityInboxMutations: () => ({
-    approveMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    dismissMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    feedbackMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    reviseMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    nextStepMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-  }),
-}));
+vi.mock('@/lib/queries/useOpportunityInboxMutations', async () =>
+  (await import('./opportunity-inbox-page-client-mocks')).inboxMutationsMock(
+    () => ({ mutate: mutateMock, mutateAsync: mutateAsyncMock })
+  )
+);
 
 const tourDateMutateMock = vi.fn();
 
@@ -178,6 +123,25 @@ const HEALTHY_AVAILABILITY = {
   tourDates: 'not_requested',
 } as const;
 
+const ONE_CARD_INBOX: OpportunityInboxData = {
+  cards: [
+    {
+      id: 'card-notes',
+      sourceKind: 'test.suggestion',
+      signalType: 'other',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-06-28T10:00:00.000Z',
+      title: 'Detroit listeners up 340% — book a show',
+      why: 'Promoter email matched your Detroit growth spike.',
+      primaryActionLabel: 'Review pitch',
+      status: 'pending',
+      category: 'suggestion',
+    },
+  ],
+  availability: HEALTHY_AVAILABILITY,
+  emptyActionCards: [],
+};
+
 const pendingTourDate = {
   id: 'td-1',
   title: 'Saint Andrews Hall',
@@ -191,7 +155,7 @@ const pendingTourDate = {
 
 describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
-    runtimeState.update = null;
+    runtimeState.mismatch = false;
 
     mutateMock.mockReset();
     mutateAsyncMock.mockReset();
@@ -378,14 +342,32 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
   });
 
-  it('shows runtime notifications in Inbox instead of a caught-up state', () => {
-    runtimeState.update = {
-      available: true,
-      busy: false,
-      title: 'Restart Jovie To Update',
-      description: 'Install the available update.',
-      apply: vi.fn(),
-    };
+  it('keeps app update status out of the main content and still shows the empty state', () => {
+    runtimeState.mismatch = true;
+    render(
+      <RuntimeUpdateProvider>
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [],
+            availability: HEALTHY_AVAILABILITY,
+            emptyActionCards: [],
+          }}
+        />
+      </RuntimeUpdateProvider>
+    );
+    const content = screen.getByTestId('opportunity-inbox-content');
+    const pill = screen.getByTestId('runtime-update-pill');
+    expect(content).not.toContainElement(pill);
+    expect(content).not.toHaveTextContent(/Jovie to update|Updating Jovie/);
+    expect(
+      screen.queryByTestId('inbox-runtime-notification')
+    ).not.toBeInTheDocument();
+    // A pending update no longer blanks Needs You.
+    expect(screen.getByTestId('opportunity-inbox-empty-state')).toBeVisible();
+    expect(screen.getByText('Your Inbox Is Clear')).toBeVisible();
+  });
+
+  it('shows a short empty state, and no Add Notes line, once an empty inbox loads', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -395,10 +377,28 @@ describe('OpportunityInboxPageClient', () => {
         }}
       />
     );
-    expect(screen.getByTestId('inbox-runtime-notification')).toBeVisible();
+    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toBeVisible();
+    expect(screen.getByText('Your Inbox Is Clear')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
     expect(
-      screen.queryByTestId('opportunity-inbox-empty-state')
+      screen.queryByRole('button', { name: 'Add Notes' })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('opportunity-inbox-notes')
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Add Notes, centered under the tabs, once there is a real item', () => {
+    render(<OpportunityInboxPageClient inbox={ONE_CARD_INBOX} />);
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add Notes' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    // Aligned with the centered tab toolbar, not floating left.
+    expect(
+      screen.getByRole('button', { name: 'Add Notes' }).parentElement
+    ).toHaveClass('justify-center');
   });
 
   it('hydrates the artist-profile rail with the inbox profile data', async () => {
@@ -444,24 +444,11 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toHaveClass(
       'justify-center'
     );
-    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Add Notes' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
   });
 
   it('discloses empty notes by keyboard and restores focus on Escape', async () => {
     const user = userEvent.setup();
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [],
-          availability: HEALTHY_AVAILABILITY,
-          emptyActionCards: [],
-        }}
-      />
-    );
+    render(<OpportunityInboxPageClient inbox={ONE_CARD_INBOX} />);
     const addNotes = screen.getByRole('button', { name: 'Add Notes' });
     addNotes.focus();
     await user.keyboard('{Enter}');
@@ -482,15 +469,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('keeps entered notes visible through view switches and allows hiding after clearing', async () => {
     const user = userEvent.setup();
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [],
-          availability: HEALTHY_AVAILABILITY,
-          emptyActionCards: [],
-        }}
-      />
-    );
+    render(<OpportunityInboxPageClient inbox={ONE_CARD_INBOX} />);
     await user.click(screen.getByRole('button', { name: 'Add Notes' }));
     const field = screen.getByRole('textbox', { name: 'Notes' });
     await user.type(field, 'Review this tomorrow');
@@ -507,7 +486,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
   });
 
-  it('renders the inbox feed when cards are present', () => {
+  it('renders the inbox feed when cards are present (JOV-8873)', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -589,7 +568,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
   });
 
-  it('renders the empty state when there are no cards', () => {
+  it('preserves the cleared-queue state when setup context is absent', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -611,11 +590,17 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    // JOV-8967: setup steps belong on Home only; the Inbox empty state never
+    // renders an action card or its CTA, even when the mapper supplies one.
     expect(
-      screen.getByRole('link', { name: 'Connect Spotify' })
-    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
+      screen.queryByRole('link', { name: 'Connect Spotify' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Connect Spotify')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveAttribute(
+      'href',
+      '/app/chat'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {
@@ -913,40 +898,37 @@ describe('OpportunityInboxPageClient', () => {
   it.each([false, true])(
     'returns focus to remaining Inbox work after clearing cards (update=%s)',
     async hasUpdate => {
-      if (hasUpdate)
-        runtimeState.update = {
-          available: true,
-          busy: false,
-          title: 'Restart Jovie To Update',
-          description: 'Install update.',
-          apply: vi.fn(),
-        };
+      // A pending update lives in the shell corner pill, so it never takes
+      // over the inbox's own focus recovery target.
+      runtimeState.mismatch = hasUpdate;
       const user = userEvent.setup();
 
       render(
-        <OpportunityInboxPageClient
-          inbox={{
-            cards: [
-              {
-                id: 'card-1',
-                sourceKind: 'test.suggestion',
-                signalType: 'other' as const,
-                typeLabel: 'Suggestion',
-                createdAt: '2026-06-28T10:00:00.000Z',
-                title: 'Detroit listeners up 340%',
-                why: 'Promoter email matched your Detroit growth spike.',
-                primaryActionLabel: 'Review pitch',
-                status: 'pending' as const,
-                category: 'suggestion' as const,
+        <RuntimeUpdateProvider>
+          <OpportunityInboxPageClient
+            inbox={{
+              cards: [
+                {
+                  id: 'card-1',
+                  sourceKind: 'test.suggestion',
+                  signalType: 'other' as const,
+                  typeLabel: 'Suggestion',
+                  createdAt: '2026-06-28T10:00:00.000Z',
+                  title: 'Detroit listeners up 340%',
+                  why: 'Promoter email matched your Detroit growth spike.',
+                  primaryActionLabel: 'Review pitch',
+                  status: 'pending' as const,
+                  category: 'suggestion' as const,
+                },
+              ],
+              availability: {
+                suggestedActions: 'available',
+                tourDates: 'not_requested',
               },
-            ],
-            availability: {
-              suggestedActions: 'available',
-              tourDates: 'not_requested',
-            },
-            emptyActionCards: [],
-          }}
-        />
+              emptyActionCards: [],
+            }}
+          />
+        </RuntimeUpdateProvider>
       );
 
       screen
@@ -954,11 +936,10 @@ describe('OpportunityInboxPageClient', () => {
         .focus();
       await user.keyboard('{ArrowRight}');
 
-      expect(
-        screen.getByRole(hasUpdate ? 'button' : 'link', {
-          name: hasUpdate ? 'Restart Jovie To Update' : 'Start A Chat',
-        })
-      ).toHaveFocus();
+      expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+      expect(screen.queryByTestId('runtime-update-pill') !== null).toBe(
+        hasUpdate
+      );
     }
   );
 

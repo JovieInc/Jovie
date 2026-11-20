@@ -32,6 +32,9 @@ ESTIMATE_TEXT = re.compile(r"(?:est(?:imate)?[-_ ]?usd|estimated cost)[:= ]+\$?(
 STOP = frozenset({"the", "a", "an", "of", "to", "for", "in", "on", "and", "or", "fix", "feat", "chore", "test", "when", "with", "is", "not"})
 MAX_BYTES = 4 * 1024 * 1024
 MACHINE_LINE = re.compile(r"^(?:machine-gap|machine):\s*(\S.*)$", re.IGNORECASE | re.MULTILINE)
+# queue_failure() writes this heading. The PR rollup stays green after a dequeue, so
+# without it every merge-group repair hashes the empty name list (fix-red-e3b0c44298).
+MERGE_GROUP_HEADING = re.compile(r"^### merge group:\s*(\S.*?)\s*$", re.MULTILINE)
 
 
 def fingerprint(title: str, labels=()) -> str:
@@ -47,10 +50,129 @@ def fingerprint(title: str, labels=()) -> str:
     return hashlib.sha256(" ".join(words).encode()).hexdigest()[:12] if words else "unclassified"
 
 
+# Advisory checks never gate a merge. Kept equal to pr_events.NON_REQUIRED_CHECKS
+# (test_machine_gap asserts that). Tently beside Source Validation hashed as one
+# class, fix-red-a021af66a4, on five lane runs while head_red already ignored it.
+ADVISORY_CHECKS = frozenset({"tently"})
+
+
+def _check_name(check: dict) -> str:
+    return str(check.get("name") or check.get("context") or "")
+
+
+def _check_stamp(check: dict) -> str:
+    return str(check.get("completedAt") or check.get("startedAt") or check.get("createdAt") or "")
+
+
+def _check_state(check: dict) -> str:
+    return str(check.get("conclusion") or check.get("state") or "").upper()
+
+
+def _newer_check(check: dict, prev: dict) -> bool:
+    """Newest stamp wins. An equal stamp keeps a real conclusion over CANCELLED."""
+    stamp, prev_stamp = _check_stamp(check), _check_stamp(prev)
+    if stamp != prev_stamp:
+        return stamp > prev_stamp
+    return _check_state(prev) == "CANCELLED" and _check_state(check) != "CANCELLED"
+
+
+def latest_checks(checks, skip_names=()) -> list[dict]:
+    """One check per name: the newest run.
+
+    GitHub's rollup stays FAILURE after a concurrency cancel even when the replacement
+    run of the same name succeeded. Fleet Rules Evidence did that on 41 lane runs
+    (fix-red-72d43f8ba6) while head_red already treated the latest success as green.
+    """
+    skip = {str(name).lower() for name in skip_names}
+    chosen: dict[str, dict] = {}
+    for check in checks or []:
+        if not isinstance(check, dict):
+            continue
+        name = _check_name(check)
+        key = name.lower()
+        if not name or key in skip:
+            continue
+        prev = chosen.get(key)
+        if prev is None or _newer_check(check, prev):
+            chosen[key] = check
+    return list(chosen.values())
+
+
+def without_aggregate_sibling(checks: list, *, hard: set[str]) -> list:
+    """Drop PR Ready when another hard failure remains, or when PR Ready itself is not hard.
+
+    A lone hard PR Ready is the failure. Skipping it hashed an empty name list
+    (`fix-red-e3b0c44298`) and dispatched a model for a quota-deferred evidence
+    lookup. A cancelled-only PR Ready stays dropped. CI Summary, rollup, and
+    advisory names are the caller's filter, not this one.
+    """
+    def low(check: dict) -> str:
+        return str(check.get("name") or "").lower()
+
+    def is_hard(check: dict) -> bool:
+        return str(check.get("conclusion") or "").upper() in hard
+
+    if any(is_hard(check) and low(check) != "pr ready" for check in checks):
+        return [check for check in checks if low(check) != "pr ready"]
+    ready = [check for check in checks if low(check) == "pr ready" and is_hard(check)]
+    if ready:
+        return ready
+    return [check for check in checks if low(check) != "pr ready"]
+
+
+def red_checks(checks: list, red: set[str], aggregate: tuple[str, ...] = ("pr ready", "ci summary", "rollup")) -> list:
+    """Red checks whose logs decide a class. Summary and rollup never do.
+
+    A lone hard PR Ready stays, so a quota-deferred fleet lookup reruns. Any other
+    hard failure drops PR Ready. A cancelled-only PR Ready is dropped.
+    """
+    skip = {name for name in aggregate if name != "pr ready"}
+    hard = {item for item in red if item != "CANCELLED"}
+    latest = latest_checks(checks, skip)
+    reds = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    return without_aggregate_sibling(reds, hard=hard)
+
+
+def merge_group_check_names(pr: dict) -> list[str]:
+    """Workflow names from a dequeued merge-group log, in heading order.
+
+    `queue_failure` prefixes the failed workflow (`### merge group: CI`). The PR head's
+    rollup does not carry that check, so a fingerprint that reads only the rollup is the
+    empty-name class. A missing or blank heading contributes nothing.
+    """
+    text = "\n".join(str(pr.get(key) or "") for key in ("queueFailure", "mergeGroupLog"))
+    names: list[str] = []
+    for match in MERGE_GROUP_HEADING.finditer(text):
+        name = match.group(1).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def check_fingerprint(pr: dict) -> str:
-    names = sorted({str(c.get("name")) for c in pr.get("statusCheckRollup") or []
-                    if str(c.get("conclusion") or "").upper() in {"FAILURE", "TIMED_OUT", "CANCELLED"}
-                    and str(c.get("name") or "").lower() not in {"pr ready", "ci summary"}})
+    """Hash the latest failing check names.
+
+    A CANCELLED run does not count when a newer run of the same name succeeded, and it
+    does not open a second class beside a FAILURE or TIMED_OUT. A rollup whose latest
+    run is only cancelled still fingerprints that name. Advisory names are skipped.
+    PR Ready is skipped unless it is the only hard failure.
+    An empty name list is fix-red-e3b0c44298. empty_review.stale_review_only refuses that
+    dispatch when the only signal is a loaded review with no current-head body.
+    When the rollup names nothing, a `### merge group: <workflow>` heading on
+    queueFailure or mergeGroupLog names that workflow instead of the empty class.
+    A rollup that already names a check is unchanged, so the log cannot open a second class.
+    """
+    red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
+    hard = {"FAILURE", "TIMED_OUT"}
+    skip = {"ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
+    latest = latest_checks(pr.get("statusCheckRollup"), skip)
+    checks = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    if any(str(check.get("conclusion") or "").upper() in hard for check in checks):
+        checks = [check for check in checks if str(check.get("conclusion") or "").upper() in hard]
+    checks = without_aggregate_sibling(checks, hard=hard)
+    names = sorted({str(check.get("name")) for check in checks if str(check.get("name") or "")})
+    if not names:
+        names = sorted(merge_group_check_names(pr))
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

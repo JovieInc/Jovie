@@ -112,21 +112,32 @@ describe('marketing language context', () => {
     }
   });
 
-  it('keeps generic product navigation on shared destinations', () => {
-    const genericLinks = [
-      ...MARKETING_NAV_LINKS.filter(link =>
-        /^(?:product|profiles|about|pricing)$/i.test(link.label)
-      ),
-      ...MARKETING_FOOTER_COLUMNS.filter(column =>
-        /^(?:product|features)$/i.test(column.title)
-      ).flatMap(column => column.links),
-    ];
+  it('keeps header navigation on shared destinations', () => {
+    const genericLinks = MARKETING_NAV_LINKS.filter(link =>
+      /^(?:product|profiles|about|pricing)$/i.test(link.label)
+    );
     expect(genericLinks.length).toBeGreaterThan(0);
     for (const link of genericLinks) {
       expect(
         getMarketingPageContractForPathname(link.href)?.copyScope,
         `${link.label} -> ${link.href}`
       ).toBe('shared');
+    }
+  });
+
+  // Tim, 2026-10-29: Smart links, Pay and Artist profiles are the product, so
+  // the footer's Product column links them. Every Product link must still have
+  // a registered page contract (no unowned destinations).
+  it('gives every footer Product link a registered page contract', () => {
+    const product = MARKETING_FOOTER_COLUMNS.find(
+      column => column.title === 'Product'
+    );
+    expect(product?.links.length).toBeGreaterThan(0);
+    for (const link of product?.links ?? []) {
+      expect(
+        getMarketingPageContractForPathname(link.href),
+        `${link.label} -> ${link.href}`
+      ).not.toBeNull();
     }
   });
 
@@ -140,11 +151,13 @@ describe('marketing language context', () => {
     }
   });
 
-  it('retains the artist directory without calling it customer proof', () => {
-    const directory = MARKETING_FOOTER_COLUMNS.flatMap(
-      column => column.links
-    ).find(link => link.href === APP_ROUTES.ARTISTS);
-    expect(directory?.label).toBe('Artist Directory');
+  it('keeps the artist directory out of the Company footer column', () => {
+    const company = MARKETING_FOOTER_COLUMNS.find(
+      column => column.title === 'Company'
+    );
+    expect(company?.links.map(link => link.href)).not.toContain(
+      APP_ROUTES.ARTISTS
+    );
   });
 
   it('describes the CLI as read-only public artist access', () => {

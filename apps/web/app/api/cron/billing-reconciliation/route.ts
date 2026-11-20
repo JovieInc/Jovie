@@ -1,19 +1,12 @@
 /**
- * Billing Reconciliation Cron Job
- *
- * Runs daily to reconcile database subscription status with Stripe.
- *
- * What it does:
- * 1. Re-drives stored Stripe events that have remained unprocessed
- * 2. Fetches all users with stripeSubscriptionId from DB
- * 3. Compares DB isPro status with Stripe subscription status
- * 4. Fixes any mismatches and logs to audit table
- *
- * Schedule: Daily via the consolidated daily-maintenance cron.
+ * Daily billing reconciliation via the consolidated daily-maintenance cron:
+ * replay stored Stripe events, repair subscription status, and check price locks.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import type Stripe from 'stripe';
+import { runPriceLockReconcile } from '@/lib/billing/price-lock-reconcile.server';
 import {
   BATCH_SIZE,
   fetchUserBatch,
@@ -33,6 +26,7 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { stripe } from '@/lib/stripe/client';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -73,6 +67,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     staleCustomers: 0,
   };
   const errors: string[] = [];
+  const observedSubscriptions = new Map<string, Stripe.Subscription>();
   let webhookReplay: WebhookReplaySummary = {
     processed: 0,
     blocked: [],
@@ -97,9 +92,10 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       )
     );
 
-    await reconcileUsersWithSubscriptions(stats, errors);
+    await reconcileUsersWithSubscriptions(stats, errors, observedSubscriptions);
     await reconcileProUsersWithoutSubscription(stats, errors);
     await checkStaleCustomers(stats);
+    await reconcilePriceLocksSafely(errors, observedSubscriptions);
 
     const duration = Date.now() - startTime;
     result = {
@@ -152,6 +148,30 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   }
 }
 
+/** Price lock reconcile, isolated so it never masks billing reconciliation. */
+async function reconcilePriceLocksSafely(
+  errors: string[],
+  observedSubscriptions: ReadonlyMap<string, Stripe.Subscription>
+): Promise<void> {
+  try {
+    const result = await runPriceLockReconcile({
+      async *listSubscriptions() {
+        yield* observedSubscriptions.values();
+      },
+    });
+    logger.info('[billing-reconciliation] Price lock reconcile', {
+      checked: result.summary.checked,
+      counts: result.summary.counts,
+      backfilled: result.backfill.created,
+    });
+  } catch (error) {
+    errors.push('Price lock reconcile failed');
+    await captureCriticalError('Price lock reconcile failed', error, {
+      job: 'price-lock-reconcile',
+    });
+  }
+}
+
 async function recordReconciliationRun(input: {
   success: boolean;
   duration: number;
@@ -182,11 +202,7 @@ async function recordReconciliationRun(input: {
   );
 }
 
-/**
- * GET /api/cron/billing-reconciliation
- *
- * Daily cron job to reconcile billing status between DB and Stripe
- */
+/** Authenticated daily billing reconciliation endpoint. */
 export async function GET(request: Request) {
   const authError = verifyCronRequest(request, {
     route: '/api/cron/billing-reconciliation',
@@ -215,10 +231,15 @@ type UserBatch = Awaited<ReturnType<typeof fetchUserBatch>>;
 async function processUserChunk(
   userChunk: UserBatch,
   stats: ReconciliationStats,
-  errors: string[]
+  errors: string[],
+  observedSubscriptions: Map<string, Stripe.Subscription>
 ): Promise<void> {
   const results = await Promise.allSettled(
-    userChunk.map(user => processSingleUser(db, stripe, user))
+    userChunk.map(user =>
+      processSingleUser(db, stripe, user, subscription => {
+        observedSubscriptions.set(subscription.id, subscription);
+      })
+    )
   );
 
   for (let i = 0; i < results.length; i++) {
@@ -248,7 +269,8 @@ async function processUserChunk(
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
-  errors: string[]
+  errors: string[],
+  observedSubscriptions: Map<string, Stripe.Subscription>
 ): Promise<void> {
   let lastUserId: string | null = null;
   let lastBatchWasFull = false;
@@ -276,7 +298,7 @@ async function reconcileUsersWithSubscriptions(
         chunkStart,
         chunkStart + FIRST_PASS_CONCURRENCY
       );
-      await processUserChunk(userChunk, stats, errors);
+      await processUserChunk(userChunk, stats, errors, observedSubscriptions);
     }
 
     if (batch.length < BATCH_SIZE) break;
@@ -322,7 +344,7 @@ async function reconcileProUsersWithoutSubscription(
     })
     .from(users)
     .where(
-      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL`
+      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL AND ${users.isAdmin} = false`
     )
     .limit(50);
 
@@ -420,35 +442,19 @@ async function repairProUserWithoutSubscription(user: {
     }
   }
 
-  // No active subscription found - they shouldn't be Pro
-  await db
-    .update(users)
-    .set({
-      isPro: false,
-      stripeSubscriptionId: null,
-      billingUpdatedAt: new Date(),
-      billingVersion: drizzleSql`${users.billingVersion} + 1`,
-    })
-    .where(eq(users.id, user.id));
-  try {
-    await withSystemIngestionSession(tx =>
-      tx.insert(billingAuditLog).values({
-        userId: user.id,
-        eventType: 'reconciliation_fix',
-        previousState: { stripeSubscriptionId: null },
-        newState: { isPro: false },
-        source: 'reconciliation',
-        metadata: {
-          reason: 'no_active_subscription',
-        },
-      })
-    );
-  } catch (auditError) {
-    await captureCriticalError(
-      'Billing audit log insert failed after user update',
-      auditError,
-      { userId: user.id, eventType: 'reconciliation_fix' }
-    );
+  // No active subscription found - they shouldn't be Pro. Same writer as the
+  // webhook: resets plan, bumps the billing version and writes the audit row
+  // in one transaction (the old direct update left plan='pro', isPro=false).
+  const result = await updateUserBillingStatus({
+    clerkUserId: user.id,
+    isPro: false,
+    stripeSubscriptionId: null,
+    eventType: 'reconciliation_fix',
+    source: 'reconciliation',
+    metadata: { reason: 'no_active_subscription' },
+  });
+  if (!result.success) {
+    throw new Error(result.error ?? 'Failed to downgrade Pro user');
   }
 
   return { mismatches: 1, fixed: 1 };

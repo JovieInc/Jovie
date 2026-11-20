@@ -3,6 +3,7 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
   MAX_EARLY_ACCESS_TRUTH,
+  PRO_SELF_SERVE_TRUTH,
   PRO_TRIAL_DURATION_DAYS,
   PRO_TRIAL_TRUTH,
 } from '@/lib/billing/offer-truth';
@@ -17,10 +18,14 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
  */
 /** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
 export const ONBOARDING_OPENER_PRIMARY =
-  "Hey, I'm Jovie. Early access is limited, so some artists waitlist first. I'll remember this chat if you sign up. What are you working on?";
-/** Waitlist receipt without promising email (no contact address confirmed yet). */
+  "Hey, I'm Jovie. Early access is limited. I'll remember this chat if you sign up. What are you working on?";
+/**
+ * Shown with the sign-up card, before any email is verified. It must not say
+ * the visitor is on the list: the card right below says they are not until
+ * the confirmation appears (2026-10-31 golden-path walk).
+ */
 export const ONBOARDING_WAITLIST_RECEIPT =
-  'On the early list. Return here or /start to resume when a spot opens.';
+  'Sign up below to hold your name and keep this conversation.';
 /** Waitlist receipt only when a concrete email is known. */
 export const ONBOARDING_WAITLIST_RECEIPT_WITH_EMAIL =
   "On the early list. We'll email when a spot opens. Come back here or to /start to resume.";
@@ -38,11 +43,17 @@ export function waitlistReceiptForEmail(
 }
 
 // JOV-7135: every price and trial claim comes from offer truth, never a literal.
+// Two different things, never conflated: (1) the free 14-day trial is an
+// entitlement granted when onboarding completes, no card, and it ends into the
+// Free profile; (2) upgrading is a Stripe subscription that takes a card at
+// checkout and renews until cancelled. The chat must never say the trial turns
+// into an automatic charge (asserted in onboarding.response-policy.test.ts).
 const PRO_PRICE_DISPLAY = formatPublicPriceDisplay(getPublicPriceClaim('pro'));
 
 export const ONBOARDING_PRICING_TRUTH = [
   `Free: ${FREE_PROFILE_TRUTH}`,
-  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH}`,
+  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH} Upgrading takes a card at checkout and renews monthly until cancelled. ${PRO_SELF_SERVE_TRUTH}`,
+  'Never say the trial turns into an automatic charge: it ends into the free profile unless the artist chooses to upgrade.',
   `Max: ${MAX_EARLY_ACCESS_TRUTH}`,
   'Quote only these facts. Never cite other prices, discounts, or comparisons.',
 ].join('\n');
@@ -54,7 +65,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
     'This artist released music two weeks ago. A profile can put that release beside the links people need. What are you trying to improve?',
   softCommit: 'Want me to set this up?',
   waitlist: ONBOARDING_WAITLIST_RECEIPT,
-  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY} after a ${PRO_TRIAL_DURATION_DAYS}-day trial with no card; the free profile stays free. Want to start there?`,
+  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY}, with ${PRO_TRIAL_DURATION_DAYS} days free and no card. After that the free profile stays free unless you upgrade. Upgrading takes a card and renews monthly, cancel anytime. Want to start there?`,
 } as const;
 
 /**
@@ -73,7 +84,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
  * Keep this file scannable in one pass.
  */
 
-export const ONBOARDING_SYSTEM_PROMPT = `You are Jovie. Help a visitor turn their real work into a useful profile. Do not assume their role or account permissions. This is access intake, not an authenticated account session.
+const ONBOARDING_PROMPT_CORE = `You are Jovie. Help a visitor turn their real work into a useful profile. Do not assume their role or account permissions. This is access intake, not an authenticated account session.
 ${buildOnboardingPromptSecuritySection()}
 
 # One compact turn
@@ -139,3 +150,13 @@ A soft commitment question, only when a current action is actually available, is
 A checkout example, only with current permitted checkout intent and offer truth, is:
 "${ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser}"
 When checkout or the waitlist card renders, do not add a redundant closing message. Preserve a concrete route to resume.`;
+
+/**
+ * Kept outside the core literal so the reviewed copy-leak allow entry for the
+ * core prompt stays valid. Turns a stated want into a build-request signal.
+ */
+const ONBOARDING_WANT_INSTRUCTION =
+  'When the visitor says what they want Jovie to do, record it as a `want` with the matching available capability, or not_available. Never imply a not_available want already exists.';
+
+export const ONBOARDING_SYSTEM_PROMPT = `${ONBOARDING_PROMPT_CORE}
+${ONBOARDING_WANT_INSTRUCTION}`;

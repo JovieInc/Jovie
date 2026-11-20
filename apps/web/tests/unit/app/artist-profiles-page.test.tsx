@@ -204,10 +204,12 @@ vi.mock(
   () => ({
     ArtistProfileReleaseCycleGallery: ({
       releaseCycle,
+      id,
     }: {
       readonly releaseCycle: typeof ARTIST_PROFILE_COPY.releaseCycle;
+      readonly id?: string;
     }) => (
-      <section>
+      <section id={id}>
         <h2>{releaseCycle.headline}</h2>
         <p>{releaseCycle.intro}</p>
       </section>
@@ -342,6 +344,10 @@ describe('ArtistProfilesPage', () => {
       SOCIAL_PROOF: true,
       FAQ: true,
     });
+    // Footer "Audience reactivation" lands on the release-alert section.
+    expect(
+      document.getElementById('bring-them-back-automatically')
+    ).not.toBeNull();
     expect(
       screen.getByRole('heading', {
         name: ARTIST_PROFILE_COPY.adaptive.headline,
@@ -364,7 +370,7 @@ describe('ArtistProfilesPage', () => {
       screen.getAllByTestId('artist-profile-related-feature')
     ).toHaveLength(4);
     expect(
-      screen.getByRole('link', { name: /See Fan Notifications/i })
+      screen.getByRole('link', { name: /See audience notifications/i })
     ).toHaveAttribute('href', '/artist-notifications');
     expect(
       screen.getByRole('link', { name: /See Instant Merch/i })

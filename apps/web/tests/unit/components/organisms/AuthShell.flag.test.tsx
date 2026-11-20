@@ -66,8 +66,16 @@ vi.mock('@/components/organisms/sidebar', () => ({
 vi.mock(
   '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton',
   () => ({
-    SidebarCollapseButton: () => (
-      <button type='button' data-testid='sidebar-rail-toggle'>
+    SidebarCollapseButton: ({
+      previewTrigger,
+    }: {
+      previewTrigger?: boolean;
+    }) => (
+      <button
+        type='button'
+        data-testid='sidebar-rail-toggle'
+        data-preview-trigger={String(previewTrigger)}
+      >
         Expand sidebar
       </button>
     ),
@@ -212,6 +220,11 @@ describe('AuthShell canonical wiring', () => {
     renderAuthShell();
 
     expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
+    // The in-content toggle must not trigger the flyout peek that covers it.
+    expect(screen.getByTestId('sidebar-rail-toggle')).toHaveAttribute(
+      'data-preview-trigger',
+      'false'
+    );
   });
 
   it('does not mount a second left-sidebar control in Electron (JOV-7207)', () => {
@@ -221,6 +234,24 @@ describe('AuthShell canonical wiring', () => {
     renderAuthShell();
 
     expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
+  });
+
+  it('keeps the header toggle hidden for an older preload bridge', () => {
+    sidebarMock.state = 'closed';
+    const bridge = Object.getOwnPropertyDescriptor(window, 'electronAPI');
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { versions: { app: 'old' } },
+    });
+    try {
+      renderAuthShell();
+      expect(
+        screen.queryByTestId('sidebar-rail-toggle')
+      ).not.toBeInTheDocument();
+    } finally {
+      if (bridge) Object.defineProperty(window, 'electronAPI', bridge);
+      else Reflect.deleteProperty(window, 'electronAPI');
+    }
   });
 
   it('hydrates the collapsed Electron shell without replacing server content (JOV-7207)', async () => {

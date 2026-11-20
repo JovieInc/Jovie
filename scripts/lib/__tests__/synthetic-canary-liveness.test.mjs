@@ -1,56 +1,30 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { load as loadYaml } from 'js-yaml';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { createGitHubClient } from '../../../packages/api-client/github.ts';
-import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
 import {
   checkSyntheticCanary,
   main,
 } from '../../synthetic-canary-liveness.mjs';
+import { QUOTA_DEFERRED_MARKER } from '../github-rate-limit.mjs';
+import {
+  check,
+  githubFor,
+  installSplitSuiteHooks,
+  iso,
+  job,
+  NOW,
+  repo,
+  run,
+} from './synthetic-canary-liveness.fixtures.mjs';
+// Collected by this file's vitest command; not a second test entry.
+import './synthetic-canary-liveness.cases.mjs';
 
 vi.mock('../../../packages/api-client/github.ts', () => ({
   createGitHubClient: vi.fn(),
 }));
-const NOW = Date.parse('2026-10-23T13:17:00Z');
-const iso = minutes => new Date(NOW - minutes * 60_000).toISOString();
-const repo = 'JovieInc/Jovie';
-const root = resolve(import.meta.dirname, '../../..');
-const job = (conclusion = 'success') => ({
-  name: 'Production Synthetic Tests',
-  status: 'completed',
-  conclusion,
-});
-const run = (overrides = {}) => ({
-  id: 100,
-  run_attempt: 1,
-  event: 'schedule',
-  head_branch: 'main',
-  created_at: iso(30),
-  updated_at: iso(1),
-  status: 'completed',
-  conclusion: 'success',
-  display_title: 'Production Synthetic Monitoring (17 */6 * * *)',
-  ...overrides,
-});
-function githubFor(runs, jobs = { 100: [job()] }) {
-  return {
-    rest: vi.fn(async (_method, path) => ({
-      status: 200,
-      json: /** @returns {unknown} */ () =>
-        path.includes('/workflows/')
-          ? { workflow_runs: runs }
-          : {
-              jobs: jobs[path.match(/runs\/(\d+)/)[1]],
-              total_count: jobs[path.match(/runs\/(\d+)/)[1]]?.length,
-            },
-    })),
-  };
-}
-const check = github => checkSyntheticCanary({ github, repo, now: NOW });
-afterEach(() => vi.restoreAllMocks());
-
+installSplitSuiteHooks();
 describe('synthetic canary dead-man', () => {
   it('uses the scheduled main job for this attempt, through the shared polling client', async () => {
     const github = githubFor([run({ run_attempt: 2 })]);
@@ -58,7 +32,7 @@ describe('synthetic canary dead-man', () => {
     expect(github.rest).toHaveBeenNthCalledWith(
       1,
       'GET',
-      `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/runs?branch=main&event=schedule&per_page=10`,
+      `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/runs?branch=main&per_page=10`,
       undefined,
       expect.objectContaining({
         priority: 'poll',
@@ -75,10 +49,15 @@ describe('synthetic canary dead-man', () => {
     expect(await check(githubFor([]))).toMatchObject({
       ok: false,
       reason: expect.stringContaining('No recent'),
+      missedSlot: true,
     });
     expect(
       await check(githubFor([run({ created_at: iso(421) })]))
-    ).toMatchObject({ ok: false, reason: expect.stringContaining('7 hours') });
+    ).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('7 hours'),
+      missedSlot: true,
+    });
     expect(
       await check(githubFor([run({ created_at: iso(420) })]))
     ).toMatchObject({ ok: true });
@@ -177,7 +156,7 @@ describe('synthetic canary dead-man', () => {
     ).toMatchObject({ ok: false, reason: expect.stringContaining('skipped') });
   });
 
-  it('ignores manual/off-branch successes and sorts by creation, not rerun time', async () => {
+  it('ignores off-branch successes, counts a dispatched canary, and sorts by creation, not rerun time', async () => {
     expect(
       await check(
         githubFor([
@@ -188,9 +167,52 @@ describe('synthetic canary dead-man', () => {
         ])
       )
     ).toMatchObject({ ok: true });
+    // A dispatched canary runs the identical probes (the job admits
+    // workflow_dispatch), so it is a heartbeat — the 2026-10-29 18:16Z
+    // manual dispatch would otherwise have left the dead-man blind.
     expect(
       await check(githubFor([run({ event: 'workflow_dispatch' })]))
-    ).toMatchObject({ ok: false });
+    ).toMatchObject({
+      ok: true,
+      reason: 'Scheduled canary healthy',
+      missedSlot: false,
+    });
+  });
+
+  it('excludes a very late daily cron run (2026-10-30 shape) from the heartbeat', async () => {
+    const lateDaily = run({
+      id: 104,
+      created_at: iso(230), // 47 7 cron landed 6h47m late
+      display_title: 'Production Synthetic Monitoring (47 7 * * *)',
+    });
+    const jobs = {
+      104: [
+        {
+          name: 'Production Synthetic Tests',
+          status: 'completed',
+          conclusion: 'skipped',
+        },
+        {
+          name: 'Web AI Health (Daily)',
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
+    };
+    expect(
+      await check(githubFor([lateDaily, run({ created_at: iso(451) })], jobs))
+    ).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('7 hours'),
+      missedSlot: true,
+    });
+  });
+
+  it('does not mark a missed slot while a fresh canary run is still in flight', async () => {
+    const pending = run({ id: 101, status: 'queued', conclusion: null });
+    const result = await check(githubFor([pending], { 101: [] }));
+    expect(result).toMatchObject({ ok: false });
+    expect(result.missedSlot).toBe(false);
   });
 
   it.each(['queued', 'in_progress', 'waiting'])(
@@ -203,7 +225,11 @@ describe('synthetic canary dead-man', () => {
       ).toMatchObject({ ok: true, reason: expect.stringContaining('pending') });
       expect(
         await check(githubFor([pending, run({ created_at: iso(421) })], jobs))
-      ).toMatchObject({ ok: false });
+      ).toMatchObject({
+        ok: false,
+        // A run in flight recovers the stale slot; never re-dispatch on top.
+        missedSlot: false,
+      });
       expect(await check(githubFor([pending], jobs))).toMatchObject({
         ok: false,
       });
@@ -287,9 +313,89 @@ describe('synthetic canary dead-man', () => {
     const github = {
       rest: vi.fn().mockRejectedValue(new Error('sensitive response body')),
     };
-    expect(JSON.stringify(await check(github))).not.toContain(
-      'sensitive response body'
-    );
+    const verdict = await check(github);
+    expect(verdict).toMatchObject({
+      ok: false,
+      reason: 'Synthetic canary evidence unavailable',
+    });
+    expect(verdict.deferred).toBeUndefined();
+    expect(JSON.stringify(verdict)).not.toContain('sensitive response body');
+  });
+
+  it.each(['shed', 'budget', 'exhausted', 'budget_exhausted'])(
+    'defers a thrown GitHub %s read instead of calling the canary dead',
+    async kind => {
+      const secret = 'raw-api-secret';
+      const verdict = await check({
+        rest: vi.fn().mockRejectedValue({
+          exitCode: 75,
+          kind,
+          message: `github ${kind}: ${secret}`,
+        }),
+      });
+      expect(verdict).toMatchObject({
+        ok: false,
+        reason: 'Synthetic canary evidence deferred',
+        missedSlot: false,
+        deferred: true,
+      });
+      expect(JSON.stringify(verdict)).not.toContain(secret);
+    }
+  );
+
+  it.each([
+    null,
+    'network down',
+    { exitCode: 75, kind: 'client' },
+    { exitCode: 74, kind: 'shed' },
+    { exitCode: 75, kind: 75 },
+  ])('keeps a non-infrastructure throw fail-closed (%j)', async error => {
+    const verdict = await check({
+      rest: vi.fn().mockRejectedValue(error),
+    });
+    expect(verdict).toMatchObject({
+      ok: false,
+      reason: 'Synthetic canary evidence unavailable',
+    });
+    expect(verdict.deferred).toBeUndefined();
+  });
+
+  it('publishes a deferred read as a warning and does not re-dispatch', async () => {
+    const secret = 'raw-api-secret';
+    const dir = mkdtempSync(join(tmpdir(), 'synthetic-deferred-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const github = {
+      rest: vi.fn().mockRejectedValue({
+        exitCode: 75,
+        kind: 'shed',
+        message: `github shed: ${secret}`,
+      }),
+    };
+    const env = {
+      GITHUB_REPOSITORY: repo,
+      SYNTHETIC_CANARY_DISPATCH: '1',
+      GITHUB_OUTPUT: join(dir, 'output'),
+      GITHUB_STEP_SUMMARY: join(dir, 'summary'),
+    };
+    try {
+      expect(await main({ github, env, now: NOW })).toBe(0);
+      expect(github.rest.mock.calls.every(([method]) => method === 'GET')).toBe(
+        true
+      );
+      const output = readFileSync(env.GITHUB_OUTPUT, 'utf8');
+      const summary = readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
+      expect(output).toContain('test_status=deferred\n');
+      expect(output).not.toContain(secret);
+      expect(summary).toContain('**deferred**');
+      expect(summary).not.toContain(secret);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(QUOTA_DEFERRED_MARKER)
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it.each([true, false])(
@@ -339,103 +445,5 @@ describe('synthetic canary dead-man', () => {
       token: 'test-credential',
     });
     expect(await main({ env: {}, now: NOW })).toBe(0);
-  });
-});
-
-describe('watchdog wiring', () => {
-  /** @typedef {{name?: string, id?: string, uses?: string, run?: string, if?: string,
-   * env?: Record<string, string>, with?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
-  /** @typedef {{on: {schedule?: unknown, workflow_run: {workflows: string[]}},
-   * jobs: Record<string, {steps: Step[]}>, 'run-name'?: string}} Workflow */
-  const load = name =>
-    /** @type {Workflow} */ (
-      loadYaml(readFileSync(join(root, '.github/workflows', name), 'utf8'))
-    );
-  const observer = load('automation-liveness.yml');
-  const producer = load('synthetic-monitoring.yml');
-  const steps = observer.jobs.liveness.steps;
-
-  it('uses exactly the synthetic failure alert action, channel and webhook', () => {
-    const failure = producer.jobs['synthetic-test'].steps.find(
-      step => step.name === 'Send Slack Alert on Failure'
-    );
-    const alarm = steps.find(
-      step => step.name === 'Send Slack Alert on Synthetic Silence'
-    );
-    expect(alarm.uses).toBe(failure.uses);
-    expect(alarm.with.channel).toBe(failure.with.channel);
-    expect(alarm.with.author_name).toBe(failure.with.author_name);
-    expect(alarm.env).toEqual(failure.env);
-    expect(alarm.if).toContain('always()');
-    expect(alarm.if).toContain(
-      "steps.synthetic-heartbeat.outcome != 'success'"
-    );
-    expect(alarm.with.custom_payload).toContain(
-      'heartbeat check did not complete'
-    );
-    const intake = steps.find(
-      step => step.name === 'File synthetic heartbeat Linear issue'
-    );
-    const failureIntake = producer.jobs['synthetic-test'].steps.find(
-      step => step.name === 'File or resolve the synthetic Linear issue'
-    );
-    expect(intake.run).toBe('node scripts/synthetic-monitoring-intake.mjs');
-    expect(failureIntake.run).toContain(
-      'node scripts/synthetic-monitoring-intake.mjs'
-    );
-    expect(intake.env.LINEAR_API_KEY).toBe(failureIntake.env.LINEAR_API_KEY);
-    expect(intake.env.REMEDIATION_TRIGGERS_DISABLED).toBe(
-      failureIntake.env.REMEDIATION_TRIGGERS_DISABLED
-    );
-    expect(intake.env.TEST_STATUS).toBe('failed');
-    expect(intake.env.FAILED_TESTS).toContain(
-      'heartbeat check did not complete'
-    );
-    expect(intake.if).toBe(alarm.if);
-  });
-
-  it('alerts before preserving failure, using the existing backstop without a cron or flag', () => {
-    expect(observer.on.schedule).toBeUndefined();
-    expect(observer.on.workflow_run.workflows).toEqual([
-      'Production Continuity Guard',
-    ]);
-    expect(producer['run-name']).toContain('github.event.schedule');
-    const probe = steps.find(step => step.id === 'synthetic-heartbeat');
-    expect(probe.run).toBe('node scripts/synthetic-canary-liveness.mjs');
-    expect(probe['continue-on-error']).toBeUndefined();
-    expect(probe.if).toBe('${{ always() }}');
-    const preserve = steps.find(
-      step => step.name === 'Preserve synthetic dead-man failure'
-    );
-    expect(preserve.run).toContain('exit 1');
-    expect(steps.indexOf(preserve)).toBeGreaterThan(
-      steps.findIndex(
-        step => step.name === 'Send Slack Alert on Synthetic Silence'
-      )
-    );
-    expect(preserve.if).toContain('always()');
-  });
-
-  it('enforces behavior coverage in source and merge-group CI for every changed input', () => {
-    const guard = SOURCE_GUARDS.find(
-      item => item.id === 'synthetic-canary-liveness'
-    );
-    expect(guard.prOnly).toBe(false);
-    for (const file of [
-      '.github/workflows/automation-liveness.yml',
-      '.github/workflows/synthetic-monitoring.yml',
-      'scripts/synthetic-canary-liveness.mjs',
-      'scripts/lib/__tests__/synthetic-canary-liveness.test.mjs',
-    ]) {
-      expect(guard.inputs.test(file)).toBe(true);
-    }
-    expect(guard.command).toContain(
-      'lib/__tests__/synthetic-canary-liveness.test.mjs'
-    );
-    expect(guard.command).toContain('run --coverage');
-    expect(guard.command).toContain(
-      '--coverage.include=synthetic-canary-liveness.mjs'
-    );
-    expect(guard.command).toContain('--coverage.thresholds.lines=90');
   });
 });

@@ -14,20 +14,28 @@ describe('generateBaseSlug', () => {
 });
 
 describe('buildSlugDisambiguationCandidates', () => {
-  it('prefers year-based disambiguation before opaque -2 suffixes', () => {
+  it('uses the co-primary artist before the year', () => {
     expect(
-      buildSlugDisambiguationCandidates('seaside-heights', 2019).slice(0, 4)
+      buildSlugDisambiguationCandidates('seaside-heights', {
+        year: 2019,
+        coPrimary: ['Vigel'],
+      }).slice(0, 3)
     ).toEqual([
       'seaside-heights',
+      'seaside-heights-with-vigel',
       'seaside-heights-2019',
-      'seaside-heights-2',
-      'seaside-heights-3',
     ]);
   });
 
-  it('falls back to numeric suffixes when year is unavailable', () => {
-    expect(
-      buildSlugDisambiguationCandidates('take-me-over').slice(0, 3)
-    ).toEqual(['take-me-over', 'take-me-over-2', 'take-me-over-3']);
+  it('never emits a numeric -N suffix, even with no qualifiers', () => {
+    const none = buildSlugDisambiguationCandidates('take-me-over');
+    expect(none).toEqual(['take-me-over']);
+    const all = buildSlugDisambiguationCandidates('take-me-over', {
+      year: 2014,
+      coPrimary: ['A'],
+      featured: ['B'],
+      remixers: ['C'],
+    });
+    for (const slug of all) expect(slug).not.toMatch(/-\d{1,3}$/);
   });
 });

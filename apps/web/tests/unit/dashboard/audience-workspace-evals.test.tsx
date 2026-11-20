@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/contacts',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { resolveContactsWorkspaceTab } from '@/app/app/(shell)/contacts/contacts-workspace';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 
@@ -17,6 +24,9 @@ describe('Audience workspace evals on the Contacts page', () => {
 
     expect(screen.getByTestId('dashboard-audience-loading')).toBeVisible();
     expect(screen.getByLabelText('Loading Audience')).toBeVisible();
+    expect(
+      screen.getByRole('tablist', { name: 'Audience Workspace' })
+    ).toBeVisible();
     // Dense 32px rows with the people-row face skeleton (JOV-7798).
     expect(
       document.querySelector('table[data-table-row-mode="dense"]')
@@ -33,6 +43,10 @@ describe('Audience workspace evals on the Contacts page', () => {
     );
     expect(page).toContain('LazyDashboardAudienceClient');
     expect(page).toContain('AudienceTableLoadingShell');
-    expect(page).toContain("tab', 'audience'");
+    const navigation = readFileSync(
+      join(WEB_ROOT, 'lib/audience/workspace-navigation.ts'),
+      'utf8'
+    );
+    expect(navigation).toContain("tab', 'audience'");
   });
 });

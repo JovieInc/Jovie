@@ -20,6 +20,7 @@ import {
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
+  detachCustomerPaymentMethods,
   ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
@@ -41,6 +42,11 @@ import {
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
+// One spec asserts one class: this file is the functional journey only.
+// The layout-shift budget for /claim and /billing/success lives in
+// claim-checkout-layout.perf.spec.ts and reports as its own check, so a
+// layout regression never turns the revenue canary red (docs/ON_CALL_PROCESS.md).
+
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -70,6 +76,13 @@ test.describe('Self-serve artist profile checkout', () => {
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
     await ensureUserIsFree(page, stripeClient);
+    // JOV-8805: the persona's Stripe customer persists across runs; clear
+    // attached test PaymentMethods so checkout.sessions.create stays under
+    // Stripe's per-customer cap.
+    await detachCustomerPaymentMethods(
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
 
     // Claim start captures Pro monthly intent and the claim-flow marker.
     const start = await page.request.get('/claim/start?new=1', {
@@ -125,6 +138,30 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
+      // Paid value (golden-path step): the buyer lands on the unlock screen,
+      // not a bare receipt. This is the only run that can pay, so it asserts it.
+      // ponytail: Stripe forbids automating hosted Checkout, so this session
+      // never reaches status 'complete' and /api/billing/checkout-session
+      // answers { plan: null }. The paid entitlement is already proven by the
+      // signed webhook above; stub only that read to render the paid screen.
+      await page.route('**/api/billing/checkout-session**', route =>
+        route.fulfill({
+          json: {
+            plan: 'pro',
+            priceId,
+            needsProfile: false,
+            proofPending: false,
+            profileShareUrl: null,
+          },
+        })
+      );
+      await page.goto(`/billing/success?session_id=${sessionId}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
+        timeout: 30_000,
+      });
+
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
         maxRedirects: 0,
@@ -136,6 +173,10 @@ test.describe('Self-serve artist profile checkout', () => {
       // The persona keeps its Stripe customer; only the test subscription
       // is canceled so the next run starts free.
       await ensureUserIsFree(page, stripeClient);
+      await detachCustomerPaymentMethods(
+        stripeClient,
+        DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+      );
     }
   });
 });
@@ -219,12 +260,24 @@ test.describe('Claim checkout dogfood', () => {
         `/${DOGFOOD_LOW_REACH_ARTIST.handle}/claim?next=auth`
       );
 
-      // At or above it: the buyer's own sign-up and checkout, never a dead end.
+      // At or above it: the buyer's own sign-up and checkout, never a dead
+      // end. One front door (Tim, 2026-11-09): anonymous claim start hands
+      // off into the /start onboarding chat with the artist context; the
+      // Pro-monthly intent rides the plan-intent cookies, not the URL.
       await options.filter({ hasText: DOGFOOD_HIGH_REACH_ARTIST.name }).click();
-      await expect(page).toHaveURL(/\/signup\?.*plan=pro/, { timeout: 30_000 });
+      await expect(page).toHaveURL(/\/start\?.*starter_prompt=/, {
+        timeout: 30_000,
+      });
       expect(decodeURIComponent(page.url())).toContain(
         DOGFOOD_HIGH_REACH_ARTIST.id
       );
+      const planIntentCookies = await page.context().cookies();
+      expect(
+        planIntentCookies.find(c => c.name === 'jovie_plan_intent')?.value
+      ).toBe('pro');
+      expect(
+        planIntentCookies.find(c => c.name === 'jv_claim_flow')?.value
+      ).toBe('1');
 
       await expect
         .poll(() => readFunnelStages(acquisitionId), { timeout: 15_000 })
@@ -249,9 +302,14 @@ test.describe('Claim checkout dogfood', () => {
 
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator-ready');
-    await ensureUserIsFree(page, stripeClient).catch(async () => {
-      await resetDogfoodBilling(buyerEmail);
-    });
+    // Reset the persona's derived billing state up front: the price-lock era
+    // (JOV-INV-048) fails checkout closed on a stale lock or subscription row,
+    // and one poisoned run then fails every later run with a masked 400
+    // (JOV-8805, red 2026-11-17..19). This normalizes pre-existing persona
+    // state only; the checkout under test is still exercised end to end.
+    await resetDogfoodBilling(buyerEmail);
+    await ensureUserIsFree(page, stripeClient);
+    await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
 
@@ -400,6 +458,9 @@ test.describe('Claim checkout dogfood', () => {
       await ensureUserIsFree(page, stripeClient).catch(async () => {
         await resetDogfoodBilling(buyerEmail);
       });
+      await detachCustomerPaymentMethods(stripeClient, buyerEmail).catch(
+        () => undefined
+      );
       if (openSession) {
         await expireRunOwnedTestCheckoutSession(
           stripeClient,

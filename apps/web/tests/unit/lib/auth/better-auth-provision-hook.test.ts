@@ -1,5 +1,6 @@
 import { type BetterAuthOptions, resolveBaseURL } from 'better-auth';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { assertNewAccountAdmission } from '@/lib/auth/signup-admission';
 
 const mocks = vi.hoisted(() => ({
   betterAuth: vi.fn((options: BetterAuthOptions) => ({ options })),
@@ -107,6 +108,12 @@ function getOptions() {
 }
 
 describe('Better Auth base URL', () => {
+  it('enforces invitation admission before every new user write', () => {
+    expect(getOptions().databaseHooks?.user?.create?.before).toBe(
+      assertNewAccountAdmission
+    );
+  });
+
   it('keeps sessions in Postgres and rate limits on Redis counters', () => {
     expect(getOptions().verification).toEqual({ storeInDatabase: true });
     expect(getOptions().secondaryStorage).toBeUndefined();

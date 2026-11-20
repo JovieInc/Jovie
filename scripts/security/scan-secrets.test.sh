@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCAN_SCRIPT="$REPO_ROOT/scripts/security/scan-secrets.sh"
+export SCAN_TEST_BASELINE_SOURCE="$REPO_ROOT/scripts/security/gitleaks-staged-public-digests.b64"
 # The repair path is CI-only by default; these scenarios exercise it locally.
 export SECRET_SCAN_ALLOW_LOCAL_REPAIR=1
 TEST_ROOT="$(mktemp -d)"
@@ -22,6 +23,15 @@ case "${1:-}" in
   diff)
     # Staged file list for pre-commit mode (newline-separated, repo-relative).
     printf '%s\n' "${SCAN_TEST_STAGED_FILES:-}"
+    ;;
+  show)
+    if [[ "${2:-}" == ':scripts/security/gitleaks-staged-public-digests.b64' ]]; then
+      [[ "${SCAN_TEST_BASELINE_MISSING:-}" != 1 ]] || exit 1
+      cat "$SCAN_TEST_BASELINE_SOURCE"
+      exit 0
+    fi
+    [[ "${SCAN_TEST_PIN_READ_ERROR:-}" != 1 ]] || exit 42
+    cat "$SCAN_TEST_PIN_SOURCE"
     ;;
   rev-parse)
     case "${2:-}" in
@@ -45,6 +55,11 @@ case "${1:-}" in
     for commit in ${SCAN_TEST_RANGE_COMMITS:-}; do
       printf '%s\n' "$commit"
     done
+    ;;
+  grep)
+    [[ "${SCAN_TEST_ACTION_PIN_GREP:-}" == 1 ]] && printf '        uses: SonarSource/sonarqube-scan-action@%s # pin\n' "$PIN_RAW"
+    [[ "${SCAN_TEST_ACTION_PIN_GREP:-}" == comment ]] && printf '        # uses: SonarSource/action@%s\n' "$PIN_RAW"
+    [[ "${SCAN_TEST_ACTION_PIN_GREP:-}" == script ]] && printf '        run: echo "uses: SonarSource/action@%s"\n' "$PIN_RAW"
     ;;
   config)
     exit 0
@@ -74,11 +89,33 @@ case "${SCAN_TEST_SCENARIO:-}" in
     exit 183
     ;;
   widened | in-range-finding | mixed | full-allowlisted | full-blocked)
-    # Realistic human-format finding blocks; TRUFFLEHOG_FAKE_FINDING_COMMITS is
-    # a space-separated list of attributions trufflehog prints per finding.
+    # JSON findings use the same attributions as the installed scanner.
     for commit in ${TRUFFLEHOG_FAKE_FINDING_COMMITS:-}; do
-      printf 'Found unverified result\nDetector Type: Postgres\nRaw result: ***ep-xxx.region.aws.neon.tech:5432\nCommit: %s\nFile: .env.example\nLine: 7\n\n' "$commit"
+      printf '{"DetectorName":"Postgres","Raw":"fixture","Verified":false,"SourceMetadata":{"Data":{"Git":{"commit":"%s","file":".env.example","line":7}}}}\n' "$commit"
     done
+    exit 183
+    ;;
+  action-pin)
+    case "${PIN_SCANNER_ERROR:-}" in
+      malformed) echo 'not JSON'; exit 0 ;;
+      empty-failure) exit 183 ;;
+      blank-failure) printf '\n'; exit 183 ;;
+      incomplete) echo 'encountered errors during scan' >&2; exit 0 ;;
+      runtime) exit 42 ;;
+    esac
+    source=Filesystem
+    [[ "$1" != git ]] || source=Git
+    jq -cn --arg source "$source" --arg file "${PIN_FILE-$SCAN_TEST_STAGED_FILES}" \
+      --arg commit "${PIN_COMMIT:-dddddddddddddddddddddddddddddddddddddddd}" \
+      --arg detector "${PIN_DETECTOR:-GitHubOauth2}" --arg raw "$PIN_RAW" \
+      --arg secret "${PIN_SECRET_PART:-${PIN_RAW}287c895573f7108da1b3}" \
+      --argjson verified "${PIN_VERIFIED:-false}" --argjson line "${PIN_LINE:-2}" \
+      '{DetectorName:$detector,Raw:$raw,RawV2:($raw+$secret),Verified:$verified,SourceMetadata:{Data:{($source):{file:$file,line:$line,commit:$commit}}}}'
+    if [[ "${PIN_MIXED:-}" == 1 ]]; then
+      # A finding elsewhere in the same file and commit must still block.
+      jq -cn --arg source "$source" --arg file "$SCAN_TEST_STAGED_FILES" --arg raw "$PIN_RAW" \
+        '{DetectorName:"GitHubOauth2",Raw:$raw,Verified:false,SourceMetadata:{Data:{($source):{file:$file,line:3,commit:"dddddddddddddddddddddddddddddddddddddddd"}}}}'
+    fi
     exit 183
     ;;
   incomplete)
@@ -144,6 +181,19 @@ run_gitleaks_scenario() {
     bash "$SCAN_SCRIPT" "$mode" origin/main >"$TEST_ROOT/$scenario.$mode.output" 2>&1 || status=$?
   printf '%s\n' "$status"
 }
+
+# The staged baseline must be the exact, reviewed set of public digests.
+# Gitleaks itself silently accepts a missing baseline, so the wrapper must
+# reject missing or modified staged bytes before invoking either scanner.
+status="$(SCAN_TEST_BASELINE_MISSING=1 run_gitleaks_scenario baseline-missing pre-commit)"
+[[ $status -ne 0 ]] || fail 'missing staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-missing.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a missing staged baseline'
+printf '%s\n' '[]' >"$TEST_ROOT/baseline-tampered.json"
+status="$(SCAN_TEST_BASELINE_SOURCE="$TEST_ROOT/baseline-tampered.json" run_gitleaks_scenario baseline-tampered pre-commit)"
+[[ $status -ne 0 ]] || fail 'modified staged Gitleaks baseline must fail closed'
+[[ ! -s "$TEST_ROOT/baseline-tampered.pre-commit.gitleaks-calls" ]] \
+  || fail 'Gitleaks must not run with a modified staged baseline'
 
 for mode in publication ci-pr full; do
   status="$(run_gitleaks_scenario gitleaks-corruption "$mode")"
@@ -346,44 +396,15 @@ status="$(run_full_scenario full-blocked "$FULL_BLOCKED_COMMIT")"
 
 bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 
-# JOV-6809: a transient download failure (curl 35 connection reset on
-# ubuntu-latest) must be retried, not fail the scan outright. Stub curl to
-# fail the first attempt then succeed; stub tar to lay down a no-op binary.
-# A restricted PATH keeps real gitleaks/trufflehog installs from
-# short-circuiting the download path.
+# JOV-6809: curl 35 must be retried. A restricted PATH keeps real scanners
+# from short-circuiting the checksum-verified release and API download path.
 DL_BIN="$TEST_ROOT/dl-bin"
 DL_TMP="$TEST_ROOT/dl-tmp"
 mkdir -p "$DL_BIN" "$DL_TMP"
-cat >"$DL_BIN/curl" <<'EOF'
-#!/usr/bin/env bash
-count=0
-[[ -f "$CURL_COUNT" ]] && count="$(cat "$CURL_COUNT")"
-count=$((count + 1))
-printf '%s\n' "$count" >"$CURL_COUNT"
-if [[ "${CURL_ALWAYS_FAIL:-}" == "1" || $count -eq 1 ]]; then
-  echo "curl: (35) Recv failure: Connection reset by peer" >&2
-  exit 35
-fi
-out=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-o' ]] && out="$arg"
-  prev="$arg"
-done
-printf 'fake-tarball' >"$out"
-EOF
-cat >"$DL_BIN/tar" <<'EOF'
-#!/usr/bin/env bash
-dest=''
-prev=''
-for arg in "$@"; do
-  [[ "$prev" == '-C' ]] && dest="$arg"
-  prev="$arg"
-done
-member="${!#}"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
-EOF
-chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
+source "$REPO_ROOT/scripts/security/test-fixtures/scanner-download-runtime.sh"
+setup_scanner_download_fixture "$DL_BIN"
+write_scanner_download_pins "$TEST_ROOT/dl-pins.txt"
+export SCANNER_PINS_FILE="$TEST_ROOT/dl-pins.txt"
 
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"
@@ -391,11 +412,13 @@ status=0
 # CI exports TRUFFLEHOG_BIN for the installed-binary regression run; the
 # download path must be exercised without either scanner env override.
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
-  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN= GH_TOKEN= GITHUB_TOKEN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
   || status=$?
-[[ $status -eq 0 ]] \
-  || fail "transient download failure must be retried to success: $status"
+if [[ $status -ne 0 ]]; then
+  cat "$TEST_ROOT/download.output" >&2
+  fail "transient download failure must be retried to success: $status"
+fi
 [[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
   || fail 'expected 1 failed attempt + 2 successful downloads (gitleaks, trufflehog)'
 grep -q 'download attempt 1 failed; retrying' "$TEST_ROOT/download.output" \
@@ -404,19 +427,43 @@ grep -q 'PASS: secret scan' "$TEST_ROOT/download.output" \
   || fail 'scan must still pass after a retried download'
 
 # Exhausted retries still fail the scan with an explicit classification.
-mkdir -p "$TEST_ROOT/dl-tmp2"
+# A recording sleep stub proves the backoff doubles with bounded jitter
+# without making the test wait.
+mkdir -p "$TEST_ROOT/dl-tmp2" "$TEST_ROOT/dl-sleep-bin"
+export SLEEP_LOG="$TEST_ROOT/download.sleep-log"
+: >"$SLEEP_LOG"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$1" >>"$SLEEP_LOG"\n' \
+  >"$TEST_ROOT/dl-sleep-bin/sleep"
+chmod +x "$TEST_ROOT/dl-sleep-bin/sleep"
 : >"$CURL_COUNT"
 status=0
-PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
-  SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
-  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+PATH="$TEST_ROOT/dl-sleep-bin:$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
+  SCAN_SECRETS_RETRY_DELAY=1 CURL_ALWAYS_FAIL=1 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN= GH_TOKEN= GITHUB_TOKEN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
   || status=$?
 [[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
-[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
-  || fail 'download must stop after exactly 3 attempts'
+[[ "$(cat "$CURL_COUNT")" -eq 6 ]] \
+  || fail 'download must stop after exactly 6 attempts'
+grep -q 'download attempt 5 failed; retrying' "$TEST_ROOT/download-fail.output" \
+  || fail 'download must retry through attempt 5'
+grep -q 'after 6 attempts' "$TEST_ROOT/download-fail.output" \
+  || fail 'download failure must report the attempt count'
+[[ "$(wc -l <"$SLEEP_LOG" | tr -d ' ')" -eq 5 ]] \
+  || fail 'download must back off between each of its 6 attempts'
+backoff=1
+while IFS= read -r slept; do
+  ((slept >= backoff && slept <= 2 * backoff)) \
+    || fail "backoff sleep $slept outside [$backoff, $((2 * backoff))]"
+  backoff=$((backoff * 2))
+done <"$SLEEP_LOG"
 grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
   || fail 'download failure must emit an explicit CI classification'
+export GH_CALLS="$TEST_ROOT/download.gh-calls" && : >"$GH_CALLS" && mkdir -p "$TEST_ROOT/dl-tmp3" # CI-token fallback
+PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp3" SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= RELEASE_DOWNLOAD_TOKEN=ci-token bash "$SCAN_SCRIPT" pre-commit \
+  >"$TEST_ROOT/download-gh.output" 2>&1 || fail 'authenticated fallback must rescue anonymous 5xx'
+grep -qE '^ci-token release download v([0-9.]+) -R gitleaks/gitleaks -p gitleaks_\1_[a-z]+_[a-z0-9]+\.tar\.gz -O .+ --clobber$' "$GH_CALLS" || fail 'authenticated fallback must fetch the exact pinned gitleaks asset'
 
 # Outside CI and without a partial clone (e.g. a git worktree on an ops host),
 # the repair must refuse instead of running a full `git fetch --refetch`.
@@ -429,3 +476,23 @@ grep -q 'Secret scan repair refused' "$TEST_ROOT/gitleaks-corruption.publication
   || fail 'local repair refusal must explain how to run history scans'
 
 echo 'PASS: scan-secrets corruption recovery regression tests'
+
+# Exercise the shipped entry points, including scanner exit/error propagation.
+# Assemble a public SHA at runtime so test source does not itself become bait.
+PIN_ROOT="$TEST_ROOT/pin"
+mkdir -p "$PIN_ROOT"
+export PIN_RAW='3a2844b7e9c422d3c10d'
+PIN_SHA="${PIN_RAW}287c895573f7108da1b3"
+printf 'steps:\n  - uses: actions/github-script@%s # v9.0.0\n  - run: echo %s\n' "$PIN_SHA" "$PIN_RAW" >"$PIN_ROOT/wf.yml"
+cp "$PIN_ROOT/wf.yml" "$PIN_ROOT/historical.yml"
+export SCAN_TEST_PIN_SOURCE="$PIN_ROOT/historical.yml"
+export SCAN_TEST_STAGED_FILES="$PIN_ROOT/wf.yml"
+export SCAN_TEST_RANGE_COMMITS="$IN_RANGE_COMMIT"
+export SCAN_TEST_LOCAL_HEAD="$IN_RANGE_COMMIT"
+export SCAN_TEST_SCENARIO=action-pin
+export GIT_CALLS="$PIN_ROOT/git-calls"
+export GITLEAKS_CALLS="$PIN_ROOT/gitleaks-calls"
+export TRUFFLEHOG_COUNT="$PIN_ROOT/count"
+
+# Keep the action-pin cases with the scanner fixture that supplies their state.
+source "$REPO_ROOT/scripts/security/test-fixtures/scan-action-pin-cases.sh"

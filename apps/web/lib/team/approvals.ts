@@ -1,6 +1,14 @@
 import 'server-only';
 
-import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+} from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import {
   profileActionApprovals,
@@ -58,6 +66,18 @@ export type RiskyActionAuthorization =
   | { status: 'requires_approval'; role: TeamRole }
   | { status: 'denied'; role: TeamRole | null };
 
+/** PostgreSQL may evaluate UPDATE predicates before waiting for a row lock.
+ * Acquire the lock first so the next statement's clock check is authoritative.
+ * The caller's transaction retains this lock through the protected operation.
+ */
+async function lockApproval(tx: DbOrTransaction, approvalId: string) {
+  await tx
+    .select({ id: profileActionApprovals.id })
+    .from(profileActionApprovals)
+    .where(eq(profileActionApprovals.id, approvalId))
+    .for('update');
+}
+
 /**
  * Authorize a risky profile action. When the caller's role is approval-gated,
  * a single-use, unexpired owner approval is consumed to let the action
@@ -100,10 +120,26 @@ export async function authorizeRiskyProfileAction(
     return { status: 'requires_approval', role: role as TeamRole };
   }
 
-  await tx
+  await lockApproval(tx, approval.id);
+  const [consumed] = await tx
     .update(profileActionApprovals)
     .set({ consumedAt: now, updatedAt: now })
-    .where(eq(profileActionApprovals.id, approval.id));
+    .where(
+      and(
+        eq(profileActionApprovals.id, approval.id),
+        eq(profileActionApprovals.creatorProfileId, input.profileId),
+        eq(profileActionApprovals.requestedBy, input.appUserId),
+        eq(profileActionApprovals.action, input.action),
+        eq(profileActionApprovals.status, 'approved'),
+        isNull(profileActionApprovals.consumedAt),
+        gt(
+          profileActionApprovals.expiresAt,
+          drizzleSql`timezone('UTC', clock_timestamp())`
+        )
+      )
+    )
+    .returning({ id: profileActionApprovals.id });
+  if (!consumed) return { status: 'requires_approval', role: role as TeamRole };
   await tx.insert(profileApprovalEvents).values({
     approvalId: approval.id,
     creatorProfileId: input.profileId,
@@ -133,12 +169,22 @@ async function expireStaleApprovals(
   if (stale.length === 0) return;
 
   const ids = stale.map(row => row.id);
-  await tx
+  const expired = await tx
     .update(profileActionApprovals)
     .set({ status: 'expired', updatedAt: now })
-    .where(inArray(profileActionApprovals.id, ids));
+    .where(
+      and(
+        inArray(profileActionApprovals.id, ids),
+        eq(profileActionApprovals.creatorProfileId, profileId),
+        inArray(profileActionApprovals.status, ['pending', 'approved']),
+        isNull(profileActionApprovals.consumedAt),
+        lte(profileActionApprovals.expiresAt, now)
+      )
+    )
+    .returning({ id: profileActionApprovals.id });
+  if (expired.length === 0) return;
   await tx.insert(profileApprovalEvents).values(
-    ids.map(id => ({
+    expired.map(({ id }) => ({
       approvalId: id,
       creatorProfileId: profileId,
       event: 'expired' as const,
@@ -146,7 +192,7 @@ async function expireStaleApprovals(
   );
   alertApprovalEvent('expired', {
     profileId,
-    approvalCount: ids.length,
+    approvalCount: expired.length,
   });
 }
 
@@ -298,7 +344,8 @@ export async function decideProfileApproval(
   }
 
   const now = new Date();
-  await tx
+  await lockApproval(tx, approval.id);
+  const [decided] = await tx
     .update(profileActionApprovals)
     .set({
       status: input.decision,
@@ -307,7 +354,19 @@ export async function decideProfileApproval(
       reason: input.reason ?? approval.reason,
       updatedAt: now,
     })
-    .where(eq(profileActionApprovals.id, approval.id));
+    .where(
+      and(
+        eq(profileActionApprovals.id, approval.id),
+        eq(profileActionApprovals.status, 'pending'),
+        isNull(profileActionApprovals.consumedAt),
+        gt(
+          profileActionApprovals.expiresAt,
+          drizzleSql`timezone('UTC', clock_timestamp())`
+        )
+      )
+    )
+    .returning({ id: profileActionApprovals.id });
+  if (!decided) return { ok: false, reason: 'not_pending' };
   await tx.insert(profileApprovalEvents).values({
     approvalId: approval.id,
     creatorProfileId: approval.creatorProfileId,
@@ -342,10 +401,18 @@ export async function revokeProfileApproval(
   }
 
   const now = new Date();
-  await tx
+  const [revoked] = await tx
     .update(profileActionApprovals)
     .set({ status: 'revoked', updatedAt: now })
-    .where(eq(profileActionApprovals.id, approval.id));
+    .where(
+      and(
+        eq(profileActionApprovals.id, approval.id),
+        inArray(profileActionApprovals.status, ['pending', 'approved']),
+        isNull(profileActionApprovals.consumedAt)
+      )
+    )
+    .returning({ id: profileActionApprovals.id });
+  if (!revoked) return { ok: false, reason: 'not_pending' };
   await tx.insert(profileApprovalEvents).values({
     approvalId: approval.id,
     creatorProfileId: approval.creatorProfileId,

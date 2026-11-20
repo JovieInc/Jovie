@@ -1,7 +1,9 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
 import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -40,6 +42,7 @@ async function upsertApprovedUser(params: {
       email: params.email,
       userStatus: 'waitlist_approved',
       waitlistEntryId: params.entryId,
+      accountClass: resolveNewAccountClass({ email: params.email }),
     });
     return;
   }
@@ -115,7 +118,12 @@ export async function redeemWaitlistInviteToken(input: {
             inviteTokenRedeemedAt: waitlistEntries.inviteTokenRedeemedAt,
           })
           .from(waitlistEntries)
-          .where(eq(waitlistEntries.inviteTokenHash, tokenHash))
+          .where(
+            and(
+              eq(waitlistEntries.inviteTokenHash, tokenHash),
+              eq(waitlistEntries.canonical, true)
+            )
+          )
           .for('update')
           .limit(1);
 
@@ -231,6 +239,7 @@ export async function redeemWaitlistInviteToken(input: {
   );
 
   if (result.outcome === 'approved') {
+    await ensurePriceLockForUserSafely(input.clerkUserId, 'waitlist');
     await invalidateProxyUserStateCache(input.clerkUserId);
   }
 

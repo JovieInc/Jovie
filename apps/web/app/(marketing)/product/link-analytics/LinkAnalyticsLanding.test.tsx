@@ -25,6 +25,11 @@ vi.mock('next/image', () => ({
 }));
 
 import { LINK_ANALYTICS_COPY } from '@/data/linkAnalyticsCopy';
+import {
+  buildLinkAnalyticsFixture,
+  LINK_ANALYTICS_SSR_NOW,
+} from '@/lib/marketing/linkAnalyticsFixture';
+import { formatShortDateUTC } from '@/lib/utils/date-formatting';
 import { LinkAnalyticsLanding } from './LinkAnalyticsLanding';
 
 describe('LinkAnalyticsLanding', () => {
@@ -67,7 +72,11 @@ describe('LinkAnalyticsLanding', () => {
   it('server-renders the analytics panel without wall-clock text', () => {
     const html = renderToString(<LinkAnalyticsLanding />);
 
-    expect(html).toContain('Aug 20, 2026');
+    expect(html).toContain(
+      formatShortDateUTC(
+        buildLinkAnalyticsFixture(LINK_ANALYTICS_SSR_NOW).lastClickAt ?? ''
+      )
+    );
     expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
 });

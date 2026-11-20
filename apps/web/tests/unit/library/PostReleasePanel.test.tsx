@@ -2,7 +2,10 @@ import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { PostReleasePanel } from '@/app/app/(shell)/library/PostReleasePanel';
+import {
+  PostReleasePanel,
+  RightsholdersList,
+} from '@/app/app/(shell)/library/PostReleasePanel';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import { ARTIST_PRESENCE_LEAK_RECOMMENDATIONS } from '@/lib/library/fixtures/inspector-scope-artist-leak';
 import {
@@ -287,5 +290,76 @@ describe('PostReleasePanel', () => {
     expect(
       screen.getByText('Spotify connection required to update this release')
     ).toBeInTheDocument();
+  });
+});
+
+describe('RightsholdersList', () => {
+  it('shows only evidence for the selected release with a safe source link', () => {
+    const rightsholders = [
+      {
+        ...bundle.rightsholders[0]!,
+        sourceUrl: 'https://www.songview.com/',
+        sourceWorkId: 'work-1',
+      },
+      {
+        ...bundle.rightsholders[0]!,
+        id: 'other-release',
+        subjectId: 'release-2',
+        partyName: 'Other artist',
+      },
+    ];
+    render(
+      <TooltipProvider>
+        <RightsholdersList
+          asset={asset}
+          bundle={{ ...bundle, rightsholders }}
+        />
+      </TooltipProvider>
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Rightsholders' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(screen.queryByText('Other artist')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Songview' })).toHaveAttribute(
+      'href',
+      'https://www.songview.com/'
+    );
+    expect(screen.getByRole('link', { name: 'Songview' })).toHaveAttribute(
+      'rel',
+      'noreferrer'
+    );
+    expect(screen.getByText(/work-1/)).toBeInTheDocument();
+  });
+
+  it('does not link an unsafe evidence URL and hides an empty selection', () => {
+    const rightsholders = [
+      { ...bundle.rightsholders[0]!, sourceUrl: 'javascript:alert(1)' },
+    ];
+    const { rerender } = render(
+      <TooltipProvider>
+        <RightsholdersList
+          asset={asset}
+          bundle={{ ...bundle, rightsholders }}
+        />
+      </TooltipProvider>
+    );
+    expect(
+      screen.getByText(/writer · composition · Songview/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Songview' })
+    ).not.toBeInTheDocument();
+    rerender(
+      <TooltipProvider>
+        <RightsholdersList
+          asset={asset}
+          bundle={{ ...bundle, rightsholders: [] }}
+        />
+      </TooltipProvider>
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'Rightsholders' })
+    ).not.toBeInTheDocument();
   });
 });

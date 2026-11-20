@@ -1,7 +1,3 @@
-import {
-  APP_ROUTES,
-  buildSpotifyCatalogConnectionRoute,
-} from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import {
   rankSocialInboxDrafts,
@@ -37,7 +33,6 @@ import type {
   OpportunityInboxCardCategory,
   OpportunityInboxCardViewModel,
   OpportunityInboxData,
-  OpportunityInboxEmptyActionCard,
   OpportunityInboxTourDates,
 } from './opportunity-inbox-types';
 import { parseYouTubeThumbnailCandidate } from './youtube-thumbnail-candidate';
@@ -262,23 +257,40 @@ export function mapSuggestedActionToInboxCard(
   };
 }
 
-export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityInboxEmptyActionCard[] =
-  [
-    {
-      id: 'connect-spotify',
-      title: 'Connect Spotify',
-      body: 'Link your catalog so Jovie can spot releases, audience spikes, and pitch windows.',
-      actionLabel: 'Connect Spotify',
-      href: buildSpotifyCatalogConnectionRoute(),
-    },
-    {
-      id: 'add-tour-dates',
-      title: 'Add tour dates',
-      body: 'Keep dates current so booking suggestions stay aligned with your calendar.',
-      actionLabel: 'Add dates',
-      href: APP_ROUTES.TOUR_DATES,
-    },
-  ] as const;
+/**
+ * A pending row is renderable creator work only when its payload survives
+ * the same validation the card mapper applies. Rows that fail parse are
+ * dropped from the feed rather than rendered as broken cards — invalid
+ * payloads never inflate the creator-work set.
+ */
+export function isCreatorReviewRenderableRow(row: SuggestedActionRow): boolean {
+  const signalType = classifyOpportunitySignalType(row);
+  if (
+    signalType === 'brand_deal' &&
+    !parseBrandDealOpportunity(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  if (
+    row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
+    !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
+  ) {
+    return false;
+  }
+  if (
+    row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
+    !parseYouTubeThumbnailCandidate(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  if (
+    row.kind === SOCIAL_REPLY_DRAFT_KIND &&
+    !parseSocialReplyDraft(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
@@ -288,34 +300,11 @@ export function buildOpportunityInboxData(
     readonly preferences?: SocialInboxRankingPreferences;
   }
 ): OpportunityInboxData {
-  const entries = rows.flatMap(row => {
-    const signalType = classifyOpportunitySignalType(row);
-    if (
-      signalType === 'brand_deal' &&
-      !parseBrandDealOpportunity(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    if (
-      row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
-      !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
-    ) {
-      return [];
-    }
-    if (
-      row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
-      !parseYouTubeThumbnailCandidate(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    if (
-      row.kind === SOCIAL_REPLY_DRAFT_KIND &&
-      !parseSocialReplyDraft(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    return [{ card: mapSuggestedActionToInboxCard(row), row }];
-  });
+  const entries = rows.flatMap(row =>
+    isCreatorReviewRenderableRow(row)
+      ? [{ card: mapSuggestedActionToInboxCard(row), row }]
+      : []
+  );
   // Preserve the existing report and brand-deal lanes, then rank inbound social
   // replies by ROI. The score stays server-internal and is never rendered.
   const reportCards = entries
@@ -366,7 +355,9 @@ export function buildOpportunityInboxData(
         ? (tourDates.availability ?? 'unknown')
         : 'not_requested',
     },
-    emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
+    // JOV-8967: the empty Inbox stays quiet — no setup CTAs here. Setup steps
+    // live on Home and render there only while setup is incomplete.
+    emptyActionCards: [],
     ...(tourDates ? { tourDates } : {}),
   };
 }

@@ -174,3 +174,61 @@ describe('POST /api/webhooks/resend-inbound', () => {
     );
   });
 });
+
+// JOV-9779: plus-addressed mail (the release-email canary inbox) reaches the
+// artist named by the local part before `+`; the full address is kept.
+describe('POST /api/webhooks/resend-inbound plus-addressing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    hoisted.profileLimitMock.mockResolvedValue([
+      {
+        id: 'profile_123',
+        displayName: 'Canary',
+        username: 'release-canary',
+        genres: [],
+      },
+    ]);
+  });
+
+  it('resolves artist+tag@ to the artist username and keeps the tagged recipient', async () => {
+    hoisted.findThreadMock.mockRejectedValue(new Error('stop after lookup'));
+    const recipient = 'release-canary+synthetic-release-email@jovie.fm';
+    const rawBody = JSON.stringify({
+      type: 'email.received',
+      data: {
+        email_id: 'email_456',
+        from: 'notifications@send.jov.ie',
+        to: [recipient],
+        subject: 'Release canary rel-1',
+        message_id: 'message_456',
+      },
+    });
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const { POST } = await import('@/app/api/webhooks/resend-inbound/route');
+    await POST(
+      new NextRequest('http://localhost/api/webhooks/resend-inbound', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-timestamp': timestamp,
+          'svix-signature': signPayload(
+            rawBody,
+            timestamp,
+            TEST_WEBHOOK_SECRET
+          ),
+        },
+        body: rawBody,
+      })
+    );
+
+    expect(hoisted.captureCriticalErrorMock).toHaveBeenCalledWith(
+      'Resend inbound webhook processing failed',
+      expect.any(Error),
+      expect.objectContaining({
+        username: 'release-canary',
+        recipientEmail: recipient,
+      })
+    );
+  });
+});

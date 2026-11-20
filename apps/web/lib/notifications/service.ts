@@ -1,12 +1,11 @@
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
-import { EMAIL_REPLY_TO } from '@/lib/notifications/config';
 import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
 import type { SendSmsResult } from '@/lib/notifications/providers/sms/twilio-sender';
 import { sendPushNotification } from '@/lib/notifications/push';
@@ -16,7 +15,7 @@ import {
   reserveTrialFanEmail,
 } from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
-import { formatSystemSender } from '@/lib/notifications/sender-policy';
+import { systemSenderName } from '@/lib/notifications/sender-policy';
 import {
   isPhoneSmsSuppressed,
   suppressPhoneForStop,
@@ -36,7 +35,7 @@ import type {
   SenderContext,
 } from '@/types/notifications';
 
-let emailProvider: EmailProvider = new ResendEmailProvider();
+let emailProvider: EmailProvider = new GatewayEmailProvider();
 
 export const setEmailProvider = (provider: EmailProvider) => {
   emailProvider = provider;
@@ -113,14 +112,6 @@ async function checkFanSendAccess(
     channel,
     'Paid fan sends are unavailable. No spend is authorized.'
   );
-}
-
-/**
- * Build the "From" address with dynamic sender name.
- * Implements the Laylo pattern: "Artist Name via Jovie <notifications@send.jov.ie>"
- */
-function buildFromAddress(senderContext?: SenderContext): string {
-  return formatSystemSender(senderContext?.displayName);
 }
 
 /**
@@ -239,6 +230,15 @@ async function handleEmailChannel(
     return buildSkippedResult('email', 'No email available');
   }
 
+  // Every email declares its gateway stream; refuse before any side effect.
+  const route = message.emailRoute;
+  if (!route) {
+    return buildErrorResult(
+      'email',
+      'emailRoute missing: every email must declare a stream (lib/email/stream-registry.json)'
+    );
+  }
+
   // Check sender eligibility if sending on behalf of a creator
   if (senderContext) {
     const eligibility = await checkSenderEligibility(senderContext);
@@ -285,23 +285,23 @@ async function handleEmailChannel(
     return buildSkippedResult('email', 'Marketing emails are disabled');
   }
 
-  // Build dynamic from address and reply-to
-  const fromAddress = message.from ?? buildFromAddress(senderContext);
-  const replyTo =
-    message.replyTo ?? senderContext?.replyToEmail ?? EMAIL_REPLY_TO;
+  // Display name only ("Artist via Jovie"); the address comes from the stream.
+  const fromName = systemSenderName(senderContext?.displayName);
+  const replyTo = message.replyTo ?? senderContext?.replyToEmail;
 
   const fanSendBlock = await checkFanSendAccess(message, 'email');
   if (fanSendBlock) return fanSendBlock;
 
   const emailResult = await emailProvider.sendEmail({
+    ...route,
     to,
     subject: message.subject,
     text: message.text,
     html: message.html,
     idempotencyKey: message.idempotencyKey,
-    replyTo,
+    ...(replyTo && { replyTo }),
     headers: message.headers,
-    from: fromAddress,
+    ...(fromName && { fromName }),
   });
 
   // Handle post-send tracking

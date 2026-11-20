@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, PlainButton } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React, {
@@ -211,7 +211,7 @@ export const DrawerEditableTextField = React.memo(
             />
           ) : null}
           {editable && !isEditing ? (
-            <button
+            <PlainButton
               type='button'
               onClick={() => setIsEditing(true)}
               onDoubleClick={() => setIsEditing(true)}
@@ -229,11 +229,11 @@ export const DrawerEditableTextField = React.memo(
                 !hasValue && 'text-tertiary-token'
               )}
             >
-              {/* Named from content (WCAG 2.5.3 Label in Name): an overriding
-                  aria-label that omits the visible value fails axe 4.14
-                  label-content-name-mismatch on the /product/isrc marketing
-                  capture and blocked production promotion. */}
-              <span className='sr-only'>{`Edit ${label}`}</span>
+              {/* No aria-label on the trigger: it shadowed the visible value
+                  (WCAG 2.5.3 label-in-name). The sr-only prefix comes first so
+                  the accessible name ("Edit <label>: <value>") still contains
+                  the visible text. */}
+              <span className='sr-only'>{`Edit ${label}:`}</span>
               <span
                 className={cn(
                   'block truncate text-app text-primary-token',
@@ -246,7 +246,7 @@ export const DrawerEditableTextField = React.memo(
               >
                 {displayValue}
               </span>
-            </button>
+            </PlainButton>
           ) : null}
           {editable ? null : (
             <span

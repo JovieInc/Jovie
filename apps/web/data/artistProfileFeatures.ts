@@ -10,7 +10,7 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
     id: 'audience-quality-filtering',
     title: 'Audience Quality Filtering',
-    body: 'Jovie identifies bots, your own team, and test traffic so your fan metrics measure actual fans.',
+    body: 'Jovie identifies bots, your own team, and test traffic so your audience metrics measure actual listeners.',
     size: 'large',
     // Distinct from the analytics tile: each feature's accent must be unique.
     accent: 'gray',
@@ -63,7 +63,7 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
     id: 'activate-creators',
     title: 'Activate Creators',
-    body: 'Give fans and creators one obvious path to use the sound and post.',
+    body: 'Give listeners and creators one obvious path to use the sound and post.',
     accent: 'green',
     size: 'small',
     layoutClassName:
@@ -140,7 +140,7 @@ export const ARTIST_PROFILE_TRUTH_TILES: readonly ArtistProfileTruthTile[] = [
   {
     id: 'smart-routing',
     title: 'Smart routing',
-    body: 'Send each fan to the right destination with less friction.',
+    body: 'Open the listener’s chosen app, with services sorted by country.',
   },
   {
     id: 'deep-link-modes',
@@ -164,13 +164,13 @@ export const ARTIST_PROFILE_TRUTH_TILES: readonly ArtistProfileTruthTile[] = [
   },
   {
     id: 'fan-capture',
-    title: 'Fan capture',
+    title: 'Audience capture',
     body: 'Move from anonymous traffic to an owned audience.',
   },
   {
     id: 'notifications',
     title: 'Notifications',
-    body: 'Give fans a simple way to stay in the loop.',
+    body: 'Give listeners a simple way to stay in the loop.',
   },
   {
     id: 'qr-sharing',

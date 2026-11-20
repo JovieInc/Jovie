@@ -10,7 +10,9 @@ import {
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logStatsigEvent } from '@/lib/flags/statsig';
 import { getClientIP, publicProfilePacEventLimiter } from '@/lib/rate-limit';
@@ -21,7 +23,6 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const MAX_BODY_BYTES = 4096;
-const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 
 /**
  * First-party sink for PAC (Primary Action Card) instrumentation events —
@@ -40,10 +41,19 @@ const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const clientIp = getClientIP(request);
-    const rateLimitResult = await publicProfilePacEventLimiter.limit(clientIp);
+    // The E2E matrix serves every parallel test on a shard from one
+    // 127.0.0.1 bucket; the anonymous per-IP budget 429s under shard load on
+    // a healthy app (public-profile-smoke, run 41153386766). Test mode skips
+    // the bucket — the allowance the auth OTP rules already honor.
+    const rateLimitResult =
+      env.E2E_TEST_MODE === '1'
+        ? null
+        : await publicProfilePacEventLimiter.limit(clientIp);
     const backendDegraded =
-      rateLimitResult.degraded === true || rateLimitResult.unavailable === true;
-    if (!rateLimitResult.success && !backendDegraded) {
+      rateLimitResult !== null &&
+      (rateLimitResult.degraded === true ||
+        rateLimitResult.unavailable === true);
+    if (rateLimitResult && !rateLimitResult.success && !backendDegraded) {
       return createRateLimitedResponse(rateLimitResult);
     }
     if (backendDegraded) {
@@ -90,7 +100,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Never trust the beacon's positive consent claim for identity joining.
     // The httpOnly granular cookie and server-resolved region policy are
     // authoritative. Client-reported opt-outs remain an extra fail-closed
-    // signal, while GPC/DNT and the legacy rejection cookie are also honored.
+    // signal. GPC/DNT override; legacy rejection is the fallback when granular
+    // consent is unusable, since privacy choices also uses it for advertising.
     const requiresCookieConsent =
       cookieStore.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
       isCookieBannerRequired(
@@ -109,7 +120,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       request.headers.get('dnt') === '1' ||
       request.headers.get('dnt') === 'yes';
     const legacyOptedOut =
-      cookieStore.get(LEGACY_TRACKING_CONSENT_COOKIE)?.value === 'rejected';
+      canonicalConsent === null &&
+      cookieStore.get(TRACKING_CONSENT_COOKIE_NAME)?.value === 'rejected';
     const clientOptedOut = PAC_IDENTITY_BLOCKED_CONSENTS.includes(
       event.consent
     );

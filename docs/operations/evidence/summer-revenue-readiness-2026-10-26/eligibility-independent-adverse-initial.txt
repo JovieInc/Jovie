@@ -1,0 +1,39 @@
+✔ control: fresh complete evidence remains eligible (12.078587ms)
+✔ stale receipt cannot inherit cached eligible flag (0.994302ms)
+✔ missing requirement is not zero-success (0.225572ms)
+✔ failed receipt overrides cached green (0.641245ms)
+✔ held cached decision cannot self-promote (0.55192ms)
+✔ profile cannot lose workflow producer silently (0.695054ms)
+✖ malformed cache cannot raise existing freshness budget (2.916386ms)
+✔ contradictory duplicate commerce receipt cannot hide red (0.573785ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36.08024
+
+✖ failing tests:
+
+test at ../../tmp/summer-independent-gate/eligibility-cache-adverse.ts:2:4068
+✖ malformed cache cannot raise existing freshness budget (2.916386ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (/tmp/summer-independent-gate/eligibility-cache-adverse.ts:14:145)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

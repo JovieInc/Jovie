@@ -4,7 +4,10 @@ import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
 import { SignupModalClient } from './SignupModalClient';
 
 export default async function SignupModalPage({
@@ -23,11 +26,15 @@ export default async function SignupModalPage({
     );
   }
 
+  // Closed public signup: anonymous visitors join the waitlist instead.
+  // Sign-in and invite links stay open (canon/PRODUCT.md, 2026-11-02).
+  if (isPublicSignupClosed()) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
+  }
+
   return (
     <Suspense fallback={<AuthFormSkeleton />}>
-      <SignupModalClient
-        showOfferSummary={isCodeFlagEnabled('AUTH_OFFER_SUMMARY')}
-      />
+      <SignupModalClient />
     </Suspense>
   );
 }

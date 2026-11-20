@@ -63,6 +63,20 @@ const ACCEPTANCE_CUE = /acceptance|done means|done when|gate verifies/i;
 const RUNTIME_CHECK = /golden[\s-]?path|e2e[\s-]smoke|nightly|cron monitor/i;
 const UNCHECKED_BOX = /^\s*[-*] \[ \]\s+\S/m;
 const COMMISSIONING_HEADING = /^#{1,6}\s.*commission/im;
+// A merged pull request cannot rotate a credential or swap a secret, and a
+// deploy cannot prove the exposure closed (JOV-9959: the guard PR reached a
+// verified production generation while the staging secret swap and rotation
+// were still open). Word cues are case-insensitive; the env-var cue stays
+// uppercase-only so ordinary prose never reads as a secret name. Cues stay
+// secrets-specific so ordinary code issues are never held: `rotate` alone
+// is excluded (image rotation), `database` and bare `password`
+// (password-reset features) are excluded.
+const SECRETS_INFRA_WORD_CUE =
+  /\b(?:secrets?|credentials?|doppler|vault|connection string|api[ _-]?keys?|access[ _-]?tokens?)\b/i;
+const SECRETS_INFRA_ENV_CUE =
+  /[A-Z][A-Z0-9_]{2,}_(?:KEY|SECRET|TOKEN|DSN|PASSWORD)/;
+const HUMAN_ONLY_CUE =
+  /\b(?:human-only|tim-only|manual-only|human-only step|human action|human step|only a human|requires? a human)\b/i;
 // A section that defines done. JOV-7510, JOV-7506, JOV-7494 and JOV-7492
 // closed on deployment alone at 02:32Z on 2026-10-04 despite "Acceptance
 // evidence", "Acceptance checks" and "Evaluation / completion" sections.
@@ -107,8 +121,38 @@ export function declaredRequirements(description) {
  * merge-based closure for this issue, so merge and deploy cannot close it
  * again.
  *
+/**
+ * Signals that the issue's closure includes a secrets/infra step a merged
+ * pull request and its deployment cannot perform: a secret swap, credential
+ * rotation, or another human-only action. Each signal independently forces
+ * an outcome receipt so a guard-style partial fix cannot auto-close the
+ * exposure (JOV-9959).
+ *
+ * @param {{
+ *   readonly title?: string,
+ *   readonly description?: string,
+ * }} issue
+ * @returns {string[]}
+ */
+export function secretsInfraClosureSignals(issue) {
+  const haystack = `${issue.title ?? ''}\n${issue.description ?? ''}`;
+  const signals = [];
+  if (
+    SECRETS_INFRA_WORD_CUE.test(haystack) ||
+    SECRETS_INFRA_ENV_CUE.test(haystack)
+  ) {
+    signals.push('secrets/credentials in scope');
+  }
+  if (HUMAN_ONLY_CUE.test(haystack)) {
+    signals.push('human-only step in scope');
+  }
+  return signals;
+}
+
+/**
  * @param {{
  *   readonly labels?: readonly string[],
+ *   readonly title?: string,
  *   readonly description?: string,
  *   readonly reopenedAfterDone?: boolean,
  * }} issue
@@ -123,6 +167,12 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
   }
   if (declaredRequirements(issue.description ?? '').includes('outcome')) {
     reasons.push('the issue declares validation-required: outcome');
+  }
+  const secrets = secretsInfraClosureSignals(issue);
+  if (secrets.length > 0) {
+    reasons.push(
+      `secrets/infra issue (${secrets.join(', ')}): a merge and deploy cannot swap the secret or rotate the credential, so an owner outcome receipt must attest the exposure is verified closed`
+    );
   }
   const description = String(issue.description ?? '');
   const labels = (issue.labels ?? []).map(label => String(label).toLowerCase());
@@ -264,6 +314,7 @@ export function selectBindingPull(pulls) {
  *   readonly issue: {
  *     readonly identifier: string,
  *     readonly labels?: readonly string[],
+ *     readonly title?: string,
  *     readonly description?: string,
  *     readonly reopenedAfterDone?: boolean,
  *     readonly receiptNotBefore?: string | null,

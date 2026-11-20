@@ -20,7 +20,7 @@ export function PillShimmer({ show }: Readonly<{ show: boolean }>) {
       className='pointer-events-none absolute inset-0 animate-shimmer motion-reduce:animate-none opacity-30 dark:opacity-20'
       style={{
         backgroundImage:
-          'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',
+          'linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-on-media) 28%, transparent), transparent)',
         backgroundSize: '200% 100%',
       }}
     />

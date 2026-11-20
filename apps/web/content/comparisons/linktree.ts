@@ -1,3 +1,7 @@
+import {
+  COMPARATIVE_CLAIM_IDS,
+  comparativeAnswer,
+} from '../comparative-claims';
 import type { ComparisonData } from './types';
 
 export const linktreeComparison: ComparisonData = {
@@ -78,6 +82,11 @@ export const linktreeComparison: ComparisonData = {
       answer:
         'Jovie offers a free public profile with audience capture. Linktree also documents a Free plan; feature depth and history vary by Linktree plan.',
       claimIds: ['jovie.free-profile', 'linktree.free-plan'],
+    },
+    {
+      question: 'Is a Jovie profile faster than a Linktree page?',
+      answer: comparativeAnswer(),
+      claimIds: COMPARATIVE_CLAIM_IDS,
     },
     {
       question: 'Can I add music links?',

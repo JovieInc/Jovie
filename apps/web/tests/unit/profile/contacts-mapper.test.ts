@@ -321,6 +321,25 @@ describe('formatPublicContactSubtitle', () => {
     ).toBe('Kelly Strickland · Maverick');
   });
 
+  it('collapses a company that repeats the person name', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Jovie',
+        primaryContactLabel: 'Jovie',
+        companyLabel: 'Jovie Technology Inc',
+        secondaryLabel: 'Jovie Technology Inc',
+      })
+    ).toBe('Jovie Technology Inc');
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Jo',
+        primaryContactLabel: 'Jo',
+        companyLabel: 'Jovie',
+        secondaryLabel: 'Jovie',
+      })
+    ).toBe('Jo · Jovie');
+  });
+
   it('returns an empty string when both sides are missing', () => {
     expect(
       formatPublicContactSubtitle({
@@ -330,5 +349,38 @@ describe('formatPublicContactSubtitle', () => {
         secondaryLabel: undefined,
       })
     ).toBe('');
+  });
+});
+
+describe('placeholder values never render publicly', () => {
+  const placeholders = ['TBF', 'tbd', 'TBC', 'N/A', 'none', '-', '???'];
+
+  it.each(placeholders)('drops placeholder company/person label %s', value => {
+    const [contact] = toPublicContacts(
+      [createContact({ companyName: value, personName: value })],
+      'Artist'
+    );
+    expect(contact.companyLabel).toBeUndefined();
+    expect(contact.contactName).toBeUndefined();
+    expect(formatPublicContactSubtitle(contact)).toBe('');
+  });
+
+  it.each(placeholders)(
+    'hides a contact whose only email/phone is placeholder %s',
+    value => {
+      expect(
+        toPublicContacts(
+          [createContact({ email: value, phone: value })],
+          'Artist'
+        )
+      ).toEqual([]);
+    }
+  );
+
+  it('keeps a real channel and real labels', () => {
+    const [contact] = toPublicContacts([createContact()], 'Artist');
+    expect(contact.companyLabel).toBe('Booking Agency');
+    expect(contact.contactName).toBe('John Doe');
+    expect(contact.channels).toHaveLength(1);
   });
 });

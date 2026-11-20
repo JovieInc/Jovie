@@ -1,13 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { toolEventToMessagePart } from '@/lib/chat/tool-events';
+import {
+  type PersistedToolEvent,
+  toolEventToMessagePart,
+} from '@/lib/chat/tool-events';
 import {
   buildFailedToolEvent,
   buildRunningToolEvent,
   buildSucceededToolEvent,
 } from '@/lib/onboarding/presence-build/tool-events';
 import { TOOL_STATUS_PARTS } from './fixtures/tool-status';
+import { MERCH_SOURCE_SELECTION_TITLE } from './merch-tool-artifacts';
+import { hydratePersistedMessageParts } from './message-parts';
 import { ToolPartsRenderer } from './tool-ui';
 
 vi.mock('@/components/molecules/UpgradeButton', () => ({
@@ -192,6 +197,8 @@ describe('ToolPartsRenderer ops data cards', () => {
   });
 
   it('falls back to a status row when the ops card payload is malformed', () => {
+    // Unconfirmed rows are hidden by default; the fallback row is a verbose view.
+    window.localStorage.setItem('jovie:chat-verbose', '1');
     render(
       <ToolPartsRenderer
         variant='chat'
@@ -214,6 +221,7 @@ describe('ToolPartsRenderer ops data cards', () => {
 
     expect(screen.queryByTestId('chat-ops-data-card')).not.toBeInTheDocument();
     expect(screen.getByTestId('tool-status-row')).toBeInTheDocument();
+    window.localStorage.removeItem('jovie:chat-verbose');
   });
 });
 
@@ -291,4 +299,37 @@ it('keeps an approval request pending with one accessible status owner', () => {
   );
   expect(screen.queryByRole('img')).not.toBeInTheDocument();
   expect(container.querySelector('[data-fill="check"]')).toBeNull();
+});
+
+describe('ToolPartsRenderer merch status title', () => {
+  it('titles a succeeded findMerchSources status row from the merch outcome', () => {
+    const event: PersistedToolEvent = {
+      schemaVersion: 2,
+      toolCallId: 'source-call-tool-ui',
+      toolName: 'findMerchSources',
+      state: 'succeeded',
+      uiHint: 'status',
+      retryable: false,
+      output: {
+        success: true,
+        state: 'source_selection_required',
+        message: 'Pick a catalog phrase before any artwork is generated.',
+        candidates: [],
+      },
+    };
+
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={hydratePersistedMessageParts('', [event])}
+      />
+    );
+
+    expect(screen.getByTestId('tool-status-row')).toHaveAttribute(
+      'data-tool-state',
+      'succeeded'
+    );
+    expect(screen.getByText(MERCH_SOURCE_SELECTION_TITLE)).toBeInTheDocument();
+    expect(screen.queryByText('Merch source ready')).not.toBeInTheDocument();
+  });
 });

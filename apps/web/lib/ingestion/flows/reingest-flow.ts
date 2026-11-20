@@ -14,8 +14,10 @@ import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { withLeadBuildHold } from '@/lib/leads/lead-build-hold';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
+import { holdLeadBuiltProfileInTx } from '@/lib/services/profile/mutations';
 import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';
 import type { checkExistingProfile } from './profile-operations';
@@ -39,7 +41,9 @@ export async function handleReingestProfile({
   existing,
   extraction,
   displayName,
+  leadHold = false,
 }: {
+  leadHold?: boolean;
   existing: NonNullable<
     Awaited<ReturnType<typeof checkExistingProfile>>['existing']
   >;
@@ -61,9 +65,15 @@ export async function handleReingestProfile({
       displayName
     );
 
+    // Lead-built profiles are held private until certified or claimed; a
+    // re-ingest must never publish them, and it demotes one that slipped out.
+    const held = leadHold
+      ? await holdLeadBuiltProfileInTx(tx, existing.id)
+      : false;
+
     // Promote quarantined profiles if quality now passes (never demote public profiles)
     let promoted = false;
-    if (existing.isPublic === false && !mergeError) {
+    if (existing.isPublic === false && !mergeError && !leadHold) {
       const qualityResult = evaluateProfileQuality({
         displayName: existing.displayNameLocked
           ? (existing.displayName ?? displayName)
@@ -94,7 +104,7 @@ export async function handleReingestProfile({
           usernameNormalized: existing.usernameNormalized,
         },
         links: extraction.links.length,
-        quarantined: existing.isPublic === false && !promoted,
+        quarantined: leadHold ? held : existing.isPublic === false && !promoted,
         promoted: promoted || undefined,
         warning: mergeError
           ? `Profile updated but link extraction had issues: ${mergeError}`
@@ -125,7 +135,9 @@ export async function handleNewProfileIngest({
   displayName,
   hostedAvatarUrl,
   extraction,
+  leadHold = false,
 }: {
+  leadHold?: boolean;
   finalHandle: string;
   displayName: string;
   hostedAvatarUrl: string | null;
@@ -182,14 +194,14 @@ export async function handleNewProfileIngest({
         usernameNormalized: canonicalHandle,
         displayName,
         avatarUrl: hostedAvatarUrl,
-        isPublic: qualityResult.isPublic,
+        isPublic: leadHold ? false : qualityResult.isPublic,
         isVerified: false,
         isFeatured: false,
         marketingOptOut: false,
         isClaimed: false,
         claimToken: claimTokenHash,
         claimTokenExpiresAt,
-        settings: {},
+        settings: leadHold ? withLeadBuildHold({}) : {},
         theme,
         ingestionStatus: 'processing',
         createdAt: new Date(),
@@ -260,7 +272,7 @@ export async function handleNewProfileIngest({
           claimToken,
         },
         links: extraction.links.length,
-        quarantined: !qualityResult.isPublic,
+        quarantined: leadHold || !qualityResult.isPublic,
         quarantineReasons:
           qualityResult.quarantineReasons.length > 0
             ? qualityResult.quarantineReasons

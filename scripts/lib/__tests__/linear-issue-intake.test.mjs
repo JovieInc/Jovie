@@ -6,6 +6,7 @@ import {
   LINEAR_LABEL_NAME_MAX,
   remediationKey,
   remediationTriggersEnabled,
+  reopenLinearIssue,
   upsertLinearIssueByTitleFingerprint,
 } from '../linear-issue-intake.mjs';
 
@@ -752,5 +753,55 @@ describe('remediationTriggersEnabled', () => {
     expect(
       remediationTriggersEnabled({ REMEDIATION_TRIGGERS_DISABLED: 'false' })
     ).toBe(true);
+  });
+});
+
+describe('reopenLinearIssue', () => {
+  it('uses the authoritative issue id and triage state without rewriting human content', async () => {
+    const fetchImpl = vi.fn(
+      async (_url, _init) =>
+        new Response(
+          JSON.stringify({ data: { issueUpdate: { success: true } } })
+        )
+    );
+    await expect(
+      reopenLinearIssue({
+        issueId: 'slo-1',
+        stateId: 'triage-1',
+        apiKey: 'slo-reopen-key',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ ok: true });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).variables).toEqual({
+      id: 'slo-1',
+      input: { stateId: 'triage-1' },
+    });
+  });
+  it('fails closed on missing routing, missing credentials, GraphQL rejection and unsuccessful writes', async () => {
+    await expect(
+      reopenLinearIssue({ issueId: '', stateId: '', apiKey: '' })
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: 'missing_linear_api_key',
+    });
+    await expect(
+      reopenLinearIssue({ issueId: '', stateId: '', apiKey: 'key' })
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: 'missing_reopen_routing',
+    });
+    for (const body of [
+      { errors: [{ message: 'denied' }] },
+      { data: { issueUpdate: { success: false } } },
+    ]) {
+      await expect(
+        reopenLinearIssue({
+          issueId: 'slo-1',
+          stateId: 'triage-1',
+          apiKey: 'slo-reopen-key',
+          fetchImpl: async () => new Response(JSON.stringify(body)),
+        })
+      ).resolves.toMatchObject({ ok: false });
+    }
   });
 });

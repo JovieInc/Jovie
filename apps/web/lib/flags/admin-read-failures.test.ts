@@ -39,6 +39,61 @@ describe('Admin flag source truth', () => {
       await expect(read()).rejects.toThrow(/unavailable/);
     }
   );
+  it('rejects a malformed override cell instead of displaying it as a value', async () => {
+    const { APP_FLAG_DEFAULTS } = await import('./contracts');
+    const flagKey = Object.keys(APP_FLAG_DEFAULTS)[0];
+    mocks.rows.mockResolvedValueOnce([
+      {
+        flagKey,
+        dev: 'yes' as unknown as boolean,
+        staging: null,
+        prod: null,
+      },
+    ]);
+    await expect(getFeatureFlagAdminRows()).rejects.toThrow(
+      /override row for \w+ is malformed \(dev cell\)/
+    );
+  });
+  it('rejects a malformed audit timestamp instead of rendering undated history', async () => {
+    const { APP_FLAG_DEFAULTS } = await import('./contracts');
+    const flagKey = Object.keys(APP_FLAG_DEFAULTS)[0];
+    mocks.rows.mockResolvedValueOnce([
+      {
+        id: 'audit-1',
+        flagKey,
+        envTier: 'prod',
+        action: 'disable',
+        actor: 'admin',
+        previousValue: true,
+        newValue: false,
+        reason: null,
+        createdAt: '2026-10-02T10:00:00Z' as unknown as Date,
+      },
+    ]);
+    await expect(getFeatureFlagAuditEvents()).rejects.toThrow(
+      /audit row is malformed \(createdAt\)/
+    );
+  });
+  it('rejects a malformed audit value cell instead of rendering it as history', async () => {
+    const { APP_FLAG_DEFAULTS } = await import('./contracts');
+    const flagKey = Object.keys(APP_FLAG_DEFAULTS)[0];
+    mocks.rows.mockResolvedValueOnce([
+      {
+        id: 'audit-2',
+        flagKey,
+        envTier: 'prod',
+        action: 'enable',
+        actor: 'admin',
+        previousValue: 'on' as unknown as boolean,
+        newValue: null,
+        reason: null,
+        createdAt: new Date('2026-10-02T10:00:00Z'),
+      },
+    ]);
+    await expect(getFeatureFlagAuditEvents()).rejects.toThrow(
+      /audit row is malformed \(previousValue\)/
+    );
+  });
   it('returns genuinely empty history and code defaults after successful reads', async () => {
     expect(await getFeatureFlagAuditEvents()).toEqual([]);
     expect((await getFeatureFlagAdminRows()).length).toBeGreaterThan(0);

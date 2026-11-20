@@ -933,15 +933,6 @@ const UNVERIFIED_MARKETING_PROOF: readonly MarketingProofAuditObservation[] = [
     missing: ['registered events or ticketing claim'],
   },
   {
-    id: 'baseline-about-founder-experience',
-    kind: 'metric',
-    claimId: 'about.founder.experience-years',
-    pages: ['/about'],
-    observedValue: '15+ years',
-    sourceLocation: 'apps/web/data/aboutCopy.ts',
-    missing: ['reproducingQuery', 'measuredAt', 'sample', 'source'],
-  },
-  {
     id: 'baseline-launch-tracks-generated',
     kind: 'metric',
     claimId: 'launch.market.tracks-generated-daily',

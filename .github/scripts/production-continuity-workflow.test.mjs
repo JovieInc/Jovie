@@ -18,7 +18,9 @@ it('keeps the external guard bounded, ordered, deduplicated, and credential-free
     /production-continuity\.mjs/,
     /cancel-in-progress: false/,
     /Slack acknowledged the production incident alert/,
-    /failure: "provider-unavailable"/,
+    /failure: \$failure/,
+    /INGRESS_FAILURE:-provider-unavailable/,
+    /agent_ingress_failure/,
     /delivery-state-machine\.mjs/,
     /productionMutation: "none"/,
     /Deduplicate acknowledged alert transport/,
@@ -68,4 +70,14 @@ it('uses an event accepted by the real provider-recovery ingress', () => {
   );
   assert.deepEqual(event.evidence.affectedTargets, ['summer-production']);
   assert.equal(event.evidence.productionMutation, 'none');
+});
+
+it('routes provider classes as provider-unavailable and stale production as production-controller-failed', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  const probe = read(
+    fileURLToPath(new URL('./production-continuity.mjs', import.meta.url)),
+    'utf8'
+  );
+  assert.match(probe, /'provider-unavailable'/);
+  assert.match(probe, /'production-controller-failed'/);
 });

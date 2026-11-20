@@ -15,10 +15,35 @@ Source Validation requires an explicit decision for customer-code PRs created fr
 <!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","availability":{"status":"ga","prerequisites":[]},"evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
 ```
 
-Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
+Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs, written as `Headline: explanation` (see Headlines).
 Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves; authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
 Optional `details` (up to 3 claim-mapped bullets, each at most 240 customer-safe characters) explain what changed and why it matters beyond the one-line outcome.
 Optional `action` (`{"label":"…","href":"…"}`, label at most 80 characters) gives the entry one next step. The destination must be an internal path or `https` on jov.ie/docs.jov.ie — a working example, setup, or help route a signed-out visitor can actually open. Unsafe or unverifiable destinations fail validation; omit `action` rather than linking a placeholder or the generic homepage.
+
+## Headlines
+
+Every entry leads with a short outcome headline. Write the marker `text` as `Headline: explanation`.
+
+- Headline: what the customer can now do, sentence case, at most 60 characters, no trailing punctuation. Not a product-area label (`Artist profiles:`), not a PR title.
+- Explanation: one or two full sentences that start with a capital letter.
+- No internal words (PR, deploy, CI, flag, API, endpoint, regression, staging, issue ids, vendor names such as Redis or Sentry) and no apologetic phrasing (again, finally, was broken, no longer crashes, bug). Say what works now.
+
+Good: `Play release previews on a profile: Tap play and the preview starts in place.` Bad: `Artist profiles: the footer bug no longer crashes after the last deploy.`
+
+Source Validation lints this for release-worthy markers in PRs created from 2026-11-14 UTC (`customerNoteCopyProblems` in `scripts/lib/changelog-filter-rules.mjs`); the failure lists each line to fix. Older PRs keep the contract they were admitted under. `pnpm pr:open` runs the same lint before the PR exists.
+
+### Editorial overlay
+
+`apps/web/data/customer-changelog-editorial.json` is keyed by the permanent `entryId` and applied inside the projection, so `/changelog`, the feeds, date pages and What's New agree. It never changes what shipped; receipts stay the authority.
+
+| Field | Use |
+|---|---|
+| `headline` | Outcome headline under the rule above. The approved explanation (or the whole approved sentence) becomes the lead. |
+| `lead` | Replaces the lead only when the approved sentence is no longer true or reads as internal. |
+| `media` | One visual: `{kind, src, alt}` with `src` under `/images/changelog/`. |
+| `hide` + `reason` | Withdraws an entry whose claim is no longer true. Its permalinks resolve to "no longer published", never to another entry. |
+
+Without an overlay headline the page falls back to the split; a bare area label is never promoted to a headline (the whole sentence is shown instead). `node scripts/check-customer-changelog-editorial.mjs` (run in Scripts CI by `scripts/lib/__tests__/changelog-source-guard.test.mjs`) fails when an overlay key is not a published `entryId`, a headline breaks the rule, or an entry from the newest 30 days of publication has neither a compliant split nor an overlay headline. The fix is one line in the overlay.
 
 ## Release path
 
@@ -31,11 +56,21 @@ The release PR changes only CHANGELOG.md and follows exact-head source CI, the n
 No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
 The draft follows the same path as every other PR: Auto-Ready green-source undrafts it once every required check passes at the observed head, and Merge Queue Green Enroll admits it. The production publisher is not a second merge owner.
 
+Because Auto-Ready green-source only undrafts a draft whose body carries a complete `jovie-writer-pr-proof/v1` receipt bound to the exact head and PR author (JOV-INV-022), the publisher attaches that receipt right after `gh pr create` with `scripts/attach-changelog-writer-proof.mjs` (JOV-10216). The Production Controller is the release PR's writer and its verified publication plan is the receipt's evidence, so the documented undraft path can complete without a manual click; the source CI, undraft conditions and queue admission are unchanged. Without the receipt the release PR could only be undrafted manually, which froze publication 2026-10-25..29 and again 2026-10-29..11-01.
+
 At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
 No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.
 Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed `{number, note}` records for recovery without modifying historical PR bodies.
 
 The customer archive, release detail, hero, and customer-entry feeds use the persisted slug. Alias anchors resolve to the same entry. If a receipted entry is withdrawn from public sections, its fragments resolve to an explicit unpublished tombstone and never to another update. Daily-post dismissal stays keyed to the existing date/version post identity.
+
+## Catch-up mode
+
+After a long gap, `publish-daily-changelog.mjs --catch-up` (workflow: repo variable `CHANGELOG_CATCH_UP=1` for one run) folds the backlog into one post of at most three area stories (Mac app, Sidebar and inbox, Profiles, releases and onboarding), each a lead outcome plus up to three bullets. Every line is an outcome's own approved copy mapped to its own claim; outcomes that do not fit stay deferred. Ongoing releases keep the three-outcomes-per-day cap. Catch-up never sends email.
+
+## Stuck-publication guard and staleness alarm
+
+One open `release/daily-changelog-*` PR owns publication. If it has been open 6 hours and is not in the merge queue, the publish job closes it and regenerates from the last merged receipt, so a stuck draft can no longer freeze the changelog (the 2026-10-25..29 gap). `changelog-staleness` (Production Controller, after each Production Verified) files a `production-monitor-customer-changelog-stale` Summer signal when release-worthy changes have been live in production for over 24 hours with no entry, and resolves it when one lands. Customer surfaces list entries newest first regardless of where a post sits in CHANGELOG.md.
 
 ## Verification and cost
 

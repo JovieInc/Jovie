@@ -6,11 +6,21 @@ import { isDeepStrictEqual } from 'node:util';
 
 const NAME = '@jovie/cli';
 const MCP_NAME = 'io.github.JovieInc/jovie';
+const BIN_COMMAND = 'jovie';
+const BIN_TARGET = 'dist/cli.js';
+
+// npm accepts both spellings of the bin target (npm/cli#7302 rewrites the
+// leading `./` form at publish time), so both published spellings verify.
+function binTarget(bin) {
+  return bin?.[BIN_COMMAND]?.replace(/^\.\//, '');
+}
 
 // Resuming registry publication never permits rebuilding a different npm release.
 export function verifyPublishedPackage(metadata, archive, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version))
     throw new Error('Invalid release version');
+  if (binTarget(metadata.bin) !== BIN_TARGET)
+    throw new Error('Published package does not ship the jovie bin command');
   if (
     metadata?.name !== NAME ||
     metadata.version !== version ||
@@ -89,6 +99,14 @@ export function verifyAndStageRegistry({
     !pack.filename.endsWith('.tgz')
   )
     throw new Error('Invalid staged npm archive receipt');
+  if (
+    binTarget(
+      JSON.parse(readFileSync(resolve(stagingDir, 'package.json'), 'utf8')).bin
+    ) !== BIN_TARGET
+  )
+    throw new Error('Staged package does not ship the jovie bin command');
+  if (!pack.files?.some(file => file.path === BIN_TARGET))
+    throw new Error('Staged npm archive does not ship the jovie bin command');
   const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
   verifyPublishedPackage(
     metadata,

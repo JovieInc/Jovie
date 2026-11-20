@@ -14,7 +14,6 @@ const contextualActionColumns = [
   'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
   'components/features/admin/admin-creator-profiles/utils/column-definitions.tsx',
   'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
-  'app/app/(shell)/profiles/ProfilesWorkspace.tsx',
 ];
 
 describe('table action contract', () => {
@@ -26,6 +25,17 @@ describe('table action contract', () => {
       expect(source, relativePath).toContain("headerVisibility: 'sr-only'");
       expect(source, relativePath).toContain("actionVisibility: 'contextual'");
     }
+  });
+
+  it('keeps Identity edit and overflow actions visible without hover', () => {
+    const source = readWebFile(
+      'app/app/(shell)/profiles/ProfilesWorkspace.tsx'
+    );
+    expect(source).toContain("header: 'Actions'");
+    expect(source).toContain("headerVisibility: 'sr-only'");
+    expect(source).not.toContain("actionVisibility: 'contextual'");
+    expect(source).toContain("aria-label='Edit Jovie Profile'");
+    expect(source).toContain('aria-label={`Actions for ${row.label}`}');
   });
 
   it('routes legacy action renderers through the shared contextual slot', () => {

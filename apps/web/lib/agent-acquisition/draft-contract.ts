@@ -107,3 +107,25 @@ export const draftCapabilitySchema = z
   .strict();
 
 export type DraftCapability = z.output<typeof draftCapabilitySchema>;
+
+export type InvalidInputField = { path: string; message: string };
+
+/**
+ * Self-correcting INVALID_INPUT body for calling LLMs. Only zod issue paths
+ * and messages are returned, never input values, so a draft_token supplied in
+ * a bad request cannot be echoed back.
+ */
+export function invalidInputError(error: z.ZodError) {
+  const fields: InvalidInputField[] = error.issues.slice(0, 10).map(issue => ({
+    path: issue.path.length ? issue.path.join('.') : '$',
+    message: issue.message.slice(0, 200),
+  }));
+  return {
+    status: 'error' as const,
+    code: 'INVALID_INPUT' as const,
+    next_action: 'correct_input' as const,
+    retryable: false,
+    message: `Invalid input. ${fields.map(f => `${f.path}: ${f.message}`).join('; ')}`,
+    fields,
+  };
+}

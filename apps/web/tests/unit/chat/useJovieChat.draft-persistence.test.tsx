@@ -72,6 +72,7 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
   consumePendingChatPrompt: () => null,
+  consumePendingChatDraft: () => null,
 }));
 
 function StrictDraftWrapper({ children }: { children: ReactNode }) {

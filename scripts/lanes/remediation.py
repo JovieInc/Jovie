@@ -14,9 +14,13 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import time
 from datetime import datetime, timezone
 
 import machine_gap
+from fix_red_source_edits import GENERATED_RESOLVERS
+import model_pools
+import revert_first
 
 SCHEMA = "jovie.remediation-event/v1"
 CLASSES = (
@@ -58,14 +62,10 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
-# Conflicts confined to machine-derived files resolve without a model: take main's copy,
-# run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
-# extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output.
-GENERATED_RESOLVERS = {
-    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
-    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
-}
+# Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
+# conflict is never a model's call.
+UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
+RESOLVABLE_CONFLICT_FILES = frozenset(GENERATED_RESOLVERS) | UNION_MERGE_FILES
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
 DIFF_POLICY = frozenset({"secret-file"})
@@ -79,7 +79,7 @@ RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
     r"runner has (?:been )?lost|The runner has received a shutdown|ETIMEDOUT|i/o timeout|"
-    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b5\d\d\b",
+    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b(?:HTTP(?:/\d(?:\.\d)?)?(?:[ \t]*Error)?[ \t:]+|(?:status|response)(?:[ _-]?code)?[ \t:=]+|requested URL returned error:[ \t]*)5\d\d\b",
     re.IGNORECASE,
 )
 STRATEGY_TEXT = re.compile(
@@ -131,6 +131,45 @@ _CREDENTIAL_ASSURANCE = re.compile(
     r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
+# An absent secret disabling delivery describes a runtime boundary, not an ask
+# to supply it. Require both the non-action and the missing-input condition.
+_CREDENTIAL_AVAILABILITY = re.compile(
+    r"\b(?:skips?|(?:is|are)\s+skipped|(?:is|are|remains?)\s+disabled)\s+"
+    r"(?:when|if)\s+(?:the\s+)?(?P<credential>credentials?)"
+    r"(?:\s+or\s+(?:the\s+)?(?:route|endpoint))?\s+(?:is|are)\s+"
+    r"(?:absent|missing|unavailable|not\s+configured)"
+    r"(?=\s*(?:$|[,;.!?]|(?:and|but)\b))",
+    re.IGNORECASE,
+)
+# Keep the noun when a request could refer back to it ("rotate them"), even
+# across title/body or sentence boundaries. This conservative veto applies only
+# to the new availability assurance; independent credential mentions stay input.
+_CREDENTIAL_AVAILABILITY_REQUEST = re.compile(
+    r"\b(?:please|rotat(?:e[sd]?|ing|ion)|grant(?:s|ed|ing)?|approv(?:e[sd]?|ing|al))\b"
+    r"|\b(?:creat(?:e[sd]?|ing)|generat(?:e[sd]?|ing)|issu(?:e[sd]?|ing)|"
+    r"elevat(?:e[sd]?|ing)|expand(?:s|ed|ing)?|increas(?:e[sd]?|ing)|add(?:s|ed|ing)?|"
+    r"enabl(?:e[sd]?|ing)|install(?:s|ed|ing)?|set(?:s|ting)?|stor(?:e[sd]?|ing)|"
+    r"writ(?:e[sd]?|ing)|chang(?:e[sd]?|ing)|updat(?:e[sd]?|ing)|replac(?:e[sd]?|ing)|"
+    r"authori[sz](?:e[sd]?|ing))\b[^.!?;,\n]*\b(?:it|them|these|those|their|its|access|permissions?|scopes?)\b",
+    re.IGNORECASE,
+)
+# URL validation rejects embedded authentication; it does not request access to
+# a provider credential. Recognize only a URL-property rejection list, and only
+# remove its credential item. A following rotation/copy request stays visible.
+_URL_CREDENTIAL_REJECTION = re.compile(
+    r"\b(?:reject(?:s|ed|ing)?|block(?:s|ed|ing)?|disallow(?:s|ed|ing)?)\s+"
+    r"(?:(?:(?:unsupported|unapproved)\s+hosts?|https?|non-?default\s+ports?)\s*,\s*)+"
+    r"(?P<credential>credentials?)"
+    r"(?=\s*(?:$|[,;]|and\s+non-?default\s+ports?\b))",
+    re.IGNORECASE,
+)
+# PRs document an already-made design choice under this evidence heading. The
+# heading alone is not a founder ask; every word in the section remains input,
+# as do headings such as "Taste approval needed" and all protected paths.
+_TASTE_EVIDENCE_HEADING = re.compile(
+    r"^(#{1,6}[ \t]+)taste(?=[ \t]*(?:\(risk[ \t]+x[ \t]+confidence\)[ \t]*)?#*[ \t]*\r?$)",
+    re.IGNORECASE | re.MULTILINE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -170,10 +209,6 @@ def escalation_enabled() -> bool:
 
 def notify_tim() -> bool:
     return _flag("LANES_ESCALATION_NOTIFY_TIM", False)
-
-
-def lift_human_holds() -> bool:
-    return _flag("LANES_ESCALATION_LIFT_HUMAN_HOLDS", False)
 
 
 def per_head_cap() -> int:
@@ -265,8 +300,9 @@ def _actionable(text: str) -> bool:
     return bool(text and ACTIONABLE_FIX.search(text))
 
 
-def _strip_negated_policy(text: str) -> str:
+def _strip_negated_policy(text: str, *, allow_availability: bool) -> str:
     """Remove assurance-only credential mentions, one sentence at a time."""
+    text = _TASTE_EVIDENCE_HEADING.sub(r"\1", text)
     pieces = re.split(r"([.!\n])", text)
     stripped = []
     for index, piece in enumerate(pieces):
@@ -278,6 +314,11 @@ def _strip_negated_policy(text: str) -> str:
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
         piece = _CREDENTIAL_ASSURANCE.sub(
             lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
+        if allow_availability:
+            piece = _CREDENTIAL_AVAILABILITY.sub(
+                lambda match: match[0].replace(match["credential"], "", 1), piece)
+        piece = _URL_CREDENTIAL_REJECTION.sub(
+            lambda match: match[0][:match.start("credential") - match.start()], piece)
         stripped.append(piece)
     return "".join(stripped)
 
@@ -296,8 +337,10 @@ def _strategy(pr: dict) -> bool:
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
-    return any(STRATEGY_TEXT.search(_strip_negated_policy(text))
-               for text in (pr.get("title") or "", pr.get("body") or ""))
+    texts = (pr.get("title") or "", pr.get("body") or "")
+    allow_availability = not _CREDENTIAL_AVAILABILITY_REQUEST.search("\n".join(texts))
+    return any(STRATEGY_TEXT.search(_strip_negated_policy(text, allow_availability=allow_availability))
+               for text in texts)
 
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:
@@ -349,9 +392,54 @@ def review_authority_ask(pr: dict) -> str | None:
     return None
 
 
+DECISION_DEADLINE_S = 48 * 3600
+
+
+def decision_ask_evidence(pr: dict, held: dict | None = None) -> list[str]:
+    """Why a PR carries a reserved decision (strategy/pricing/credential/taste, retired
+    needs-human, sensitive surface, human review that asks for authority). EVENT 2026-10-28:
+    this is an ask for an Ovie card, never a reason to park or hold the PR."""
+    labels = _labels(pr)
+    why = []
+    if _strategy(pr):
+        why.append("strategy/pricing/credential/taste content")
+    if "needs-human" in labels:
+        why.append("needs-human label (retired; does not pause)")
+    if _held_reason(pr, held) in DIFF_POLICY:
+        why.append(_held_reason(pr, held))
+    if "sensitive-surface" in labels or pr.get("sensitiveSurface"):
+        why.append("sensitive-surface")
+    if ask := review_authority_ask(pr):
+        why.append(f"review evidence carries a {ask} decision")
+    return why
+
+
+def decision_card(pr: dict, classified: dict, now: float | None = None) -> dict:
+    """A non-blocking Ovie decision card payload (docs/operations/DECISION_DEFAULT_CONTRACT.md).
+    The default ships if Tim is silent; spend and outbound asks default to no action."""
+    evidence = list(classified.get("decisionAsk") or classified.get("evidence") or [])
+    text = " ".join(evidence).lower()
+    reserved = bool(re.search(r"credential|spend|billing|legal|outbound|price|pricing", text))
+    at = time.time() if now is None else now
+    return {"schema": "jovie.lanes-decision-ask/v1", "pr": pr.get("number"), "head": pr.get("headRefOid"),
+            "evidence": evidence[:6], "blocking": False,
+            "defaultDecision": "reject" if reserved else "approve",
+            "defaultIfSilent": ("no action: the change ships disabled behind its flag" if reserved
+                                else "the change ships behind its flag as written; feedback arrives as a follow-up"),
+            "decideBy": at + DECISION_DEADLINE_S}
+
+
 def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
                      main_rollup=None) -> dict:
-    """One blocker class from the reconcile fields the lanes already read."""
+    """One blocker class from the reconcile fields the lanes already read. A reserved
+    decision rides along as `decisionAsk` evidence; it never changes the class."""
+    classified = _classify_blocker(pr, held, attempts, main_rollup)
+    ask = decision_ask_evidence(pr, held)
+    return {**classified, "decisionAsk": ask} if ask else classified
+
+
+def _classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
+                      main_rollup=None) -> dict:
     attempts = attempts or {}
     labels = _labels(pr)
     evidence: list[str] = []
@@ -365,21 +453,12 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     if obsolete:
         return blocker("obsolete", None, [obsolete], "surface-only")
 
-    if _strategy(pr) or "needs-human" in labels or reason in DIFF_POLICY \
-            or "sensitive-surface" in labels or pr.get("sensitiveSurface"):
-        why = []
-        if _strategy(pr):
-            why.append("strategy/pricing/credential/taste content")
-        if "needs-human" in labels:
-            why.append("needs-human label")
-        if reason in DIFF_POLICY:
-            why.append(reason)
-        if "sensitive-surface" in labels or pr.get("sensitiveSurface"):
-            why.append("sensitive-surface")
-        return blocker("needs-human-decision", reason or "human-gate", why, "tim-decides")
+    if reason in DIFF_POLICY:
+        # A machine security gate (a secret-like file in the diff), not a human gate: it stays
+        # blocking and terminal-surfaces once; nothing is labeled and no human is asked to hold.
+        return blocker("needs-human-decision", reason, [reason], "surface-only")
 
-    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
-    stop_labels = bool(labels & {"needs-human", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+    held_here = bool(labels & {"hold", "gated", "incident"})
     human_review = pr.get("reviewDecision") == "CHANGES_REQUESTED" and (
         bool(human_threads) or not bot_threads)
     # A current human thread can carry a real founder decision (spend, billing,
@@ -388,25 +467,21 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # tim-decides instead of being routed as prescribed implementation.
     thread_ask = review_authority_ask(pr)
     if thread_ask:
+        # A reserved decision (spend, credentials, legal, outbound, price): the agent must not act
+        # on it, so the repair surfaces once as a non-blocking Ovie ask. Nothing is labeled or held.
         return blocker("needs-human-decision", "changes-requested",
                        ["current human review requires authority",
                         f"review evidence carries a {thread_ask} decision"],
-                       "tim-decides")
-
-    if held_here and not _actionable(note):
-        return blocker("needs-human-decision", "hold",
-                       [note[:240] or "human hold without a fix"], "tim-decides")
-    if pr.get("codeownersBlocked") or "codeowners" in labels:
-        return blocker("needs-human-decision", "codeowners",
-                       ["missing required human approval"], "tim-decides")
+                       "ovie-card")
+    # A bare machine hold with no fix and a CODEOWNERS block are not human gates: the hold
+    # contract releases the first by receipt, and review is a machine (LLM) gate, not a label.
 
     # GitHub computes mergeability asynchronously. UNKNOWN is missing evidence,
     # not a failed repair or a human decision; the next pass reads it again.
     if merge == "UNKNOWN":
         return blocker("ready", "awaiting", ["mergeStateStatus=UNKNOWN"], "wait")
 
-    if human_review and not held_here and not stop_labels and not thread_ask \
-            and not (pr.get("codeownersBlocked") or "codeowners" in labels):
+    if human_review and not held_here and not thread_ask:
         # Tim 2026-10-15: ordinary requested changes ship through the automated
         # review-fix ladder; only a human gate (strategy/taste/credential) waits.
         # The fix prompt already embeds the reviewers' own words (review_excerpt),
@@ -485,13 +560,13 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
 
     if pr.get("isDraft") and _green(pr):
         return blocker("ready", "draft", ["lane draft is green"], "ready-green")
-    return blocker("needs-human-decision", "unclassified", ["no autonomous rung matched"], "tim-decides")
+    return blocker("ready", "awaiting", ["no autonomous rung matched; waiting on the next event"], "wait")
 
 
 def classify_event(event: dict) -> dict:
     """Same classes as classify_blocker, plus main-red when main itself is the failure."""
     if not isinstance(event, dict):
-        return blocker("needs-human-decision", "malformed", ["event was not an object"], "tim-decides")
+        return blocker("obsolete", "malformed", ["event was not an object"], "surface-only")
     source = event.get("source")
     if source == "pr" or event.get("pr"):
         pr = event.get("pr") if isinstance(event.get("pr"), dict) else event.get("subject") or {}
@@ -503,9 +578,8 @@ def classify_event(event: dict) -> dict:
     excerpt = str(evidence.get("excerpt") or "")
     if source in {"main-ci", "schedule", "golden-path"} and (
             event.get("main_red") or INFRA_TEXT.search(excerpt)):
-        cls = "main-red" if event.get("main_red") or source == "main-ci" else "flaky-infra"
-        if event.get("main_red") or source == "main-ci":
-            return blocker("main-red", "main-red", [excerpt[:240] or source], "wait")
+        if event.get("main_red") or source == "main-ci":  # a named culprit commit is reverted, not waited on
+            return blocker("main-red", *revert_first.main_red_rung(event.get("culprit"), [excerpt[:240] or source]))
         return blocker("flaky-infra", source, [excerpt[:240] or source], "rerun")
     if source == "deploy":
         return blocker("fixable-by-model", "deploy", [excerpt[:240] or "deploy failure"], "route")
@@ -515,8 +589,7 @@ def classify_event(event: dict) -> dict:
 
 
 def _indexed(providers: dict, *, remote: bool = False) -> list[tuple[int, int, str, dict]]:
-    """Lanes by tier. Remote-only lanes (`repairs: false`, Hyperagent) cannot continue a local
-    worktree or repair a checkout, so handoff and escalation never see them unless asked."""
+    """Lanes by tier; local handoff/escalation exclude remote-only (`repairs: false`) lanes."""
     rows = []
     for index, (name, spec) in enumerate(providers.items()):
         if not isinstance(spec, dict) or (not remote and spec.get("repairs") is False):
@@ -537,7 +610,8 @@ def route_lane(providers: dict, *, exclude: set[str] | None = None, healthy=None
     cooled = cooled or set()
     healthy = healthy or (lambda name, spec: True)
     for tier, index, name, spec in _indexed(providers):
-        if name in exclude or name in cooled or not spec.get("enabled", True):
+        if (model_pools.lane_assignment_reason(spec) or name in exclude or name in cooled
+                or not spec.get("enabled", True)):
             continue
         if not healthy(name, spec):
             continue
@@ -569,7 +643,8 @@ def select_escalation_lane(providers: dict, attempted: set[str], *, healthy=None
     tiers = {}
     for tier, index, name, spec in _indexed(providers):
         tiers[name] = tier
-        if not spec.get("enabled", True) or name in cooled or not healthy(name, spec):
+        if (model_pools.lane_assignment_reason(spec) or not spec.get("enabled", True)
+                or name in cooled or not healthy(name, spec)):
             continue
         catalog.append({"lane": name, "spec": spec, "tier": tier, "index": index})
     if not catalog:
@@ -630,7 +705,7 @@ def issue_routes(providers: dict) -> list[dict]:
     """Every enabled (lane, model) route with its capability and base cost."""
     rows = []
     for tier, index, name, spec in _indexed(providers, remote=True):
-        if not spec.get("enabled", True):
+        if model_pools.lane_assignment_reason(spec) or not spec.get("enabled", True):
             continue
         for order, route in enumerate(spec.get("routes") or ()):
             if not isinstance(route, dict) or not route.get("model"):
@@ -657,17 +732,14 @@ def explicit_lane(labels, providers: dict) -> dict | None:
 
 
 def route_issue(issue: dict, providers: dict, policy: dict, availability, *, only_lanes=None) -> dict:
-    """Pure routing decision; `availability(lane, route)` returns {ok, why, pressure}.
-
-    Candidates are routes at or above the floor, cheapest effective cost first (ties: tier,
-    then list order). An explicit lane narrows the candidates to that lane when it can clear
-    the floor; otherwise it is ignored and the receipt says so. `only_lanes` is the guarded
-    sensitive-surface restriction. The first available candidate is chosen; none -> held.
-    """
+    """Cheapest eligible available route above the floor, else held; labels pin eligible routes.
+    availability returns {ok, why, pressure}; only_lanes restricts sensitive work; ties use tier/order."""
     labels = issue.get("labels") or []
     need = required_capability(issue.get("title", ""), issue.get("description", ""), labels, policy)
     floor = capability_rank(need["capability"])
     routes = issue_routes(providers)
+    assignment_rejected = [{"lane": name, "why": reason} for name, spec in providers.items() if isinstance(spec, dict)
+                           and (reason := model_pools.lane_assignment_reason(spec))]
     if only_lanes is not None:
         routes = [row for row in routes if row["lane"] in only_lanes]
     qualified = [row for row in routes if capability_rank(row["capability"]) >= floor]
@@ -680,7 +752,9 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
             qualified = pinned
             notes.append(f"explicit:{explicit['via']}")
         else:
-            notes.append(f"explicit-below-floor-or-disabled:{explicit['via']}")
+            why = ("explicit-assignment-ineligible" if model_pools.lane_assignment_reason(providers[explicit["lane"]])
+                   else "explicit-below-floor-or-disabled")
+            notes.append(f"{why}:{explicit['via']}")
     candidates = []
     for row in qualified:
         seen = availability(row["lane"], row) or {}
@@ -707,7 +781,7 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
         if rejected:
             rationale += "; below floor: " + ", ".join(sorted({f"{row['lane']}/{row['model']}" for row in rejected}))
     return {"schema": ROUTING_SCHEMA, "issue": issue.get("identifier"), "required": need["capability"],
-            "reasons": need["reasons"], "notes": notes,
+            "reasons": need["reasons"], "notes": notes, "assignmentRejected": assignment_rejected,
             "chosen": None if chosen is None else {key: chosen[key] for key in
                                                    ("lane", "model", "alias", "capability", "costClass",
                                                     "cost", "pressure", "paceAdjust", "effectiveCost")},
@@ -787,7 +861,7 @@ def plan_ladder(classified: dict, record: dict, providers: dict, now: float, hea
     if cls in {"obsolete", "needs-human-decision"}:
         return {"action": "surface", "reason": cls, "cls": cls}
     if cls == "main-red" or subtype == "main-red":
-        return {"action": "wait", "reason": "main-red", "cls": "main-red"}
+        return revert_first.ladder_rung(subtype)
     if cls == "ready":
         if subtype == "awaiting":
             return {"action": "wait", "reason": "awaiting", "cls": cls}
@@ -875,7 +949,7 @@ def surface_body(pr: dict, classified: dict, reason: str) -> str:
     subtype = f" ({classified['subtype']})" if classified.get("subtype") else ""
     return (f"🤖 lanes: `{classified['cls']}`{subtype} — {reason}.\n"
             f"Evidence: {evidence}.\n"
-            f"Decision needed: {decision}.\n"
+            f"Decision: {decision}. Non-blocking: nothing waits on this; a default ships if unanswered.\n"
             + surface_marker(pr.get("number"), pr.get("headRefOid") or ""))
 
 

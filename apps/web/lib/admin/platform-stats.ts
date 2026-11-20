@@ -3,6 +3,7 @@ import 'server-only';
 import { and, count, sql as drizzleSql, eq, isNotNull, ne } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 
+import { notInternalProfileSql } from '@/lib/accounts/internal-account';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
@@ -81,6 +82,7 @@ const getCachedAdminPlatformStats = unstable_cache(
         .where(
           and(
             eq(creatorProfiles.isClaimed, true),
+            notInternalProfileSql(creatorProfiles.id),
             isNotNull(discogReleases.label),
             ne(discogReleases.label, '')
           )
@@ -95,6 +97,7 @@ const getCachedAdminPlatformStats = unstable_cache(
         .where(
           and(
             eq(creatorProfiles.isClaimed, true),
+            notInternalProfileSql(creatorProfiles.id),
             isNotNull(discogReleases.distributor),
             ne(discogReleases.distributor, '')
           )
@@ -102,23 +105,34 @@ const getCachedAdminPlatformStats = unstable_cache(
       db.execute(drizzleSql<{ count: number }>`
           SELECT count(DISTINCT COALESCE(NULLIF(fingerprint, ''), lower(email), phone, id::text))::int AS count
           FROM audience_members
+          WHERE ${notInternalProfileSql(drizzleSql.raw('creator_profile_id'))}
         `),
       db
         .select({ count: count() })
         .from(clickEvents)
         .where(
-          and(eq(clickEvents.linkType, 'listen'), eq(clickEvents.isBot, false))
+          and(
+            eq(clickEvents.linkType, 'listen'),
+            eq(clickEvents.isBot, false),
+            notInternalProfileSql(drizzleSql.raw('creator_profile_id'))
+          )
         ),
       db.execute(drizzleSql<{ email_count: number; phone_count: number }>`
           SELECT
             count(DISTINCT lower(email)) FILTER (WHERE email IS NOT NULL AND email <> '')::int AS email_count,
             count(DISTINCT phone) FILTER (WHERE phone IS NOT NULL AND phone <> '')::int AS phone_count
           FROM notification_subscriptions
+          WHERE ${notInternalProfileSql(drizzleSql.raw('creator_profile_id'))}
         `),
       db
         .select({ count: count() })
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.isClaimed, true)),
+        .where(
+          and(
+            eq(creatorProfiles.isClaimed, true),
+            notInternalProfileSql(creatorProfiles.id)
+          )
+        ),
       db
         .select({ count: count() })
         .from(discogReleases)
@@ -126,7 +140,12 @@ const getCachedAdminPlatformStats = unstable_cache(
           creatorProfiles,
           eq(discogReleases.creatorProfileId, creatorProfiles.id)
         )
-        .where(eq(creatorProfiles.isClaimed, true)),
+        .where(
+          and(
+            eq(creatorProfiles.isClaimed, true),
+            notInternalProfileSql(creatorProfiles.id)
+          )
+        ),
       db
         .select({ count: count() })
         .from(discogRecordings)
@@ -134,7 +153,12 @@ const getCachedAdminPlatformStats = unstable_cache(
           creatorProfiles,
           eq(discogRecordings.creatorProfileId, creatorProfiles.id)
         )
-        .where(eq(creatorProfiles.isClaimed, true)),
+        .where(
+          and(
+            eq(creatorProfiles.isClaimed, true),
+            notInternalProfileSql(creatorProfiles.id)
+          )
+        ),
     ]);
 
     const combinedValues = [

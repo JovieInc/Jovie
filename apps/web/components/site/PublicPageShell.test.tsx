@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PublicPageShell } from './PublicPageShell';
 
@@ -14,21 +14,6 @@ vi.mock('next/navigation', async importOriginal => {
   return {
     ...actual,
     usePathname: () => pathnameRef.current,
-  };
-});
-
-const footerFlagCalls = vi.hoisted(() => ({
-  values: [] as Array<boolean | undefined>,
-}));
-
-vi.mock('./MarketingFooter', async importOriginal => {
-  const actual = await importOriginal<typeof import('./MarketingFooter')>();
-  return {
-    ...actual,
-    MarketingFooter: (props: ComponentProps<typeof actual.MarketingFooter>) => {
-      footerFlagCalls.values.push(props.genericCreatorNav);
-      return <actual.MarketingFooter {...props} />;
-    },
   };
 });
 
@@ -48,6 +33,25 @@ describe('PublicPageShell', () => {
     expect(mains[0]).toContainElement(
       screen.getByTestId('marketing-section-cta')
     );
+  });
+
+  it('renders route-owned pageContract markers and footer CTA suppression regardless of pathname', () => {
+    pathnameRef.current = '/not-the-route';
+    const { container } = render(
+      <PublicPageShell
+        footerShowCta={false}
+        pageContract={MARKETING_PAGE_CONTRACTS['(home)/page.tsx']}
+      >
+        <p>route content</p>
+      </PublicPageShell>
+    );
+    pathnameRef.current = '/';
+
+    expect(container.querySelector('[data-primary-cta]')).toHaveAttribute(
+      'href',
+      MARKETING_PAGE_CONTRACTS['(home)/page.tsx'].primaryCta.href
+    );
+    expect(screen.queryByTestId('marketing-footer-cta')).toBeNull();
   });
 
   it('renders children inside main#main-content with the header offset by default', () => {
@@ -135,21 +139,21 @@ describe('PublicPageShell', () => {
     expect(main).not.toHaveClass('public-shell-main--docked');
   });
 
-  it('passes MARKETING_GENERIC_CREATOR_NAV into the marketing footer', () => {
-    footerFlagCalls.values.length = 0;
-    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
-
-    const on = render(<PublicPageShell>body</PublicPageShell>);
-    expect(footerFlagCalls.values.at(-1)).toBe(true);
-    on.unmount();
-
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
-    try {
-      render(<PublicPageShell>body</PublicPageShell>);
-      expect(footerFlagCalls.values.at(-1)).toBe(false);
-    } finally {
-      delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
-    }
+  it('passes published chrome columns into the footer', () => {
+    render(
+      <PublicPageShell
+        chrome={{
+          nav: { primary: [], customers: [] },
+          legalLinks: [{ href: '/legal/privacy', label: 'Privacy' }],
+          footerColumns: [
+            { title: 'Beta', links: [{ href: '/about', label: 'About us' }] },
+          ],
+        }}
+      >
+        body
+      </PublicPageShell>
+    );
+    expect(screen.getByRole('link', { name: 'About us' })).toBeInTheDocument();
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {
@@ -180,6 +184,31 @@ describe('PublicPageShell', () => {
     ).toHaveAttribute('href', '/start');
   });
 
+  it.each([
+    ['default frame', {}],
+    ['minimal frame', { footerVariant: 'minimal' as const, mainOffset: false }],
+  ])('has no axe violations in the %s', async (_label, props) => {
+    const { container } = render(
+      <PublicPageShell {...props}>
+        <h1>Public page content</h1>
+      </PublicPageShell>
+    );
+    expect(screen.getByRole('main')).toHaveTextContent('Public page content');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps one main landmark for a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <PublicPageShell footerVariant='minimal'>
+          <h1>محتوى الصفحة العامة</h1>
+        </PublicPageShell>
+      </div>
+    );
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    await expectNoA11yViolations(container);
+  });
+
   it('uses min-h-svh so iOS Safari chrome cannot jump the public shell', () => {
     const { container } = render(<PublicPageShell>body</PublicPageShell>);
     expect(container.firstElementChild?.className).toContain('min-h-svh');
@@ -199,5 +228,41 @@ describe('PublicPageShell', () => {
     expect(
       screen.queryByRole('link', { name: 'Skip to content' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingPageContractMarkers.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/site/MarketingPageContractMarkers.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+
+  it('drops the header primary CTA and tags the footer for the Pen diff gate', () => {
+    const { container } = render(
+      <PublicPageShell
+        footerPenSection='footer'
+        footerVariant='expanded'
+        headerCta={{ href: '/#request-invite', label: 'Request an Invite' }}
+        headerHidePrimaryCta
+        headerVariant='landing'
+      >
+        <p>route content</p>
+      </PublicPageShell>
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Request an Invite' })
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('footer[data-pen-section="footer"]')
+    ).not.toBeNull();
   });
 });

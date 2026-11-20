@@ -27,13 +27,17 @@ vi.spyOn(crypto, 'scryptSync').mockImplementation((...args: unknown[]) => {
   return originalScryptSync(...(args as Parameters<typeof crypto.scryptSync>));
 });
 
-function createTxMock(entryRows: Array<Record<string, unknown>>) {
-  const updateSet = vi.fn(() => ({
+function createTxMock(
+  entryRows: Array<Record<string, unknown>>,
+  userRows: Array<Record<string, unknown>> = []
+) {
+  const updateSet = vi.fn((_value: Record<string, unknown>) => ({
     where: vi.fn().mockResolvedValue(undefined),
   }));
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue(userRows),
         for: vi.fn(() => ({
           limit: vi.fn().mockResolvedValue(entryRows),
         })),
@@ -420,5 +424,153 @@ describe('enqueueWaitlistApprovalInviteEmail (issueWaitlistInviteToken)', () => 
     expect(updatePayload.inviteTokenExpiresAt).toEqual(
       new Date('2026-04-15T00:00:00.000Z')
     );
+  });
+});
+
+// -----------------------------------------------------------------------
+// Reserved / canary / test recipients (JOV-10187, JOV-10190)
+// -----------------------------------------------------------------------
+//
+// The send gateway refuses reserved recipients by design
+// (getEmailSendBlockReason → `reserved-test-recipient`). That refusal used to
+// surface as a thrown error from the job, so every test/canary waitlist entry
+// burned all its attempts and paged Sentry on every cron run. It must instead
+// be a terminal, non-error skip: the job completes, no retry, no Sentry error.
+
+const RESERVED_RECIPIENT_SKIP_DISPATCH = {
+  results: [
+    {
+      channel: 'email',
+      status: 'skipped',
+      provider: 'gateway',
+      detail:
+        'reserved-test-recipient: Recipient domain example.com is reserved for testing',
+    },
+  ],
+} as const;
+
+describe('processWaitlistEmailJob — reserved/canary/test recipient skip', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns a terminal skip (no throw) when the confirmation send is refused for a reserved recipient', async () => {
+    mockSendNotification.mockResolvedValue(RESERVED_RECIPIENT_SKIP_DISPATCH);
+    const { tx } = createTxMock([
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        email: 'creator@example.com',
+        fullName: 'Creator',
+        status: 'waitlisted',
+        waitlistEmailSentAt: null,
+        inviteEmailSentAt: null,
+        inviteTokenHash: null,
+        inviteTokenExpiresAt: null,
+      },
+    ]);
+
+    const result = await processWaitlistEmailJob(tx, {
+      entryId: '33333333-3333-4333-8333-333333333333',
+      type: 'waitlist_confirmation',
+    });
+
+    expect(result.status).toBe('skipped');
+    expect(result.detail).toContain('reserved-test-recipient');
+    expect(mockSendNotification).toHaveBeenCalledOnce();
+  });
+
+  it('returns a terminal skip (no throw) when an approval invite send is refused for a reserved recipient', async () => {
+    mockSendNotification.mockResolvedValue(RESERVED_RECIPIENT_SKIP_DISPATCH);
+    const inviteToken = 'reserved-recipient-token-enough-entropy-32ch';
+    const { tx, updateSet } = createTxMock([
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        email: 'creator@example.com',
+        fullName: 'Creator',
+        status: 'invited',
+        waitlistEmailSentAt: null,
+        inviteEmailSentAt: null,
+        inviteTokenHash: hashWaitlistInviteToken(inviteToken),
+        inviteTokenExpiresAt: new Date(Date.now() + 60_000),
+      },
+    ]);
+
+    const result = await processWaitlistEmailJob(
+      tx,
+      {
+        entryId: '33333333-3333-4333-8333-333333333333',
+        type: 'approval_invite',
+        encryptedInviteToken: encryptPII(inviteToken) ?? '',
+      },
+      { jobId: 'job-reserved-1' }
+    );
+
+    expect(result.status).toBe('skipped');
+    expect(result.detail).toContain('reserved-test-recipient');
+    // The queued invite token is still scrubbed after the terminal skip.
+    expect(updateSet).toHaveBeenCalledWith({
+      payload: {
+        entryId: '33333333-3333-4333-8333-333333333333',
+        type: 'approval_invite',
+        force: false,
+      },
+      updatedAt: expect.any(Date),
+    });
+  });
+
+  it('returns a terminal skip (no throw) when the welcome send is refused for a reserved recipient', async () => {
+    mockSendNotification.mockResolvedValue(RESERVED_RECIPIENT_SKIP_DISPATCH);
+    const { tx, updateSet } = createTxMock(
+      [
+        {
+          id: '44444444-4444-4444-8444-444444444444',
+          email: 'founder-canary@example.com',
+          fullName: 'Canary',
+          status: 'signed_up',
+          waitlistEmailSentAt: null,
+          inviteEmailSentAt: null,
+          inviteTokenHash: null,
+          inviteTokenExpiresAt: null,
+        },
+      ],
+      [{ id: 'user-reserved-welcome', founderWelcomeSentAt: null }]
+    );
+
+    const result = await processWaitlistEmailJob(tx, {
+      entryId: '44444444-4444-4444-8444-444444444444',
+      type: 'welcome',
+    });
+
+    expect(result.status).toBe('skipped');
+    expect(result.detail).toContain('reserved-test-recipient');
+    const welcomeFailedWrites = updateSet.mock.calls.filter(([value]) =>
+      Object.hasOwn(value as object, 'welcomeFailedAt')
+    );
+    expect(welcomeFailedWrites).toHaveLength(0);
+  });
+
+  it('still throws for a non-reserved failure so real send errors stay visible', async () => {
+    mockSendNotification.mockResolvedValue({
+      results: [{ channel: 'email', status: 'error', error: 'Resend is down' }],
+    });
+    const { tx } = createTxMock([
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        email: 'creator@realdomain.com',
+        fullName: 'Creator',
+        status: 'waitlisted',
+        waitlistEmailSentAt: null,
+        inviteEmailSentAt: null,
+        inviteTokenHash: null,
+        inviteTokenExpiresAt: null,
+      },
+    ]);
+
+    await expect(
+      processWaitlistEmailJob(tx, {
+        entryId: '33333333-3333-4333-8333-333333333333',
+        type: 'waitlist_confirmation',
+      })
+    ).rejects.toThrow('Resend is down');
   });
 });

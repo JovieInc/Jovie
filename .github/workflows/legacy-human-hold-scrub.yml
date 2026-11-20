@@ -5,31 +5,40 @@ name: Legacy Human Hold Scrub
 # removal-trigger: Delete this scrub hop after repository label deletion and 30 consecutive days with no attempted legacy-label application.
 
 # JOV-INV-028: retired human-hold labels are removed at the PR boundary.
+# EVENT 2026-10-28: tim-hold, tim:hold, hold:tim and do-not-merge join the retired set
+# (nothing in the shipping machinery waits on a human).
 # Human taste feedback is collected before a PR opens or after landing behind
 # a feature flag. These retired labels must never pause automated remediation,
 # admission, or landing. The event path deletes the repository label itself, so
 # it detaches from every PR and issue at once; the manual sweep reconciles any
-# label applied while this workflow was unavailable. No clock (JOV-INV-042):
-# the */5 sweep removed nothing in its last runs because the labels no longer
-# exist, and re-creating one fires the labeled event above.
+# label applied while this workflow was unavailable. No clock (JOV-INV-042).
+# A retired label can only sit on a PR or issue while the repository label
+# exists, so the label's own created/edited event is the boundary: the run
+# deletes it before anything can wait on it. The former per-application
+# trigger (every PR and issue `labeled` event) started ~645 runs a week, all
+# but a handful skipped (2026-11-11 audit). The sweep also runs on the main
+# push that changes this file, so a label already in the repository when the
+# retired set grows (tim-hold and do-not-merge after 2026-10-28) is deleted
+# without a manual dispatch.
 on:
-  pull_request_target:
-    types: [labeled]
-  issues:
-    types: [labeled]
+  label:
+    types: [created, edited]
+  push:
+    branches: [main]
+    paths: [.github/workflows/legacy-human-hold-scrub.yml]
   workflow_dispatch: {}
 
 permissions: {}
 
 concurrency:
-  group: legacy-human-hold-scrub-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  group: legacy-human-hold-scrub-${{ github.event.label.name || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   scrub-event:
-    name: Delete newly applied retired label
+    name: Delete a newly created retired label
     if: >-
-      (github.event_name == 'pull_request_target' || github.event_name == 'issues') &&
+      github.event_name == 'label' &&
       (
         github.event.label.name == 'needs-human' ||
         github.event.label.name == 'needs-human-review' ||
@@ -38,7 +47,11 @@ jobs:
         github.event.label.name == 'human-review-required' ||
         github.event.label.name == 'no-auto' ||
         github.event.label.name == 'no-auto-merge' ||
-        github.event.label.name == 'no-automerge'
+        github.event.label.name == 'no-automerge' ||
+        github.event.label.name == 'tim-hold' ||
+        github.event.label.name == 'tim:hold' ||
+        github.event.label.name == 'hold:tim' ||
+        github.event.label.name == 'do-not-merge'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -56,7 +69,7 @@ jobs:
 
   sweep:
     name: Reconcile all open pull requests
-    if: github.event_name == 'workflow_dispatch'
+    if: contains(fromJSON('["workflow_dispatch","push"]'), github.event_name)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -74,7 +87,7 @@ jobs:
             --json number,labels \
             --jq '.[] | [.number, ([.labels[].name] | join(","))] | @tsv' |
           while IFS=$'\t' read -r pr labels; do
-            for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge; do
+            for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge tim-hold tim:hold hold:tim do-not-merge; do
               case ",$labels," in
                 *",$label,"*) gh pr edit "$pr" --repo "$GH_REPO" --remove-label "$label" ;;
               esac
@@ -87,6 +100,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge; do
+          for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge tim-hold tim:hold hold:tim do-not-merge; do
             gh api --method DELETE "repos/$GH_REPO/labels/$label" 2>/dev/null || true
           done

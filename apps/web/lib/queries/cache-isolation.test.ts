@@ -217,3 +217,59 @@ describe('JOV-6186 cache isolation', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe('trusted bootstrap session hydration', () => {
+  beforeEach(() => resetCacheIsolationForTests());
+  afterEach(() => resetCacheIsolationForTests());
+
+  it('consumes only the initial trusted same-user session marker without a fence', () => {
+    applyCacheScope({
+      userId: 'a',
+      sessionId: null,
+      ready: true,
+      bootstrapSessionPending: true,
+    });
+    expect(
+      applyCacheScope({ sessionId: 'first', bootstrapSessionPending: false })
+    ).toBeNull();
+    expect(getCacheScope().bootstrapSessionPending).toBe(false);
+    expect(getCacheGeneration()).toBe(0);
+    expect(applyCacheScope({ sessionId: 'second' })?.reason).toBe(
+      'account-change'
+    );
+  });
+
+  it('does not exempt an unmarked null-session transition or allow a later marker to re-arm it', () => {
+    applyCacheScope({ userId: 'a', sessionId: null, ready: true });
+    applyCacheScope({ bootstrapSessionPending: true });
+    expect(getCacheScope().bootstrapSessionPending).toBe(false);
+    expect(applyCacheScope({ sessionId: 'first' })?.reason).toBe(
+      'account-change'
+    );
+  });
+
+  it.each([
+    ['account-change', { userId: 'b' }],
+    ['sign-out', { userId: null }],
+    ['profile-switch', { profileId: 'profile-b' }],
+    ['impersonation', { impersonationSubject: 'subject-b' }],
+  ] as const)(
+    'preserves %s while the initial session is pending',
+    (reason, patch) => {
+      applyCacheScope({
+        userId: 'a',
+        sessionId: null,
+        profileId: 'profile-a',
+        ready: true,
+        bootstrapSessionPending: true,
+      });
+      expect(
+        applyCacheScope({
+          ...patch,
+          sessionId: reason === 'sign-out' ? null : 'first',
+        })?.reason
+      ).toBe(reason);
+      expect(getCacheScope().bootstrapSessionPending).toBe(false);
+    }
+  );
+});

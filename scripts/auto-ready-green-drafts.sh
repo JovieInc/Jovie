@@ -7,7 +7,8 @@
 #
 # This controller never enables native auto-merge and never enrolls the merge
 # queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
-# All wakes require persisted exact-head, author-owned proof.
+# All wakes require the author's ship intent: trusted writers ship on green
+# unless parked; any other author needs exact-head, author-owned proof.
 #
 # Never mutates HOLD #17156. Tim/machine hold labels (GREEN_SOURCE_HOLD_LABELS)
 # cover other open holds — do not keep merged/closed PR numbers here.
@@ -53,7 +54,7 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{__typename login} state mergeable mergeStateStatus reviewDecision labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -63,12 +64,19 @@ read_state() {  # read_state <num>
       branch: .headRefName,
       base: .baseRefName,
       body: (.body // ""),
-      authorLogin: .author.login,
+      # GraphQL Bot.login omits the REST suffix; User identities stay literal.
+      authorLogin: (
+        .author as $author
+        | if $author.__typename == "Bot" and ($author.login | type) == "string"
+          then ($author.login | if (test("\\S") | not) or (ascii_downcase | endswith("[bot]")) then . else . + "[bot]" end)
+          else $author.login end
+      ),
       title: (.title // ""),
       labels: [.labels.nodes[].name],
       state: .state,
       mergeable: .mergeable,
       mergeStateStatus: .mergeStateStatus,
+      reviewDecision: (.reviewDecision // ""),
       # Converted to draft after the last push: a deliberate park.
       parkedDraft: (
         ([.timelineItems.nodes[]? | select(.__typename == "ConvertToDraftEvent") | .createdAt] | max) as $parked
@@ -115,6 +123,7 @@ classify_live() {  # classify_live <num> <json> <checks-json> [expected-head]
       expectedHeadSha: $expectedHead,
       mergeable: $state.mergeable,
       mergeStateStatus: $state.mergeStateStatus,
+      reviewDecision: ($state.reviewDecision // ""),
       parkedDraft: ($state.parkedDraft == true),
       labels: $state.labels,
       title: $state.title,
@@ -230,7 +239,8 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
   merge_after="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after")"
   held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
-  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
+  review_after="$(jq -r '.reviewDecision // ""' <<<"$after")"
+  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber, greenSource: true}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
 
   if [[ "$state_after" != "OPEN" ]]; then
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
@@ -239,7 +249,7 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   # Mergeability was proven on this exact head before mutation. Leaving draft
   # wakes new (often advisory) checks, so a transient BLOCKED/UNSTABLE here is
   # expected and must not trigger a re-draft loop.
-  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" && "$(jq -r '.eligible' <<<"$proof_after")" == "true" ]]; then
+  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" && "$review_after" != "CHANGES_REQUESTED" && "$(jq -r '.eligible' <<<"$proof_after")" == "true" ]]; then
     echo "    ✓ marked #$n ready; Auto-Enroll owns queue admission"
     upsert_status_comment "$n" "🤖 Auto-ready green-source: marked ready after PR Ready + required checks SUCCESS and mergeable CLEAN. Auto-Enroll / jovie-bot own queue admission. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
@@ -251,6 +261,10 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   fi
   upsert_status_comment "$n" "⚠️ Auto-ready green-source: verification failed (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, merge=\`${merge_after}\`), so the PR was restored to draft. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
   return 1
+}
+
+lower() {  # bash 3.2 has no ${var,,}; tr is portable
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 read_missed_snapshot() {
@@ -265,7 +279,7 @@ read_missed_snapshot() {
     [[ -n "$cursor" ]] && cursor_args=(-f endCursor="$cursor")
     page="$(gh_retry api graphql \
       -f query='query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:20,after:$endCursor,states:OPEN,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number isDraft title headRefName baseRefName mergeable mergeStateStatus labels(first:100){nodes{name}}} pageInfo{hasNextPage endCursor}}}}' \
-      -f owner="$owner" -f name="$name" "${cursor_args[@]}" \
+      -f owner="$owner" -f name="$name" ${cursor_args[@]+"${cursor_args[@]}"} \
       --jq '.data.repository.pullRequests')" || return 1
     snapshot="$(jq -c --argjson page "$page" '. + [$page.nodes[] | .labels = .labels.nodes]' <<<"$snapshot")" || return 1
     if [[ "$(jq -r '.pageInfo.hasNextPage' <<<"$page")" != "true" ]]; then
@@ -325,7 +339,7 @@ if [[ -n "$TARGET_PR" ]]; then
   fi
   echo "  event target #$TARGET_PR"
   target_status=0
-  undraft_if_eligible "$TARGET_PR" "${TARGET_HEAD,,}" || target_status=$?
+  undraft_if_eligible "$TARGET_PR" "$(lower "$TARGET_HEAD")" || target_status=$?
   if [[ "$target_status" -eq 2 ]]; then
     exit 2
   fi
@@ -334,11 +348,12 @@ elif [[ -n "$TARGET_HEAD" ]]; then
     echo "!! TARGET_HEAD must be a 40-character SHA"
     exit 2
   fi
-  mapfile -t matching < <(resolve_head_pr "${TARGET_HEAD,,}" || true)
+  matching=()
+  while IFS= read -r _line; do matching+=("$_line"); done < <(resolve_head_pr "$(lower "$TARGET_HEAD")" || true)
   if [[ "${#matching[@]}" -eq 1 ]]; then
     echo "  event head ${TARGET_HEAD:0:12} → #${matching[0]}"
     target_status=0
-    undraft_if_eligible "${matching[0]}" "${TARGET_HEAD,,}" || target_status=$?
+    undraft_if_eligible "${matching[0]}" "$(lower "$TARGET_HEAD")" || target_status=$?
     if [[ "$target_status" -eq 2 ]]; then
       exit 2
     fi
@@ -352,8 +367,9 @@ fi
 if [[ "$MISSED_COHORT" =~ ^[1-9][0-9]*$ ]]; then
   echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts (offset $RUN_OFFSET) ==="
   SNAP="$(read_missed_snapshot)"
-  mapfile -t cohort < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
-  for n in "${cohort[@]}"; do
+  cohort=()
+  while IFS= read -r _line; do cohort+=("$_line"); done < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
+  for n in ${cohort[@]+"${cohort[@]}"}; do
     [[ -z "$n" ]] && continue
     echo "  missed candidate #$n"
     missed_status=0

@@ -192,6 +192,10 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
       terminal: sourceFiles[1],
       wire: sourceFiles[4],
     },
+    // `zod` must be the pinned install, never whatever an ancestor of the
+    // archive provides: a stray ~/node_modules/zod (2026-10-26 on Gem) shadowed
+    // nodePaths and refused every update with mesh-runtime-unpinned-input.
+    alias: { zod: zodRoot },
     nodePaths: [dirname(zodRoot)],
     outdir: 'compiled-mesh',
     outExtension: { '.js': '.mjs' },

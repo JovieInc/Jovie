@@ -94,7 +94,7 @@ export function planningRisks(diff = '') {
       p =>
         p === PLANNING_POLICY ||
         p === 'canon/invariants.jsonl' ||
-        /capability-planning|internal-pr-review|rule-scopes|CODEOWNERS/.test(p)
+        /capability-planning|rule-scopes|CODEOWNERS/.test(p)
     ),
   };
 }

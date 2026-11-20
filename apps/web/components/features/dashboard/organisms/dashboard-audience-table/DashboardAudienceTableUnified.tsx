@@ -26,13 +26,13 @@ import {
   DashboardHeaderActionButton,
 } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import {
-  AnalyticsSidebar,
-  StaticAnalyticsSidebar,
-} from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
+import {
+  AnalyticsSidebar,
+  StaticAnalyticsSidebar,
+} from '@/features/dashboard/organisms/analytics-sidebar-lazy';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
@@ -75,7 +75,7 @@ import { copyTextToClipboard, downloadVCard } from './utils';
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return 'Track visitors and grow your fan base';
+    return 'Track visitors and grow your audience';
   }
   return 'Every visitor, anonymous or identified, lives in this table.';
 }

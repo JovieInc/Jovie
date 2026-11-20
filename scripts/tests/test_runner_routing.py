@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import json
 import os
 import stat
@@ -693,7 +695,7 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     query = _QUERY_SCRIPT.read_text(encoding="utf-8")
     awaiter = _AWAIT_SCRIPT.read_text(encoding="utf-8")
 
-    assert "runs-on: ubuntu-latest" in route
+    assert _HOSTED_RUNS_ON.search(route)
     assert "ref: main" in route
     assert "persist-credentials: false" in route
     assert ".github/scripts/await-runner-heartbeat.sh" in route
@@ -741,7 +743,7 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
     assert "needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]" in units
     assert "ci-unit-runner-route" not in units
-    assert "runs-on: ubuntu-latest" in units
+    assert _HOSTED_RUNS_ON.search(units)
     assert "runs-on: jovie-runner" not in units
     assert "vars.CI_UNIT_RUNNER" not in units
     assert "max-parallel: 120" in units
@@ -782,7 +784,7 @@ def test_merge_group_allocates_no_fixed_runner_probe() -> None:
 def test_observers_are_hosted_and_never_mutate_routing_or_fail_on_api_state() -> None:
     standalone = _job_block("runner-health-monitor.yml", "monitor")
     for observer in (standalone,):
-        assert "runs-on: ubuntu-latest" in observer
+        assert _HOSTED_RUNS_ON.search(observer)
         assert "actions: read" in observer
         assert "actions: write" not in observer
         assert "GH_TOKEN: ${{ github.token }}" in observer
@@ -846,3 +848,6 @@ def test_unknown_heartbeat_workflow_is_not_authorized(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert outputs["health"] == "down"
     assert outputs["evidence"] == "heartbeat workflow identity is not authorized"
+
+
+_HOSTED_RUNS_ON = re.compile(r"runs-on: ubuntu-(?:latest|24\.04)")

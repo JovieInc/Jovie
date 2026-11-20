@@ -1,9 +1,7 @@
 /**
  * Facts and one evaluation step for the Linear validation lifecycle
- * (JOV-7694). GitHub reads are read-only: the served production build, its
- * Production Verified marker, commit ancestry, merged pull requests linked to
- * an issue, and the existing CI risk classification (JOV-5937) of their
- * files. Linear writes go through a port the merge-sync writer supplies.
+ * (JOV-7694): the production build + marker, ancestry, linked merged pulls
+ * and their CI risk (JOV-5937). Linear writes go through a port.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -38,8 +36,7 @@ import {
   receiptMatchesAcceptanceEpisode,
 } from './validation-lifecycle.mjs';
 
-// Long-running issues collect many linked pull requests (JOV-7707 had more
-// than 10 on its first live run). The cap only bounds GitHub reads.
+// The cap only bounds GitHub reads (JOV-7707: long-running issues collect many).
 const MAX_LINKED_PULLS = 60;
 const MAX_FILE_PAGES = 30;
 const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
@@ -55,7 +52,14 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  *   input: string | URL | Request,
  *   init?: RequestInit,
  * ) => Promise<HttpResponse>} HttpFetch
- * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGet
+ * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGetBase
+ * @typedef {GithubGetBase & {
+ *   batchPulls?: (
+ *     repository: string,
+ *     numbers: readonly number[],
+ *     selection: string,
+ *   ) => Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string, headRef: string } | null>>,
+ * }} GithubGet
  * @typedef {{
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
@@ -77,12 +81,8 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  */
 
 /**
- * One retry for a transport failure (a thrown fetch, not an HTTP status), so a
- * dropped connection on a loaded runner does not fail the whole sweep.
- *
- * @param {HttpFetch} fetchImpl
- * @param {Parameters<HttpFetch>} args
- * @returns {Promise<HttpResponse>}
+ * One retry for a thrown fetch (not an HTTP status): a dropped connection
+ * does not fail the whole sweep.
  */
 export async function fetchWithRetry(fetchImpl, ...args) {
   try {
@@ -121,13 +121,8 @@ export function headerRetryMs(headers, now = Date.now()) {
 }
 
 /**
- * Wait only when the server named a delay inside the sweep budget. A reset
- * that is already past the cap means persist the cursor instead of sleeping.
- *
- * @param {number} retryAfterMs
- * @param {number} attempt
- * @param {number} maxAttempts
- * @returns {number | null}
+ * Wait only when the server named a delay inside the sweep budget; past
+ * the cap, null, so the caller defers instead.
  */
 export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
   if (attempt >= maxAttempts) return null;
@@ -176,13 +171,9 @@ export function githubStatusError(status, headers, body, path) {
  * @returns {GithubGet}
  */
 export function githubClient(fetchImpl, token, sleep = defaultSleep) {
-  return async path => {
-    // Bounded retry for transient GitHub upstream failures: a 503 from
-    // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
-    // run 37818346153) even though the next sweep would have converged.
-    // A primary quota 403 (remaining 0) is not retried past the sweep budget:
-    // the caller persists the cursor. A single inaccessible pull request is
-    // `forbidden` so the sweep can skip it.
+  const client = async path => {
+    // Bounded retry for transient upstream failures (JOV-5143); a quota 403
+    // is not retried past the sweep budget (the caller persists the cursor).
     const maxAttempts = 4;
     /** @type {Error | null} */
     let lastError = null;
@@ -228,6 +219,45 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
     }
     throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
+
+  // One aliased GraphQL batch via the shared api-client (JOV-12717).
+  client.batchPulls = async (repository, numbers, selection) => {
+    const { createGitHubClient, pullRequestField } = await import(
+      '../../packages/api-client/github.ts'
+    );
+    const [owner, name] = String(repository).split('/');
+    const api = createGitHubClient({
+      token,
+      fetch: /** @type {typeof fetch} */ (
+        (url, options) => fetchImpl(url, { ...options, redirect: 'error' })
+      ),
+    });
+    const rows = await api.batch(
+      numbers.map(String),
+      pullRequestField(owner, name, selection),
+      { priority: 'repair', maxWaitMs: 0 }
+    );
+    // Unwrap repository { pullRequest } } + flatten refs (JOV-12768): nested shapes drop MERGED pulls; null -> REST fallback.
+    return new Map(
+      [...rows].map(([key, value]) => {
+        const pull = value?.pullRequest;
+        return [
+          Number(key),
+          pull && {
+            state: String(pull.state ?? ''),
+            mergedAt: String(pull.mergedAt ?? ''),
+            mergeCommitSha: String(pull.mergeCommitSha ?? ''),
+            title: String(pull.title ?? ''),
+            body: String(pull.body ?? ''),
+            baseRef: String(pull.base?.ref ?? ''),
+            headRef: String(pull.head?.ref ?? ''),
+          },
+        ];
+      })
+    );
+  };
+
+  return client;
 }
 
 /** @param {number} ms */
@@ -240,6 +270,51 @@ const PULL_FILES = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)\/files\?/;
 const SHA_COMPARE =
   /^repos\/[^/]+\/[^/]+\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/i;
 export const GITHUB_CACHE_KEEP = 4000;
+const MAX_CLOSED_PULL_SNAPSHOT_PAGES = 10;
+
+/**
+ * @typedef {{ number: number, merged: boolean }} ClosedPullSnapshotEntry
+ */
+
+/**
+ * The next page's API path from a Link header (absolute URLs collapse to
+ * their path so the client does not double the origin).
+ */
+function nextApiPath(link) {
+  for (const part of String(link ?? '').split(',')) {
+    const match = /<([^>]+)>;\s*rel="next"/i.exec(part);
+    if (match) {
+      return String(match[1]).replace(/^https:\/\/api\.github\.com\//i, '');
+    }
+  }
+  return null;
+}
+
+export async function readClosedPullSnapshot(input) {
+  const maxPages = input.maxPages ?? MAX_CLOSED_PULL_SNAPSHOT_PAGES;
+  const github = githubClient(input.fetchImpl, input.token);
+  /** @type {Map<number, ClosedPullSnapshotEntry>} */
+  const snapshot = new Map();
+  let path = `repos/${input.repository}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=1`;
+  for (let page = 0; page < maxPages; page += 1) {
+    const { body, link } = await github(path);
+    if (!Array.isArray(body)) {
+      throw new Error('GitHub closed pull request snapshot was not a list');
+    }
+    for (const row of body) {
+      const number = Number(row?.number);
+      if (!Number.isInteger(number) || number <= 0) continue;
+      const merged =
+        typeof row?.merged_at === 'string' &&
+        /^[0-9a-f]{40}$/i.test(String(row?.merge_commit_sha ?? ''));
+      snapshot.set(number, { number, merged });
+    }
+    const next = nextApiPath(link);
+    if (!next) break;
+    path = next;
+  }
+  return snapshot;
+}
 
 /**
  * Reuse the release owner's complete byte/producer/attempt classifier.
@@ -279,16 +354,8 @@ export function inspectVerifiedProductionMarker({
 }
 
 /**
- * Reads that can never change, kept across sweeps (actions/cache): a merged
- * pull request, its files, and a compare between two exact commits. Every
- * sweep re-evaluates ~280 lifecycle issues at ~3-4 such reads each, so
- * sweeps that run back to back drained the repo's shared 1,000/h
- * GITHUB_TOKEN quota on 2026-10-11. Open pull requests, artifact markers and
- * the served build stay live. Only the fields the lifecycle reads are kept.
- *
- * @param {GithubGet} github
- * @param {string | undefined} dir
- * @returns {GithubGet}
+ * Immutable reads kept across sweeps (actions/cache): merged pulls, their
+ * files, SHA compares (unmerged pulls stay uncached).
  */
 export function immutableGithubCache(github, dir) {
   if (!dir) return github;
@@ -312,7 +379,7 @@ export function immutableGithubCache(github, dir) {
       // Persistence is optional; the next sweep reads live again.
     }
   };
-  return async path => {
+  const wrapped = async path => {
     const pull = MERGED_PULL.exec(path);
     const files = PULL_FILES.exec(path);
     const cacheable =
@@ -354,12 +421,16 @@ export function immutableGithubCache(github, dir) {
     }
     return result;
   };
+  // The batch capability must survive the wrapper (JOV-12768 review).
+  if (typeof github.batchPulls === 'function')
+    wrapped.batchPulls = github.batchPulls;
+  return wrapped;
 }
 
 /**
- * Keep the newest `keep` entries and return a content digest for the cache
- * save key ('' when the directory is empty or unreadable).
- * @param {string} dir
+ * Response cache for immutable reads: merged `pulls/N` bodies, their file
+ * listings and SHA compares (files of unmerged pulls stay uncached; the
+ * githubInstallationQuota bucket is not spent on repeats).
  */
 export function boundGithubCache(dir, keep = GITHUB_CACHE_KEEP) {
   try {
@@ -540,16 +611,8 @@ export function createProductionFacts(input) {
 }
 
 /**
- * Does this pull request implement the issue, rather than mention it? Linear
- * attaches every pull request whose body names an issue, so a passing
- * reference (#20371 naming JOV-7192) must not bind the issue's evidence. The
- * title, the jov-N branch, the merge-sync identifier marker, Summer's issue
- * bind, or a Linear closing keyword count; a bare mention or "Part of" does
- * not.
- *
- * @param {{ title?: string, body?: string, head?: { ref?: string } }} pull
- * @param {string} identifier
- * @returns {boolean}
+ * Does this pull implement the issue (not just mention it): identifier in
+ * title/branch, a bind marker, or a closes/fixes clause.
  */
 export function pullImplementsIssue(pull, identifier) {
   const match = /^JOV-(\d+)$/i.exec(identifier);
@@ -574,18 +637,10 @@ export function pullImplementsIssue(pull, identifier) {
 }
 
 /**
- * Merged pull requests in this repository that implement the issue, from
- * Linear's native attachments plus the merging pull request itself (whose
- * link the merge sync already proved).
- *
- * @param {{
- *   readonly github: GithubGet,
- *   readonly repository: string,
- *   readonly identifier: string,
- *   readonly attachmentUrls: readonly string[],
- *   readonly eventPull?: { number: number },
- * }} input
- * @returns {Promise<MergedPull[]>}
+ * The merged pulls in this repository that implement the issue: numbers from
+ * its attachment URLs plus the event pull, answered without per-pull reads
+ * whenever the closed snapshot, the open scan or the GraphQL batch can
+ * decide them (JOV-12717), with the per-pull REST path as the fallback.
  */
 export async function listMergedLinkedPulls(input) {
   const prefix = `https://github.com/${input.repository}/pull/`.toLowerCase();
@@ -608,15 +663,71 @@ export async function listMergedLinkedPulls(input) {
   const merged = [];
   /** @type {number[]} */
   const unreadable = [];
+  // Out-of-window numbers: one batch instead of one REST GET each (failure
+  // falls back to the per-pull REST path below, unchanged).
+  let batched = null;
+  if (typeof input.github.batchPulls === 'function') {
+    const needBatch = selected.filter(
+      number =>
+        !input.closedPulls?.get(number) && !input.openPullNumbers?.has(number)
+    );
+    try {
+      if (needBatch.length > 0)
+        batched = await input.github.batchPulls(
+          input.repository,
+          needBatch,
+          'number state mergedAt mergeCommitSha title body base { ref } head { ref }'
+        );
+    } catch {
+      batched = null;
+    }
+  }
   for (const number of selected) {
+    const closed = input.closedPulls?.get(number);
+    if (closed && !closed.merged) {
+      // Closed-unmerged can never bind and stays mutable: without this cut
+      // every sweep re-reads it (JOV-7707).
+      continue;
+    }
+    if (input.openPullNumbers?.has(number)) {
+      // The open scan is complete, so an open number cannot be merged.
+      continue;
+    }
+    const batchedPull = batched?.get(number);
+    if (batchedPull) {
+      // MERGED binds; CLOSED-unmerged/OPEN can never bind.
+      if (
+        batchedPull.state === 'MERGED' &&
+        batchedPull.mergedAt &&
+        /^[0-9a-f]{40}$/i.test(batchedPull.mergeCommitSha) &&
+        batchedPull.baseRef === 'main' &&
+        (number === input.eventPull?.number ||
+          pullImplementsIssue(
+            {
+              title: batchedPull.title,
+              body: batchedPull.body,
+              head: { ref: batchedPull.headRef },
+            },
+            input.identifier
+          ))
+      ) {
+        merged.push({
+          number,
+          url: `https://github.com/${input.repository}/pull/${number}`,
+          mergeSha: batchedPull.mergeCommitSha.toLowerCase(),
+          mergedAt: batchedPull.mergedAt,
+        });
+      }
+      continue;
+    }
     let body;
     try {
       ({ body } = await input.github(
         `repos/${input.repository}/pulls/${number}`
       ));
     } catch (error) {
-      // A permission 403 on one pull request must not fail the sweep. A rate
-      // limit still throws so the caller can persist the cursor and resume.
+      // A permission 403 on one pull must not fail the sweep; a rate limit
+      // still throws so the caller can persist the cursor and resume.
       if (/** @type {{ forbidden?: boolean }} */ (error)?.forbidden) {
         unreadable.push(number);
         continue;
@@ -791,6 +902,8 @@ export function selectStateId(name, states) {
  *   readonly assuranceMatrix: unknown,
  *   readonly linear: LinearPort,
  *   readonly eventPull?: { number: number },
+ *   readonly closedPulls?: ReadonlyMap<number, ClosedPullSnapshotEntry>,
+ *   readonly openPullNumbers?: ReadonlySet<number>,
  *   readonly dryRun?: boolean,
  *   readonly now?: () => Date,
  *   readonly log: (message: string) => void,
@@ -835,6 +948,8 @@ export async function reconcileValidation(ctx) {
     identifier: issue.identifier,
     attachmentUrls: issue.attachmentUrls,
     eventPull: ctx.eventPull,
+    closedPulls: ctx.closedPulls,
+    openPullNumbers: ctx.openPullNumbers,
   });
   const escapedDefect = evaluateEscapedDefectClosure({
     ...issue,

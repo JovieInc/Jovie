@@ -1,5 +1,7 @@
 'use client';
+// @coverage-via apps/web/components/features/demo/DemoShowcaseSurface.lazy.test.tsx
 
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -15,10 +17,10 @@ import { convertDbLinkToDetected } from '@/features/dashboard/organisms/links/ut
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
 import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep';
+import { ONBOARDING_STEPS } from '@/features/dashboard/organisms/onboarding-v2/shared/types';
 import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
 import { ShellReleasesView } from '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
-import { getDesignStudioItem } from '@/lib/design-studio/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
@@ -47,6 +49,11 @@ import { SettingsDemoHarness } from './SettingsDemoHarness';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
+
+// Studio previews pull in the full registry; other demo surfaces do not need it.
+const DemoDesignStudioShowcase = dynamic(() =>
+  import('./DemoDesignStudioShowcase').then(mod => mod.DemoDesignStudioShowcase)
+);
 
 const RELEASE_SHOWCASE_STATES = [
   'populated',
@@ -159,26 +166,6 @@ function DemoReleasesShowcaseState({
         })}
       />
     </DemoAuthShell>
-  );
-}
-
-function DemoDesignStudioShowcase({
-  itemId,
-  testId,
-}: Readonly<{
-  itemId: string;
-  testId: string;
-}>) {
-  const item = getDesignStudioItem(itemId);
-
-  if (!item) {
-    throw new Error(`Missing Design Studio item: ${itemId}`);
-  }
-
-  return (
-    <div className='min-h-screen bg-surface-1 p-4 sm:p-6' data-testid={testId}>
-      {item.preview()}
-    </div>
   );
 }
 
@@ -313,8 +300,8 @@ export function DemoShowcaseSurface({
           testId='demo-showcase-onboarding-handle'
         >
           <OnboardingHandleStep
-            title='Choose your handle'
-            prompt='This is how fans will find and remember you.'
+            title={ONBOARDING_STEPS[0].title}
+            prompt={ONBOARDING_STEPS[0].prompt}
             handleInput={handleInput}
             isHydrated
             handleValidation={
@@ -337,8 +324,8 @@ export function DemoShowcaseSurface({
       return (
         <DemoOnboardingShowcase testId='demo-showcase-onboarding-dsp'>
           <OnboardingDspStep
-            title='Connect your music'
-            prompt='Import your releases from Spotify so fans can find your music.'
+            title={ONBOARDING_STEPS[1].title}
+            prompt={ONBOARDING_STEPS[1].prompt}
             onConnected={noop}
             onSkip={noop}
             isTransitioning={false}

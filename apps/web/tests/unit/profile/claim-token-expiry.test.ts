@@ -115,11 +115,15 @@ describe('claim token expiry enforcement', () => {
       a: creatorProfiles.isClaimed,
       b: false,
     });
-    expect(condition.args).toContainEqual({
-      _type: 'eq',
-      a: creatorProfiles.isPublic,
-      b: true,
-    });
+    // Public, or a held lead-built page its artist is claiming (migration 0152).
+    expect(condition.args).toContainEqual(
+      expect.objectContaining({
+        _type: 'or',
+        args: expect.arrayContaining([
+          { _type: 'eq', a: creatorProfiles.isPublic, b: true },
+        ]),
+      })
+    );
   });
 
   it('lookupUsernameByClaimToken includes the expiry guard in its WHERE clause', async () => {

@@ -1,4 +1,12 @@
-import QRCode from 'qrcode';
+/**
+ * The `qrcode` encoder (~9 KB gzip) loads on first use instead of riding in
+ * first-load JS. Both generators were already async, so callers already wait
+ * for the result (route-js-budget.mjs, /demo/audience).
+ */
+async function loadQrCode() {
+  const { default: QRCode } = await import('qrcode');
+  return QRCode;
+}
 
 /**
  * Default QR code size for high-resolution printing (1024px).
@@ -28,6 +36,7 @@ export async function generateQrCodeDataUrl(
   url: string,
   size: number = DEFAULT_QR_SIZE
 ): Promise<string> {
+  const QRCode = await loadQrCode();
   return QRCode.toDataURL(url, {
     ...BASE_OPTIONS,
     width: size,
@@ -46,6 +55,7 @@ export async function generateQrCodeSvg(
   url: string,
   size: number = DEFAULT_QR_SIZE
 ): Promise<string> {
+  const QRCode = await loadQrCode();
   return QRCode.toString(url, {
     ...BASE_OPTIONS,
     width: size,

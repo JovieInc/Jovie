@@ -13,6 +13,7 @@ import { afterEach, test } from 'node:test';
 import {
   command,
   describeReleaseSource,
+  GH_RETRY,
   resolveStagingReleaseSource,
   runStagingReleaseSource,
 } from './staging-release-source.mjs';
@@ -409,6 +410,8 @@ test('gh evidence reads recover from transient transport failures but reject per
     ['gh', 'api', 'route'],
     {},
     {
+      // Mid-jitter (0.5 => factor 1.0) keeps the backoff curve deterministic.
+      random: () => 0.5,
       spawn: () => {
         transientCalls++;
         if (transientCalls < 3) {
@@ -443,7 +446,7 @@ test('gh evidence reads recover from transient transport failures but reject per
       ),
     /evidence transport failed: gh/
   );
-  assert.equal(exhaustedCalls, 3);
+  assert.equal(exhaustedCalls, GH_RETRY.attempts);
 
   let defaultSleepCalls = 0;
   assert.equal(
@@ -484,6 +487,50 @@ test('gh evidence reads recover from transient transport failures but reject per
     /evidence transport failed: gh/
   );
   assert.equal(permanentCalls, 1);
+});
+
+test('gh retry budget is exponential with ±25% jitter and a hard per-wait cap', () => {
+  // Upper jitter edge (random() => 1) rides the full +25% curve until the cap.
+  const upper = [];
+  assert.throws(
+    () =>
+      command(
+        ['gh', 'api', 'route'],
+        {},
+        {
+          retryDelayMs: 10_000,
+          random: () => 1,
+          spawn: () => ({ status: 1, stderr: 'HTTP 503', stdout: '' }),
+          sleep: ms => upper.push(ms),
+        }
+      ),
+    /evidence transport failed: gh/
+  );
+  assert.equal(upper.length, GH_RETRY.attempts - 1);
+  assert.deepEqual(upper, [12_500, 25_000, 50_000, 60_000, 60_000, 60_000]);
+
+  // Lower jitter edge (random() => 0) and a base delay past the cap: the cap
+  // must clamp the final delay, never let jitter exceed the budget.
+  const capped = [];
+  assert.throws(
+    () =>
+      command(
+        ['gh', 'api', 'route'],
+        {},
+        {
+          retryDelayMs: 50_000,
+          random: () => 1,
+          spawn: () => ({ status: 1, stderr: 'HTTP 503', stdout: '' }),
+          sleep: ms => capped.push(ms),
+        }
+      ),
+    /evidence transport failed: gh/
+  );
+  assert.deepEqual(capped, [60_000, 60_000, 60_000, 60_000, 60_000, 60_000]);
+  assert.ok(
+    capped.every(ms => ms <= GH_RETRY.maxDelayMs),
+    'every wait must stay within the bounded budget'
+  );
 });
 
 test('real workflow command reads only authenticated data ZIP entries and writes original CI fields', () => {

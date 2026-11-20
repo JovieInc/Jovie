@@ -197,7 +197,6 @@ export const currencyCodeEnum = pgEnum('currency_code', [
   'DKK',
 ]);
 
-// Ingestion Enums
 export const ingestionStatusEnum = pgEnum('ingestion_status', [
   'idle',
   'pending',
@@ -216,6 +215,7 @@ export const ingestionJobStatusEnum = pgEnum('ingestion_job_status', [
   'processing',
   'succeeded',
   'failed',
+  'held_for_approval',
 ]);
 
 export const scraperStrategyEnum = pgEnum('scraper_strategy', [
@@ -270,27 +270,7 @@ export const inboxOutboundSentByEnum = pgEnum('inbox_outbound_sent_by', [
 
 export const contactChannelEnum = pgEnum('contact_channel', ['email', 'phone']);
 
-// Waitlist Enums
-export const waitlistStatusEnum = pgEnum('waitlist_status', [
-  'new',
-  'invited',
-  'claimed',
-  'chat_started',
-  'qualified',
-  'waitlisted',
-  'approved',
-  'signed_up',
-  'rejected',
-  'expired',
-  'blocked',
-]);
-
-export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
-  'pending',
-  'sending',
-  'sent',
-  'failed',
-]);
+export { waitlistInviteStatusEnum, waitlistStatusEnum } from './waitlist-enums';
 
 // Canonical customer lifecycle stages (JOV-6888). One ordered funnel shared by
 // leads, waitlist entries, creator profiles, and users.

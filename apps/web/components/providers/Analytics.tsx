@@ -1,12 +1,12 @@
 'use client';
 
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
-import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { page } from '@/lib/analytics';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 
 export function Analytics() {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
 
   useEffect(() => {
     try {

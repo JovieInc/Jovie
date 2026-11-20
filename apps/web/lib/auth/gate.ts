@@ -1,9 +1,12 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { getRequestSession } from '@/lib/auth/request-session';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import {
@@ -46,11 +49,6 @@ export {
 /**
  * Result of resolving user state. Contains all information needed
  * to make auth gating decisions and redirect users appropriately.
- *
- * `clerkUserId` is preserved as the field name for churn reduction; after
- * the Clerk → Better Auth cutover it holds the Better Auth user id
- * (resolved from `auth.api.getSession`). `dbUserId` remains the app
- * `users.id` UUID.
  */
 export interface AuthGateResult {
   state: CanonicalUserState;
@@ -279,6 +277,10 @@ async function upsertUser(
         email,
         userStatus,
         waitlistEntryId,
+        accountClass: resolveNewAccountClass({
+          email,
+          header: await readRequestAccountClassHeader(),
+        }),
       })
       .onConflictDoUpdate({
         target: users.betterAuthUserId,
@@ -290,7 +292,11 @@ async function upsertUser(
       })
       .returning({ id: users.id });
 
-    if (createdUser?.id) return createdUser.id;
+    if (createdUser?.id) {
+      // Price lock: the price they sign up at is recorded now (idempotent).
+      await ensurePriceLockForUserSafely(createdUser.id, 'signup');
+      return createdUser.id;
+    }
   } catch (insertError) {
     const adoptedId = await tryAdoptExistingUser(
       insertError,

@@ -2,6 +2,7 @@
 
 **Status:** Canonical  
 **Date:** 2026-05-08  
+**Caching amendment:** 2026-10-24, JOV-8629 (source contract; not deployment evidence)
 **Author:** COS coder agent (cos/jov-2020-profile-spec)  
 **Input:** `docs/public-profile-hardening-audit.md` (JOV-2019)  
 **Consumed by:** JOV-2021, JOV-2022, JOV-2023, JOV-2024, JOV-2025, JOV-2026, JOV-2027  
@@ -41,8 +42,8 @@ Standalone pages with their own visual surface. No profile bottom tab bar. User 
 
 | Route | Purpose | Caching |
 |---|---|---|
-| `/{username}/alerts` | Campaign-linked subscribe landing; reads `?s=` source code client-side | ISR (`revalidate = 3600`) |
-| `/{username}/notifications` | Legacy standalone subscribe page; no clear entry point from profile (see §4.3 for canonical decision) | Defaults (see §4.3) |
+| `/{username}/alerts` | Campaign-linked subscribe landing; reads `?s=` source code client-side | Per-request publication decision (§6) |
+| `/{username}/notifications` | Legacy notifications redirect | Per-request profile metadata (§6) |
 | `/{username}/{slug}` | Content smart link / release landing page | ISR (`revalidate = 300`) + `generateStaticParams` for featured profiles |
 | `/{username}/{slug}/{trackSlug}` | Track smart link | ISR (`revalidate = 300`) |
 | `/{username}/{slug}/sounds` | "Use this sound" page | ISR (`revalidate = 300`) |
@@ -140,7 +141,7 @@ Active destination is `resolvePublicProfileActiveDestination()` in
 
 | Scenario | Behavior |
 |---|---|
-| Direct load of `/{username}` | Destinations render; Home active; profile data fetched server-side (ISR after JOV-2023 fix) |
+| Direct load of `/{username}` | Destinations render; Home active; profile data fetched server-side with a fresh publication decision (§6, JOV-8629) |
 | Direct load of `/{username}?mode=listen` | Destinations render; Music active; drawer or tab panel opens to DSP list |
 | Direct load of `/{username}?mode=subscribe` | Destinations render; Home active; Get updates action/flow visible when fan-capture is allowed |
 | Direct load of `/{username}?mode=tour` | Destinations render; Events active |
@@ -258,7 +259,7 @@ The inline form at `?mode=subscribe` is the in-profile entry point (accessed fro
 
 **The `/{username}/notifications` route is a legacy dead-end. Its canonical status is: deprecated, redirect to `/{username}/alerts`.**
 
-Rationale (from audit §4.1): Two separate full-page subscribe surfaces exist with overlapping intent. `/alerts` is the campaign-linked surface (ISR, full metadata, `robots: index: true`). `/notifications` has no entry point from the profile, no clear product intent, and no test coverage. Deduplication is a JOV-2027 task.
+Rationale (from audit §4.1): Two separate full-page subscribe surfaces exist with overlapping intent. `/alerts` is the campaign-linked surface (full metadata; fresh publication required by §6). `/notifications` has no entry point from the profile, no clear product intent, and no test coverage. Deduplication is a JOV-2027 task.
 
 Until JOV-2027 ships, `/notifications` continues to serve its current behavior. After JOV-2027 ships, `/notifications` issues a 301 permanent redirect to `/{username}/alerts`.
 
@@ -454,41 +455,65 @@ fallback.display_name            | @{username}
 
 ---
 
-## 6. Canonical Decision: ISR / Cookies (P0)
+## 6. Canonical Decision: Fresh Publication / Cookies (JOV-8629)
 
 ### 6.1 The Problem
 
-`apps/web/app/[username]/page.tsx` contains:
-```ts
-export const dynamic = 'force-dynamic';
-```
-and calls `await cookies()` to read `AUDIENCE_ANON_COOKIE` at line 325.
-
-The layout sets `export const revalidate = 3600`. In Next.js App Router, `dynamic = 'force-dynamic'` on the page overrides the layout's `revalidate`, making every profile visit a server-render on demand. ISR does not apply. Every profile page load hits the server and the database. This is the P0 finding from audit §3.3.
+A previously public profile body can outlive publication withdrawal when shared
+HTML or data-cache invalidation fails. A cached success cannot authorize another
+anonymous request. This privacy requirement supersedes JOV-2023's hourly profile
+ISR decision; separately published release and asset authority remains unchanged.
 
 ### 6.2 The Canonical Decision
 
-**ISR with cache tags. No per-request cookie reads in the public profile server component.**
+**Read current publication before serving each profile representation.**
 
-The `AUDIENCE_ANON_COOKIE` read must be moved out of the page server component. The correct approach:
-1. Remove `export const dynamic = 'force-dynamic'` from `apps/web/app/[username]/page.tsx`.
-2. Remove the `await cookies()` call from the page server component.
-3. Move the anonymous visitor state (`AUDIENCE_ANON_COOKIE`) read to a Client Component that reads the cookie client-side (via `document.cookie` or a lightweight API route) after the static shell has been served.
-4. The `getClientTrackingToken` server-side HMAC generation does NOT require a cookie — it only uses `username` and the `TRACKING_TOKEN_SECRET` env var. It is safe to keep as a server-side call without forcing dynamic rendering, provided the cookie read is removed.
-5. On-demand cache invalidation uses `revalidateTag('profile:{username}')` triggered by profile mutation events (admin edits, profile updates, etc.).
+1. The canonical profile loader reads publication (`id`, `is_public` by
+   `username_normalized`) from storage on every request. Only after that fresh
+   read permits the same profile id may it return the non-authority profile
+   body, which is cached cross-request (`unstable_cache`, tags `profiles-all` +
+   `profile:<handle>`, 1h, `ok` bodies only, expired immediately on privacy
+   changes). A cache miss, cache-store failure or a handle now owned by a
+   different profile id reads the body fresh. Redis is still bypassed. React
+   `cache()` deduplicates within one request. Authoritative profile and OG
+   readers propagate storage failures rather than treating them as absent rows;
+   missing/private profiles disclose no profile body.
+2. The canonical profile page and its rewritten modes are ISR (`revalidate =
+   3600`), and the cached body is never the access decision. On every request
+   to `/<username>`, the proxy (`lib/routing/profile-publication-edge.ts`)
+   reads publication from storage in-process (`lib/profile/publication-read.ts`:
+   one Neon HTTP query, 1.5s timeout, no function hop). Missing, withdrawn, deleted and renamed-away handles get a
+   no-store 404, and a failed or slow decision gets a no-store 503, before any
+   cached body is served. RSC, prefetch and `?mode=` requests share the path
+   and pass through the same gate. Real top-level routes are excluded by
+   `STATIC_TOP_LEVEL_ROUTE_SEGMENTS`, which a guard test keeps equal to `app/`
+   and `public/`. The shared username layout keeps its default behavior, so
+   release descendants keep their own caching and publication rules.
+3. Profile text, feeds, calendars and OG responses cannot reuse an old public
+   body after withdrawal. Feed/calendar responses use `no-store`.
+4. Existing cache invalidation still refreshes other facts; invalidation success
+   is not the public-access decision.
+5. Anonymous visitor personalization stays client-side after hydration. The
+   tracking HMAC may still be generated server-side without a viewer-cookie read.
 
-**Result:** Profile pages are ISR-cached at `revalidate = 3600` (1 hour CDN TTL). Profile mutations trigger `revalidateTag` for instant stale-mark. Anonymous visitor state is read client-side after hydration, not in the server component.
-
-This decision is assigned to JOV-2023 (Phase 3: Route Data Hardening). Implementation agents working JOV-2023 MUST follow this decision and not introduce any new `cookies()` call in the `/{username}` page server component.
+Shipped 2026-11-01: profile latency regressed once every request re-read the
+full body (staged-build alias budgets: median 822-1068ms and p95 up to 2.3s,
+every canonical document a cache MISS, against a 490-590ms median before), so
+non-authority facts are now cached behind the fresh publication decision
+described in item 1. Caching the body alone didn't recover the budget (the
+cost was the per-request uncached render, not the body query), so the
+document is ISR-cached again behind the per-request proxy gate in item 2. The staged
+field-policy parser does not enable a field setting or change audience authority;
+complete privacy acceptance remains tracked by JOV-8629.
 
 ### 6.3 What Must Not Regress
 
-After the JOV-2023 fix:
-- Profile pages must return HTTP 200 with cached HTML from the CDN for cold visitors.
-- OG/Twitter metadata must be pre-rendered in the static HTML.
-- JSON-LD structured data must be pre-rendered in the static HTML.
-- The `ProfileViewTracker` visit tracking (using the HMAC token) must still fire on client hydration.
-- Anonymous visitor personalization (if any) must be applied client-side after hydration, not as a server-side render difference.
+- Publication withdrawal and storage failure must never reuse a prior public body.
+- Missing/private profiles and unavailable storage remain distinguishable.
+- Public metadata and JSON-LD remain server-rendered when publication permits them.
+- The `ProfileViewTracker` HMAC-based visit tracking still runs on hydration.
+- Anonymous visitor personalization stays client-side after hydration.
+- Separately published releases retain their existing publication and cache rules.
 
 ---
 

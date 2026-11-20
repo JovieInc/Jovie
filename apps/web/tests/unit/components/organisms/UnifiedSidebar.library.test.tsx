@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -29,6 +30,7 @@ import {
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
+import { dashboardData } from './unified-sidebar-dashboard-data';
 
 const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
@@ -94,9 +96,13 @@ vi.mock('@/components/organisms/user-button', () => ({
 vi.mock('@/components/organisms/SidebarDockBridge', () => ({
   SidebarDockBridge: (props: {
     readonly collapsed: boolean;
+    readonly userState?: { readonly hasClaimedHandle: boolean };
     readonly children: (status: undefined) => React.ReactNode;
   }) => {
-    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    nowPlayingBridgePropsMock({
+      collapsed: props.collapsed,
+      userState: props.userState,
+    });
     return (
       <>
         <div data-sidebar-dock='true' className='shrink-0'>
@@ -111,46 +117,6 @@ vi.mock('@/components/organisms/SidebarDockBridge', () => ({
     );
   },
 }));
-
-const dashboardData: DashboardData = {
-  user: { id: 'user_123' },
-  creatorProfiles: [
-    {
-      id: 'profile_123',
-      avatarUrl: null,
-      displayName: 'Tim White',
-      username: 'timwhite',
-      usernameNormalized: 'timwhite',
-    } as DashboardData['creatorProfiles'][number],
-  ],
-  selectedProfile: {
-    id: 'profile_123',
-    avatarUrl: null,
-    displayName: 'Tim White',
-    username: 'timwhite',
-    usernameNormalized: 'timwhite',
-  } as DashboardData['selectedProfile'],
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: false,
-  tippingStats: {
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 6,
-    steps: [],
-    profileIsLive: false,
-  },
-};
 
 function LibrarySidebarOverride({
   children,
@@ -246,6 +212,13 @@ describe('UnifiedSidebar library route', () => {
     expect(link).toHaveAttribute('data-prefetch', 'false');
   });
 
+  it('mounts the flyout-capable rail as the left navigation region', () => {
+    renderUnifiedSidebar();
+    const rail = document.querySelector('#shell-left-rail');
+    expect(rail).toHaveAttribute('data-rail-preview-region', 'left');
+    expect(rail?.querySelector('[data-sidebar="sidebar"]')).not.toBeNull();
+  });
+
   it('pins the sidebar content scrollport so focusing New Chat does not shift the shell', () => {
     renderUnifiedSidebar();
 
@@ -313,16 +286,16 @@ describe('UnifiedSidebar library route', () => {
     expect(dock).toContainElement(
       screen.getByTestId('sidebar-now-playing-bridge')
     );
-    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
-      collapsed: false,
-    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ collapsed: false })
+    );
     const row = screen
-      .getByRole('link', { name: /Inbox —/ })
+      .getByRole('link', { name: 'Inbox' })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
       'href',
       '/app'
     );
@@ -347,7 +320,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Identity' })
+      screen.getByRole('button', { name: /Switch identity:/ })
     ).toBeInTheDocument();
   });
 
@@ -358,7 +331,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Identity' })
+      screen.queryByRole('button', { name: /Switch identity:/ })
     ).not.toBeInTheDocument();
   });
 
@@ -384,21 +357,39 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('keeps the unified user panel available on settings routes', () => {
+  it('tells the dock whether the viewer already claimed a handle', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userState: { hasClaimedHandle: true } })
+    );
+  });
+
+  it('removes only the duplicate Settings account menu while preserving dock and profile access', async () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.SETTINGS,
       section: 'settings',
     });
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
 
     const panel = screen.getByTestId('sidebar-user-panel');
-    expect(panel).toContainElement(screen.getByTestId('user-button'));
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-whats-new')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('sidebar-now-playing-bridge')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
     const settingsNav = screen.getByRole('navigation', {
       name: 'settings navigation',
     });
-    for (const label of ['Account', 'Artist']) {
+    for (const label of ['Personal', 'Artist']) {
       const group = within(settingsNav)
         .getAllByText(label)
         .find(node => node.className.includes('font-caption'));
@@ -559,6 +550,30 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
+  it('renders bell and rail toggle from one header actions contract in the brand row', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+    const brandRow = toggle.closest('[data-sidebar-brand-row]');
+    const toggleSlot = toggle.closest('[data-sidebar-header-toggle-slot]');
+    expect(toggleSlot).not.toBeNull();
+    expect(brandRow?.contains(toggleSlot ?? null)).toBe(true);
+
+    const bell = screen.getByRole('link', { name: /^Inbox/ });
+    expect(bell.closest('[data-sidebar-header-actions]')?.contains(bell)).toBe(
+      true
+    );
+    // Bell and toggle share the same 28px box so the header reads as one row.
+    for (const control of [bell, toggle]) {
+      expect(control).toHaveClass('size-7', 'rounded-md', 'focus-ring-themed');
+    }
+  });
+
   it.each([
     {
       section: 'dashboard' as const,
@@ -585,7 +600,7 @@ describe('UnifiedSidebar library route', () => {
         logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
       ).toBeNull();
       expect(
-        screen.getByRole('button', { name: 'Switch Workspace' })
+        screen.getByRole('button', { name: /Switch Workspace:/ })
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole('button', { name: 'Expand sidebar' })
@@ -601,7 +616,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /Switch Workspace:/ })
     ).toHaveTextContent('Jovie');
   });
 
@@ -613,7 +628,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Workspace' })
+      screen.queryByRole('button', { name: /Switch Workspace:/ })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Ask Jovie' })
@@ -628,7 +643,7 @@ describe('UnifiedSidebar library route', () => {
       variant: 'ov',
     });
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /Switch Workspace:/ });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger).toHaveClass('h-7');
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
@@ -660,11 +675,10 @@ describe('UnifiedSidebar library route', () => {
     const link = within(nav).getByRole('link', { name: 'Shipping' });
     fireEvent.mouseOver(link);
     fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    const shippingCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state');
+    await waitFor(() => expect(shippingCalls()).toHaveLength(1));
+    expect(shippingCalls()[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     fetchMock.mockRestore();
   });
 
@@ -689,7 +703,7 @@ describe('UnifiedSidebar library route', () => {
         href: link.getAttribute('href'),
       }))
     ).toEqual(
-      // Business is collapsed here; Tools is open because Ops is active.
+      // Company is collapsed here; Tools is open because Ops is active.
       ADMIN_NAV_REGISTRY.filter(item => item.section !== 'business').map(
         item => ({
           label: item.label,
@@ -698,6 +712,7 @@ describe('UnifiedSidebar library route', () => {
       )
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ov-nav-section-tools').className).toBe('');
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();
@@ -787,7 +802,7 @@ describe('UnifiedSidebar library route', () => {
       within(operatorNavigation).getByRole('link', { name: 'Presence' })
     ).toBeVisible();
     const business = within(operatorNavigation).getByRole('button', {
-      name: 'Business',
+      name: 'Company',
     });
     expect(business).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(business);
@@ -848,5 +863,54 @@ describe('UnifiedSidebar library route', () => {
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });
     expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
+  });
+});
+
+// JOV-8137: the completion widget persists in the sidebar on every page
+// until the profile hits 100%.
+describe('UnifiedSidebar profile completion widget (JOV-8137)', () => {
+  const incompleteCompletion = {
+    percentage: 50,
+    completedCount: 2,
+    totalCount: 4,
+    steps: [
+      {
+        id: 'avatar' as const,
+        label: 'Add A Profile Photo',
+        description: 'A recognizable photo makes your page feel personal.',
+        href: APP_ROUTES.SETTINGS_PROFILE,
+      },
+    ],
+    profileIsLive: false,
+  };
+
+  it('renders the completion widget while the profile is incomplete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: { profileCompletion: incompleteCompletion },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).not.toBeNull();
+  });
+
+  it('renders no completion widget once the profile is complete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: {
+        profileCompletion: {
+          ...incompleteCompletion,
+          percentage: 100,
+          completedCount: 4,
+          steps: [],
+          profileIsLive: true,
+        },
+      },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).toBeNull();
   });
 });

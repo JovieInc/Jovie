@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRecordShippedFixDeploys = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock('@/lib/recovery/probes.server', () => ({
+  recordShippedFixDeploys: mockRecordShippedFixDeploys,
+}));
+
 vi.mock('@/lib/env', () => ({
   env: new Proxy(
     {},
@@ -30,6 +38,19 @@ describe('@critical GET /api/health/build-info', () => {
     vi.unstubAllEnvs();
   });
 
+  it('never touches the recovery/DB hooks on the request path (JOV-12766)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+
+    // The public identity receipt is read by monitors on every probe; its
+    // request path must not kick off database work (the recovery deploy-time
+    // stamp runs from the instrumentation boot hook instead).
+    expect(mockRecordShippedFixDeploys).not.toHaveBeenCalled();
+  });
+
   it('logs warning and returns fallback when build info read fails in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
 
@@ -56,6 +77,20 @@ describe('@critical GET /api/health/build-info', () => {
     expect(body.commitSha).toBe('a'.repeat(40));
   });
 
+  it('falls back to GITHUB_SHA on standalone GitHub-hosted servers', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', '');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+    vi.stubEnv('GITHUB_SHA', 'c'.repeat(40));
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.commitSha).toBe('c'.repeat(40));
+  });
+
   it('publishes the immutable Vercel deployment identity', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_exactStaging123');
@@ -70,6 +105,9 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+    // GITHUB_SHA is genuinely set on hosted runners; exclude it so this case
+    // measures only the abbreviated build-time value.
+    vi.stubEnv('GITHUB_SHA', '');
 
     const { GET } = await import('@/app/api/health/build-info/route');
     const body = await (await GET()).json();

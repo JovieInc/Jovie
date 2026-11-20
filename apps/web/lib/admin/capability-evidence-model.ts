@@ -118,3 +118,133 @@ export function deriveCapabilityStage(
   }
   return record.outcome.measured ? 'healthy' : 'configured-unobserved';
 }
+
+/** The delivery lifecycle every capability moves through, in order. */
+export const CAPABILITY_LIFECYCLE = [
+  'desired',
+  'built',
+  'certified',
+  'deployed',
+  'exposed',
+  'observed',
+  'healthy',
+] as const;
+
+export type CapabilityLifecycleId = (typeof CAPABILITY_LIFECYCLE)[number];
+
+export type CapabilityLifecycleState =
+  | 'done'
+  | 'current'
+  | 'failed'
+  | 'pending'
+  | 'unknown';
+
+/** Structurally a `StatusPipelineStage` with a string value. */
+export interface CapabilityLifecycleStage {
+  readonly id: CapabilityLifecycleId;
+  readonly label: string;
+  readonly state: CapabilityLifecycleState;
+  readonly value: string;
+  readonly evidence: string;
+}
+
+const LIFECYCLE_LABEL: Record<CapabilityLifecycleId, string> = {
+  desired: 'Desired',
+  built: 'Built',
+  certified: 'Certified',
+  deployed: 'Deployed',
+  exposed: 'Exposed',
+  observed: 'Observed',
+  healthy: 'Healthy',
+};
+
+const CERTIFIED_STATES = new Set(['shipped', 'monitored', 'founder_locked']);
+
+function observationStage(
+  observation: CapabilityObservation
+): Pick<CapabilityLifecycleStage, 'state' | 'value' | 'evidence'> {
+  const evidence = `${observation.population}, ${observation.windowDays}-day window`;
+  if (observation.error) {
+    return { state: 'failed', value: 'Source error', evidence };
+  }
+  if (!observation.measured) {
+    return { state: 'unknown', value: 'Not instrumented', evidence };
+  }
+  const count = (observation.count ?? 0).toLocaleString('en-US');
+  const value = `${count} in ${observation.windowDays}d`;
+  if (observation.stale) {
+    return {
+      state: 'current',
+      value: `${value} · stale`,
+      evidence: `${evidence}; newest event ${observation.latestAt ?? 'unknown'}`,
+    };
+  }
+  return {
+    state: (observation.count ?? 0) > 0 ? 'done' : 'pending',
+    value,
+    evidence,
+  };
+}
+
+/**
+ * Each lifecycle stage's state and real reading for one capability. A stage
+ * is `done` only when its own evidence exists; a missing source is `unknown`,
+ * and the first stage not yet reached is `current`.
+ */
+export function capabilityLifecycleStages(
+  record: CapabilityEvidenceRecord
+): readonly CapabilityLifecycleStage[] {
+  const { certification, deployment } = record;
+  const registry = certification?.sourcePath ?? 'docs/FEATURE_REGISTRY.md';
+  const stage = deriveCapabilityStage(record);
+  const raw: Record<
+    CapabilityLifecycleId,
+    Pick<CapabilityLifecycleStage, 'state' | 'value' | 'evidence'>
+  > = {
+    desired: certification
+      ? { state: 'done', value: 'Registered', evidence: registry }
+      : { state: 'unknown', value: 'Registry unread', evidence: registry },
+    built: certification
+      ? { state: 'done', value: 'Merged', evidence: registry }
+      : { state: 'unknown', value: 'Registry unread', evidence: registry },
+    certified: !certification
+      ? { state: 'unknown', value: 'Registry unread', evidence: registry }
+      : {
+          state: CERTIFIED_STATES.has(certification.state) ? 'done' : 'pending',
+          value: certification.state.replaceAll('_', ' '),
+          evidence: `Certification ${certification.readiness}, evidence ${certification.decisionEvidenceDigest.slice(0, 12)}`,
+        },
+    deployed: deployment.commitSha
+      ? {
+          state: 'done',
+          value: deployment.version
+            ? `${deployment.version} ${deployment.commitSha.slice(0, 7)}`
+            : deployment.commitSha.slice(0, 7),
+          evidence: `Deployed build${deployment.environment ? ` (${deployment.environment})` : ''}`,
+        }
+      : {
+          state: 'unknown',
+          value: 'No build info',
+          evidence: 'Deployed build',
+        },
+    exposed: observationStage(record.exposure),
+    observed: observationStage(record.outcome),
+    healthy:
+      stage === 'healthy'
+        ? { state: 'done', value: 'Healthy', evidence: 'All stages evidenced' }
+        : {
+            state: stage === 'failure' ? 'failed' : 'pending',
+            value: CAPABILITY_STAGE_LABEL[stage],
+            evidence: 'Derived from the stages before it',
+          },
+  };
+  const firstOpen = CAPABILITY_LIFECYCLE.find(
+    id => raw[id].state === 'pending'
+  );
+  return CAPABILITY_LIFECYCLE.map(id => ({
+    id,
+    label: LIFECYCLE_LABEL[id],
+    ...raw[id],
+    state: id === firstOpen ? 'current' : raw[id].state,
+  }));
+}

@@ -3,7 +3,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { downloadingUpdate } from '@/lib/desktop/desktop-updates.test-utils';
+import {
+  availableUpdate,
+  downloadingUpdate,
+} from '@/lib/desktop/desktop-updates.test-utils';
 import { DesktopUpdateModalView } from './DesktopUpdateModal';
 
 function renderDownload(transferredBytes: number, bytesPerSecond: number) {
@@ -51,6 +54,59 @@ describe('Desktop update download feedback', () => {
     renderDownload(0, 0);
     expect(screen.getByText('0 B of 200 MB')).toBeInTheDocument();
     expect(screen.queryByText(/\/s$/)).not.toBeInTheDocument();
+  });
+
+  it('keeps unknown totals indeterminate instead of inventing a percentage', () => {
+    render(
+      <DesktopUpdateModalView
+        open
+        state={{ ...downloadingUpdate(0), totalBytes: 0 }}
+        notes={null}
+        loading={false}
+        onDownload={vi.fn()}
+        onInstall={vi.fn()}
+        onRetry={vi.fn()}
+        onLater={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute(
+      'aria-valuenow'
+    );
+    expect(screen.queryByText('0%')).not.toBeInTheDocument();
+  });
+
+  it('focuses Hide when the download begins and retains focus as progress changes', () => {
+    const props = {
+      open: true,
+      notes: null,
+      loading: false,
+      onDownload: vi.fn(),
+      onInstall: vi.fn(),
+      onRetry: vi.fn(),
+      onLater: vi.fn(),
+    };
+    const { rerender } = render(
+      <DesktopUpdateModalView {...props} state={availableUpdate('26.9.16')} />
+    );
+    expect(screen.getByRole('button', { name: 'Download' })).toHaveFocus();
+    rerender(
+      <DesktopUpdateModalView {...props} state={downloadingUpdate(12)} />
+    );
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveFocus();
+    rerender(
+      <DesktopUpdateModalView {...props} state={downloadingUpdate(75)} />
+    );
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveFocus();
+  });
+
+  it('offers a manual download without replacing the active update', () => {
+    renderDownload(0, 0);
+    expect(
+      screen.getByRole('link', { name: 'Download the latest version' })
+    ).toHaveAttribute('href', '/download');
+    expect(
+      screen.getByRole('link', { name: 'Download the latest version' })
+    ).toHaveAttribute('target', '_blank');
   });
 
   it('keeps Escape available while the download continues', async () => {

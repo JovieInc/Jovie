@@ -347,3 +347,120 @@ printf '%s' '{}' > "$dir/release.json"
     expect(result.stderr).toContain('accepts 1 arg(s)');
   });
 });
+
+describe('Staging Controller non-Web routing (anti-starvation, 2026-10-29)', () => {
+  const routingScript = workflow
+    .split('        run: |\n')[3]
+    .split('\n      - ')[0]
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  function route(policyDecision) {
+    const root = mkdtempSync(join(tmpdir(), 'staging-routing-'));
+    roots.push(root);
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    mkdirSync(join(root, 'product-lane-release'));
+    writeFileSync(
+      join(root, 'product-lane-release/release.json'),
+      JSON.stringify({
+        provenance: { sha: sourceSha },
+        releaseRouting: { sourceMainRunId: '100' },
+        aggregatePassed: true,
+        selectedLanes: ['operations'],
+      })
+    );
+    writeFileSync(
+      join(root, 'staging-lineage.json'),
+      JSON.stringify({
+        schema: 'jovie-staging-lineage/v1',
+        sha: sourceSha,
+        outcome: 'not_applicable',
+        replacementSha: sourceSha,
+        sourceCiRunId: '100',
+      })
+    );
+    writeFileSync(join(root, 'gh-api-hold.sh'), 'shift; exec gh api "$@"\n');
+    writeFileSync(join(root, 'resolve-main-sha.sh'), 'echo "$MAIN_SHA"\n');
+    writeFileSync(
+      join(root, 'staging-supersession-policy.mjs'),
+      `if (process.env.CURRENT_MAIN_SHA !== process.env.MAIN_SHA) process.exit(3);
+console.log(process.env.POLICY_DECISION);\n`
+    );
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/bin/sh\ncase "$2" in *compare/*) echo ahead;; *) exit 2;; esac\n`
+    );
+    writeFileSync(
+      join(bin, 'curl'),
+      `#!/bin/sh\necho '{"commitSha":"${sourceSha}","deploymentId":"dpl_abc","environment":"preview"}'\n`
+    );
+    chmodSync(join(bin, 'gh'), 0o755);
+    chmodSync(join(bin, 'curl'), 0o755);
+    const output = join(root, 'github-output');
+    const result = spawnSync('bash', ['-c', routingScript], {
+      cwd: resolve(import.meta.dirname, '../../..'),
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        PATH: `${bin}${delimiter}${process.env.PATH}`,
+        RUNNER_TEMP: root,
+        GITHUB_OUTPUT: output,
+        INITIAL_OUTCOME: 'not_applicable',
+        EXPECTED_SHA: sourceSha,
+        SOURCE_CI_RUN_ID: '100',
+        REPOSITORY: 'JovieInc/Jovie',
+        MAIN_SHA: mainSha,
+        POLICY_DECISION: JSON.stringify(policyDecision),
+      },
+    });
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    return {
+      output: readFileSync(output, 'utf8'),
+      lineage: JSON.parse(
+        readFileSync(join(root, 'staging-lineage.json'), 'utf8')
+      ),
+      stdout: result.stdout,
+    };
+  }
+
+  it('lets a finished green generation carry over when the policy says production is stale', () => {
+    const { output, lineage, stdout } = route({
+      outcome: 'carryover',
+      replacementSha: null,
+      reason: 'production is stale',
+    });
+    expect(output).toContain('outcome=not_applicable');
+    expect(lineage).toMatchObject({
+      outcome: 'not_applicable',
+      supersession: { outcome: 'carryover' },
+      carryover: { outcome: 'not_applicable', stagingSha: sourceSha },
+    });
+    expect(stdout).toContain('Staging supersession');
+  });
+
+  it('records the policy replacement when it supersedes', () => {
+    const { output, lineage } = route({
+      outcome: 'superseded',
+      replacementSha: candidateSha,
+      reason: 'newer generation already passed CI',
+    });
+    expect(output).toContain('outcome=superseded');
+    expect(lineage).toMatchObject({
+      outcome: 'superseded',
+      replacementSha: candidateSha,
+    });
+  });
+
+  it('ships the policy from the trusted resolver checkout', () => {
+    expect(workflow).toContain(
+      '            .github/scripts/staging-supersession-policy.mjs'
+    );
+    expect(workflow).toContain(
+      'cp .github/scripts/staging-supersession-policy.mjs "$RUNNER_TEMP/staging-supersession-policy.mjs"'
+    );
+  });
+});

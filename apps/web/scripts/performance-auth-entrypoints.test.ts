@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as (
+const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as ((
   browser: {
     newPage(): Promise<Record<string, unknown>>;
     defaultBrowserContext?(): {
@@ -19,7 +19,7 @@ const seedDashboardAuth = require('./lighthouse-dashboard-auth.cjs') as (
     };
   },
   options: { url: string }
-) => Promise<void>;
+) => Promise<void>) & { resolveCollectUrls(baseUrl: string): string[] };
 
 const temporaryDirectories: string[] = [];
 
@@ -219,5 +219,81 @@ describe('authenticated performance entrypoints', () => {
     );
     expect(page.waitForSelector).not.toHaveBeenCalled();
     expect(page.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('dashboard Lighthouse collect URLs', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('measures the pages /app and /app/releases land on by default', () => {
+    vi.stubEnv('LIGHTHOUSE_DASHBOARD_URLS', '');
+    expect(
+      seedDashboardAuth.resolveCollectUrls('http://localhost:3000')
+    ).toEqual([
+      'http://localhost:3000/app',
+      'http://localhost:3000/app/library?view=releases',
+    ]);
+  });
+
+  it('uses the configured list when one is set', () => {
+    vi.stubEnv('LIGHTHOUSE_DASHBOARD_URLS', '/start, /app/chat');
+    expect(
+      seedDashboardAuth.resolveCollectUrls('http://localhost:3000')
+    ).toEqual([
+      'http://localhost:3000/start',
+      'http://localhost:3000/app/chat',
+    ]);
+  });
+});
+
+describe('signed-in Lighthouse budgets', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const webRoot = resolve(import.meta.dirname, '..');
+  const scripts = (
+    JSON.parse(readFileSync(resolve(webRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    }
+  ).scripts;
+
+  it.each([
+    'test:lighthouse:dashboard:pr',
+    'test:lighthouse:onboarding:pr',
+    'test:lighthouse:admin:pr',
+    'test:lighthouse:chat:pr',
+  ])('%s holds every page it measures to a budget', commandName => {
+    const command = scripts[commandName] ?? '';
+    const config =
+      /LIGHTHOUSE_CONFIG=(\S+)/.exec(command)?.[1] ??
+      '.lighthouserc.dashboard.pr.json';
+    vi.stubEnv(
+      'LIGHTHOUSE_DASHBOARD_URLS',
+      /LIGHTHOUSE_DASHBOARD_URLS=(\S+)/.exec(command)?.[1] ?? ''
+    );
+    const urls = seedDashboardAuth.resolveCollectUrls('http://localhost:3000');
+    const matrix = (
+      JSON.parse(readFileSync(resolve(webRoot, config), 'utf8')) as {
+        ci: { assert: { assertMatrix: { matchingUrlPattern: string }[] } };
+      }
+    ).ci.assert.assertMatrix;
+    const patterns = matrix.map(row => new RegExp(row.matchingUrlPattern));
+
+    expect(urls.length, commandName).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(
+        patterns.some(pattern => pattern.test(url)),
+        `${config} has no budget for ${url}`
+      ).toBe(true);
+    }
+    for (const pattern of patterns) {
+      expect(
+        urls.some(url => pattern.test(url)),
+        `${config} budget ${pattern} matches no measured page`
+      ).toBe(true);
+    }
   });
 });

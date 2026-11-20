@@ -1,8 +1,8 @@
-// Promotion gate for auth/billing journey evidence (extends JOV-5937;
+// Promotion gate for golden-path journey evidence (extends JOV-5937;
 // release-integrity repair 2, founder decision 2026-10-21).
 //
 // A candidate whose range artifact (`jovie.release-range-risk/v1`) affects
-// auth or billing, or is unknown, may be promoted only with successful, fresh,
+// a golden-path consequence, or is unknown, may be promoted only with successful, fresh,
 // exact-candidate evidence for BOTH the auth and billing journeys, produced by
 // a run that actually executed them. Never counted: dispatch success, skipped
 // tests, mocked providers, expired quarantine exclusions, exit-0 placeholders,
@@ -21,6 +21,8 @@
 export const EVIDENCE_SCHEMA = 'jovie.journey-evidence/v1';
 export const OVERRIDE_SCHEMA = 'jovie.promotion-recovery-override/v1';
 export const GATE_SCHEMA = 'jovie.promotion-journey-gate/v1';
+export const JOURNEY_POLICY_VERSION =
+  'jovie.promotion-journey-policy/2026-11-04.1';
 export const REQUIRED_JOURNEYS = ['auth', 'billing'];
 /** Evidence older than this at decision time is stale. */
 export const DEFAULT_FRESHNESS_MS = 6 * 60 * 60 * 1000;
@@ -32,11 +34,92 @@ const SHA = /^[0-9a-f]{40}$/;
 const AUTOMATION_APPROVER =
   /bot|github-actions|automation|system|claude|agent|hermes/i;
 
+// Bounded consequence mapping over the existing range-risk receipt, not a
+// replacement risk classifier. These surfaces still select the Web lane, medium
+// release evidence and exact-route browser/visual checks. Auth and billing
+// journeys block only a release that can reach auth, billing or signup (Tim,
+// 2026-11-06), so the COMPLETE range must be leaf pages outside those flows.
+// This is an allowlist of pages that hold no claim, signup or checkout form;
+// the name check is only a backstop. Profile pages stay out: their templates
+// and loaders carry the claim footer and owner state under ordinary names.
+const JOURNEY_FREE_UI_SURFACE =
+  /^apps\/web\/(?:app\/\(marketing\)\/(?:(?:about|alternatives|api-versioning|blog|changelog|cli|compare|developers|engineering|integrations|proof|support|voice)\/|artist-profiles\/page\.tsx$)|screenshot-catalog\/)/;
+const JOURNEY_PROTECTED_PATH =
+  /auth|billing|buy|checkout|claim|cta|donate|handle|invite|join|layout|log-?in|onboarding|owner|pay|plans?\b|pricing|register|sign|start|stripe|subscri|tip|upgrade|waitlist/i;
+
+function isJourneyFreeUiPath(path) {
+  return (
+    typeof path === 'string' &&
+    JOURNEY_FREE_UI_SURFACE.test(path) &&
+    !JOURNEY_PROTECTED_PATH.test(path)
+  );
+}
+
 export function journeysRequired(range) {
   if (!range || range.schema !== 'jovie.release-range-risk/v1') return true;
-  if (range.unknown === true) return true;
-  const a = range.affects ?? {};
-  return a.auth === true || a.billing === true || a.unknown === true;
+  if (
+    typeof range.candidateSha !== 'string' ||
+    !SHA.test(range.candidateSha) ||
+    typeof range.baseDeployedSha !== 'string' ||
+    !SHA.test(range.baseDeployedSha) ||
+    range.unknown !== false
+  )
+    return true;
+  const a = range.affects;
+  if (
+    !a ||
+    [
+      'auth',
+      'billing',
+      'publicUi',
+      'proxy',
+      'database',
+      'config',
+      'automation',
+      'ci',
+      'agent',
+      'unknown',
+    ].some(key => typeof a[key] !== 'boolean')
+  )
+    return true;
+  // Shared runtime/config and activation include the dependencies of claim,
+  // auth and billing even when the coarse receipt names neither directly.
+  if (
+    a.auth === true ||
+    a.billing === true ||
+    a.proxy === true ||
+    a.database === true ||
+    a.config === true ||
+    a.automation === true ||
+    a.unknown === true
+  )
+    return true;
+  if (a.publicUi !== true) return false;
+
+  // Never infer marketing independence from publicUi alone, a directory
+  // prefix, the newest commit, or a missing/contradictory path receipt.
+  return !(
+    range.baseDeployedSha !== range.candidateSha &&
+    range.level === 'medium' &&
+    a.ci === false &&
+    a.agent === false &&
+    Array.isArray(range.unknownReasons) &&
+    range.unknownReasons.length === 0 &&
+    Array.isArray(range.matchedRuleIds) &&
+    range.matchedRuleIds.length === 1 &&
+    range.matchedRuleIds[0] === 'public-ui' &&
+    range.requiresPreview === true &&
+    range.requiresSmoke === false &&
+    range.blocksUnattended === false &&
+    Array.isArray(range.paths) &&
+    range.paths.length > 0 &&
+    range.paths.every(
+      row =>
+        row?.class === 'public-ui' &&
+        row.level === 'medium' &&
+        isJourneyFreeUiPath(row.path)
+    )
+  );
 }
 
 function validateEvidence(ev, journey, range, nowMs, freshnessMs) {
@@ -59,10 +142,8 @@ function validateEvidence(ev, journey, range, nowMs, freshnessMs) {
   if (!ev.runId || !ev.runUrl) r.push('missing run id/url');
   const t = ev.tests ?? {};
   if (!Number.isInteger(t.total) || t.total < 1) r.push('no tests executed');
-  if (t.skipped > 0 || t.skipped === undefined)
-    r.push('journey has skipped tests');
-  if (t.failed > 0 || t.failed === undefined)
-    r.push('journey has failed tests');
+  if (t.skipped !== 0) r.push('journey has skipped tests');
+  if (t.failed !== 0) r.push('journey has failed tests');
   if (t.passed !== t.total) r.push('not every journey test passed');
   const providers = Array.isArray(ev.providers) ? ev.providers : [];
   if (providers.length === 0) r.push('no provider mode recorded');
@@ -155,6 +236,7 @@ export function evaluatePromotion({
   const candidateSha = range?.candidateSha ?? null;
   const base = {
     schema: GATE_SCHEMA,
+    policyVersion: JOURNEY_POLICY_VERSION,
     candidateSha,
     evaluatedAt: now.toISOString(),
   };
@@ -175,11 +257,26 @@ export function evaluatePromotion({
       perJourney[journey] = ['no evidence'];
       continue;
     }
-    const results = candidates.map(e =>
+    // Only executed, exact-candidate observations can supersede an execution.
+    // Artifact download order is not chronology. A failed rerun must invalidate
+    // an earlier green; a later successful recovery can certify it again.
+    const executions = candidates.filter(
+      e => e.candidateSha === candidateSha && EXECUTING_SOURCES.has(e.source)
+    );
+    if (executions.some(e => !Number.isFinite(Date.parse(e.completedAt)))) {
+      perJourney[journey] = ['executed evidence has unknown completion time'];
+      continue;
+    }
+    const latest = Math.max(...executions.map(e => Date.parse(e.completedAt)));
+    const current = executions.length
+      ? executions.filter(e => Date.parse(e.completedAt) === latest)
+      : candidates;
+    const results = current.map(e =>
       validateEvidence(e, journey, range ?? {}, nowMs, window)
     );
-    const ok = results.find(x => x.length === 0);
-    perJourney[journey] = ok ? [] : results[0];
+    // Equal timestamps have no trustworthy ordering: every tied execution
+    // must agree. A green record cannot erase a contradictory failure.
+    perJourney[journey] = [...new Set(results.flat())];
   }
   const reasons = Object.entries(perJourney).flatMap(([j, rs]) =>
     rs.map(x => `${j}: ${x}`)

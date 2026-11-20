@@ -97,7 +97,7 @@ describe('VoiceLandingPage (gh-9809 hero landing)', () => {
   it('renders the explicit 4-step how-it-works section and final CTA', () => {
     render(<VoiceLandingPage />);
 
-    expect(screen.getByText('Four steps')).toBeInTheDocument();
+    expect(screen.queryByText('Four steps')).not.toBeInTheDocument();
     expect(screen.getByText('Link your clip')).toBeInTheDocument();
     expect(screen.getByText('Consent & start train')).toBeInTheDocument();
     expect(screen.getByText('Review your model')).toBeInTheDocument();

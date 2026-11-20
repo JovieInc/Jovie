@@ -5,6 +5,7 @@ import {
   createRecoveryOverride,
   evaluatePromotion,
 } from '../promotion-journey-evidence.mjs';
+import { gradeReleaseRange } from '../release-range-risk.mjs';
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -18,7 +19,19 @@ const range = (affects = {}, extra = {}) => ({
   candidateSha: SHA,
   unknown: false,
   paths: [],
-  affects: { auth: false, billing: false, ...affects },
+  affects: {
+    auth: false,
+    billing: false,
+    publicUi: false,
+    proxy: false,
+    database: false,
+    config: false,
+    automation: false,
+    ci: false,
+    agent: false,
+    unknown: false,
+    ...affects,
+  },
   ...extra,
 });
 const good = journey => ({
@@ -42,6 +55,7 @@ const set = (mutate = {}) => [
   { ...good('auth'), ...(mutate.auth ?? {}) },
   { ...good('billing'), ...(mutate.billing ?? {}) },
 ];
+/** @param {unknown} [r] Deliberately includes malformed range fixtures. */
 const run = (evidence, r = range({ billing: true }), extra = {}) =>
   evaluatePromotion({ range: r, evidence, now: NOW, ...extra });
 
@@ -53,6 +67,77 @@ describe('promotion journey gate: valid evidence passes', () => {
     const r = run([], range());
     expect(r.decision).toBe('pass');
     expect(r.required).toBe(false);
+  });
+  it.each(['ci', 'agent'])(
+    'valid %s-only risk does not inherit auth/billing journeys',
+    surface => {
+      expect(run([], range({ [surface]: true }))).toMatchObject({
+        decision: 'pass',
+        required: false,
+      });
+    }
+  );
+});
+
+describe('current evidence cannot be replaced by an older green receipt', () => {
+  it.each([null, -1, 'unknown', 0.5])(
+    'rejects invalid failed/skipped counters: %s',
+    count => {
+      expect(
+        run(
+          set({
+            auth: {
+              tests: { total: 4, passed: 4, failed: count, skipped: count },
+            },
+          })
+        ).decision
+      ).toBe('blocked');
+    }
+  );
+
+  it.each([
+    { schema: 'jovie.release-range-risk/v1' },
+    range({}, { affects: {} }),
+    range({}, { unknown: null }),
+    range({}, { candidateSha: null }),
+  ])('does not exempt an incomplete range from journey checks', r => {
+    expect(run([], r).decision).toBe('blocked');
+  });
+
+  const later = (extra = {}) => ({
+    ...good('auth'),
+    runId: '124',
+    completedAt: '2026-10-21T11:30:00.000Z',
+    ...extra,
+  });
+  it('blocks a later failed execution in either artifact order', () => {
+    const evidence = [
+      ...set(),
+      later({
+        conclusion: 'failure',
+        tests: { total: 4, passed: 3, failed: 1, skipped: 0 },
+      }),
+    ];
+    expect(run(evidence).decision).toBe('blocked');
+    expect(run([...evidence].reverse()).decision).toBe('blocked');
+  });
+  it('accepts a later successful recovery, not a newer unrelated candidate', () => {
+    expect(
+      run([...set({ auth: { conclusion: 'failure' } }), later()]).decision
+    ).toBe('pass');
+    expect(
+      run([...set(), later({ candidateSha: OTHER, conclusion: 'failure' })])
+        .decision
+    ).toBe('pass');
+  });
+  it('blocks conflicting newest executions with equal or unknown chronology', () => {
+    expect(
+      run([...set(), { ...good('auth'), conclusion: 'failure' }]).decision
+    ).toBe('blocked');
+    expect(
+      run([...set(), later({ completedAt: 'invalid', conclusion: 'failure' })])
+        .decision
+    ).toBe('blocked');
   });
 });
 
@@ -99,6 +184,13 @@ describe('promotion journey gate: deliberate-red failures', () => {
     expect(run([], range({}, { unknown: true })).decision).toBe('blocked');
     expect(run([], range({ auth: true })).decision).toBe('blocked');
   });
+  it.each(['publicUi', 'proxy', 'database', 'config', 'automation'])(
+    'blocks a %s range without exact-SHA journey evidence (golden path is a promotion input)',
+    surface => {
+      expect(run([], range({ [surface]: true })).decision).toBe('blocked');
+      expect(run(set(), range({ [surface]: true })).decision).toBe('pass');
+    }
+  );
   it('blocks a missing or malformed range artifact', () => {
     expect(run(set(), null).decision).toBe('blocked');
   });
@@ -192,5 +284,49 @@ describe('repairs (a)-(d) stay fixed', () => {
     expect(fn.indexOf('pressSequentially')).toBeLessThan(
       fn.indexOf("waitForLoadState('load'")
     );
+  });
+});
+
+const gradeScope = paths =>
+  gradeReleaseRange({
+    baseDeployedSha: 'a'.repeat(40),
+    candidateSha: 'b'.repeat(40),
+    paths,
+  });
+
+describe('auth and billing journeys block only releases that can reach them', () => {
+  it.each([
+    [['apps/web/app/(marketing)/compare/page.tsx']],
+    [['apps/web/app/(marketing)/blog/page.tsx']],
+    [
+      [
+        'apps/web/app/(marketing)/about/page.tsx',
+        'apps/web/app/(marketing)/support/page.tsx',
+      ],
+    ],
+  ])('leaf pages ship without journeys: %j', paths => {
+    expect(evaluatePromotion({ range: gradeScope(paths) })).toMatchObject({
+      required: false,
+      decision: 'pass',
+    });
+  });
+
+  it.each([
+    // Ordinary names that render or build claim state: names alone can't protect these.
+    'apps/web/app/(marketing)/product/ProductLanding.tsx',
+    'apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx',
+    'apps/web/app/[username]/page.tsx',
+    'apps/web/lib/images/validate-magic-bytes.ts',
+    'apps/web/app/(marketing)/start/page.tsx',
+    'apps/web/app/(marketing)/waitlist/page.tsx',
+    'apps/web/app/(marketing)/compare/layout.tsx',
+    'apps/web/app/(marketing)/blog/SignupBanner.tsx',
+    'apps/web/styles/globals.css',
+    'packages/ui/src/button.tsx',
+  ])('%s can reach a protected flow, so journeys stay required', path => {
+    expect(evaluatePromotion({ range: gradeScope([path]) })).toMatchObject({
+      required: true,
+      decision: 'blocked',
+    });
   });
 });

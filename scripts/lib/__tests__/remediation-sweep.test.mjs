@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizePull } from '../../remediation-sweep.mjs';
+import { HOLD_LABELS } from '../merge-group-member-policy.mjs';
 import {
   DAY_MS,
   DRAFT_STALE_MS,
@@ -10,6 +11,7 @@ import {
   planStaleDraftRollup,
   planSummerConfigRedPulls,
   planSummerReceipts,
+  planSwiftArchDebt,
   planVercelFailure,
   RECEIPT_STALE_MS,
   runRemediationSweep,
@@ -229,6 +231,88 @@ describe('remediation sweep selection', () => {
     ).toEqual([]);
   });
 
+  it('does not file exhausted conflict cards for PRs a hold parks', () => {
+    const held = planExhaustedConflicts(
+      [
+        pull({
+          number: 22809,
+          labels: ['lane-fix-exhausted', 'incident'],
+          exhaustedSince: ago(DAY_MS + 1),
+        }),
+      ],
+      NOW
+    );
+    expect(held.plans).toEqual([]);
+    expect(held.warnings).toHaveLength(1);
+    expect(held.warnings[0]).toContain('#22809');
+    expect(held.warnings[0]).toContain('incident');
+    // The hold nag, not the conflict card, owns a held PR's disposition.
+    expect(
+      planIdleHolds(
+        [
+          pull({
+            number: 22809,
+            labels: ['lane-fix-exhausted', 'incident'],
+            updatedAt: ago(7 * DAY_MS + 1),
+          }),
+        ],
+        NOW
+      )[0].fingerprint
+    ).toBe('remediation:pr-22809-hold');
+    // An unheld exhausted PR past the deadline still files its conflict card.
+    expect(
+      planExhaustedConflicts(
+        [
+          pull({
+            number: 22810,
+            labels: ['lane-fix-exhausted'],
+            exhaustedSince: ago(DAY_MS + 1),
+          }),
+        ],
+        NOW
+      ).plans[0].fingerprint
+    ).toBe('remediation:pr-22810-conflict');
+  });
+
+  it.each([...HOLD_LABELS])(
+    'keeps canonical %s holds with their existing nag',
+    hold => {
+      for (const label of [hold, { name: hold.toUpperCase() }]) {
+        const item = pull({
+          labels: ['lane-fix-exhausted', label],
+          exhaustedSince: ago(DAY_MS + 1),
+          updatedAt: ago(7 * DAY_MS + 1),
+        });
+        const result = planExhaustedConflicts([item], NOW);
+        expect(result.plans).toEqual([]);
+        expect(result.warnings).toHaveLength(1);
+        expect(result.warnings[0].toLowerCase()).toContain(hold);
+        expect(planIdleHolds([item], NOW)).toHaveLength(1);
+      }
+    }
+  );
+
+  it.each([
+    'tim-hold',
+    'tim:hold',
+    'hold:tim',
+    'needs-human',
+    'human-review-required',
+    'no-auto',
+    'do-not-merge',
+  ])('keeps retired human hold %s actionable', label => {
+    const item = pull({
+      labels: ['lane-fix-exhausted', { name: label.toUpperCase() }],
+      exhaustedSince: ago(DAY_MS + 1),
+      updatedAt: ago(7 * DAY_MS + 1),
+    });
+    const result = planExhaustedConflicts([item], NOW);
+    expect(result.plans).toHaveLength(1);
+    expect(result.plans[0].fingerprint).toBe('remediation:pr-1-conflict');
+    expect(result.warnings).toEqual([]);
+    expect(planIdleHolds([item], NOW)).toEqual([]);
+  });
+
   it('files Summer receipts per provider on age, not on commissioning', () => {
     const health = (ages, extra = {}) => ({
       commissioned: false,
@@ -373,6 +457,51 @@ describe('remediation sweep selection', () => {
     });
     expect(loadDeployments).not.toHaveBeenCalled();
     expect(skipped.warnings).toEqual([VERCEL_TOKEN_MISSING_WARNING]);
+  });
+
+  it('files one stable Swift architecture debt issue per rule with debt', async () => {
+    const metrics = {
+      generatedAt: '2026-10-29T00:00:00.000Z',
+      total: 5,
+      byRule: {
+        'main-actor-keychain': 3,
+        'gcd-main-hop': 2,
+        'polling-timer': 0,
+      },
+      topFiles: [
+        { rule: 'main-actor-keychain', file: 'App/A.swift', count: 3 },
+        { rule: 'gcd-main-hop', file: 'App/B.swift', count: 2 },
+      ],
+    };
+    const plans = planSwiftArchDebt(metrics);
+    expect(plans.map(plan => plan.fingerprint)).toEqual([
+      'remediation:swift-arch-debt:main-actor-keychain',
+      'remediation:swift-arch-debt:gcd-main-hop',
+    ]);
+    expect(plans[0].title).toBe(
+      'Swift architecture debt: main-actor-keychain (remediation:swift-arch-debt:main-actor-keychain)'
+    );
+    expect(plans[0].priority).toBe(2);
+    expect(plans[1].priority).toBe(3);
+    expect(plans[0].description).toContain('`App/A.swift`: 3');
+    expect(plans[0].description).toContain('--write-baseline');
+    expect(planSwiftArchDebt(null)).toEqual([]);
+
+    const missing = await runRemediationSweep({
+      mode: 'swift-arch',
+      dryRun: true,
+      upsert: vi.fn(),
+    });
+    expect(missing.warnings).toEqual([
+      'Swift architecture guard loader not wired; not judged',
+    ]);
+    const dry = await runRemediationSweep({
+      mode: 'swift-arch',
+      dryRun: true,
+      loadSwiftArch: async () => metrics,
+      upsert: vi.fn(),
+    });
+    expect(dry.issues).toHaveLength(2);
   });
 
   it('wires the summer-config scan to the existing daily workflow', () => {

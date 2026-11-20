@@ -128,9 +128,7 @@ test('every Electron launch and package path bundles the preload', async () => {
   assert.equal(packageJson.scripts.compile, 'tsc && pnpm run bundle:preload');
   for (const scriptName of [
     'dev',
-    'build:staging',
     'build:production',
-    'package:staging',
     'package:production',
     'package:local',
   ]) {
@@ -162,7 +160,7 @@ test('the production bundle command writes a sandbox-compatible preload', async 
         contextBridge: {
           exposeInMainWorld: (name, api) => exposed.set(name, api),
         },
-        ipcRenderer: { send() {} },
+        ipcRenderer: { send() {}, on() {}, invoke: async () => false },
       }),
     });
     return exposed.get('electronAPI');
@@ -211,6 +209,7 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   assert.equal(await api.notifyComposerReadiness('focused'), true);
   assert.equal(await api.notifyComposerReadiness({ userId: 'private' }), false);
   assert.deepEqual(invoked, [
+    ['desktop-get-full-screen-state'],
     ['desktop-composer-readiness', 'visible-editable'],
     ['desktop-composer-readiness', 'focused'],
   ]);

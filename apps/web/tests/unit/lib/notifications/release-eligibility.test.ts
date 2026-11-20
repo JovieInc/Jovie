@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ingestionSourceTypeEnum } from '@/lib/db/schema/enums';
 import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import {
+  DSP_IMPORTED_RELEASE_SOURCE_TYPE,
   getProfileNotificationReadiness,
   getReleaseNotificationEligibility,
   type ProfileNotificationReadinessInput,
@@ -16,7 +20,7 @@ function eligibilityInput(
     hasSmartLink: true,
     isClaimed: true,
     isTrialing: false,
-    releaseSourceType: 'spotify',
+    releaseSourceType: 'ingested',
     spotifyId: 'spotify_1',
     spotifyImportStatus: 'complete',
     trialNotificationsSent: 0,
@@ -113,6 +117,34 @@ describe('getReleaseNotificationEligibility', () => {
         eligibilityInput({ releaseSourceType: 'manual' })
       )
     ).toEqual({ eligible: false, reason: 'release_not_spotify_imported' });
+  });
+
+  it('blocks admin-entered releases as not-Spotify-imported', () => {
+    expect(
+      getReleaseNotificationEligibility(
+        eligibilityInput({ releaseSourceType: 'admin' })
+      )
+    ).toEqual({ eligible: false, reason: 'release_not_spotify_imported' });
+  });
+
+  // JOV-9779 regression: eligibility compared against 'spotify', a value the
+  // ingestion_source_type enum cannot hold, so no release was ever eligible
+  // and fan_release_notifications stayed at 0 rows in production.
+  it('accepts the exact source type the Spotify import writes', () => {
+    expect(ingestionSourceTypeEnum.enumValues).toContain(
+      DSP_IMPORTED_RELEASE_SOURCE_TYPE
+    );
+    const importSource = readFileSync(
+      resolve(__dirname, '../../../../lib/discography/spotify-import.ts'),
+      'utf8'
+    );
+    const written = [
+      ...importSource.matchAll(/sourceType:\s*'([a-z_]+)'/g),
+    ].map(match => match[1]);
+    expect(written.length).toBeGreaterThan(0);
+    expect(new Set(written)).toEqual(
+      new Set([DSP_IMPORTED_RELEASE_SOURCE_TYPE])
+    );
   });
 
   it('blocks null release source type as not-Spotify-imported', () => {

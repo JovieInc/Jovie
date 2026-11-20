@@ -15,6 +15,7 @@ LogYourBody and the hosted dead-man receipt (canon/automation-registry.jsonl, ge
 from __future__ import annotations
 
 import json
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,7 +30,12 @@ import throughput_sentinel as sentinel
 # These are SEEDS: deploy_lag.py recomputes the limits weekly from the trailing 7 days of real deploys and they replace
 # the seeds once 20 samples exist. Method: each successful deploy that followed a successful deploy, previous head..this head.
 REPOS = {
-    "JovieInc/Jovie": {"label": "jovie", "workflow": "production-controller.yml", "behindCommits": 6, "behindMaxAgeS": 246 * 60},
+    # Jovie measures from the SHA production actually serves: a Production Controller run concludes `success`
+    # when its generation was superseded and nothing deployed (2026-10-29: production sat on 836f596a while
+    # superseded runs read as green deploys). Caps bound the measured limits: page Summer once production is
+    # more than 60 min or 15 commits behind main, whatever the trailing p95 has drifted to.
+    "JovieInc/Jovie": {"label": "jovie", "workflow": "production-controller.yml", "behindCommits": 6, "behindMaxAgeS": 246 * 60,
+                       "buildInfoUrl": "https://jov.ie/api/health/build-info", "capCommits": 15, "capAgeS": 3600},
     "JovieInc/LogYourBody": {"label": "lyb", "workflow": "deploy.yml", "behindCommits": 5, "behindMaxAgeS": 183 * 60},
 }
 REFRESH_S = 300
@@ -74,10 +80,43 @@ def evaluate(repo: str, runs: list[dict], compare: dict | None, now: float) -> d
     return state
 
 
+def read_build_info(url: str, opener=urllib.request.urlopen) -> dict | None:
+    """The live production build (commitSha, deployedAt ms); None when unreadable, never a guess."""
+    try:
+        request = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": "jovie-lanes-deploy-health"})
+        with opener(request, timeout=10) as response:  # noqa: S310 (fixed https origin)
+            body = json.loads(response.read(8192))
+    except (OSError, ValueError):
+        return None
+    sha = body.get("commitSha") if isinstance(body, dict) else None
+    if not (isinstance(sha, str) and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha)):
+        return None
+    deployed = body.get("deployedAt")
+    return {"sha": sha, "deployedAt": deployed / 1000 if isinstance(deployed, (int, float)) and deployed > 0 else None}
+
+
+def release_sample(previous_sha: str, live: dict, compare: dict) -> dict | None:
+    """One release's merge->production lead time from the compare of the previous live SHA to the new one."""
+    commits = compare.get("commits") or []
+    deployed = live.get("deployedAt")
+    if not commits or deployed is None or not isinstance(compare.get("ahead_by"), int):
+        return None
+    date = lambda row: _epoch(((row or {}).get("commit") or {}).get("committer", {}).get("date"))  # noqa: E731
+    oldest, newest = date(commits[0]), date(commits[-1])
+    if oldest is None or newest is None:
+        return None
+    return {"id": live["sha"], "from": previous_sha, "at": deployed, "commits": compare["ahead_by"],
+            "leadTimeS": max(0, int(deployed - newest)), "oldestLeadTimeS": max(0, int(deployed - oldest))}
+
+
 def reasons(state: dict, now: float) -> list[str]:
     spec = REPOS.get(state.get("repo"), {})
     max_commits = state.get("limitCommits", spec.get("behindCommits", 6))
     max_age = state.get("limitAgeS", spec.get("behindMaxAgeS", 246 * 60))
+    if spec.get("capCommits"):
+        max_commits = min(max_commits, spec["capCommits"])
+    if spec.get("capAgeS"):
+        max_age = min(max_age, spec["capAgeS"])
     out = []
     if state.get("status") == "failing":
         since = state.get("failingSince")
@@ -123,7 +162,8 @@ def feed_block(sample: dict | None, now: float) -> dict | None:
             "healthy": not alerts, "repos": repos}
 
 
-def sample(state_dir: Path, now: float, run=None, repos: dict | None = None) -> tuple[dict | None, str | None]:
+def sample(state_dir: Path, now: float, run=None, repos: dict | None = None,
+           build_info=read_build_info) -> tuple[dict | None, str | None]:
     """Read every repo (4 REST calls per 5 min at poll priority), cache the sample, keep going past one repo's failure."""
     path = Path(state_dir) / "deploy-health.json"
     try:
@@ -153,10 +193,26 @@ def sample(state_dir: Path, now: float, run=None, repos: dict | None = None) -> 
             limits[repo] = deploy_lag.limits_or_seed(store, spec["behindCommits"], spec["behindMaxAgeS"])
             lag[repo] = deploy_lag.lag_summary(store, now)
             first = evaluate(repo, runs, None, now)
+            live = build_info(spec["buildInfoUrl"]) if spec.get("buildInfoUrl") else None
+            base = live["sha"] if live else first["lastSuccessSha"]
             compare = None
-            if first["lastSuccessSha"]:
-                compare = sentinel._gh_json(run, f"repos/{repo}/compare/{first['lastSuccessSha']}...main")
-            out[repo] = {**evaluate(repo, runs, compare, now), "limitCommits": limits[repo]["commits"], "limitAgeS": limits[repo]["ageS"]}
+            if base:
+                compare = sentinel._gh_json(run, f"repos/{repo}/compare/{base}...main")
+            extra = {"measuredFrom": "build-info" if live else "controller-run"}
+            if live:
+                extra.update(liveSha=live["sha"], liveDeployedAt=live["deployedAt"])
+                prior = (previous.get(repo) or {}).get("liveSha")
+                if prior and prior != live["sha"]:
+                    try:  # one compare per release; the measurement never blocks the alarm
+                        row = release_sample(prior, live, sentinel._gh_json(run, f"repos/{repo}/compare/{prior}...{live['sha']}"))
+                        if row:
+                            store = deploy_lag.record_release(store, row, now)
+                            deploy_lag.save(state_dir, spec["label"], store)
+                            lag[repo] = deploy_lag.lag_summary(store, now)
+                    except Exception as error:  # noqa: BLE001
+                        errors.append(f"{repo} lead time: {type(error).__name__}: {str(error)[:80]}")
+            out[repo] = {**evaluate(repo, runs, compare, now), **extra,
+                         "limitCommits": limits[repo]["commits"], "limitAgeS": limits[repo]["ageS"]}
         except Exception as error:  # noqa: BLE001 - an unreadable repo keeps its last state, never reads as healthy-new
             errors.append(f"{repo}: {type(error).__name__}: {str(error)[:100]}")
             if repo in previous:

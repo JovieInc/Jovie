@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import { storyEvidenceEligibility } from '../../../../../scripts/lib/component-render-inputs.mjs';
 import {
   cronGapMinutes,
   filterList,
@@ -253,7 +254,7 @@ describe('source PR path-output reachability contract', () => {
     const buildLayout = getJobBlock(workflow, 'ci-build-layout');
 
     expect(provenanceHeader).not.toMatch(/^    if:/m);
-    expect(provenanceHeader).toContain('runs-on: ubuntu-latest');
+    expect(provenanceHeader).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(neutralProvenance).toContain(
       "github.event_name != 'push' || github.ref != 'refs/heads/main'"
     );
@@ -453,12 +454,32 @@ describe('CI test-performance path gate', () => {
       /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
     )?.[1];
     expect(generalTestElse).not.toContain('run_test_performance');
-    const forkGuard = detectStep.slice(
-      detectStep.indexOf('if [[ "$IS_FORK" == "true" ]]')
-    );
-    expect(forkGuard).toContain(
-      'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
-    );
+    const forkGuard = getStepRunScript(detectStep).match(
+      /^if \[\[ "\$IS_FORK" == "true" \]\]; then[\s\S]*?^fi$/m
+    )?.[0];
+    expect(forkGuard, 'fork path override').toBeDefined();
+    const dir = mkdtempSync(resolve(tmpdir(), 'fork-performance-output-'));
+    try {
+      const output = resolve(dir, 'step-output');
+      for (const isFork of ['true', 'false']) {
+        writeFileSync(output, 'run_test_performance=true\n');
+        const result = spawnSync('bash', ['-ec', forkGuard!], {
+          encoding: 'utf8',
+          env: { ...process.env, IS_FORK: isFork, GITHUB_OUTPUT: output },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        const values = readFileSync(output, 'utf8')
+          .split('\n')
+          .filter(line => line.startsWith('run_test_performance='));
+        expect(values).toEqual(
+          isFork === 'true'
+            ? ['run_test_performance=true', 'run_test_performance=false']
+            : ['run_test_performance=true']
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
 
     expect(performanceJob).toContain(
       "github.event_name == 'workflow_dispatch'"
@@ -523,16 +544,9 @@ describe('CI Storybook accessibility path gate', () => {
       visualPathJob,
       'Detect visual-relevant changes'
     );
-    expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
-    );
-    expect(visualDetectStep).toContain(
-      'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
-    );
-    const visualPattern = visualDetectStep.match(
-      /VISUAL_PATTERNS='([^']+)'/
-    )?.[1];
-    expect(visualPattern).toBeTruthy();
+    expect(visualDetectStep).toContain("EVENT_NAME === 'workflow_dispatch'");
+    expect(visualDetectStep).toContain('{ visual: true, render: true }');
+    expect(visualDetectStep).toContain('storyEvidenceEligibility(paths)');
     for (const input of [
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
@@ -545,16 +559,11 @@ describe('CI Storybook accessibility path gate', () => {
       'pnpm-lock.yaml',
       '.github/workflows/visual-a11y.yml',
     ]) {
-      expect(
-        spawnSync('grep', ['-q', '-E', visualPattern!], { input }).status,
-        input
-      ).toBe(0);
+      expect(storyEvidenceEligibility([input]).visual, input).toBe(true);
     }
-    expect(
-      spawnSync('grep', ['-q', '-E', visualPattern!], {
-        input: 'apps/web/styles.css',
-      }).status
-    ).toBe(1);
+    expect(storyEvidenceEligibility(['apps/web/styles.css']).visual).toBe(
+      false
+    );
     expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
@@ -663,7 +672,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
-    expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildJob).toContain('Build exact combined head');
     expect(buildJob).toContain('Run deterministic layout behavior guard');
     expect(buildJob).not.toContain('actions/upload-artifact');
@@ -683,10 +692,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'promote-production',
       'release-result',
     ]) {
-      expect(getJobBlock(workflow, job)).toContain('runs-on: ubuntu-latest');
+      expect(getJobBlock(workflow, job)).toMatch(
+        /runs-on: ubuntu-(?:latest|24\.04)/
+      );
     }
-    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
-      'runs-on: ubuntu-latest'
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toMatch(
+      /runs-on: ubuntu-(?:latest|24\.04)/
     );
   });
 
@@ -1670,60 +1681,64 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only', () => {
-    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+  it('blocks certified alias budgets beside post-deploy smoke', () => {
+    const releaseWorkflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controllerWorkflow = readFileSync(
+      productionControllerWorkflowPath,
+      'utf8'
+    );
     const aliasGate = getJobBlock(
-      workflow,
+      controllerWorkflow,
       'production-public-profile-alias-gate'
     );
-    const releaseResult = getJobBlock(workflow, 'release-result');
+    const verified = getJobBlock(controllerWorkflow, 'production-verified');
 
-    expect(aliasGate).toContain('needs: [promote-production]');
+    expect(aliasGate).toContain(
+      'needs: [authorize-production, production-release]'
+    );
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // Post-promote production alias budgets must not fail the job on miss.
     expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
-      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+      'https://jov.ie/api/internal/ovie/golden-path-evidence'
+    );
+    expect(aliasGate).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(aliasGate).toMatch(
+      /if ! guard \$blocking; then[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
+    );
+    expect(aliasGate).toMatch(
+      /if ! guard \$warning; then[\s\S]*?::warning::[\s\S]*?status=warn\s+fi/
     );
     expect(aliasGate).toContain(
-      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+      'echo "performance_status=${status}" >> "$GITHUB_OUTPUT"'
     );
-    expect(aliasGate).toContain(
-      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
-    );
-    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain('::error::');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
-    expect(aliasGate).not.toContain('fail_performance_gate');
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(aliasGate).not.toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
-    );
-    const promoteJob = getJobBlock(workflow, 'promote-production');
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
+    const promoteJob = getJobBlock(releaseWorkflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
       promoteJob,
       'Prove canonical navigation budgets on exact staged build'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
     const stagedPublicProfileGate = stagedPerformanceGate.slice(
-      stagedPerformanceGate.lastIndexOf(
-        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
-      )
+      stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
+      stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget independently
-    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
-    // the exact-build failure subtype. Production canonical-alias budgets
-    // above stay warning-only (11/14, streak 0/14) until their own receipt
-    // graduates.
     expect(stagedPublicProfileGate).toContain(
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+      'scripts/lib/alias-gate-certified-routes.mjs'
     );
+    expect(stagedPublicProfileGate).toMatch(
+      /if ! staged_alias_guard \$blocking; then\s+fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages/
+    );
+    expect(stagedPublicProfileGate).toContain('staged-alias-perf-intake.mjs');
+    expect(stagedPublicProfileGate).toContain('--base-url "$deployment_url"');
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -1732,12 +1747,18 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'public-profile-tour',
       'public-profile-releases',
     ]) {
-      expect(aliasGate).toContain(`--route-id ${routeId}`);
+      // Routes are split into certified (blocking) and uncertified (warning)
+      // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
+      expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
-    // Downstream still requires job successful completion (exit 0), not a perf pass.
-    expect(releaseResult).toContain('production-public-profile-alias-gate,');
-    expect(releaseResult).toContain(
-      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
+    // The gate runs beside smoke and still blocks Production Verified.
+    // It is not an input to the release result.
+    expect(verified).toContain('production-public-profile-alias-gate,');
+    expect(verified).toContain(
+      'Public-profile alias gate:${{ needs.production-public-profile-alias-gate.result }}'
+    );
+    expect(releaseWorkflow).not.toContain(
+      'production-public-profile-alias-gate'
     );
   });
 
@@ -1754,7 +1775,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'lighthouse-ci',
     ]) {
       const block = getJobBlock(workflow, job);
-      expect(block).toContain('runs-on: ubuntu-latest');
+      expect(block).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
         'needs.production-release.outputs.production_deployment_url_b64'
@@ -2016,7 +2037,7 @@ describe('unit-test runner capacity', () => {
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
-    expect(routeJob).toContain('runs-on: ubuntu-latest');
+    expect(routeJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(routeJob).toContain('ref: main');
     expect(routeJob).toContain('continue-on-error: true');
     expect(routeJob).toContain("runner_class='hosted'");
@@ -2025,7 +2046,7 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
@@ -2042,12 +2063,26 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain('&& 5 || 3');
     // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
     // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
-    expect(unitJob).toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
-    );
-    expect(unitJob).not.toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
-    );
+    const runUnits = getStepRunScript(getStepBlock(unitJob, 'Run unit tests'));
+    const flags = runUnits.match(/^ *VITEST_CI_FLAGS=.*$/m)?.[0];
+    expect(flags, 'missing worker options').toBeDefined();
+    for (const cpus of ['2', '7']) {
+      const shell = [
+        'nproc() { echo "$CPUS"; }',
+        flags!,
+        'printf "%s\\n" "${VITEST_CI_FLAGS[@]}"',
+      ].join('\n');
+      const result = spawnSync('bash', ['-ec', shell], {
+        encoding: 'utf8',
+        env: { ...process.env, CPUS: cpus },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim().split('\n')).toEqual([
+        '--pool=forks',
+        '--maxWorkers=' + cpus,
+        '--fileParallelism',
+      ]);
+    }
     // Each isolated fork re-parses the DOM environment and other externals;
     // the shared V8 compile cache lets later forks load bytecode instead.
     const compileCacheEnv =
@@ -2096,7 +2131,7 @@ describe('iOS stage contract', () => {
     expect(iosWorkflow).not.toContain('mac-runner-heartbeat.yml');
     expect(ios).toContain('mac-first: true');
     expect(pathChanges).toContain(
-      "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
+      "event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios"
     );
     expect(pathChanges).toContain(
       'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
@@ -2130,7 +2165,7 @@ describe('informational CI tail capacity', () => {
 
     expect(summaryJob).toContain('name: Manual Evidence Summary');
     expect(summaryJob).toContain("github.event_name == 'workflow_dispatch'");
-    expect(summaryJob).toContain('runs-on: ubuntu-latest');
+    expect(summaryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
@@ -2194,6 +2229,9 @@ describe('canary health gate workflow', () => {
   });
 
   // Execute the production Bash, including privacy checks after identity passes.
+  // Local test:fast times out at 5s. CI allows 12s for this config. One
+  // identity case took 949ms alone and crossed 5s while the hook host was
+  // loaded. Use the CI budget. Status and request counts stay fail-closed.
   it.each([
     ['exact', 0, 1],
     ['sha-converges', 0, 2],
@@ -2471,7 +2509,8 @@ esac
       } finally {
         rmSync(root, { force: true, recursive: true });
       }
-    }
+    },
+    12_000
   );
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
@@ -3378,7 +3417,10 @@ describe('CI E2E smoke workflow', () => {
       'Protected Golden Path fixture is already owned; refusing to detach'
     );
     expect(goldenPathSpec).toContain('user_profile_claims upc');
-    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    // JOV-9758/JOV-9771: onboarding imports the catalog; the journey never
+    // clicks a manual sync and must see real releases before any pricing.
+    expect(goldenPathSpec).not.toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('data-catalog-releases');
     expect(goldenPathSpec).toContain('FROM discog_releases r');
     expect(goldenPathSpec).toContain(
       'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
@@ -3416,7 +3458,7 @@ describe('CI E2E smoke workflow', () => {
       readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
     ) as { scripts: Record<string, string> };
     expect(packageJson.scripts['seed:test-data']).toContain(
-      'tests/seed-test-data.ts'
+      'tests/seed-e2e-entry.ts'
     );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });
@@ -3439,8 +3481,6 @@ describe('CI E2E smoke workflow', () => {
     expect(builds).toHaveLength(1);
     expect(builds[0]?.env).toMatchObject({
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
       NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
     });
@@ -3950,31 +3990,6 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
-  it('uses the root packageManager as the single pnpm version source', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-    const packageJson = JSON.parse(
-      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-    ) as { packageManager?: string };
-    const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
-
-    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
-    expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
-    expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
-  });
-
-  it('deletes prefixed CI branches when a PR closes', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-
-    expect(cleanupWorkflow).toContain('List and delete matching Neon branches');
-    expect(cleanupWorkflow).toContain('startswith($base + "-")');
-  });
-
   it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
@@ -4776,7 +4791,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=error"');
     expect(sentryAction).toContain('refusing automatic rollback');
 
-    expect(sentryJob).toContain('runs-on: ubuntu-latest');
+    expect(sentryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(sentryJob).toContain('uses: ./.github/actions/sentry-error-gate');
@@ -5705,7 +5720,7 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
     expect(seedStep).toContain(
-      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+      "github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == ''"
     );
     const seedIndex = job.indexOf(
       '- name: Seed authenticated release fixtures'

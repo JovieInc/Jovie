@@ -7,6 +7,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
+import { canSetUpPublicProfile } from '@/lib/profile/profile-setup-eligibility';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 import { markWaitlistSignedUpInTx } from '@/lib/waitlist/signup';
@@ -95,11 +96,7 @@ export async function completeMobileProfile(
           'Your account could not be loaded.'
         );
       }
-      if (
-        user.userStatus === 'banned' ||
-        user.userStatus === 'suspended' ||
-        user.userStatus === 'waitlist_pending'
-      ) {
+      if (!canSetUpPublicProfile(user.userStatus)) {
         throw new MobileProfileCompletionError(
           'forbidden',
           'This account cannot complete profile setup.'

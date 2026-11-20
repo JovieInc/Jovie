@@ -21,6 +21,9 @@ vi.mock('@/lib/spotify/client', () => ({
     searchArtists: mocks.spotifySearch,
   },
 }));
+vi.mock('@/lib/music-resolver/resolve-parity.server', () => ({
+  scheduleResolveParity: () => false,
+}));
 vi.mock('@/lib/spotify/blacklist', () => ({
   isBlacklistedSpotifyId: () => false,
 }));

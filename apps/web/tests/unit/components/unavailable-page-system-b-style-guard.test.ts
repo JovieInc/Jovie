@@ -35,7 +35,7 @@ describe('UnavailablePage System B style guard', () => {
       'utf8'
     );
     const unavailableCss = source.match(
-      /:where\(\.system-b-unavailable-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B START LOADING PRIMITIVES/
+      /:where\(\.system-b-unavailable-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B SHELL LOADING PRIMITIVES/
     )?.[0];
 
     expect(unavailableCss).toContain('var(--system-b-bg-page)');

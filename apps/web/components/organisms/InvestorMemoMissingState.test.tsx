@@ -38,9 +38,9 @@ describe('web-187 investor memo missing-state source contract', () => {
     expect(routeSource).toContain('async function requireInvestorAccess()');
     expect(routeSource).toContain('await getInvestorPortalAccess()');
     expect(routeSource).toContain('if (!page)');
-    expect(routeSource.match(/notFound\(\)/g)).toHaveLength(2);
+    expect(routeSource.match(/notFound\(\)/g)).toHaveLength(3);
     expect(routeSource).toContain(
-      'getMarkdownDocument(`investors/${page.file}`)'
+      'readInvestorPrivateText(`content/investors/${page.file}`)'
     );
     expect(routeSource).toContain('<MemoContent');
 

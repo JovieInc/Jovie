@@ -1,3 +1,4 @@
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -47,11 +48,11 @@ const baseDashboardData: DashboardData = {
         href: '/app/settings/profile',
       },
       {
-        id: 'email',
-        label: 'Add your account email',
+        id: 'handle',
+        label: 'Claim your handle',
         description:
-          'Email keeps your account recoverable and mission-critical.',
-        href: '/app/dashboard/earnings',
+          'Your jov.ie handle is how fans find and share your profile.',
+        href: '/app/settings/profile',
       },
     ],
     profileIsLive: false,
@@ -72,7 +73,7 @@ describe('ProfileCompletionCard', () => {
 
     expect(getByText('Your profile is not live yet')).toBeDefined();
     expect(getByText('Add a profile photo')).toBeDefined();
-    expect(getByText('Add your account email')).toBeDefined();
+    expect(getByText('Claim your handle')).toBeDefined();
   });
 
   it('does not crash when profileCompletion is missing', () => {
@@ -123,5 +124,55 @@ describe('ProfileCompletionCard', () => {
     });
 
     expect(queryByText(/Your profile is/)).toBeNull();
+  });
+
+  describe('dismissal on page load', () => {
+    const liveCompletion: DashboardData['profileCompletion'] = {
+      percentage: 80,
+      completedCount: 4,
+      totalCount: 4,
+      steps: [
+        {
+          id: 'avatar',
+          label: 'Add a profile photo',
+          description: 'A recognizable photo makes your page feel personal.',
+          href: '/app/settings/profile',
+        },
+      ],
+      profileIsLive: true,
+    };
+
+    function serverMarkup(overrides: Partial<DashboardData>) {
+      return renderToString(
+        <DashboardDataProvider value={{ ...baseDashboardData, ...overrides }}>
+          <ProfileCompletionCard />
+        </DashboardDataProvider>
+      );
+    }
+
+    it('renders nothing for a live profile before the dismissal is read', () => {
+      // The server pass and the first client frame can't read localStorage.
+      // Showing the card there made it flash for users who dismissed it.
+      expect(serverMarkup({ profileCompletion: liveCompletion })).toBe('');
+    });
+
+    it('still renders a not-live profile on the first pass', () => {
+      expect(serverMarkup({})).toContain('Your profile is not live yet');
+    });
+
+    it('stays hidden after mount once a live profile was dismissed', () => {
+      localStorage.setItem(
+        'jovie_profile_completion_dismissed:profile-1:80',
+        '1'
+      );
+      try {
+        const { queryByText } = renderCard({
+          profileCompletion: liveCompletion,
+        });
+        expect(queryByText(/Your profile is/)).toBeNull();
+      } finally {
+        localStorage.clear();
+      }
+    });
   });
 });

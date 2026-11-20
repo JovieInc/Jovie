@@ -5,7 +5,12 @@
  */
 
 import type Stripe from 'stripe';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import {
+  resolvePlanFromPriceIds,
+  subscriptionPriceIds,
+} from '@/lib/stripe/subscription-plan';
 import { extractCustomerId } from './subscription-status-resolver';
 
 /**
@@ -35,20 +40,53 @@ export async function fixStatusMismatch(
   expectedIsPro: boolean
 ): Promise<StatusMismatchFixResult> {
   const customerId = extractCustomerId(subscription.customer);
-
-  const result = await updateUserBillingStatus({
+  const base = {
     clerkUserId: user.clerkId ?? user.id,
-    isPro: expectedIsPro,
     stripeSubscriptionId: expectedIsPro ? subscription.id : null,
     stripeCustomerId: customerId ?? undefined,
-    eventType: 'reconciliation_fix',
-    source: 'reconciliation',
+    eventType: 'reconciliation_fix' as const,
+    source: 'reconciliation' as const,
     metadata: {
       reason: 'status_mismatch',
       dbIsPro: user.isPro,
       stripeStatus: subscription.status,
       expectedIsPro,
     },
+  };
+
+  if (!expectedIsPro) {
+    const result = await updateUserBillingStatus({ ...base, isPro: false });
+    return { success: result.success, error: result.error };
+  }
+
+  // Grant the plan the subscription's price maps to, exactly as the webhook
+  // does. Never default it: that downgraded Max subscribers to Pro. An
+  // unmappable price is left for manual reconciliation, not guessed.
+  const priceIds = subscriptionPriceIds(subscription);
+  const resolved = resolvePlanFromPriceIds(priceIds);
+  if (!resolved) {
+    // A paying customer stays Free until someone maps the price: alert, like
+    // the webhook path does, instead of only counting a batch error.
+    await captureCriticalError(
+      'Reconciliation cannot map subscription price to a plan',
+      new Error('unknown_price_id'),
+      {
+        userId: user.id,
+        subscriptionId: subscription.id,
+        priceIds,
+        route: '/api/cron/billing-reconciliation',
+      }
+    );
+    return {
+      success: false,
+      error: `unknown_price_id: ${priceIds.join(',') || 'none'}`,
+    };
+  }
+  const result = await updateUserBillingStatus({
+    ...base,
+    isPro: true,
+    plan: resolved.plan,
+    stripePriceId: resolved.priceId,
   });
 
   return {

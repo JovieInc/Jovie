@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertPrimaryRailInvariants,
-  buildLauncherControl,
   filterLaunchers,
   githubPullsUrl,
+  isLocalOnlyLauncher,
   OVIE_LAUNCHER_CATALOG,
   OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS,
   type OvieLauncherControl,
   originFromUrl,
   publicHref,
   rankLaunchers,
+  reachableLaunchers,
   resolveLauncherDestination,
   stripSecrets,
   whyForControl,
@@ -141,30 +142,45 @@ describe('ovie-launchers inventory', () => {
     );
   });
 
-  it('keeps Symphony on SSH, searchable, and off the homemade 4041 API', () => {
-    const symphony = resolveLauncherDestination(item('symphony'), {
-      symphonySshHost: 'evil.example',
-    });
-    expect(symphony.href).toBeUndefined();
-    expect(symphony.sshHost).toBe('gem');
-    expect(symphony.display).toBe('ssh gem');
-    expect(
-      buildLauncherControl({
-        definition: item('symphony'),
-        destination: symphony,
-        status: 'ready',
-        timActionCount: 0,
-      }).why
-    ).not.toMatch(/4041/);
+  it('replaces the retired Symphony TUI with an in-app Fleet link', () => {
+    expect(OVIE_LAUNCHER_CATALOG.some(row => row.id === 'symphony')).toBe(
+      false
+    );
+    const fleet = resolveLauncherDestination(item('fleet'), {});
+    expect(fleet.href).toBe('/app/ov/operations');
+    expect(fleet.sshHost).toBeUndefined();
     const matches = filterLaunchers(
       rankLaunchers({
         destinations: destinations({ gbrainApiUrl: 'http://127.0.0.1:7801' }),
         state: QUIET,
       }).all,
-      'symphony tui'
+      'symphony'
     );
-    expect(matches.map(row => row.id)).toEqual(['symphony']);
-    expect(matches[0]?.destinationDisplay).toMatch(/^ssh /);
+    expect(matches.map(row => row.id)).toContain('fleet');
+    expect(matches.map(row => row.id)).not.toContain('symphony');
+  });
+
+  it('hides loopback and SSH launchers from surfaces that cannot reach them', () => {
+    const all = rankLaunchers({
+      destinations: destinations({}),
+      state: QUIET,
+    }).all;
+    const web = reachableLaunchers(all, false).map(row => row.id);
+    expect(web).toEqual(
+      expect.arrayContaining(['fleet', 'github-prs', 'vercel'])
+    );
+    expect(web).not.toContain('hermes');
+    expect(web).not.toContain('gbrain');
+    expect(reachableLaunchers(all, true).map(row => row.id)).toEqual(
+      expect.arrayContaining(['hermes', 'gbrain', 'fleet'])
+    );
+    const publicGbrain = rankLaunchers({
+      destinations: destinations({
+        gbrainApiUrl: 'https://gbrain.example.com',
+      }),
+      state: QUIET,
+    }).all.find(row => row.id === 'gbrain');
+    expect(publicGbrain && isLocalOnlyLauncher(publicGbrain)).toBe(false);
   });
 
   it('explains ready, missing, and failed launcher preflight', () => {

@@ -814,6 +814,11 @@
           "kind": "runtime_blocker",
           "ref": "gbrain://jovie/marketing-public-certification-profile-claim-contract-drift-2026-09-01",
           "summary": "Exact staging main 40a22c61 passed 56/57 public surfaces. Protected testartist correctly redirects to root; certification needs separate positive allowed-fixture preview and negative protected-fixture redirect invariants without weakening identity policy."
+        },
+        {
+          "kind": "source_gap",
+          "ref": "docs/operations/evidence/summer-revenue-readiness-2026-10-26.jsonl",
+          "summary": "Dated JOV-7701 acceptance index: local fail-closed admission/evidence repairs and provider observations; full deployed journey, measurement integrity, scheduled repair cycle and human authorization remain unverified. This index does not renew runtime certification or authorize admissions."
         }
       ],
       "lastVerified": null,

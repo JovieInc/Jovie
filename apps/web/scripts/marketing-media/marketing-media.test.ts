@@ -48,6 +48,7 @@ const request: ImageGenerationRequest = {
   width: 1600,
   height: 900,
   brief: 'editorial background behind a headline',
+  quietZone: { position: 'left third', size: '42% of the frame width' },
 };
 
 const spawnReturning =
@@ -199,6 +200,9 @@ describe('fal image adapter', () => {
     expect(url).toBe(`https://fal.run/${FAL_DEFAULT_MODEL}`);
     expect(init.headers.Authorization).toBe('Key secret');
     expect(init.body).not.toContain('secret');
+    expect(init.body).toContain('Quiet content zone: left third');
+    expect(init.body).toContain('Size: 42% of the frame width');
+    expect(init.body).toContain('Never blow the zone out');
     expect(adapter.family).toBe('bfl');
   });
 

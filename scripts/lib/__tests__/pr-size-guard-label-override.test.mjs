@@ -118,7 +118,12 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).not.toContain('ready_for_review');
     expect(workflow).not.toMatch(/types:\s*\[[^\]]*labeled/);
     expect(workflow).toContain(
-      "group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}"
+      "group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || format('{0}-{1}', github.event.pull_request.number, github.run_id) }}"
+    );
+    // A shared per-PR group lets GitHub cancel the older pending run when a
+    // second queues; pull_request groups must stay unique per run.
+    expect(workflow).not.toMatch(
+      /group: pr-size-\$\{\{[^\n]*pull_request\.number \}\}\s*$/m
     );
     expect(workflow).toContain(
       "cancel-in-progress: ${{ github.event_name == 'merge_group' }}"

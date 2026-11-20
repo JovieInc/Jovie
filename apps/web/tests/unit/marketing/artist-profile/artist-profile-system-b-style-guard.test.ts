@@ -119,7 +119,7 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(outcomes).toContain("aria-label='Fan Outcomes'");
+    expect(outcomes).toContain("aria-label='Audience Outcomes'");
     expect(outcomes).not.toContain('MarketingSnapRail');
     expect(outcomes).not.toContain('scrollByDirection');
 

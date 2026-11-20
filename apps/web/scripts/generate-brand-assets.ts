@@ -48,7 +48,6 @@ const DESKTOP_ASSETS_DIR = resolve(REPO_ROOT, 'apps/desktop/assets');
 const CONTACT_SHEET_PATH = resolve(BRAND_DIR, 'jovie-icon-contact-sheet.png');
 const STALE_DESKTOP_ICON_CACHE_DIRS = [
   resolve(DESKTOP_ASSETS_DIR, 'icon.iconset'),
-  resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset'),
 ] as const;
 const MAC_ICONSET_ENTRIES = [
   ['icon_16x16.png', 16],
@@ -300,18 +299,9 @@ async function generateIosIcons(): Promise<void> {
 async function generateDesktopIcons(): Promise<void> {
   await clearStaleDesktopIconCaches();
   await renderDesktopAppIcon(resolve(DESKTOP_ASSETS_DIR, 'icon.png'), 512);
-  await renderDesktopAppIcon(
-    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.png'),
-    512
-  );
   await generateMacIcns(
     resolve(DESKTOP_ASSETS_DIR, 'icon.icns'),
     resolve(DESKTOP_ASSETS_DIR, 'icon.iconset'),
-    renderDesktopAppIcon
-  );
-  await generateMacIcns(
-    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.icns'),
-    resolve(DESKTOP_ASSETS_DIR, 'icon-staging.iconset'),
     renderDesktopAppIcon
   );
 }

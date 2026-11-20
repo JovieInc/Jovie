@@ -211,6 +211,27 @@ export function resolveMergeGroupPathDiff({
 
   const eventDiff = diffNameOnlyThreeDot(git, eventBase, headSha);
   if (eventDiff.ok && eventDiff.files.length > 0) {
+    // HEADGREEN lands every entry ahead of a green head, so the head must
+    // select lanes for everything it contains, not only its own diff. The
+    // event base is the entry ahead; a docs-only head used to skip the
+    // structural lane and land a red #23600 (2026-10-29). Widen to the union
+    // with the live-main merge-base diff when it adds files.
+    const live = resolveLiveMainChangedFiles({
+      git,
+      headSha,
+      liveMainRef,
+      fetchLiveMain,
+    });
+    const known = new Set(eventDiff.files);
+    if (live.mergeBase && live.files.some(file => !known.has(file))) {
+      return {
+        files: [...new Set([...eventDiff.files, ...live.files])].sort(),
+        source: 'live_main_merge_base',
+        isNoop: false,
+        baseSha: live.mergeBase,
+        headSha,
+      };
+    }
     return {
       files: eventDiff.files,
       source: 'event_base',

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
 import userEvent from '@testing-library/user-event';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import {
@@ -20,10 +21,12 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { CmdKPalette } from './CmdKPalette';
 
+const allDim = (r: HTMLElement[]) =>
+  r.every(x => x.getAttribute('aria-disabled'));
+
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
 const onOpenChangeMock = vi.fn();
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
@@ -37,11 +40,9 @@ vi.mock('next/image', () => ({
     <span data-testid='img' data-src={src} data-alt={alt} />
   ),
 }));
-
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: [], isLoading: false }),
 }));
-
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   useArtistSearchQuery: () => {
     const [query, setQuery] = useState('');
@@ -58,7 +59,6 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     };
   },
 }));
-
 vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   useChatCapabilitiesQuery: () => ({
     data: {
@@ -154,6 +154,54 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('filters and commits operator rows while excluding customer commands', () => {
+    const onAdditionalSelect = vi.fn();
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        operatorMode
+        onOpenChange={onOpenChange}
+        onAdditionalSelect={onAdditionalSelect}
+        additionalSectionsAfter={[
+          {
+            id: 'ovie-go',
+            label: 'Go To',
+            items: [
+              {
+                kind: 'nav',
+                nav: {
+                  kind: 'nav',
+                  id: 'ovie-go:home',
+                  label: 'Operator Home',
+                  description: 'Company overview',
+                  iconName: 'ArrowRight',
+                  surfaces: ['cmdk'],
+                  href: APP_ROUTES.ADMIN_NOW,
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'Contacts' } });
+    expect(allDim(screen.queryAllByRole('option'))).toBe(true);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(onAdditionalSelect).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'Operator Home' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onAdditionalSelect).toHaveBeenCalledExactlyOnceWith('ovie-go:home');
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
   it('constrains dialog search to the compact presentation column', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
@@ -348,7 +396,7 @@ describe('CmdKPalette', () => {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'totally-absent-command' } });
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(allDim(screen.queryAllByRole('option'))).toBe(true);
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'Enter' });

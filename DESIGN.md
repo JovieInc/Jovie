@@ -8,8 +8,7 @@
 Read this execution contract before UI work. Load only the relevant section of
 [design details](docs/design-system/DETAILS.md) for the component or surface being changed.
 Token values come from the source registries below. Historical decisions describe
-past state; the newest founder-locked decision governs. For instruction-only edits,
-verify policy preservation and links; screenshots apply when rendered UI changes.
+past state; the newest founder-locked decision governs.
 
 Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
@@ -107,6 +106,10 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 
 Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
 
+## No Dead Ends (JOV-INV-046)
+
+Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
+
 ## Use Tokens, Not Raw Colors
 
 Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
@@ -137,15 +140,15 @@ CI lanes are path-selected; blocking failures fail the required aggregate:
   `pnpm --filter @jovie/web lint:contrast-ratchet` and the optical-grid tests.
 - **G** — Source Validation → `merge-group-unit-guards` on web/UI source PRs;
   `ci-fast` → Merge-group unit guards on selected merge groups. Both run
-  `tests/unit/design-system` through Vitest.
+  `tests/unit/design-system` in Vitest.
 - **D** — `ci-fast` → Design governance enforcement, including
   `lint:touch-target` and `lint:ui-feel`.
 - **I** — `ci-fast` → Design-system source identity ratchet,
   `pnpm design:source-count-ratchet`.
 
-The commands and selectors live in [ci-fast-lanes.mjs](scripts/ci-fast-lanes.mjs).
-Rule severities come from [the web ESLint config](apps/web/eslint.config.js).
-Count baselines live in [the design-system test directory](apps/web/tests/unit/design-system/)
+Commands and selectors: [ci-fast-lanes.mjs](scripts/ci-fast-lanes.mjs).
+Rule severities: [the web ESLint config](apps/web/eslint.config.js).
+Count baselines: [the design-system test directory](apps/web/tests/unit/design-system/)
 unless linked below.
 
 | Gate | Severity | CI lane | Blocks? | Committed baseline |
@@ -153,18 +156,19 @@ unless linked below.
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
-| `arbitrary-values` | `error` | G + I | Yes | 2167 |
+| `arbitrary-values` | `error` | G + I | Yes | 1674 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
-| `linear-namespace` | `error` | G + I | Yes | 700 |
-| `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2055 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
+| `linear-namespace` | `error` | G + I | Yes | 687 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2991 messages (grandfathered) |
+| `off-scale-step` | `error` | G + I | Yes | None; vs base |
+| `source-identity` | `error` | I | Yes | 1907 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 587; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=241 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=264; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=253; missingTabularNums=70; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
@@ -176,10 +180,10 @@ The radius detector is active in `concentric-radius-contract.test.ts`.
 Component-family has `WARN_ONLY = false` and also enforces the explicit
 EmptyState path allowlist. Spacing's strict inventory is report-only;
 conservative growth blocks, including per-family ceilings. The source-identity
-gate blocks new `file + rule + value` identities (including arbitrary CSS
-properties), even when total counts stay flat. It also checks the arbitrary-value
-and linear-namespace count ceilings. Lower count baselines in the same PR when
-removing debt; see each detector's shrink policy for merge-group behavior.
+gate blocks new `file + rule + value` identities (arbitrary CSS properties,
+off-scale `h-7.25` steps) at flat counts, and the arbitrary-value and
+linear-namespace ceilings. Lower count baselines in the same PR when removing
+debt; see each detector's shrink policy for merge-group behavior.
 
 The [no-restyle baseline](apps/web/tests/unit/design-system/shadcn-no-restyle.baseline.json)
 grants exact legacy paths a lint override; the changed-file baseline probe and

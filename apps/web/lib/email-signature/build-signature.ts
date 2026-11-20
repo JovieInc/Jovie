@@ -7,8 +7,8 @@
  */
 
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { viaJovieQuery } from '@/lib/growth/loop-links';
 import { detectPlatformByHost } from '@/lib/utils/platform-detection';
-
 import { getEmailSignatureIconUrl } from './social-icons';
 
 export interface EmailSignatureSocial {
@@ -43,8 +43,7 @@ export interface BuiltEmailSignature {
 const FONT_STACK =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 
-const UTM_FOOTER_SUFFIX =
-  '?utm_source=email_signature&utm_medium=referral&utm_campaign=branding';
+const UTM_FOOTER_SUFFIX = viaJovieQuery('email_signature');
 
 function escapeHtml(value: string): string {
   return value

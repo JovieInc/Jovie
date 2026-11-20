@@ -1,6 +1,10 @@
 import 'server-only';
 import { type ToolSet, tool, type UIMessage } from 'ai';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
   type AccessDecision,
@@ -10,10 +14,16 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import { captureOnboardingWant } from '@/lib/chat/tools/onboarding-want-capture';
 import {
   type CanonicalArtistMetrics,
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
+import {
+  type OnboardingCatalogPreview,
+  readOnboardingCatalogPreview,
+} from '@/lib/onboarding/catalog-preview';
+import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
 import {
   buildSpotifyEnrichedFacts,
   spotifyEnrichmentSubjectId,
@@ -23,9 +33,14 @@ import {
   normalizeHandleCandidate,
   toHandleAvailabilityResult,
 } from '@/lib/onboarding/handle-availability';
+import {
+  type OnboardingProfileDraft,
+  readOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
 import type {
   GoldenPathAdmissionReason,
@@ -41,7 +56,7 @@ import type {
  * Implementation strategy by tool type:
  *
  *   Deterministic (real logic now):
- *     - recordInterviewSignal  → appends to in-memory signal accumulator
+ *     - recordInterviewSignal  → appends to accumulator; logs unmet wants
  *     - proposeNextStep        → runs decideOnboardingAccess against accumulator
  *
  *   Pass-throughs to existing APIs (real logic now):
@@ -69,6 +84,8 @@ import type {
  * outside the per-turn tool accumulator.
  */
 export interface OnboardingTurnState {
+  /** Server-persisted interview; public evidence never grants ownership/access. */
+  profileDraft?: OnboardingProfileDraft | null;
   sessionId: string;
   /** DB-backed controlled-access state resolved once by the request handler. */
   accessControlled: boolean;
@@ -94,6 +111,8 @@ export interface OnboardingTurnState {
   spotifyFollowers: number | null;
   /** Full metrics snapshot for UI surfaces that need source/updatedAt. */
   artistMetrics: CanonicalArtistMetrics | null;
+  /** JOV-9758: newest public releases shown in the preview before pricing. */
+  catalogPreview?: OnboardingCatalogPreview | null;
   /** Append-only log of recordInterviewSignal calls within this turn. */
   signals: InterviewSignal[];
   /** Cumulative LLM turn count (1-indexed). Drives the proposeNextStep eval. */
@@ -171,6 +190,8 @@ function restoreArtistFromOutput(
   );
   state.artistMetrics = metrics;
   state.spotifyFollowers = metrics.spotifyFollowers;
+  state.catalogPreview =
+    readOnboardingCatalogPreview(output.catalog) ?? state.catalogPreview;
 
   state.spotifyPopularity =
     typeof artist?.popularity === 'number' && Number.isFinite(artist.popularity)
@@ -236,6 +257,10 @@ export function deriveOnboardingTurnStateFromMessages(
   for (const message of messages) {
     for (const part of getToolParts(message)) {
       if (isRecord(part.output)) {
+        state.profileDraft =
+          readOnboardingProfileDraft(part.output) ?? state.profileDraft;
+        if (state.profileDraft?.selectedSource)
+          state.publicProfileUrl = state.profileDraft.selectedSource.url;
         restoreArtistFromOutput(state, part.output);
         if (
           part.output.action === 'propose_social_link' &&
@@ -275,6 +300,8 @@ export interface ConfirmSpotifyArtistOutput {
   } | null;
   /** Top-level metrics mirror for consumers that do not unwrap artist. */
   readonly metrics: CanonicalArtistMetrics | null;
+  /** JOV-9758: the artist's real catalog for the preview, before pricing. */
+  readonly catalog?: OnboardingCatalogPreview | null;
   readonly summary: string;
 }
 
@@ -311,7 +338,10 @@ export async function buildConfirmSpotifyArtistOutput(
   state.spotifyPopularity = null;
   state.spotifyFollowers = null;
   state.artistMetrics = null;
+  state.catalogPreview = null;
   let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
+  // Fetched alongside the artist; never throws (null on failure).
+  const catalogPromise = fetchOnboardingCatalogPreview(spotifyArtistId);
 
   try {
     artist = await getSpotifyArtist(spotifyArtistId);
@@ -351,6 +381,11 @@ export async function buildConfirmSpotifyArtistOutput(
     state.spotifyPopularity = artist.popularity ?? null;
     state.artistMetrics = metrics;
     state.spotifyFollowers = metrics.spotifyFollowers;
+    const catalog = await catalogPromise;
+    state.catalogPreview = catalog;
+    if (catalog && catalog.releases.length > 0) {
+      void recordCatalogPreviewShown();
+    }
 
     return {
       action: 'spotify_artist_confirmed' as const,
@@ -381,7 +416,11 @@ export async function buildConfirmSpotifyArtistOutput(
         metrics,
       },
       metrics,
-      summary: `${artist.name} matched on Spotify.`,
+      ...(catalog ? { catalog } : {}),
+      summary:
+        catalog && catalog.total > 0
+          ? `${artist.name} matched on Spotify with ${catalog.total} releases. The preview shows the newest.`
+          : `${artist.name} matched on Spotify.`,
     };
   }
 
@@ -394,6 +433,28 @@ export async function buildConfirmSpotifyArtistOutput(
     metrics: null,
     summary: 'Spotify artist selected.',
   };
+}
+
+/**
+ * JOV-9758 measurement: the preview now carries the artist's real catalog.
+ * Anonymous funnel count plus the consented journey stage (p50/p95 timing).
+ * Never throws and never blocks the turn.
+ */
+async function recordCatalogPreviewShown(): Promise<void> {
+  await recordFunnelStep({
+    funnel: 'artist_signup',
+    step: 'catalog_preview',
+    surface: 'onboarding',
+  });
+  try {
+    const cookieStore = await cookies();
+    await recordArtistOfferStage(
+      cookieStore.get(ACQUISITION_COOKIE_NAME)?.value,
+      'catalog-preview'
+    );
+  } catch {
+    // No request cookie store (script engine tests): nothing to record.
+  }
 }
 
 /** The artist the server already confirmed, rebuilt from turn state. */
@@ -436,6 +497,7 @@ export function echoConfirmedArtist(
         }
       : null,
     metrics,
+    ...(state.catalogPreview ? { catalog: state.catalogPreview } : {}),
     summary: state.spotifyArtistName
       ? `${state.spotifyArtistName} is already confirmed.`
       : 'Spotify artist selected; profile data is unavailable right now.',
@@ -541,13 +603,12 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.recordInterviewSignal.inputSchema,
       execute: async (signal: z.infer<typeof interviewSignalSchema>) => {
         state.signals.push(signal);
-        const recordedAt = new Date().toISOString();
-        // Keep this silent in the UI; the accumulator feeds proposeNextStep
-        // within the same turn.
+        await captureOnboardingWant(state.sessionId, signal.want);
+        // Silent in the UI; the accumulator feeds proposeNextStep this turn.
         return {
           action: 'signal_recorded' as const,
           signal,
-          recordedAt,
+          recordedAt: new Date().toISOString(),
           signalCount: state.signals.length,
           summary: 'Signal noted.',
         };
@@ -561,6 +622,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         // JOV-7144: the single access gate shared with the scripted fallback.
         // The DB-backed controlled-access gate stays authoritative inside it.
         const decision = decideOnboardingAccess({
+          activeRole: state.profileDraft?.activeRole,
           accessControlled: state.accessControlled,
           goldenPathVerdict: state.goldenPathVerdict,
           goldenPathHold: state.goldenPathHold,
@@ -594,6 +656,27 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeCheckout.description,
       inputSchema: TOOL_SCHEMAS.proposeCheckout.inputSchema,
       execute: async ({ plan }) => {
+        const decision = decideOnboardingAccess({
+          activeRole: state.profileDraft?.activeRole,
+          accessControlled: state.accessControlled,
+          goldenPathVerdict: state.goldenPathVerdict,
+          goldenPathHold: state.goldenPathHold,
+          spotifyArtistId: state.spotifyArtistId,
+          publicProfileUrl: state.publicProfileUrl,
+          spotifyFollowers: state.spotifyFollowers,
+          metrics: state.artistMetrics,
+          signals: state.signals,
+          turnCount: state.turnCount,
+        });
+        if (
+          decision.kind !== 'instant_access' ||
+          (plan && !getPublicPriceClaim(plan).selfService)
+        )
+          return {
+            action: 'checkout_unavailable',
+            summary:
+              'Checkout is unavailable for the current access and offer state.',
+          };
         const handoffUrl = plan
           ? `/onboarding/checkout?plan=${encodeURIComponent(plan)}`
           : '/onboarding/checkout';

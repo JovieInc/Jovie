@@ -8,14 +8,41 @@ const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
+const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());
+const mockSweepLegacySlugs = vi.hoisted(() =>
+  vi.fn(async () => ({ renamed: 1 }))
+);
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
+const mockAutostartDesignPartnerAutopilot = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
 const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
 const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
+const mockReadShadowParitySummary = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockRunLegacyClaimSweep = vi.hoisted(() =>
+  vi.fn(async () => ({
+    skipped: true,
+    scanned: 0,
+    nudged: 0,
+    proofRequired: 0,
+  }))
+);
+
+vi.mock('@/lib/claim/legacy-verification.server', () => ({
+  runLegacyClaimVerificationSweep: mockRunLegacyClaimSweep,
+}));
+
+vi.mock('@/lib/agent-acquisition/draft-purge.server', () => ({
+  purgeExpiredAgentDrafts: vi.fn(async () => ({
+    deleted: 0,
+    retentionDays: 30,
+    oldestOverdueDays: null,
+  })),
+}));
 
 vi.mock('@/lib/ai/gateway-spend', () => ({
   recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
@@ -34,14 +61,7 @@ vi.mock('@/lib/analytics/data-retention', () => ({
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/app/api/cron/billing-reconciliation/route', () => ({
@@ -74,6 +94,12 @@ vi.mock('@/lib/waitlist/auto-accept', () => ({
   runWaitlistAutoAccept: mockRunWaitlistAutoAccept,
 }));
 
+vi.mock('@/lib/discography/apple-music-import', () => ({
+  sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,
+}));
+vi.mock('@/lib/discography/slug-migration', () => ({
+  sweepLegacySlugsForCron: mockSweepLegacySlugs,
+}));
 vi.mock('@/lib/discography/re-enrich', () => ({
   sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
 }));
@@ -90,12 +116,31 @@ vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
   syncAiCrawlerAnalyticsCron: mockSyncAiCrawlerAnalyticsCron,
 }));
 
+vi.mock('@/lib/release-to-revenue/autostart', () => ({
+  runDesignPartnerAutopilotSubJob: mockAutostartDesignPartnerAutopilot,
+}));
+
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
   reconcileReleaseWorkflowRunOutcomes: mockReconcileReleaseWorkflowRunOutcomes,
 }));
 vi.mock('@/lib/music-resolver/shadow', () => ({
   runMusicResolverParityCorpus: mockRunMusicResolverParityCorpus,
 }));
+
+vi.mock('@/lib/music-resolver/resolve-parity.server', () => ({
+  FALSE_LINK_ALARM_FINGERPRINT: 'remediation:music-resolver-false-link',
+  readShadowParitySummary: mockReadShadowParitySummary,
+}));
+
+async function runDailyMaintenance() {
+  const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+  const response = await GET(
+    new Request('http://localhost/api/cron/daily-maintenance', {
+      headers: { Authorization: 'Bearer test-secret' },
+    })
+  );
+  return { response, data: await response.json() };
+}
 
 describe('GET /api/cron/daily-maintenance', () => {
   beforeEach(() => {
@@ -143,6 +188,11 @@ describe('GET /api/cron/daily-maintenance', () => {
       errors: [],
       hasMoreProfiles: true,
     });
+    mockSweepAppleMusicCatalog.mockResolvedValue({
+      profilesChecked: 2,
+      releasesImported: 3,
+      failed: 0,
+    });
     mockRunOnboardingScriptAggregation.mockResolvedValue({
       syncedSeeds: 2,
       updatedStats: 3,
@@ -172,6 +222,9 @@ describe('GET /api/cron/daily-maintenance', () => {
       unavailable: 0,
       failed: 0,
     });
+    mockAutostartDesignPartnerAutopilot.mockResolvedValue({
+      status: 'not-configured',
+    });
     mockCleanupFounderReviewUploadLeases.mockResolvedValue({
       scanned: 1,
       deletedOrphans: 1,
@@ -188,6 +241,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       alerts: [],
     });
     mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
+    mockReadShadowParitySummary.mockResolvedValue({
+      receipts: 6,
+      organicReceipts: 0,
+      falseLinkAlarm: { firing: false, candidateFalseLinks: 0, rate: 0 },
+      families: [],
+    });
   });
 
   afterEach(() => {
@@ -207,13 +266,7 @@ describe('GET /api/cron/daily-maintenance', () => {
   });
 
   it('runs all daily maintenance sub-jobs with valid auth', async () => {
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
@@ -240,6 +293,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       hasMoreProfiles: true,
     });
     expect(mockSweepUnderEnrichedProfilesForCron).toHaveBeenCalledTimes(1);
+    expect(data.results.appleMusicCatalogImport.data).toEqual({
+      profilesChecked: 2,
+      releasesImported: 3,
+      failed: 0,
+    });
+    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });
     expect(data.results.onboardingScriptAggregation.success).toBe(true);
     expect(data.results.onboardingScriptAggregation.data).toEqual({
       syncedSeeds: 2,
@@ -267,6 +326,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       },
     });
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
+    expect(mockAutostartDesignPartnerAutopilot).toHaveBeenCalledTimes(1);
     expect(data.results.founderReviewUploadLeases.success).toBe(true);
     expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
     expect(data.results.aiGatewaySpend).toEqual({
@@ -283,8 +343,65 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
     expect(data.results.musicResolverParity).toEqual({
       success: true,
-      data: [{ version: 2 }],
+      data: {
+        receipts: 6,
+        organicReceipts: 0,
+        falseLinkAlarm: { firing: false, candidateFalseLinks: 0, rate: 0 },
+        families: [],
+      },
     });
+    expect(data.results.legacyClaimSweep).toEqual({
+      success: true,
+      data: { skipped: true, scanned: 0, nudged: 0, proofRequired: 0 },
+    });
+    expect(mockRunLegacyClaimSweep).toHaveBeenCalledTimes(1);
+    expect(data.results.dataRetention.success).toBe(true);
+  });
+
+  it('raises the false-link alarm when the parity summary has a candidate false link', async () => {
+    mockReadShadowParitySummary.mockResolvedValueOnce({
+      receipts: 7,
+      organicReceipts: 1,
+      falseLinkAlarm: { firing: true, candidateFalseLinks: 1, rate: 1 },
+      families: [],
+    });
+    const { data } = await runDailyMaintenance();
+    expect(data.results.musicResolverParity.data.falseLinkAlarm.firing).toBe(
+      true
+    );
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Music resolver false link',
+      expect.any(Error),
+      expect.objectContaining({
+        fingerprint: 'remediation:music-resolver-false-link',
+      })
+    );
+  });
+
+  it('reports an autopilot refusal and continues later maintenance jobs', async () => {
+    const refusal = new Error(
+      'Design-partner autopilot trigger refused: release-not-found'
+    );
+    mockAutostartDesignPartnerAutopilot.mockRejectedValueOnce(refusal);
+
+    const { response, data } = await runDailyMaintenance();
+
+    expect(response.status).toBe(207);
+    expect(data.success).toBe(false);
+    expect(data.results.designPartnerAutopilot).toEqual({
+      success: false,
+      error: refusal.message,
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Daily maintenance: designPartnerAutopilot failed',
+      refusal,
+      {
+        route: '/api/cron/daily-maintenance',
+        subjob: 'designPartnerAutopilot',
+      }
+    );
+    expect(data.results.founderReviewUploadLeases.success).toBe(true);
+    expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
   });
 
@@ -297,13 +414,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       failed: 1,
     });
 
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.releaseOutcomeReconciliation).toMatchObject({
@@ -320,13 +431,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       state: 'unavailable',
       mrrCents: null,
     });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.lybDailyMrr).toMatchObject({
@@ -338,13 +443,7 @@ describe('GET /api/cron/daily-maintenance', () => {
 
   it('skips the unbound MRR feed without failing existing maintenance', async () => {
     vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', undefined);
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(200);
     expect(data.results.lybDailyMrr).toMatchObject({
@@ -363,13 +462,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       failed: 1,
     });
 
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.founderReviewUploadLeases).toMatchObject({
@@ -384,13 +477,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       healedMissingEntries: 2,
       stalePending: 1,
     });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
+    const { response, data } = await runDailyMaintenance();
 
     expect(response.status).toBe(207);
     expect(data.results.waitlistAdmission.success).toBe(false);

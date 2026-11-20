@@ -99,7 +99,7 @@ export function usePostCreateReleasePlan({
         if (isUpgradeRequiredError(error)) {
           // Expected entitlement gate — not a bug, do not report to Sentry.
           toast.error(
-            `Release plans require the ${PRO_PLAN_DISPLAY_NAME} plan. Upgrade to unlock this feature.`
+            `Generated release plans are not included in ${PRO_PLAN_DISPLAY_NAME} yet.`
           );
         } else {
           captureError('Failed to generate release plan', error, {

@@ -56,12 +56,15 @@ export function useImpersonationQuery() {
 
   const impersonation = query.data;
   useEffect(() => {
+    // A fence remounts observers and reloads this status. An unreadable status
+    // is not evidence that the effective-user session ended.
+    if (impersonation === undefined) return;
     applyCacheScope({
-      impersonationSubject: impersonation?.isImpersonating
+      impersonationSubject: impersonation.isImpersonating
         ? (impersonation.effectiveUserId ?? 'impersonating')
         : null,
     });
-  }, [impersonation?.effectiveUserId, impersonation?.isImpersonating]);
+  }, [impersonation]);
 
   return query;
 }

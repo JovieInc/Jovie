@@ -3,8 +3,6 @@ import { createHash } from 'node:crypto';
 import type { MarketingRegistryEntry } from '@/data/marketing/componentRegistry';
 import {
   CERTIFICATION_CERTIFIER_AUTHORITIES,
-  CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
-  CERTIFICATION_TASTE_EVIDENCE_TIERS,
   type CertificationAdmission,
   type CertificationAuditEvent,
   type CertificationBlocker,
@@ -23,25 +21,85 @@ import {
 export const MARKETING_CERTIFICATION_LEDGER_SCHEMA_VERSION = 1 as const;
 export const MARKETING_CERTIFICATION_STORE_KEY =
   'jovie:certification:v1:marketing-components' as const;
+/** Append-only audit chunks: `${prefix}:${identityId}:${chunkNo}`. Never rewritten or deleted. */
+export const MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX =
+  'jovie:certification:v1:marketing-components:audit' as const;
+/** The hot ledger row keeps only the newest audit events per record; the rest moves to the archive. */
+export const MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD = 10;
+const COMPACT_AUDIT_AT = 40;
+/** The hot row is read on every ingest and inventory view: it must stay small. */
+export const MARKETING_CERTIFICATION_LEDGER_MAX_BYTES = 256 * 1024;
+
+/**
+ * Immutable packet shards: `${prefix}:${identityId}:${revision}` (JOV-12830).
+ *
+ * Hot records atomically bind immutable packet revisions with their stamps,
+ * decisions and audit tails, keeping each operating-KV row below 256 KiB.
+ */
+export const MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX =
+  `${MARKETING_CERTIFICATION_STORE_KEY}:packet:` as const;
+export const MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA =
+  'jovie.marketing-certification-packet/v1' as const;
 
 import {
   type CertificationRecordBackend,
+  certificationPacketMeaning,
   certificationRecordJson,
+  createCertificationPacketStorage,
+  EVIDENCE_TIERS,
+  isCertificationReviewPacket,
   CERTIFICATION_CAS_ATTEMPTS as MAX_COMPARE_AND_SET_ATTEMPTS,
-  mutateCertificationRecord,
   CERTIFICATION_PERSISTENCE_TTL_SECONDS as PERSISTENCE_TTL_SECONDS,
 } from './certification-cas';
 
 export type { CertificationRecordBackend } from './certification-cas';
+export {
+  certificationPacketMeaning,
+  isCertificationReviewPacket,
+} from './certification-cas';
+
+const { hydrateLedger, serializeHotLedger, writePacketShard } =
+  createCertificationPacketStorage({
+    prefix: MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX,
+    schema: MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA,
+    maxBytes: MARKETING_CERTIFICATION_LEDGER_MAX_BYTES,
+    missingPacket: missingPacketForEntry,
+    error: message => new MarketingCertificationPersistenceError(message),
+    registryError: message =>
+      new MarketingCertificationRegistryDriftError(message),
+  });
 
 export interface MarketingCertificationRecord {
   readonly identityId: string;
   readonly packet: CertificationReviewPacket;
   readonly packetUpdatedAt: string;
+  readonly packetRevision?: string;
+  /** Hydration diagnostic; never persisted in the hot row. */
+  readonly packetFailure?: string;
   readonly decisions: readonly FounderCertificationDecision[];
   readonly auditHistory: readonly CertificationAuditEvent[];
+  /** Number of append-only audit chunks already moved out of this row (see compactAudit). */
+  readonly auditArchiveChunks?: number;
   readonly updatedAt: string;
 }
+
+/**
+ * The persisted hot-row record shape (JOV-12830): the packet payload lives in
+ * a per-identity shard row, so the stored record carries no `packet`. Legacy
+ * rows written before the shard split still carry an inline packet; parse
+ * keeps it and hydration prefers it until the migration flush moves it out.
+ */
+export type MarketingCertificationHotRecord = Omit<
+  MarketingCertificationRecord,
+  'packet'
+> & { readonly packet?: CertificationReviewPacket };
+
+export type MarketingCertificationHotLedger = Omit<
+  MarketingCertificationLedger,
+  'records'
+> & {
+  readonly records: Readonly<Record<string, MarketingCertificationHotRecord>>;
+};
 
 export interface MarketingCertificationLedger {
   readonly schemaVersion: typeof MARKETING_CERTIFICATION_LEDGER_SCHEMA_VERSION;
@@ -314,17 +372,6 @@ const AUDIT_EVENT_TYPES = new Set([
   'transition_blocked',
   'transition_allowed',
 ]);
-const EVIDENCE_TIERS = new Set<string>([
-  ...CERTIFICATION_TASTE_EVIDENCE_TIERS,
-  ...CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
-]);
-const EVIDENCE_STATUSES = new Set<string>([
-  'missing',
-  'pending',
-  'passed',
-  'failed',
-  'blocked',
-]);
 const ASSURANCE_PREREQUISITE_KINDS = new Set<string>([
   ...MARKETING_MANDATORY_ASSURANCE_DIMENSIONS,
   'written_invariant',
@@ -562,26 +609,6 @@ function assertAssuranceProfileShape(
   }
 }
 
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string';
-}
-
-function isEvidenceReceipt(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    value.id.length > 0 &&
-    typeof value.tier === 'string' &&
-    EVIDENCE_TIERS.has(value.tier) &&
-    typeof value.status === 'string' &&
-    EVIDENCE_STATUSES.has(value.status) &&
-    isNullableString(value.sourceSha) &&
-    typeof value.ref === 'string' &&
-    isNullableString(value.digest) &&
-    typeof value.summary === 'string'
-  );
-}
-
 function packetEvidenceReceipts(
   packet: CertificationReviewPacket
 ): CertificationEvidenceReceipt[] {
@@ -768,83 +795,6 @@ function assuranceProfilesBySubject(
   return result;
 }
 
-export function isCertificationReviewPacket(
-  value: unknown
-): value is CertificationReviewPacket {
-  if (
-    !isRecord(value) ||
-    typeof value.contract !== 'string' ||
-    !isRecord(value.subject) ||
-    typeof value.subject.id !== 'string' ||
-    typeof value.subject.kind !== 'string' ||
-    typeof value.subject.title !== 'string' ||
-    !Array.isArray(value.canonicalReferences) ||
-    !value.canonicalReferences.every(isEvidenceReceipt) ||
-    !Array.isArray(value.invariantEvaluation) ||
-    !value.invariantEvaluation.every(isEvidenceReceipt) ||
-    !Array.isArray(value.testsCoverage) ||
-    !value.testsCoverage.every(isEvidenceReceipt) ||
-    !Array.isArray(value.visualProof) ||
-    !value.visualProof.every(isEvidenceReceipt) ||
-    !Array.isArray(value.requiredVariants) ||
-    !value.requiredVariants.every(
-      variant =>
-        isRecord(variant) &&
-        typeof variant.id === 'string' &&
-        variant.id.length > 0 &&
-        typeof variant.label === 'string' &&
-        typeof variant.sourceSha === 'string' &&
-        (variant.proof === null || isEvidenceReceipt(variant.proof)) &&
-        Array.isArray(variant.requiredMediaIds) &&
-        variant.requiredMediaIds.every(id => typeof id === 'string')
-    ) ||
-    !Array.isArray(value.itemMedia) ||
-    !value.itemMedia.every(
-      media =>
-        isRecord(media) &&
-        typeof media.id === 'string' &&
-        media.id.length > 0 &&
-        typeof media.itemId === 'string' &&
-        isNullableString(media.variantId) &&
-        typeof media.status === 'string' &&
-        EVIDENCE_STATUSES.has(media.status) &&
-        isNullableString(media.sourceSha) &&
-        typeof media.ref === 'string' &&
-        isNullableString(media.digest) &&
-        typeof media.summary === 'string'
-    )
-  ) {
-    return false;
-  }
-
-  if (
-    value.source !== null &&
-    (!isRecord(value.source) ||
-      typeof value.source.repository !== 'string' ||
-      typeof value.source.ref !== 'string' ||
-      typeof value.source.sha !== 'string' ||
-      (value.source.expectedSha !== undefined &&
-        !isNullableString(value.source.expectedSha)) ||
-      !Array.isArray(value.source.paths) ||
-      !value.source.paths.every(path => typeof path === 'string') ||
-      (value.source.digest !== undefined &&
-        !isNullableString(value.source.digest)))
-  ) {
-    return false;
-  }
-
-  if (value.operational === undefined) return true;
-  if (!isRecord(value.operational)) return false;
-  const operational = value.operational;
-  return ['ci', 'queueMerge', 'deploy', 'runtimeDogfood'].every(key => {
-    const receipts = operational[key];
-    return (
-      receipts === undefined ||
-      (Array.isArray(receipts) && receipts.every(isEvidenceReceipt))
-    );
-  });
-}
-
 export function isPersistedFounderDecision(
   value: unknown,
   subjectId: string
@@ -886,7 +836,7 @@ export function isPersistedAuditEvent(
   );
 }
 
-function parseLedger(stored: unknown): MarketingCertificationLedger {
+function parseLedger(stored: unknown): MarketingCertificationHotLedger {
   const raw = certificationRecordJson(stored);
   if (raw === null) {
     throw new MarketingCertificationPersistenceError(
@@ -921,11 +871,16 @@ function parseLedger(stored: unknown): MarketingCertificationLedger {
     if (
       !isRecord(record) ||
       record.identityId !== id ||
-      !isRecord(record.packet) ||
+      (record.packet !== undefined && !isRecord(record.packet)) ||
+      (record.packetRevision !== undefined &&
+        (typeof record.packetRevision !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(record.packetRevision))) ||
       typeof record.packetUpdatedAt !== 'string' ||
       Number.isNaN(Date.parse(record.packetUpdatedAt)) ||
       !Array.isArray(record.decisions) ||
       !Array.isArray(record.auditHistory) ||
+      (record.auditArchiveChunks !== undefined &&
+        !Number.isInteger(record.auditArchiveChunks)) ||
       typeof record.updatedAt !== 'string' ||
       Number.isNaN(Date.parse(record.updatedAt)) ||
       !record.decisions.every(decision =>
@@ -939,7 +894,7 @@ function parseLedger(stored: unknown): MarketingCertificationLedger {
     }
   }
 
-  return value as unknown as MarketingCertificationLedger;
+  return value as unknown as MarketingCertificationHotLedger;
 }
 
 function assertDenominator(
@@ -1069,10 +1024,6 @@ function driftedSourcePacket(
   };
 }
 
-function serializeLedger(ledger: MarketingCertificationLedger): string {
-  return JSON.stringify(ledger);
-}
-
 function assertValidTimestamp(value: string, label: string): void {
   if (Number.isNaN(Date.parse(value))) {
     throw new MarketingCertificationPersistenceError(
@@ -1130,6 +1081,7 @@ function projectEntry(
   };
 
   try {
+    if (record.packetFailure) return failClosed(record.packetFailure);
     assertPacketMatchesEntry(record.packet, entry);
     const admission = evaluateCertificationAdmission({
       decisions: record.decisions,
@@ -1238,20 +1190,34 @@ function extendLedgerRegistry(
   ledger: MarketingCertificationLedger,
   entries: readonly MarketingRegistryEntry[],
   initializedAt: string
-): MarketingCertificationLedger {
+): {
+  ledger: MarketingCertificationLedger;
+  /** Records whose packet payload changed and must be flushed to its shard row. */
+  dirtyIds: ReadonlySet<string>;
+} {
   const rebound = rebindDriftedSourcePackets(ledger, entries, initializedAt);
+  const dirtyIds = new Set<string>(
+    Object.entries(rebound.records)
+      .filter(([id, record]) => record !== ledger.records[id])
+      .map(([id]) => id)
+  );
   const storedIds = new Set(rebound.registryIds);
   const existingEntries = entries.filter(entry => storedIds.has(entry.id));
   // Reject removals, duplicate ids, and orphan records. One unevaluable
   // existing packet fails that entry alone.
   assertLedgerMatchesRegistry(rebound, existingEntries, initializedAt);
   const addedEntries = entries.filter(entry => !storedIds.has(entry.id));
-  if (addedEntries.length === 0) return rebound;
+  if (addedEntries.length === 0) {
+    return { ledger: rebound, dirtyIds };
+  }
   const additions = initialLedger(addedEntries, initializedAt);
   return {
-    ...rebound,
-    registryIds: registryIds(entries),
-    records: { ...rebound.records, ...additions.records },
+    ledger: {
+      ...rebound,
+      registryIds: registryIds(entries),
+      records: { ...rebound.records, ...additions.records },
+    },
+    dirtyIds,
   };
 }
 
@@ -1272,6 +1238,17 @@ export class MarketingCertificationStore {
     packet: CertificationReviewPacket,
     evaluatedAt = new Date().toISOString()
   ): Promise<MarketingCertificationProjectionRow> {
+    return (await this.ingestPacketWithOutcomes(packet, evaluatedAt)).row;
+  }
+
+  /** Ingest and return every entry outcome from the ledger just written (no re-read of the MB-sized ledger). */
+  async ingestPacketWithOutcomes(
+    packet: CertificationReviewPacket,
+    evaluatedAt = new Date().toISOString()
+  ): Promise<{
+    readonly row: MarketingCertificationProjectionRow;
+    readonly entryOutcomes: readonly MarketingCertificationEntryOutcome[];
+  }> {
     assertValidTimestamp(evaluatedAt, 'Packet evaluation time');
     const entry = this.entryById.get(packet.subject.id);
     if (!entry) {
@@ -1295,16 +1272,39 @@ export class MarketingCertificationStore {
           `Certification packet ${entry.id} is not newer than the persisted packet.`
         );
       }
+      if (
+        !isInitialPlaceholder &&
+        isCertificationReviewPacket(existing.packet) &&
+        certificationPacketMeaning(existing.packet) ===
+          certificationPacketMeaning(packet)
+      ) {
+        const unchanged = projectEntry(entry, existing, evaluatedAt);
+        if (unchanged.evaluation !== 'failed') {
+          return {
+            ledger,
+            result: {
+              row: unchanged.row,
+              entryOutcomes: evaluateLedgerEntries(
+                ledger,
+                this.entries,
+                evaluatedAt
+              ),
+            },
+          };
+        }
+      }
       const admission = evaluateCertificationAdmission({
         decisions: existing.decisions,
         evaluatedAt,
         packet,
       });
       const nextRecord: MarketingCertificationRecord = {
+        ...existing,
         auditHistory: [...existing.auditHistory, ...admission.auditHistory],
         decisions: existing.decisions,
         identityId: entry.id,
         packet,
+        packetFailure: undefined,
         packetUpdatedAt: evaluatedAt,
         updatedAt: laterTimestamp(existing.updatedAt, evaluatedAt),
       };
@@ -1321,7 +1321,14 @@ export class MarketingCertificationStore {
       }
       return {
         ledger: nextLedger,
-        result: outcome.row,
+        result: {
+          row: outcome.row,
+          entryOutcomes: evaluateLedgerEntries(
+            nextLedger,
+            this.entries,
+            evaluatedAt
+          ),
+        },
       };
     });
   }
@@ -1466,8 +1473,14 @@ export class MarketingCertificationStore {
     const ledger =
       raw === null || raw === undefined
         ? initialLedger(this.entries, evaluatedAt)
-        : extendLedgerRegistry(parseLedger(raw), this.entries, evaluatedAt);
-    return ledgerProjection(ledger, this.entries, evaluatedAt);
+        : (await hydrateLedger(this.backend, this.entryById, parseLedger(raw)))
+            .ledger;
+    const { ledger: extended } = extendLedgerRegistry(
+      ledger,
+      this.entries,
+      evaluatedAt
+    );
+    return ledgerProjection(extended, this.entries, evaluatedAt);
   }
 
   async projectReviewReady(input: {
@@ -1550,28 +1563,49 @@ export class MarketingCertificationStore {
     ) {
       const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
       if (raw !== null && raw !== undefined) {
-        const current = parseLedger(raw);
-        const extended = extendLedgerRegistry(
-          current,
+        const hydrated = await hydrateLedger(
+          this.backend,
+          this.entryById,
+          parseLedger(raw)
+        );
+        const { ledger: extended, dirtyIds } = extendLedgerRegistry(
+          hydrated.ledger,
           this.entries,
           initializedAt
         );
-        if (extended === current) return current;
+        // The migration backlog (inline legacy packet payloads) flushes here
+        // too, so the first projection after deploy shrinks the hot row.
+        const pending = new Set<string>([
+          ...dirtyIds,
+          ...hydrated.inlineBacklog,
+        ]);
+        if (extended === hydrated.ledger && pending.size === 0) return extended;
         assertLedgerMatchesRegistry(extended, this.entries, initializedAt);
+        const records = { ...extended.records };
+        for (const id of pending) {
+          const record = extended.records[id];
+          const packetRevision = await writePacketShard(
+            this.backend,
+            id,
+            record.packetUpdatedAt,
+            record.packet
+          );
+          records[id] = { ...record, packetRevision };
+        }
         const updated = await this.backend.compareAndSet(
           MARKETING_CERTIFICATION_STORE_KEY,
           certificationRecordJson(raw) as string,
-          serializeLedger(extended),
+          JSON.stringify(serializeHotLedger({ ...extended, records })),
           PERSISTENCE_TTL_SECONDS
         );
-        if (updated) return extended;
+        if (updated) return { ...extended, records };
         continue;
       }
 
       const ledger = initialLedger(this.entries, initializedAt);
-      const serialized = serializeLedger(ledger);
-      const validated = parseLedger(serialized);
-      assertLedgerMatchesRegistry(validated, this.entries, initializedAt);
+      assertLedgerMatchesRegistry(ledger, this.entries, initializedAt);
+      const serialized = JSON.stringify(serializeHotLedger(ledger));
+      parseLedger(serialized);
       const inserted = await this.backend.setIfAbsent(
         MARKETING_CERTIFICATION_STORE_KEY,
         serialized,
@@ -1591,16 +1625,172 @@ export class MarketingCertificationStore {
       readonly result: Result;
     }
   ): Promise<Result> {
-    await this.ensureLedger(initializedAt);
-    return mutateCertificationRecord({
-      backend: this.backend,
-      key: MARKETING_CERTIFICATION_STORE_KEY,
-      initialize: () => this.ensureLedger(initializedAt),
-      parse: parseLedger,
-      validate: ledger =>
-        assertLedgerMatchesRegistry(ledger, this.entries, initializedAt),
-      update,
-      error: message => new MarketingCertificationPersistenceError(message),
-    });
+    // Write immutable packet revisions first, then atomically publish their pointers,
+    // stamps, decisions and audit history in the hot-row CAS. Losing writes stay invisible.
+    for (
+      let attempt = 0;
+      attempt < MAX_COMPARE_AND_SET_ATTEMPTS;
+      attempt += 1
+    ) {
+      const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+      if (raw === null || raw === undefined) {
+        await this.ensureLedger(initializedAt);
+        continue;
+      }
+      const json = certificationRecordJson(raw);
+      if (json === null) {
+        throw new MarketingCertificationPersistenceError(
+          'Certification ledger must be stored as one compare-and-set JSON string.'
+        );
+      }
+      const hydrated = await hydrateLedger(
+        this.backend,
+        this.entryById,
+        parseLedger(json)
+      );
+      const { ledger: current, dirtyIds } = extendLedgerRegistry(
+        hydrated.ledger,
+        this.entries,
+        initializedAt
+      );
+      assertLedgerMatchesRegistry(current, this.entries, initializedAt);
+      const next = update(current);
+      const dirty = new Set<string>([...dirtyIds, ...hydrated.inlineBacklog]);
+      for (const [id, record] of Object.entries(next.ledger.records)) {
+        if (current.records[id] === undefined) dirty.add(id);
+        else if (record.packet !== current.records[id].packet) dirty.add(id);
+      }
+      const records = { ...next.ledger.records };
+      for (const id of dirty) {
+        const record = records[id];
+        const packetRevision = await writePacketShard(
+          this.backend,
+          id,
+          record.packetUpdatedAt,
+          record.packet
+        );
+        records[id] = { ...record, packetRevision };
+      }
+      const serialized = JSON.stringify(
+        serializeHotLedger({ ...next.ledger, records })
+      );
+      // Unchanged state skips the write; registry extension or the migration
+      // backlog still persists.
+      if (serialized === json && dirty.size === 0) return next.result;
+      if (
+        await this.backend.compareAndSet(
+          MARKETING_CERTIFICATION_STORE_KEY,
+          json,
+          serialized,
+          PERSISTENCE_TTL_SECONDS
+        )
+      ) {
+        if (
+          Object.values(next.ledger.records).some(
+            record => record.auditHistory.length > COMPACT_AUDIT_AT
+          )
+        ) {
+          // Best effort: the write above already succeeded, compaction retries on the next write.
+          await this.compactAudit().catch(() => undefined);
+        }
+        return next.result;
+      }
+    }
+    throw new MarketingCertificationPersistenceError(
+      'Certification ledger update lost compare-and-set repeatedly.'
+    );
+  }
+
+  /**
+   * Move old audit events out of the hot ledger row into append-only chunk rows.
+   * Archive first (setIfAbsent), then trim the ledger by compare-and-set, so a crash
+   * between the two never loses history; a retry reuses the existing chunk.
+   */
+  async compactAudit(): Promise<void> {
+    for (
+      let attempt = 0;
+      attempt < MAX_COMPARE_AND_SET_ATTEMPTS;
+      attempt += 1
+    ) {
+      const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+      const json = certificationRecordJson(raw);
+      if (json === null) return;
+      const ledger = parseLedger(json);
+      const records: Record<string, MarketingCertificationHotRecord> = {
+        ...ledger.records,
+      };
+      let changed = false;
+      for (const [id, record] of Object.entries(ledger.records)) {
+        if (record.auditHistory.length <= COMPACT_AUDIT_AT) continue;
+        const chunkNo = record.auditArchiveChunks ?? 0;
+        const key = `${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${id}:${chunkNo}`;
+        const moved = record.auditHistory.slice(
+          0,
+          record.auditHistory.length -
+            MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD
+        );
+        const inserted = await this.backend.setIfAbsent(
+          key,
+          JSON.stringify({ identityId: id, chunkNo, events: moved }),
+          PERSISTENCE_TTL_SECONDS
+        );
+        let archivedCount = moved.length;
+        if (!inserted) {
+          // A previous attempt archived this chunk; trim exactly what it holds.
+          const existing = certificationRecordJson(await this.backend.get(key));
+          const stored = existing
+            ? (JSON.parse(existing) as { events?: unknown })
+            : null;
+          if (!stored || !Array.isArray(stored.events)) continue;
+          archivedCount = Math.min(
+            stored.events.length,
+            record.auditHistory.length
+          );
+        }
+        records[id] = {
+          ...record,
+          auditArchiveChunks: chunkNo + 1,
+          auditHistory: record.auditHistory.slice(archivedCount),
+        };
+        changed = true;
+      }
+      if (!changed) return;
+      const next = JSON.stringify({ ...ledger, records });
+      if (
+        await this.backend.compareAndSet(
+          MARKETING_CERTIFICATION_STORE_KEY,
+          json,
+          next,
+          PERSISTENCE_TTL_SECONDS
+        )
+      ) {
+        return;
+      }
+    }
+  }
+
+  /** Full audit history for one identity: archived chunks in order, then the hot tail. */
+  async readAuditHistory(
+    identityId: string
+  ): Promise<readonly CertificationAuditEvent[]> {
+    const raw = await this.backend.get(MARKETING_CERTIFICATION_STORE_KEY);
+    const json = certificationRecordJson(raw);
+    if (json === null) return [];
+    const record = parseLedger(json).records[identityId];
+    if (!record) return [];
+    const events: CertificationAuditEvent[] = [];
+    for (let n = 0; n < (record.auditArchiveChunks ?? 0); n += 1) {
+      const chunk = certificationRecordJson(
+        await this.backend.get(
+          `${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${identityId}:${n}`
+        )
+      );
+      if (!chunk) continue;
+      const parsed = JSON.parse(chunk) as {
+        events?: CertificationAuditEvent[];
+      };
+      events.push(...(parsed.events ?? []));
+    }
+    return [...events, ...record.auditHistory];
   }
 }

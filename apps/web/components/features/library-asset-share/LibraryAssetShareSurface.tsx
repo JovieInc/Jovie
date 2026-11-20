@@ -23,7 +23,7 @@ export function LibraryAssetShareSurface({
   return (
     <main className='mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-10 sm:px-6'>
       <header className='space-y-2'>
-        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs text-quaternary-token font-semibold'>
           Shared Asset
         </p>
         <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
@@ -52,8 +52,8 @@ export function LibraryAssetShareSurface({
         className={cn(
           'inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs',
           view.visibility === 'public'
-            ? 'border-emerald-400/30 text-emerald-300'
-            : 'border-amber-400/30 text-amber-200'
+            ? 'border-success/30 text-success'
+            : 'border-warning/30 text-warning'
         )}
       >
         {view.visibility === 'public' ? (

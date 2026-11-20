@@ -52,3 +52,65 @@ export const Disabled: Story = {
     </div>
   ),
 };
+
+export const ErrorState: Story = {
+  render: () => (
+    <div className='flex w-72 flex-col gap-1.5'>
+      <Label htmlFor='lbl-error' variant='error' required>
+        Payout email
+      </Label>
+      <Input
+        id='lbl-error'
+        type='email'
+        defaultValue='not-an-email'
+        error='Enter a valid email address.'
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The error variant paired with an invalid control so the label and the feedback share the destructive token.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-56 flex-col gap-1.5'>
+      <Label htmlFor='lbl-long' required>
+        The email address where we send payout receipts and tax documents
+      </Label>
+      <Input id='lbl-long' type='email' />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow column wraps onto further lines inside the column, with the required marker kept beside the text.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='flex w-56 flex-col gap-1.5'>
+      <Label htmlFor='lbl-rtl' required>
+        البريد الإلكتروني الذي نرسل إليه إيصالات الدفع والمستندات الضريبية
+      </Label>
+      <Input id='lbl-rtl' type='email' />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'An Arabic label in a narrow right-to-left column wraps from the start edge, with the required marker kept beside the text.',
+      },
+    },
+  },
+};

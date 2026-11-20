@@ -1,5 +1,9 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { repairCopyFloorText } from '@/lib/chat/copy-floor-repair';
+import { lintVoice } from '@/lib/chat/voice-lint';
+import { excludeOtherSegments } from '@/lib/creator/segment-registry';
+import type { ResolvedSegment } from '@/lib/creator/segments';
 import { db } from '@/lib/db';
 import { onboardingScriptLines } from '@/lib/db/schema/onboarding-script';
 import { logger } from '@/lib/utils/logger';
@@ -43,6 +47,31 @@ export const HOLDOUT_MODULUS = 20;
 
 export function isHoldoutSession(sessionId: string): boolean {
   return hashSessionId(sessionId) % HOLDOUT_MODULUS === 0;
+}
+
+/**
+ * Steps whose words describe state the promoted copy cannot see: the access
+ * decision card below the line, or the handle card shipped in the same turn.
+ * Only code seeds serve these (2026-10-31 golden-path walk: a promoted
+ * waitlist line said "Putting you on the early list" above a card saying
+ * "You are not on the list until the confirmation appears").
+ */
+const SEED_ONLY_STEPS: ReadonlySet<ScriptStepId> = new Set([
+  'confirm_artist',
+  'confirm_artist_no_data',
+  'attach_social',
+  'instant_access',
+  'golden_path_admitted',
+  'waitlist',
+]);
+
+/**
+ * Promoted DB text must pass today's copy floor, not the one it was promoted
+ * under. Returns the servable text (mechanical repairs applied) or null.
+ */
+function servablePromotedText(text: string): string | null {
+  const repaired = repairCopyFloorText(text);
+  return lintVoice(repaired).ok ? repaired : null;
 }
 
 let cache: { bank: ScriptBank; expiresAt: number } | null = null;
@@ -89,12 +118,15 @@ export async function loadScriptBank(): Promise<ScriptBank> {
         if (seed) entries[seedIndex] = { ...seed, weight: row.weight };
         continue;
       }
+      if (SEED_ONLY_STEPS.has(row.stepId)) continue;
+      const text = servablePromotedText(row.text);
+      if (text === null) continue;
       entries.push({
         line: {
           key: row.lineKey as ScriptLine['key'],
           stepId: row.stepId,
           variant: row.variant,
-          text: row.text,
+          text,
         },
         weight: row.weight,
         source: 'promoted',
@@ -118,9 +150,17 @@ export async function loadScriptBank(): Promise<ScriptBank> {
 export function pickFromBank(
   bank: ScriptBank,
   stepId: ScriptStepId,
-  sessionId: string
+  sessionId: string,
+  segment?: ResolvedSegment
 ): ScriptLine {
-  const bankEntries = bank.get(stepId) ?? [];
+  // Segment gate (JOV-9679): when a segment is resolved, lines scoped to other
+  // segments are never candidates. If that empties the step, fall back to the
+  // unfiltered bank rather than leave the visitor without a reply.
+  const allEntries = bank.get(stepId) ?? [];
+  const scoped = allEntries.filter(
+    entry => excludeOtherSegments([entry.line], segment).length > 0
+  );
+  const bankEntries = scoped.length > 0 ? scoped : allEntries;
   // Holdout arm: stable excluded group that only ever sees seed lines, so
   // promoted copy can be measured against an unexposed control.
   const entries = isHoldoutSession(sessionId)
@@ -132,7 +172,9 @@ export function pickFromBank(
   );
   if (entries.length === 0 || total <= 0) {
     // Bank rows exhausted or all zero-weight — seeds are the floor.
-    const seeds = linesForStep(stepId);
+    const allSeeds = linesForStep(stepId);
+    const gated = excludeOtherSegments(allSeeds, segment);
+    const seeds = gated.length > 0 ? gated : allSeeds;
     const seed = seeds[hashSessionId(sessionId) % Math.max(seeds.length, 1)];
     if (!seed) throw new Error(`No script lines defined for step ${stepId}`);
     return seed;

@@ -10,6 +10,28 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Git exports repository-local routing into hooks. Clear it before any child
+# check creates a fixture repository (as buildVerificationEnv does for affected
+# tests), so child Git commands discover their own repository from their cwd.
+# Use Git's complete list; preserve unrelated authentication and network env.
+git_local_env_names="$(git rev-parse --local-env-vars)"
+while IFS= read -r git_local_env_name; do
+  # An empty list still yields one empty line from the here-string; skip it,
+  # since `unset ""` is an error that aborts the gate (seen in the fixture test).
+  if [ -n "$git_local_env_name" ]; then
+    unset "$git_local_env_name"
+  fi
+done <<< "$git_local_env_names"
+unset git_local_env_names git_local_env_name
+
+# Recursion guard (incident 2026-11-01, Gem load 1,661): preflight sets
+# JOVIE_PREFLIGHT_DEPTH for its children, so a gate that finds it set was
+# re-entered from inside a preflight and must refuse rather than fork-storm.
+if [[ -n "${JOVIE_PREFLIGHT_DEPTH:-}" ]]; then
+  echo "[pre-push-gate] refusing to run: nested inside a preflight (JOVIE_PREFLIGHT_DEPTH=${JOVIE_PREFLIGHT_DEPTH})" >&2
+  exit 1
+fi
+
 if [[ "${JOVIE_SKIP_PRE_PUSH_GATE:-}" == "1" ]]; then
   echo "[pre-push-gate] skipped (JOVIE_SKIP_PRE_PUSH_GATE=1)"
   exit 0
@@ -22,7 +44,14 @@ if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
   exit 1
 fi
 if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  # The nvm prefix also contains pnpm. Prepending that prefix hides a
+  # caller-supplied pnpm, so a fixture gate runs the real pnpm in a repo
+  # with no package.json whenever ambient Node is behind .nvmrc.
+  NODE_ONLY="$(mktemp -d "${TMPDIR:-/tmp}/jovie-node.XXXXXX")"
+  ln -s "$RESOLVED_NODE_BIN/node" "$NODE_ONLY/node"
+  trap 'rm -rf "$NODE_ONLY"' EXIT
   echo "[pre-push-gate] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  RESOLVED_NODE_BIN="$NODE_ONLY"
   export PATH="$RESOLVED_NODE_BIN:$PATH"
 fi
 
@@ -38,16 +67,39 @@ run_test() {
 }
 
 run_affected() {
+  # Certified source/owner edits need renewed browser evidence on this branch.
+  # Catch stale census digests before typecheck, rather than in the merge group.
+  pnpm design:authority:check
+  # Catch the same merged/head byte limits as PR Size Guard before slow checks.
+  node scripts/lib/projected-tree-budget.mjs --local
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
+  # Company Guards size ratchet. Fail before heavier steps when a baselined
+  # source file grows (the hosted job is still the authority).
+  node scripts/company-guards/size.mjs --base-ref origin/main
+  # Same verdicts as the required CI checks, before the remote sees the push:
+  # PR Size Guard (line/file cap via the CI modules) and the pinned JovieInc/ci
+  # size-500 guard itself (no mirror drift). CI stays authoritative.
+  node scripts/hooks/pr-size-local.mjs
+  bash scripts/hooks/company-size-local.sh
   run_lint
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
   pnpm component-ship-gate
+  pnpm component-certificate:gate
+  # One pass over every changed-file step Source Validation runs, listing all
+  # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
+  # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
+  echo "[pre-push-gate] running preflight"
+  node scripts/preflight.mjs --hook
+  # JOV-9727: path-scoped rules, PR body and companion edits. JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed"
+  node scripts/preflight-changed.mjs --hook --no-typecheck --no-coverage
   bash scripts/automation-verify.sh affected
 }
 
 run_publication() {
+  node scripts/lib/projected-tree-budget.mjs --local
   # Draft publication is a feedback start, not a promotion qualification.
   # Keep the committed diff safe, then let rolling CI evaluate the broader
   # affected surface while implementation continues.
@@ -63,9 +115,25 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Same 500-line ceiling Company Guards enforces. A grown baselined file
+  # fails here instead of after the next hosted round.
+  node scripts/company-guards/size.mjs --base-ref origin/main
+  # PR Size Guard cap (1500 lines / 75 files, tests+generated excluded) and the
+  # pinned canonical size-500 guard: fail here, not as another hosted round.
+  node scripts/hooks/pr-size-local.mjs
+  bash scripts/hooks/company-size-local.sh
+  # Reuse the changed-file Biome guard so formatter failures never reach CI.
+  bash scripts/hooks/biome-pre-push.sh
+  # Catch missing component tests/stories before another Source Validation run.
+  node scripts/component-ship-gate.mjs --check-artifacts --diff-base="$publication_base"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
+  # Same path-scoped Source Validation guards CI runs (one manifest:
+  # scripts/lib/source-validation-manifest.mjs), static checks only (--fast).
+  # JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed (fast)"
+  node scripts/hooks/prepush-preflight.mjs
 }
 
 run_format() {

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,7 +35,7 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
   ContentSurfaceCard: () => null,
 }));
 
-import ArtistsPage from '@/app/artists/page';
+import ArtistsPage, { generateMetadata } from '@/app/artists/page';
 
 const artist = {
   id: 'id-1',
@@ -46,7 +48,7 @@ const artist = {
 describe('/artists page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.count.mockResolvedValue(1);
+    mocks.count.mockResolvedValue(12);
   });
 
   it('renders page 1 normally with the global count', async () => {
@@ -61,7 +63,7 @@ describe('/artists page', () => {
     expect(mocks.directoryProps).toHaveBeenCalledWith(
       expect.objectContaining({
         profiles: [artist],
-        total: 1,
+        total: 12,
         nextCursor: null,
       })
     );
@@ -99,20 +101,18 @@ describe('/artists page', () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it('allows the empty state on the first page only', async () => {
-    mocks.count.mockResolvedValue(0);
+  it('redirects to /artist-profiles while the directory is below the publish gate', async () => {
+    mocks.count.mockResolvedValue(1);
     mocks.profiles.mockResolvedValue({
       status: 'ok',
-      profiles: [],
+      profiles: [artist],
       nextCursor: null,
     });
 
-    render(await ArtistsPage({ searchParams: Promise.resolve({}) }));
-
-    expect(mocks.directoryProps).toHaveBeenCalledWith(
-      expect.objectContaining({ profiles: [], total: 0 })
-    );
-    expect(mocks.redirect).not.toHaveBeenCalled();
+    await expect(
+      ArtistsPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('NEXT_REDIRECT:/artist-profiles');
+    expect(mocks.directoryProps).not.toHaveBeenCalled();
   });
 
   it('renders the no-DB fallback instead of the directory when the catalog is unavailable (JOV-7125)', async () => {
@@ -123,5 +123,34 @@ describe('/artists page', () => {
     expect(screen.getByTestId('artists-directory')).toBeInTheDocument();
     expect(mocks.directoryProps).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('/artists SEO contract', () => {
+  it('canonicalizes page 1 to /artists, not the homepage', async () => {
+    const metadata = await generateMetadata({
+      searchParams: Promise.resolve({}),
+    });
+
+    expect(metadata.title).toBe('Artists');
+    expect(metadata.alternates?.canonical).toBe('/artists');
+    expect(metadata.robots).toBeUndefined();
+  });
+
+  it('keeps cursor pages out of the index with no canonical', async () => {
+    const metadata = await generateMetadata({
+      searchParams: Promise.resolve({ cursor: 'abc' }),
+    });
+
+    expect(metadata.alternates).toBeUndefined();
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
+
+  it('has no loading boundary, so the publish-gate redirect is a real HTTP redirect', () => {
+    // A loading.tsx starts the response as 200 before the page runs, which
+    // turns redirect() into a meta refresh on an indexable 200 page.
+    expect(existsSync(resolve(process.cwd(), 'app/artists/loading.tsx'))).toBe(
+      false
+    );
   });
 });

@@ -20,7 +20,6 @@ const {
   mockDbInsert,
   mockIsWaitlistGateEnabled,
   mockCheckUserStatus,
-  mockNormalizeEmail,
   mockCaptureError,
   mockCaptureCriticalError,
 } = vi.hoisted(() => ({
@@ -30,12 +29,16 @@ const {
   mockDbInsert: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
   mockCheckUserStatus: vi.fn(),
-  mockNormalizeEmail: vi.fn((e: string) => e?.toLowerCase().trim() ?? e),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
   mockCaptureCriticalError: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('server-only', () => ({}));
+
+// Price lock recording is covered by price-lock.server.test.ts.
+vi.mock('@/lib/billing/price-lock.server', () => ({
+  ensurePriceLockForUserSafely: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
@@ -107,10 +110,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
 }));
 
-vi.mock('@/lib/utils/email', () => ({
-  normalizeEmail: mockNormalizeEmail,
-}));
-
 vi.mock('@/lib/auth/status-checker', () => ({
   checkUserStatus: mockCheckUserStatus,
 }));
@@ -136,15 +135,6 @@ vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
 }));
-
-vi.mock('react', async importOriginal => {
-  const actual = await importOriginal<typeof import('react')>();
-  return {
-    ...actual,
-    // Disable request memoization so each call is independent in tests
-    cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
-  };
-});
 
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 

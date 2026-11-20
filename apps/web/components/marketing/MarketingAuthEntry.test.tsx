@@ -54,10 +54,10 @@ describe('marketing auth entry waits for intent', () => {
     const hero = ARTIST_NOTIFICATIONS_COPY.hero;
     const view = render(<ArtistNotificationsHero hero={hero} />);
     const link = screen.getByRole('link', { name: hero.primaryCtaLabel });
-    expectIntentOnly(link, '/signup?plan=pro');
+    expectIntentOnly(link, '/start');
     fireEvent.focus(link);
     fireEvent.mouseEnter(link);
-    expectIntentOnly(link, '/signup?plan=pro');
+    expectIntentOnly(link, '/start');
     view.rerender(
       <ArtistNotificationsHero hero={{ ...hero, primaryCtaHref: '/pricing' }} />
     );
@@ -71,8 +71,8 @@ describe('marketing auth entry waits for intent', () => {
     const links = screen.getAllByRole('link', { name: 'Create a Smart Link' });
     expect(links).toHaveLength(2);
     for (const [index, href] of [
-      '/signup?source=smart-links',
-      '/signup?source=smart-links&intent=create',
+      '/start?source=smart-links',
+      '/start?source=smart-links&intent=create',
     ].entries()) {
       const link = links[index]!;
       expectIntentOnly(link, href);
@@ -91,10 +91,10 @@ describe('marketing auth entry waits for intent', () => {
     const links = screen.getAllByRole('link', { name: 'Request access' });
     expect(links).toHaveLength(2);
     for (const link of links) {
-      expectIntentOnly(link, '/signup');
+      expectIntentOnly(link, '/start');
       fireEvent.focus(link);
       fireEvent.click(link);
-      expectIntentOnly(link, '/signup');
+      expectIntentOnly(link, '/start');
     }
     expect(screen.getByRole('link', { name: 'Contact us' })).toHaveAttribute(
       'href',
@@ -192,7 +192,7 @@ describe('marketing auth entry waits for intent', () => {
     render(<HomepageV2Route />);
     expectIntentOnly(
       screen.getByTestId('homepage-v2-hero-primary-cta'),
-      '/signup'
+      '/start'
     );
   });
 });

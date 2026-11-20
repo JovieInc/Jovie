@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/components/organisms/home-loop/HomeLoopCanvas.test.tsx
+// @coverage-via apps/web/components/organisms/home-loop/HomeLoopAnswerPanel.test.tsx
 import { Button } from '@jovie/ui';
 import {
   ChevronLeft,

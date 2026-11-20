@@ -82,6 +82,7 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/pay',
   '/pricing',
   '/product',
+  '/proof',
   '/r',
   '/renders',
   '/s',

@@ -26,6 +26,21 @@ describe('PaySelector', () => {
     expect(onContinue).toHaveBeenCalledWith(20);
   });
 
+  it('keeps the custom-amount toggle wired to the heading it controls', () => {
+    render(
+      <PaySelector
+        amounts={[5, 10, 20]}
+        onContinue={vi.fn()}
+        presentation='drawer'
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /custom amount/i });
+    expect(toggle).toHaveAttribute('aria-controls', 'pay-selector-heading');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(document.getElementById('pay-selector-heading')).not.toBeNull();
+  });
+
   it('normalizes a custom amount to the USD contract precision', () => {
     const onContinue = vi.fn();
     render(
@@ -105,5 +120,24 @@ describe('PaySelector', () => {
       screen.getByRole('button', { name: 'Continue with $7.59' })
     );
     expect(onContinue).toHaveBeenCalledWith(7.59);
+  });
+});
+
+describe('PaySelector focus ring', () => {
+  it('draws the custom-amount toggle focus ring from the canonical focus token', () => {
+    render(
+      <PaySelector
+        amounts={[5, 10, 20]}
+        onContinue={vi.fn()}
+        presentation='drawer'
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /custom amount/i });
+    expect(toggle).toHaveClass(
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus'
+    );
+    expect(toggle.className).not.toContain('var(--focus-ring)');
   });
 });

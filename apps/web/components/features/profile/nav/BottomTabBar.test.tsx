@@ -166,6 +166,17 @@ describe('BottomTabBar — active state', () => {
       expect(btn).not.toHaveAttribute('aria-current', 'page');
     }
   });
+  it('colours active and inactive tabs from the media token, not raw white', () => {
+    render(<BottomTabBar {...makeProps({ activeTab: 'listen' })} />);
+    const music = screen.getByRole('button', { name: 'Music' });
+    const home = screen.getByRole('button', { name: 'Home' });
+    expect(music).toHaveClass('text-on-media');
+    expect(home).toHaveClass('text-on-media/40');
+    for (const tab of [music, home]) {
+      expect(tab).toHaveAttribute('type', 'button');
+      expect(tab.className).not.toContain('text-white');
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -423,5 +434,20 @@ describe('BottomTabBar — liquid glass lens', () => {
     }).finally(() => {
       delete document.documentElement.dataset.reducedTransparency;
     });
+  });
+});
+
+describe('BottomTabBar — focus ring', () => {
+  it('draws each tab focus ring from the canonical focus token', () => {
+    render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
+
+    for (const name of ['Home', 'Music', 'Events']) {
+      const tab = screen.getByRole('button', { name });
+      expect(tab).toHaveClass(
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus'
+      );
+      expect(tab.className).not.toContain('var(--focus-ring)');
+    }
   });
 });

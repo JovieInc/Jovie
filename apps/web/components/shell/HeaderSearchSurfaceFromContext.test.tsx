@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +7,7 @@ import {
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { HeaderSearchSurfaceFromContext } from './HeaderSearchSurfaceFromContext';
+import { SIDEBAR_HEADER_ICON_BUTTON_CLASS } from './sidebar-header-icon-button';
 
 function renderSurface(calm = false) {
   return render(
@@ -24,10 +26,25 @@ describe('HeaderSearchSurfaceFromContext', () => {
   it('renders the calm chat-search treatment used by the canonical rail', () => {
     renderSurface(true);
 
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    const trigger = screen.getByRole('button', {
+      name: 'Search chats in Jovie',
+    });
 
     expect(trigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(screen.getByText('Search chats')).toBeVisible();
+    // WCAG 2.5.3 Label in Name: the accessible name must contain the
+    // visible trigger text (axe label-content-name-mismatch).
+    expect(trigger.getAttribute('aria-label')).toContain('Search chats');
+    // The decorative shortcut hint must not leak into the trigger's visible
+    // text for axe label-content-name-mismatch: the kbd carries no DOM text
+    // (the glyph is CSS-generated from data-shortcut-glyph), and the shortcut
+    // stays programmatic via aria-keyshortcuts (releases-dashboard fixture
+    // states, run 41143756572).
+    expect(trigger).toHaveAttribute('aria-keyshortcuts', 'Meta+K');
+    const kbd = trigger.querySelector('kbd');
+    if (!kbd) throw new Error('expected the shortcut kbd hint');
+    expect(kbd).toHaveAttribute('data-shortcut-glyph', '⌘K');
+    expect(kbd.textContent).toBe('');
     expect(trigger.className).toContain('h-9');
     expect(trigger.className).toContain('rounded-full');
     expect(trigger.className).toContain('text-(length:--text-app)');
@@ -71,5 +88,23 @@ describe('HeaderSearchSurfaceFromContext', () => {
       screen.getByRole('button', { name: 'Other destination' })
     );
     expect(screen.getByRole('status')).toHaveTextContent('Closed');
+  });
+
+  it('renders the compact rail trigger on the shared header icon-button box', () => {
+    render(
+      <HeaderActionsProvider>
+        <TooltipProvider>
+          <HeaderSearchSurfaceFromContext compact />
+        </TooltipProvider>
+      </HeaderActionsProvider>
+    );
+    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    for (const token of SIDEBAR_HEADER_ICON_BUTTON_CLASS.split(' ')) {
+      expect(trigger).toHaveClass(token);
+    }
+    const glyph = trigger.querySelector('svg');
+    expect(glyph).toHaveClass('size-(--app-shell-sidebar-icon-size)');
+    // The compact glyph no longer takes the nav row's muted icon color.
+    expect(glyph?.getAttribute('class') ?? '').not.toContain('sidebar-muted');
   });
 });

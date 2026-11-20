@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
-
 import * as reconciliation from './capability-reconciliation.mjs';
 
 const evidence = {
@@ -247,7 +247,7 @@ test('commissions Next and TanStack deltas through one commit-bound Summer path'
   // biome-ignore format: the three dispositions are the asserted decision boundary
   const next = run(makeDelta('next'), ['ADOPT', 'DEFER', 'ADOPT'], reconciliation.NEXT_CACHE_COMPONENTS_EXCEPTION);
   // biome-ignore format: compact assertions keep commissioning evidence together
-  assert.equal(inventory.rows.find(row => row.app === 'apps/web' && row.package === 'next').resolvedVersion, '16.4.1');
+  assert.equal(inventory.rows.find(row => row.app === 'apps/web' && row.package === 'next').resolvedVersion, JSON.parse(readFileSync(new URL('../../apps/web/package.json', import.meta.url), 'utf8')).dependencies.next);
   // biome-ignore format: explicit denominator equality is the coverage contract
   assert.equal(next.assessment.coverage.denominator, Object.values(next.assessment.coverage.counts).reduce((sum, count) => sum + count, 0));
   // biome-ignore format: exact completed-foundation impact receipt
@@ -263,7 +263,7 @@ test('commissions Next and TanStack deltas through one commit-bound Summer path'
   // biome-ignore format: failed-source bounded staleness proof
   assert.deepEqual(Object.entries(reconciliation.adaptStackDelta(makeDelta('next'), { status: 'failed', attempts: 2, error: 'timeout' }, [], nowUtc)).filter(([key]) => ['status', 'freshness', 'retryAt'].includes(key)).map(([, value]) => value), ['stale', 'unknown', '2026-10-14T04:00:00.000Z']);
   // biome-ignore format: exact ratchet receipt
-  assert.deepEqual(reconciliation.assertStackPatternRatchet(root), { legacyFiles: 245 });
+  assert.deepEqual(reconciliation.assertStackPatternRatchet(root), { legacyFiles: 241 });
 });
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -663,6 +663,46 @@ test('stack inventory in a git checkout digests tracked source only (JOV-8749)',
       reconciliation.buildStackInventory(root, 'sha-3', first).status,
       'refreshed'
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('stack pattern ratchet names every legacy file when the budget is exceeded', async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const { dirname, join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'stack-ratchet-'));
+  const first = 'apps/web/app/api/health/revenue-spine/route.ts';
+  const second = 'apps/web/app/api/other/route.ts';
+  try {
+    const write = (path, content) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), content);
+    };
+    write('apps/web/next.config.js', 'export default {};\n');
+    write(first, "export const dynamic = 'force-dynamic';\n");
+    write(second, 'export const revalidate = 0;\n');
+    assert.deepEqual(reconciliation.assertStackPatternRatchet(root, 2), {
+      legacyFiles: 2,
+    });
+    assert.throws(
+      () => reconciliation.assertStackPatternRatchet(root, 1),
+      error => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /grew to 2 \(maximum 1\)/);
+        assert.ok(error.message.includes(first));
+        assert.ok(error.message.includes(second));
+        return true;
+      }
+    );
+    write(first, 'export async function GET() {}\n');
+    write(second, 'export async function GET() {}\n');
+    assert.deepEqual(reconciliation.assertStackPatternRatchet(root, 0), {
+      legacyFiles: 0,
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

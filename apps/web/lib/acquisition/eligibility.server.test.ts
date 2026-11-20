@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   redis: null as null | {
@@ -38,6 +38,7 @@ import {
   defaultAcquisitionEligibilityDeps,
   getAcquisitionEligibility,
   jobConclusion,
+  readCachedAcquisitionEligibility,
   type WorkflowRunRead,
 } from './eligibility.server';
 
@@ -399,6 +400,32 @@ describe('computeAcquisitionEligibility', () => {
     expect(red.firstBlocker?.explanation).toContain('1 of 1 checks failed.');
   });
 
+  it.each([
+    ['empty', { ...canary(), checks: [] }, 'unknown'],
+    [
+      'contradictory',
+      {
+        ...canary(),
+        checks: [{ name: 'ownership', ok: false, durationMs: 1 }],
+      },
+      'red',
+    ],
+  ] as const)(
+    'rejects a green canary summary with %s underlying checks',
+    async (_name, report, status) => {
+      const result = await computeAcquisitionEligibility(
+        deps({
+          readAuthSignupCanary: async () => ({
+            ...report,
+            checks: [...report.checks],
+          }),
+        })
+      );
+      expect(result.eligible).toBe(false);
+      expect(result.firstBlocker).toMatchObject({ id: 'auth_signup', status });
+    }
+  );
+
   it('cannot diagnose the funnel when the funnel read is degraded', async () => {
     const result = await computeAcquisitionEligibility(
       deps({ readFunnel: async () => funnel(['db timeout']) })
@@ -433,6 +460,23 @@ describe('getAcquisitionEligibility', () => {
       deps({ runRevenuePathCanary })
     );
     expect(result.eligible).toBe(true);
+    expect(runRevenuePathCanary).not.toHaveBeenCalled();
+  });
+
+  it('expires evidence while the Redis entry still exists without probing', async () => {
+    const cached = await computeAcquisitionEligibility(deps());
+    hoisted.redis?.get.mockResolvedValue(cached);
+    const runRevenuePathCanary = vi.fn();
+    const result = await getAcquisitionEligibility(
+      {},
+      deps({
+        now: () => new Date(NOW.getTime() + 16 * 60_000),
+        runRevenuePathCanary,
+      })
+    );
+    expect(result.eligible).toBe(false);
+    expect(result.verdict).toBe('UNKNOWN');
+    expect(result.firstBlocker?.id).toBe('entry');
     expect(runRevenuePathCanary).not.toHaveBeenCalled();
   });
 
@@ -565,4 +609,95 @@ describe('Golden Path workflow evidence', () => {
       'cancelled'
     );
   });
+});
+
+describe('readCachedAcquisitionEligibility', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    hoisted.redis = { get: vi.fn(), set: vi.fn() };
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('preserves a current complete report but invalidates it after its evidence expires', async () => {
+    const cached = await computeAcquisitionEligibility(deps());
+    hoisted.redis?.get.mockResolvedValue(cached);
+    expect((await readCachedAcquisitionEligibility())?.eligible).toBe(true);
+    vi.setSystemTime(new Date(NOW.getTime() + 16 * 60_000));
+    expect((await readCachedAcquisitionEligibility())?.eligible).toBe(false);
+    expect(hoisted.redis?.set).not.toHaveBeenCalled();
+  });
+
+  it('does not retain a nested green commerce decision after its canary expires', async () => {
+    const cached = await computeAcquisitionEligibility(deps());
+    const decision = cached.commerce.matrix[0];
+    const expired = new Date(NOW.getTime() - 25 * 60 * 60_000).toISOString();
+    hoisted.redis?.get.mockResolvedValue({
+      ...cached,
+      commerce: {
+        ...cached.commerce,
+        matrix: [
+          { ...decision, canary: { ...decision.canary, observedAt: expired } },
+        ],
+      },
+    });
+    expect((await readCachedAcquisitionEligibility())?.eligible ?? false).toBe(
+      false
+    );
+  });
+
+  it.each([
+    'missing-evidence',
+    'missing-required-source',
+    'inflated-freshness-budget',
+    'invalid-status',
+    'invalid-budget',
+    'duplicate-requirement',
+    'contradictory-summary',
+    'duplicate-commerce-evidence',
+    'future-evaluation',
+    'zero-budget',
+    'nonfinite-budget',
+  ])(
+    'fails closed for %s even when the stored eligible flag is true',
+    async mutation => {
+      const cached = JSON.parse(
+        JSON.stringify(await computeAcquisitionEligibility(deps()))
+      );
+      if (mutation === 'duplicate-commerce-evidence')
+        cached.commerce.matrix[0].evidence.push({
+          ...cached.commerce.matrix[0].evidence[0],
+          status: 'red',
+        });
+      if (mutation === 'future-evaluation')
+        cached.evaluatedAt = new Date(NOW.getTime() + 6 * 60_000).toISOString();
+      if (mutation === 'zero-budget')
+        cached.requirements[0].evidence[0].maxAgeMs = 0;
+      if (mutation === 'nonfinite-budget')
+        cached.requirements[0].evidence[0].maxAgeMs = Number.POSITIVE_INFINITY;
+      if (mutation === 'missing-required-source')
+        cached.requirements
+          .find((row: { id: string }) => row.id === 'profile_truth')
+          .evidence.pop();
+      if (mutation === 'inflated-freshness-budget') {
+        cached.requirements[0].evidence[0].maxAgeMs = 90 * 24 * 60 * 60_000;
+        cached.requirements[0].evidence[0].observedAt = new Date(
+          NOW.getTime() - 16 * 60_000
+        ).toISOString();
+      }
+      if (mutation === 'missing-evidence') cached.requirements[0].evidence = [];
+      if (mutation === 'invalid-status')
+        cached.requirements[0].evidence[0].status = 'skipped';
+      if (mutation === 'invalid-budget')
+        cached.requirements[0].evidence[0].maxAgeMs = -1;
+      if (mutation === 'duplicate-requirement')
+        cached.requirements.push(cached.requirements[0]);
+      if (mutation === 'contradictory-summary')
+        cached.requirements[0].evidence[0].status = 'red';
+      hoisted.redis?.get.mockResolvedValue(cached);
+      expect(
+        (await readCachedAcquisitionEligibility())?.eligible ?? false
+      ).toBe(false);
+    }
+  );
 });

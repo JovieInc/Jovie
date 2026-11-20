@@ -8,9 +8,10 @@ import {
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
+// Push/overlay presentation coverage lives in RightDrawer.presentation.test.tsx.
 const mockUseBreakpointDown = vi.fn();
-
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: (...args: unknown[]) => mockUseBreakpointDown(...args),
 }));
@@ -35,6 +36,30 @@ describe('RightDrawer', () => {
     mockUseBreakpointDown.mockReturnValue(false);
   });
 
+  it.each([false, true])(
+    'exposes valid accessible drawer semantics (mobile: %s)',
+    async isMobile => {
+      mockUseBreakpointDown.mockReturnValue(isMobile);
+      render(
+        <RightDrawer isOpen width={360} ariaLabel='Accessible details'>
+          <button type='button'>Edit details</button>
+        </RightDrawer>
+      );
+
+      const drawer = screen.getByRole(isMobile ? 'dialog' : 'complementary', {
+        name: 'Accessible details',
+      });
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+      expect(
+        screen
+          .getByRole('button', { name: 'Edit details' })
+          .closest('[data-rail-phase]')
+      ).toBe(drawer);
+      if (isMobile) expect(drawer).toHaveAttribute('aria-modal', 'true');
+      await expectNoA11yViolations(drawer);
+    }
+  );
+
   it('updates aria-hidden when toggling open and closed', () => {
     const { rerender } = render(
       <RightDrawer isOpen={false} width={360} ariaLabel='Details drawer'>
@@ -44,8 +69,6 @@ describe('RightDrawer', () => {
 
     const aside = screen.getByLabelText('Details drawer');
     expect(aside).toHaveAttribute('aria-hidden', 'true');
-    // Pre-hydration on small screens the closed rail must not hold layout
-    // space that the mobile overlay later releases (CLS on /hud?fs=1).
     expect(aside).toHaveClass('max-lg:hidden');
 
     rerender(
@@ -63,8 +86,9 @@ describe('RightDrawer', () => {
       'rounded-(--app-shell-radius)',
       'border-(--app-shell-frame-seam)',
       'bg-surface-1',
-      'shadow-(--app-shell-drawer-shadow)'
+      'shadow-(--app-shell-shadow)'
     );
+    expect(aside).not.toHaveClass('shadow-(--app-shell-drawer-shadow)');
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 

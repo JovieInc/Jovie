@@ -2,9 +2,10 @@ import 'server-only';
 
 import { sql as drizzleSql, type SQL } from 'drizzle-orm';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
+import { activatedUserSql } from '@/lib/activation/admitted-activation';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 
 export type FounderFunnelTimeRange = '7d' | '30d' | 'all';
 
@@ -196,7 +197,7 @@ function findBiggestDropOff(stages: FounderFunnelStage[]): string | null {
  * stage so seeded QA and team accounts never read as customers.
  */
 const EXTERNAL_USER_CONSTRAINT = drizzleSql`
-  (u.email IS NULL OR u.email !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})
+  ${externalAccountSql(drizzleSql.raw('u.email'), drizzleSql.raw('u.account_class'))}
 `;
 
 function userDateConstraint(dateFilter: Date | null): SQL {
@@ -221,10 +222,7 @@ function stageMembershipConstraint(stage: FounderFunnelDrilldownStage): SQL {
         WHERE cp.user_id = bu.id AND cp.is_claimed = true
       )`;
     case 'onboarding_complete':
-      return drizzleSql`AND EXISTS (
-        SELECT 1 FROM creator_profiles cp
-        WHERE cp.user_id = bu.id AND cp.onboarding_completed_at IS NOT NULL
-      )`;
+      return drizzleSql`AND ${activatedUserSql(drizzleSql.raw('bu.id'))}`;
     case 'paid':
       return drizzleSql`AND bu.stripe_subscription_id IS NOT NULL`;
   }

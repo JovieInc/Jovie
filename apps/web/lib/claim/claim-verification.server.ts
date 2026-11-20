@@ -6,6 +6,8 @@ import { generateProofCode } from '@/lib/claim/proof-code';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -105,6 +107,32 @@ async function readRequesterEmail(profileId: string): Promise<string | null> {
     // The card is still filed without it; the operator can look it up.
     return null;
   }
+}
+
+/**
+ * File the operator review card for a self-serve private claim after the
+ * response, so the claim request never waits on the card store. Filing is
+ * idempotent per profile; never throws.
+ */
+export function scheduleClaimVerificationCard(input: {
+  readonly profileId: string;
+  readonly handle: string;
+  readonly record: ClaimVerificationRecord;
+}): void {
+  if (input.record.status !== 'pending_verification') return;
+  scheduleAfter(async () => {
+    try {
+      await fileClaimVerificationCard({
+        ...input,
+        requesterEmail: await readRequesterEmail(input.profileId),
+      });
+    } catch (error) {
+      await captureError('Claim verification card filing failed', error, {
+        action: 'scheduleClaimVerificationCard',
+        creatorProfileId: input.profileId,
+      });
+    }
+  });
 }
 
 /**

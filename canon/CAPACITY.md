@@ -26,7 +26,7 @@ Plan spend at the snapshot: $715.67/mo across active accounts.
 - **Dots** (uncapped-own-model): No usage cap on the agent's own model; use it first. Delegating to another provider spends that provider's quota. Delegation: Delegating to Codex consumes the shared Codex Pro quota (openai-codex).
 - **Instinct** (uncapped-own-model): No usage cap on the agent's own model; use it first. Delegating to another provider spends that provider's quota. Delegation: Delegating to Codex consumes the shared Codex Pro quota (openai-codex).
 - **Muse** (burn-before-reset): Capped quota: spend it fully before each reset; unused quota at reset is lost. Route eligible work here first while under pace.
-- **Anthropic (Opus, Sonnet, Haiku)** (preserve-frontier): Subscription capacity for frontier work only (money and auth critical); cheaper lanes take the rest. Delegation: Opus only for money and auth critical work; Sonnet and Haiku for the rest.
+- **Anthropic (Opus, Sonnet, Haiku)** (preserve-frontier): Subscription capacity, paid for either way. Anthropic models run here or on Hyperagent, never the Vercel AI Gateway or a metered key. Within a capability class the pool whose allowance expires first takes the run (Tim, 2026-11-11; scripts/lanes/model-pools.json). Delegation: Opus for frontier work; Sonnet and Haiku for the rest. Balance against Hyperagent by what expires first.
 - **Vercel AI Gateway** (pay-as-you-go): Real cash or prepaid credit: cheapest model that clears the capability floor; honour the caps in the spend registry. Delegation: Shared balance across every key and project including Summer; the cheap fixer draws on it.
 - **Cloudflare Startup credits** (spend-credits-before-expiry): Given credits, not bought: spend them before they expire, paced to balance divided by days left, within the per-run and per-turn caps.
 - **Devin (free SWE-2)** (unavailable): Not routable: lane disabled, plan lapsed or unverified. Do not route work here. Delegation: Lane disabled in canon/agent-identities.json.
@@ -38,12 +38,14 @@ Price every model by how it is accessed. API and credits paths cost tokens times
 
 | Model | Path | Where | List $/MTok in / out | Note |
 |---|---|---|---|---|
-| gpt-5.6-luna | api | direct | 0.2 / 1.2 |  |
-| gpt-5.6-luna | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 0.2 / 1.2 | Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone. |
-| gpt-5.6-terra | api | direct | 2 / 12 |  |
-| gpt-5.6-terra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 2 / 12 |  |
-| gpt-5.6-sol | api | direct | 5 / 30 |  |
-| gpt-5.6-sol | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 5 / 30 |  |
+| gpt-6-luna | api | direct | 0.1 / 0.5 |  |
+| gpt-6-luna | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 0.1 / 0.5 | Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone. |
+| gpt-6.1-terra | api | direct | 1 / 5 |  |
+| gpt-6.1-terra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 1 / 5 |  |
+| gpt-6.1-sol | api | direct | 2 / 10 |  |
+| gpt-6.1-sol | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 2 / 10 |  |
+| gpt-6-astra | api | direct | 10 / 50 |  |
+| gpt-6-astra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 10 / 50 |  |
 | moonshotai/kimi-k3 | credits | hyperagent (founding-500) | 0.6 / 2 |  |
 | moonshotai/kimi-k3.1-pro | credits | hyperagent (founding-500) | not listed | Gateway catalog per-token price once the model appears; no list price is recorded today |
 | glm-5.3 | credits | hyperagent (founding-500) | 0.3 / 1.2 |  |

@@ -6,11 +6,12 @@
  * the page's independent secondary reads mocked at their boundaries.
  * ArtistPageContent is an async server component, so the render path follows
  * the repo's async-page convention (see tests/unit/app/waitlist/invite-page):
- * await the page, then execute the Suspense child, then renderToStaticMarkup.
+ * await the page, then execute the ArtistPageContent element, then
+ * renderToStaticMarkup.
  *
  * - invalid/reserved usernames 404 via notFound() before any profile lookup
  * - opaque internal handles 404 or permanently redirect before rendering
- * - not_found profiles 404 before the streamed Suspense boundary
+ * - not_found profiles 404 before the page content renders
  * - error results render the server-side recovery state, not a thrown 500
  * - the unfazed handle renders its dedicated client surface, no loader call
  * - secondary read failures degrade instead of failing the render
@@ -295,19 +296,17 @@ async function executeArtistPage(
 }
 
 /**
- * ArtistPageContent is an async server component wrapped in Suspense —
- * renderToStaticMarkup cannot execute it. Reach into the page tree, execute
- * the async child directly (its own notFound()/redirect throws propagate),
- * and return its rendered element for static markup.
+ * ArtistPageContent is an async server component (the page returns it with no
+ * Suspense wrapper, so the LCP content is in the first HTML) —
+ * renderToStaticMarkup cannot execute it. Execute the async element directly
+ * (its own notFound()/redirect throws propagate) and return its rendered
+ * element for static markup.
  */
 async function renderArtistPageContent(
   username: string,
   mode: ProfileMode = 'profile'
 ): Promise<string> {
-  const pageTree = (await executeArtistPage(username, mode)) as ReactElement<{
-    children: ReactElement;
-  }>;
-  const child = pageTree.props.children as ReactElement<
+  const child = (await executeArtistPage(username, mode)) as ReactElement<
     Record<string, unknown>,
     (props: Record<string, unknown>) => Promise<ReactNode>
   >;
@@ -421,7 +420,7 @@ describe('public profile page route behavior (JOV-5778)', () => {
     expect(getProfileAndLinksMock).not.toHaveBeenCalled();
   });
 
-  it('404s missing profiles before the streamed Suspense boundary', async () => {
+  it('404s missing profiles before the page content renders', async () => {
     getProfileAndLinksMock.mockResolvedValue(NOT_FOUND_RESULT);
 
     await expect(executeArtistPage('ghost')).rejects.toThrow('NEXT_NOT_FOUND');
@@ -453,7 +452,7 @@ describe('public profile page route behavior (JOV-5778)', () => {
 
   it('renders the dedicated client surface for the unfazed handle', async () => {
     const pageTree = await executeArtistPage('unfazed');
-    // The Unfazed branch returns its client element before the Suspense
+    // The Unfazed branch returns its client element before the content
     // boundary, so the tree is the Unfazed element itself.
     const html = renderToStaticMarkup(pageTree);
 

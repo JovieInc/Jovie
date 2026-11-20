@@ -50,7 +50,7 @@ const matrixRun = () => ({
   run_attempt: MATRIX_ATTEMPT,
   head_sha: MATRIX_SHA,
   path: '.github/workflows/e2e-full-matrix.yml',
-  event: 'push',
+  event: 'repository_dispatch',
   head_branch: 'main',
   repository: { full_name: 'JovieInc/Jovie' },
 });

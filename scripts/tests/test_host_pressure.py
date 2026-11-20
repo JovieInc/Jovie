@@ -52,6 +52,58 @@ class HostPressureTest(unittest.TestCase):
         self.assertLessEqual(len(rows), 2)
         self.assertTrue(all({"pid", "rssMiB", "cgroup", "cmd"} <= set(r) for r in rows))
 
+    def test_disk_forecast_alarms_on_a_shrinking_trend_before_the_threshold(self):
+        total, day = 1000 * G, 86400
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            lines = lambda: (state / "host-alarms.jsonl").read_text().splitlines() if (state / "host-alarms.jsonl").exists() else []
+            # 20% free, losing 2% (20 GB) per day: 5% floor is 7.5 days away -> quiet, then alarm as it nears.
+            for hour in range(0, 49):
+                now = 1_000_000 + hour * 3600
+                free = 200 * G - int(20 * G * hour / 24)
+                hp.publish_disk_forecast(state, now, usage=lambda _p, f=free: (total, total - f, f))
+            self.assertEqual(len(lines()), 1)
+            self.assertEqual(json.loads(lines()[0])["kind"], "host-disk-forecast")
+            self.assertTrue(json.loads(lines()[0])["alarm"])
+            # Space recovers (flat trend afterwards would take days of history); a big jump flips the slope.
+            self.assertEqual(hp.forecast_days([[0, 100 * G], [3600, 100 * G], [8 * 3600, 100 * G]], total), None)
+            self.assertIsNone(hp.forecast_days([[0, 100 * G]], total))
+            self.assertEqual(hp.forecast_days([[0, 60 * G], [3600, 55 * G], [8 * 3600, 40 * G]], total), 0.0)
+
+    def test_load_storm_alarms_only_when_sustained_and_clears(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            census = lambda: {"processes": 3000, "defunct": 1293, "top": [{"comm": "node", "count": 194}]}
+            lines = lambda: [json.loads(x) for x in (state / "host-alarms.jsonl").read_text().splitlines()] if (state / "host-alarms.jsonl").exists() else []
+            hp.publish_load(state, 60.0, 16, 1000, census=census)       # 4x16=64: under the line
+            hp.publish_load(state, 457.0, 16, 1060, census=census)      # over, just started
+            self.assertEqual(lines(), [])
+            hp.publish_load(state, 900.0, 16, 1120, census=census)      # 60 s over: not yet
+            self.assertEqual(lines(), [])
+            hp.publish_load(state, 1661.0, 16, 1180, census=census)     # 120 s over: alarm
+            hp.publish_load(state, 1661.0, 16, 1240, census=census)     # still over: no duplicate
+            self.assertEqual(len(lines()), 1)
+            event = lines()[0]
+            self.assertEqual((event["kind"], event["alarm"], event["threshold"]), ("host-load-storm", True, 64.0))
+            self.assertEqual(event["census"]["defunct"], 1293)
+            hp.publish_load(state, 5.0, 16, 1300, census=census)
+            self.assertEqual([e["alarm"] for e in lines()], [True, False])
+
+    def test_load_blip_resets_the_clock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            hp.publish_load(state, 500.0, 16, 1000, census=dict)
+            hp.publish_load(state, 10.0, 16, 1060, census=dict)
+            hp.publish_load(state, 500.0, 16, 1120, census=dict)
+            row = hp.publish_load(state, 500.0, 16, 1180, census=dict)
+            self.assertFalse(row["alarm"])
+
+    def test_load_config_env_override_and_census(self):
+        self.assertEqual(hp.load_config({"JOVIE_LOAD_ALARM_MULT": "0.5", "JOVIE_LOAD_ALARM_SECS": "1"}), (0.5, 1.0))
+        self.assertEqual(hp.load_config({"JOVIE_LOAD_ALARM_MULT": "x"}), (4.0, 120.0))
+        if Path("/proc").exists():
+            self.assertGreater(hp.process_census()["processes"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

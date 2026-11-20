@@ -97,13 +97,14 @@ export function bodyContainsInitializedInterview(body: string): boolean {
 }
 
 /**
- * SSR-visible marker for the `/start` onboarding session boundary.
- * `OnboardingSessionBoundary` (JOV-7689) resolves conversation history on the
- * client before mounting the chat, so the SSR/HTML body only ever contains the
- * boundary's restore shell — the `INITIALIZED_INTERVIEW_MARKERS` can never
- * appear over plain HTTP. This marker proves `/start` dispatched to the
- * onboarding session flow without a surface error; the Playwright spec still
- * asserts real interview initialization in the browser.
+ * SSR marker for the `/start` onboarding session restore boundary.
+ * `OnboardingSessionBoundary` renders this only while a restore is on screen
+ * (no server-seeded snapshot, or an identity change mid-restore). Since the
+ * server-seeded `initialSnapshot` path (PR #25189), a healthy fresh-visitor
+ * /start skips the restore state entirely and SSRs the initialized interview
+ * instead — so the cron canary must assert `bodyContainsInitializedInterview`,
+ * not this marker. This predicate stays for the restoring-state contract and
+ * the browser-side helpers that share the selector.
  */
 export function bodyContainsOnboardingSessionBoundary(body: string): boolean {
   return (
@@ -143,8 +144,11 @@ export function isKnownOnboardingFallback(text: string): boolean {
 
 /**
  * Build the anonymous onboarding chat probe payload used by deploy + prod crons.
- * Intentionally omits a Turnstile token: a healthy build should reach the bot
- * gate and return 403 TURNSTILE_REQUIRED, not 503 ONBOARDING_CHAT_DISABLED.
+ * Intentionally omits a Turnstile token: a healthy build reaches the bot gate
+ * and either admits the visitor on the unverified budget (HTTP 200,
+ * JOV-10194 fail-open) or, once that budget is spent, returns 403
+ * TURNSTILE_REQUIRED. It must never return 503 ONBOARDING_CHAT_DISABLED or
+ * any other error envelope.
  */
 export function buildOnboardingChatProbePayload(): Record<string, unknown> {
   return {
@@ -166,6 +170,13 @@ export interface OnboardingChatProbeEvaluation {
 
 /**
  * Evaluate the onboarding chat probe response from POST /api/chat.
+ *
+ * Healthy outcomes mirror the deploy canary contract (JOV-10194 fail-open
+ * bot check): the gate admits the anonymous first message on the unverified
+ * budget — a 200 streamed chat response with no error envelope — or, once
+ * that budget is spent, denies it with the retryable 403 TURNSTILE_REQUIRED.
+ * The probe must never see the 503 ONBOARDING_CHAT_DISABLED kill switch or
+ * any other error envelope.
  */
 export function evaluateOnboardingChatProbe(
   statusCode: number,
@@ -182,9 +193,18 @@ export function evaluateOnboardingChatProbe(
     return { ok: true };
   }
 
+  if (statusCode === 200) {
+    return body.includes('"errorCode"')
+      ? {
+          ok: false,
+          detail: 'Onboarding chat returned an error envelope after admission',
+        }
+      : { ok: true };
+  }
+
   return {
     ok: false,
-    detail: `Expected 403 TURNSTILE_REQUIRED, got HTTP ${statusCode}`,
+    detail: `Expected 200 unverified-budget admit or 403 TURNSTILE_REQUIRED, got HTTP ${statusCode}`,
   };
 }
 

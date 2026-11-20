@@ -2,6 +2,7 @@
 /**
  * App Store graphics for the Jovie iOS app (JOV-4481).
  *
+ *   node apps/ios/scripts/app-store-graphics.mjs boot-status
  *   node apps/ios/scripts/app-store-graphics.mjs capture --app <Jovie.app> [--out <dir>]
  *   node apps/ios/scripts/app-store-graphics.mjs render [--out <dir>]
  *   node apps/ios/scripts/app-store-graphics.mjs verify [--out <dir>]
@@ -19,6 +20,20 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+import {
+  BOOT_STATUS_TIMEOUT_MS,
+  budgetRecap,
+  CAPTURE_BUDGET_MS,
+  durationUntil,
+  guardScreenStart,
+  LAUNCH_TIMEOUT_MS,
+  runBounded,
+  SCREEN_DEADLINE_MS,
+  settleDeadline,
+  sleep,
+  withDeadline,
+} from './capture-budget.mjs';
+import { renderHtml } from './store-graphic-html.mjs';
 
 export const REPO_ROOT = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -327,97 +342,27 @@ export function screenBackground(buffer) {
   return `#${hex}`;
 }
 
-function escapeHtml(text) {
-  return text.replace(
-    /[&<>"]/g,
-    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]
-  );
-}
-
-/**
- * One store graphic as a self-contained HTML document. One key light from
- * the upper left sets the single-hue glow, the bezel highlight and the
- * shadow, and the device bleeds off the bottom edge at the same position on
- * every panel so the set reads as one strip.
- */
-export function renderHtml({
-  spec,
-  screen,
-  colorSot,
-  captureDataUri,
-  fontDataUri,
-  screenFill = '#000',
-}) {
-  const { width, height } = spec.device;
-  const layout = spec.layout;
-  const canvas = colorSot.elevations.dark[layout.canvas];
-  const card = colorSot.elevations.dark.card;
-  const floating = colorSot.elevations.dark.floating;
-  const accent = colorSot.accents.hex[screen.accent];
-  const screenWidth = layout.deviceWidth - layout.bezel * 2;
-  const screenHeight = Math.round((screenWidth * height) / width);
-  // The status bar and app header stay put; only the content below scrolls.
-  const pinned = Math.round(layout.pinnedHeader * screenHeight);
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Satoshi;src:url(${fontDataUri}) format("woff2");font-weight:300 900}
-*{box-sizing:border-box;margin:0}
-html,body{width:${width}px;height:${height}px;overflow:hidden;background:${canvas}}
-.stage{position:relative;width:100%;height:100%;overflow:hidden;
-background:
-radial-gradient(ellipse 120% 70% at 12% 8%,
-color-mix(in oklch,${accent} 58%,${canvas}) 0%,
-color-mix(in oklch,${accent} 24%,${canvas}) 38%,transparent 72%),
-radial-gradient(ellipse 80% 45% at 60% 78%,
-color-mix(in oklch,${accent} 18%,${canvas}) 0%,transparent 70%),${canvas}}
-h1{position:absolute;top:${layout.headlineTop}px;left:${layout.marginX}px;
-width:${width - layout.marginX * 2}px;color:#fff;white-space:pre-line;
-font:700 ${layout.headlineSize}px/1.02 Satoshi,Inter,system-ui,sans-serif;
-letter-spacing:-0.035em}
-.device{position:absolute;top:${layout.deviceTop}px;left:50%;transform:translateX(-50%);
-width:${layout.deviceWidth}px;padding:${layout.bezel}px;border:2px solid transparent;
-border-radius:${layout.deviceRadius}px;
-background:linear-gradient(${card},${card}) padding-box,
-linear-gradient(135deg,rgb(255 255 255 / .34),${floating} 32%,${floating} 70%,rgb(0 0 0 / .4)) border-box;
-box-shadow:40px 72px 160px rgb(0 0 0 / .62),12px 20px 48px rgb(0 0 0 / .4)}
-.screen{position:relative;width:${screenWidth}px;height:${screenHeight}px;overflow:hidden;
-background:${screenFill};border-radius:${layout.deviceRadius - layout.bezel}px}
-.screen img{display:block;width:${screenWidth}px;height:${screenHeight}px}
-.pinned{position:absolute;inset:0 0 auto;height:${pinned}px;overflow:hidden}
-.content{position:absolute;inset:${pinned}px 0 0;overflow:hidden}
-.content img{margin-top:${-pinned - Math.round((screen.scroll ?? 0) * screenHeight)}px}
-</style></head><body><div class="stage" data-screen="${screen.id}">
-<h1>${escapeHtml(screen.headline)}</h1>
-<div class="device"><div class="screen">
-<div class="pinned"><img alt="" src="${captureDataUri}"></div>
-<div class="content"><img alt="" src="${captureDataUri}"></div>
-</div></div>
-</div></body></html>`;
-}
-
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
 function run(command, args, options = {}) {
-  return execFileSync(command, args, {
-    encoding: 'utf8',
-    timeout: 180_000,
-    ...options,
-  });
+  const { timeout = 180_000, cwd, stdio, env } = options;
+  return runBounded(command, args, { timeout, cwd, stdio, env });
 }
 
 /** For simctl calls whose failure means "already in that state". */
-function runQuietly(command, args) {
+async function runQuietly(command, args) {
   try {
-    run(command, args, { stdio: 'ignore' });
+    await run(command, args, { stdio: 'ignore' });
   } catch {
     // Already booted, not installed, or not running.
   }
 }
 
-function simulatorUdid(name) {
+async function simulatorUdid(name) {
   const { devices } = JSON.parse(
-    run('xcrun', ['simctl', 'list', 'devices', 'available', '-j'])
+    await run('xcrun', ['simctl', 'list', 'devices', 'available', '-j'])
   );
   for (const [runtime, list] of Object.entries(devices)) {
     if (!runtime.includes('SimRuntime.iOS')) continue;
@@ -431,33 +376,37 @@ function simulatorUdid(name) {
   );
 }
 
-const sleep = ms => new Promise(done => setTimeout(done, ms));
-
 /**
  * Screenshot until two consecutive frames match and the screen body has
  * content. Fixtures seed asynchronously, and a cold CI simulator is much
  * slower than a warm local one, so a fixed delay captured empty screens.
  */
 async function captureSettled({ udid, file, spec, screen, settleMs }) {
-  // A cold hosted simulator can spend 30s+ on one screenshot, so the budget
-  // is generous and a capture always gets at least three frames to compare.
-  const deadline = Date.now() + settleMs * 18;
+  // A cold hosted simulator can spend 30s+ on one screenshot, so the waiting
+  // budget is generous, screenshot latency is credited back into it, and a
+  // capture always gets at least three frames to compare.
+  const startedAt = Date.now();
+  let shotMs = 0;
   let frames = 0;
   await sleep(settleMs);
   let previous;
   let density = 0;
   let difference = 1;
   while (true) {
-    run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
-      stdio: 'ignore',
-    });
+    const shotStart = Date.now();
+    const shot = ['simctl', 'io', udid, 'screenshot', '--type=png', file];
+    await run('xcrun', shot, { stdio: 'ignore' });
+    shotMs += Date.now() - shotStart;
     const buffer = readFileSync(file);
     frames++;
     density = contentDensity(buffer, spec.contentCheck);
     difference = previous ? frameDifference(previous, buffer) : 1;
     const settled = difference < 0.001;
     if (settled && density >= spec.contentCheck.minDensity) return buffer;
-    if (Date.now() > deadline && frames >= 3) {
+    if (
+      Date.now() > settleDeadline({ settleMs, startedAt, shotMs }) &&
+      frames >= 3
+    ) {
       throw new Error(
         `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%, last frame change ${(difference * 100).toFixed(2)}%)`
       );
@@ -467,16 +416,82 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
   }
 }
 
-async function capture({ appPath, out, settleMs }) {
+async function launchAndSettle({
+  udid,
+  file,
+  spec,
+  screen,
+  settleMs,
+  launchTimeoutMs,
+  settleDurationMs,
+}) {
+  const timeout = launchTimeoutMs?.() ?? LAUNCH_TIMEOUT_MS;
+  await runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
+  console.log(`launching ${screen.id}`);
+  await run(
+    'xcrun',
+    ['simctl', 'launch', udid, BUNDLE_ID, screen.launchArgument, 'UITest'],
+    { timeout }
+  );
+  return withDeadline(
+    captureSettled({ udid, file, spec, screen, settleMs }),
+    settleDurationMs?.() ?? SCREEN_DEADLINE_MS,
+    `${screen.id} capture`
+  );
+}
+
+export { settleDeadline, sleep } from './capture-budget.mjs';
+export { renderHtml } from './store-graphic-html.mjs';
+
+export const CAPTURE_ATTEMPTS = 2;
+
+/** One bounded relaunch (JOV-7952). A budget miss is not retried. */
+export async function captureScreen(
+  input,
+  {
+    attempt,
+    attempts = CAPTURE_ATTEMPTS,
+    launchTimeoutMs,
+    settleDurationMs,
+  } = {}
+) {
+  const runAttempt =
+    attempt ??
+    (args => launchAndSettle({ ...args, launchTimeoutMs, settleDurationMs }));
+  let failure;
+  for (let tryIndex = 1; tryIndex <= attempts; tryIndex++) {
+    try {
+      return await runAttempt(input);
+    } catch (error) {
+      if (error?.budgetExhausted) throw error;
+      failure = error;
+    }
+  }
+  throw failure;
+}
+
+async function capture({
+  appPath,
+  out,
+  settleMs,
+  budgetMs = CAPTURE_BUDGET_MS,
+}) {
+  const startedAt = Date.now();
   const spec = loadStorefront();
   if (!appPath) throw new Error('capture needs --app <path to Jovie.app>');
-  const udid = simulatorUdid(spec.device.simulator);
+  const udid = await simulatorUdid(spec.device.simulator);
   const rawDir = join(out, 'raw');
   mkdirSync(rawDir, { recursive: true });
-  runQuietly('xcrun', ['simctl', 'boot', udid]);
-  run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 });
-  run('xcrun', ['simctl', 'ui', udid, 'appearance', 'dark']);
-  run('xcrun', [
+  const bootStartedAt = Date.now();
+  await runQuietly('xcrun', ['simctl', 'boot', udid]);
+  console.log('waiting for simulator bootstatus');
+  await run('xcrun', ['simctl', 'bootstatus', udid, '-b'], {
+    timeout: 600_000,
+  });
+  const bootMs = Date.now() - bootStartedAt;
+  console.log(`simulator ready in ${(bootMs / 1000).toFixed(1)}s`);
+  await run('xcrun', ['simctl', 'ui', udid, 'appearance', 'dark']);
+  await run('xcrun', [
     'simctl',
     'status_bar',
     udid,
@@ -500,20 +515,36 @@ async function capture({ appPath, out, settleMs }) {
     '--batteryLevel',
     '100',
   ]);
-  runQuietly('xcrun', ['simctl', 'uninstall', udid, BUNDLE_ID]);
-  run('xcrun', ['simctl', 'install', udid, appPath]);
+  const installStartedAt = Date.now();
+  await runQuietly('xcrun', ['simctl', 'uninstall', udid, BUNDLE_ID]);
+  await run('xcrun', ['simctl', 'install', udid, appPath]);
+  const installMs = Date.now() - installStartedAt;
+  console.log(`app installed in ${(installMs / 1000).toFixed(1)}s`);
+  let captured = 0;
   for (const screen of spec.screens) {
-    runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
-    run('xcrun', [
-      'simctl',
-      'launch',
-      udid,
-      BUNDLE_ID,
-      screen.launchArgument,
-      'UITest',
-    ]);
+    const recap = {
+      bootMs,
+      installMs,
+      captured,
+      total: spec.screens.length,
+      startedAt,
+    };
+    guardScreenStart({ budgetMs, ...recap });
     const file = join(rawDir, `${screen.id}.png`);
-    const buffer = await captureSettled({ udid, file, spec, screen, settleMs });
+    const remainingMs = () =>
+      durationUntil(guardScreenStart({ budgetMs, ...recap }), Date.now());
+    let buffer;
+    try {
+      buffer = await captureScreen(
+        { udid, file, spec, screen, settleMs },
+        {
+          launchTimeoutMs: () => Math.min(LAUNCH_TIMEOUT_MS, remainingMs()),
+          settleDurationMs: remainingMs,
+        }
+      );
+    } catch (error) {
+      throw new Error(`${error.message} — ${budgetRecap(recap)}`);
+    }
     const info = pngInfo(buffer);
     if (
       info.width !== spec.device.width ||
@@ -523,9 +554,20 @@ async function capture({ appPath, out, settleMs }) {
         `${screen.id}: captured ${info.width}x${info.height}, expected ${spec.device.width}x${spec.device.height}`
       );
     }
+    captured += 1;
     console.log(`captured ${file}`);
   }
-  run('xcrun', ['simctl', 'status_bar', udid, 'clear']);
+  await run('xcrun', ['simctl', 'status_bar', udid, 'clear']);
+}
+
+async function bootStatus({ timeoutMs = BOOT_STATUS_TIMEOUT_MS } = {}) {
+  const spec = loadStorefront();
+  const udid = await simulatorUdid(spec.device.simulator);
+  console.log(`waiting for simulator ${spec.device.simulator} (${udid})`);
+  await run('xcrun', ['simctl', 'bootstatus', udid, '-b'], {
+    timeout: timeoutMs,
+  });
+  console.log('simulator bootstatus finished');
 }
 
 async function render({ out }) {
@@ -580,7 +622,9 @@ async function render({ out }) {
     schema: RECEIPT_SCHEMA,
     sourceHash: sourceHash(),
     marketingVersion: marketingVersion(readRepo(PBXPROJ_PATH)),
-    gitSha: run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT }).trim(),
+    gitSha: (
+      await run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT })
+    ).trim(),
     device: spec.device,
     pen: {
       file: spec.pen.file,
@@ -694,11 +738,16 @@ function option(args, name) {
 async function main(argv) {
   const [command, ...args] = argv;
   const out = resolve(option(args, '--out') ?? DEFAULT_OUT);
-  if (command === 'capture') {
+  if (command === 'boot-status') {
+    await bootStatus({
+      timeoutMs: Number(option(args, '--timeout-ms') ?? BOOT_STATUS_TIMEOUT_MS),
+    });
+  } else if (command === 'capture') {
     await capture({
       appPath: option(args, '--app'),
       out,
       settleMs: Number(option(args, '--settle-ms') ?? 5000),
+      budgetMs: Number(option(args, '--budget-ms') ?? CAPTURE_BUDGET_MS),
     });
   } else if (command === 'render') {
     await render({ out });
@@ -706,7 +755,7 @@ async function main(argv) {
     verify({ out });
   } else {
     throw new Error(
-      'usage: app-store-graphics.mjs capture|render|verify [--out dir] [--app Jovie.app]'
+      'usage: app-store-graphics.mjs boot-status|capture|render|verify [--out dir] [--app Jovie.app]'
     );
   }
 }

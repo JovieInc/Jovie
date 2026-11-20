@@ -30,6 +30,9 @@ def obs(**over):
                                 "openedPerHour": 20, "ejectionRate": 0.1},
             "disk": {"admitted": True, "freePct": 40}}
     base.update(over)
+    # Fixtures explicitly attest capacity; dedicated unknown cases pass known=False.
+    base["newIssueBudgetByProvider"] = {name: {"capacity": {"allowed": True, "known": True, "reason": "within-capacity", "blockers": []}, **row}
+                                        for name, row in base["newIssueBudgetByProvider"].items()}
     if "linearDimensions" not in over:
         base["linearDimensions"] = {"requests": {"remaining": base["linearRemaining"], "limit": base["linearLimit"], "observedAt": NOW},
                                     "complexity": {"remaining": 1000000, "limit": 2000000, "observedAt": NOW}}
@@ -429,5 +432,64 @@ class AutoscaleTest(unittest.TestCase):
         self.assertLess(self.lane(local, "hyperagent")["effective"], 10)
         rate = decide(None, obs(rateBankAt={"hyperagent": NOW - 10}, eligiblePoolByProvider={"hyperagent": 20}, newIssueBudgetByProvider={"hyperagent": {"reason": "within-budget"}}, maintenanceQueueByProvider={"hyperagent": 0}, runningByProvider={"hyperagent": 10}), hot, {"hyperagent": 10}, cfg(remote=["hyperagent"]), NOW)
         self.assertEqual(self.lane(rate, "hyperagent")["effective"], 5)
+class MarginalYieldAndAdmissionTest(unittest.TestCase):
+    lane = staticmethod(lambda state, name: state["lanes"][name])
+
+    def test_low_marginal_yield_blocks_growth_and_gives_a_seat_back(self):
+        prev = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 4, "target": 4}}, "host": {"lastChangeAt": NOW - 3600}}
+        seen = obs(runningByProvider={"codex": 4}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
+                   yieldByProvider={"codex": {"attempts": 20, "converted": 1}})
+        state = decide(prev, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["lastReason"]), (3, "low-yield"))
+        healthy = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 20, "converted": 9}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreater(self.lane(healthy, "codex")["effective"], 4)
+        few = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 3, "converted": 0}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreaterEqual(self.lane(few, "codex")["effective"], 4, "too few attempts is no evidence")
+
+    def test_current_capacity_blocks_intake_while_repair_seats_remain(self):
+        base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        for token in ("github-quota:graphql", "github-quota:core", "ci-runner-backlog"):
+            with self.subTest(token=token):
+                capacity = {"allowed": False, "known": True, "reason": token, "blockers": [token]}
+                seen = {**base, "newIssueBudgetByProvider": {"codex": {"reason": token, "capacity": capacity}}}
+                row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
+                self.assertEqual(row["intakeEffective"], 0)
+                self.assertIn(token, row["intakeBlockers"])
+                self.assertGreaterEqual(row["effective"], 3, "recovery retains bounded execution seats")
+        saturated = {**base, "ciQueue": {"queuedRuns": 990, "oldestMin": 18.0, "fresh": True}}
+        row = self.lane(decide(None, saturated, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
+        self.assertEqual(row["intakeEffective"], 0)
+        self.assertIn("ci-runner-backlog", row["intakeBlockers"])
+
+    def test_flow_metrics_and_swarm_claims(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "swarm-claims.json").write_text(json.dumps({"claims": [{"pr": 1, "at": NOW - 60}, {"pr": 2, "at": NOW - 99999}]}))
+            self.assertEqual(A.swarm_claims(Path(tmp), NOW), 1)
+        merged = [{"createdAt": "2026-10-28T00:00:00Z", "mergedAt": "2026-10-28T01:00:00Z"}] * 4
+        m = A.flow_metrics({"merged24h": merged, "mergedWindow": {"complete": True}, "openPRCount": 120, "eligiblePoolByProvider": {"codex": 40}},
+                           {"codex": {"attempts": 10, "converted": 6}}, 3, 80, NOW)
+        self.assertEqual((m["mergedPerDay"], m["convertedPerAttempt"], m["cycleMinutesP50"], m["burnDownEtaDays"], m["swarmClaims"]), (4, 0.6, 60.0, 10.0, 3))
+
+
+class StageTimingsTest(unittest.TestCase):
+    def test_stage_timings_publish_counts_percentiles_and_busy_total(self):
+        st = load("stage_timings")
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"; runs.mkdir()
+            rows = [{"schema": "jovie-lane-run/v1", "provider": "codex", "kind": "fix-red", "verdict": v,
+                     "startedAt": "2027-01-15T07:59:00Z", "endedAt": ended}
+                    for v, ended in (("fix-pushed", "2027-01-15T08:00:00Z"), ("failed", "2027-01-15T08:01:00Z"), ("skipped", "2027-01-15T08:00:30Z"))]
+            (runs / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+            now = st._epoch("2027-01-15T08:05:00Z")
+            out = st.cached(Path(tmp), now)
+            stage = out["stages"]["codex/fix-red"]
+            self.assertEqual((out["schema"], stage["count"], stage["convertedPerAttempt"], stage["p50S"], stage["p95S"]),
+                             ("symphony-lane-stage-timings/v1", 2, 0.5, 120.0, 120.0))
+            self.assertTrue((Path(tmp) / "stage-timings.json").exists())
+        state = decide(None, obs(stageTimings=out), sample(), {"codex": 3}, cfg(), NOW)
+        self.assertEqual(state["metrics"]["stages"]["stages"]["codex/fix-red"]["count"], 2)
+        self.assertIn("codex", state["metrics"]["busyTotal"])
+
+
 if __name__ == "__main__":
     unittest.main()

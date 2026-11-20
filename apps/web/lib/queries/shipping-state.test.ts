@@ -1,11 +1,54 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { unknownProjection } from '@/lib/ovie/shipping-state/project';
 import { shippingStateQueryOptions } from './shipping-state';
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('Shipping query contract', () => {
+  const receipt = unknownProjection({
+    sequence: 1,
+    observationTimestamp: new Date().toISOString(),
+    emissionTimestamp: new Date().toISOString(),
+    latencyMs: 1,
+    publishing: true,
+    lastError: null,
+  });
+  const empty = emptyDeliverySummary();
+  const measured = {
+    ...empty,
+    lanes: {
+      ...empty.lanes,
+      running: { state: 'measured-nonzero', value: 2 },
+      slots: { state: 'measured-nonzero', value: 3 },
+      alerts: ['remediation-delivery-failed'],
+      failedByReason: { 'harness-failed': 61 },
+      flow: null,
+    },
+  };
+  it.each([
+    ['measured', measured, measured],
+    ['missing', undefined, empty],
+    ['null', null, empty],
+    ['invalid', { lanes: { running: 'invalid' } }, empty],
+  ])(
+    'preserves validated delivery or an unmeasured fallback (%s)',
+    async (_, delivery, expected) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ...receipt, delivery }))
+      );
+      const client = new QueryClient();
+      try {
+        expect(
+          (await client.fetchQuery(shippingStateQueryOptions)).delivery
+        ).toEqual(expected);
+      } finally {
+        client.clear();
+      }
+    }
+  );
+
   it('shares navigation prefetch with page reads without a second network request', async () => {
     const receipt = unknownProjection({
       sequence: 1,

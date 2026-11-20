@@ -1,0 +1,462 @@
+{
+  "schema": "jovie.waste/v1",
+  "description": "One registry for company-wide waste. Every class is normalised to an outcome (per active user, per merged PR, per day) so anomalies show while absolute numbers are small. Read by scripts/capacity/waste.py, which runs inside the existing capacity collector pass (no new daemon). Detections become jovie-factory-signal/v1 files, which scripts/lanes/factory_intake.py files as compounding Linear issues. Tech debt is waste. No quarterly paydowns: JovieInc/ci canon/COMPANY.md.",
+  "updatedAt": "2026-10-30T00:00:00Z",
+  "fixStream": {
+    "signalLabel": "waste",
+    "workstream": "ws:symphony-throughput (compounding: ranked first by lane_runner.admission_order)",
+    "reservedIntakePerPass": 1,
+    "maxOpen": 5,
+    "everyFixMust": [
+      "name an owner (the class owner below)",
+      "run the generalization sweep: does the same waste exist in other apps, ops or agents? fix once at the highest layer",
+      "leave a durable guard (lint, ratchet, test, quota or alert)",
+      "record before and after in the wins store (waste.py does this itself when the unit metric drops)"
+    ],
+    "winsStorePrefix": "summer-company/wins-ledger/",
+    "digestStorePrefix": "summer-company/waste/"
+  },
+  "inputs": {
+    "activeUsers": {
+      "value": 0,
+      "observedAt": "2026-10-30T00:00:00Z",
+      "source": "Tim 2026-10-30: zero users pre-launch; replace with the prod active-user read when the waitlist opens",
+      "maxAgeDays": 7
+    },
+    "fixedMonthlyUsd": {
+      "neon": {
+        "value": 130,
+        "observedAt": "2026-10-30T00:00:00Z",
+        "source": "Tim 2026-10-30, Neon invoice about $130/month"
+      }
+    },
+    "quotas": {
+      "resend-daily": {
+        "limit": 100,
+        "source": "Resend free tier, 100 emails/day"
+      }
+    }
+  },
+  "classes": [
+    {
+      "id": "money",
+      "label": "Money",
+      "owner": "summer",
+      "unit": "usd per active user per day",
+      "metrics": [
+        {
+          "id": "money.usd_per_day_zero_users",
+          "label": "Daily vendor spend (Neon + Gateway + Vercel) while active users is 0",
+          "unit": "usd/day",
+          "source": "money.usdPerDay",
+          "den": "inputs.activeUsers",
+          "detector": {
+            "kind": "zero-denominator",
+            "minNumerator": 1
+          }
+        },
+        {
+          "id": "money.neon_spend_share",
+          "label": "Neon est. overage vs spend notification (capacity collector #23904)",
+          "unit": "share",
+          "source": "capacity:neon-spend",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.5
+          }
+        }
+      ],
+      "feeds": [
+        "ops/registry/spend.json",
+        "spend guard (#23805)",
+        "scripts/lanes/credentials_spend.py"
+      ]
+    },
+    {
+      "id": "api-calls",
+      "label": "API calls and rate-limit burn",
+      "owner": "gem-hostops",
+      "unit": "calls per merged PR; rate-limit share",
+      "metrics": [
+        {
+          "id": "api.gh_core_used_share",
+          "label": "GitHub REST core budget used",
+          "unit": "share",
+          "source": "github.coreUsedShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.6
+          }
+        }
+      ],
+      "feeds": [
+        "capacity-resources.json github-rest-core",
+        "scripts/apiclient/gh.py ledger",
+        "scripts/lanes/gh_budget.py"
+      ]
+    },
+    {
+      "id": "llm",
+      "label": "LLM tokens and cache misses",
+      "owner": "summer",
+      "unit": "usd per merged PR; cache-miss share",
+      "metrics": [
+        {
+          "id": "llm.cache_miss_share",
+          "label": "Gateway prompt-cache miss share",
+          "unit": "share",
+          "source": "gateway.cacheMissShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.5
+          }
+        },
+        {
+          "id": "llm.usd_per_merged_pr",
+          "label": "Gateway spend per merged PR",
+          "unit": "usd/PR",
+          "source": "llm.gatewayUsdPerMergedPr",
+          "detector": {
+            "kind": "wow",
+            "pct": 0.3,
+            "floor": 0.05
+          }
+        }
+      ],
+      "feeds": [
+        "scripts/ai-gateway-report.mjs (#23892, merged)",
+        "scripts/ai-call-guard.mjs",
+        "AI receipts",
+        "ops/registry/spend.json"
+      ]
+    },
+    {
+      "id": "ci",
+      "label": "CI minutes and runner time",
+      "owner": "ci",
+      "unit": "runner minutes per merged PR; cancelled share",
+      "metrics": [
+        {
+          "id": "ci.cancelled_share",
+          "label": "Cancelled share of recent workflow runs",
+          "unit": "share",
+          "source": "ci.cancelledShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.35
+          }
+        },
+        {
+          "id": "ci.runner_min_per_merged_pr",
+          "label": "Runner minutes per merged PR (sampled)",
+          "unit": "min/PR",
+          "source": "ci.runnerMinPerMergedPr",
+          "detector": {
+            "kind": "wow",
+            "pct": 0.3,
+            "floor": 5
+          }
+        },
+        {
+          "id": "ci.runs_per_merged_pr",
+          "label": "Workflow runs per merged PR (sampled)",
+          "unit": "runs/PR",
+          "source": "ci.runsPerMergedPr",
+          "detector": {
+            "kind": "wow",
+            "pct": 0.3,
+            "floor": 5
+          }
+        }
+      ],
+      "feeds": [
+        "scripts/waste-sweep.mjs (#23690) for Actions wall minutes",
+        "ci-rounds-report",
+        "shipping-slo-latest.json"
+      ]
+    },
+    {
+      "id": "queue-rework",
+      "label": "Queue wait and rework",
+      "owner": "ci",
+      "unit": "ejections and re-runs per merged PR",
+      "metrics": [
+        {
+          "id": "queue.closed_unmerged_share",
+          "label": "PRs closed unmerged / merged (abandoned work)",
+          "unit": "share",
+          "source": "github.closedUnmergedShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.15
+          }
+        },
+        {
+          "id": "pr.first_push_gate_failure_rate",
+          "label": "PRs whose first push fails Fleet Rules, Source Validation or PR Ready (fix: scripts/pr-open.mjs, pnpm pr:open)",
+          "unit": "share",
+          "source": "pr.firstPushGateFailureShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.1
+          }
+        }
+      ],
+      "feeds": [
+        "scripts/lanes/queue_breaker.py",
+        "merge-queue ejections (fleet_ledger)",
+        "data-vs-PR guard (ci#19)",
+        "scripts/pr-open.mjs (#23936)"
+      ]
+    },
+    {
+      "id": "agent-time",
+      "label": "Agent time on duplicate work, abandoned PRs and polling",
+      "owner": "summer",
+      "unit": "agent hours per merged PR",
+      "metrics": [
+        {
+          "id": "agent.duplicate_overlaps",
+          "label": "Duplicate overlapping runs (fleet ledger, 7d)",
+          "unit": "count",
+          "source": "fleet.duplicateOverlaps",
+          "detector": {
+            "kind": "ceiling",
+            "max": 3
+          }
+        }
+      ],
+      "feeds": [
+        "scripts/timewaste agent-waste ledger (#23668)",
+        "scripts/lanes/fleet_ledger.py metrics",
+        "factory_watchdog"
+      ]
+    },
+    {
+      "id": "tim-attention",
+      "label": "Tim's attention: emails, alerts and asks he did not need",
+      "owner": "summer",
+      "unit": "interrupts per day",
+      "metrics": [
+        {
+          "id": "tim.open_asks",
+          "label": "Asks waiting on Tim right now (Ovie Home shows at most 3; the rest must default)",
+          "unit": "count",
+          "source": "feed:time-leverage.json:openAsks",
+          "detector": {
+            "kind": "ceiling",
+            "max": 3
+          }
+        },
+        {
+          "id": "tim.unneeded_asks",
+          "label": "Escalation cards resolved by their own default (Tim not needed)",
+          "unit": "count/7d",
+          "source": "feed:time-leverage.json:unneededAsks",
+          "detector": {
+            "kind": "ceiling",
+            "max": 3
+          }
+        },
+        {
+          "id": "summer.turn_failure_rate",
+          "label": "Summer turns with any failure class (turn critic, 24h)",
+          "unit": "share",
+          "source": "summer.turnFailureRate",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.1
+          }
+        },
+        {
+          "id": "summer.noise_to_tim_rate",
+          "label": "Summer turns judged noise to Tim (turn critic, 24h)",
+          "unit": "share",
+          "source": "summer.noiseToTimRate",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.05
+          }
+        },
+        {
+          "id": "summer.missed_incidents",
+          "label": "Stay-live incidents Summer saw but did not route to Tim within 60 min",
+          "unit": "count",
+          "source": "summer.missedIncidents",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0
+          }
+        }
+      ],
+      "feeds": [
+        "Tim-time ledger (#23668)",
+        "capacity escalations.jsonl",
+        "Summer escalations",
+        "summer.jov.ie/runtime/v1/summer-turn-critic (summer-config #385)"
+      ]
+    },
+    {
+      "id": "notifications",
+      "label": "Emails and notifications sent",
+      "owner": "growth",
+      "unit": "bounce share; quota share",
+      "metrics": [
+        {
+          "id": "notify.resend_daily_quota_share",
+          "label": "Resend daily quota used (capacity collector #23904)",
+          "unit": "share",
+          "source": "capacity:resend-daily",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.5
+          }
+        }
+      ],
+      "feeds": [
+        "capacity-resources.json resend-daily (#23904)",
+        "Neon/Resend worker (already running)"
+      ]
+    },
+    {
+      "id": "storage",
+      "label": "Storage and disk",
+      "owner": "gem-hostops",
+      "unit": "bytes per retired checkout",
+      "metrics": [
+        {
+          "id": "storage.stale_checkouts",
+          "label": "Checkouts untouched for 14 days (this host)",
+          "unit": "count",
+          "source": "storage.staleCheckouts",
+          "detector": {
+            "kind": "ceiling",
+            "max": 10
+          }
+        },
+        {
+          "id": "storage.stale_checkout_gib",
+          "label": "Size of stale checkouts (this host, top 40 measured)",
+          "unit": "GiB",
+          "source": "storage.staleCheckoutGiB",
+          "detector": {
+            "kind": "ceiling",
+            "max": 20
+          }
+        }
+      ],
+      "feeds": [
+        "capacity-resources.json gem-disk / mac-disk",
+        "scripts/lanes/disk_guard.py",
+        "git_housekeeping.py"
+      ]
+    },
+    {
+      "id": "idle-compute",
+      "label": "Idle compute",
+      "owner": "gem-hostops",
+      "unit": "idle-while-ready minutes",
+      "metrics": [
+        {
+          "id": "idle.ready_minutes",
+          "label": "Minutes with ready work and idle lanes (fleet ledger, 7d)",
+          "unit": "min",
+          "source": "fleet.idleWhileReadyMin",
+          "detector": {
+            "kind": "ceiling",
+            "max": 120
+          }
+        }
+      ],
+      "feeds": ["fleet_ledger.py metrics idleWhileReady", "factory_watchdog"]
+    },
+    {
+      "id": "tech-debt",
+      "label": "Tech debt (a form of waste)",
+      "owner": "ci",
+      "unit": "oversized files; slop ratchet size",
+      "metrics": [
+        {
+          "id": "debt.oversized_files",
+          "label": "Tracked source files over 1500 lines",
+          "unit": "count",
+          "source": "debt.oversizedFiles",
+          "detector": {
+            "kind": "wow",
+            "pct": 0.1,
+            "floor": 5
+          }
+        }
+      ],
+      "feeds": [
+        "scripts/waste-sweep.mjs dead code (#23690)",
+        "slop ratchets",
+        "findings ledger (#23709)"
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "id": "neon-idle-spend",
+      "class": "money",
+      "observed": "2026-10-30",
+      "what": "Neon about $130/month with zero users",
+      "usdPerMonth": 130,
+      "units": "$130/mo over 0 active users",
+      "status": "in-flight",
+      "owner": "Neon/Resend worker (already running)",
+      "outcome": "linked: capacity-resources neon-*/resend-* (#23904), worker already running; not duplicated"
+    },
+    {
+      "id": "resend-synthetic-bounces",
+      "class": "notifications",
+      "observed": "2026-10-30",
+      "what": "Resend 100/day quota burned by synthetic sign-in tests that bounce",
+      "units": "100/100 daily quota",
+      "status": "in-flight",
+      "owner": "Neon/Resend worker (already running)",
+      "outcome": "linked: capacity-resources neon-*/resend-* (#23904), worker already running; not duplicated"
+    },
+    {
+      "id": "gem-retired-clones",
+      "class": "storage",
+      "observed": "2026-10-30",
+      "what": "Gem disk full from retired clones",
+      "units": "disk at the 90% admission floor",
+      "status": "detector-live",
+      "owner": "gem-hostops",
+      "outcome": "storage.stale_checkouts detector; fix = retire sweep + guard"
+    },
+    {
+      "id": "gateway-summer-spend",
+      "class": "llm",
+      "observed": "2026-10-30",
+      "what": "AI Gateway about $3/day, mostly Summer",
+      "usdPerMonth": 90,
+      "units": "$3/day over 0 users",
+      "status": "detector-live",
+      "owner": "summer",
+      "outcome": "money.usd_per_day_zero_users + llm.cache_miss_share from #23892; #23891 cut golden-path cost (linked)"
+    },
+    {
+      "id": "vercel-update-branch-storm",
+      "class": "api-calls",
+      "observed": "2026-10-30",
+      "what": "Vercel paused by update-branch storms",
+      "units": "spend cap reached",
+      "status": "detector-live",
+      "owner": "ci",
+      "outcome": "ci.runs_per_merged_pr wow + spend guard (#23805)"
+    },
+    {
+      "id": "data-shipped-as-prs",
+      "class": "queue-rework",
+      "observed": "2026-10-30",
+      "what": "Data shipped as PRs, causing conflicts",
+      "units": "7 bot PRs/day (wins ledger alone)",
+      "status": "in-flight",
+      "owner": "data-vs-PR worker (already running)",
+      "outcome": "linked: ci#19 data-vs-PR guard and #23905 wins to the runtime store; not duplicated"
+    }
+  ]
+}

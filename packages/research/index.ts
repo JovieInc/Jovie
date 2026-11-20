@@ -2,6 +2,7 @@ export * from './credentials.ts';
 export * from './gbrain.ts';
 export * from './judge.ts';
 export * from './normalize.ts';
+export * from './outcome.ts';
 export * from './persist.ts';
 export * from './report.ts';
 export * from './router.ts';

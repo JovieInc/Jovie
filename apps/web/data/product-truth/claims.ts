@@ -96,6 +96,14 @@ function deriveOfferClaims(): Claim[] {
       kind: 'offer' as const,
       source: 'offer-truth' as const,
     },
+    {
+      // Paid CTAs name the plan and price (JOV-9692).
+      id: `offer.${offer.plan}.cta`,
+      capabilityId: 'public-profile',
+      statement: offer.ctaLabel,
+      kind: 'offer' as const,
+      source: 'offer-truth' as const,
+    },
   ]);
 }
 

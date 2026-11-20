@@ -168,8 +168,8 @@ test.describe('right-rail × composer interaction', () => {
     await page.waitForTimeout(500);
 
     // Assert the rail is inert=false (open) — we want the *composer* to be
-    // interactive. The AppShellRightRail mounts beside the scroll clip and
-    // should not capture pointer events in the composer area.
+    // interactive. The AppShellRightRail is a column beside the route column
+    // (it pushes the route), so it never covers the composer area.
     const textarea = page.locator(COMPOSER_TEXTAREA);
 
     // Dispatch a pointerdown and check it reaches the textarea

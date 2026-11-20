@@ -22,6 +22,9 @@ vi.mock('@/components/organisms/Dialog', () => ({
   Dialog: ({ children }: { children: ReactNode }) => (
     <div role='dialog'>{children}</div>
   ),
+  DialogActions: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
   DialogBody: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogDescription: ({ children }: { children: ReactNode }) => (
     <p>{children}</p>
@@ -54,12 +57,6 @@ vi.mock('@/components/atoms/ProviderIcon', () => ({
   ProviderIcon: () => <span aria-hidden='true'>Spotify</span>,
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Spinner: ({ label }: { label?: string }) => (
-    <span role='status'>{label}</span>
-  ),
-}));
-
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => <img {...props} alt='' />,
 }));
@@ -85,17 +82,15 @@ const currentUserArtist = {
 };
 
 function renderDialog() {
-  render(<SpotifyConnectDialog open onOpenChange={vi.fn()} />);
+  render(
+    <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+  );
 }
 
 function getResultButton(name: string) {
   const button = screen
-    .getAllByRole('button', { hidden: true })
-    .find(
-      candidate =>
-        candidate.classList.contains('system-b-spotify-connect-result-row') &&
-        candidate.textContent?.includes(name)
-    );
+    .getAllByRole('option')
+    .find(candidate => candidate.textContent?.includes(name));
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Missing result button for ${name}`);
   }
@@ -121,7 +116,7 @@ describe('SpotifyConnectDialog', () => {
     });
   });
 
-  it('keeps the current user artist actionable while denying another owner', async () => {
+  it('selects the current user artist and connects only from the primary', async () => {
     const user = userEvent.setup();
     renderDialog();
 
@@ -134,10 +129,16 @@ describe('SpotifyConnectDialog', () => {
     expect(getResultButton('Other Owner')).toBeDisabled();
 
     await user.click(getResultButton('Tim White'));
+    expect(mockHandleArtistSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect Tim White'
+    );
+
+    await user.click(screen.getByTestId('spotify-connect-primary'));
     expect(mockHandleArtistSelect).toHaveBeenCalledWith(currentUserArtist);
   }, 15_000);
 
-  it('uses the current user artist for the trailing action and keyboard Enter', async () => {
+  it('selects with Enter, connects with a second Enter, and skips other owners', async () => {
     const user = userEvent.setup();
     renderDialog();
 
@@ -146,25 +147,28 @@ describe('SpotifyConnectDialog', () => {
     });
     await user.type(input, 'tim white');
 
-    await user.click(screen.getByRole('button', { name: 'Connect Spotify' }));
-    expect(mockHandleArtistSelect).toHaveBeenCalledWith(currentUserArtist);
-
-    mockHandleArtistSelect.mockClear();
-    input.focus();
     await user.keyboard('{ArrowDown}{Enter}');
+    expect(mockHandleArtistSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect Tim White'
+    );
+
+    await user.keyboard('{Enter}');
     expect(mockHandleArtistSelect).toHaveBeenCalledWith(currentUserArtist);
 
     mockHandleArtistSelect.mockClear();
     input.focus();
-    await user.keyboard('{ArrowDown}');
-    expect(input).toHaveAttribute(
-      'aria-activedescendant',
-      'spotify-connect-result-2'
-    );
+    const visited: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      await user.keyboard('{ArrowDown}');
+      visited.push(input.getAttribute('aria-activedescendant') ?? '');
+    }
+    // Navigation never lands on another owner's claimed row.
+    expect(visited).not.toContain('spotify-connect-result-1');
     expect(mockHandleArtistSelect).not.toHaveBeenCalled();
   }, 15_000);
 
-  it('disables the trailing action when every claimed result belongs to someone else', async () => {
+  it('keeps the primary disabled with no selectable result', async () => {
     const user = userEvent.setup();
     mockArtistSearch.mockReturnValue({
       results: [otherClaimedArtist],
@@ -180,9 +184,10 @@ describe('SpotifyConnectDialog', () => {
     });
     await user.type(input, 'other owner');
 
-    expect(
-      screen.getByRole('button', { name: 'Connect Spotify' })
-    ).toBeDisabled();
+    expect(screen.getByTestId('spotify-connect-primary')).toBeDisabled();
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect'
+    );
     expect(getResultButton('Other Owner')).toBeDisabled();
   });
 });

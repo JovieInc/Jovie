@@ -1,0 +1,15 @@
+# Public app certification (static leg): config, privacy registry and rules.
+# Policy: JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md. Scaffolded by the company
+# layer; the pin is bumped with the company guards pin.
+name: Public App Certification
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  certify:
+    uses: JovieInc/ci/.github/workflows/public-app-certification.yml@bce84c9f7d370dd0f274d8f61554c3eaf27855a4
+    with:
+      ci-ref: bce84c9f7d370dd0f274d8f61554c3eaf27855a4

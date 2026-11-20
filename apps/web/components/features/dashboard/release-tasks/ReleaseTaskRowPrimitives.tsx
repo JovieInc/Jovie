@@ -62,9 +62,7 @@ export function ReleaseTaskTitleText({
     <span
       className={cn(
         'truncate transition-colors duration-subtle ease-subtle',
-        isDone
-          ? 'text-tertiary-token line-through opacity-60'
-          : 'text-primary-token',
+        isDone ? 'text-tertiary-token line-through' : 'text-primary-token',
         className
       )}
     >

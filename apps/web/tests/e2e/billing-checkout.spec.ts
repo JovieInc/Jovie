@@ -30,8 +30,8 @@ const REQUIRED_ENV = {
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+  process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(

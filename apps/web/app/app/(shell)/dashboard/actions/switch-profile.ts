@@ -12,6 +12,7 @@ import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { canSetUpPublicProfile } from '@/lib/profile/profile-setup-eligibility';
 import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 
 const UUID_RE =
@@ -98,7 +99,10 @@ export async function switchActiveProfile(
       .set({ activeProfileId: profileId, updatedAt: new Date() })
       .where(eq(users.id, user.id));
 
-    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+    // Read-your-own-write: both callers are Route Handlers (updateTag is
+    // unavailable there) and the client calls router.refresh() right after, so
+    // the old selectedProfile must not be served stale-while-revalidate.
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, { expire: 0 });
 
     return { success: true };
   } catch (error) {
@@ -162,13 +166,19 @@ export async function createAdditionalProfile(input: {
     await setupDbSession(appUserId);
 
     const [user] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, userStatus: users.userStatus })
       .from(users)
       .where(appUserIdFilter(appUserId))
       .limit(1);
 
     if (!user) {
       return { success: false, error: 'User not found' };
+    }
+    if (!canSetUpPublicProfile(user.userStatus)) {
+      return {
+        success: false,
+        error: 'This account cannot create a profile yet',
+      };
     }
 
     const existingProfiles = await db
@@ -220,7 +230,8 @@ export async function createAdditionalProfile(input: {
       return newProfile;
     });
 
-    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+    // Read-your-own-write, same as switchActiveProfile above.
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, { expire: 0 });
 
     // Passive first-touch receipt (JOV-5036): idempotent, best-effort.
     await attachFirstTouchReceipt(user.id);

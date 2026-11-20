@@ -15,6 +15,10 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
   HOMEPAGE_PROFILE_SHOWCASE_STATES,
+  HOMEPAGE_TEMPLATE_PROFILE_ARTIST,
+  HOMEPAGE_TEMPLATE_PROFILE_RELEASE,
+  HOMEPAGE_TEMPLATE_PROFILE_SOCIAL_LINKS,
+  homepageTemplateReleaseDate,
 } from '@/features/home/homepage-profile-preview-fixture';
 import {
   type ProfileMode,
@@ -38,6 +42,7 @@ import {
 } from '@/lib/profile/profile-theme';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { DemoClientProviders } from './DemoClientProviders';
+import { isProfileShowcaseStateId } from './demo-profile-showcase-states';
 
 const DEMO_PRESS_PHOTOS = [
   {
@@ -98,37 +103,12 @@ const SHOWCASE_VIEWER_LOCATION = {
 } as const;
 const SHOWCASE_NOW = new Date('2026-04-20T12:00:00.000Z');
 const DEMO_TIM_WHITE_SHOWCASE_MODES = ['cards', 'subscribe'] as const;
-const DEMO_PROFILE_ARCHETYPE_KEYS = ['tim', 'mainstream', 'sparse'] as const;
-const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
-  'mock-home',
-  'streams-latest',
-  'streams-presave',
-  'streams-release-day',
-  'streams-video',
-  'tour-nearby',
-  'playlist-fallback',
-  'listen-fallback',
-  'alerts-fallback',
-  'events-empty',
-  'more-menu',
-  'fans-opt-in',
-  'fans-confirmed',
-  'fans-song-alert',
-  'fans-show-alert',
-  'subscribe-email',
-  'subscribe-otp',
-  'subscribe-otp-error',
-  'subscribe-name',
-  'subscribe-birthday',
-  'subscribe-done',
-  'tips-open',
-  'tips-apple-pay',
-  'tips-thank-you',
-  'tips-followup',
-  'tour',
-  'contact',
-  'catalog',
-] as const satisfies readonly ProfileShowcaseStateId[];
+const DEMO_PROFILE_ARCHETYPE_KEYS = [
+  'tim',
+  'mainstream',
+  'sparse',
+  'template',
+] as const;
 const SUBSCRIBE_SHOWCASE_STATE_IDS = [
   'fans-opt-in',
   'subscribe-email',
@@ -229,8 +209,33 @@ function getDemoProfileFixture(params: {
   readonly archetype: DemoProfileArchetype;
   readonly releaseKey: ReleaseVariant;
   readonly latestRelease: DemoRelease;
+  readonly nowMs: number;
 }) {
-  const { archetype, releaseKey, latestRelease } = params;
+  const { archetype, releaseKey, latestRelease, nowMs } = params;
+
+  if (archetype === 'template') {
+    // The homepage hero's template profile: no person, no real act. Its one
+    // release is dated relative to the capture clock so it always reads as new.
+    const artist = HOMEPAGE_TEMPLATE_PROFILE_ARTIST;
+    return {
+      artist,
+      socialLinks: [...HOMEPAGE_TEMPLATE_PROFILE_SOCIAL_LINKS],
+      contacts: [],
+      latestRelease: {
+        ...makeDemoRelease({
+          ...HOMEPAGE_TEMPLATE_PROFILE_RELEASE,
+          releaseDate: homepageTemplateReleaseDate(nowMs),
+        }),
+        id: `demo-template-${HOMEPAGE_TEMPLATE_PROFILE_RELEASE.slug}`,
+        creatorProfileId: artist.id,
+        genres: null,
+      },
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+    };
+  }
 
   if (archetype === 'mainstream') {
     const artist = {
@@ -355,14 +360,6 @@ function isDemoProfileArchetype(
   value: string | null
 ): value is DemoProfileArchetype {
   return DEMO_PROFILE_ARCHETYPE_KEYS.includes(value as DemoProfileArchetype);
-}
-
-function isProfileShowcaseStateId(
-  value: string | null
-): value is ProfileShowcaseStateId {
-  return DEMO_TIM_WHITE_SHOWCASE_STATE_IDS.includes(
-    value as ProfileShowcaseStateId
-  );
 }
 
 function DemoShowcaseShell({
@@ -615,8 +612,10 @@ function SingleStatePhonePreview({
   );
 }
 
-function MoreMenuPhonePreview() {
-  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES['more-menu'];
+function DrawerPhonePreview({
+  stateId,
+}: Readonly<{ stateId: 'more-menu' | 'share' }>) {
+  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const profileAccentStyle = buildProfileAccentCssVars(
     readProfileAccentTheme(HOMEPAGE_PROFILE_PREVIEW_ARTIST.theme)
   );
@@ -704,12 +703,14 @@ export function DemoTimWhiteProfileSurface() {
   const showcaseState = isProfileShowcaseStateId(stateParam)
     ? stateParam
     : null;
-  const releaseVariants = useMemo(() => getReleaseVariants(Date.now()), []);
+  const nowMs = useMemo(() => Date.now(), []);
+  const releaseVariants = useMemo(() => getReleaseVariants(nowMs), [nowMs]);
   const latestRelease = makeDemoRelease(releaseVariants[releaseKey]);
   const fixture = getDemoProfileFixture({
     archetype,
     releaseKey,
     latestRelease,
+    nowMs,
   });
   const seededPressPhotos =
     captureMode === 'press-assets' ? [...DEMO_PRESS_PHOTOS] : [];
@@ -775,8 +776,8 @@ export function DemoTimWhiteProfileSurface() {
   }
 
   if (showcaseState) {
-    if (showcaseState === 'more-menu') {
-      return <MoreMenuPhonePreview />;
+    if (showcaseState === 'more-menu' || showcaseState === 'share') {
+      return <DrawerPhonePreview stateId={showcaseState} />;
     }
 
     return (
@@ -791,11 +792,29 @@ export function DemoTimWhiteProfileSurface() {
     );
   }
 
+  // Homepage hero crop: the top of the template profile (identity, links,
+  // and the featured release) without the empty run above the tab bar.
+  const heroCrop = archetype === 'template' && captureMode === 'hero';
+
   return (
     <DemoClientProviders>
-      <div data-testid='demo-showcase-tim-white-profile'>
+      <div
+        data-testid='demo-showcase-tim-white-profile'
+        className={heroCrop ? 'relative' : undefined}
+      >
+        {heroCrop ? (
+          <div
+            aria-hidden='true'
+            data-testid='demo-template-hero-capture'
+            className='pointer-events-none absolute inset-x-0 top-0 z-30 h-158'
+          />
+        ) : null}
         <StaticArtistPage
-          presentation='full-public'
+          presentation={
+            searchParams.get('presentation') === 'compact-preview'
+              ? 'compact-preview'
+              : 'full-public'
+          }
           mode={mode}
           artist={fixture.artist}
           subtitle='Official artist profile'

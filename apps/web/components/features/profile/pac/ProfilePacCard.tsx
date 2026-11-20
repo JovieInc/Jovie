@@ -61,6 +61,7 @@ const FEATURED_FALLBACK_ACCENT: ProfileCardAccentAssignment = {
   strength: 'text',
 };
 
+import { featuredArtLoadHints } from './featured-art-hints';
 import {
   hasReachedListenThreshold,
   type PacContext,
@@ -964,8 +965,8 @@ export function ProfilePacCard({
                     alt={artImageAlt}
                     fill
                     priority={artPriority}
-                    loading={artPriority ? undefined : 'eager'}
-                    sizes='104px'
+                    {...featuredArtLoadHints(isInteractive, artPriority)}
+                    sizes='(min-width: 1024px) 400px, 104px'
                     className={
                       isReleaseArtwork
                         ? ARTWORK_FIT_CLASSNAME
