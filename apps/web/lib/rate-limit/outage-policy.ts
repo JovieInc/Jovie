@@ -168,7 +168,7 @@ export const REDIS_DATA_CONSUMERS = {
   'auth/rate-limit': {
     class: 'mandatory',
     recovery:
-      'Fail closed for OTP/passwordless/credential paths when Redis is missing (deny + Retry-After). Fail open only for non-abuse Better Auth paths. Sessions stay in Postgres plus the cookie cache',
+      'When store is Upstash/local Redis and the backend is down: fail closed for OTP/passwordless/credential paths (deny + Retry-After). Intentional non-prod memory store uses a process-local counter (not treated as outage). Fail open only for non-abuse Better Auth paths during durable-backend outage. Sessions stay in Postgres plus the cookie cache',
   },
   'musicfetch/budget-guard': {
     class: 'mandatory',

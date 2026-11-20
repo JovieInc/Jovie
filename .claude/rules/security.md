@@ -20,10 +20,11 @@ For webhook signature verification: verify before parsing business logic.
 
 Better Auth path counters live in Redis (`apps/web/lib/auth/rate-limit-storage.ts`), not in session storage. Sessions and OTP verification values stay in Postgres.
 
-When Redis is missing, times out, or the consume script cannot set a TTL:
+Distinguish **intentional no-Redis** from **Redis expected but down**:
 
-- **Fail closed** for abuse-critical auth paths (email OTP send/sign-in, phone OTP, one-time tokens, `/sign-in/*`, `/sign-up/*`, password reset / change-email / change-password). Return deny with `retryAfter` = rule window so Better Auth responds 429 + `X-Retry-After`. Classifier: `isSensitiveAuthRateLimitPath` in `rate-limit-rules.ts`.
-- **Fail open** only for non-abuse Better Auth paths that still hit this storage (if any). Do not broaden fail-open to OTP or passwordless endpoints to “keep sign-in available” during an outage — that unbounded spray is worse than a temporary deny.
+- Non-production selects the in-memory store via `selectRedisStore` (`kind: 'memory'`). That is not an outage — use the process-local fixed-window counter (same split as `RateLimiter`, which only fail-closes when `storeKind === 'upstash'`). Do not 429 OTP/sign-in solely because preview/local/CI/E2E chose memory.
+- When the selected store is Upstash or local Redis and the client is missing, times out, or the consume script cannot set a TTL: **fail closed** for abuse-critical auth paths (email OTP send/sign-in, phone OTP, one-time tokens, `/sign-in/*`, `/sign-up/*`, password reset / change-email / change-password). Return deny with `retryAfter` = rule window so Better Auth responds 429 + `X-Retry-After`. Classifier: `isSensitiveAuthRateLimitPath` in `rate-limit-rules.ts`.
+- **Fail open** only for non-abuse Better Auth paths that still hit this storage during a durable-backend outage. Do not broaden fail-open to OTP or passwordless endpoints to “keep sign-in available” during an outage — that unbounded spray is worse than a temporary deny.
 - Inventory: `REDIS_DATA_CONSUMERS['auth/rate-limit']` in `lib/rate-limit/outage-policy.ts` (mandatory).
 
 ## No Unlimited Anything
