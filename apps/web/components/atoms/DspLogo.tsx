@@ -173,6 +173,37 @@ function DspLogoInner({
 export const DspLogo = memo(DspLogoInner);
 DspLogo.displayName = 'DspLogo';
 
+interface DspServiceIconProps {
+  readonly provider: string;
+  readonly className?: string;
+}
+
+/**
+ * Icon-only brand glyph from `DSP_LOGO_CONFIG` — the same path/color source
+ * MusicServiceDial and SmartLinkProviderButton use on live smart links.
+ * Prefer this over colored-circle placeholders or one-off SVG copies.
+ */
+export function DspServiceIcon({
+  provider,
+  className = 'h-7 w-7 shrink-0',
+}: Readonly<DspServiceIconProps>) {
+  const config = DSP_LOGO_CONFIG[provider];
+  if (!config?.iconPath) return null;
+
+  return (
+    <svg
+      viewBox='0 0 24 24'
+      fill='currentColor'
+      className={className}
+      style={{ color: config.color }}
+      aria-hidden='true'
+      data-dsp-icon={provider}
+    >
+      <path d={config.iconPath} />
+    </svg>
+  );
+}
+
 /**
  * Brand logo configuration for video providers (short-form "Use this sound").
  * Separate from DSP_LOGO_CONFIG since these are video platforms, not music DSPs.

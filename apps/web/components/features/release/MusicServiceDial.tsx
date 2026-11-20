@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { DSP_LOGO_CONFIG, DspServiceIcon } from '@/components/atoms/DspLogo';
 import { LISTEN_COOKIE } from '@/constants/app';
 import type { ProviderKey } from '@/lib/discography/types';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
@@ -73,16 +73,9 @@ export function MusicServiceDial({
           id: provider.key,
           label: logo?.name ?? provider.label,
           href: appendUTMParamsToUrl(provider.url, utmParams),
+          // Same DSP_LOGO_CONFIG glyph as SmartLinkProviderButton / listen rows.
           icon: logo?.iconPath ? (
-            <svg
-              viewBox='0 0 24 24'
-              fill='currentColor'
-              className='h-7 w-7 shrink-0'
-              style={{ color: logo.color }}
-              aria-hidden='true'
-            >
-              <path d={logo.iconPath} />
-            </svg>
+            <DspServiceIcon provider={provider.key} />
           ) : undefined,
         };
       }),
