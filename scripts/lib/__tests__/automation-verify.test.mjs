@@ -985,7 +985,6 @@ describe('structural control stage execution', () => {
       )
     ).toHaveLength(1);
   });
-
   it('propagates an authored observation coverage failure before later control stages', async () => {
     const visited = [];
     const status = await runControlTestCommands(async (command, args) => {
@@ -1002,7 +1001,6 @@ describe('structural control stage execution', () => {
     expect(status).toBe(32);
     expect(visited).toEqual(buildControlTestCommands().slice(0, 3));
   });
-
   it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
     const [nativeControl] = buildControlCoverageCommands();
     expect(nativeControl[1]).toContain(
@@ -1083,11 +1081,13 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
-        '--test-coverage-include=.github/scripts/production-continuity.mjs',
+        '--test-coverage-include=.github/scripts/production-continuity{,-arrival}.mjs',
         '--test-coverage-lines=95',
         '--test-coverage-branches=90',
         '--test-coverage-functions=90',
         '.github/scripts/production-continuity.test.mjs',
+        '.github/scripts/production-continuity-arrival.test.mjs',
+        '.github/scripts/production-continuity-limits.test.mjs',
       ],
     ]);
     expect(stages[12]).toEqual([
