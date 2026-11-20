@@ -207,6 +207,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
+                  "scripts/lib/wins-measure/classify.mjs",
                   "scripts/tests/repair_customer_decision_cases.py", "scripts/lib/daily-changelog-evidence.mjs", "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog.mjs", "scripts/lib/changelog-filter-rules.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",

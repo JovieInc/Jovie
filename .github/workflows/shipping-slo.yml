@@ -150,10 +150,9 @@ jobs:
         # Immediately after --write-latest so JSON field-path adapters see the
         # fresh snapshot. Must run before snapshot/ratchet steps that switch
         # git branches (those reset the working tree to origin/main).
-        # continue-on-error: advisory — never suppress snapshot/intake/Slack.
-        # Receipts stay in the runtime store (data vs behaviour).
+        # Advisory (`|| true`): never fail the SLO job or suppress snapshot /
+        # intake / Slack. Receipts stay in the runtime store (data vs behaviour).
         id: wins-measure
-        continue-on-error: true
         if: ${{ !cancelled() }}
         env:
           SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
@@ -161,8 +160,8 @@ jobs:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY"
+          set -uo pipefail
+          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       # Merge to live per production promotion (alias move), last 10: p50/p95
       # and the slowest stage. REST only, so a GraphQL shed cannot blank it.

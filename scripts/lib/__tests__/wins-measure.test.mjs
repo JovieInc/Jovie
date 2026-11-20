@@ -322,7 +322,11 @@ test('shipping-slo workflow measures due wins before branch checkouts', () => {
   assert.ok(measureIdx > 0, 'measure-due step present');
   assert.ok(measureIdx < snapshotIdx, 'measure-due before snapshot branch');
   assert.ok(measureIdx < ratchetIdx, 'measure-due before ratchet checkout');
-  assert.equal(steps[measureIdx].continueOnError ?? steps[measureIdx]['continue-on-error'], true);
+  assert.equal(
+    steps[measureIdx].continueOnError ?? steps[measureIdx]['continue-on-error'],
+    undefined
+  );
+  assert.match(String(steps[measureIdx].run ?? ''), /\|\| true/);
   assert.match(String(slack?.if ?? ''), /always\(\)/);
   assert.match(steps.map(s => s.run ?? '').join('\n'), /measure-due --store/);
   assert.ok(doc.on.schedule || doc.on.workflow_dispatch);

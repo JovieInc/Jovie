@@ -174,9 +174,10 @@ export async function measureDueWins(wins, opts = {}) {
     skipped.push(...winSkips);
     // Queryable metrics that soft-skipped or errored leave the win incomplete.
     // Do not append any receipts — winStatus must stay pending-measure.
-    const queryableAttempted = winMeasured.length + winSkips.filter(
-      s => s.adapter !== 'needs-probe'
-    ).length + winErrors.length;
+    const queryableAttempted =
+      winMeasured.length +
+      winSkips.filter(s => s.adapter !== 'needs-probe').length +
+      winErrors.length;
     const incomplete =
       winErrors.length > 0 ||
       winSkips.some(s => s.adapter !== 'needs-probe') ||
