@@ -3492,7 +3492,6 @@ async function main() {
   writeLaneResults(results, laneGroup, setupError);
 
   if (setupError) process.exit(1);
-
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
     console.error(
