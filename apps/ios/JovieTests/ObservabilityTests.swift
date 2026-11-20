@@ -432,6 +432,10 @@ extension ObservabilityTests {
     #expect(ObservabilityEvent.authFailed != ObservabilityEvent.authPresentationRetry)
     #expect(ObservabilityEvent.profileUrlCopied.rawValue == "profile_url_copied")
     #expect(ObservabilityEvent.profileSharePresented.rawValue == "profile_share_presented")
+    #expect(ObservabilityEvent.identityFirstValueSeen.rawValue == "identity_first_value_seen")
+    #expect(ObservabilityEvent.chatFirstSendCancelled.rawValue == "chat_first_send_cancelled")
+    #expect(ObservabilityEvent.chatFirstSendFailed.rawValue == "chat_first_send_failed")
+    #expect(ObservabilityEvent.chatFirstSendCancelled != ObservabilityEvent.chatFirstSendFailed)
   }
 
   @Test func mobileAuthFailureReasonIsStableMachineToken() {
