@@ -58,6 +58,13 @@ test('keys match changed paths on whole segments, web-relative or repo-relative'
   assert.ok(keyMatches('apps/web/app', page));
   assert.ok(keyMatches('(shell)', page));
   assert.ok(keyMatches('page.tsx', page));
+  assert.ok(
+    keyMatches('baseline.json', 'apps/web/scripts/fixtures/baseline.json')
+  );
+  assert.ok(
+    !keyMatches('baseline.json', 'scripts/swift-arch/baseline.json'),
+    'bare filenames must not match outside apps/web'
+  );
   assert.ok(!keyMatches('app/app/(sh', page));
   assert.ok(!keyMatches('apps/web/application', page));
   assert.ok(
