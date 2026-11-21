@@ -1047,7 +1047,6 @@
     "apps/web/components/atoms/InvisibleTurnstile.tsx:types": 1,
     "apps/web/components/atoms/RailToggleButton.tsx:exports": 1,
     "apps/web/components/atoms/StatusBadge.tsx:types": 2,
-    "apps/web/components/atoms/UpdateAvailablePill.tsx:types": 1,
     "apps/web/components/atoms/index.ts:files": 1,
     "apps/web/components/atoms/table-action-menu/index.ts:types": 1,
     "apps/web/components/canonical/index.ts:exports": 20,

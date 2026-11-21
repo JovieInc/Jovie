@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CuesPanel } from './CuesPanel';
 import type { Cue } from './cues.types';
 
@@ -51,5 +52,30 @@ describe('CuesPanel', () => {
   it('uses a custom title when provided', () => {
     render(<CuesPanel cues={SAMPLE_CUES} durationSec={213} title='Sections' />);
     expect(screen.getByText('Sections')).toBeInTheDocument();
+  });
+
+  it('marks cues on the ribbon with the accent token, axe-clean', async () => {
+    const { container } = render(
+      <CuesPanel cues={SAMPLE_CUES} durationSec={213} onSeek={vi.fn()} />
+    );
+    const marks = container.querySelectorAll('span[style*="left"]');
+    expect(marks).toHaveLength(3);
+    for (const mark of marks) {
+      expect(mark).toHaveClass('bg-accent/60');
+      expect(mark.className).not.toMatch(/cyan/);
+    }
+    expect(screen.getByRole('button', { name: /Verse 1/ })).toHaveAttribute(
+      'type',
+      'button'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders disabled rows without a seek handler, axe-clean', async () => {
+    const { container } = render(
+      <CuesPanel cues={SAMPLE_CUES} durationSec={213} />
+    );
+    expect(screen.getAllByRole('button')[0]).toBeDisabled();
+    await expectNoA11yViolations(container);
   });
 });

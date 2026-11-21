@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminReleaseRow } from '@/lib/admin/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
 const { mockStartImpersonation, mockUseAdminReleasesInfiniteQuery } =
@@ -210,7 +212,8 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     expect(image).toHaveAttribute('alt', '');
   });
 
-  it('starts impersonation with the release owner user ID', () => {
+  it('starts impersonation with the release owner user ID', async () => {
+    const user = userEvent.setup();
     render(
       <AdminReleasesTableUnified
         releases={[release]}
@@ -221,7 +224,7 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'Impersonate' }).click();
+    await user.click(screen.getByRole('button', { name: 'Impersonate' }));
 
     expect(mockStartImpersonation).toHaveBeenCalledWith(
       { targetUserId: 'user-alpha' },
@@ -253,5 +256,49 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
 
     expect(source).not.toMatch(/\bred-\d/);
     expect(source).toContain('TableIssueSummary');
+  });
+
+  it('has no accessibility violations with a row and with no rows', async () => {
+    const { container, unmount } = render(
+      <AdminReleasesTableUnified
+        releases={[release]}
+        pageSize={20}
+        total={1}
+        search=''
+        sort='release_date_desc'
+      />
+    );
+    await expectNoA11yViolations(container);
+    unmount();
+    mockUseAdminReleasesInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [], total: 0 }] },
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    const empty = render(
+      <AdminReleasesTableUnified
+        releases={[]}
+        pageSize={20}
+        total={0}
+        search=''
+        sort='release_date_desc'
+      />
+    );
+    await expectNoA11yViolations(empty.container);
+  });
+
+  it('paints release and source badges on one neutral surface with sized artwork', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\b(?:blue|purple|emerald|amber)-\d/);
+    expect(source).toContain('width={36}');
+    expect(source).toContain('height={36}');
   });
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { MouseEvent } from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
@@ -54,8 +55,7 @@ export function LyricsTimeline({
         <span className='text-3xs tabular-nums text-quaternary-token w-9 text-right shrink-0'>
           {formatTime(safeCurrent)}
         </span>
-        <button
-          type='button'
+        <PlainButton
           onClick={handleScrub}
           className='relative flex-1 h-6 rounded-full grid focus:outline-none'
           aria-label='Lyric Timeline'
@@ -94,7 +94,7 @@ export function LyricsTimeline({
             className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-accent ring-2 ring-accent/20 transition-[left] duration-subtle ease-subtle'
             style={{ left: `${pct}%` }}
           />
-        </button>
+        </PlainButton>
         <span className='text-3xs tabular-nums text-quaternary-token w-9 text-left shrink-0'>
           {formatTime(safeDuration)}
         </span>

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LyricsView } from './LyricsView';
 
 const lines = [
@@ -85,5 +87,46 @@ describe('JOV-5466 token retire', () => {
     expect(source).toContain(
       'hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover)'
     );
+  });
+
+  it('fires the empty-state handlers from the PlainButton actions, axe-clean', async () => {
+    const user = userEvent.setup();
+    const onTranscribe = vi.fn();
+    const onPaste = vi.fn();
+    const { container } = render(
+      <LyricsView
+        {...baseProps}
+        currentTimeSec={0}
+        lines={[]}
+        onTranscribe={onTranscribe}
+        onPaste={onPaste}
+      />
+    );
+    await expectNoA11yViolations(container);
+    await user.click(
+      screen.getByRole('button', { name: 'Transcribe with Jovie' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Paste lyrics' }));
+    expect(onTranscribe).toHaveBeenCalledOnce();
+    expect(onPaste).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Paste lyrics' })
+    ).toHaveAttribute('type', 'button');
+  });
+
+  it('has no axe violations with lyrics, and seeks from a line', async () => {
+    const user = userEvent.setup();
+    const onSeek = vi.fn();
+    const { container } = render(
+      <LyricsView
+        {...baseProps}
+        onSeek={onSeek}
+        currentTimeSec={20}
+        lines={lines}
+      />
+    );
+    await expectNoA11yViolations(container);
+    await user.click(screen.getByText('Watching the highway turn into stars'));
+    expect(onSeek).toHaveBeenCalledWith(18);
   });
 });

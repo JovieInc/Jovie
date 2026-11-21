@@ -49,6 +49,8 @@ const pendingResponse = {
   fetchedAt: '2026-09-01T12:10:00.000Z',
 };
 
+const fetchedAt = '2026-09-01T12:10:00.000Z';
+
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -61,7 +63,15 @@ function MockTasteInboxFetch({
   mode,
 }: Readonly<{
   readonly children: ReactNode;
-  readonly mode: 'pending' | 'forbidden' | 'loading';
+  readonly mode:
+    | 'pending'
+    | 'forbidden'
+    | 'loading'
+    | 'empty'
+    | 'error'
+    | 'offline'
+    | 'long'
+    | 'partial';
 }>) {
   // Layout effect so the mock is installed before the panel's own useEffect
   // fetch fires (passive effects run bottom-up after all layout effects).
@@ -81,6 +91,54 @@ function MockTasteInboxFetch({
       if (path === '/api/admin/design-lab/proposals') {
         if (mode === 'loading') {
           return new Promise<Response>(() => {});
+        }
+
+        if (mode === 'offline') {
+          throw new TypeError('Failed to fetch');
+        }
+
+        if (mode === 'error') {
+          return jsonResponse(
+            { error: 'Taste Inbox is temporarily unavailable.' },
+            { status: 500 }
+          );
+        }
+
+        if (mode === 'empty') {
+          return jsonResponse({ proposals: [], fetchedAt });
+        }
+
+        if (mode === 'long') {
+          return jsonResponse({
+            proposals: [
+              {
+                ...pendingResponse.proposals[0],
+                id: 'story-long',
+                surfaceName:
+                  'A very long surface name that keeps going well past the width of the card to prove it truncates or wraps cleanly',
+                proposalText:
+                  'A deliberately long proposal body that wraps across many lines so the card has to grow rather than clip the decision buttons. '.repeat(
+                    6
+                  ),
+              },
+            ],
+            fetchedAt,
+          });
+        }
+
+        if (mode === 'partial') {
+          return jsonResponse({
+            proposals: [
+              {
+                ...pendingResponse.proposals[1],
+                id: 'story-partial',
+                scoring: null,
+                linearIssueId: null,
+                linearIssueUrl: null,
+              },
+            ],
+            fetchedAt,
+          });
         }
 
         if (mode === 'forbidden') {
@@ -166,10 +224,67 @@ export const Loading: Story = {
   ),
 };
 
-export const AuthorizationFailure: Story = {
+/** Signed in without an admin Ovie account: the inbox asks to reverify. */
+export const PermissionDenied: Story = {
   render: () => (
     <MockTasteInboxFetch mode='forbidden'>
       <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** No pending taste proposals. */
+export const Empty: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='empty'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** The proposals request fails with a server error. */
+export const Error: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='error'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** The browser is offline: the fetch rejects. */
+export const Offline: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='offline'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** A very long surface name and proposal body. */
+export const LongContent: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='long'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** A proposal with no score and no Linear issue. */
+export const Partial: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='partial'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+/** Right-to-left page direction. */
+export const RtlPending: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='pending'>
+      <div dir='rtl'>
+        <DesignProposalReviewPanel />
+      </div>
     </MockTasteInboxFetch>
   ),
 };
