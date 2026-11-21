@@ -190,6 +190,33 @@ test('classifyWriteError does not treat free-text not found as unavailable', () 
   );
 });
 
+test('classifyWriteError treats execFileSync ETIMEDOUT as write failure not unavailable', () => {
+  const timeout = Object.assign(new Error('spawnSync gbrain ETIMEDOUT'), {
+    code: 'ETIMEDOUT',
+    signal: 'SIGTERM',
+  });
+  assert.notEqual(classifyWriteError(timeout), 'gbrain-unavailable');
+  assert.match(classifyWriteError(timeout), /ETIMEDOUT/i);
+  assert.notEqual(
+    classifyWriteError(new Error('operation timed out waiting for daemon')),
+    'gbrain-unavailable'
+  );
+
+  const writer = createGbrainWriter({
+    bin: 'gbrain',
+    execute: (file, args) => {
+      if (args[0] === '--help') return 'gbrain help';
+      throw timeout;
+    },
+  });
+  const result = compoundHealthDigest({
+    digest: healthyDigest(),
+    writer,
+  });
+  assert.equal(result.status, 'degraded');
+  assert.notEqual(result.reason, 'gbrain-unavailable');
+});
+
 test('putWithReadback rejects stale pages that only share static tails', () => {
   const stale = withCompoundId(
     '---\ntitle: old\n---\n\n# old\n\nNot Linear work acceptance, not an authority change, not a shipping receipt.\n'

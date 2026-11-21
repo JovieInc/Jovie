@@ -189,8 +189,10 @@ export function compoundIdMarker(body) {
 }
 
 /**
- * True only for transport / binary absence — never for free-text "not found"
- * (a missing page after put is a write failure, not gbrain-unavailable).
+ * True only for transport / binary absence — never for free-text "not found",
+ * and never for command timeouts (`execFileSync` sets `code: 'ETIMEDOUT'` when
+ * our timeout kills a hung put/get; that is a write failure → degraded, not
+ * needs-probe / exit 0).
  * @param {unknown} err
  */
 function isTransportUnavailable(err) {
@@ -200,12 +202,15 @@ function isTransportUnavailable(err) {
       : '';
   const message = err instanceof Error ? err.message : String(err);
   const blob = `${code} ${message}`;
+  // Command / our timeout — hang after probe succeeded is degraded, not unavailable.
+  if (code === 'ETIMEDOUT') return false;
+  if (/\btimed out\b/i.test(message)) return false;
   if (code === 'ENOENT') return true;
   if (/gbrain-unavailable/i.test(message)) return true;
   if (/\bspawn\b.*\bENOENT\b/i.test(blob)) return true;
   if (/\bcommand not found\b/i.test(message)) return true;
-  if (/ECONNREFUSED|ETIMEDOUT|ECONNRESET|ENOTFOUND/i.test(blob)) return true;
-  if (/\btimed out\b/i.test(message)) return true;
+  // Connect-time refusal / reset / DNS only — not execution timeouts.
+  if (/ECONNREFUSED|ECONNRESET|ENOTFOUND/i.test(blob)) return true;
   return false;
 }
 
