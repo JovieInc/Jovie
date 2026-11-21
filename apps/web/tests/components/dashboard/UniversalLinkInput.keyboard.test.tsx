@@ -56,8 +56,6 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
 
 // Mock color utils
 vi.mock('@/lib/utils/color', () => ({
-  ON_BRAND_WHITE: '#ffffff',
-  brandHexOrNeutral: (hex?: string | null) => (hex ? `#${hex}` : '#6b7280'),
   isBrandDark: () => false,
   contrastRatio: () => 10,
   getContrastTextOnBrand: () => '#0f172a',

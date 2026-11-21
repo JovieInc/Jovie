@@ -154,7 +154,7 @@ export function DspMatchCard({
           <PlainButton
             onClick={() => setIsExpanded(!isExpanded)}
             aria-expanded={isExpanded}
-            className='flex h-7 w-full items-center justify-between rounded-lg px-2 text-xs text-tertiary-token transition-[background-color,box-shadow,color] duration-subtle hover:bg-surface-0 hover:text-secondary-token hover:ring-1 hover:ring-subtle focus-visible:outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
+            className='flex h-7 w-full items-center justify-between rounded-lg px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-secondary-token hover:ring-1 hover:ring-subtle focus-visible:outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
           >
             <span>Confidence breakdown</span>
             <Icon
