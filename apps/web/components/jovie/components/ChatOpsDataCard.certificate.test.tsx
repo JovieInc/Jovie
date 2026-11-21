@@ -35,14 +35,22 @@ describe('ChatOpsDataCard certificate', () => {
   it('shows a degraded card without facts or a series', async () => {
     const { container } = render(
       <ChatOpsDataCard
-        card={{ ...card, state: 'degraded', facts: [], series: null, observedAt: null }}
+        card={{
+          ...card,
+          state: 'degraded',
+          facts: [],
+          series: null,
+          observedAt: null,
+        }}
         summary='Read incomplete.'
       />
     );
 
     expect(screen.getByText('Degraded')).toBeInTheDocument();
     expect(screen.getByText('Read incomplete.')).toBeInTheDocument();
-    expect(screen.getByText(/Observation time unavailable/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Observation time unavailable/)
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 });

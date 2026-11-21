@@ -54,7 +54,10 @@ describe('ImagePreviewStrip', () => {
 
   it('uses the singular count for one image', async () => {
     const { container } = render(
-      <ImagePreviewStrip images={[image('a', 'cover.png')]} onRemove={vi.fn()} />
+      <ImagePreviewStrip
+        images={[image('a', 'cover.png')]}
+        onRemove={vi.fn()}
+      />
     );
 
     expect(screen.getByText('1 image ready to send')).toBeInTheDocument();

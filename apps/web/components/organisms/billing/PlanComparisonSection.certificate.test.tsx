@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { PricingOption } from '@/lib/queries';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PlanComparisonSection } from './PlanComparisonSection';
 
 const pricingOptions: PricingOption[] = [

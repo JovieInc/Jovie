@@ -80,7 +80,11 @@ export const EmptyNoPriceOptions: Story = {
 
 /** Permission denied: money is hidden for a restricted workspace role. */
 export const PermissionDeniedMoneyHidden: Story = {
-  args: { pricingOptions, currentPlan: 'free', defaultPriceId: 'price_pro_monthly' },
+  args: {
+    pricingOptions,
+    currentPlan: 'free',
+    defaultPriceId: 'price_pro_monthly',
+  },
   decorators: [
     function HiddenMoneyFrame(Story) {
       return (
@@ -94,7 +98,11 @@ export const PermissionDeniedMoneyHidden: Story = {
 
 /** Rtl: the plan cards mirror in a right-to-left layout. */
 export const RtlPlans: Story = {
-  args: { pricingOptions, currentPlan: 'pro', defaultPriceId: 'price_pro_monthly' },
+  args: {
+    pricingOptions,
+    currentPlan: 'pro',
+    defaultPriceId: 'price_pro_monthly',
+  },
   decorators: [
     function RtlFrame(Story) {
       return (

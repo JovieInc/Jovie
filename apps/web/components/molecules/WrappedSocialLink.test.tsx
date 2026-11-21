@@ -7,7 +7,10 @@ const wrap = vi.hoisted(() => ({
   isPending: false,
 }));
 vi.mock('@/lib/queries', () => ({
-  useWrapLinkMutation: () => ({ mutate: wrap.mutate, isPending: wrap.isPending }),
+  useWrapLinkMutation: () => ({
+    mutate: wrap.mutate,
+    isPending: wrap.isPending,
+  }),
 }));
 vi.mock('@/components/atoms/SocialIcon', () => ({
   SocialIcon: () => <svg aria-hidden='true' />,
@@ -43,7 +46,10 @@ describe('WrappedSocialLink', () => {
       options.onSuccess({ kind: 'normal', shortId: 'abc', titleAlias: 'My IG' })
     );
     const { container } = render(
-      <WrappedSocialLink href='https://instagram.com/jovie' platform='instagram' />
+      <WrappedSocialLink
+        href='https://instagram.com/jovie'
+        platform='instagram'
+      />
     );
 
     const link = await screen.findByRole('link');
@@ -55,7 +61,11 @@ describe('WrappedSocialLink', () => {
 
   it('routes sensitive links through /out with a verification badge', async () => {
     wrap.mutate.mockImplementation((_input, options) =>
-      options.onSuccess({ kind: 'sensitive', shortId: 'xyz', titleAlias: 'Fan page' })
+      options.onSuccess({
+        kind: 'sensitive',
+        shortId: 'xyz',
+        titleAlias: 'Fan page',
+      })
     );
     const { container } = render(
       <WrappedSocialLink href='https://example.com/x' platform='website' />
@@ -70,7 +80,9 @@ describe('WrappedSocialLink', () => {
 
   it('falls back to the original url when wrapping fails', async () => {
     wrap.mutate.mockImplementation((_input, options) => options.onError());
-    render(<WrappedSocialLink href='https://example.com/x' platform='website' />);
+    render(
+      <WrappedSocialLink href='https://example.com/x' platform='website' />
+    );
 
     expect(await screen.findByRole('link')).toHaveAttribute(
       'href',
@@ -84,7 +96,10 @@ describe('WrappedSocialLink', () => {
       <WrappedSocialLink href='https://example.com/x' platform='website' />
     );
 
-    expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.com/x');
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      'https://example.com/x'
+    );
     await expectNoA11yViolations(container);
   });
 
@@ -100,7 +115,9 @@ describe('WrappedSocialLink', () => {
       </>
     );
 
-    expect(screen.getByRole('link', { name: 'Listen on Spotify' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Listen on Spotify' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /link$/ })).toHaveAttribute(
       'rel',
       'noreferrer noopener ugc nofollow'

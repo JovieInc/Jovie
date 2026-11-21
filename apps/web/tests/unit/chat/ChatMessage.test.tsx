@@ -41,6 +41,15 @@ vi.mock('@jovie/ui', () => ({
   }: ComponentProps<'button'> & { asChild?: boolean }) => (
     <button {...props}>{children}</button>
   ),
+  PlainButton: ({
+    children,
+    asChild: _,
+    ...props
+  }: ComponentProps<'button'> & { asChild?: boolean }) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   ICON_BUTTON_VISIBLE_CLASSNAME:
     'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100',
   ICON_BUTTON_FADE_CLASSNAME:

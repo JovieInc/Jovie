@@ -15,7 +15,9 @@ describe('ReleaseMomentDrawer', () => {
   it('renders nothing while no moment is selected', () => {
     render(<ReleaseMomentDrawer moment={null} onClose={vi.fn()} />);
 
-    expect(screen.queryByTestId('release-moment-drawer')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-moment-drawer')
+    ).not.toBeInTheDocument();
   });
 
   it('shows the moment, its workflow and the fan notification', async () => {

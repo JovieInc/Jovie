@@ -45,7 +45,10 @@ describe('PickerRow certificate', () => {
   it('leaves an idle row unselected', async () => {
     const { container } = renderRow(false);
 
-    expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('option')).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
     await expectNoA11yViolations(container);
   });
 
@@ -58,7 +61,10 @@ describe('PickerRow certificate', () => {
     await user.hover(screen.getByRole('option'));
     expect(onMouseEnter).toHaveBeenCalledWith(2);
 
-    await user.pointer({ keys: '[MouseLeft>]', target: screen.getByRole('option') });
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('option'),
+    });
     expect(onCommit).toHaveBeenCalledWith(2);
     expect(screen.getByRole('option')).not.toHaveFocus();
   });

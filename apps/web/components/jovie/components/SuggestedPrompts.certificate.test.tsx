@@ -63,7 +63,9 @@ describe('SuggestedPrompts certificate', () => {
   });
 
   it('makes dimmed prompts inert and hidden from assistive tech', async () => {
-    const { container } = render(<SuggestedPrompts onSelect={vi.fn()} dimmed />);
+    const { container } = render(
+      <SuggestedPrompts onSelect={vi.fn()} dimmed />
+    );
 
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
     await expectNoA11yViolations(container);

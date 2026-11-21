@@ -28,7 +28,9 @@ describe('EntityChip certificate', () => {
   it('removes the entity when the remove button is pressed', async () => {
     const user = userEvent.setup();
     const onRemove = vi.fn();
-    const { container } = render(<EntityChip data={data} onRemove={onRemove} />);
+    const { container } = render(
+      <EntityChip data={data} onRemove={onRemove} />
+    );
 
     await user.click(screen.getByRole('button', { name: 'Remove Sober' }));
 

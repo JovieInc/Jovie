@@ -42,7 +42,11 @@ export const RtlItems: Story = {
   args: {
     items: [
       { number: '3.1', title: 'ذكاء الجمهور', description: 'اعرف من يتابعك.' },
-      { number: '3.2', title: 'تتبع المصدر', description: 'اعرف مصدر كل معجب.' },
+      {
+        number: '3.2',
+        title: 'تتبع المصدر',
+        description: 'اعرف مصدر كل معجب.',
+      },
     ],
   },
   decorators: [

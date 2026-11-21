@@ -81,7 +81,11 @@ describe('InspectorTabs', () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
     render(
-      <InspectorTabs {...baseProps} value='details' onValueChange={onValueChange} />
+      <InspectorTabs
+        {...baseProps}
+        value='details'
+        onValueChange={onValueChange}
+      />
     );
 
     screen.getByTestId('drawer-tab-details').focus();

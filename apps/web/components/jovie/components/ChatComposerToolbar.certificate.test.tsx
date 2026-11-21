@@ -45,11 +45,7 @@ describe('ChatComposerToolbar certificate', () => {
     const onInterruptAndSend = vi.fn();
     const { container, rerender } = render(
       <TooltipProvider>
-        <ComposerSendButton
-          {...sendProps}
-          isStreaming
-          onStop={onStop}
-        />
+        <ComposerSendButton {...sendProps} isStreaming onStop={onStop} />
       </TooltipProvider>
     );
 
@@ -68,7 +64,9 @@ describe('ChatComposerToolbar certificate', () => {
         />
       </TooltipProvider>
     );
-    await user.click(screen.getByRole('button', { name: 'Interrupt and send' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Interrupt and send' })
+    );
     expect(onInterruptAndSend).toHaveBeenCalledTimes(1);
     await expectNoA11yViolations(container);
   });

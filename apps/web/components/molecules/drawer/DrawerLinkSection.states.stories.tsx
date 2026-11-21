@@ -33,7 +33,8 @@ export const PartialReadOnly: Story = {
 /** Long content: a long title truncates beside the add button. */
 export const LongContentTitle: Story = {
   args: {
-    title: 'Streaming, download and store links for every release in the catalog',
+    title:
+      'Streaming, download and store links for every release in the catalog',
   },
 };
 

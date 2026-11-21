@@ -64,7 +64,9 @@ describe('ChatPitchCard', () => {
     expect(screen.queryByText('Amazon Music')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
 
-    await user.click(screen.getByRole('button', { name: 'Copy Spotify pitch' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Copy Spotify pitch' })
+    );
 
     expect(writeText).toHaveBeenCalledWith('Spotify copy');
     expect(toast.success).toHaveBeenCalledWith('Spotify pitch copied');
@@ -75,7 +77,9 @@ describe('ChatPitchCard', () => {
     writeText.mockRejectedValue(new Error('denied'));
     render(<ChatPitchCard state='success' pitches={pitches} />);
 
-    await user.click(screen.getByRole('button', { name: 'Copy Spotify pitch' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Copy Spotify pitch' })
+    );
 
     await vi.waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith('Failed to copy')
@@ -104,6 +108,8 @@ describe('ChatPitchCard', () => {
     await user.click(
       screen.getByRole('button', { name: 'Copy full pitch draft' })
     );
-    expect(writeText).toHaveBeenCalledWith(`Subject: New single\n\n${longBody}`);
+    expect(writeText).toHaveBeenCalledWith(
+      `Subject: New single\n\n${longBody}`
+    );
   });
 });
