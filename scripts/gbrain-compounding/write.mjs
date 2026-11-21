@@ -1,12 +1,13 @@
 /**
  * Durable write path for compounded gbrain health claims.
  *
- * Contract mirrors yc_corpus / reason_lane: put on stdin, then get read-back
- * must contain a distinguishing tail from the page body. Soft-degrades with
- * explicit `gbrain-unavailable` / `needs-probe` — never claims a write on the
- * buffer path.
+ * Contract: put on stdin, then get read-back must contain a run-unique
+ * `compound_id` (content hash of the page). Soft-degrades with explicit
+ * `gbrain-unavailable` / `needs-probe` — never claims a write on the buffer
+ * path.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -73,12 +74,13 @@ export function createGbrainWriter(options = {}) {
    * @returns {WriteResult}
    */
   function putWithReadback(slug, body) {
-    const tail = nextTail(body);
+    const page = withCompoundId(body);
+    const marker = compoundIdMarker(page);
     try {
       execute(bin, ['put', slug], {
         encoding: 'utf8',
         timeout: 25_000,
-        input: body,
+        input: page,
         maxBuffer: 2 * 1024 * 1024,
       });
     } catch (err) {
@@ -97,19 +99,21 @@ export function createGbrainWriter(options = {}) {
       const normalized = String(stored || '')
         .replace(/\s+/g, ' ')
         .trim();
-      if (tail && normalized.includes(tail)) {
+      if (marker && normalized.includes(marker)) {
         return { ok: true, slug };
       }
       return {
         ok: false,
         slug,
-        reason: 'gbrain read-back missing page body',
+        reason: 'gbrain read-back missing compound_id',
       };
     } catch (err) {
+      // A failed get after put is a write/read-back failure, not "CLI missing"
+      // unless the transport itself is down (spawn/connect).
       return {
         ok: false,
         slug,
-        reason: classifyWriteError(err),
+        reason: classifyReadbackError(err),
       };
     }
   }
@@ -152,40 +156,75 @@ export function createGbrainWriter(options = {}) {
 }
 
 /**
+ * Content-hash marker unique to this page body. Stale pages from a prior run
+ * cannot satisfy read-back even when they share static boilerplate tails.
  * @param {string} body
  */
-function nextTail(body) {
-  return (
-    [...String(body).split('\n')]
-      .reverse()
-      .map(line => line.trim())
-      .find(line => line.length > 0) ?? ''
-  )
-    .replace(/\s+/g, ' ')
-    .trim();
+export function compoundIdForBody(body) {
+  return createHash('sha256').update(String(body)).digest('hex').slice(0, 16);
+}
+
+/**
+ * @param {string} body
+ */
+export function withCompoundId(body) {
+  const text = String(body);
+  if (/^compound_id:\s*\S+/m.test(text)) return text;
+  const id = compoundIdForBody(text);
+  if (text.startsWith('---\n')) {
+    const end = text.indexOf('\n---\n', 4);
+    if (end > 0) {
+      return `${text.slice(0, end)}\ncompound_id: ${id}${text.slice(end)}`;
+    }
+  }
+  return `compound_id: ${id}\n\n${text}`;
+}
+
+/**
+ * @param {string} body
+ */
+export function compoundIdMarker(body) {
+  const match = String(body).match(/^compound_id:\s*([a-f0-9]{16})\s*$/m);
+  return match ? `compound_id: ${match[1]}` : null;
+}
+
+/**
+ * True only for transport / binary absence — never for free-text "not found"
+ * (a missing page after put is a write failure, not gbrain-unavailable).
+ * @param {unknown} err
+ */
+function isTransportUnavailable(err) {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? String(/** @type {{ code?: unknown }} */ (err).code)
+      : '';
+  const message = err instanceof Error ? err.message : String(err);
+  const blob = `${code} ${message}`;
+  if (code === 'ENOENT') return true;
+  if (/gbrain-unavailable/i.test(message)) return true;
+  if (/\bspawn\b.*\bENOENT\b/i.test(blob)) return true;
+  if (/\bcommand not found\b/i.test(message)) return true;
+  if (/ECONNREFUSED|ETIMEDOUT|ECONNRESET|ENOTFOUND/i.test(blob)) return true;
+  if (/\btimed out\b/i.test(message)) return true;
+  return false;
 }
 
 /**
  * @param {unknown} err
  */
 export function classifyWriteError(err) {
-  const code =
-    err && typeof err === 'object' && 'code' in err
-      ? String(/** @type {{ code?: unknown }} */ (err).code)
-      : '';
+  if (isTransportUnavailable(err)) return 'gbrain-unavailable';
   const message = err instanceof Error ? err.message : String(err);
-  if (
-    code === 'ENOENT' ||
-    /ENOENT|not found|command not found|gbrain-unavailable/i.test(
-      `${code} ${message}`
-    )
-  ) {
-    return 'gbrain-unavailable';
-  }
-  if (/ECONNREFUSED|timed out|ETIMEDOUT|ECONNRESET/i.test(message)) {
-    return 'gbrain-unavailable';
-  }
   return message.slice(0, 240) || 'gbrain-write-failed';
+}
+
+/**
+ * @param {unknown} err
+ */
+export function classifyReadbackError(err) {
+  if (isTransportUnavailable(err)) return 'gbrain-unavailable';
+  const message = err instanceof Error ? err.message : String(err);
+  return message.slice(0, 240) || 'gbrain-readback-failed';
 }
 
 /**
@@ -235,6 +274,12 @@ export function compoundHealthDigest(args) {
       priorTrend,
     }),
   });
+
+  // Stamp run-unique compound_id before buffer/put so read-back cannot pass on
+  // a stale page that only shares static boilerplate.
+  for (const page of pages) {
+    page.body = withCompoundId(page.body);
+  }
 
   if (dryRun) {
     return {

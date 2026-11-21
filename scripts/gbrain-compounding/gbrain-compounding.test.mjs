@@ -10,11 +10,13 @@ import {
   classifyWriteError,
   collectHealthDigest,
   compoundHealthDigest,
+  compoundIdMarker,
   createGbrainWriter,
   DIGEST_SCHEMA,
   extractDurableClaims,
   LATEST_SLUG,
   runCompounding,
+  withCompoundId,
 } from './index.mjs';
 
 const generatedAt = '2026-11-21T12:00:00.000Z';
@@ -175,6 +177,49 @@ test('classifyWriteError maps missing binary to gbrain-unavailable', () => {
     classifyWriteError(new Error('connect ECONNREFUSED 127.0.0.1:7801')),
     'gbrain-unavailable'
   );
+});
+
+test('classifyWriteError does not treat free-text not found as unavailable', () => {
+  assert.notEqual(
+    classifyWriteError(new Error('page not found: ops/gbrain-health/latest')),
+    'gbrain-unavailable'
+  );
+  assert.match(
+    classifyWriteError(new Error('page not found: ops/gbrain-health/latest')),
+    /not found/i
+  );
+});
+
+test('putWithReadback rejects stale pages that only share static tails', () => {
+  const stale = withCompoundId(
+    '---\ntitle: old\n---\n\n# old\n\nNot Linear work acceptance, not an authority change, not a shipping receipt.\n'
+  );
+  const writer = createGbrainWriter({
+    bin: 'gbrain',
+    execute: (file, args) => {
+      assert.equal(file, 'gbrain');
+      if (args[0] === '--help') return 'gbrain help';
+      if (args[0] === 'put') return ''; // pretend put succeeded / was dropped
+      if (args[0] === 'get') return stale; // stale prior page
+      throw new Error(`unexpected ${args.join(' ')}`);
+    },
+  });
+  const result = compoundHealthDigest({
+    digest: healthyDigest(),
+    writer,
+  });
+  assert.equal(result.status, 'degraded');
+  assert.ok(
+    result.writes.every(
+      w =>
+        !w.ok &&
+        'reason' in w &&
+        w.reason === 'gbrain read-back missing compound_id'
+    )
+  );
+  const stamped = result.pages[0].body;
+  assert.ok(compoundIdMarker(stamped));
+  assert.notEqual(compoundIdMarker(stamped), compoundIdMarker(stale));
 });
 
 test('runCompounding --dry-run exits 0 without writing', () => {

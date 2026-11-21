@@ -22,9 +22,13 @@ export {
 } from './digest.mjs';
 export { parseArgs, runCompounding } from './run.mjs';
 export {
+  classifyReadbackError,
   classifyWriteError,
   compoundHealthDigest,
+  compoundIdForBody,
+  compoundIdMarker,
   createGbrainWriter,
   RUN_SCHEMA,
   resolveGbrainBin,
+  withCompoundId,
 } from './write.mjs';
