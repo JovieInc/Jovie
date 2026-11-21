@@ -24,13 +24,15 @@ vi.mock('@/lib/utils/pii-encryption', () => ({
   decryptPII: vi.fn((val: string) => val),
 }));
 
-// Mock db with configurable query result
 let mockDbResult: unknown[] = [];
 const mockLimit = vi.fn(() => Promise.resolve(mockDbResult));
 const mockWhere = vi.fn(() => ({ limit: mockLimit }));
 const mockInnerJoin2 = vi.fn(() => ({ where: mockWhere }));
 const mockInnerJoin1 = vi.fn(() => ({ innerJoin: mockInnerJoin2 }));
-const mockFrom = vi.fn(() => ({ innerJoin: mockInnerJoin1 }));
+const mockFrom = vi.fn(() => ({
+  innerJoin: mockInnerJoin1,
+  where: mockWhere,
+}));
 const mockSelectResult = vi.fn(() => ({ from: mockFrom }));
 
 vi.mock('@/lib/db', () => ({
@@ -49,7 +51,7 @@ vi.mock('@/lib/db/schema/auth', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: { id: 'id', userId: 'userId' },
+  creatorProfiles: { id: 'id', userId: 'userId', settings: 'settings' },
 }));
 
 // Mock env
@@ -68,6 +70,17 @@ describe('fireSubscribeCAPIEvent', () => {
     mockDbResult = [];
     mockEnv.JOVIE_FACEBOOK_PIXEL_ID = undefined;
     mockEnv.JOVIE_FACEBOOK_ACCESS_TOKEN = undefined;
+  });
+
+  it('skips CAPI for young-audience profiles', async () => {
+    mockDbResult = [{ settings: { youngAudience: true } }];
+    mockEnv.JOVIE_FACEBOOK_PIXEL_ID = 'jovie-fb-pixel';
+    mockEnv.JOVIE_FACEBOOK_ACCESS_TOKEN = 'jovie-fb-token';
+    await fireSubscribeCAPIEvent({
+      creatorProfileId: 'prof-1',
+      email: 'fan@test.com',
+    });
+    expect(mockForwardToFacebook).not.toHaveBeenCalled();
   });
 
   it('hashes email with SHA-256 to expected hex', async () => {
