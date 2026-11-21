@@ -28,9 +28,8 @@ const DELTA_TONE: Record<string, string> = {
   neutral: 'text-tertiary-token',
 };
 
-/** Editorial meta labels — flat board, no card chrome. */
-const META_LABEL =
-  'text-2xs font-medium uppercase tracking-wide text-tertiary-token';
+/** Editorial meta labels — flat board, no card chrome (no CSS uppercase; ASR-022). */
+const META_LABEL = 'text-2xs font-medium tracking-wide text-tertiary-token';
 
 /**
  * Melt: opacity + lift + soft blur (cinematic). Reduced motion keeps a
