@@ -601,7 +601,9 @@ describe('merge_group workflow contract', () => {
 
     const typecheck = getJobBlock(CI_WORKFLOW, 'ci-fast-typecheck');
     expect(typecheck).toContain("steps.reuse.outputs.reuse != 'true'");
-    expect(typecheck).toContain('Validate CI/release incident prevention contract');
+    expect(typecheck).toContain(
+      'Validate CI/release incident prevention contract'
+    );
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
