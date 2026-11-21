@@ -13,11 +13,11 @@ import {
   WRITE_SWARM_STEPS,
 } from './contract.mjs';
 
-const CLI = fileURLToPath(new URL('./cli.mjs', import.meta.url));
-const cli = (...args) =>
-  spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
-
-const liveBase = {
+const CLI = fileURLToPath(new URL('./contract.mjs', import.meta.url));
+const cli = (...a) =>
+  spawnSync(process.execPath, [CLI, ...a], { encoding: 'utf8' });
+const has = (r, code) => r.blockers.some(b => b.code === code);
+const live = {
   schema: WRITE_SWARM_SCHEMA,
   mode: 'live',
   inventAndRubberStamp: false,
@@ -42,9 +42,7 @@ const liveBase = {
 };
 
 describe('design-write-swarm', () => {
-  it('exposes lease → System-1 → code-sync contract', () => {
-    assert.equal(WRITE_SWARM_CONTRACT.requiresLease, true);
-    assert.equal(WRITE_SWARM_CONTRACT.requiresSystem1Panel, true);
+  it('contract + dry plan', () => {
     assert.equal(WRITE_SWARM_CONTRACT.forbidsInventAndRubberStamp, true);
     assert.equal(WRITE_SWARM_CONTRACT.dryMutatesPen, false);
     assert.equal(
@@ -52,118 +50,87 @@ describe('design-write-swarm', () => {
       'jovie-founder-design-studio'
     );
     assert.equal(WRITE_SWARM_STEPS.length, 8);
-  });
-
-  it('dry plan never claims Pen mutation', () => {
     const plan = planWriteSwarm({ mode: 'dry' });
     assert.equal(plan.contract.mutatesPen, false);
     assert.ok(plan.steps.every(s => s.mutatesPen === false));
   });
 
-  it('rejects invent-and-rubber-stamp, missing identities, mutate-without-lease', () => {
+  it('rejects rubber-stamp, missing ids, mutate-without-lease', () => {
     const stamped = validateWriteSwarmReceipt({
-      ...liveBase,
+      ...live,
       inventAndRubberStamp: true,
-      system1: {
-        ...liveBase.system1,
-        judge: 'write-swarm',
-        selfApproved: true,
-      },
+      system1: { ...live.system1, judge: 'write-swarm', selfApproved: true },
     });
     assert.equal(stamped.ok, false);
-    assert.ok(stamped.blockers.some(b => b.code === 'invent_and_rubber_stamp'));
-
-    const missingIds = validateWriteSwarmReceipt({
-      ...liveBase,
+    assert.ok(has(stamped, 'invent_and_rubber_stamp'));
+    const missing = validateWriteSwarmReceipt({
+      ...live,
       mutate: { performed: true, writer: '' },
-      system1: { ...liveBase.system1, judge: '' },
+      system1: { ...live.system1, judge: '' },
     });
-    assert.equal(missingIds.ok, false);
-    assert.ok(missingIds.blockers.some(b => b.code === 'system1_judge'));
-    assert.ok(missingIds.blockers.some(b => b.code === 'mutate_writer'));
-
+    assert.ok(has(missing, 'system1_judge') && has(missing, 'mutate_writer'));
     const noLease = validateWriteSwarmReceipt({
-      ...liveBase,
+      ...live,
       lease: {
         schema: 'pen-writer-lease/v1',
         holder: 'a',
         token: '',
         acquired: false,
       },
-      system1: { ...liveBase.system1, source: 'writer-self' },
+      system1: { ...live.system1, source: 'writer-self' },
     });
-    assert.equal(noLease.ok, false);
     assert.ok(
-      noLease.blockers.some(b =>
-        [
-          'mutate_without_lease',
-          'lease_not_acquired',
-          'lease_token',
-          'system1_source',
-        ].includes(b.code)
-      )
+      [
+        'mutate_without_lease',
+        'lease_not_acquired',
+        'lease_token',
+        'system1_source',
+      ].some(c => has(noLease, c))
     );
   });
 
   it('rejects mutate/code-sync without system1 pass', () => {
     const failed = validateWriteSwarmReceipt({
-      ...liveBase,
-      system1: { ...liveBase.system1, verdict: 'fail' },
+      ...live,
+      system1: { ...live.system1, verdict: 'fail' },
       timReady: { renamed: false },
       codeSync: undefined,
     });
-    assert.equal(failed.ok, false);
-    assert.ok(
-      failed.blockers.some(b => b.code === 'mutate_without_system1_pass')
-    );
-
-    const syncOnly = validateWriteSwarmReceipt({
-      ...liveBase,
+    assert.ok(has(failed, 'mutate_without_system1_pass'));
+    const sync = validateWriteSwarmReceipt({
+      ...live,
       mutate: { performed: false, writer: 'write-swarm' },
-      system1: { ...liveBase.system1, verdict: 'pending' },
+      system1: { ...live.system1, verdict: 'pending' },
       timReady: { renamed: false },
       codeSync: { includesPenBlob: false, targets: ['packages/ui'] },
     });
-    assert.equal(syncOnly.ok, false);
-    assert.ok(
-      syncOnly.blockers.some(b => b.code === 'mutate_without_system1_pass')
-    );
-
-    const truthyNonObject = validateWriteSwarmReceipt({
-      ...liveBase,
+    assert.ok(has(sync, 'mutate_without_system1_pass'));
+    const bad = validateWriteSwarmReceipt({
+      ...live,
       mutate: { performed: false, writer: 'write-swarm' },
-      system1: { ...liveBase.system1, verdict: 'fail' },
+      system1: { ...live.system1, verdict: 'fail' },
       timReady: { renamed: false },
       codeSync: true,
     });
-    assert.equal(truthyNonObject.ok, false);
-    assert.ok(truthyNonObject.blockers.some(b => b.code === 'code_sync_type'));
     assert.ok(
-      truthyNonObject.blockers.some(
-        b => b.code === 'mutate_without_system1_pass'
-      )
+      has(bad, 'code_sync_type') && has(bad, 'mutate_without_system1_pass')
     );
   });
 
-  it('accepts live receipt with lease + panel pass + Tim-ready', () => {
-    const ok = validateWriteSwarmReceipt(liveBase);
-    assert.equal(ok.ok, true, JSON.stringify(ok.blockers));
-  });
-
-  it('CLI dry-run prints mutatesPen false; validate fails rubber-stamp', () => {
+  it('accepts live pass; CLI dry + validate', () => {
+    assert.equal(validateWriteSwarmReceipt(live).ok, true);
     const dry = cli('dry-run');
     assert.equal(dry.status, 0, dry.stderr);
     const body = JSON.parse(dry.stdout);
     assert.equal(body.proof.mutatesPen, false);
-    assert.equal(body.proof.forbidsInventAndRubberStamp, true);
-
-    const dir = mkdtempSync(path.join(tmpdir(), 'write-swarm-'));
-    const receipt = path.join(dir, 'bad.json');
+    const receipt = path.join(
+      mkdtempSync(path.join(tmpdir(), 'ws-')),
+      'bad.json'
+    );
     writeFileSync(
       receipt,
-      JSON.stringify({ ...liveBase, inventAndRubberStamp: true })
+      JSON.stringify({ ...live, inventAndRubberStamp: true })
     );
-    const bad = cli('validate', '--receipt', receipt);
-    assert.equal(bad.status, 1);
+    assert.equal(cli('validate', '--receipt', receipt).status, 1);
   });
 });

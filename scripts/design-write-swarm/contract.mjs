@@ -1,7 +1,7 @@
-/**
- * Design write swarm (JOV-13851): lease → System-1 → Tim-ready → code sync.
- * Dry never mutates Pen; live requires pen-review lease + panel (no rubber-stamp).
- */
+/** JOV-13851 write swarm: lease→System-1→Tim-ready→code-sync. Dry never mutates Pen. */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const WRITE_SWARM_SCHEMA = 'jovie.design-write-swarm/v1';
 export const PEN_REVIEW_RECEIPT_SCHEMA = 'pen-review-receipt/v1';
@@ -9,7 +9,6 @@ export const LEASE_SCHEMA = 'pen-writer-lease/v1';
 export const LOCK_PROFILE = 'jovie-founder-design-studio';
 export const CANONICAL_CANVAS =
   '~/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen';
-
 export const WRITE_SWARM_STEPS = Object.freeze([
   'attach',
   'lease',
@@ -20,7 +19,6 @@ export const WRITE_SWARM_STEPS = Object.freeze([
   'code-sync',
   'release',
 ]);
-
 export const WRITE_SWARM_CONTRACT = Object.freeze({
   schema: WRITE_SWARM_SCHEMA,
   mutatesPen: true,
@@ -31,12 +29,6 @@ export const WRITE_SWARM_CONTRACT = Object.freeze({
   lockProfile: LOCK_PROFILE,
   canonicalCanvas: CANONICAL_CANVAS,
   attach: 'pen interactive -a desktop',
-  leaseCli:
-    'node scripts/pen-review/run.mjs lease acquire --holder <you> --scope <slice>',
-  system1:
-    'node scripts/pen-review/run.mjs review --frames <ids> (System-1 panel)',
-  timReady: '· ready for Tim r<receipt> only after quiet System-1 rounds',
-  codeSync: ['tokens', 'packages/ui', 'pen-bindings', 'consumers'],
   forbidPenBlobsInPr: true,
   steps: WRITE_SWARM_STEPS,
 });
@@ -44,7 +36,6 @@ export const WRITE_SWARM_CONTRACT = Object.freeze({
 const t = v => (typeof v === 'string' ? v.trim() : '');
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 
-/** @param {{ mode?: 'dry'|'live', holder?: string, scope?: string, frameIds?: string[] }} [opts] */
 export function planWriteSwarm(opts = {}) {
   const mode = opts.mode === 'live' ? 'live' : 'dry';
   const holder = t(opts.holder) || 'write-swarm';
@@ -52,7 +43,18 @@ export function planWriteSwarm(opts = {}) {
   const frameIds = Array.isArray(opts.frameIds)
     ? opts.frameIds.map(String).filter(Boolean)
     : [];
-  const liveMutate = new Set(['mutate', 'tim-ready', 'persist']);
+  const live = new Set(['mutate', 'tim-ready', 'persist']);
+  const frames = frameIds.length ? frameIds.join(',') : '<frameIds>';
+  const cmd = {
+    attach: WRITE_SWARM_CONTRACT.attach,
+    lease: `node scripts/pen-review/run.mjs lease acquire --holder ${holder} --scope ${scope}`,
+    mutate: 'Atomic Pen edit under lease',
+    system1: `node scripts/pen-review/run.mjs review --frames ${frames}`,
+    'tim-ready': 'markReady → · ready for Tim r<receipt>',
+    persist: 'save() + pen-live-canvas-persist',
+    'code-sync': 'PR: tokens/packages/ui/bindings (no *.pen)',
+    release: `node scripts/pen-review/run.mjs lease release --holder ${holder} --token <token>`,
+  };
   return {
     schema: WRITE_SWARM_SCHEMA,
     mode,
@@ -62,52 +64,27 @@ export function planWriteSwarm(opts = {}) {
     frameIds,
     steps: WRITE_SWARM_STEPS.map(id => ({
       id,
-      mutatesPen: mode === 'live' && liveMutate.has(id),
-      command: stepCommand(id, { mode, holder, scope, frameIds }),
+      mutatesPen: mode === 'live' && live.has(id),
+      command: mode === 'dry' ? `dry:${id}` : (cmd[id] ?? id),
     })),
-    note:
-      mode === 'dry'
-        ? 'Dry: contract/plan only. Attach Tim canvas for live; do not invent Pen mutations.'
-        : 'Live requires jovie-founder-design-studio lease on Tim’s open canvas.',
   };
 }
 
-function stepCommand(id, { mode, holder, scope, frameIds }) {
-  if (mode === 'dry') return `dry:${id}`;
-  const frames = frameIds.length ? frameIds.join(',') : '<frameIds>';
-  const map = {
-    attach: WRITE_SWARM_CONTRACT.attach,
-    lease: `node scripts/pen-review/run.mjs lease acquire --holder ${holder} --scope ${scope}`,
-    mutate: 'Atomic Pen edit under lease (one slice)',
-    system1: `node scripts/pen-review/run.mjs review --frames ${frames}`,
-    'tim-ready': 'pen-review markReady → · ready for Tim r<receipt>',
-    persist: 'save() then pen-live-canvas-persist.mjs --phase persist',
-    'code-sync': 'Small PR: tokens / packages/ui / bindings (no *.pen)',
-    release: `node scripts/pen-review/run.mjs lease release --holder ${holder} --token <token>`,
-  };
-  return map[id] ?? id;
-}
-
-/** @param {unknown} receipt */
 export function validateWriteSwarmReceipt(receipt) {
-  /** @type {{code:string,message:string}[]} */
   const blockers = [];
   const block = (code, message) => blockers.push({ code, message });
   const doc = obj(receipt);
   if (!doc) {
-    block('receipt_missing', 'Write-swarm receipt object is required.');
+    block('receipt_missing', 'receipt required');
     return { ok: false, schema: WRITE_SWARM_SCHEMA, blockers };
   }
   if (t(doc.schema) !== WRITE_SWARM_SCHEMA)
-    block('schema_mismatch', `Expected ${WRITE_SWARM_SCHEMA}.`);
+    block('schema_mismatch', WRITE_SWARM_SCHEMA);
   const mode =
     t(doc.mode) === 'live' ? 'live' : t(doc.mode) === 'dry' ? 'dry' : '';
-  if (!mode) block('mode_missing', 'mode must be dry or live.');
+  if (!mode) block('mode_missing', 'dry|live');
   if (doc.inventAndRubberStamp === true)
-    block(
-      'invent_and_rubber_stamp',
-      'inventAndRubberStamp=true is forbidden (JOV-13851).'
-    );
+    block('invent_and_rubber_stamp', 'forbidden');
 
   const lease = obj(doc.lease);
   const system1 = obj(doc.system1);
@@ -117,97 +94,57 @@ export function validateWriteSwarmReceipt(receipt) {
   const codeSync = obj(doc.codeSync);
 
   if (mode === 'dry') {
-    if (doc.mutatesPen === true)
-      block('dry_mutates_pen', 'Dry receipts must set mutatesPen=false.');
-    if (mutate?.performed === true)
-      block('dry_mutate_performed', 'Dry mode must not perform Pen mutations.');
-    if (timReady?.renamed === true)
-      block('dry_tim_ready', 'Dry mode must not rename frames.');
+    if (doc.mutatesPen === true) block('dry_mutates_pen', 'mutatesPen=false');
+    if (mutate?.performed === true) block('dry_mutate_performed', 'no mutate');
+    if (timReady?.renamed === true) block('dry_tim_ready', 'no rename');
   }
 
   if (mode === 'live') {
-    if (!lease) block('lease_missing', 'live lease is required.');
+    if (!lease) block('lease_missing', 'lease required');
     else {
-      if (t(lease.schema) !== LEASE_SCHEMA)
-        block('lease_schema', `lease.schema must be ${LEASE_SCHEMA}.`);
-      if (!t(lease.holder)) block('lease_holder', 'lease.holder is required.');
-      if (!t(lease.token))
-        block('lease_token', 'lease.token is required for live writes.');
-      if (lease.acquired !== true)
-        block('lease_not_acquired', 'lease.acquired must be true.');
+      if (t(lease.schema) !== LEASE_SCHEMA) block('lease_schema', LEASE_SCHEMA);
+      if (!t(lease.holder)) block('lease_holder', 'holder');
+      if (!t(lease.token)) block('lease_token', 'token');
+      if (lease.acquired !== true) block('lease_not_acquired', 'acquired');
     }
     if (
       mutate?.performed === true &&
       (!lease || lease.acquired !== true || !t(lease?.token))
-    ) {
-      block(
-        'mutate_without_lease',
-        'Pen mutate requires an acquired lease token.'
-      );
-    }
-    if (!system1)
-      block('system1_missing', 'system1 panel receipt is required.');
+    )
+      block('mutate_without_lease', 'need lease token');
+    if (!system1) block('system1_missing', 'system1 required');
     else {
       if (t(system1.source) !== 'pen-review-panel')
-        block(
-          'system1_source',
-          'system1.source must be pen-review-panel (not writer self-verdict).'
-        );
+        block('system1_source', 'pen-review-panel');
       if (t(system1.receiptSchema) !== PEN_REVIEW_RECEIPT_SCHEMA)
-        block(
-          'system1_receipt_schema',
-          `system1.receiptSchema must be ${PEN_REVIEW_RECEIPT_SCHEMA}.`
-        );
+        block('system1_receipt_schema', PEN_REVIEW_RECEIPT_SCHEMA);
       if (!['pass', 'fail', 'pending'].includes(t(system1.verdict)))
-        block('system1_verdict', 'system1.verdict must be pass|fail|pending.');
+        block('system1_verdict', 'pass|fail|pending');
       const writer = t(mutate?.writer);
       const judge = t(system1.judge);
-      // Fail closed: missing identities must not bypass anti-rubber-stamp.
-      if (!judge)
-        block('system1_judge', 'system1.judge is required in live mode.');
+      if (!judge) block('system1_judge', 'judge required');
       if (mutate?.performed === true && !writer)
-        block(
-          'mutate_writer',
-          'mutate.writer is required when mutate.performed.'
-        );
+        block('mutate_writer', 'writer required');
       if (
         system1.selfApproved === true ||
         (writer && judge && writer === judge)
       )
-        block(
-          'invent_and_rubber_stamp',
-          'Writer must not System-1 self-approve (invent-and-rubber-stamp).'
-        );
+        block('invent_and_rubber_stamp', 'writer≠judge');
     }
-    // Fail closed: truthy non-objects (true/"done") must not bypass panel pass.
-    if (codeSyncPresent && !codeSync)
-      block('code_sync_type', 'codeSync must be an object when present.');
-    // Landing receipts: mutate or code-sync claim require panel pass (not only Tim-ready).
-    const needsPanelPass =
+    if (codeSyncPresent && !codeSync) block('code_sync_type', 'object');
+    const needsPass =
       mutate?.performed === true ||
       codeSyncPresent ||
       timReady?.renamed === true;
-    if (needsPanelPass && t(system1?.verdict) !== 'pass') {
-      block(
-        'mutate_without_system1_pass',
-        'mutate/code-sync/Tim-ready require system1.verdict=pass from pen-review.'
-      );
-    }
-    if (timReady?.renamed === true) {
-      if (
-        !t(timReady.name) ||
-        !/ready for Tim r[0-9a-f]{8}/.test(timReady.name)
-      )
-        block(
-          'tim_ready_name',
-          'timReady.name must include · ready for Tim r<8 hex>.'
-        );
-    }
+    if (needsPass && t(system1?.verdict) !== 'pass')
+      block('mutate_without_system1_pass', 'need system1 pass');
+    if (
+      timReady?.renamed === true &&
+      (!t(timReady.name) || !/ready for Tim r[0-9a-f]{8}/.test(timReady.name))
+    )
+      block('tim_ready_name', '· ready for Tim r<8hex>');
     if (codeSync?.includesPenBlob === true)
-      block(
-        'pen_blob_in_code_sync',
-        '*.pen blobs must not enter the code-sync PR.'
-      );
+      block('pen_blob_in_code_sync', 'no *.pen');
   }
 
   return {
@@ -217,4 +154,64 @@ export function validateWriteSwarmReceipt(receipt) {
     mode,
     mutatesPen: mode === 'live',
   };
+}
+
+function main(argv) {
+  const [cmd, ...rest] = argv;
+  const opt = {};
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === '--live') opt.live = true;
+    else if (a === '--holder') opt.holder = rest[++i];
+    else if (a === '--scope') opt.scope = rest[++i];
+    else if (a === '--frames') opt.frames = rest[++i];
+    else if (a === '--receipt') opt.receipt = rest[++i];
+  }
+  const out = (v, code = 0) => {
+    console.log(JSON.stringify(v, null, 2));
+    process.exitCode = code;
+  };
+  if (cmd === 'list') {
+    out({ contract: WRITE_SWARM_CONTRACT, modes: ['dry', 'live'] });
+    return;
+  }
+  if (cmd === 'plan' || cmd === 'dry-run') {
+    const plan = planWriteSwarm({
+      mode: cmd === 'dry-run' ? 'dry' : opt.live ? 'live' : 'dry',
+      holder: opt.holder,
+      scope: opt.scope,
+      frameIds: opt.frames ? opt.frames.split(',').map(s => s.trim()) : [],
+    });
+    out({
+      ...plan,
+      proof: {
+        mutatesPen: plan.contract.mutatesPen,
+        forbidsInventAndRubberStamp: true,
+        attachPath: CANONICAL_CANVAS,
+      },
+    });
+    return;
+  }
+  if (cmd === 'validate') {
+    if (!opt.receipt) {
+      process.exitCode = 1;
+      return;
+    }
+    const r = validateWriteSwarmReceipt(
+      JSON.parse(readFileSync(opt.receipt, 'utf8'))
+    );
+    out(r, r.ok ? 0 : 1);
+    return;
+  }
+  console.log(
+    'Usage: list|plan [--live]|dry-run|validate --receipt <path>\nAttach: pen interactive -a desktop (lock jovie-founder-design-studio)'
+  );
+  process.exitCode = cmd ? 1 : 0;
+}
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+) {
+  main(process.argv.slice(2));
 }
