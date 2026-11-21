@@ -190,18 +190,13 @@ export function DemoReleaseDetail({
                 Add comment
               </label>
               <div className='text-xs leading-[1.45] text-secondary-token'>
-                <CompositeField
-                  shape='md'
-                  size='sm'
-                  surface='none'
-                  className='h-auto items-start'
-                >
+                <CompositeField shape='md' size='md' surface='none'>
                   <HostDrawnTextarea
                     id='release-comment'
                     rows={3}
                     readOnly
                     value='Leave a short update for your team. Demo comments stay local to this preview.'
-                    className='w-full resize-none bg-transparent'
+                    className='w-full resize-none'
                   />
                 </CompositeField>
               </div>

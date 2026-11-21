@@ -253,28 +253,8 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  Input: ({
-    value,
-    onChange,
-    id,
-    placeholder,
-    type = 'text',
-    ...props
-  }: {
-    value?: string;
-    onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    id?: string;
-    placeholder?: string;
-    type?: string;
-  }) => (
-    <input
-      id={id}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      type={type}
-      {...props}
-    />
+  Input: (props: React.ComponentProps<'input'>) => (
+    <input type='text' {...props} />
   ),
   Select: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   SelectContent: ({ children }: { children: ReactNode }) => (
