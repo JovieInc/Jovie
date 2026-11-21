@@ -1576,9 +1576,7 @@ ${fixtureCheckout}
               step =>
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) &&
-                (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
-                  step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
+                ) && (step.includes('tests/e2e/smoke-prod-auth.spec.ts') || step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )
             .map(step => ({
               file,
