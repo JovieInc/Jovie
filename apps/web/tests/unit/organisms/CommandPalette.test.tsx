@@ -13,12 +13,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import {
-  type ButtonHTMLAttributes,
-  type ReactNode,
-  useCallback,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -69,34 +64,7 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
-    open ? <div role='dialog'>{children}</div> : null,
-  DialogContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  Button: ({
-    children,
-    onClick,
-    disabled,
-  }: {
-    children: ReactNode;
-    onClick?: () => void;
-    disabled?: boolean;
-  }) => (
-    <button type='button' onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  ),
-  PlainButton: ({
-    children,
-    ...props
-  }: { children?: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
-}));
+vi.mock('@jovie/ui', () => import('./command-palette-ui-mock'));
 
 vi.mock('@radix-ui/react-dialog', () => ({
   Title: ({ children }: { children: ReactNode }) => <div>{children}</div>,
