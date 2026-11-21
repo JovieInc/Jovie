@@ -138,7 +138,7 @@ function ShipperStatusPanel({
             {payload.inFlightJobs.map(job => (
               <div
                 key={`${job.repo}-${job.issue}-${job.startedAt}`}
-                className='rounded-md bg-surface-0 px-3 py-2'
+                className='rounded-md border border-subtle bg-surface-0 px-3 py-2'
               >
                 <p className='text-app font-semibold text-primary-token'>
                   #{job.issue}
@@ -170,7 +170,7 @@ function ShipperStatusPanel({
             </p>
           ) : null}
           {payload.recentErrors.length > 0 ? (
-            <pre className='max-h-32 overflow-auto rounded-md bg-surface-0 p-3 text-2xs leading-5 text-tertiary-token'>
+            <pre className='max-h-32 overflow-auto rounded-md border border-subtle bg-surface-0 p-3 text-2xs leading-5 text-tertiary-token'>
               {payload.recentErrors.join('\n')}
             </pre>
           ) : null}

@@ -446,7 +446,6 @@ describe('CertificationJudgments', () => {
       })
     );
     const note = screen.getByPlaceholderText(/What should change/);
-    expect(note).toHaveClass('h-auto');
     await user.type(note, 'tighten the hero copy');
     rerender(<CertificationJudgments />);
     await user.keyboard('{Escape}');

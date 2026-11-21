@@ -1,6 +1,6 @@
 'use client';
 
-import { LoadingSkeleton, Textarea } from '@jovie/ui';
+import { LoadingSkeleton } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/FounderReviewRecorder';
@@ -312,9 +312,9 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                       className='block text-xs text-secondary-token'
                     >
                       Decision notes
-                      <Textarea
+                      <textarea
                         id='ovie-inbox-decision-notes'
-                        className='mt-1 block min-h-0 w-full rounded-lg border border-subtle bg-surface-0 p-2 text-app text-primary-token'
+                        className='mt-1 block w-full rounded-lg border border-subtle bg-surface-0 p-2 text-app text-primary-token'
                         value={notes}
                         onChange={event => setNotes(event.target.value)}
                         rows={3}

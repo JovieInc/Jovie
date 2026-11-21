@@ -124,7 +124,6 @@ describe('Ovie Inbox', () => {
     const notes = await screen.findByRole('textbox', {
       name: /Decision notes/,
     });
-    expect(notes).toHaveClass('min-h-0');
     await user.type(notes, 'Looks right');
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() =>

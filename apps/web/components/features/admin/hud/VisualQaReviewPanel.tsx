@@ -62,7 +62,7 @@ function SurfaceScreenshot({
 }: Readonly<{ readonly label: string; readonly src: string | null }>) {
   return (
     <figure className='min-w-0 space-y-1'>
-      <figcaption className='text-2xs tracking-wide text-tertiary-token'>
+      <figcaption className='text-2xs uppercase tracking-wide text-tertiary-token'>
         {label}
       </figcaption>
       {src ? (
