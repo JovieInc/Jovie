@@ -112,7 +112,10 @@ export function LinkPill({
       ariaLabel={menuButtonAria}
       ref={setReferenceRef}
       {...getReferenceProps()}
-      size='sm'
+      // lg = 40px face (matches prior h-10); leaves glyph size to the child
+      // so h-5/w-5 is not overridden by sm's [&_svg]:h-3.5 rule.
+      size='lg'
+      className='-mr-2 rounded-lg border-transparent bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25'
     >
       <Icon name='MoreHorizontal' className='h-5 w-5 opacity-90' />
     </IconButton>
