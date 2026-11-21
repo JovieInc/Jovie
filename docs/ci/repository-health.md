@@ -264,4 +264,18 @@ Budget: **60 runs per merged PR** across all workflows. The registry ceiling sta
 
 2026-11-21 hygiene pass (headroom audit): main measured 207,079,614 of 207,618,048 tracked regular-file bytes (99.74%) at `8c091d12`. The vendored `actions-cache` bundles are now minified at refresh time (`processing: minify/v1` in `.github/actions/vendor/manifest.json`; esbuild with `keepNames` and inline legal comments, `upstreamFiles` still pins the upstream hashes), cutting 6.75 MB to 2.65 MB. They stay vendored for JOV-8754. Budget unchanged.
 
+2026-11-21 duplicate baselines fixed: the three identical groups the
+2026-10-21 hash audit kept were not route or theme tripwires. Theme switching
+ships off (`lib/theme/route-policy.ts`), so `pricing-dark`/`pricing-light`
+became one shared `pricing.png` that the light test still compares against,
+failing if light mode leaks out uncertified. `signin-dark`/`signup-dark` were
+the retired Clerk "Configuration Error" card, still passing against the real
+Better Auth form inside the dark-on-dark diff tolerance; that block is gone and
+`auth-visual.spec.ts` covers both pages. The Growth deep links
+(`admin-growth-outreach`/`-campaigns`/`-ingest`) photographed the page top, so
+they now snapshot the accordion each link opens (`snapshotAccordion` in
+`admin-surface-manifest.ts`), and `?view=campaigns`, which opens the same
+accordion as outreach, shares its baseline (`snapshotSharedWith`). The
+scheduled refresh writes the new outreach and ingest baselines.
+
 2026-11-21 changelog receipts (headroom audit): 1.29 MB of the 1.56 MB `CHANGELOG.md` was the 17 hidden `daily-changelog-receipt/v1` comments, and 1.17 MB of that was each receipt's `audit` array: one row per unpublished candidate PR, re-listed every day (20-130 KB per publish) and never read back (`pending` and `deferred` carry the follow-up ids; the plan's `audit` still feeds the writer-proof attachment). Receipts now persist `auditCounts` (rows per reason), and each daily publish compacts older receipts the same way (`scripts/lib/daily-changelog-receipts.mjs`), so the writer frees about 1.2 MB on its next publish without an implementation PR touching `CHANGELOG.md` (JOV-5378). Full rows remain in git history. Budget unchanged.
