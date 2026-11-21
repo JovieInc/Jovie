@@ -25,6 +25,16 @@ describe('Sparkline', () => {
     expect(lines[1]?.getAttribute('stroke')).toBe('var(--color-error-text)');
   });
 
+  it('flips tone by polarity: a rising lower-is-better metric is bad news', () => {
+    const stroke = (polarity?: 'lower-is-better') =>
+      render(<Sparkline points={[1, 2, 3]} trend='up' polarity={polarity} />)
+        .container.querySelectorAll('path')[1]
+        ?.getAttribute('stroke');
+
+    expect(stroke('lower-is-better')).toBe('var(--color-error-text)');
+    expect(stroke()).toBe('var(--color-success-text)');
+  });
+
   it('never strokes with the neon accent fills, which fail 3:1 on white', () => {
     for (const trend of ['up', 'down'] as const) {
       const { container, unmount } = render(

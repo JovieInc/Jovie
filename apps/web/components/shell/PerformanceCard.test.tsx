@@ -82,8 +82,23 @@ describe('PerformanceCard', () => {
         delta={-15}
       />
     );
-    // The delta block uses rose color for down
-    expect(container.innerHTML).toContain('rose-300');
+    // A drop in a higher-is-better metric reads as bad news.
+    expect(container.innerHTML).toContain('text-error-text');
+  });
+
+  it('reads a drop as good news when lower is better', () => {
+    const { container } = render(
+      <PerformanceCard
+        title='Skips'
+        metricLabel='skips'
+        pointsByRange={{ '7d': [10, 8, 6] }}
+        trend='down'
+        polarity='lower-is-better'
+        delta={-15}
+      />
+    );
+    expect(container.innerHTML).toContain('text-success-text');
+    expect(container.innerHTML).toContain('var(--color-success-text)');
   });
 
   it('falls back to the first surfaced range when initialRange is missing', () => {
