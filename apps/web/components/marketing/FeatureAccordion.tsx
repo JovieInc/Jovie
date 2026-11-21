@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useState } from 'react';
 import type { SubItem } from './NumberedSection';
 
@@ -23,7 +24,7 @@ export function FeatureAccordion({ items }: FeatureAccordionProps) {
 
         return (
           <div key={item.number} className='w-full sm:w-auto'>
-            <button
+            <PlainButton
               type='button'
               id={triggerId}
               className='accordion-trigger'
@@ -37,7 +38,7 @@ export function FeatureAccordion({ items }: FeatureAccordionProps) {
               <span className='accordion-icon' aria-hidden='true'>
                 +
               </span>
-            </button>
+            </PlainButton>
 
             <section
               id={panelId}

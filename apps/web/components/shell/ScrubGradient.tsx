@@ -187,9 +187,7 @@ export function ScrubGradient({
                 fill='currentColor'
                 className='text-quaternary-token'
               >
-                <title>
-                  {c.label} · {formatTime((c.at / 100) * safeDuration)}
-                </title>
+                <title>{`${c.label} · ${formatTime((c.at / 100) * safeDuration)}`}</title>
               </circle>
             );
           })}

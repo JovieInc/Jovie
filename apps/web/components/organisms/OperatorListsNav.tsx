@@ -1,10 +1,10 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, PlainButton } from '@jovie/ui';
 import { List, ListFilter, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type KeyboardEvent, useState } from 'react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { OPERATOR_NAV_GROUP_LABEL } from '@/components/organisms/operator-navigation';
 import {
@@ -97,6 +97,12 @@ function NewListRow() {
   const create = useCreateOvieListMutation();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // The input opens from the New List click; move focus to it then.
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -129,7 +135,7 @@ function NewListRow() {
     return (
       <SidebarMenuItem>
         <Input
-          autoFocus
+          ref={inputRef}
           aria-label='New List Name'
           placeholder='List name'
           value={name}
@@ -148,7 +154,7 @@ function NewListRow() {
   return (
     <SidebarMenuItem>
       <Tooltip label='New List' side='right' block>
-        <button
+        <PlainButton
           type='button'
           aria-label='New List'
           onClick={() => {
@@ -158,7 +164,7 @@ function NewListRow() {
           className={getSidebarNavRowClassName({
             calm: true,
             collapsed: state === 'closed' && !isMobile,
-            className: 'rounded-lg',
+            className: 'rounded-lg text-left',
           })}
         >
           <Plus
@@ -168,7 +174,7 @@ function NewListRow() {
           <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
             New List
           </span>
-        </button>
+        </PlainButton>
       </Tooltip>
     </SidebarMenuItem>
   );

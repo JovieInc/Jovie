@@ -2,11 +2,14 @@ import { sitemapPaths } from './sample-params.mjs';
 
 // The core crawl's within-invocation cold-measurement reuse stays isolated by
 // identity, viewport, full URL and fixture. Rechecks bypass this cache.
-export function createColdVisit(safeVisit, origin) {
+export function createColdVisit(safeVisit, origin, { adoption = null } = {}) {
   const loads = new Map();
   let reuses = 0;
+  let adopted = 0;
   return {
     reuses: () => reuses,
+    adoption: () =>
+      adopted ? { count: adopted, source: adoption.source } : null,
     async visit(job) {
       const key = JSON.stringify([
         job.identity,
@@ -25,6 +28,13 @@ export function createColdVisit(safeVisit, origin) {
         ) {
           reuses++;
           return { ...row, route: job.route, measurementReused: true };
+        }
+      }
+      if (job.identity === 'stranger' && !job.collect) {
+        const row = adoption?.find(job);
+        if (row) {
+          adopted++;
+          return row;
         }
       }
       const promise = safeVisit(job);

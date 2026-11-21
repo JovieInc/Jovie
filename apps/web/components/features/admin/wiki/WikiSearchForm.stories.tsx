@@ -19,3 +19,16 @@ export const WithQuery: Story = {
     initialQuery: 'deployment runbook',
   },
 };
+
+export const LongContentQuery: Story = {
+  args: {
+    initialQuery:
+      'how to roll back a deployment when the migration has already run and the cache is warm across every region',
+  },
+};
+
+export const RtlQuery: Story = {
+  args: {
+    initialQuery: 'دليل النشر والتراجع',
+  },
+};

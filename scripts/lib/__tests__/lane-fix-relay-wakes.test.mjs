@@ -256,7 +256,9 @@ test('the actual sparse relay checkout can wake through the shared API policy', 
       maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
-      timeout: 30000,
+      // Shared clone of a warm agent checkout can exceed 30s when .git packs
+      // are multi-GB after a deepen fetch; keep the fixture hermetic, just wait.
+      timeout: 120000,
     });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();

@@ -92,12 +92,10 @@ type PolicyWorkflow = {
   readonly jobs?: Record<string, PolicyJob>;
 };
 const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
-// Commands that make Playwright (or its telemetry normalizers) write the
-// browser-derived files the guard scans before any upload can read them.
+// Playwright/telemetry commands that write browser-derived files the guard scans.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
-// `file:job` to one step name or '*' for the whole job.
+// Unguarded producers: `file:job` → step name or '*' for the whole job.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
@@ -734,7 +732,7 @@ afterEach(() => {
 });
 
 describe('Playwright artifact secret boundary', () => {
-  it('keeps configs reporter-safe and suppresses default JSON only for producer jobs', async () => {
+  it('keeps configs reporter-safe and always emits JSON flaky status in CI', async () => {
     const actual = readdirSync(webRoot)
       .filter(name =>
         /^playwright(?:\.[\w-]+)*\.config(?:\.[\w-]+)*\.[cm]?[jt]s$/.test(name)
@@ -840,11 +838,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(reporterNames(ci['playwright.config.ts'].reporter)).toContain(
       'json'
     );
+    // Producer-stage lanes still need JSON flaky status for the flakiness
+    // report on green runs (JOV-12621). Only Vercel automation bypass skips it.
     expect(
       reporterNames(
         (await configs(true, true))['playwright.config.ts'].reporter
       )
-    ).not.toContain('json');
+    ).toContain('json');
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
@@ -1574,7 +1574,9 @@ ${fixtureCheckout}
               step =>
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) && step.includes('tests/e2e/smoke-prod-auth.spec.ts')
+                ) &&
+                (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
+                  step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )
             .map(step => ({
               file,
@@ -2929,6 +2931,7 @@ ${fixtureCheckout}
       'apps/web/test-results/nightly-agent/skill-delta.json',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
       'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/nightly-agent/skill-delta.json',
     ];
     const reportContents = Object.fromEntries(
       reportPaths.map((path, index) => [
