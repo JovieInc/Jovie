@@ -12,9 +12,15 @@ this expiry branch, so no further comments or alerts fire while parked."""
 from __future__ import annotations
 
 
-def escalate_or_park(sid: str, e: dict, linear, at: float, state) -> int:
-    """Handle one claim expiry in place. Returns 1 when a stale Linear link was refiled."""
-    import prod_errors as pe  # late import: prod_errors loads this module at import time
+def escalate_or_park(sid: str, e: dict, linear, at: float, state, pe=None) -> int:
+    """Handle one claim expiry in place. Returns 1 when a stale Linear link was refiled.
+
+    `pe` must be the live prod_errors module (pass sys.modules[__name__] from advance).
+    A bare `import prod_errors` here would load a second module object when the script
+    runs as __main__ (Gem run.sh), so LinearIssueMissing catches and CLAIM_S/MAX would
+    disagree with the caller (JOV-14113 / Seer 20813183)."""
+    if pe is None:
+        import prod_errors as pe  # import-path / unittest callers only
 
     try:
         linked_state = linear.state_type(e["linear"]) or ""

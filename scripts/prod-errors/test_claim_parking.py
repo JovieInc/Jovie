@@ -104,6 +104,24 @@ class ClaimParkingTest(unittest.TestCase):
         self.assertEqual(self.ledger["101"]["status"], "deployed")
         self.assertAlmostEqual(self.ledger["101"]["deployedAt"], at + 60, delta=1)  # iso() truncates to seconds
 
+    def test_advance_passes_live_module_not_reimport(self):
+        # JOV-14113 / Seer: Gem run.sh execs prod_errors.py as __main__. advance() must pass
+        # the live module into escalate_or_park so LinearIssueMissing/CLAIM_S match the caller.
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        seen, orig = [], pe.escalate_or_park
+
+        def spy(sid, e, linear, at, state, pe=None):
+            seen.append(pe)
+            return orig(sid, e, linear, at, state, pe=pe)
+
+        pe.escalate_or_park = spy
+        try:
+            self.expire(1)
+        finally:
+            pe.escalate_or_park = orig
+        self.assertEqual(len(seen), 1)
+        self.assertIs(seen[0], pe)  # live module object, not a re-import
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -530,7 +530,9 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
                     e.update(status="claimed", claimExpiresAt=at + CLAIM_S)
                 e.update(pr=pr["number"], prOpenedAt=e.get("prOpenedAt") or at)
             elif e["status"] == "claimed" and at > e["claimExpiresAt"] and not e.get("gate"):
-                stale += escalate_or_park(sid, e, linear, at, state)
+                # Pass the live module so claim_parking catches our LinearIssueMissing and
+                # reads our CLAIM_S/MAX when this file is exec'd as __main__ (Gem run.sh).
+                stale += escalate_or_park(sid, e, linear, at, state, pe=sys.modules[__name__])
         if e["status"] == "deployed" and at - e["deployedAt"] >= QUIET_S and e.get("lastSeen", 0) <= e["deployedAt"]:
             e.update(status="closed", closedAt=at)
             try:
