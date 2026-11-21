@@ -45,3 +45,29 @@ test('iOS CI restores only immutable Swift package state before dependency resol
     'mutable DerivedData build products must not be shared across jobs'
   );
 });
+
+test('iOS CI skips package resolve only on a full SwiftPM primary-key cache hit', () => {
+  const cacheStart = workflow.indexOf(
+    '      - name: Restore Swift package cache'
+  );
+  const resolveStart = workflow.indexOf(
+    '      - name: Resolve Swift package dependencies'
+  );
+  const cacheBlock = workflow.slice(cacheStart, resolveStart);
+  const resolveBlock = workflow.slice(
+    resolveStart,
+    workflow.indexOf('\n      - name:', resolveStart + 1)
+  );
+
+  assert.match(
+    cacheBlock,
+    /id: swiftpm-cache/,
+    'cache step must expose cache-hit for the resolve gate'
+  );
+  assert.match(
+    resolveBlock,
+    /if: \$\{\{ steps\.swiftpm-cache\.outputs\.cache-hit != 'true' \}\}/,
+    'resolve must run on miss, partial restore-keys hit, and self-hosted (skipped cache)'
+  );
+  assert.match(resolveBlock, /run-xcodebuild\.sh -resolvePackageDependencies/);
+});
