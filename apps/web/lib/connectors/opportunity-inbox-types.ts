@@ -1,3 +1,4 @@
+import type { DeltaSentiment, MetricPolarity } from '@/lib/design/metric-tone';
 import type { OpportunitySignalType } from './opportunity-inbox-signal-type';
 
 export type OpportunityInboxCardStatus = 'pending';
@@ -74,6 +75,10 @@ export interface OpportunityInboxReportData {
   readonly deltaPercent: number;
   readonly deltaDisplay: string;
   readonly direction: 'up' | 'down' | 'flat';
+  /** Whether a rise in this metric is good news; colors the delta (ASR-041). */
+  readonly polarity: MetricPolarity;
+  /** Direction combined with polarity: what the delta means for the artist. */
+  readonly sentiment: DeltaSentiment;
   readonly series: readonly number[];
   readonly items: readonly OpportunityInboxReportBreakdownItem[];
   readonly experimentId: string | null;

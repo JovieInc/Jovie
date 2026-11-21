@@ -91,7 +91,7 @@ function ConnectedArtistBadge({
       <span className='max-w-35 truncate text-xs text-secondary-token'>
         {info.artistName}
       </span>
-      <CheckCircle2 className='h-3.5 w-3.5 text-green-500 shrink-0' />
+      <CheckCircle2 className='h-3.5 w-3.5 text-success-text shrink-0' />
       {info.externalUrl && (
         <InlineIconButton
           href={info.externalUrl}
