@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import { Download } from 'lucide-react';
+import Image from 'next/image';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import type { ScreenshotInfo } from '@/lib/admin/types';
@@ -30,14 +31,13 @@ export function ScreenshotCard({
         aria-label={`View ${screenshot.title}`}
       >
         <div className='relative aspect-video w-full overflow-hidden bg-surface-1'>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
+            unoptimized
             src={screenshot.url}
             alt={screenshot.title}
             width={640}
             height={360}
             loading='lazy'
-            decoding='async'
             className='h-full w-full object-cover object-top'
           />
         </div>

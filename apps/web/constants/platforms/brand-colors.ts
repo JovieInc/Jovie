@@ -11,3 +11,6 @@ export const GOOGLE_BRAND_COLORS = {
   yellow: 'FBBC05',
   red: 'EA4335',
 } as const;
+
+/** Colour for a platform with no published brand colour (bare hex, no #). */
+export const NEUTRAL_BRAND_FALLBACK_HEX = '6b7280';

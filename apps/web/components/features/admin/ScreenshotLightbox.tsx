@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import Image from 'next/image';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
@@ -60,8 +61,8 @@ export function ScreenshotLightbox({
         {selected && (
           <div className='space-y-4'>
             <ContentSurfaceCard surface='nested' className='overflow-hidden'>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
+                unoptimized
                 src={selected.url}
                 alt={selected.title}
                 width={1440}
