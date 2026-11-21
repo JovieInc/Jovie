@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +16,12 @@ export const ALIAS_ROUTES = [
 export const ALIAS_SURFACES = {
   production: {
     surface: 'production-canonical-alias',
-    job: 'Production Release / Production public-profile alias usable-result gate',
+    // The post-promote gate moved out of the reusable Production Release
+    // workflow into this repo's Production Controller (#24006, 2026-10-31):
+    // reusable-workflow jobs render as "Production Release / <job>", while a
+    // controller-native job renders under its own name. Read the live shape
+    // from the runs being enumerated, never a retired workflow's prefix.
+    job: 'Production public-profile alias usable-result gate',
     step: 'Gate canonical public-profile aliases on usable results',
   },
   staging: {
@@ -233,7 +239,7 @@ export async function collectAliasGraduation({
       const matches = jobs.filter(job => job.name === surface.job);
       if (matches.length > 1) throw new Error('Duplicate surface job');
       const job = matches[0];
-      const step = job?.steps.find(item => item.name === surface.step);
+      const step = job?.steps?.find(item => item.name === surface.step);
       row[key] = job
         ? {
             jobId: job.id,
@@ -349,22 +355,30 @@ export async function collectAliasGraduation({
   return { receipt, inventoryText, measurementsText };
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+export function writeAliasGraduation(
+  result,
+  root = new URL('../../docs/performance/', import.meta.url)
 ) {
-  const [since, cutoff, nextReviewAt, trackingIssue] = process.argv.slice(2);
-  const result = await collectAliasGraduation({
-    since,
-    cutoff,
-    nextReviewAt,
-    trackingIssue,
-  });
-  const root = new URL('../../docs/performance/', import.meta.url);
+  // Use the installed formatter and repository config for every refresh. Plain
+  // JSON.stringify expands numeric arrays differently and fails Source Validation.
+  const receiptText = execFileSync(
+    'pnpm',
+    [
+      'exec',
+      'biome',
+      'format',
+      '--stdin-file-path=docs/performance/public-profile-alias-graduation.json',
+    ],
+    {
+      cwd: new URL('../../', import.meta.url),
+      input: `${JSON.stringify(result.receipt, null, 2)}\n`,
+      encoding: 'utf8',
+    }
+  );
   mkdirSync(new URL('generated/', root), { recursive: true });
   writeFileSync(
     new URL('public-profile-alias-graduation.json', root),
-    `${JSON.stringify(result.receipt, null, 2)}\n`
+    receiptText
   );
   writeFileSync(
     new URL(result.receipt.evidence.inventory, root),
@@ -373,5 +387,15 @@ if (
   writeFileSync(
     new URL(result.receipt.evidence.measurements, root),
     result.measurementsText
+  );
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  const [since, cutoff, nextReviewAt, trackingIssue] = process.argv.slice(2);
+  writeAliasGraduation(
+    await collectAliasGraduation({ since, cutoff, nextReviewAt, trackingIssue })
   );
 }
