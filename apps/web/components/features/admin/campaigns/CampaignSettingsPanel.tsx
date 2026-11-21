@@ -14,6 +14,10 @@ import {
   useSaveCampaignSettings,
 } from '@/lib/queries';
 
+// ui-casing-allow: Admin Growth is the name of a page
+const GROWTH_DEFAULTS_DESCRIPTION =
+  'Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.';
+
 export function CampaignSettingsPanel() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
@@ -68,7 +72,7 @@ export function CampaignSettingsPanel() {
     return (
       <SettingsPanel
         title='Growth Defaults'
-        description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
+        description={GROWTH_DEFAULTS_DESCRIPTION}
       >
         <div className='flex items-center gap-2 px-4 py-4 text-app text-secondary-token sm:px-5'>
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
@@ -82,7 +86,7 @@ export function CampaignSettingsPanel() {
     return (
       <SettingsPanel
         title='Growth Defaults'
-        description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
+        description={GROWTH_DEFAULTS_DESCRIPTION}
       >
         <div className='px-4 py-4 text-app text-destructive sm:px-5'>
           {error instanceof Error
@@ -101,7 +105,7 @@ export function CampaignSettingsPanel() {
   return (
     <SettingsPanel
       title='Growth Defaults'
-      description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
+      description={GROWTH_DEFAULTS_DESCRIPTION}
       actions={
         <div className='flex flex-wrap items-center gap-3'>
           <Button

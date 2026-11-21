@@ -171,7 +171,7 @@ export const LongContent: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(36rem,calc(100vw-2rem))]'>
+      <div className='w-full max-w-xl'>
         <Story />
       </div>
     ),
@@ -182,7 +182,7 @@ export const RtlOverflow: Story = {
   args: { initialFunnel: funnel },
   decorators: [
     Story => (
-      <div dir='rtl' className='w-[min(24rem,calc(100vw-2rem))]'>
+      <div dir='rtl' className='w-full max-w-sm'>
         <Story />
       </div>
     ),
