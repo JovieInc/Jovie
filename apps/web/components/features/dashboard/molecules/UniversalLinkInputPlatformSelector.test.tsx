@@ -26,7 +26,7 @@ describe('UniversalLinkInputPlatformSelector', () => {
     const { container } = renderSelector();
 
     const trigger = screen.getByRole('button', {
-      name: 'Add link from platform',
+      name: 'Add Link From Platform',
     });
     expect(trigger).toHaveAttribute('type', 'button');
     await user.click(trigger);
@@ -42,7 +42,7 @@ describe('UniversalLinkInputPlatformSelector', () => {
     const { onArtistSearchSelect } = renderSelector();
 
     await user.click(
-      screen.getByRole('button', { name: 'Add link from platform' })
+      screen.getByRole('button', { name: 'Add Link From Platform' })
     );
     await user.click(
       await screen.findByRole('menuitem', {
@@ -60,7 +60,7 @@ describe('UniversalLinkInputPlatformSelector', () => {
     const { onPlatformSelect, onRestoreFocus } = renderSelector();
 
     await user.click(
-      screen.getByRole('button', { name: 'Add link from platform' })
+      screen.getByRole('button', { name: 'Add Link From Platform' })
     );
     await user.click(
       await screen.findByRole('menuitem', { name: PLATFORM_OPTIONS[0].name })
@@ -75,7 +75,7 @@ describe('UniversalLinkInputPlatformSelector', () => {
     renderSelector(true);
 
     const trigger = screen.getByRole('button', {
-      name: 'Add link from platform',
+      name: 'Add Link From Platform',
     });
     expect(trigger).toBeDisabled();
     await user.click(trigger);

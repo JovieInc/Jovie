@@ -48,7 +48,7 @@ export function ConnectedArtistBadge({
           className='rounded-full object-cover'
         />
       )}
-      <span className='max-w-35 truncate text-xs text-secondary-token'>
+      <span className='max-w-32 truncate text-xs text-secondary-token'>
         {info.artistName}
       </span>
       <CheckCircle2
@@ -108,7 +108,7 @@ export function PrimaryDspRow({
         <SocialIcon platform={icon} className='h-4 w-4' aria-hidden />
       </div>
       <div className='flex min-w-0 flex-1 items-center gap-3'>
-        <span className='w-25 shrink-0 text-app font-medium text-primary-token'>
+        <span className='w-24 shrink-0 text-app font-medium text-primary-token'>
           {label}
         </span>
         {connectedInfo ? (
@@ -185,7 +185,7 @@ export function AdditionalLinkRow({
 
       <Select value={link.platform} onValueChange={onPlatformChange}>
         <SelectTrigger
-          className='w-35 shrink-0'
+          className='w-32 shrink-0'
           aria-label={`${name} platform`}
         >
           <SelectValue placeholder='Platform' />
@@ -205,7 +205,7 @@ export function AdditionalLinkRow({
       </Select>
 
       {dspInfo && (
-        <span className='max-w-30 shrink-0 truncate text-xs text-secondary-token'>
+        <span className='max-w-32 shrink-0 truncate text-xs text-secondary-token'>
           {dspInfo.artistName}
         </span>
       )}
