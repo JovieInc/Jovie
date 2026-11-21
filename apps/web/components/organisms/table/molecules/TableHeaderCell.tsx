@@ -73,7 +73,16 @@ export function TableHeaderCell<TData extends RowData>({
         ? `${columnLabel}: sorted descending`
         : `${columnLabel}: not sorted, activate to sort`;
 
-  const headerContent = isSemanticOnlyHeader ? (
+  // Columns with no visible label (selection, actions, placeholders) still
+  // need an accessible column name, so axe `empty-table-header` stays green.
+  const hasNoLabel =
+    header.isPlaceholder ||
+    rawHeader == null ||
+    (typeof rawHeader === 'string' && rawHeader.trim().length === 0);
+
+  const headerContent = hasNoLabel ? (
+    <span className='sr-only'>{columnLabel}</span>
+  ) : isSemanticOnlyHeader ? (
     <span className='sr-only'>
       {flexRender(header.column.columnDef.header, header.getContext())}
     </span>
@@ -123,7 +132,7 @@ export function TableHeaderCell<TData extends RowData>({
         : {})}
     >
       {(() => {
-        if (header.isPlaceholder) return null;
+        if (header.isPlaceholder) return headerContent;
         if (canSort) {
           return (
             <button
