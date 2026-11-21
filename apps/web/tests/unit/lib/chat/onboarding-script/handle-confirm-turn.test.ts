@@ -1,4 +1,3 @@
-import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
@@ -9,79 +8,15 @@ import {
   resolveAwaitingHandleConfirm,
 } from '@/lib/chat/onboarding-script/handle-confirm-turn';
 import { pickLine } from '@/lib/chat/onboarding-script/script';
-import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
-
-const SESSION = '00112233-4455-6677-8899-aabbccddeeff';
-
-function user(text: string): UIMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: 'user',
-    parts: [{ type: 'text', text }],
-  } as UIMessage;
-}
-
-function assistant(
-  text: string,
-  toolParts: readonly {
-    toolName: string;
-    output: Record<string, unknown>;
-  }[] = []
-): UIMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    parts: [
-      { type: 'text', text },
-      ...toolParts.map(part => ({
-        type: `tool-${part.toolName}`,
-        toolCallId: crypto.randomUUID(),
-        state: 'output-available',
-        input: {},
-        output: part.output,
-      })),
-    ],
-  } as UIMessage;
-}
-
-const HANDLE_CHECKED = {
-  toolName: 'checkHandle',
-  output: { action: 'check_handle', handle: 'testartist' },
-} as const;
-
-const CONFIRMED_OUTPUT = {
-  action: 'spotify_artist_confirmed',
-  spotifyArtistId: 'artist-1',
-  artist: {
-    id: 'artist-1',
-    name: 'Test Artist',
-    url: 'https://open.spotify.com/artist/artist-1',
-    followers: 12_300,
-    popularity: 48,
-    genres: ['house'],
-  },
-};
-
-function baseThroughArtist(): UIMessage[] {
-  return [
-    user('hey'),
-    assistant('Who are you?', [
-      {
-        toolName: 'confirmSpotifyArtist',
-        output: CONFIRMED_OUTPUT,
-      },
-    ]),
-  ];
-}
-
-function stateFor(messages: UIMessage[]) {
-  return createOnboardingTurnState({
-    sessionId: SESSION,
-    turnCount: messages.filter(m => m.role === 'user').length,
-    accessControlled: false,
-    messages,
-  });
-}
+import {
+  assistantMessage as assistant,
+  messagesThroughArtistConfirm as baseThroughArtist,
+  CONFIRMED_SPOTIFY_OUTPUT as CONFIRMED_OUTPUT,
+  HANDLE_CHECKED_PART as HANDLE_CHECKED,
+  ONBOARDING_SCRIPT_TEST_SESSION as SESSION,
+  turnStateFor as stateFor,
+  userMessage as user,
+} from './onboarding-script-test-fixtures';
 
 describe('keepAuthTurnAfterHandleConfirmed', () => {
   it('opens auth handoff with handle_confirmed (no social card)', () => {
@@ -227,12 +162,7 @@ describe('decideFallbackTurn free-text handle keep', () => {
       ];
       const turn = await decideFallbackTurn({
         uiMessages: messages,
-        state: createOnboardingTurnState({
-          sessionId: SESSION,
-          turnCount: messages.filter(m => m.role === 'user').length,
-          accessControlled: false,
-          messages,
-        }),
+        state: stateFor(messages),
       });
       expect(turn.guardedStep).toBe('waitlist_or_complete');
       expect(turn.toolEvents.map(e => e.output.action)).toContain(
