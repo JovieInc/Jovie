@@ -3216,14 +3216,7 @@
   white-space: nowrap;
 }
 
-.system-b-copy-link-field input {
-  border-width: 1px;
-  border-radius: 9999px;
-  padding: 0.375rem 2.25rem 0.375rem 0.625rem;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  cursor: text;
-  text-overflow: ellipsis;
-  outline: none;
+.system-b-copy-link-input {
   border-color: var(--system-b-app-frame-seam);
   background: var(--system-b-bg-surface-0);
   color: var(--color-text-secondary-token);
@@ -3234,20 +3227,12 @@
     box-shadow var(--duration-fast) var(--ease-subtle);
 }
 
-.system-b-copy-link-field input[data-size="sm"] {
-  height: 1.75rem;
-}
-
-.system-b-copy-link-field input[data-size="md"] {
-  height: 2.25rem;
-}
-
-.system-b-copy-link-field input:focus-visible {
+.system-b-copy-link-input:focus-visible {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 1px var(--color-border-focus);
 }
 
-.system-b-copy-link-field input[data-copied="true"] {
+.system-b-copy-link-input[data-copied="true"] {
   border-color: color-mix(
     in oklab,
     var(--color-success) 34%,

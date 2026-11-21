@@ -10,7 +10,7 @@
  * - Visual feedback on copy
  */
 
-import { Button, Input } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import {
   type MouseEvent,
   useCallback,
@@ -105,11 +105,8 @@ export function CopyLinkInput({
   };
 
   return (
-    <div
-      className={cn('system-b-copy-link-field relative', className)}
-      data-testid={testId}
-    >
-      <Input
+    <div className={cn('relative', className)} data-testid={testId}>
+      <input
         ref={inputRef}
         type='text'
         readOnly
@@ -117,8 +114,14 @@ export function CopyLinkInput({
         onClick={handleInputClick}
         aria-label='URL To Copy'
         data-copied={isCopied ? 'true' : undefined}
-        data-size={size}
-        className={inputClassName}
+        className={cn(
+          'system-b-copy-link-input w-full rounded-full border px-2.5 py-1.5 pr-9',
+          'truncate font-mono text-app',
+          'cursor-text focus-visible:outline-none',
+          size === 'sm' && 'h-7',
+          size === 'md' && 'h-9',
+          inputClassName
+        )}
       />
       <Button
         type='button'

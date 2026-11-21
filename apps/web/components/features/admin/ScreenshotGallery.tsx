@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Separator } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 
 import {
   ChevronLeft,
@@ -13,22 +13,53 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { ScreenshotInfo } from '@/lib/admin/types';
-import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
+import {
+  CANONICAL_SURFACES,
+  type CanonicalSurfaceId,
+} from '@/lib/canonical-surfaces';
+import { GROUP_LABELS } from '@/lib/screenshots/registry';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
 } from '@/lib/screenshots/types';
-import {
-  CONSUMER_FILTERS,
-  FilterChip,
-  GROUP_FILTERS,
-  SURFACE_FILTERS,
-  type SurfaceFilter,
-} from './ScreenshotGalleryFilters';
 
 interface ScreenshotGalleryProps {
   readonly screenshots: readonly ScreenshotInfo[];
 }
+
+type SurfaceFilter = 'all' | 'other' | CanonicalSurfaceId;
+
+const SURFACE_FILTERS: ReadonlyArray<{
+  readonly id: SurfaceFilter;
+  readonly label: string;
+}> = [
+  { id: 'all', label: 'All Captures' },
+  ...CANONICAL_SURFACES.map(surface => ({
+    id: surface.id,
+    label: surface.label,
+  })),
+  { id: 'other', label: 'Other Captures' },
+] as const;
+
+const GROUP_FILTERS: ReadonlyArray<{
+  readonly id: 'all' | ScreenshotGroup;
+  readonly label: string;
+}> = [
+  { id: 'all', label: 'All Groups' },
+  ...Object.entries(GROUP_LABELS).map(([id, label]) => ({
+    id: id as ScreenshotGroup,
+    label,
+  })),
+] as const;
+
+const CONSUMER_FILTERS: ReadonlyArray<{
+  readonly id: 'all' | ScreenshotConsumer;
+  readonly label: string;
+}> = [
+  { id: 'all', label: 'All Uses' },
+  { id: 'marketing-export', label: 'Marketing Export' },
+  { id: 'investor-ready', label: 'Investor Ready' },
+] as const;
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -161,8 +192,6 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               alt={screenshot.title}
               loading='lazy'
               decoding='async'
-              width={1280}
-              height={720}
               className='h-full w-full object-cover object-top'
             />
           </div>
@@ -230,13 +259,21 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
             <div className='flex flex-wrap gap-2'>
               {SURFACE_FILTERS.map(filter => (
-                <FilterChip
+                <Button
                   key={filter.id}
-                  label={filter.label}
-                  pressed={surfaceFilter === filter.id}
-                  idleTone='bg-surface-0'
-                  onSelect={() => setSurfaceFilter(filter.id)}
-                />
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => setSurfaceFilter(filter.id)}
+                  aria-pressed={surfaceFilter === filter.id}
+                  className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                    surfaceFilter === filter.id
+                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                      : 'border-subtle bg-surface-0 text-secondary-token'
+                  }`}
+                >
+                  {filter.label}
+                </Button>
               ))}
             </div>
           </div>
@@ -250,21 +287,28 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 Group and use case
               </span>
             </summary>
-            <Separator />
-            <div className='space-y-3 px-3 py-3'>
+            <div className='space-y-3 border-t border-subtle px-3 py-3'>
               <div className='space-y-2'>
                 <p className='text-xs font-semibold text-primary-token'>
                   Capture Group
                 </p>
                 <div className='flex flex-wrap gap-2'>
                   {GROUP_FILTERS.map(filter => (
-                    <FilterChip
+                    <Button
                       key={filter.id}
-                      label={filter.label}
-                      pressed={groupFilter === filter.id}
-                      idleTone='bg-surface-1'
-                      onSelect={() => setGroupFilter(filter.id)}
-                    />
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setGroupFilter(filter.id)}
+                      aria-pressed={groupFilter === filter.id}
+                      className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                        groupFilter === filter.id
+                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          : 'border-subtle bg-surface-1 text-secondary-token'
+                      }`}
+                    >
+                      {filter.label}
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -274,13 +318,21 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 </p>
                 <div className='flex flex-wrap gap-2'>
                   {CONSUMER_FILTERS.map(filter => (
-                    <FilterChip
+                    <Button
                       key={filter.id}
-                      label={filter.label}
-                      pressed={consumerFilter === filter.id}
-                      idleTone='bg-surface-1'
-                      onSelect={() => setConsumerFilter(filter.id)}
-                    />
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setConsumerFilter(filter.id)}
+                      aria-pressed={consumerFilter === filter.id}
+                      className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                        consumerFilter === filter.id
+                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          : 'border-subtle bg-surface-1 text-secondary-token'
+                      }`}
+                    >
+                      {filter.label}
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -305,7 +357,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   as='section'
                   className='overflow-hidden bg-surface-0'
                 >
-                  <div className='px-4 py-3'>
+                  <div className='border-b border-subtle px-4 py-3'>
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
                         <h3 className='text-app font-semibold tracking-tight text-primary-token'>
@@ -326,7 +378,6 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       </div>
                     </div>
                   </div>
-                  <Separator />
                   <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
                     {items.map(renderScreenshotCard)}
                   </div>
@@ -354,7 +405,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   as='section'
                   className='overflow-hidden bg-surface-0'
                 >
-                  <div className='flex items-center justify-between gap-3 px-4 py-3'>
+                  <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
                     <h3 className='truncate text-app font-semibold tracking-tight text-primary-token'>
                       {sourceLabel}
                     </h3>
@@ -362,7 +413,6 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       {items.length}
                     </span>
                   </div>
-                  <Separator />
                   <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
                     {items.map(renderScreenshotCard)}
                   </div>
@@ -434,8 +484,6 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 <img
                   src={selected.url}
                   alt={selected.title}
-                  width={1280}
-                  height={720}
                   className='w-full h-auto'
                 />
               </ContentSurfaceCard>
