@@ -570,6 +570,8 @@ export async function decideFallbackTurn(
   // showing, short claim/keep free-text must not be swallowed by the adaptive
   // draft questionnaire (awaiting=outcome + text.length>5 gate). Fall through
   // to resolveAwaitingHandleConfirm instead.
+  // Artist-only: non-artist drafts must stay in the adaptive block — falling
+  // through without spotifyArtistId opens the artist picker (Seer 20813115).
   const pendingHandleConfirm =
     Boolean(findLatestToolOutput(uiMessages, 'check_handle')) &&
     !hasHandleConfirmed(uiMessages);
@@ -578,7 +580,10 @@ export async function decideFallbackTurn(
     return latest ? messageText(latest) : '';
   })();
   const honorHandleConfirmIntent =
-    pendingHandleConfirm && isHandleConfirmIntent(latestFreeText);
+    pendingHandleConfirm &&
+    Boolean(state.spotifyArtistId) &&
+    (draft?.activeRole === 'artist' || draft?.activeRole == null) &&
+    isHandleConfirmIntent(latestFreeText);
   if (
     draft &&
     !input.openPickerQuery?.trim() &&

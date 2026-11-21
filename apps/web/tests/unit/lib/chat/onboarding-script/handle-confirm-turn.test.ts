@@ -214,4 +214,48 @@ describe('decideFallbackTurn free-text handle keep', () => {
       );
     }
   });
+
+  it('keeps non-artist drafts in adaptive on claim (no artist picker)', async () => {
+    // Seer 20813115: unscoped honorHandleConfirmIntent skipped adaptive for
+    // founder/expert/creator and fell into open_artist_picker.
+    const messages = [
+      user('I am a founder'),
+      assistant('What is your company site?', [
+        {
+          toolName: 'checkHandle',
+          output: { action: 'check_handle', handle: 'acme' },
+        },
+      ]),
+      user('claim'),
+    ];
+    const state = stateFor(messages);
+    state.spotifyArtistId = null;
+    state.spotifyArtistName = null;
+    state.profileDraft = {
+      version: 1,
+      roles: ['founder'],
+      activeRole: 'founder',
+      outcome: null,
+      outcomes: {},
+      sourceCandidates: [],
+      selectedSource: {
+        url: 'https://example.com',
+        status: 'available',
+        title: 'Acme',
+        description: null,
+        fetchedAt: new Date().toISOString(),
+      },
+      sourceSkipped: false,
+      awaiting: 'outcome',
+      lastUserMessageId: null,
+    };
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+    expect(turn.line.key).toMatch(/^greet:adaptive-/);
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'open_artist_picker'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'handle_confirmed'
+    );
+  });
 });
