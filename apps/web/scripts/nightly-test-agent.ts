@@ -514,11 +514,12 @@ function commandSelect(repoRoot: string, args: Record<string, string>): void {
       '',
     ].join('\n')
   );
+  const skillDeltaLog =
+    skillDeltaMemory.consumed && skillDeltaMemory.path
+      ? ` (skill-delta consumed from ${path.relative(repoRoot, skillDeltaMemory.path)}).`
+      : ' (no prior skill-delta).';
   console.log(
-    `Selected ${selectedTargets.length} nightly target(s)` +
-      (skillDeltaMemory.consumed
-        ? ` (skill-delta consumed from ${path.relative(repoRoot, skillDeltaMemory.path!)}).`
-        : ' (no prior skill-delta).')
+    `Selected ${selectedTargets.length} nightly target(s)${skillDeltaLog}`
   );
 }
 
