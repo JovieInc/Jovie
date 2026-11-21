@@ -35,7 +35,8 @@ export const VenmoEditForm = memo(function VenmoEditForm({
           value={venmoHandle}
           onChange={e => onVenmoHandleChange(e.target.value)}
           placeholder='your-username'
-          className='h-8 min-w-0 flex-1'
+          inputSize='sm'
+          className='min-w-0 flex-1'
         />
       </div>
       <div className='flex items-center gap-2'>
@@ -89,7 +90,7 @@ export const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <Wallet className='h-4 w-4 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
-          <DialogTitle className='text-mid font-semibold tracking-[-0.011em] text-primary-token'>
+          <DialogTitle className='text-mid font-semibold tracking-tight text-primary-token'>
             Connect Venmo
           </DialogTitle>
           <DialogDescription className='mt-0.5 text-app leading-5 text-secondary-token'>
@@ -170,7 +171,9 @@ export const TipLinkSection = memo(function TipLinkSection({
         >
           <Link2 className='h-3.5 w-3.5 text-tertiary-token' />
         </div>
-        <h2 className='text-app font-caption text-primary-token'>Pay Link</h2>
+        <h2 className='text-balance text-app font-caption text-primary-token'>
+          Pay Link
+        </h2>
       </div>
 
       <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
@@ -183,7 +186,7 @@ export const TipLinkSection = memo(function TipLinkSection({
           idleLabel='Copy'
           successLabel='Copied'
           errorLabel='Failed'
-          className='h-7 shrink-0 px-2.5 text-app'
+          className='shrink-0'
         />
       </div>
       <p className='mt-2 text-2xs text-tertiary-token sm:text-app'>

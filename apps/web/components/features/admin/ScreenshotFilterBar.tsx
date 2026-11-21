@@ -14,14 +14,12 @@ interface FilterPillsProps<Id extends string> {
   readonly filters: ReadonlyArray<{ readonly id: Id; readonly label: string }>;
   readonly value: Id;
   readonly onChange: (id: Id) => void;
-  readonly idleClassName: string;
 }
 
 function FilterPills<Id extends string>({
   filters,
   value,
   onChange,
-  idleClassName,
 }: Readonly<FilterPillsProps<Id>>) {
   return (
     <div className='flex flex-wrap gap-2'>
@@ -29,15 +27,10 @@ function FilterPills<Id extends string>({
         <Button
           key={filter.id}
           type='button'
-          variant='ghost'
+          variant={value === filter.id ? 'secondary' : 'ghost'}
           size='sm'
           onClick={() => onChange(filter.id)}
           aria-pressed={value === filter.id}
-          className={`h-auto rounded-full px-3 py-1.5 text-xs ${
-            value === filter.id
-              ? 'bg-accent/10 text-primary-token'
-              : idleClassName
-          }`}
         >
           {filter.label}
         </Button>
@@ -73,7 +66,8 @@ export function ScreenshotFilterBar({
   onConsumerChange,
 }: Readonly<ScreenshotFilterBarProps>) {
   return (
-    <ContentSurfaceCard className='space-y-4 p-4'>
+    <ContentSurfaceCard>
+      <div className='space-y-4 p-4'>
       <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
         <div>
           <p className='text-xs font-semibold text-primary-token'>
@@ -88,7 +82,6 @@ export function ScreenshotFilterBar({
           filters={SURFACE_FILTERS}
           value={surfaceFilter}
           onChange={onSurfaceChange}
-          idleClassName='bg-surface-0 text-secondary-token'
         />
       </div>
       <details className='group rounded-md border border-subtle bg-surface-0'>
@@ -110,7 +103,6 @@ export function ScreenshotFilterBar({
               filters={GROUP_FILTERS}
               value={groupFilter}
               onChange={onGroupChange}
-              idleClassName='bg-surface-1 text-secondary-token'
             />
           </div>
           <div className='space-y-2'>
@@ -119,11 +111,11 @@ export function ScreenshotFilterBar({
               filters={CONSUMER_FILTERS}
               value={consumerFilter}
               onChange={onConsumerChange}
-              idleClassName='bg-surface-1 text-secondary-token'
             />
           </div>
         </div>
       </details>
+      </div>
     </ContentSurfaceCard>
   );
 }

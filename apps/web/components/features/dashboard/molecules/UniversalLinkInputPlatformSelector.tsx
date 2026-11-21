@@ -55,7 +55,6 @@ export function UniversalLinkInputPlatformSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
-        className='max-h-80 overflow-y-auto'
         onCloseAutoFocus={event => {
           event.preventDefault();
           onRestoreFocus('end');
@@ -68,7 +67,7 @@ export function UniversalLinkInputPlatformSelector({
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onArtistSearchSelect(platform.provider)}
-              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
+              className='flex items-center gap-2.5'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'
@@ -96,7 +95,7 @@ export function UniversalLinkInputPlatformSelector({
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onPlatformSelect(platform)}
-              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
+              className='flex items-center gap-2.5'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'

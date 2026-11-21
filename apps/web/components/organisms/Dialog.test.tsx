@@ -190,26 +190,4 @@ describe('Dialog compatibility adapter', () => {
     expect(screen.getByTestId('dialog-footer')).toHaveAttribute('dir', 'rtl');
     await expectNoA11yViolations(baseElement);
   });
-
-  it('lets the caller choose where focus lands when it opens', async () => {
-    render(
-      <Dialog
-        open
-        onClose={vi.fn()}
-        onOpenAutoFocus={event => {
-          event.preventDefault();
-          document.getElementById('second-field')?.focus();
-        }}
-      >
-        <DialogTitle>Pick focus</DialogTitle>
-        <DialogDescription>Focus lands on the second field.</DialogDescription>
-        <DialogBody>
-          <input aria-label='First field' />
-          <input id='second-field' aria-label='Second field' />
-        </DialogBody>
-      </Dialog>
-    );
-
-    expect(await screen.findByLabelText('Second field')).toHaveFocus();
-  });
 });

@@ -30,12 +30,6 @@ interface DialogProps extends Omit<UiDialogRootProps, 'open' | 'onOpenChange'> {
   readonly onClose: () => void;
   readonly size?: DialogSize;
   readonly hideClose?: boolean;
-  /**
-   * Called when the dialog opens and moves focus in. Call
-   * `event.preventDefault()` and focus your own element to pick where
-   * focus lands (use this instead of `autoFocus`).
-   */
-  readonly onOpenAutoFocus?: (event: Event) => void;
   readonly className?: string;
   readonly children: React.ReactNode;
 }
@@ -45,7 +39,6 @@ export function Dialog({
   onClose,
   size = 'lg',
   hideClose = false,
-  onOpenAutoFocus,
   className,
   children,
   ...props
@@ -62,7 +55,6 @@ export function Dialog({
     >
       <UiDialogContent
         hideClose={hideClose}
-        onOpenAutoFocus={onOpenAutoFocus}
         className={cn(
           sizes[size],
           'gap-0 [&>[data-slot=dialog-description]]:mt-1.5 [&>[data-slot=dialog-description]]:pr-10 [&>[data-slot=dialog-title]]:pr-10',

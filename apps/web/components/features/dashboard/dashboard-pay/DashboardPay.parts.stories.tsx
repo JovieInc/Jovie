@@ -7,7 +7,7 @@ const noop = () => undefined;
 const meta = {
   title: 'Features/Dashboard/DashboardPay/Parts',
   component: VenmoConnectDialog,
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'centered', jovie: { uncoveredProps: ['onCancel'] } },
   args: {
     open: true,
     onClose: noop,

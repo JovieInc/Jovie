@@ -2,7 +2,7 @@
 
 import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { FormField } from '@/components/molecules/FormField';
 import {
@@ -28,7 +28,10 @@ export function DashboardFeedbackModal({
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Stable callback ref: focuses the message field once, when it mounts.
+  const focusOnMount = useCallback((node: HTMLTextAreaElement | null) => {
+    node?.focus();
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!feedback.trim() || isSubmitting) return;
@@ -81,11 +84,6 @@ export function DashboardFeedbackModal({
       onClose={handleClose}
       size='sm'
       hideClose
-      onOpenAutoFocus={event => {
-        // Land on the message field, not the Close button that precedes it.
-        event.preventDefault();
-        textareaRef.current?.focus();
-      }}
     >
       {isSubmitted ? (
         <div className='px-6 py-8 text-center bg-surface-1'>
@@ -129,7 +127,7 @@ export function DashboardFeedbackModal({
               helpText={`Press ${GLYPH_CMD} + Enter to send instantly`}
             >
               <Textarea
-                ref={textareaRef}
+                ref={focusOnMount}
                 value={feedback}
                 onChange={event => setFeedback(event.target.value)}
                 onKeyDown={handleKeyDown}

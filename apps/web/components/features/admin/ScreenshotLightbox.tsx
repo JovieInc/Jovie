@@ -43,7 +43,7 @@ export function ScreenshotLightbox({
           >
             <ChevronLeft className='size-4' />
           </DrawerButton>
-          <span className='text-xs text-secondary-token tabular-nums min-w-[4ch] text-center'>
+          <span className='text-xs text-secondary-token tabular-nums min-w-12 text-center'>
             {index === null ? 0 : index + 1}/{count}
           </span>
           <DrawerButton

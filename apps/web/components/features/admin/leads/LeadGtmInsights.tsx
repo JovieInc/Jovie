@@ -77,7 +77,7 @@ export function LeadGtmInsightsView({
 
   return (
     <section>
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
           title='GTM insights'
           subtitle='Attributed cohort performance and ramp recommendation'

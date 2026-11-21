@@ -8,6 +8,7 @@ const meta = {
   component: ListenNowFormView,
   parameters: {
     layout: 'centered',
+    jovie: { uncoveredProps: ['artist', 'onUpdate'] },
   },
   decorators: [
     Story => (
