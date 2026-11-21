@@ -15,7 +15,6 @@ export const CHAT_FIRST_TOKEN_SAMPLE_UNRUN_RELATIVE =
 
 export type ChatFirstTokenSampleStatus = 'unrun' | 'recorded';
 export type ChatFirstTokenSampleMode = 'live' | 'relay' | 'mocked' | 'injected';
-
 export type ChatFirstTokenSample = {
   readonly schema: typeof CHAT_FIRST_TOKEN_SAMPLE_SCHEMA;
   readonly schemaVersion: typeof CHAT_FIRST_TOKEN_SAMPLE_SCHEMA_VERSION;
@@ -31,19 +30,32 @@ export type ChatFirstTokenSample = {
   readonly notes?: string;
 };
 
+const MODES = new Set(['live', 'relay', 'mocked', 'injected']);
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const isMs = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
 export function firstTokenP50Ms(samplesMs: readonly number[]): number | null {
   if (samplesMs.length === 0) return null;
-  const sorted = [...samplesMs].toSorted((a, b) => a - b);
-  const index = Math.max(0, Math.ceil(sorted.length * 0.5) - 1);
-  return sorted[index] ?? null;
+  const s = [...samplesMs].toSorted((a, b) => a - b);
+  return s[Math.max(0, Math.ceil(s.length * 0.5) - 1)] ?? null;
 }
 
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isMs(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+function baseFields(
+  status: ChatFirstTokenSampleStatus,
+  mode: ChatFirstTokenSampleMode
+) {
+  return {
+    schema: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA,
+    schemaVersion: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA_VERSION,
+    metric: ASSISTANTS_FIRST_TOKEN_METRIC,
+    status,
+    surface: '/app/chat' as const,
+    mode,
+    account: 'test' as const,
+    targetMs: ASSISTANTS_FIRST_TOKEN_TARGET_MS,
+  };
 }
 
 export function parseChatFirstTokenSample(
@@ -70,55 +82,40 @@ export function parseChatFirstTokenSample(
   if (value.status !== 'unrun' && value.status !== 'recorded') {
     throw new Error('status must be unrun|recorded');
   }
-  const modes = new Set(['live', 'relay', 'mocked', 'injected']);
-  if (typeof value.mode !== 'string' || !modes.has(value.mode)) {
+  if (typeof value.mode !== 'string' || !MODES.has(value.mode)) {
     throw new Error('mode must be live|relay|mocked|injected');
   }
   if (!Array.isArray(value.samplesMs) || !value.samplesMs.every(isMs)) {
     throw new Error('samplesMs must be non-neg numbers');
   }
   const samplesMs = value.samplesMs.map(n => n);
-  const computedP50 = firstTokenP50Ms(samplesMs);
-
+  const p50 = firstTokenP50Ms(samplesMs);
   if (value.status === 'unrun') {
-    if (samplesMs.length !== 0)
-      throw new Error('unrun samplesMs must be empty');
+    if (samplesMs.length) throw new Error('unrun samplesMs must be empty');
     if (value.p50Ms !== null) throw new Error('unrun p50Ms must be null');
-    if (value.recordedAt !== null)
+    if (value.recordedAt !== null) {
       throw new Error('unrun recordedAt must be null');
-  } else {
-    if (samplesMs.length === 0) throw new Error('recorded needs samples');
-    if (value.p50Ms !== computedP50) {
-      throw new Error(
-        `p50Ms ${String(value.p50Ms)} !== ${String(computedP50)}`
-      );
     }
-    if (typeof value.recordedAt !== 'string' || value.recordedAt.length === 0) {
+  } else {
+    if (!samplesMs.length) throw new Error('recorded needs samples');
+    if (value.p50Ms !== p50) {
+      throw new Error(`p50Ms ${String(value.p50Ms)} !== ${String(p50)}`);
+    }
+    if (typeof value.recordedAt !== 'string' || !value.recordedAt) {
       throw new Error('recordedAt must be non-empty ISO');
     }
   }
-
-  const notes =
-    value.notes === undefined
-      ? undefined
-      : typeof value.notes === 'string'
-        ? value.notes
-        : (() => {
-            throw new Error('notes must be a string');
-          })();
-
+  let notes: string | undefined;
+  if (value.notes !== undefined) {
+    if (typeof value.notes !== 'string')
+      throw new Error('notes must be a string');
+    notes = value.notes;
+  }
   return {
-    schema: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA,
-    schemaVersion: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA_VERSION,
-    metric: ASSISTANTS_FIRST_TOKEN_METRIC,
-    status: value.status,
-    surface: '/app/chat',
-    mode: value.mode as ChatFirstTokenSampleMode,
-    account: 'test',
-    targetMs: ASSISTANTS_FIRST_TOKEN_TARGET_MS,
+    ...baseFields(value.status, value.mode as ChatFirstTokenSampleMode),
     recordedAt: value.recordedAt as string | null,
     samplesMs,
-    p50Ms: value.status === 'recorded' ? computedP50 : null,
+    p50Ms: value.status === 'recorded' ? p50 : null,
     ...(notes === undefined ? {} : { notes }),
   };
 }
@@ -147,14 +144,7 @@ export function buildUnrunChatFirstTokenSample(
   notes?: string
 ): ChatFirstTokenSample {
   return {
-    schema: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA,
-    schemaVersion: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA_VERSION,
-    metric: ASSISTANTS_FIRST_TOKEN_METRIC,
-    status: 'unrun',
-    surface: '/app/chat',
-    mode: 'relay',
-    account: 'test',
-    targetMs: ASSISTANTS_FIRST_TOKEN_TARGET_MS,
+    ...baseFields('unrun', 'relay'),
     recordedAt: null,
     samplesMs: [],
     p50Ms: null,
@@ -169,20 +159,13 @@ export function buildRecordedChatFirstTokenSample(input: {
   readonly notes?: string;
 }): ChatFirstTokenSample {
   const samplesMs = [...input.samplesMs];
-  if (samplesMs.length === 0 || !samplesMs.every(isMs)) {
+  if (!samplesMs.length || !samplesMs.every(isMs)) {
     throw new Error('need finite non-neg samplesMs');
   }
   const p50Ms = firstTokenP50Ms(samplesMs);
   if (p50Ms === null) throw new Error('p50Ms compute failed');
   return {
-    schema: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA,
-    schemaVersion: CHAT_FIRST_TOKEN_SAMPLE_SCHEMA_VERSION,
-    metric: ASSISTANTS_FIRST_TOKEN_METRIC,
-    status: 'recorded',
-    surface: '/app/chat',
-    mode: input.mode ?? 'injected',
-    account: 'test',
-    targetMs: ASSISTANTS_FIRST_TOKEN_TARGET_MS,
+    ...baseFields('recorded', input.mode ?? 'injected'),
     recordedAt: input.recordedAt ?? new Date().toISOString(),
     samplesMs,
     p50Ms,

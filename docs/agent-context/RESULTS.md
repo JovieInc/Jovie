@@ -43,8 +43,18 @@ large task-specific gstack playbooks remain and should be evaluated before split
 Raw structured results (archived off-tree) include all frozen-v2 decisions, input
 hashes, usage and failed gateway attempts. Expected answers were withheld; models
 received case inputs and decision field names. Pass requires every case and no
+extra claims, with key order ignored. These deliberately small cases primarily
+measure instruction compliance, not problem-solving ability. Baseline also passed.
+
+Astra used `/Applications/ChatGPT.app/Contents/Resources/codex exec`, with
+`--ignore-user-config --ephemeral --skip-git-repo-check -s read-only -m gpt-6-astra`.
+CLI version: `0.153.4`. Reasoning settings were the CLI default; no explicit override. The model received
+the old or new root instructions, with the same frozen 12-case schema. The optional
+promptfoo config additionally loads the context guide and was validated locally,
+not used to claim these live measurements. CLI latency was not captured.
+
 
 ## Archive note
 
-Long-form eval receipts archived off-tree for Size Guard headroom.
+Long-form eval trial narrative archived off-tree for Size Guard headroom.
 
