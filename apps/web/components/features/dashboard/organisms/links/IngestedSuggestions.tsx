@@ -1,8 +1,8 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { Plus, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import { track } from '@/lib/analytics';
 import type { SuggestedLink } from './hooks/useSuggestions';
@@ -254,13 +254,15 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
                 />
               </button>
 
-              <AppIconButton
+              <IconButton
+                size='sm'
+                variant='control'
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-lg border border-subtle bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={event => handleDismiss(suggestion, event)}
+                className='absolute top-1/2 right-2 z-10 -translate-y-1/2'
               >
                 <X className='h-3.5 w-3.5' aria-hidden />
-              </AppIconButton>
+              </IconButton>
             </div>
           );
         })}

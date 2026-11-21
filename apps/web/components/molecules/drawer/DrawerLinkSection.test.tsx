@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { DrawerLinkSection } from './DrawerLinkSection';
 
 describe('DrawerLinkSection', () => {
@@ -30,5 +31,21 @@ describe('DrawerLinkSection', () => {
 
     expect(screen.getByText('Link row')).toBeInTheDocument();
     expect(screen.queryByText('No links yet.')).not.toBeInTheDocument();
+  });
+});
+
+describe('DrawerLinkSection add PlainButton', () => {
+  it('renders a type=button add control that fires onAdd on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn();
+    render(
+      <DrawerLinkSection title='Links' onAdd={onAdd} addLabel='Add link'>
+        <div>Link row</div>
+      </DrawerLinkSection>
+    );
+    const add = screen.getByRole('button', { name: 'Add link' });
+    expect(add).toHaveAttribute('type', 'button');
+    await user.click(add);
+    expect(onAdd).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ScrubGradient } from '../ScrubGradient';
 
@@ -80,5 +82,29 @@ describe('Ion accent polish (glm/lyrics-player)', () => {
     );
     const band = container.querySelector('rect.text-accent');
     expect(band).not.toBeNull();
+  });
+
+  it('hydrates a fractional playhead and cue title without a mismatch', async () => {
+    const element = (
+      <ScrubGradient
+        currentTime={84}
+        duration={222}
+        onSeek={() => undefined}
+        cues={[{ at: 12.5, label: 'Intro' }]}
+        loopMode='section'
+        loopSection={{ from: 6.25, to: 23.5 }}
+      />
+    );
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(element);
+    const errors: string[] = [];
+    hydrateRoot(host, element, {
+      onRecoverableError(error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(errors).toEqual([]);
+    expect(host.querySelector('title')?.textContent).toBe('Intro · 0:27');
   });
 });

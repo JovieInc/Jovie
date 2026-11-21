@@ -254,6 +254,7 @@ export function buildDegradedHudMetrics(
       defaultStatusDetail:
         'Metrics temporarily unavailable due to upstream timeout.',
       financialDataAvailable: false,
+      mrrAvailable: false,
     },
     operations: operationsStatus,
     reliability: {
@@ -432,6 +433,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
         : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
       financialDataAvailable,
+      mrrAvailable: stripeMetrics.isAvailable,
       ...(stripeMetrics.isAvailable &&
       stripeMetrics.mrrUsd7dAgo !== undefined &&
       stripeMetrics.activeSubscribers7dAgo !== undefined

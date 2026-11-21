@@ -1,7 +1,7 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import type { SocialLinkSuggestion } from './useSocialLinkSuggestions';
@@ -68,10 +68,11 @@ export function SocialLinkSuggestionRows({
                   )}
                   Add
                 </button>
-                <InlineIconButton
+                <IconButton
+                  size='lg'
+                  variant='inline'
                   onClick={() => onDismiss(suggestion)}
                   disabled={isActioning}
-                  className='[&_svg]:h-3 [&_svg]:w-3 disabled:opacity-50'
                   aria-label={`Dismiss ${suggestion.platformLabel}`}
                 >
                   {isActioning ? (
@@ -79,7 +80,7 @@ export function SocialLinkSuggestionRows({
                   ) : (
                     <X className='h-3 w-3' />
                   )}
-                </InlineIconButton>
+                </IconButton>
               </div>
             </div>
           );

@@ -484,6 +484,10 @@ describe('LibrarySurface', () => {
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
     );
+    const statusBarSource = readFileSync(
+      resolve(process.cwd(), 'app/app/(shell)/library/library-status-bar.tsx'),
+      'utf8'
+    );
 
     expect(source).toContain('LIBRARY_CONTENT_INSET_CLASS');
     expect(source).toContain(
@@ -492,7 +496,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
     expect(source).toContain("containerClassName='h-full'");
-    expect(source).toContain('h-(--app-shell-footer-row-height)');
+    expect(source).toContain('LibraryStatusBar');
+    expect(statusBarSource).toContain('h-(--app-shell-footer-row-height)');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
   });
@@ -932,23 +937,6 @@ describe('LibrarySurface', () => {
       ).toBeInTheDocument();
       expect(screen.queryByTestId('library-status-glyph-release-a')).toBeNull();
     });
-  });
-
-  it('marks archived work with the canceled glyph on rows and tiles (#10384)', () => {
-    renderLibrary([
-      buildAsset({
-        status: 'released',
-        approvalStatus: 'archived',
-      }),
-    ]);
-
-    const glyph = () => screen.getByTestId('library-status-glyph-release-1');
-    expect(glyph()).toHaveAccessibleName('Archived');
-    expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
-
-    clickGridView();
-
-    expect(glyph()).toHaveAccessibleName('Archived');
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {

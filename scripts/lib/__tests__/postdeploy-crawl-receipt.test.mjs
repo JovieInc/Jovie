@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
@@ -8,10 +9,12 @@ import {
   scriptContractNodeArgs,
   selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
+import { createGitHubTransport } from '../../postdeploy-probe-admission.mjs';
 import { productReady } from '../../product-crawl/ready-gate.mjs';
+import { storedZip } from '../real-gh-harness.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
 
-/** @typedef {{ name?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, with?: { path?: string, name?: string, pattern?: string } }} WorkflowStep */
+/** @typedef {{ name?: string, id?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, with?: { path?: string, name?: string, pattern?: string } }} WorkflowStep */
 /** @typedef {{ if?: string, needs?: string[], env?: Record<string, string>, strategy?: { 'fail-fast'?: boolean, matrix?: Record<string, unknown> }, steps: WorkflowStep[] }} WorkflowJob */
 /** @typedef {{ event: string, ref: string, resolveResult?: string, shouldCertify?: string }} CrawlEvent */
 
@@ -296,4 +299,78 @@ it('sets both existing crawl deadlines before setup while preserving manual-only
       rmSync(root, { recursive: true, force: true });
     }
   }
+});
+
+it('reads only hash-verified canonical crawl members through the existing bounded transport', () => {
+  const root = mkdtempSync(join(tmpdir(), 'crawl-reuse-transport-'));
+  try {
+    const archive = storedZip({
+      'receipt.json': JSON.stringify({ schema: 'fixture', value: 1 }),
+      'verdict.json': '{}',
+    });
+    const digest = `sha256:${createHash('sha256').update(archive).digest('hex')}`;
+    const execute = (command, args, options) => {
+      if (command === process.execPath) {
+        const fd = options.stdio[1];
+        if (typeof fd !== 'number')
+          throw new Error('expected private artifact descriptor');
+        writeFileSync(fd, archive);
+        return { status: 0 };
+      }
+      return spawnSync(command, args, options);
+    };
+    const transport = createGitHubTransport({ execute, temporaryRoot: root });
+    expect(transport.getCrawlReceipt('JovieInc/Jovie', 1, digest)).toEqual({
+      schema: 'fixture',
+      value: 1,
+    });
+    expect(() =>
+      transport.getCrawlReceipt('JovieInc/Jovie', 1, `sha256:${'0'.repeat(64)}`)
+    ).toThrow('digest mismatch');
+    expect(() => transport.getLedger('JovieInc/Jovie', 1)).toThrow(
+      'only ledger.json'
+    );
+    const unsafe = storedZip({
+      'receipt.json': '{}',
+      'verdict.json': '{}',
+      '../private-state.json': 'private',
+    });
+    const unsafeDigest = `sha256:${createHash('sha256').update(unsafe).digest('hex')}`;
+    const bad = createGitHubTransport({
+      temporaryRoot: root,
+      execute: (command, args, options) => {
+        if (command === process.execPath) {
+          const fd = options.stdio[1];
+          if (typeof fd !== 'number')
+            throw new Error('expected private artifact descriptor');
+          writeFileSync(fd, unsafe);
+          return { status: 0 };
+        }
+        return spawnSync(command, args, options);
+      },
+    });
+    expect(() =>
+      bad.getCrawlReceipt('JovieInc/Jovie', 1, unsafeDigest)
+    ).toThrow('canonical crawl');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('uses only existing manual-main resolve authority and bounded nonsecret outputs for public adoption', () => {
+  const lookup = workflow.jobs['resolve-target'].steps.find(
+    s => s.id === 'crawl-public-reuse'
+  );
+  expect(lookup.if).toContain("github.event_name == 'workflow_dispatch'");
+  expect(lookup.if).toContain("github.ref == 'refs/heads/main'");
+  expect(lookup.run).toContain('scripts/product-crawl/receipt-adoption.mjs');
+  const job = workflow.jobs['product-crawl'];
+  const caller = job.steps.find(
+    s => s.name === 'Crawl as a stranger and signed in'
+  );
+  expect(caller.env.CRAWL_PUBLIC_REUSE_B64).toBe(
+    '${{ needs.resolve-target.outputs.crawl_public_reuse_b64 }}'
+  );
+  expect(caller.run).toContain('guard-playwright-artifacts.mjs --run --');
+  expect(caller.run).toContain('scripts/product-crawl/crawl.mjs');
 });
