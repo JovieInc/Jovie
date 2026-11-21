@@ -251,6 +251,12 @@ describe('buildStoryFirstStages', () => {
       buckets.find(b => b.stage === 'investigating')?.highlight
     ).toBeNull();
     expect(buckets.find(b => b.stage === 'tested')?.label).toBe('Review');
+    expect(buckets.map(b => b.stage)).toEqual([
+      'investigating',
+      'building',
+      'tested',
+      'merging',
+    ]);
   });
 
   it('folds deployed work into the merging bucket', () => {

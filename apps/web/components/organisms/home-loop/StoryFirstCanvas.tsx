@@ -245,7 +245,7 @@ function StageBuckets({
           ) : null}
         </div>
       ) : (
-        <ol className='grid grid-cols-2 gap-0 sm:grid-cols-5'>
+        <ol className='grid grid-cols-2 gap-0 sm:grid-cols-4'>
           {stages.map((bucket, index) => (
             <li
               key={bucket.stage}

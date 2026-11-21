@@ -74,7 +74,6 @@ const stages: readonly StoryFirstStageBucket[] = [
   },
   { stage: 'tested', label: 'Review', count: 3, highlight: null },
   { stage: 'merging', label: 'Merging', count: 1, highlight: null },
-  { stage: 'verified', label: 'Verified', count: 4, highlight: null },
 ];
 
 describe('StoryFirstCanvas', () => {

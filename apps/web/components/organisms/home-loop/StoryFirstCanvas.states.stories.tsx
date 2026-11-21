@@ -49,7 +49,6 @@ const emptyStages: readonly StoryFirstStageBucket[] = [
   { stage: 'building', label: 'Building', count: 0, highlight: null },
   { stage: 'tested', label: 'Review', count: 0, highlight: null },
   { stage: 'merging', label: 'Merging', count: 0, highlight: null },
-  { stage: 'verified', label: 'Verified', count: 0, highlight: null },
 ];
 
 const clear: StoryFirstBottleneck = {

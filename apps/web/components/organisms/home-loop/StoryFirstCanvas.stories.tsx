@@ -91,7 +91,6 @@ const stages: readonly StoryFirstStageBucket[] = [
   },
   { stage: 'tested', label: 'Review', count: 3, highlight: null },
   { stage: 'merging', label: 'Merging', count: 1, highlight: null },
-  { stage: 'verified', label: 'Verified', count: 4, highlight: null },
 ];
 
 const meta = {
@@ -141,7 +140,6 @@ export const Bottleneck: Story = {
       { stage: 'building', label: 'Building', count: 4, highlight: null },
       { stage: 'tested', label: 'Review', count: 2, highlight: null },
       { stage: 'merging', label: 'Merging', count: 1, highlight: null },
-      { stage: 'verified', label: 'Verified', count: 3, highlight: null },
     ],
     inFlightHref: '/app/ov/shipping',
   },

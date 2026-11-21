@@ -78,13 +78,16 @@ export const STORY_FIRST_STAGE_LABELS: Readonly<Record<OvieShipStage, string>> =
     verified: 'Verified',
   };
 
-/** Stages Tim’s flat board shows; deployed stays on Shipping. */
+/**
+ * In-flight stages on the flat board. `verified` is omitted on purpose —
+ * `buildShipRows` drops production-verified work into "done today", so a
+ * Verified column here would always read zero.
+ */
 export const STORY_FIRST_BOARD_STAGES = [
   'investigating',
   'building',
   'tested',
   'merging',
-  'verified',
 ] as const satisfies readonly OvieShipStage[];
 
 const STEP_EYEBROW: Readonly<Record<string, string>> = {
