@@ -57,7 +57,7 @@ export function CopyableField({
         toast.error('Failed to copy');
       }
     },
-    [value, label, showToast]
+    [value, showToast]
   );
 
   return (
