@@ -449,7 +449,9 @@ jobs:
 
       - name: Require screenshot objects in R2
         if: steps.screenshot-pointers.outputs.changed == 'true'
-        run: node scripts/screenshot-store.mjs verify --remote
+        run: |
+          node --test scripts/lib/__tests__/screenshot-store.test.mjs scripts/lib/__tests__/moved-binary.test.mjs
+          node scripts/screenshot-store.mjs verify --remote
 
       - name: Set up Node and pnpm for screenshot integrity
         if: steps.screenshot-integrity.outputs.required == 'true'

@@ -17,7 +17,7 @@ import {
   HYGIENE_LIMITS,
   MAX_GEN_JSON_BYTES,
 } from './lib/repo-hygiene-limits.mjs';
-import { isMovedBinary } from './lib/screenshot-store.mjs';
+import { binaryAdditionError, isMovedBinary } from './lib/moved-binary.mjs';
 
 export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
@@ -83,10 +83,7 @@ const BINARY_ALLOWLIST = [
   /^apps\/web\/assets\//,
   /^apps\/web\/public\//,
   /^apps\/web\/tests\/(?:[^/]+\/)*__snapshots__\//,
-  /^docs\/pen-stills\//,
-  // docs/screenshots keeps only the two small files in MOVED_BINARY_ALLOWED;
-  // every other image lives in R2 behind a pointer (see below).
-  /^docs\/screenshots\/(?:gem-symphony-hud-430x90\.png|jov-7878-shell\/mobile-history-short\.png)$/,
+  /^docs\/(?:pen-stills|screenshots)\//,
 ];
 
 const FORBIDDEN_ROOT_DIRECTORIES = new Set([
@@ -146,7 +143,7 @@ const TEMP_FILE_PATTERN =
 const normalizePath = path => path.replaceAll('\\', '/').replace(/^\.\//, '');
 const isBinary = path => BINARY_EXTENSIONS.has(extname(path).toLowerCase());
 const isAllowedBinary = path =>
-  BINARY_ALLOWLIST.some(pattern => pattern.test(path));
+  BINARY_ALLOWLIST.some(p => p.test(path)) && !isMovedBinary(path);
 const formatBytes = bytes => `${(bytes / MiB).toFixed(2)} MiB`;
 const dateValue = (value, end = false) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
@@ -679,14 +676,8 @@ export function evaluateRepoHygiene({
       errors.push(`${path}: binary files are not allowed at repository root`);
     if (TEMP_FILE_PATTERN.test(path))
       errors.push(`${path}: temporary/backup files are not tracked`);
-    if (isMovedBinary(path))
-      errors.push(
-        `${path}: screenshot binaries live in R2, not git. Add a pointer instead: node scripts/screenshot-store.mjs pointers (then commit the *.pointer.json and run the "Screenshots to R2 upload" workflow); see ${HYGIENE_POLICY_DOC}`
-      );
-    else if (isBinary(path) && !isAllowedBinary(path))
-      errors.push(
-        `${path}: binary addition is outside the allowlisted asset paths`
-      );
+    if (isBinary(path) && !isAllowedBinary(path))
+      errors.push(binaryAdditionError(path, HYGIENE_POLICY_DOC));
   }
 
   let changedBytes = 0;

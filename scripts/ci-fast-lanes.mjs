@@ -1169,7 +1169,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/screen-audit.test.mjs',
   'scripts/invariants/oasdiff-breaking-change.test.mjs',
   'scripts/invariants/ui-escape-holdout.test.mjs',
-  'scripts/lib/__tests__/screenshot-store.test.mjs',
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',

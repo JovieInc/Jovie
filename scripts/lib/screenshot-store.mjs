@@ -234,7 +234,7 @@ export async function hydrate({
   scope = 'all',
   fetchImpl = fetch,
   env = process.env,
-  log = () => {},
+  log = (/** @type {string} */ _message) => {},
   concurrency = 8,
 }) {
   const pointers = listPointers(root, scope);

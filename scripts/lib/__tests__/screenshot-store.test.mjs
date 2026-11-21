@@ -39,20 +39,19 @@ function fixture() {
   writePointer(root, pointerPathFor(binaryPath), pointer());
   return { root, binaryPath };
 }
+/**
+ * @param {Record<string, Buffer>} map
+ * @returns {typeof fetch}
+ */
 const respond =
   (map, { head = false } = {}) =>
-  async (url, init) => {
-    const body = map[url];
-    if (body === undefined) return { ok: false, status: 404 };
-    return {
-      ok: true,
+  async input => {
+    const body = map[String(input)];
+    if (body === undefined) return new Response(null, { status: 404 });
+    return new Response(head ? null : new Uint8Array(body), {
       status: 200,
-      headers: { get: () => String(body.length) },
-      arrayBuffer: async () =>
-        head
-          ? new ArrayBuffer(0)
-          : body.buffer.slice(body.byteOffset, body.byteOffset + body.length),
-    };
+      headers: { 'content-length': String(body.length) },
+    });
   };
 
 test('pointers are content addressed and verify against bytes', () => {

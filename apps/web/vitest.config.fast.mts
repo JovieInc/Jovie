@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
+import { react } from './tests/vitest-catalog-image-stub';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';

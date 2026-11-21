@@ -1,4 +1,4 @@
-import react from '@vitejs/plugin-react';
+import { react } from './tests/vitest-catalog-image-stub';
 import dotenv from 'dotenv';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
