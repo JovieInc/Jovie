@@ -43,6 +43,14 @@ on:
           left out: they change only through approved_homepage_baselines.
         type: boolean
         default: false
+      baseline_specs:
+        description: >-
+          With commit_branch_baselines: the specs whose baselines to commit,
+          comma-separated (for example storybook-elevation.spec.ts). Required,
+          because a refresh adopts whatever renders, loading and error states
+          included, so every adopted baseline must be one somebody looked at.
+        type: string
+        default: ''
 
 permissions: {}
 
@@ -502,12 +510,27 @@ jobs:
           pattern: visual-suite-*-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/visual-suites
 
-      - name: Apply refreshed baselines (homepage excluded)
+      - name: Apply refreshed baselines (named specs only, homepage excluded)
         id: diff
+        env:
+          BASELINE_SPECS: ${{ inputs.baseline_specs }}
         run: |
           set -euo pipefail
+          if ! [[ "$BASELINE_SPECS" =~ ^[a-z0-9-]+\.spec\.ts(,[a-z0-9-]+\.spec\.ts)*$ ]]; then
+            echo "::error::baseline_specs must name the specs to commit, comma-separated (got '$BASELINE_SPECS')."
+            exit 1
+          fi
           node scripts/lib/visual-baseline-refresh.mjs --suites-dir "$RUNNER_TEMP/visual-suites" \
             --snapshot-dir "$SNAPSHOT_DIR" --body-file "$RUNNER_TEMP/visual-baseline-body.md"
+          # Keep only the named specs' baselines.
+          IFS=',' read -ra KEEP <<< "$BASELINE_SPECS"
+          for dir in "$SNAPSHOT_DIR"/*/; do
+            spec=$(basename "$dir")
+            if [[ " ${KEEP[*]} " != *" $spec "* ]]; then
+              git checkout -- "$dir" 2>/dev/null || true
+              git clean -fdq -- "$dir"
+            fi
+          done
           # Founder-approved homepage stills change only through a receipt.
           git checkout -- "$SNAPSHOT_DIR"/visual-regression.spec.ts/homepage-*.png 2>/dev/null || true
           git clean -fq -- "$SNAPSHOT_DIR"/visual-regression.spec.ts/homepage-*.png 2>/dev/null || true
@@ -537,6 +560,7 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASELINE_SPECS: ${{ inputs.baseline_specs }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -544,7 +568,7 @@ jobs:
           git add "$SNAPSHOT_DIR"
           git commit -m "chore(visual): refresh branch baselines [auto]
 
-          Rendered by run ${GITHUB_RUN_ID} from ${GITHUB_SHA::8}."
+          Specs: ${BASELINE_SPECS}. Rendered by run ${GITHUB_RUN_ID} from ${GITHUB_SHA::8}."
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           # Plain fast-forward push: never force, so a newer branch commit wins.
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
