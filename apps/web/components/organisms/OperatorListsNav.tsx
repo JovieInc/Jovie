@@ -158,7 +158,7 @@ function NewListRow() {
           className={getSidebarNavRowClassName({
             calm: true,
             collapsed: state === 'closed' && !isMobile,
-            className: 'rounded-lg',
+            className: 'rounded-lg text-left',
           })}
         >
           <Plus

@@ -1115,8 +1115,11 @@
   min-width: 154px;
 }
 
-/* System B Library route primitives */
-:where(.system-b-library-artwork-shell),
+/* System B Library route primitives.
+   ArtworkFrame owns release-art shape (thumbnail → 2px / rounded-xs).
+   Do not assign border-radius on `.system-b-library-artwork-shell` —
+   unlayered route CSS beats layered Tailwind utilities and was rounding
+   24px table thumbs to --radius-md (JOV-7752 / JOV-5455). */
 :where(.system-b-library-status-pill),
 :where(.system-b-library-count-pill),
 :where(.system-b-library-filter-row),

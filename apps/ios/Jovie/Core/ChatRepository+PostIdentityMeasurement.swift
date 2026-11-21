@@ -24,6 +24,17 @@ extension ChatRepository {
     )
   }
 
+  func notePostIdentityFirstSendCancelled() {
+    notePostIdentityFirstSendOutcome(.cancelled)
+  }
+
+  func notePostIdentityFirstSendFailed(error: Error) {
+    notePostIdentityFirstSendOutcome(
+      .failed,
+      failureReason: PostIdentityChatMeasurement.failureReason(for: error)
+    )
+  }
+
   /// Emit first-send outcome after a non-throwing stream completion.
   func notePostIdentityFirstSendAfterStream(
     wasInFlight: Bool,

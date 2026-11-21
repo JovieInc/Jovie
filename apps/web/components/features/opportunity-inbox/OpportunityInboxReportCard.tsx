@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import {
   ArrowRight,
   ChevronDown,
@@ -114,7 +115,7 @@ export function OpportunityInboxReportCard({
 
       {report.items.length > 0 ? (
         <>
-          <button
+          <PlainButton
             type='button'
             className='system-b-opportunity-inbox-report-expand'
             aria-expanded={expanded}
@@ -129,7 +130,7 @@ export function OpportunityInboxReportCard({
                 expanded && 'system-b-opportunity-inbox-report-expand-icon-open'
               )}
             />
-          </button>
+          </PlainButton>
           {expanded ? (
             <ul
               id={breakdownId}
@@ -169,16 +170,16 @@ export function OpportunityInboxReportCard({
       ) : null}
 
       <div className='system-b-opportunity-inbox-card-actions'>
-        <button
+        <PlainButton
           type='button'
           className='system-b-opportunity-inbox-dismiss'
           disabled={isBusy}
           onClick={() => onDismiss(card.id)}
         >
           Dismiss
-        </button>
+        </PlainButton>
         {report.nextStep ? (
-          <button
+          <PlainButton
             type='button'
             className='system-b-opportunity-inbox-primary'
             disabled={isBusy}
@@ -187,7 +188,7 @@ export function OpportunityInboxReportCard({
           >
             {isSubmittingNextStep ? 'Queuing…' : report.nextStep.label}
             <ArrowRight className='system-b-opportunity-inbox-primary-icon' />
-          </button>
+          </PlainButton>
         ) : null}
       </div>
     </article>

@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Minus, Plus } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
@@ -40,7 +41,7 @@ export function ClientFaqAccordion({
             key={item.question}
             className='faq-accordion__item border-b border-border-primary last:border-b-0'
           >
-            <button
+            <PlainButton
               ref={element => {
                 triggerRefs.current[index] = element;
               }}
@@ -90,7 +91,7 @@ export function ClientFaqAccordion({
                   <Plus className='h-4 w-4' strokeWidth={1.9} />
                 )}
               </span>
-            </button>
+            </PlainButton>
             <section
               id={panelId}
               aria-labelledby={triggerId}

@@ -98,6 +98,22 @@ const STEP_EYEBROW: Readonly<Record<string, string>> = {
   activation_dashboard: 'Activation',
 };
 
+/** Drop a trailing " (ID)" or leading "ID: " when it repeats the identifier. */
+export function stripIssueId(identifier: string, title: string): string {
+  const id = identifier.trim();
+  if (!id) return title;
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripped = title
+    .replace(new RegExp(`\\s*\\(${escaped}\\)\\s*$`, 'i'), '')
+    .replace(new RegExp(`^${escaped}:\\s*`, 'i'), '')
+    .trim();
+  return stripped || title;
+}
+
+export function issueLabel(identifier: string, title: string): string {
+  return `${identifier} · ${stripIssueId(identifier, title)}`;
+}
+
 function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
   const first = points.at(0);
   const last = points.at(-1);
@@ -338,7 +354,10 @@ export function buildStoryFirstBottleneck(input: {
       body: input.revenue.text,
       moving: input.highlight
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            label: issueLabel(
+              input.highlight.identifier,
+              input.highlight.title
+            ),
             href: input.highlight.href,
           }
         : null,
@@ -358,7 +377,10 @@ export function buildStoryFirstBottleneck(input: {
         : 'Revenue is clear; shipping needs attention.',
       moving: input.highlight
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            label: issueLabel(
+              input.highlight.identifier,
+              input.highlight.title
+            ),
             href: input.highlight.href,
           }
         : null,
@@ -376,7 +398,10 @@ export function buildStoryFirstBottleneck(input: {
       body: 'Company state could not be read. Retry or check Summer.',
       moving: input.highlight
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            label: issueLabel(
+              input.highlight.identifier,
+              input.highlight.title
+            ),
             href: input.highlight.href,
           }
         : null,
@@ -395,7 +420,7 @@ export function buildStoryFirstBottleneck(input: {
       'The cone is clear. Shipping stays the quiet pulse — act only when a stage heats up.',
     moving: input.highlight
       ? {
-          label: `${input.highlight.identifier} · ${input.highlight.title}`,
+          label: issueLabel(input.highlight.identifier, input.highlight.title),
           href: input.highlight.href,
         }
       : null,

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
@@ -34,5 +35,17 @@ describe('ChatPinnedOpportunityHeader', () => {
 
     fireEvent.click(screen.getByTestId('chat-pinned-opportunity-unpin'));
     expect(onUnpin).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ChatPinnedOpportunityHeader PlainButton', () => {
+  it('renders a type=button unpin control that fires onUnpin on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onUnpin = vi.fn();
+    render(<ChatPinnedOpportunityHeader card={card} onUnpin={onUnpin} />);
+    const unpin = screen.getByTestId('chat-pinned-opportunity-unpin');
+    expect(unpin).toHaveAttribute('type', 'button');
+    await user.click(unpin);
+    expect(onUnpin).toHaveBeenCalledOnce();
   });
 });
