@@ -3,6 +3,8 @@
  * Design and failure analysis: gbrain projects/jovie/agent-mesh-hub-architecture-2026-10-31.
  * No Vercel, Gem or Mac in the delivery path.
  */
+
+import { adminMailboxRoute, bearer, isAdmin, readJson } from './admin.ts';
 import {
   type Envelope,
   HubError,
@@ -57,12 +59,6 @@ function mailbox(env: Env, kind: string) {
   return env.MAILBOX.get(env.MAILBOX.idFromName(kind));
 }
 
-function bearer(request: Request): string | null {
-  const header = request.headers.get('Authorization') ?? '';
-  const match = /^Bearer ([A-Za-z0-9._~+/=-]{32,512})$/.exec(header);
-  return match?.[1] ?? null;
-}
-
 async function authenticate(request: Request, env: Env): Promise<string> {
   const token = bearer(request);
   if (!token) throw new HubError(401, 'unauthorized');
@@ -87,23 +83,6 @@ async function authenticate(request: Request, env: Env): Promise<string> {
     expires: Date.now() + AUTH_CACHE_MS,
   });
   return result.kind;
-}
-
-async function isAdmin(request: Request, env: Env): Promise<boolean> {
-  const token = bearer(request);
-  if (!token || !env.HUB_ADMIN_TOKEN) return false;
-  // Compare digests so timing does not leak the token.
-  return (await sha256Hex(token)) === (await sha256Hex(env.HUB_ADMIN_TOKEN));
-}
-
-async function readJson(request: Request, maxBytes = 16_384): Promise<unknown> {
-  const text = await request.text();
-  if (text.length > maxBytes) throw new HubError(413, 'body_too_large');
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new HubError(400, 'invalid_json');
-  }
 }
 
 async function send(
@@ -269,7 +248,8 @@ async function route(request: Request, env: Env): Promise<Response> {
     });
   }
   if (path.startsWith('/v1/admin/')) {
-    if (!(await isAdmin(request, env))) return failure(401, 'unauthorized');
+    if (!(await isAdmin(request, env.HUB_ADMIN_TOKEN)))
+      return failure(401, 'unauthorized');
     if (path === '/v1/admin/agents' && request.method === 'PUT') {
       const body = (await readJson(request, 65_536)) as {
         agents?: AgentEntry[];
@@ -306,6 +286,19 @@ async function route(request: Request, env: Env): Promise<Response> {
     }
     if (path === '/v1/admin/sweep' && request.method === 'POST')
       return json(200, { ok: true, ...(await registry(env).sweep()) });
+    const mailboxMatch =
+      /^\/v1\/admin\/mailbox\/([^/]+)\/(peek|bulk-ack)$/.exec(path);
+    if (mailboxMatch)
+      return adminMailboxRoute(
+        request,
+        url,
+        decodeURIComponent(mailboxMatch[1]),
+        {
+          mailbox: target => mailbox(env, target),
+          recordEvent: (type, kind, detail) =>
+            registry(env).recordEvent(type, kind, detail),
+        }
+      );
     return failure(404, 'not_found');
   }
   const mcp = await handleMcpHttp(request, url, {

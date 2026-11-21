@@ -27,4 +27,7 @@ export type Env = {
   EXECUTOR_GRACE_MS?: string;
   /** Unhandled-mail alarm threshold in ms (default 600000, min 60000). */
   MAIL_STALE_MS?: string;
+  /** TTL for automated notices (board fan-outs, DLQ wrappers, events/probes)
+   * in ms; default 6h in LIMITS.autoNoticeTtlMs, clamped to [1 minute, 7 days]. */
+  AUTO_NOTICE_TTL_MS?: string;
 };

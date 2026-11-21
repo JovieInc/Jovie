@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import {
   HubError,
@@ -10,41 +9,11 @@ import {
   sha256Hex,
   validateSend,
 } from './core.ts';
+import { envelope, sqlite } from './fixtures/test-fixture.mjs';
 import { backoffFor, isOpen, Outbox } from './outbox.ts';
 import { scanBody } from './scan.ts';
 
-/** node:sqlite with the DO SqlStorage call shape. */
-export function sqlite() {
-  const db = new DatabaseSync(':memory:');
-  return {
-    exec(query, ...bindings) {
-      const statement = db.prepare(query);
-      const rows = /^\s*(SELECT|WITH)\b|\bRETURNING\b/i.test(query)
-        ? statement.all(...bindings)
-        : (statement.run(...bindings), []);
-      return { toArray: () => rows.map(row => ({ ...row })) };
-    },
-  };
-}
-
-async function envelope(over = {}) {
-  const body = over.body ?? 'status ping';
-  return {
-    id: `claude:${over.correlationId ?? 'mesh-0001-test'}`,
-    from: 'claude',
-    to: 'codex',
-    correlationId: over.correlationId ?? 'mesh-0001-test',
-    sha256: await sha256Hex(body),
-    body,
-    refs: [],
-    inReplyTo: null,
-    sentAt: null,
-    acceptedAt: over.acceptedAt ?? 1_000,
-    kind: over.kind ?? 'message',
-    ...over,
-    ...(over.body ? { sha256: await sha256Hex(over.body) } : {}),
-  };
-}
+export { sqlite };
 
 test('validateSend accepts a well-formed message and rejects each bad field with a fixed code', async () => {
   const body = 'hello mesh';
@@ -436,3 +405,5 @@ test('clearDead un-flags a message so a failed dead-letter notification is retri
     'retried after clearDead'
   );
 });
+
+/** A board notice: kind 'message' from 'board' (default: a fan-out offer). */
