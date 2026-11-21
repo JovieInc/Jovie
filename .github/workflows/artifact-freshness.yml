@@ -22,6 +22,8 @@ on:
 permissions:
   actions: read
   contents: read
+  # fetchDesktopPublishInFlight lists open PRs (+ stamp detail GET) with github.token
+  pull-requests: read
 
 concurrency:
   group: artifact-freshness
