@@ -107,7 +107,7 @@ export const AvatarCell = React.memo(function AvatarCell({
             {isFeatured ? (
               <Star
                 aria-label='Featured'
-                className='h-3 w-3 fill-current text-yellow-400 dark:text-yellow-300'
+                className='h-3 w-3 fill-current text-warning'
               />
             ) : null}
             {usernameActions}

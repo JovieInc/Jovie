@@ -19,18 +19,23 @@ const forbiddenNonDestructiveSwipeFillClasses =
   /\bbg-(?:blue|purple|violet|indigo)-\d|\bbg-accent\b|text-on-accent|text-accent-foreground/;
 
 describe('dashboard link action System B style guard', () => {
-  it.each([
+  const motionGuardSources: ReadonlyArray<readonly [string, string]> = [
     [
       'LinkActions',
       'components/features/dashboard/atoms/link-actions/LinkActions.tsx',
     ],
     ['LinkPill', 'components/features/dashboard/atoms/LinkPill.tsx'],
     ...linkRowSources,
-  ])('%s does not use decorative press motion', (_name, filePath) => {
-    const source = readFileSync(filePath, 'utf8');
+  ];
 
-    expect(source).not.toMatch(forbiddenMotionClasses);
-  });
+  it.each(motionGuardSources)(
+    '%s does not use decorative press motion',
+    (_name, filePath) => {
+      const source = readFileSync(filePath, 'utf8');
+
+      expect(source).not.toMatch(forbiddenMotionClasses);
+    }
+  );
 
   it.each(linkRowSources)(
     '%s keeps swipe edit and visibility actions neutral',
@@ -41,7 +46,7 @@ describe('dashboard link action System B style guard', () => {
       expect(source).toContain('NEUTRAL_SWIPE_ACTION_CLASS');
       expect(source).toContain('bg-surface-2 text-primary-token');
       expect(source).toContain('DESTRUCTIVE_SWIPE_ACTION_CLASS');
-      expect(source).toContain('bg-error text-white');
+      expect(source).toContain('bg-error text-error-foreground');
     }
   );
 });

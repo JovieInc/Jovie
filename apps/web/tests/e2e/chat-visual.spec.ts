@@ -21,6 +21,7 @@ import {
   smokeNavigateWithRetry,
   waitForHydration,
 } from './utils/smoke-test-utils';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
@@ -51,6 +52,7 @@ test.describe('Chat composer visual regression', () => {
     await expect(surface).toHaveAttribute('data-surface-mode', 'empty', {
       timeout: 5_000,
     });
+    await expectCaptureReady(surface);
     await expect(surface).toHaveScreenshot('composer-empty.png', {
       maxDiffPixelRatio: 0.02,
     });
@@ -62,6 +64,7 @@ test.describe('Chat composer visual regression', () => {
     await expect(surface).toHaveAttribute('data-surface-mode', 'typing', {
       timeout: 5_000,
     });
+    await expectCaptureReady(surface);
     await expect(surface).toHaveScreenshot('composer-typing.png', {
       maxDiffPixelRatio: 0.03,
     });
@@ -76,6 +79,7 @@ test.describe('Chat composer visual regression', () => {
       timeout: 5_000,
     });
     await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
+    await expectCaptureReady(surface);
     await expect(surface).toHaveScreenshot('composer-root.png', {
       maxDiffPixelRatio: 0.03,
     });

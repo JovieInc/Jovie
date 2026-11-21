@@ -58,6 +58,7 @@ import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
 import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
+import repo_headroom  # noqa: E402  (tracked-bytes headroom of origin/main)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -659,6 +660,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": disk_pct,
         "diskMounts": disk_mounts,
+        "repoHeadroom": repo_headroom.measure(host.repo) if getattr(host, "repo", None) else None,
         "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
                             if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
@@ -1433,6 +1435,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}); worktrees and installs will start failing"
+    if headroom_line := repo_headroom.alert_line(obs.get("repoHeadroom")):
+        alerts["repo-headroom-low"] = headroom_line
     held_since = (previous or {}).get("diskHeldSince")
     if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
         top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
