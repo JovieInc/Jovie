@@ -56,7 +56,7 @@ function walk(dir: string, out: string[]): void {
       walk(full, out);
     } else if (
       SOURCE_EXT.test(entry) &&
-      !/\.(test|stories)\.[tj]sx?$/.test(entry) &&
+      !/\.(test|stories|probe)\.[tj]sx?$/.test(entry) &&
       !full.includes(`${sep}__tests__${sep}`)
     ) {
       out.push(full);
@@ -77,7 +77,15 @@ export function countDeprecatedAliasSelections(
   const byFile = new Map<string, number>();
   let total = 0;
   for (const file of files) {
-    const matches = readFileSync(file, 'utf8').match(ALIAS_SELECTION);
+    let source: string;
+    try {
+      source = readFileSync(file, 'utf8');
+    } catch (error) {
+      // Parallel suite probes (*.probe.tsx) can vanish between walk and read.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    const matches = source.match(ALIAS_SELECTION);
     if (!matches) continue;
     total += matches.length;
     byFile.set(relative(WEB_ROOT, file), matches.length);
