@@ -19,12 +19,8 @@ describe('TIM_WHITE_PROFILE public handle (JOV-14240)', () => {
       ),
       'utf8'
     );
-    expect(source).toContain(
-      'handle: TIM_WHITE_PROFILE.publicProfileHandle'
-    );
-    expect(source).not.toMatch(
-      /handle:\s*TIM_WHITE_PROFILE\.handle\b/
-    );
+    expect(source).toContain('handle: TIM_WHITE_PROFILE.publicProfileHandle');
+    expect(source).not.toMatch(/handle:\s*TIM_WHITE_PROFILE\.handle\b/);
   });
 
   it('keeps /solutions/artists share deep links on the live handle', () => {
@@ -47,7 +43,7 @@ describe('TIM_WHITE_PROFILE public handle (JOV-14240)', () => {
       'See how it adapts'
     );
     expect(
-      ARTIST_PROFILE_COPY.specWall.callouts.find(
+      ARTIST_PROFILE_COPY.specWall.callouts?.find(
         callout => callout.id === 'identity'
       )?.title
     ).toBe('They know it is you');

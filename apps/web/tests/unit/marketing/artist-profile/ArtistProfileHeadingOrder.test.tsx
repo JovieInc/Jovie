@@ -88,7 +88,9 @@ describe('artist-profiles heading order (JOV-2246)', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('link', { name: ARTIST_PROFILE_COPY.hero.secondaryCtaLabel })
+      screen.getByRole('link', {
+        name: ARTIST_PROFILE_COPY.hero.secondaryCtaLabel,
+      })
     );
 
     expect(trackHomepageEvent).toHaveBeenLastCalledWith(

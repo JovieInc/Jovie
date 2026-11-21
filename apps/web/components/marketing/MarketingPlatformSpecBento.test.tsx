@@ -25,9 +25,7 @@ describe('MarketingPlatformSpecBento', () => {
       screen.queryByText(/Dark product surfaces, Jovie accents only/i)
     ).toBeNull();
     expect(
-      screen.queryByText(
-        'Preserved product demonstrations · illustrative data'
-      )
+      screen.queryByText('Preserved product demonstrations · illustrative data')
     ).toBeNull();
     expect(
       screen

@@ -143,8 +143,7 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly subhead: string;
     readonly ctaLabel: string;
-    /** Secondary CTA under the hero; sentence case (JOV-14240). */
-    readonly secondaryCtaLabel: string;
+    readonly secondaryCtaLabel: string; // sentence case (JOV-14240)
     readonly signature: string;
     readonly proofWhisper: string;
     readonly phoneCaption: string;
@@ -1152,12 +1151,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       displayValue: TIM_WHITE_PROFILE.publicProfileDisplay,
       qrLabel: 'QR code',
       deepLinksLabel: 'Deep links',
-      deepLinks: [
-        TIM_WHITE_PROFILE.publicProfileDisplay,
-        `${TIM_WHITE_PROFILE.publicProfileDisplay}/pay`,
-        `${TIM_WHITE_PROFILE.publicProfileDisplay}/listen`,
-        `${TIM_WHITE_PROFILE.publicProfileDisplay}/contact`,
-      ],
+      deepLinks: (['', '/pay', '/listen', '/contact'] as const).map(
+        suffix => `${TIM_WHITE_PROFILE.publicProfileDisplay}${suffix}`
+      ),
     },
   },
   socialProof: {
