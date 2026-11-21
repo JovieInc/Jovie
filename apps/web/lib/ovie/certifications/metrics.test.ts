@@ -108,6 +108,8 @@ describe('computeCertificationMetrics', () => {
     const result = input();
     expect(result.contract).toBe(CERTIFICATION_METRICS_CONTRACT);
     expect(result.qualityScoreboard.source.status).toBe('disconnected');
+    expect(result.dogfoodFeed.status).toBe('disconnected');
+    expect(result.dogfoodFeed.receiptCount).toBe(0);
     expect(Object.keys(result.lanes).sort()).toEqual(['jov', 'lyb', 'ovie']);
     const jov = result.lanes.jov;
     expect(jov.founderBlockingMinutes).toBe(0);

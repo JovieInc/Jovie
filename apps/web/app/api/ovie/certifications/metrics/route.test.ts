@@ -1,11 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { dogfoodReceiptProvesOutcome } from '@/lib/agent-os/dogfood-receipt';
+import { getCanonicalSurface } from '@/lib/canonical-surfaces';
 import {
   fixturePacket,
   memoryCertificationBackend,
 } from '@/lib/ovie/certifications/fixtures';
 import type { CertificationPacketFileRead } from '@/lib/ovie/certifications/packet-files.server';
+import {
+  buildPublicProfileScriptedFalseSuccess,
+  PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID,
+  PUBLIC_PROFILE_FIXTURE_DEPLOY,
+  seedPublicProfileDogfoodFixture,
+} from '@/lib/ovie/certifications/public-profile-dogfood-fixture';
 import { QUALITY_OUTCOME_RECEIPT_SCHEMA } from '@/lib/ovie/certifications/quality-scoreboard';
 import { recordQualityOutcomeReceipt } from '@/lib/ovie/certifications/quality-scoreboard-ledger';
+import { recordDogfoodReceipt } from '@/lib/ovie/certifications/dogfood-receipt-ledger';
 import { GET } from './route';
 
 const mocks = vi.hoisted(() => ({
@@ -47,6 +56,20 @@ const packetRead: CertificationPacketFileRead = {
       links: [],
       packet: fixturePacket('signup'),
       file: 'docs/certification/2026-09-27/signup.packet.json',
+    },
+    {
+      domain: 'public_profiles',
+      surface: 'Public Profile',
+      packetUpdatedAt: '2026-09-27T07:00:00.000Z',
+      links: [],
+      packet: fixturePacket(PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID, {
+        subject: {
+          id: PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID,
+          kind: 'surface',
+          title: 'Public Profile',
+        },
+      }),
+      file: 'docs/certification/2026-09-27/public-profile.packet.json',
     },
   ],
   issues: [],
@@ -113,9 +136,92 @@ describe('GET /api/ovie/certifications/metrics', () => {
     expect(Object.keys(jov.byRiskClass).sort()).toEqual(
       ['money_path', 'presentation', 'product'].sort()
     );
-    // One packet-file subject exists; stores with no data yield null metrics.
-    expect(jov.machineCertifiableCoverage).toEqual({ value: 0, sampleSize: 1 });
+    // Two packet-file subjects; dogfood ledger disconnected → empty feed.
+    expect(jov.machineCertifiableCoverage).toEqual({ value: 0, sampleSize: 2 });
     expect(jov.judgeCalibration).toEqual([]);
+    expect(body.dogfoodFeed).toEqual({
+      status: 'disconnected',
+      receiptCount: 0,
+      subjectsWithRequiredMissions: 1,
+      subjectsWithDeploy: 0,
+      knownGoodDeploymentCount: 0,
+    });
+  });
+
+  it('feeds dogfood receipts and required missions into the projection (empty→fed)', async () => {
+    const emptyBody = await (await GET(request())).json();
+    expect(emptyBody.dogfoodFeed.status).toBe('disconnected');
+    expect(emptyBody.dogfoodFeed.receiptCount).toBe(0);
+    expect(emptyBody.dogfoodFeed.subjectsWithRequiredMissions).toBe(1);
+    expect(emptyBody.lanes.jov.dogfoodKindCoverage.value).toBe(0);
+
+    const backend = memoryCertificationBackend();
+    await seedPublicProfileDogfoodFixture({
+      backend,
+      recordedAt: new Date().toISOString(),
+    });
+    mocks.backend.mockReturnValue(backend);
+
+    const fedBody = await (await GET(request())).json();
+    expect(fedBody.dogfoodFeed).toMatchObject({
+      status: 'fixture',
+      receiptCount: 1,
+      subjectsWithRequiredMissions: 1,
+      subjectsWithDeploy: 1,
+      knownGoodDeploymentCount: 1,
+    });
+    // public-profile proves one kind; signup has none → mean 0.5
+    expect(fedBody.lanes.jov.dogfoodKindCoverage).toEqual({
+      value: 0.5,
+      sampleSize: 2,
+    });
+    expect(fedBody.lanes.jov.driverReliability.playwright).toEqual({
+      value: 1,
+      sampleSize: 1,
+    });
+  });
+
+  it('rejects a deliberate scripted false-success from dogfood kind coverage', async () => {
+    const backend = memoryCertificationBackend();
+    const now = new Date().toISOString();
+    const startedAt = new Date(Date.parse(now) - 60_000).toISOString();
+    await seedPublicProfileDogfoodFixture({
+      backend,
+      recordedAt: now,
+      includeCapabilityReceipt: false,
+    });
+    const falseSuccess = buildPublicProfileScriptedFalseSuccess({
+      commitSha: PUBLIC_PROFILE_FIXTURE_DEPLOY.commitSha,
+      deploymentId: PUBLIC_PROFILE_FIXTURE_DEPLOY.deploymentId,
+      startedAt,
+      completedAt: now,
+    });
+    expect(falseSuccess.outcome).toBe('failed');
+    expect(
+      dogfoodReceiptProvesOutcome(falseSuccess, {
+        id: getCanonicalSurface('public-profile').outcomeMission.id,
+        outcome: getCanonicalSurface('public-profile').outcomeMission.outcome,
+      })
+    ).toBe(false);
+    await recordDogfoodReceipt({
+      backend,
+      receipt: falseSuccess,
+      recordedAt: now,
+    });
+    mocks.backend.mockReturnValue(backend);
+
+    const body = await (await GET(request())).json();
+    expect(body.dogfoodFeed.receiptCount).toBe(1);
+    expect(body.dogfoodFeed.status).toBe('fixture');
+    // Scripted false-success is present but does not prove an outcome kind.
+    expect(body.lanes.jov.dogfoodKindCoverage).toEqual({
+      value: 0,
+      sampleSize: 2,
+    });
+    expect(body.lanes.jov.machineCertifiableCoverage).toEqual({
+      value: 0,
+      sampleSize: 2,
+    });
   });
 
   it('counts founder-facing Summer cards toward cards per day', async () => {

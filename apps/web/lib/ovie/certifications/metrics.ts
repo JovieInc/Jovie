@@ -176,6 +176,17 @@ export interface CertificationMetricsInput {
   readonly knownGoodDeploymentIds: readonly string[];
   /** Immutable Ovie quality ledger; null means the source is disconnected. */
   readonly qualityReceipts: readonly QualityOutcomeReceipt[] | null;
+  /**
+   * Dogfood receipt ledger feed status. Absent/`disconnected` means the
+   * adapter has no authoritative store yet; never invent coverage from silence.
+   */
+  readonly dogfoodFeed?: {
+    readonly status: 'disconnected' | 'fixture' | 'production';
+    readonly receiptCount: number;
+    readonly subjectsWithRequiredMissions: number;
+    readonly subjectsWithDeploy: number;
+    readonly knownGoodDeploymentCount: number;
+  };
 }
 
 export interface MetricValue {
@@ -253,6 +264,14 @@ export interface CertificationLaneMetrics extends CertificationScopeMetrics {
   >;
 }
 
+export interface DogfoodFeedProjection {
+  readonly status: 'disconnected' | 'fixture' | 'production';
+  readonly receiptCount: number;
+  readonly subjectsWithRequiredMissions: number;
+  readonly subjectsWithDeploy: number;
+  readonly knownGoodDeploymentCount: number;
+}
+
 export interface CertificationMetricsProjection {
   readonly contract: typeof CERTIFICATION_METRICS_CONTRACT;
   readonly generatedAt: string;
@@ -260,6 +279,12 @@ export interface CertificationMetricsProjection {
   readonly lanes: Readonly<Record<DogfoodProduct, CertificationLaneMetrics>>;
   /** Product outcomes are top-line; engineering throughput is diagnostic only. */
   readonly qualityScoreboard: QualityScoreboardProjection;
+  /**
+   * Explicit dogfood receipt / mission coverage feed (JOV-7200). Disconnected
+   * until the existing ledger is present; fixture bindings may graduate to
+   * production without a new queue.
+   */
+  readonly dogfoodFeed: DogfoodFeedProjection;
 }
 
 const MINUTES_PER_MS = 1 / 60_000;
@@ -676,6 +701,20 @@ export function computeCertificationMetrics(
     })
   ) as Record<DogfoodProduct, CertificationLaneMetrics>;
 
+  const subjectsWithRequiredMissions = input.subjects.filter(
+    subject => subject.requiredMissions.length > 0
+  ).length;
+  const subjectsWithDeploy = input.subjects.filter(
+    subject => subject.deploy !== null
+  ).length;
+  const dogfoodFeed: DogfoodFeedProjection = input.dogfoodFeed ?? {
+    status: 'disconnected',
+    receiptCount: input.receipts.length,
+    subjectsWithRequiredMissions,
+    subjectsWithDeploy,
+    knownGoodDeploymentCount: input.knownGoodDeploymentIds.length,
+  };
+
   return {
     contract: CERTIFICATION_METRICS_CONTRACT,
     generatedAt: input.generatedAt,
@@ -686,5 +725,6 @@ export function computeCertificationMetrics(
       generatedAt: input.generatedAt,
       windowStart: input.windowStart,
     }),
+    dogfoodFeed,
   };
 }
