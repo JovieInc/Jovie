@@ -38,7 +38,7 @@ function buildMetrics(
     },
     aiOps: { counts: { blocked: 0, failed: 0 } },
     generatedAtIso: observedAtIso,
-  } as unknown as HudMetrics;
+  } as HudMetrics;
 }
 
 const meta = {

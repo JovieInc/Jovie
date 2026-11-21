@@ -3,11 +3,25 @@ import type { ComponentType } from 'react';
 import type { AudienceMember } from '@/types';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 
-const member = {
+const member: AudienceMember = {
   id: 'aud-1',
   type: 'email',
   displayName: 'Avery Stone',
+  locationLabel: 'Los Angeles, CA',
+  geoCity: 'Los Angeles',
+  geoCountry: 'US',
   visits: 8,
+  engagementScore: 62,
+  intentLevel: 'medium',
+  email: 'avery@example.com',
+  emailVisibleToArtist: true,
+  phone: null,
+  spotifyConnected: false,
+  purchaseCount: 0,
+  tipAmountTotalCents: 0,
+  tipCount: 0,
+  tags: [],
+  deviceType: 'mobile',
   latestActions: [
     {
       label: 'link_click',
@@ -22,7 +36,7 @@ const member = {
   ],
   utmParams: { source: 'newsletter', medium: 'email' },
   lastSeenAt: '2026-08-31T18:20:00.000Z',
-} as unknown as AudienceMember;
+};
 
 function withRail(Story: ComponentType) {
   return (
@@ -53,7 +67,7 @@ export const EmptyNoSources: Story = {
       latestActions: [],
       referrerHistory: [],
       utmParams: {},
-    } as unknown as AudienceMember,
+    },
   },
 };
 
@@ -65,7 +79,7 @@ export const PartialUtmOnly: Story = {
       latestActions: [],
       referrerHistory: [],
       utmParams: { source: 'newsletter' },
-    } as unknown as AudienceMember,
+    },
   },
 };
 
@@ -80,7 +94,7 @@ export const LongContentSources: Story = {
           timestamp: '2026-08-31T17:00:00.000Z',
         },
       ],
-    } as unknown as AudienceMember,
+    },
   },
 };
 
