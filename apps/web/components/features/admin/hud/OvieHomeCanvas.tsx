@@ -310,7 +310,8 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       melting={melting}
       answer={answerPanel}
       glanceLoading={company.isPending || loopStatus === 'loading'}
-      stagesLoading={loopStatus === 'loading'}
+      stagesStatus={loopStatus}
+      onRetryStages={() => void shipping.refetch()}
     />
   );
 }

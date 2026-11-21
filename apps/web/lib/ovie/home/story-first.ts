@@ -109,7 +109,11 @@ function formatDelta(
   prior: number | null,
   kind: 'signed' | 'alive' | 'flat-label'
 ): string | null {
-  if (prior === null) return kind === 'alive' ? 'alive' : null;
+  // Pre-revenue / $0 with no prior must not claim "alive" (and paint red).
+  if (prior === null) {
+    if (kind !== 'alive') return null;
+    return current > 0 ? 'alive' : null;
+  }
   if (kind === 'alive') {
     if (current > prior) return 'alive';
     if (current < prior) return 'down';

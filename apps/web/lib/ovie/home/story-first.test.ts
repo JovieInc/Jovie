@@ -70,6 +70,33 @@ describe('buildStoryFirstGlance', () => {
     });
     expect(glance[2]?.href).toBe(APP_ROUTES.ADMIN_GROWTH);
   });
+
+  it('does not label $0 MRR with no prior as alive', () => {
+    const company = buildCompanyTiles({
+      overview: {
+        mrrUsd: 0,
+        activeSubscribers: 0,
+        balanceUsd: 1000,
+        burnRateUsd: 100,
+        runwayMonths: 10,
+        defaultStatus: 'alive',
+        defaultStatusDetail: '',
+        financialDataAvailable: true,
+      },
+      funnel: null,
+      goldenPath: null,
+    });
+    const glance = buildStoryFirstGlance({
+      delivery: emptyDeliverySummary(),
+      company,
+      shippingPulse: buildPulse(emptyDeliverySummary()),
+    });
+    expect(glance[1]).toMatchObject({
+      value: '$0',
+      delta: null,
+      tone: 'bad',
+    });
+  });
 });
 
 describe('buildStoryFirstBottleneck', () => {

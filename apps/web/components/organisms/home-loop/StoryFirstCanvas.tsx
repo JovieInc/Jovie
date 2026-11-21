@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Sparkline } from '@/components/shell/Sparkline';
@@ -9,6 +10,7 @@ import type {
   StoryFirstStageBucket,
 } from '@/lib/ovie/home/story-first';
 import { cn } from '@/lib/utils';
+import type { HomeLoopSectionStatus } from './HomeLoopSection';
 
 const TONE_DOT: Record<StoryFirstBottleneck['tone'], string> = {
   clear: 'bg-success',
@@ -35,7 +37,9 @@ export interface StoryFirstCanvasProps {
   /** Generated Summer answer when a turn is present. */
   readonly answer?: ReactNode;
   readonly glanceLoading?: boolean;
-  readonly stagesLoading?: boolean;
+  /** Shipping stage read — error must not look like an empty pipeline. */
+  readonly stagesStatus?: HomeLoopSectionStatus;
+  readonly onRetryStages?: () => void;
 }
 
 function GlancePulse({
@@ -190,17 +194,20 @@ function BottleneckHero({
 function StageBuckets({
   stages,
   href,
-  loading,
+  status,
+  onRetry,
 }: Readonly<{
   readonly stages: readonly StoryFirstStageBucket[];
   readonly href?: string;
-  readonly loading: boolean;
+  readonly status: HomeLoopSectionStatus;
+  readonly onRetry?: () => void;
 }>) {
   return (
     <section
       aria-label='In Flight'
       className='flex flex-col gap-3'
       data-testid='story-first-stages'
+      data-status={status}
     >
       <div className='flex items-baseline justify-between gap-3'>
         <h2 className='text-balance text-2xs font-medium tracking-wide text-tertiary-token'>
@@ -216,8 +223,27 @@ function StageBuckets({
           </a>
         ) : null}
       </div>
-      {loading ? (
+      {status === 'loading' ? (
         <LoadingSkeleton height='h-16' width='w-full' />
+      ) : status === 'error' ? (
+        <div
+          role='alert'
+          className='flex flex-wrap items-center gap-3 border border-subtle px-3 py-2 text-xs text-secondary-token'
+          data-testid='story-first-stages-error'
+        >
+          <span>Shipping stages could not load.</span>
+          {onRetry ? (
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              onClick={onRetry}
+            >
+              {/* ui-casing-allow: recovery action sentence case (Tim, 2026-09-28) */}
+              Try again
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <ol className='grid grid-cols-2 gap-0 sm:grid-cols-5'>
           {stages.map((bucket, index) => (
@@ -269,7 +295,8 @@ export function StoryFirstCanvas({
   melting = false,
   answer,
   glanceLoading = false,
-  stagesLoading = false,
+  stagesStatus = 'ready',
+  onRetryStages,
 }: StoryFirstCanvasProps) {
   return (
     <div
@@ -305,7 +332,8 @@ export function StoryFirstCanvas({
         <StageBuckets
           stages={stages}
           href={inFlightHref}
-          loading={stagesLoading}
+          status={stagesStatus}
+          onRetry={onRetryStages}
         />
       </div>
       {answer ? (

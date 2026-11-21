@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
   StoryFirstBottleneck,
   StoryFirstGlancePulse,
@@ -104,6 +104,26 @@ describe('StoryFirstCanvas', () => {
     expect(
       screen.getByRole('link', { name: 'Open Shipping →' })
     ).toHaveAttribute('href', '/app/ov/shipping');
+  });
+
+  it('shows a stages error with retry instead of zero counts', () => {
+    const onRetry = vi.fn();
+    render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={glance}
+        stages={stages.map(stage => ({ ...stage, count: 0, highlight: null }))}
+        stagesStatus='error'
+        onRetryStages={onRetry}
+      />
+    );
+    expect(screen.getByTestId('story-first-stages')).toHaveAttribute(
+      'data-status',
+      'error'
+    );
+    expect(screen.queryByTestId('story-first-stage-building')).toBeNull();
+    screen.getByRole('button', { name: 'Try again' }).click();
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it('melts the board without removing the canvas shell', () => {

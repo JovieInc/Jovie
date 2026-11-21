@@ -85,7 +85,7 @@ export const LoadingBoard: Story = {
     glance,
     stages: emptyStages,
     glanceLoading: true,
-    stagesLoading: true,
+    stagesStatus: 'loading',
   },
 };
 
@@ -118,6 +118,7 @@ export const ErrorUnknown: Story = {
       points: [],
     })),
     stages: emptyStages,
+    stagesStatus: 'error',
   },
 };
 
