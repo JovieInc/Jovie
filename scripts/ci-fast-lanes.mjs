@@ -101,6 +101,7 @@ import {
   laneFailureExcerpt,
   structuralFailureExcerpt,
 } from './lib/ci-failure-excerpts.mjs';
+import { parseSkipLaneIds } from './lib/ci-fast-skip-lanes.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -1492,7 +1493,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-unit-selection.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
   'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
-  'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
+  'scripts/lib/__tests__/merge-group-token-budget.test.mjs scripts/lib/__tests__/merge-group-typecheck-lint-reuse.test.mjs',
   'scripts/lib/__tests__/merge-group-dead-run-sweep.test.mjs',
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -1792,7 +1793,6 @@ export function selectLanes(groupId) {
   }
   return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
 }
-
 function shell(command, opts = {}) {
   const result = spawnSync(command, {
     shell: true,
@@ -3268,7 +3268,6 @@ export async function runStructural(opts = {}) {
   const combined = results.map(result => result.output).join('');
   return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
-
 function annotateFailure(lane, logExcerpt) {
   // GitHub Actions annotation — visible on the PR Checks UI.
   const msg = `${lane.name} failed. Fix: ${lane.nextLocalCommand}`;
@@ -3360,7 +3359,6 @@ export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
-
 async function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
@@ -3372,7 +3370,9 @@ async function main() {
   const failFast = failFastEnabled();
 
   try {
-    let selectedLanes = selectLanes(laneGroup);
+    let selectedLanes = selectLanes(laneGroup).filter(
+      lane => !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id)
+    );
     if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }

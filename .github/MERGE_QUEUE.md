@@ -78,6 +78,38 @@ the fast diff secret scan gates source and combined heads.
 The full iOS simulator UI and screenshot regression runs only for an authorized
 iOS TestFlight generation and must pass before upload.
 
+## Typecheck/lint reuse on the exact same tree (JOV-12618)
+
+Merge groups re-run `ci-fast` typecheck and lint by default. They skip those
+lanes only when every condition holds (JOV-13081):
+
+1. The merge_group **tree SHA** equals the queued PR's **source head tree SHA**.
+2. Source Validation already concluded **success** on that exact source head.
+3. Decision fails open on any lookup error (full typecheck/lint runs).
+
+Reusable (skippable) lanes: `typecheck`, `web-tests-typecheck`,
+`web-stories-typecheck`, `biome`, `shadcn-lint-contracts`, `scripts-typecheck`.
+
+Always keep running in the merge group (base-sensitive, combined-head, or
+proof-inequivalent to Source Validation):
+
+| Check | Why it stays |
+| --- | --- |
+| CI/release incident prevention contract | Every-head receipt; dependency-free |
+| `eslint-server-boundaries` | Lane uses `--no-inline-config`; SV `lint:eslint:changed` honors inline disables |
+| `guardrails` (proxy) | Path + product-lane sensitive |
+| `design-exception-registry` and other design ratchets | Compare against the group's base / trusted tip |
+| `source-guards`, `copy-gate`, `node-runtime-contracts` | Read disk / base-bound contracts |
+| `structural` (+ python/web/lanes shards) | Combined-head structural inventory |
+| `merge-group-guards`, billing/profile admission | Queue-only or product-lane proof |
+| Ovie typecheck / build / Storybook / unit shards | Combined-head product evidence |
+
+Admission exports `source_head_sha` (already known from the live queue) so the
+reuse step spends no extra GraphQL. REST proof lookup runs only on same-tree
+candidates (~3/10 groups in the Nov 19 sample), against the workflow-scoped
+`actions/workflows/source-validation.yml/runs` endpoint (`per_page=100`) so
+other PR workflows cannot hide the green proof.
+
 ## Queue parity: the queue is a re-check, not a first check
 
 The queue exists to catch one thing: two green PRs that break each other. So:
