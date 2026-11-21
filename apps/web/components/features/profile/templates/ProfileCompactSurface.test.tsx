@@ -234,8 +234,6 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(false);
   });
 
-  // Drawer no longer lazy-loads (JOV-7973): its same-commit render contract
-  // lives in ProfileCompactSurface.drawer-import.test.tsx.
   it.each(['notifications'])(
     'keeps the mounted profile and focused claim available while the %s module loads',
     async kind => {
@@ -466,7 +464,7 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
-  // JOV-6453: the subscribe CTA must stay a skeleton until the per-user
+  // JOV-6453: subscribe CTA stays a skeleton until per-user
   // experiment assignment resolves, so the flag is forwarded verbatim.
   it('forwards an unresolved visitor assignment into the subscribe panel', () => {
     renderSurface({
@@ -597,8 +595,6 @@ describe('ProfileCompactSurface', () => {
   it('keeps the chrome, identity header, and content regions in the responsive layout contract', () => {
     renderSurface();
 
-    // Floating chrome over the identity header; the header scrolls with
-    // the content instead of occupying a fixed hero band.
     expect(screen.getByTestId('profile-cover')).toHaveClass(
       'pointer-events-none',
       'absolute',
@@ -623,8 +619,14 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
+  it('falls home when Events is empty (JOV-14241)', () => {
+    const onModeSelect = vi.fn();
+    renderSurface({ activeMode: 'tour', tourDates: [], onModeSelect });
+    expect(onModeSelect).toHaveBeenCalledWith('profile');
+  });
+
   it('reserves dock clearance from the content column on every compact mode', () => {
-    const modes = ['profile', 'listen', 'tour', 'about', 'subscribe'] as const;
+    const modes = ['profile', 'listen', 'about', 'subscribe'] as const;
 
     for (const activeMode of modes) {
       const view = renderSurface({ activeMode });
@@ -639,9 +641,6 @@ describe('ProfileCompactSurface', () => {
       expect(surface).toHaveAttribute('data-presentation', 'standalone');
       expect(column.parentElement).toBe(surface);
       expect(column).toHaveClass('profile-content-column');
-      // The dock is a direct sibling, so the compact reservation selector
-      // (`:has(> .profile-floating-tab-bar) > .profile-content-column`)
-      // applies on every mode. BottomTabBar owns the floating class.
       expect(tabBar.parentElement).toBe(surface);
       expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
         'profile-content-scroll-region'
