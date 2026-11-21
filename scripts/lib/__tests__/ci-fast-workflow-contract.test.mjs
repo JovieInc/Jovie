@@ -367,30 +367,11 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('partitions the structural pytest suite into exactly complementary shards', () => {
-    // The original single invocation ran these files once; the shards must
-    // select the identical files with complementary -k expressions so every
-    // collected test runs in exactly one shard (never zero, never twice).
-    expect(STRUCTURAL_PYTEST_FILES).toEqual([
-      'scripts/prod-errors/test_claim_parking.py',
-      'scripts/prod-errors/test_prod_errors.py',
-      'scripts/tests/test_noabandon_route.py',
-      'scripts/tests/test_gh_retry.py',
-      'scripts/tests/test_noabandon_invariant.py',
-      'scripts/tests/test_noabandon_adapters.py',
-      'scripts/tests/test_vercel_prebuilt_deploy.py',
-      'scripts/tests/test_vercel_blocked_breaker.py',
-      'scripts/tests/test_brand_scrub.py',
-      'scripts/tests/test_agent_workflow_hygiene.py',
-      'scripts/tests/test_fleet_audit.py',
-      'scripts/tests/test_runner_routing.py',
-      'scripts/tests/test_signal_watch.py',
-      'scripts/tests/test_x_grok.py',
-      'scripts/tests/test_pr_remediation_swarm.py',
-      'scripts/tests/test_codex_launcher.py',
-      'scripts/tests/test_loose_exec_guard.py',
-      'scripts/tests/test_noabandon_ledger.py',
-      'scripts/tests/test_poll_loop_guard.py',
-    ]);
+    // File list lock lives in ci-structural-pytest-files.mjs; shards must
+    // select that identical pool with complementary -k expressions.
+    expect(STRUCTURAL_PYTEST_FILES).toContain(
+      'scripts/tests/test_vercel_blocked_breaker.py'
+    );
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
       return { command, keyword, files: files?.split(' ') };
