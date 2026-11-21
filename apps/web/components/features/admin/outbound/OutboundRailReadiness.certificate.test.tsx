@@ -24,24 +24,27 @@ const certified: ContactCertificationInspection = {
 function setup(
   overrides: Partial<Parameters<typeof OutboundRailReadiness>[0]> = {}
 ) {
+  const handlers = {
+    onRefreshEvidence: vi.fn<() => void>(),
+    onCertify: vi.fn<() => void>(),
+    onReviewFacts: vi.fn<() => void>(),
+    onReviewMessage: vi.fn<() => void>(),
+  };
   const props = {
     row: outboundFixtureRow(),
     certification: certified,
     loading: false,
     pending: null,
-    onRefreshEvidence: vi.fn(),
-    onCertify: vi.fn(),
-    onReviewFacts: vi.fn(),
-    onReviewMessage: vi.fn(),
+    ...handlers,
     ...overrides,
   };
   const view = render(<OutboundRailReadiness {...props} />);
-  return { props, ...view };
+  return { props, handlers, ...view };
 }
 
 describe('OutboundRailReadiness certificate', () => {
   it('runs the next action and stays axe-clean when certified', async () => {
-    const { props, container } = setup();
+    const { handlers, container } = setup();
     const action = screen
       .getByTestId('outbound-next-action')
       .querySelector('button, a');
@@ -49,9 +52,11 @@ describe('OutboundRailReadiness certificate', () => {
     if (action?.tagName === 'BUTTON') {
       await userEvent.click(action);
       expect(
-        [props.onReviewMessage, props.onCertify, props.onRefreshEvidence].some(
-          fn => fn.mock.calls.length === 1
-        )
+        [
+          handlers.onReviewMessage,
+          handlers.onCertify,
+          handlers.onRefreshEvidence,
+        ].some(fn => fn.mock.calls.length === 1)
       ).toBe(true);
     }
     await expectNoA11yViolations(container);

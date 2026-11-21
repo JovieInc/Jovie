@@ -7,17 +7,23 @@ import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 
-const entry = {
+const entry: WaitlistEntryRow = {
   id: 'waitlist_1',
   fullName: 'Ari Lane',
   email: 'ari@example.com',
   primaryGoal: null,
+  primarySocialUrl: 'https://instagram.com/ari',
   primarySocialPlatform: 'instagram',
   primarySocialUrlNormalized: 'https://instagram.com/ari',
+  spotifyUrl: 'https://open.spotify.com/artist/ari',
   spotifyUrlNormalized: 'https://open.spotify.com/artist/ari',
+  spotifyArtistName: 'Ari Lane',
+  heardAbout: null,
   status: 'new',
+  primarySocialFollowerCount: null,
   createdAt: new Date('2026-01-10T00:00:00.000Z'),
-} as WaitlistEntryRow;
+  updatedAt: new Date('2026-01-10T00:00:00.000Z'),
+};
 
 function render(ui: ReactElement) {
   return rtlRender(ui, { wrapper: TooltipProvider });
@@ -37,7 +43,7 @@ describe('WaitlistKanbanCard certificate', () => {
   it('offers Disapprove for an approved entry', async () => {
     const { container } = render(
       <WaitlistKanbanCard
-        entry={{ ...entry, status: 'approved' } as WaitlistEntryRow}
+        entry={{ ...entry, status: 'approved' }}
         onApprove={vi.fn()}
       />
     );
@@ -59,7 +65,7 @@ describe('WaitlistKanbanCard certificate', () => {
 
     const signedUp = render(
       <WaitlistKanbanCard
-        entry={{ ...entry, status: 'signed_up' } as WaitlistEntryRow}
+        entry={{ ...entry, status: 'signed_up' }}
         onApprove={vi.fn()}
       />
     );
@@ -70,13 +76,11 @@ describe('WaitlistKanbanCard certificate', () => {
   it('omits links and the action when there is nothing to show', async () => {
     const { container } = render(
       <WaitlistKanbanCard
-        entry={
-          {
-            ...entry,
-            primarySocialUrlNormalized: null,
-            spotifyUrlNormalized: null,
-          } as WaitlistEntryRow
-        }
+        entry={{
+          ...entry,
+          primarySocialUrlNormalized: '',
+          spotifyUrlNormalized: null,
+        }}
       />
     );
     expect(screen.queryByRole('button')).toBeNull();

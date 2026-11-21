@@ -25,7 +25,10 @@ const meta = {
   title: 'Dashboard/Nav/CustomerNavMoreMenu/States',
   component: CustomerNavMoreMenu,
   parameters: { layout: 'centered' },
-  args: { items: overflowItems, isItemActive: () => false },
+  args: {
+    items: overflowItems,
+    isItemActive: (_item: NavItem): boolean => false,
+  },
   decorators: [
     function NavFrame(Story) {
       return (

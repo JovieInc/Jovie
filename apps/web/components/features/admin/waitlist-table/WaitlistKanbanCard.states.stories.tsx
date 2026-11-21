@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 
-const entry = {
+const entry: WaitlistEntryRow = {
   id: 'waitlist_1',
   fullName: 'Ari Lane',
   email: 'ari@example.com',
@@ -18,7 +18,7 @@ const entry = {
   primarySocialFollowerCount: null,
   createdAt: new Date('2026-01-10T00:00:00.000Z'),
   updatedAt: new Date('2026-01-10T00:00:00.000Z'),
-} as WaitlistEntryRow;
+};
 
 const meta = {
   title: 'Admin/Waitlist/WaitlistKanbanCard/States',
@@ -44,9 +44,9 @@ export const EmptyNoLinks: Story = {
   args: {
     entry: {
       ...entry,
-      primarySocialUrlNormalized: null,
+      primarySocialUrlNormalized: '',
       spotifyUrlNormalized: null,
-    } as WaitlistEntryRow,
+    },
     onApprove: undefined,
   },
 };
@@ -58,7 +58,7 @@ export const ErrorApproveFailed: Story = {
 
 /** Partial: a signed-up entry whose action is locked. */
 export const PartialSignedUp: Story = {
-  args: { entry: { ...entry, status: 'signed_up' } as WaitlistEntryRow },
+  args: { entry: { ...entry, status: 'signed_up' } },
 };
 
 /** Long content: a long name, email and profile URL truncate. */
@@ -71,13 +71,13 @@ export const LongContentEntry: Story = {
         'an.extraordinarily.long.email.address@a-very-long-domain-name.example.com',
       primarySocialUrlNormalized:
         'https://instagram.com/a-profile-handle-that-goes-on-and-on-and-on',
-    } as WaitlistEntryRow,
+    },
   },
 };
 
 /** Rtl: the card in a right-to-left board. */
 export const RtlCard: Story = {
-  args: { entry: { ...entry, fullName: 'ليلى أحمد' } as WaitlistEntryRow },
+  args: { entry: { ...entry, fullName: 'ليلى أحمد' } },
   decorators: [
     function RtlFrame(Story) {
       return (

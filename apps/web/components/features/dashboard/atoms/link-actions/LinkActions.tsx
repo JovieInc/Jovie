@@ -98,7 +98,7 @@ export const LinkActions = memo(function LinkActions({
             aria-haspopup='menu'
             onClick={() => setOpen(!open)}
             onKeyDown={handleKeyDown}
-            className='inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-subtle ease-out hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+            className='relative before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-subtle ease-out hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
           >
             <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
           </PlainButton>
