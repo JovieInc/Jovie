@@ -27,6 +27,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/jovie/components/ChatComposerToolbar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/jovie/components/ChatOpsDataCard.tsx": [
       "ds-owner",
       "tokens",
@@ -91,6 +100,24 @@
       "forced-caps"
     ],
     "apps/web/components/jovie/components/SkillChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/SuggestedPrompts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/picker-rows.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -191,8 +218,19 @@
     ]
   },
   "waivers": {
+    "apps/web/components/jovie/components/ChatComposerToolbar.tsx": {
+      "long-content": "The toolbar renders icon-only controls with fixed aria labels and takes no user text, so no content can overflow."
+    },
     "apps/web/components/jovie/components/ChatPitchCard.tsx": {
       "offline": "No offline UI exists: the card never fetches, and its only async call is navigator.clipboard.writeText, whose rejection takes the toast.error('Failed to copy') path covered by ChatPitchCard.test.tsx."
+    },
+    "apps/web/components/jovie/components/SuggestedPrompts.tsx": {
+      "empty": "The component always appends the static feedback pill unless featuredOnly is set, and featured skills are a fixed list, so no reachable input renders an empty list.",
+      "offline": "No offline UI exists: the pills render static copy and the only async work is the analytics track() call, which fails silently."
+    },
+    "apps/web/components/jovie/components/picker-rows.tsx": {
+      "empty": "PickerRow renders exactly one row for one item and no collection; the empty list state belongs to the palette that maps over items.",
+      "permission-denied": "No permission-gated UI exists: a row only renders the item and callbacks it is given."
     },
     "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx": {
       "permission-denied": "No permission-gated UI exists: the drawer only reads a demo moment passed in as a prop and has no role or entitlement check."

@@ -36,6 +36,7 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react';
+import { PlainButton } from '@jovie/ui';
 import Image from 'next/image';
 import { memo } from 'react';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
@@ -426,7 +427,7 @@ export const PickerRow = memo(function PickerRow({
   rowId,
 }: PickerRowProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       role='option'
       id={rowId}
@@ -444,6 +445,6 @@ export const PickerRow = memo(function PickerRow({
     >
       <RowVisual item={item} />
       <RowBody item={item} />
-    </button>
+    </PlainButton>
   );
 });
