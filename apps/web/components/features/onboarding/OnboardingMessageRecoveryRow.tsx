@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { RefreshCw, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRef } from 'react';
@@ -71,7 +70,7 @@ export function OnboardingMessageRecoveryRow({
           <p className='text-secondary-token'>Try again in {waitLabel}.</p>
         ) : null}
         {canRetry ? (
-          <PlainButton
+          <button
             type='button'
             onClick={handleRetry}
             disabled={isBusy || isSubmitted}
@@ -79,7 +78,7 @@ export function OnboardingMessageRecoveryRow({
           >
             <RefreshCw className='size-3.5' aria-hidden='true' />
             Retry message
-          </PlainButton>
+          </button>
         ) : null}
         {isRateLimited ? (
           <Link

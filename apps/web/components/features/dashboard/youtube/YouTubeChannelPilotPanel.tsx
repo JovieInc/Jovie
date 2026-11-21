@@ -28,7 +28,7 @@ function isoDate(value: string | null): string {
 
 function AuthRequiredState({ message }: { readonly message: string | null }) {
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <EmptyState
         icon={<Icon name='Youtube' className='h-5 w-5' />}
         heading='Founder Authorization Required'
@@ -89,38 +89,40 @@ export function YouTubeChannelPilotPanel({
         {workspace.state === 'auth-required' ? (
           <AuthRequiredState message={workspace.errorMessage} />
         ) : workspace.state === 'ambiguous-channel' ? (
-          <ContentSurfaceCard className='border-accent-red/30 p-4'>
+          <div className='rounded-xl border border-accent-red/30 bg-surface-1 p-4'>
             <h2 className='text-app font-semibold text-primary-token'>
               Channel Ownership Is Ambiguous
             </h2>
             <p className='mt-1 text-xs text-secondary-token'>
               {workspace.errorMessage}
             </p>
-          </ContentSurfaceCard>
+          </div>
         ) : (
           <>
-            <ContentSurfaceCard className='p-4'>
-              <div className='flex flex-wrap items-start justify-between gap-3'>
-                <div>
-                  <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
-                    Authorized Channel
-                  </p>
-                  <h1 className='mt-1 font-mono text-app text-primary-token'>
-                    {workspace.authorizedChannelId}
-                  </h1>
-                  <p className='mt-1 text-xs text-secondary-token'>
-                    Last connector sync {isoDate(workspace.lastSyncAt)} ·{' '}
-                    {workspace.videos.length} represented
-                  </p>
+            <ContentSurfaceCard>
+              <div className='p-4'>
+                <div className='flex flex-wrap items-start justify-between gap-3'>
+                  <div>
+                    <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
+                      Authorized Channel
+                    </p>
+                    <h1 className='mt-1 font-mono text-app text-primary-token'>
+                      {workspace.authorizedChannelId}
+                    </h1>
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      Last connector sync {isoDate(workspace.lastSyncAt)} ·{' '}
+                      {workspace.videos.length} represented
+                    </p>
+                  </div>
+                  <span className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-2xs font-medium text-secondary-token'>
+                    Publication blocked pending Studio experiment + readback
+                  </span>
                 </div>
-                <span className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-2xs font-medium text-secondary-token'>
-                  Publication blocked pending Studio experiment + readback
-                </span>
               </div>
             </ContentSurfaceCard>
 
             {workspace.videos.length === 0 ? (
-              <ContentSurfaceCard className='overflow-hidden p-0'>
+              <ContentSurfaceCard className='overflow-hidden'>
                 <EmptyState
                   heading='Authorized Channel Is Waiting for Its First Sync'
                   description='No local videos are shown because Jovie has not yet received a complete API-backed uploads ledger for this channel.'
@@ -146,78 +148,82 @@ export function YouTubeChannelPilotPanel({
                 </div>
                 <div className='space-y-2'>
                   {workspace.videos.map(video => (
-                    <ContentSurfaceCard key={video.id} className='p-3'>
-                      <div className='flex flex-col items-start gap-3 sm:flex-row'>
-                        {video.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={video.thumbnailUrl}
-                            alt=''
-                            aria-hidden='true'
-                            className='aspect-video w-full shrink-0 rounded-md bg-surface-0 object-cover sm:w-36'
-                          />
-                        ) : (
-                          <div className='flex h-20 w-full shrink-0 items-center justify-center rounded-md bg-surface-0 sm:aspect-video sm:h-auto sm:w-36'>
-                            <Icon
-                              name='Film'
-                              className='h-5 w-5 text-tertiary-token'
+                    <ContentSurfaceCard key={video.id}>
+                      <div className='p-3'>
+                        <div className='flex flex-col items-start gap-3 sm:flex-row'>
+                          {video.thumbnailUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={video.thumbnailUrl}
+                              alt=''
+                              aria-hidden='true'
+                              className='aspect-video w-full shrink-0 rounded-md bg-surface-0 object-cover sm:w-36'
                             />
+                          ) : (
+                            <div className='flex h-20 w-full shrink-0 items-center justify-center rounded-md bg-surface-0 sm:aspect-video sm:h-auto sm:w-36'>
+                              <Icon
+                                name='Film'
+                                className='h-5 w-5 text-tertiary-token'
+                              />
+                            </div>
+                          )}
+                          <div className='min-w-0 w-full flex-1'>
+                            <div className='flex flex-wrap items-start justify-between gap-2'>
+                              <div className='min-w-0'>
+                                <a
+                                  href={video.url}
+                                  target='_blank'
+                                  rel='noreferrer'
+                                  className='line-clamp-2 text-app font-medium text-primary-token hover:underline'
+                                >
+                                  {video.title}
+                                </a>
+                                <p className='mt-0.5 font-mono text-2xs text-quaternary-token'>
+                                  {video.videoId} ·{' '}
+                                  {video.privacyStatus ?? 'status unavailable'}
+                                </p>
+                              </div>
+                              <span className='text-2xs text-tertiary-token'>
+                                {isoDate(video.publishedAt)}
+                              </span>
+                            </div>
+                            <dl className='mt-3 grid grid-cols-3 gap-2 text-xs'>
+                              <div>
+                                <dt className='text-tertiary-token'>Views</dt>
+                                <dd className='font-medium tabular-nums text-primary-token'>
+                                  {metric(video.apiMetrics?.views ?? null)}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className='text-tertiary-token'>
+                                  Watch time
+                                </dt>
+                                <dd className='font-medium tabular-nums text-primary-token'>
+                                  {metric(
+                                    video.apiMetrics?.watchTimeMinutes ?? null,
+                                    ' min'
+                                  )}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className='text-tertiary-token'>
+                                  Avg. view
+                                </dt>
+                                <dd className='font-medium tabular-nums text-primary-token'>
+                                  {metric(
+                                    video.apiMetrics?.avgViewDurationSeconds ??
+                                      null,
+                                    ' sec'
+                                  )}
+                                </dd>
+                              </div>
+                            </dl>
+                            <p className='mt-2 text-2xs text-quaternary-token'>
+                              {video.apiMetrics
+                                ? `API captured ${isoDate(video.apiMetrics.capturedAt)}`
+                                : 'API snapshot pending — no performance values inferred'}
+                            </p>
                           </div>
-                        )}
-                        <div className='min-w-0 w-full flex-1'>
-                          <div className='flex flex-wrap items-start justify-between gap-2'>
-                            <div className='min-w-0'>
-                              <a
-                                href={video.url}
-                                target='_blank'
-                                rel='noreferrer'
-                                className='line-clamp-2 text-app font-medium text-primary-token hover:underline'
-                              >
-                                {video.title}
-                              </a>
-                              <p className='mt-0.5 font-mono text-2xs text-quaternary-token'>
-                                {video.videoId} ·{' '}
-                                {video.privacyStatus ?? 'status unavailable'}
-                              </p>
-                            </div>
-                            <span className='text-2xs text-tertiary-token'>
-                              {isoDate(video.publishedAt)}
-                            </span>
-                          </div>
-                          <dl className='mt-3 grid grid-cols-3 gap-2 text-xs'>
-                            <div>
-                              <dt className='text-tertiary-token'>Views</dt>
-                              <dd className='font-medium tabular-nums text-primary-token'>
-                                {metric(video.apiMetrics?.views ?? null)}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className='text-tertiary-token'>
-                                Watch time
-                              </dt>
-                              <dd className='font-medium tabular-nums text-primary-token'>
-                                {metric(
-                                  video.apiMetrics?.watchTimeMinutes ?? null,
-                                  ' min'
-                                )}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className='text-tertiary-token'>Avg. view</dt>
-                              <dd className='font-medium tabular-nums text-primary-token'>
-                                {metric(
-                                  video.apiMetrics?.avgViewDurationSeconds ??
-                                    null,
-                                  ' sec'
-                                )}
-                              </dd>
-                            </div>
-                          </dl>
-                          <p className='mt-2 text-2xs text-quaternary-token'>
-                            {video.apiMetrics
-                              ? `API captured ${isoDate(video.apiMetrics.capturedAt)}`
-                              : 'API snapshot pending — no performance values inferred'}
-                          </p>
                         </div>
                       </div>
                     </ContentSurfaceCard>

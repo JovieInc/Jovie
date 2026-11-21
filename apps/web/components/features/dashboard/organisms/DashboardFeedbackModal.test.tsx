@@ -98,6 +98,26 @@ describe('DashboardFeedbackModal', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Sent from the train');
     expect(screen.getByRole('button', { name: /^send/i })).toBeEnabled();
   });
+
+  it('focuses the field once on open and does not pull focus back on rerender', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSubmit = vi.fn();
+    const { rerender } = render(
+      <DashboardFeedbackModal isOpen onClose={onClose} onSubmit={onSubmit} />
+    );
+    const field = screen.getByRole('textbox');
+    await waitFor(() => expect(field).toHaveFocus());
+
+    await user.tab();
+    expect(field).not.toHaveFocus();
+
+    rerender(
+      <DashboardFeedbackModal isOpen onClose={onClose} onSubmit={onSubmit} />
+    );
+
+    expect(field).not.toHaveFocus();
+  });
 });
 
 describe('DashboardFeedbackModal scale tokens', () => {

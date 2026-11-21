@@ -82,4 +82,16 @@ describe('TaskRowActionMenu', () => {
       ).toBeInTheDocument();
     }
   );
+
+  it('renders the trigger as a type=button PlainButton with a popup menu', () => {
+    render(
+      <TaskRowActionMenu
+        items={[{ id: 'archive', label: 'Archive', onClick: vi.fn() }]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Open task actions' });
+    expect(trigger).toHaveAttribute('type', 'button');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  });
 });
