@@ -61,10 +61,6 @@
     "apps/web/components/features/demo/DemoReleasePresaveSurface.tsx": {
       "empty": "The demo renders one fixed release with real artwork and provider rows; it has no collection or empty state.",
       "long-content": "Every string is a fixed, verified demo constant (title, artist, listen links), so no variable-length content can reach the surface."
-    },
-    "apps/web/components/features/demo/ProductDemoCarousel.tsx": {
-      "empty": "The carousel renders a fixed list of four registered marketing screenshots and takes no data, so it has no empty state.",
-      "long-content": "Slide captions and alt text are fixed constants in the module, so no variable-length content can reach the carousel."
     }
   }
 }
