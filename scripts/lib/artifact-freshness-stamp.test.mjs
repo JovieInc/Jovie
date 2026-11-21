@@ -380,7 +380,45 @@ test('production-controller lookup failure is incomplete observation', async () 
   );
 });
 
-test('dirty stamp falls through to controller-newer and stays in-flight', async () => {
+test('dwell-exceeded is not masked by production-controller for newer SHA', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 7 * 60 * 60 * 1000).toISOString();
+  const seen = [];
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    nowMs,
+    fetchImpl: async url => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('/pulls?') || /\/pulls$/.test(u)) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      if (/\/pulls\/\d+$/.test(u)) {
+        return {
+          ok: true,
+          json: async () =>
+            stampListRow({ mergeable_state: 'blocked', created_at: created }),
+        };
+      }
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        throw new Error('controller fallback must not run on dwell-exceeded');
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /stamp-dwell-exceeded/);
+  assert.ok(
+    !seen.some(u => u.includes('/workflows/production-controller.yml/runs'))
+  );
+});
+
+test('dirty stamp is not masked by production-controller for newer SHA', async () => {
   const result = await fetchDesktopPublishInFlight({
     repo: REPO,
     token: 't',
@@ -400,20 +438,11 @@ test('dirty stamp falls through to controller-newer and stays in-flight', async 
         return releaseRunsResponse([]);
       }
       if (u.includes('/workflows/production-controller.yml/runs')) {
-        if (u.includes('status=in_progress')) {
-          return releaseRunsResponse([
-            {
-              head_sha: SHA_B,
-              status: 'in_progress',
-              display_title: controllerTitle(SHA_B),
-            },
-          ]);
-        }
-        return releaseRunsResponse([]);
+        throw new Error('controller fallback must not run on dirty stamp');
       }
       throw new Error(`unexpected url ${u}`);
     },
   });
-  assert.equal(result.inFlight, true);
-  assert.equal(result.reason, 'production-controller-in_progress');
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /mergeable_state=dirty/);
 });

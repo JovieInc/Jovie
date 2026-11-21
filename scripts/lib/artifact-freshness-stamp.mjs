@@ -205,7 +205,11 @@ export async function fetchDesktopPublishInFlight(input = {}) {
   const token = input.token ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  /** Prefer release/controller-inflight over a false stamp when observation is complete. */
+  /**
+   * Prefer release-inflight over a false stamp when observation is complete.
+   * Controller-newer only applies after stamp merge (`no-open-stamp`): never
+   * mask stamp-dwell-exceeded / dirty / multiple-open (stalled publish path).
+   */
   const withReleaseFallback = async stampResult => {
     const release = await fetchDesktopReleaseInFlight({
       repo,
@@ -214,14 +218,16 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       headers,
     });
     if (release.inFlight === true || release.inFlight == null) return release;
-    const controller = await fetchProductionControllerInFlight({
-      repo,
-      certifiedSha: input.headSha,
-      fetchImpl,
-      headers,
-    });
-    if (controller.inFlight === true || controller.inFlight == null) {
-      return controller;
+    if (stampResult.reason === 'no-open-stamp') {
+      const controller = await fetchProductionControllerInFlight({
+        repo,
+        certifiedSha: input.headSha,
+        fetchImpl,
+        headers,
+      });
+      if (controller.inFlight === true || controller.inFlight == null) {
+        return controller;
+      }
     }
     return stampResult;
   };
