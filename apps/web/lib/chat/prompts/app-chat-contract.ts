@@ -1,8 +1,4 @@
-/**
- * Deterministic instruction-contract checks for the production `/app/chat`
- * system prompt (ASS-9). Offline unit tests lock these strings so one-rec,
- * no-invented-stats, draft-hold, and revenue-first voice cannot silently drift.
- */
+/** Deterministic `/app/chat` prompt contract checks (ASS-9 + ASS-16). */
 
 export function checkAppChatPromptContract(prompt: string) {
   const normalized = prompt.toLowerCase();
@@ -40,6 +36,23 @@ export function checkAppChatPromptContract(prompt: string) {
     keepsGroundingToPromptOrTools: includesAll(
       'must come from this prompt or from a tool result in this turn',
       'unless it appears above or in a tool result this turn'
+    ),
+    requiresUpcomingFirstSentence: includesAll(
+      'first content sentence',
+      'name that release and the days left',
+      'Never invent lead-time rules',
+      'pre-save can go up today'
+    ),
+    requiresDatedMoveOrToolCall: includesAll(
+      'clarifying question is allowed only when a required tool field is truly missing',
+      '"do it", "yes", "ok", or "go"',
+      'call the proposed tool in this turn',
+      'choose one target and draft'
+    ),
+    requiresVisibleCatalogFacts: includesAll(
+      'Never invent popularity, streams, peer benchmarks',
+      'Never say you lack per-release data',
+      'today Jovie setup step'
     ),
   };
 }

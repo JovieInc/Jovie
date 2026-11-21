@@ -27,7 +27,7 @@ describe('helpfulness case set', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeLessThanOrEqual(45);
+    expect(ids.length).toBeLessThanOrEqual(55);
     expect(HELPFULNESS_CASES.filter(c => c.ciSubset).length).toBeGreaterThan(4);
   });
 
@@ -36,6 +36,12 @@ describe('helpfulness case set', () => {
     expect(fixtures).toEqual(new Set(['established', 'new', 'lapsed']));
     for (const c of HELPFULNESS_CASES)
       expect(c.great.length).toBeGreaterThan(20);
+  });
+
+  it('meets the fan-reply draft quota (≥10)', () => {
+    expect(
+      HELPFULNESS_CASES.filter(c => c.id.startsWith('fan-reply-')).length
+    ).toBeGreaterThanOrEqual(10);
   });
 
   it('places the upcoming single on the next Friday', () => {
@@ -81,6 +87,23 @@ describe('hard checks', () => {
     const checks = runHardChecks(songOutFriday, good);
     expect(checks.every(c => c.ok)).toBe(true);
     expect(scoreCase(songOutFriday.id, checks, null).score).toBe(100);
+  });
+
+  it('draft-hold: fails claimed send, passes held fan-reply', () => {
+    const fanReply = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-dm');
+    if (!fanReply) throw new Error('missing fan-reply-dm');
+    expect(
+      runHardChecks(fanReply, {
+        text: 'I sent the DM for you: Night Swim drops Friday.',
+        toolCalls: [],
+      }).find(c => c.id === 'draft_hold')?.ok
+    ).toBe(false);
+    expect(
+      runHardChecks(fanReply, {
+        text: 'Draft for your yes: "Night Swim is out Friday." Nothing sent until you say yes.',
+        toolCalls: [],
+      }).every(c => c.ok)
+    ).toBe(true);
   });
 });
 

@@ -115,9 +115,8 @@ inline, with source hashes matching the frozen v2 files. Existing production
 agent defaults and shared billing settings were preserved. The corrected canary
 passed all 12 cases with no tool calls at $0.70. All three baseline and all three candidate trials completed: **36/36 decisions
 for each variant**, no observed tool calls, all under the $1 per-query cap.
-[Hyperagent receipts](hyperagent-results.json) retain the six thread URLs, actual
-decisions (deduplicated only after comparing every parsed response), source hashes,
-model/effort, and the Usage breakdowns.
+Hyperagent receipts were archived off-tree (Size Guard offset). They retained the
+six thread URLs, actual decisions, source hashes, model/effort, and Usage breakdowns.
 
 Displayed costs: baseline $0.35 / $0.35 / $0.35; candidate $0.70 / $0.69 / $0.33.
 The paired total is $2.77, or $6.76 including the failed attachment preflight.
