@@ -47,3 +47,33 @@ export const LongContent: Story = {
     },
   },
 };
+
+export const Partial: Story = {
+  args: {
+    state: 'input-available',
+    inputQuery: 'Alex',
+    output: null,
+  },
+};
+
+export const Offline: Story = {
+  args: { state: 'output-error', inputQuery: 'Alex Example' },
+};
+
+export const PermissionDenied: Story = {
+  args: { state: 'output-denied' },
+};
+
+export const Rtl: Story = {
+  args: {
+    state: 'output-available',
+    output: { action: 'open_artist_picker', query: null },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -1,6 +1,9 @@
 import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { OnboardingHandleCheckCard } from './OnboardingToolStatusCards';
+import {
+  OnboardingHandleCheckCard,
+  OnboardingSocialLinkCard,
+} from './OnboardingToolStatusCards';
 
 const meta = {
   title: 'Features/Onboarding/OnboardingToolStatusCards',
@@ -48,4 +51,36 @@ export const Rtl: Story = {
       </div>
     ),
   ],
+};
+
+export const Empty: Story = {
+  args: { state: 'output-available', output: null },
+};
+
+export const Partial: Story = {
+  render: () => (
+    <OnboardingSocialLinkCard
+      state='output-available'
+      output={{ action: 'propose_social_link', url: 'https://instagram.com' }}
+      onAttachAccount={() => {}}
+    />
+  ),
+};
+
+export const LongContent: Story = {
+  args: {
+    state: 'output-available',
+    output: {
+      action: 'check_handle',
+      handle: 'an.unusually.long.artist.handle.with.many.parts',
+    },
+  },
+};
+
+export const Offline: Story = {
+  args: { state: 'output-error', output: { handle: 'alexexample' } },
+};
+
+export const PermissionDenied: Story = {
+  args: { state: 'output-denied' },
 };
