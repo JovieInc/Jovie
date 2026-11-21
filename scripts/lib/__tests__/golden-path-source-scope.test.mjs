@@ -205,6 +205,13 @@ for (const path of [
   'scripts/lanes/vitest.config.mjs',
   'scripts/golden-path-lock.mjs',
   'scripts/lib/golden-path-source-scope.mjs',
+  'scripts/prod-cert.mjs',
+  'scripts/lib/prod-cert-probes.mjs',
+  'apps/web/lib/ovie/certifications/golden-path-status.ts',
+  'apps/web/lib/ovie/certifications/prod-golden-path-ledger.ts',
+  'apps/web/lib/acquisition/eligibility.ts',
+  'apps/web/lib/acquisition/eligibility-cache.ts',
+  'apps/web/lib/acquisition/eligibility.server.ts',
   'apps/web/data/marketing/routeManifest.ts',
 ]) {
   it(`retains coverage for shared/config/unknown neighbor: ${path}`, () => {

@@ -20,10 +20,15 @@ vi.mock('@/lib/server-analytics', () => ({
 
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const WEBHOOK_UNIX_SEC = 1_700_000_000;
+const WEBHOOK_EVENT_TIMESTAMP = new Date(WEBHOOK_UNIX_SEC * 1000);
+
 import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockCaptureCriticalError,
+  mockExpireReferralOnChurn,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
@@ -50,14 +55,14 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_123',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_123',
             status: 'canceled',
             customer: 'cus_deleted',
             metadata: { clerk_user_id: 'user_deleted' },
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
@@ -97,20 +102,20 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_slack',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_slack',
             status: 'canceled',
             customer: 'cus_deleted_slack',
             metadata: { clerk_user_id: 'user_deleted_slack' },
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_slack',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
     };
 
     const result = await handler.handle(context);
@@ -133,20 +138,20 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_skipped_slack',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_skipped_slack',
             status: 'canceled',
             customer: 'cus_deleted_skipped_slack',
             metadata: { clerk_user_id: 'user_deleted_skipped_slack' },
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_skipped_slack',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
     };
 
     const result = await handler.handle(context);
@@ -163,20 +168,20 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_no_meta',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_no_meta',
             status: 'canceled',
             customer: 'cus_deleted_no_meta',
             metadata: {},
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_no_meta',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
     };
 
     const result = await handler.handle(context);
@@ -208,20 +213,20 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_fail',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_fail',
             status: 'canceled',
             customer: 'cus_deleted_fail',
             metadata: { clerk_user_id: 'user_deleted_fail' },
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_fail',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
     };
 
     await expect(handler.handle(context)).rejects.toThrow(
@@ -239,6 +244,92 @@ describe('@critical SubscriptionHandler - Deleted', () => {
     );
   });
 
+  it('completes churn analytics and referral expiry on duplicate_event retry without re-sending Slack', async () => {
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      skipped: true,
+      reason: 'duplicate_event',
+      skipReason: 'duplicate_event',
+      appUserId: 'app_user_deleted_duplicate',
+    });
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_deleted_duplicate',
+        type: 'customer.subscription.deleted',
+        created: WEBHOOK_UNIX_SEC,
+        data: {
+          object: {
+            id: 'sub_deleted_duplicate',
+            status: 'canceled',
+            customer: 'cus_deleted_duplicate',
+            metadata: { clerk_user_id: 'user_deleted_duplicate' },
+            canceled_at: WEBHOOK_UNIX_SEC,
+            items: { data: [{ price: { id: 'price_pro' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_deleted_duplicate',
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(result.skipped).toBe(true);
+    expect(result.reason).toBe('duplicate_event');
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'subscription_churned',
+      { stripeEventId: 'evt_deleted_duplicate' },
+      undefined,
+      expect.objectContaining({
+        eventIdentity: 'stripe:evt_deleted_duplicate',
+      })
+    );
+    expect(mockExpireReferralOnChurn).toHaveBeenCalledWith(
+      'app_user_deleted_duplicate'
+    );
+    expect(mockNotifySlackCancellation).not.toHaveBeenCalled();
+  });
+
+  it('does not run churn or referral post-effects for stale_event skips', async () => {
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      skipped: true,
+      reason: 'stale_event',
+      skipReason: 'stale_event',
+      appUserId: 'app_user_deleted_stale',
+    });
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_deleted_stale_churn',
+        type: 'customer.subscription.deleted',
+        created: WEBHOOK_UNIX_SEC,
+        data: {
+          object: {
+            id: 'sub_deleted_stale_churn',
+            status: 'canceled',
+            customer: 'cus_deleted_stale_churn',
+            metadata: { clerk_user_id: 'user_deleted_stale' },
+            canceled_at: WEBHOOK_UNIX_SEC,
+            items: { data: [{ price: { id: 'price_pro' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_deleted_stale_churn',
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(result.skipped).toBe(true);
+    expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    expect(mockExpireReferralOnChurn).not.toHaveBeenCalled();
+    expect(mockNotifySlackCancellation).not.toHaveBeenCalled();
+  });
+
   it('propagates skipped result from billing update on deletion', async () => {
     mockUpdateUserBillingStatus.mockResolvedValue({
       success: true,
@@ -251,20 +342,20 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       event: {
         id: 'evt_deleted_skipped',
         type: 'customer.subscription.deleted',
-        created: Math.floor(Date.now() / 1000),
+        created: WEBHOOK_UNIX_SEC,
         data: {
           object: {
             id: 'sub_deleted_skipped',
             status: 'canceled',
             customer: 'cus_deleted_skipped',
             metadata: { clerk_user_id: 'user_deleted_skipped' },
-            canceled_at: Math.floor(Date.now() / 1000),
+            canceled_at: WEBHOOK_UNIX_SEC,
             items: { data: [{ price: { id: 'price_pro' } }] },
           } as unknown as Stripe.Subscription,
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_skipped',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp: WEBHOOK_EVENT_TIMESTAMP,
     };
 
     const result = await handler.handle(context);

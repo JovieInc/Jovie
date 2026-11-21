@@ -17,7 +17,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "a8260d3292af576dbc5e17b74b4ecae43c177d82c56a575650180016d1fbdec2"
+    "bodySha256": "ddc6fa20c94cee33cee2dc0715b93c74b3e4402e3dfaba5ac75937090b901ffd"
   },
   {
     "file": ".claude/rules/db.md",
@@ -51,7 +51,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "a76df58a1cfe405e9df2ef9e78e7a5150a4056a8a177ac27443005aa5fd0b428"
+    "bodySha256": "75f921f49b129ee4392c581b6997613dc262552ffa97a50893d4b45916d49496"
   },
   {
     "file": ".claude/rules/external-apis.md",
@@ -92,7 +92,7 @@
       ".github/actions/**",
       ".github/scripts/**"
     ],
-    "bodySha256": "ab6e1ef736a3788ac1fba123dd562ca3a26007affe6331fe2badd74b5ddb55f1"
+    "bodySha256": "bc62cf8f075ebef2862467117d0fa78d1483e27b8a82c8ccf7fc44771c24b737"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -116,7 +116,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
+    "bodySha256": "09001090cb26977b865a25038927fe528831da035a91db3d101ada4b95df8a5e"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -137,7 +137,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "d454e6f80e8fe4322b7d03ac03ed472f69095e16e935212b1f1025bdbbdb2f17"
+    "bodySha256": "9bd27ae5162d6df5852d8dce19c30d2d5ae7baa0ca663089f25b87c377cc8c83"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -148,12 +148,12 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "d923a03cbc44bea8b7104790889662c61a0f0da0117d1398630b02a6b8b361e7"
+    "bodySha256": "4b84d3552a7aa3bb2709d3d64850bf7e8b368407f4b2c9a3bbf57a50ff4a496a"
   },
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
+    "bodySha256": "c8ead93f857dfb686fe7398a57adf6f7837446cd7b0c1c2ec08c27cd325c1b1e"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
@@ -181,7 +181,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "f566f0df3d70659a7146b7388695f74745fef4fd459484e86dd9707d5b2c76e4"
+    "bodySha256": "a8b91b26bdb6b9f0f0c769433b44e9c846b5c58f5e050f1611e16710b663c4ff"
   },
   {
     "file": ".claude/rules/security.md",
@@ -192,7 +192,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
+    "bodySha256": "4509b7d4d9a9d8510773d769e4991dee6049d0da0d5221c50fcf0895a5184522"
   },
   {
     "file": ".claude/rules/source-of-truth.md",
@@ -240,6 +240,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
+    "bodySha256": "f8208af39b454b16f8951bbbc9785d767afe2f0f0c24a709b40f0dfcd20f5ade"
   }
 ]

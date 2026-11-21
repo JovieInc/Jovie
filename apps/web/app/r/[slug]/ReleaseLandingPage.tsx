@@ -158,16 +158,22 @@ function SmartLinkClaimBanner({
     () => `smartlink:claim-banner:dismissed:${profileId}`,
     [profileId]
   );
-  const [isDismissed, setIsDismissed] = useState(
-    () => globalThis.localStorage?.getItem(dismissalKey) === '1'
-  );
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    setIsDismissed(globalThis.localStorage?.getItem(dismissalKey) === '1');
+    try {
+      setIsDismissed(globalThis.localStorage?.getItem(dismissalKey) === '1');
+    } catch {
+      setIsDismissed(false);
+    }
   }, [dismissalKey]);
 
   const handleDismiss = useCallback(() => {
-    globalThis.localStorage?.setItem(dismissalKey, '1');
+    try {
+      globalThis.localStorage?.setItem(dismissalKey, '1');
+    } catch {
+      // Storage may be unavailable in private/sandboxed browsing contexts.
+    }
     setIsDismissed(true);
   }, [dismissalKey]);
 
@@ -177,7 +183,10 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div
+      className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'
+      data-testid='smartlink-claim-banner'
+    >
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
@@ -188,7 +197,7 @@ function SmartLinkClaimBanner({
           </p>
           <Link
             href={signupUrl}
-            className='text-foreground/90 hover:text-foreground mt-2 inline-flex items-center gap-1 text-2xs font-semibold transition-colors'
+            className='text-foreground/90 hover:text-foreground relative mt-2 inline-flex items-center gap-1 rounded-sm text-2xs font-semibold transition-colors focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
           >
             Claim profile
             <Icon name='ArrowRight' className='h-3 w-3' aria-hidden='true' />
@@ -197,7 +206,7 @@ function SmartLinkClaimBanner({
         <button
           type='button'
           onClick={handleDismiss}
-          className='text-muted-foreground hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors'
+          className='text-muted-foreground hover:text-foreground relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
           aria-label='Dismiss Claim Profile Banner'
         >
           <Icon name='X' className='h-3.5 w-3.5' aria-hidden='true' />
@@ -453,7 +462,7 @@ export function ReleaseLandingPage({
                 {downloadUrl ? (
                   <Link
                     href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
-                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-(--color-text-tooltip) transition-colors hover:bg-white/15'
+                    className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-(--color-text-tooltip) transition-colors hover:bg-white/15 focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                   >
                     Download files
                   </Link>
@@ -461,7 +470,7 @@ export function ReleaseLandingPage({
                 {artist.handle ? (
                   <Link
                     href={`/${artist.handle}`}
-                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                    className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                   >
                     Visit artist profile
                   </Link>
@@ -469,7 +478,7 @@ export function ReleaseLandingPage({
                 <button
                   type='button'
                   onClick={() => setShareOpen(true)}
-                  className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white'
+                  className='relative inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-transparent px-3 text-xs font-medium text-white/80 transition-colors hover:text-white focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
                 >
                   Share release
                 </button>

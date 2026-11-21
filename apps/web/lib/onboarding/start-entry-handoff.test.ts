@@ -51,4 +51,38 @@ describe('resolveStartEntryHandoff', () => {
       prompt: 'Help me find my artist profile.',
     });
   });
+
+  it('upgrades the generic homepage claim starter prompt when a valid handle is submitted', () => {
+    expect(
+      resolveStartEntryHandoff({
+        starter_prompt: 'I want to claim my profile.',
+        handle: ' @LunaHarbor ',
+      })
+    ).toEqual({
+      kind: 'prompt',
+      prompt: 'I want to claim jov.ie/lunaharbor.',
+    });
+
+    expect(
+      resolveStartEntryHandoff({
+        starter_prompt: 'I want to claim my profile.',
+        handle: '',
+      })
+    ).toEqual({
+      kind: 'prompt',
+      prompt: 'I want to claim my profile.',
+    });
+  });
+
+  it('rewrites display-name handle= into a Spotify search prior (JOV-10127)', () => {
+    expect(
+      resolveStartEntryHandoff({
+        starter_prompt: 'I want to claim my profile.',
+        handle: 'Taylor Swift',
+      })
+    ).toEqual({
+      kind: 'prompt',
+      prompt: 'I want to claim my profile. Find Taylor Swift on Spotify.',
+    });
+  });
 });

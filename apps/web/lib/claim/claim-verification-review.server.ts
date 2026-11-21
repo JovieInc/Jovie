@@ -560,12 +560,12 @@ export async function decideClaimVerification(input: {
   }
 
   if (input.decision === 'approve') {
+    await importAfterLink(input.profileId);
     await Promise.allSettled(
       [row.handle, ...releasedHandles].map(handle =>
-        invalidateProfileCache(handle)
+        invalidateProfileCache(handle, null, { privacyChanged: true })
       )
     );
-    await importAfterLink(input.profileId);
   }
 
   return { outcome: 'decided', record: next };

@@ -639,7 +639,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
       rgba(45, 83, 142, 0.1) 0%,
       rgba(5, 6, 8, 0) 70%
     ),
-    linear-gradient(180deg, #050608 0%, var(--color-bg-base) 100%);
+    linear-gradient(
+      180deg,
+      var(--noir-ion-canvas) 0%,
+      var(--color-bg-base) 100%
+    );
 }
 
 .homepage-profile-outcome-inner {

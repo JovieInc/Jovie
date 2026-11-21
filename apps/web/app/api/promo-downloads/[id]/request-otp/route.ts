@@ -9,7 +9,6 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
@@ -17,6 +16,8 @@ import {
   getPromoDownloadOtpSubject,
   getPromoDownloadOtpText,
 } from '@/lib/email/templates/promo-download-otp';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { isProPlan } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -96,7 +97,7 @@ export async function POST(
       );
     }
 
-    // Fetch promo download + verify active + artist is Pro
+    // Fetch promo download + verify active + artist plan via entitlements
     const [download] = await db
       .select({
         id: promoDownloads.id,
@@ -106,18 +107,24 @@ export async function POST(
         artworkUrl: promoDownloads.artworkUrl,
         isActive: promoDownloads.isActive,
         artistName: creatorProfiles.displayName,
-        isPro: users.isPro,
       })
       .from(promoDownloads)
       .innerJoin(
         creatorProfiles,
         eq(creatorProfiles.id, promoDownloads.creatorProfileId)
       )
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(promoDownloads.id, id))
       .limit(1);
 
-    if (!download?.isActive || !download?.isPro) {
+    if (!download?.isActive) {
+      return NextResponse.json(
+        { error: 'Not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { plan } = await getCreatorEntitlements(download.creatorProfileId);
+    if (!isProPlan(plan)) {
       return NextResponse.json(
         { error: 'Not found' },
         { status: 404, headers: NO_STORE_HEADERS }

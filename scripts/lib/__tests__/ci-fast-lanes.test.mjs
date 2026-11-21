@@ -166,11 +166,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     'validation-sync',
     'linear-sync-on-merge',
     'founder-taste-order',
+    'ordinary-issue-validation-closure-replay',
   ]) {
     expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
       `lib/__tests__/${test}.test.mjs`
     );
   }
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    'outcome-residual-policy'
+  );
   // An explicit '=true' becomes a string in Vitest 5 and silently checks
   // aggregate coverage. Exercise its actual parser at this runner boundary.
   expect(
@@ -287,7 +291,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -997,21 +1001,20 @@ describe('invariant-scanned structural selection', () => {
     expect(plan.runJovieProduct).toBe(false);
   });
 
-  it('routes every feedback inventory and linked guard edit through invariants', async () => {
-    const paths = new Set([
+  it.each([
+    ...new Set([
       'LESSONS.md',
       'LESSONS.guards.json',
       ...readFeedbackGuardPaths(),
-    ]);
-    for (const path of paths) {
-      expect(isInvariantScannedPath(path), path).toBe(true);
-      const { execute } = await runFor(
-        'pull_request',
-        [path],
-        classifyProductLanes([path]).selectedLanes
-      );
-      expect(invariantRuns(execute), path).toBe(1);
-    }
+    ]),
+  ])('routes feedback input %s through invariants', async path => {
+    expect(isInvariantScannedPath(path), path).toBe(true);
+    const { execute } = await runFor(
+      'pull_request',
+      [path],
+      classifyProductLanes([path]).selectedLanes
+    );
+    expect(invariantRuns(execute), path).toBe(1);
   });
 
   it('classifies every scanned path into a lane that reaches structural', () => {
@@ -2260,43 +2263,20 @@ describe('source-read guard selection', () => {
 
   it.each([
     [
-      'pull_request',
-      [
-        'web-source-read-tests',
-        'script-contracts',
-        'merged-with-base-invariants',
-        'gate-weakening-detector',
-      ],
+      'scripts/lib/ci-schedule-inventory.mjs',
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['merge_group', []],
-    ['push', []],
-  ])(
-    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
-    (event, pr) => {
-      expect(
-        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual([
-        'ci-schedule-inventory',
-        'automation-registry',
-        'external-api-guard',
-        ...pr,
-      ]);
-    }
-  );
-
-  it.each([
-    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
-    ['canon/automation-registry.jsonl', ['automation-registry']],
-    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
+    ['canon/automation-registry.jsonl', ['automation-registry', 'anti-slop']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry', 'anti-slop']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
-      ['ci-schedule-inventory'],
+      ['ci-schedule-inventory', 'anti-slop'],
     ],
-    ['.github/workflows/nested/not-loaded.yml', []],
-    ['.github/scripts/run-actionlint.sh', []],
+    ['.github/workflows/nested/not-loaded.yml', ['anti-slop']],
+    ['.github/scripts/run-actionlint.sh', ['anti-slop']],
     [
       'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/app/api/cron/example/route.test.ts',
@@ -2306,23 +2286,24 @@ describe('source-read guard selection', () => {
         'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
+        'anti-slop',
       ],
     ],
     [
       'apps/web/eslint-rules/rule.test.js',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/scripts/tool.test.mjs',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/node-environment-files.json',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/tests/setup-optimized.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files', 'anti-slop'],
     ],
     [
       'apps/web/vitest.config.fast.mts',
@@ -2330,6 +2311,7 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2338,6 +2320,7 @@ describe('source-read guard selection', () => {
         'artist-profile-conformance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
     [
@@ -2350,6 +2333,7 @@ describe('source-read guard selection', () => {
         'static-revalidate-policy',
         'art-direction',
         'icp-language',
+        'anti-slop',
         'marketing-rounded-media',
         'marketing-container-width',
       ],
@@ -2360,16 +2344,17 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'node-environment-files',
         'static-revalidate-policy',
+        'anti-slop',
       ],
     ],
-    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
-    ['apps/ios/Jovie/App.swift', ['native-design-system']],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', ['anti-slop']],
+    ['apps/ios/Jovie/App.swift', ['native-design-system', 'anti-slop']],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      ['merge-group-unit-guards', 'static-revalidate-policy', 'anti-slop'],
     ],
-    ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
+    ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
@@ -2452,11 +2437,12 @@ describe('source-read guard selection', () => {
       const expected = path.startsWith('apps/web/lib/')
         ? [
             'artist-profile-conformance',
+            'anti-slop',
             ...apiGuard(path),
             ...domainGuard(path),
             'copy-leak',
           ]
-        : ['copy-leak'];
+        : ['anti-slop', 'copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }

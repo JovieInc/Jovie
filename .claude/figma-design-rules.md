@@ -1,11 +1,11 @@
-# Figma MCP Design System Rules for Jovie
+# Figma MCP — optional bridge only (not design SoT)
 
-> **Legacy integration reference.** It may explain older Figma translations but
-> cannot override `DESIGN.md`, current source registries, or the Pen/source
-> identity boundary.
-
-> Comprehensive design system reference for Figma MCP integration.
-> Use when translating between Figma designs and Jovie codebase components.
+> **Not publishable design authority.** Pen (+ZiaWI for color) is the only
+> publishable design SoT. Figma and Paper are scratch/reference. This file
+> documents Figma MCP as an **optional** Code Connect / import-export bridge
+> when Tim’s plan allows it. It must never override `DESIGN.md`, current
+> source registries, `.claude/rules/pen.md`, or the Pen/source identity
+> boundary. Prefer Pen for art direction; use this guide only when bridging.
 
 ---
 
@@ -116,11 +116,12 @@ design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind util
 ```
 
 Current production UI anchors are Pen node ZiaWI (`ziawi-color-sot-v1`),
-projected into Noir Ion CSS. Figma translation must read that SoT, `DESIGN.md`,
-and the live CSS emitters before introducing colors. Do not invent a parallel
-React-only or Figma-only color root. Jovie-owned generated brand imagery uses
-Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`; do not
-apply the softened scene references to shipped UI tokens.
+projected into Noir Ion CSS. Any optional Figma bridge must read that SoT,
+`DESIGN.md`, and the live CSS emitters before introducing colors. Do not invent
+a parallel React-only or Figma-only color root. Jovie-owned generated brand
+imagery uses Scene Palette v1 from
+`apps/web/data/marketing/imageColorPolicy.ts`; do not apply the softened scene
+references to shipped UI tokens.
 
 ### Borders
 
@@ -668,7 +669,7 @@ All durations → 0ms via `@media (prefers-reduced-motion: reduce)`.
 
 ---
 
-## 14. Figma-to-Code Translation Guide
+## 14. Optional Figma→code bridge (never SoT)
 
 ### Mapping Rules
 

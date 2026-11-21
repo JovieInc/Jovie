@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+import execution_mirror  # noqa: E402
 SCHEMA, GITHUB_LEDGER_ANCHOR = "jovie-execution-attempt/v1", "cd29469b1fa2c433135f23bbfca273e674934676"
 TERMINAL = frozenset({"succeeded", "no_op_stale", "canceled", "failed_known", "failed_unknown", "budget_exhausted", "quarantined", "superseded", "dead_lettered"})
 RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete", "target_state_unavailable"})
@@ -14,36 +15,13 @@ def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
     return {"workKey": work_key, "executionGeneration": generation, "identityDigest": digest({"workKey": work_key, "generation": generation})}
-def _mirror_rows(text: str) -> list[dict]:
-    """A crash or full disk can tear the last append. The local file mirrors the GitHub ledger,
-    so a torn final line (no newline) is dropped, never fatal: one torn line failed every
-    fix-red claim on Gem from 2026-10-26 07:30Z. Interior corruption still raises."""
-    lines = text.split("\n")
-    if lines[-1] == "": lines.pop()
-    else:
-        try: json.loads(lines[-1])
-        except json.JSONDecodeError: lines.pop()
-    return [json.loads(line) for line in lines if line]
-def _ends_open(path: Path) -> bool:
-    if not path.exists() or not path.stat().st_size: return False
-    with open(path, "rb") as handle:
-        handle.seek(-1, os.SEEK_END); return handle.read(1) != b"\n"
+_mirror_rows, _ends_open = execution_mirror.mirror_rows, execution_mirror.ends_open
 def _rows(path: Path) -> list[dict]:
     rows = [] if not path.exists() else _mirror_rows(path.read_text())
     if any(row.get("schema") != SCHEMA or not row.get("identityDigest") for row in rows): raise RuntimeError("execution-ledger-malformed")
     return rows
 def _file_locked(path: Path, fn):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(f"{path}.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        result, additions = fn(_rows(path))
-        if additions:
-            if _ends_open(path):
-                data = path.read_bytes(); path.write_bytes(data[:data.rfind(b"\n") + 1])
-            with open(path, "a") as ledger:
-                ledger.writelines(json.dumps(row, sort_keys=True) + "\n" for row in additions)
-                ledger.flush(); os.fsync(ledger.fileno())
-        return result
+    return execution_mirror.file_locked(path, fn, _rows)
 GET_TIMEOUT_S = 90
 
 
@@ -320,7 +298,11 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None)
             # is unknown. Do not turn this invocation into another authorization.
             if recovered["event"] == "boundary_admitted": raise RuntimeError("execution-coordinator-recovered-boundary")
         result, additions = fn(rows)
-        if not additions: return result
+        if not additions:
+            if isinstance(result, dict) and result.get("reason") in {"generation_terminal", "generation_completion_fenced"}:
+                error = execution_mirror.remember_stops(path, rows, TERMINAL, _rows)
+                if error: result = {**result, "mirrorError": error}
+            return result
         if len(additions) != 1: raise RuntimeError("execution-coordinator-non-atomic-append")
         event_id = _github_append(coordination, ident, additions[0], head)
         if event_id is None: continue

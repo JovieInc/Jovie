@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import {
   listAllChangedFiles,
-  MERGED_WITH_BASE_POOL_CONCURRENCY,
-  MERGED_WITH_BASE_POOL_LONG_POLES,
   packageScripts,
   runCommandPool,
   selectSourceGuards,
@@ -12,6 +10,11 @@ import {
   structuralLocks,
 } from '../ci-fast-lanes.mjs';
 import { commandLabel } from './ci-failure-excerpts.mjs';
+import {
+  filterMergedWithBasePoolEntries,
+  MERGED_WITH_BASE_POOL_CONCURRENCY,
+  MERGED_WITH_BASE_POOL_LONG_POLES,
+} from './merged-with-base-pool-config.mjs';
 
 /**
  * Expand a pool spec into runnable entries. A `splitChain` entry becomes one
@@ -194,16 +197,61 @@ export async function runSourceGuards(guards, opts = {}) {
  * @param {{execute?: (command: string) => {code: number, output: string} | Promise<{code: number, output: string}>, now?: () => number}} [opts]
  * @returns {Promise<{code: number, output: string}>}
  */
-export async function runSourceGuardPool(spec, opts = {}) {
-  const entries = expandSourcePoolEntries(spec);
-  const commands = entries.map(entry => entry.command);
-  const concurrency = Math.max(
+/**
+ * Concurrency for the nested merged-with-base subpool.
+ *
+ * The top-level Validate pool defaults SOURCE_GUARD_CONCURRENCY=3 so
+ * script-contracts and merged-with-base can overlap without starving a
+ * 4-vCPU runner. That default must NOT silently cap this nested pool:
+ * MERGED_WITH_BASE_POOL_CONCURRENCY=4 is the intended width once the
+ * invariants chain is split. SOURCE_GUARD_CONCURRENCY=1 remains the
+ * documented serial debug switch for the whole Validate step.
+ * @param {number | undefined} specConcurrency
+ * @returns {number}
+ */
+export function mergedWithBasePoolConcurrency(specConcurrency) {
+  const nestedEnv = process.env.MERGED_WITH_BASE_POOL_CONCURRENCY;
+  if (nestedEnv !== undefined && String(nestedEnv).trim() !== '') {
+    const parsed = Number(String(nestedEnv).trim());
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  if (String(process.env.SOURCE_GUARD_CONCURRENCY ?? '').trim() === '1') {
+    return 1;
+  }
+  return Math.max(
     1,
     Math.min(
-      spec.concurrency ?? MERGED_WITH_BASE_POOL_CONCURRENCY,
-      sourceGuardConcurrency()
+      specConcurrency ?? MERGED_WITH_BASE_POOL_CONCURRENCY,
+      availableParallelism()
     )
   );
+}
+
+export async function runSourceGuardPool(spec, opts = {}) {
+  const expanded = expandSourcePoolEntries(spec);
+  // PR path-gates drop expensive invariant segments when unrelated; merge-group
+  // structural still runs the full `pnpm invariants:check` chain. Empty or
+  // unreadable diffs fail closed onto every entry.
+  const changedFiles =
+    opts.changedFileList !== undefined
+      ? opts.changedFileList
+      : listAllChangedFiles();
+  const { kept: entries, skipped } = filterMergedWithBasePoolEntries(
+    expanded,
+    changedFiles
+  );
+  const skipLines = skipped.map(
+    entry =>
+      `[merged-with-base] skip: ${entry.id}; ${entry.reason}; duration_ms=0`
+  );
+  if (entries.length === 0) {
+    return {
+      code: 0,
+      output: `${skipLines.join('\n')}${skipLines.length ? '\n' : ''}[merged-with-base] no pool entries selected\n`,
+    };
+  }
+  const commands = entries.map(entry => entry.command);
+  const concurrency = mergedWithBasePoolConcurrency(spec.concurrency);
   const results = await runCommandPool(commands, {
     execute: opts.execute ?? shellAsync,
     concurrency,
@@ -222,7 +270,7 @@ export async function runSourceGuardPool(spec, opts = {}) {
     now: opts.now,
   });
   let code = 0;
-  const output = results
+  const runOutput = results
     .map((result, index) => {
       if (result?.code !== 0 && code === 0) code = result?.code ?? 1;
       const text = String(result?.output ?? '');
@@ -230,6 +278,7 @@ export async function runSourceGuardPool(spec, opts = {}) {
       return `${text}${separator}[merged-with-base] ${entries[index].id}: exit ${result?.code ?? 1}; duration_ms=${Math.round(result?.durationMs ?? 0)}`;
     })
     .join('\n');
+  const output = [...skipLines, runOutput].filter(Boolean).join('\n');
   return { code, output: `${output}\n` };
 }
 

@@ -72,6 +72,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
+            scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -577,6 +578,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
+            scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -868,6 +870,7 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
+            scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
@@ -1014,6 +1017,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
+            scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
             scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs

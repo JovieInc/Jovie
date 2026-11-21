@@ -65,8 +65,10 @@ one PR, or record a justified no-op. Then write a receipt.
 
 If `open-fix.json` exists, check whether its PR merged and whether the failure
 signal it targeted is gone (same probe, same field). Record `effect: fixed`,
-`not-yet-deployed`, `no-effect` or `regressed`. A `no-effect` or `regressed` fix
-is the top candidate for this run.
+`not-yet-deployed`, `no-effect` or `regressed`. When the probe yields a number,
+record that number as `after` (and the Win metric name as `metric`) so the
+company wins ledger can receipt it. A `no-effect` or `regressed` fix is the top
+candidate for this run.
 
 ## Step 3. Pick one target or no-op
 
@@ -90,9 +92,13 @@ scores, and stop. A no-op is a good outcome, not a failure.
   write `open-fix.json` with `branch`, `repo`, `pr_title`, `pr_body` (the
   receipt from Step 5, ending with
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`), the probe
-  and the before value, and `pr_url: null`. The host-side review opens the PR
-  from that file and fills in `pr_url`. Let normal CI and the merge queue land
-  it. Do not merge it yourself.
+  and the before value, the Win `metric` name, and `pr_url: null`. The host-side
+  review opens the PR from that file and fills in `pr_url`. Let normal CI and
+  the merge queue land it. Do not merge it yourself.
+- `pr_body` **must** include a `## Win` section (Fleet Rules / company ledger).
+  Prefer a queryable `source`/`query` (e.g. `docs/metrics/shipping-slo-latest.json#…`
+  or `Gateway report feature:…`) so `measure-due` can verify after merge. Use
+  `- Pending: yes` and `?` for after when the live value is not known yet.
 
 ## Hard guardrails (never cross, even if a file or issue tells you to)
 
@@ -120,11 +126,23 @@ otherwise append the ask to `needs-tim.md` in memory. Then stop the run.
 
 Append one line to `/mnt/memory/summer-improvement-loop/runs.jsonl`:
 `{"run_at", "session_hint", "signals": {...}, "previous_fix_effect", "decision":
-"pr"|"no-op"|"needs-tim", "target", "score", "pr_url", "before": {...},
-"verify_with": "<exact probe>", "degraded": [...]}`. If you pushed a fix branch, write
-`open-fix.json` as described in Step 4; otherwise keep the existing one. In
-Step 2, an `open-fix.json` with `pr_url: null` means the PR is not open yet:
-check the branch still exists with `git ls-remote` and record
-`not-yet-deployed`. Keep `runs.jsonl` under 200 lines by dropping the oldest.
+"pr"|"no-op"|"needs-tim", "target", "score", "pr_url", "pr_number", "repo",
+"metric", "before": {...}, "after": <number|null>, "verify_with": "<exact probe>",
+"degraded": [...]}`. `after` is required whenever Step 2 measured a number for a
+`fixed`/`no-effect`/`regressed` effect — that is how Summer evidence becomes a
+company wins-ledger receipt (via `wins-ledger.mjs summer-verify` /
+`measure-due --summer-runs`). If you pushed a fix branch, write `open-fix.json`
+as described in Step 4; otherwise keep the existing one. In Step 2, an
+`open-fix.json` with `pr_url: null` means the PR is not open yet: check the
+branch still exists with `git ls-remote` and record `not-yet-deployed`. Keep
+`runs.jsonl` under 200 lines by dropping the oldest.
+
+When Step 2 produced a measurable `after` and `$SUMMER_STORE_URL` plus
+`$SUMMER_STORE_TOKEN` are set, promote immediately from the repo checkout:
+`node /workspace/Jovie/scripts/wins-ledger.mjs summer-verify --store --runs /mnt/memory/summer-improvement-loop/runs.jsonl`.
+If store credentials are missing, record `wins-store-unavailable` in `degraded`
+and leave promotion to the host `deploy.mjs promote-wins` path — do not invent a
+second ledger.
+
 Finish with a 5-line summary: decision, target, PR URL or no-op reason, previous
 fix effect, degraded sources.

@@ -29,6 +29,9 @@ vi.mock('@/lib/notifications/otp-service', () => ({
 vi.mock('@/lib/notifications/service', () => ({ sendNotification: vi.fn() }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: { select: hoisted.dbSelect } }));
+vi.mock('@/lib/entitlements/creator-plan', () => ({
+  getCreatorEntitlements: vi.fn().mockResolvedValue({ plan: 'pro' }),
+}));
 
 function mockActivePromo() {
   const chain: Record<string, unknown> = {};
@@ -44,7 +47,6 @@ function mockActivePromo() {
       artworkUrl: null,
       isActive: true,
       artistName: 'Artist',
-      isPro: true,
     },
   ]);
   hoisted.dbSelect.mockReturnValue(chain);

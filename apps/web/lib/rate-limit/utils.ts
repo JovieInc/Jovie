@@ -25,9 +25,12 @@ export interface StandardRateLimitHeaderOptions {
  * Treat a denied rate-limit result as allowed when the durable backend was
  * degraded or unavailable (Redis down / circuit open → per-instance memory).
  *
- * User-critical paths (auth, chat) must not hard-block on an advisory
- * in-memory bucket during an Upstash outage (JOV-3929 / JOV-3956). Healthy
- * Redis denials still enforce the limit.
+ * ONLY for documented UX-critical authenticated paths (native auth exchange /
+ * handback, AI chat hourly burst). Public abuse writers (feedback, report,
+ * claim entry/start/agent claim) and other anonymous durable limiters MUST
+ * fail closed — return the denial and map via `rateLimitDenialStatus` /
+ * `rateLimitDenialMessage` (429 exhaustion, 503 unavailable). Healthy Redis
+ * denials still enforce the limit on every path.
  */
 export function allowIfRateLimitBackendDegraded(
   result: RateLimitResult,

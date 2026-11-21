@@ -76,7 +76,9 @@ describe('homepage claim actions', { timeout: 60_000 }, () => {
     const { container } = await renderHomePage();
 
     const primary = screen.getByTestId('homepage-primary-cta');
-    expect(claim.href).toBe('/start');
+    expect(claim.href).toBe(
+      '/start?starter_prompt=I+want+to+claim+my+profile.'
+    );
     expect(primary).toHaveAttribute('href', claim.href);
     expect(primary).toHaveTextContent(claim.label);
     expect(HOME_MARKETING_HEADER_CTA).toEqual({
@@ -87,7 +89,7 @@ describe('homepage claim actions', { timeout: 60_000 }, () => {
       container.querySelectorAll('[data-primary-action="true"]')
     ).toHaveLength(1);
     // What the stranger certification check reads from the homepage HTML.
-    expect(signupEntries(container.innerHTML)).toEqual(['/start']);
+    expect(signupEntries(container.innerHTML)).toEqual([claim.href]);
 
     // The note under the actions describes the invitation form, so it goes.
     expect(screen.queryByText(copy.hero.note)).not.toBeInTheDocument();

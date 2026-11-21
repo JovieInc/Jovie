@@ -183,13 +183,6 @@ const PUBLIC_PROFILE_QUERY_TIMEOUT_MS =
     ? 30000 // 30 seconds for dev/test
     : 15000; // 15 seconds for production (covers Neon cold starts)
 
-/**
- * Get a profile by its ID.
- *
- * @param profileId - The profile ID
- * @returns Profile data or null if not found
- */
-
 /** True while the profile carries an unreleased lead-build hold (migration 0152). */
 const leadBuildHeldSql = drizzleSql`(${creatorProfiles.settings} -> 'leadBuild' ->> 'held') = 'true' and (${creatorProfiles.settings} -> 'leadBuild' ->> 'releasedAt') is null`;
 
@@ -201,16 +194,9 @@ export async function getProfileById(
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
-
   return profile ?? null;
 }
 
-/**
- * Get a profile by username (normalized).
- *
- * @param username - The username to look up
- * @returns Profile data or null if not found
- */
 export async function getProfileByUsername(
   username: string
 ): Promise<ProfileData | null> {
@@ -219,16 +205,9 @@ export async function getProfileByUsername(
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
-
   return profile ?? null;
 }
 
-/**
- * Get a profile with user context (isPro, clerkId).
- *
- * @param username - The username to look up
- * @returns Profile with user data or null if not found
- */
 export async function getProfileWithUser(
   username: string
 ): Promise<ProfileWithUser | null> {
@@ -239,6 +218,7 @@ export async function getProfileWithUser(
       userClerkId: users.clerkId,
       userEmail: users.email,
       userPlan: users.plan,
+      userTrialEndsAt: users.trialEndsAt,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -541,6 +521,7 @@ function buildProfileFallbackDefaults(
     userClerkId: null,
     userEmail: null,
     userPlan: null,
+    userTrialEndsAt: null,
   };
 }
 
@@ -554,6 +535,7 @@ async function selectProfileWithUser(
       userClerkId: users.clerkId,
       userEmail: users.email,
       userPlan: users.plan,
+      userTrialEndsAt: users.trialEndsAt,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))

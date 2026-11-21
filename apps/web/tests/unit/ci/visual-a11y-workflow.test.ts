@@ -151,24 +151,24 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayout.if).not.toContain("github.event_name == 'pull_request'");
   });
 
-  it('runs three two-worker browser shards beside one merge-group certification', () => {
+  it('runs six two-worker browser shards beside one merge-group certification', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
-    // Three disjoint Playwright shards cover the full spec list. Merge groups
+    // Six disjoint Playwright shards cover the full spec list. Merge groups
     // also require one parallel certification; any member failure fails the
     // matrix result read by the aggregates.
     expect(storybook.strategy).toEqual({
       'fail-fast': true,
       matrix: {
         shard:
-          "${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, \"certification\"]' || '[1, 2, 3]') }}",
+          "${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, 4, 5, 6, \"certification\"]' || '[1, 2, 3, 4, 5, 6]') }}",
       },
     });
     const matrix = step(storybook, 'Run surface elevation matrix (Storybook)');
     expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}');
     const command = String(matrix.step.run).replace(/\s*\\\n\s*/g, ' ');
     expect(command).toMatch(
-      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD\/3"/
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD\/6"/
     );
     expect(command).not.toMatch(/--update-snapshots|--retries|--repeat-each/);
     const config = readFileSync(
@@ -229,7 +229,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       expect(ready.calls).toMatch(
         /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
       );
-      expect(ready.calls).toContain('--shard=2/3');
+      expect(ready.calls).toContain('--shard=2/6');
       // The EXIT trap terminates the owned child; await reaping before kill -0.
       expect((await exited)[1]).toBe('SIGTERM');
       expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);

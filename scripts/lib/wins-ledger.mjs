@@ -2,6 +2,7 @@
 // every measured engineering result. Wins are data, never prose. Posts, pages
 // and Summer read numbers from here only.
 import { readFileSync } from 'node:fs';
+import { isNeedsProbeWin, isQueryableWin } from './wins-measure/classify.mjs';
 
 export const WIN_SCHEMA = 'jovie.win/v1';
 export const WINS_PATH = 'canon/wins/wins.jsonl';
@@ -379,6 +380,7 @@ export function weeklyRollup(wins, merged = []) {
 export function weeklyMetrics(wins, nowMs = Date.now()) {
   const weekAgo = new Date(nowMs - 7 * 86_400_000).toISOString().slice(0, 10);
   const status = wins.map(winStatus);
+  const pending = wins.filter((_, i) => status[i] === 'pending-measure');
   return {
     winsTotal: wins.length,
     winsVerified: status.filter(s => s === 'verified').length,
@@ -386,7 +388,9 @@ export function weeklyMetrics(wins, nowMs = Date.now()) {
     winsUnverified: status.filter(s => s === 'unverified').length,
     winsNotReproduced: status.filter(s => s === 'not-reproduced').length,
     winsPendingMerge: status.filter(s => s === 'pending-merge').length,
-    winsPendingMeasure: status.filter(s => s === 'pending-measure').length,
+    winsPendingMeasure: pending.length,
+    winsPendingMeasureQueryable: pending.filter(isQueryableWin).length,
+    winsNeedsProbe: pending.filter(isNeedsProbeWin).length,
     winsLast7d: wins.filter(w => w.date >= weekAgo).length,
   };
 }

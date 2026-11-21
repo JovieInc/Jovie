@@ -43,6 +43,7 @@ from fix_red_source_edits import (  # noqa: F401
 )
 from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
 from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
+from fix_red_missing_contract import ACTION as DROP_MISSING_CONTRACT, hit as missing_contract_hit
 import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 
 SCHEMA = "jovie-fix-red-class/v1"
@@ -53,7 +54,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SP
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win", "split-size-500")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR, DROP_MISSING_CONTRACT})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -214,8 +215,11 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         hit = fix_red_size_split.legacy_hit(text, hit)
+        if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
+            import fix_red_win_envelope
+            hit = fix_red_win_envelope.route(text)
         hit = fix_red_measured_win.annotated_win_hit(text, hit)
-        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
+        per_check.append(missing_contract_hit(text) or detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     per_check = fix_red_measured_win.promote_sole_win(per_check, names, logs)
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []

@@ -6,10 +6,8 @@ import {
 } from '@/lib/acquisition/proof-claim-funnel';
 import { recordProofClaimFunnelEvent } from '@/lib/acquisition/proof-claim-funnel.server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import {
-  createRateLimitHeaders,
-  trackingIpClicksLimiter,
-} from '@/lib/rate-limit';
+import { trackingIpClicksLimiter } from '@/lib/rate-limit';
+import { trackingLimiterResponse } from '@/lib/rate-limit/tracking-outage';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -28,18 +26,18 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ipAddress = extractClientIP(request.headers);
+  // optionalDrop telemetry: durable Redis when healthy; ack+drop on outage
+  // rather than 429 or per-instance memory (SEC-04 / tracking outage policy).
   const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { error: 'Too many tracking requests. Please try again later.' },
-      {
-        status: 429,
-        headers: {
-          ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitResult),
-        },
-      }
-    );
+  const limited = trackingLimiterResponse(rateLimitResult, {
+    dropBody: { ok: true, dropped: true },
+    dropStatus: 202,
+    throttleBody: {
+      error: 'Too many tracking requests. Please try again later.',
+    },
+  });
+  if (limited) {
+    return limited;
   }
 
   try {

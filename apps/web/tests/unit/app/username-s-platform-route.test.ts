@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => {
     id: 'profile_123',
     username: 'tim',
     usernameNormalized: 'tim',
+    isPublic: true,
+    isClaimed: true,
+    settings: null,
+    userEmail: null,
   };
   const link = {
     id: 'link_ig',
@@ -15,7 +19,10 @@ const mocks = vi.hoisted(() => {
 
   const profileLimit = vi.fn().mockResolvedValue([profile]);
   const profileWhere = vi.fn().mockReturnValue({ limit: profileLimit });
-  const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+  const profileFrom = vi.fn().mockReturnValue({
+    leftJoin: vi.fn().mockReturnValue({ where: profileWhere }),
+    where: profileWhere,
+  });
 
   const linkLimit = vi.fn().mockResolvedValue([link]);
   const linkWhere = vi.fn().mockReturnValue({ limit: linkLimit });
@@ -153,6 +160,39 @@ describe('GET /[username]/s/[platform]', () => {
     expect(res.headers.get('location')).toBe('https://instagram.com/timwhite');
   });
 
+  it('flushes the 301 before the rate limiter resolves (redirect latency budget)', async () => {
+    let releaseLimit: (result: {
+      success: boolean;
+      limit: number;
+      remaining: number;
+      reset: Date;
+    }) => void = () => undefined;
+    mocks.publicClickLimiter.limit.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseLimit = resolve;
+        })
+    );
+
+    const res = await GET(makeRequest('/tim/s/ig'), {
+      params: Promise.resolve({ username: 'tim', platform: 'ig' }),
+    });
+
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('https://instagram.com/timwhite');
+    expect(mocks.recordClickEvent).not.toHaveBeenCalled();
+
+    releaseLimit({
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date(Date.now() + 60_000),
+    });
+    await vi.waitFor(() => {
+      expect(mocks.recordClickEvent).toHaveBeenCalled();
+    });
+  });
+
   it('302s to the profile when the platform link is missing', async () => {
     mocks.linkLimit.mockResolvedValueOnce([]);
 
@@ -167,6 +207,11 @@ describe('GET /[username]/s/[platform]', () => {
   it('302s to the profile for unknown platform slugs (never 404 a fan)', async () => {
     mocks.selectMock.mockImplementationOnce(() => ({
       from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: mocks.profileLimit,
+          }),
+        }),
         where: vi.fn().mockReturnValue({
           limit: mocks.profileLimit,
         }),

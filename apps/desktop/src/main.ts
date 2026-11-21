@@ -2860,7 +2860,7 @@ function scheduleDesktopAutoUpdate(): void {
   powerMonitor.on('unlock-screen', checkAfterWake);
 }
 
-/** Restart into a downloaded update only overnight, idle, and with no work at risk. */
+/** Restart into a downloaded update when idle with no work at risk. */
 const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
   const workStateSafe = await allWindowWorkStateSafe();

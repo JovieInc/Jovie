@@ -28,9 +28,10 @@ describe('golden path certification after the Pen export', () => {
     expect(certify?.if).toBe('${{ !cancelled() }}');
   });
 
-  // JOV-12620: a not-certified verdict is its own receipt; only smoke, auth
-  // and Lighthouse fail the run. A crash that records nothing still fails.
-  const runCertify = code => {
+  // A not-certified verdict (rc=1) must fail the job (never swallow rc=1 into
+  // exit 0 as a false-green workflow run) while still uploading receipts via
+  // `if: ${{ always() }}` and blocking reuse stamping (`steps.certify.outcome == 'success'`).
+  const runCertify = (code, writeReceipts = true) => {
     const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
     const run = steps.find(
       s => s.name === 'Certify the golden path on production'
@@ -54,7 +55,9 @@ describe('golden path certification after the Pen export', () => {
         { surface: 'checkout', status: 'passed', checks: [] },
       ],
     };
-    const stub = `node() { printf '%s' '${JSON.stringify(receipts)}' > "$RUNNER_TEMP/prod-cert-receipts.json"; return ${code}; }\n`;
+    const stub = writeReceipts
+      ? `node() { printf '%s' '${JSON.stringify(receipts)}' > "$RUNNER_TEMP/prod-cert-receipts.json"; return ${code}; }\n`
+      : `node() { return ${code}; }\n`;
     const result = spawnSync('bash', ['-e', '-c', stub + run], {
       encoding: 'utf8',
       env: { ...process.env, RUNNER_TEMP: temp, GITHUB_STEP_SUMMARY: summary },
@@ -66,18 +69,29 @@ describe('golden path certification after the Pen export', () => {
     };
   };
 
-  it('records a not-certified verdict as a warning and summary, not a red run', () => {
+  it('fails the job (exit 1, never false-green exit 0) and writes the summary table when prod-cert is not certified', () => {
     const { status, out, summary } = runCertify(1);
-    expect(status).toBe(0);
-    expect(out).toContain('::warning title=Golden path not certified::');
+    expect(status).toBe(1);
+    expect(out).toContain('::error title=Golden path not certified::');
     expect(summary).toContain('| landing | failed | pen.design-exists |');
     expect(summary).toContain(
       '| chat | blocked | pen.matches-production: no Pen comparison yet |'
     );
     expect(summary).not.toContain('checkout');
+
+    const certSteps = workflow.jobs['golden-path-cert']?.steps ?? [];
+    const upload = certSteps.find(
+      s => s.name === 'Upload certification receipts'
+    );
+    const stamp = certSteps.find(
+      s => s.name === 'Stamp the receipts certified for reuse'
+    );
+    expect(upload?.if).toBe('${{ always() }}');
+    expect(stamp?.if).toBe("${{ steps.certify.outcome == 'success' }}");
   });
 
-  it('still fails when certification crashes without a verdict', () => {
+  it('fails closed on rc=1 even when no receipt file was written and on rc=2 crashes', () => {
+    expect(runCertify(1, false).status).toBe(1);
     expect(runCertify(2).status).toBe(2);
     expect(runCertify(0).status).toBe(0);
   });

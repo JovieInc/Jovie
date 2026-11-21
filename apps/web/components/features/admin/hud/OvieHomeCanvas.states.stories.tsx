@@ -3,30 +3,8 @@ import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { OvieInbox } from '@/lib/ovie/inbox';
-import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-
-type InboxCase = OvieInbox['cases'][number];
-
-const spendCase: InboxCase = {
-  contract: INTERACTION_CASE_CONTRACT,
-  id: 'summer:vercel-concurrency',
-  kind: 'spend',
-  source: { system: 'summer', id: 'vercel-concurrency', revision: null },
-  title: 'Vercel on-demand concurrency for Jovie',
-  recommendation: 'About $6 a month, at most $44. Recommended.',
-  owner: null,
-  state: 'needs_you',
-  priority: 1,
-  createdAt: '2026-10-20T18:00:00.000Z',
-  nextAction: null,
-  waitingUntil: null,
-  confidence: null,
-  evidence: [],
-  body: 'Gives production and staging builds their own lane so preview floods cannot stall production.',
-  decisionTarget: { kind: 'summer', id: 'vercel-concurrency' },
-};
+import { COMPANY_RESPONSES } from './OvieHomeCanvas.test-fixtures';
 
 type Answer = () => Promise<Response>;
 
@@ -35,22 +13,30 @@ const unavailable: Answer = async () => new Response('{}', { status: 503 });
 const unreachable: Answer = async () => {
   throw new TypeError('Failed to fetch');
 };
-const inboxAnswer =
-  (inbox: OvieInbox): Answer =>
-  async () =>
-    Response.json(inbox);
+
+function json(body: unknown): Answer {
+  return async () => Response.json(body);
+}
 
 /**
- * Answers every Home read for one story. Shipping state and the company
- * sources stay unavailable unless the story says otherwise, so nothing
- * reaches the API.
+ * Answers every Home read for one story. Shipping state stays unavailable
+ * unless the story says otherwise, so nothing reaches the API.
  */
-function stubHome(inbox: Answer, rest: Answer = unavailable) {
+function stubHome(rest: Answer = unavailable) {
   return () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       const url = new URL(String(input), window.location.href);
-      if (url.pathname === '/api/ovie/inbox') return inbox();
+      if (url.pathname === '/api/hud/metrics')
+        return json(COMPANY_RESPONSES['/api/hud/metrics'])();
+      if (url.pathname === '/api/admin/hud/founder-funnel')
+        return json(
+          COMPANY_RESPONSES['/api/admin/hud/founder-funnel?range=7d']
+        )();
+      if (url.pathname === '/api/ovie/certifications')
+        return json(COMPANY_RESPONSES['/api/ovie/certifications'])();
+      if (url.pathname === '/api/ovie/home/blocker')
+        return json(COMPANY_RESPONSES['/api/ovie/home/blocker'])();
       if (url.pathname.startsWith('/api/')) return rest();
       return originalFetch(input, init);
     };
@@ -60,99 +46,131 @@ function stubHome(inbox: Answer, rest: Answer = unavailable) {
   };
 }
 
-function HomeFrame({ dir = 'ltr' }: { readonly dir?: 'ltr' | 'rtl' }) {
+function HomeFrame({
+  dir = 'ltr',
+  melting = false,
+}: {
+  readonly dir?: 'ltr' | 'rtl';
+  readonly melting?: boolean;
+}) {
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
   );
   return (
     <QueryClientProvider client={client}>
-      <div dir={dir} className='bg-base p-4 text-primary-token'>
-        <OvieHomeCanvas />
+      <div dir={dir} className='min-h-dvh bg-base p-6 text-primary-token'>
+        <OvieHomeCanvas
+          chat={
+            melting
+              ? {
+                  messages: [],
+                  isStreaming: false,
+                  composerHasIntent: true,
+                  onOpenTranscript: () => undefined,
+                }
+              : undefined
+          }
+        />
       </div>
     </QueryClientProvider>
   );
-}
-
-function renderHome() {
-  return <HomeFrame />;
 }
 
 const meta = {
   title: 'Features/Admin/Hud/OvieHomeCanvas States',
   component: OvieHomeCanvas,
   parameters: { layout: 'fullscreen' },
-  render: renderHome,
+  render: () => <HomeFrame />,
 } satisfies Meta<typeof OvieHomeCanvas>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Loading: no read has answered, so every section holds its skeleton. */
+/** Loading: no read has answered, so Story First holds skeletons. */
 export const LoadingEverySection: Story = {
-  beforeEach: stubHome(pending, pending),
+  beforeEach: stubHome(pending),
 };
 
-/** Empty: the inbox answers with no cases, so nothing needs a decision. */
-export const EmptyNoAsks: Story = {
-  beforeEach: stubHome(inboxAnswer({ cases: [], issues: [] })),
+/** Empty: revenue clear, company glance measured, no in-flight work. */
+export const EmptyClearBoard: Story = {
+  beforeEach: stubHome(),
 };
 
-/** Error: the inbox and every other source answer 503. */
-export const ErrorDecisionsUnavailable: Story = {
+/** Error: every Home source answers 503. */
+export const ErrorSourcesUnavailable: Story = {
   beforeEach: stubHome(unavailable),
 };
 
-/** Partial: asks load, but one inbox source is named as missing. */
-export const PartialInboxSourceMissing: Story = {
-  beforeEach: stubHome(
-    inboxAnswer({
-      cases: [spendCase],
-      issues: ['Requested work is unavailable.'],
-    })
-  ),
+/** Partial: blocker reads, company glance fails. */
+export const PartialCompanyUnavailable: Story = {
+  beforeEach: () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input), window.location.href);
+      if (url.pathname === '/api/ovie/home/blocker')
+        return Response.json(COMPANY_RESPONSES['/api/ovie/home/blocker']);
+      if (url.pathname.startsWith('/api/')) return unavailable();
+      return originalFetch(input, init);
+    };
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
+  },
+};
+
+/** Long content: long bottleneck copy + long highlight title. */
+export const LongContentBottleneck: Story = {
+  beforeEach: () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input), window.location.href);
+      if (url.pathname === '/api/ovie/home/blocker')
+        return Response.json({
+          generatedAt: '2026-11-21T00:00:00.000Z',
+          blocker: {
+            schema: 'jovie.company-blocker/v1',
+            id: 'certification:checkout_payment_entitlement',
+            kind: 'certification',
+            step: 'checkout_payment_entitlement',
+            tone: 'bad',
+            text: 'Checkout fails certification across entitlement, receipt delivery and the first-session unlock path, so nobody can pay yet and Summer will keep naming the same cone until payment is certified end to end',
+            detailsHref: '/app/ov/certifications',
+            since: '2026-11-18T00:00:00.000Z',
+            nextAction:
+              'Certify the full payment path including entitlement after Stripe confirms the charge',
+            observedAt: '2026-11-21T00:00:00.000Z',
+          },
+        });
+      if (url.pathname === '/api/hud/metrics')
+        return Response.json(COMPANY_RESPONSES['/api/hud/metrics']);
+      if (url.pathname === '/api/admin/hud/founder-funnel')
+        return Response.json(
+          COMPANY_RESPONSES['/api/admin/hud/founder-funnel?range=7d']
+        );
+      if (url.pathname === '/api/ovie/certifications')
+        return Response.json(COMPANY_RESPONSES['/api/ovie/certifications']);
+      if (url.pathname.startsWith('/api/')) return unavailable();
+      return originalFetch(input, init);
+    };
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
+  },
+};
+
+/** Melt-to-chat: composer has intent, board fades. */
+export const Melting: Story = {
+  beforeEach: stubHome(),
+  render: () => <HomeFrame melting />,
 };
 
 /** Offline: no request can leave the browser. */
 export const OfflineNothingReachable: Story = {
-  beforeEach: stubHome(unreachable, unreachable),
+  beforeEach: stubHome(unreachable),
 };
 
-const longCases: InboxCase[] = Array.from({ length: 6 }, (_, index) => ({
-  ...spendCase,
-  id: `summer:long-${index}`,
-  source: { system: 'summer', id: `long-${index}`, revision: null },
-  priority: index + 1,
-  title: `Move the release-day smart link router to its own deployment lane so preview floods cannot stall production builds during a launch window (${index + 1})`,
-  recommendation:
-    'About $6 a month in the typical case and at most $44 in a month with back-to-back launches. Recommended, because the last stall cost five hours of production deploys.',
-  body: 'Gives production and staging builds their own lane. Preview builds queue behind each other instead of behind production, and the cost only applies while more than one build is running at once.',
-  decisionTarget: { kind: 'summer', id: `long-${index}` },
-}));
-
-/** Long content: six long asks; three show and the rest are deferred. */
-export const LongContentManyAsks: Story = {
-  beforeEach: stubHome(inboxAnswer({ cases: longCases, issues: [] })),
-};
-
-function renderRtl() {
-  return <HomeFrame dir='rtl' />;
-}
-
-/** RTL: an Arabic ask in a right-to-left container. */
-export const RtlArabicAsk: Story = {
-  beforeEach: stubHome(
-    inboxAnswer({
-      cases: [
-        {
-          ...spendCase,
-          title: 'مسار بناء مستقل للإنتاج على منصة النشر',
-          recommendation:
-            'حوالي ٦ دولارات شهريًا، وبحد أقصى ٤٤ دولارًا. موصى به.',
-          body: 'يمنح الإنتاج مسارًا خاصًا حتى لا تعطله طلبات المعاينة.',
-        },
-      ],
-      issues: [],
-    })
-  ),
-  render: renderRtl,
+/** RTL: Story First in a right-to-left container. */
+export const RtlArabic: Story = {
+  beforeEach: stubHome(),
+  render: () => <HomeFrame dir='rtl' />,
 };

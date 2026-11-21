@@ -600,6 +600,9 @@ jobs:
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       has_web_coverage_changes: ${{ steps.coverage-detect.outputs.has_web_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      # JOV-12618: every changed path is documentation (trusted base classifier).
+      # Missing output fails closed: merge groups then run the structural lane.
+      docs_only: ${{ steps.detect.outputs.docs_only || 'false' }}
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
       path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha || '' }}
@@ -1090,14 +1093,24 @@ jobs:
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/product-lane-classification"
+          # Only record ios/mac as queue-deferred when the classifier selected
+          # them. Unselected Apple lanes stay absent so post-queue main can tell
+          # deferral from "never touched Apple paths".
           jq '
-            .selectedLanes |= map(select(. != "ios" and . != "mac"))
+            .selectedLanes as $selected
+            | .selectedLanes |= map(select(. != "ios" and . != "mac"))
             | .skippedLanes = (
                 [.skippedLanes[] | select(.lane != "ios" and .lane != "mac")]
-                + [
-                  {"lane":"ios","reason":"merge queue does not wait on the hosted macOS pool"},
-                  {"lane":"mac","reason":"merge queue does not wait on the hosted macOS pool"}
-                ]
+                + (
+                    ["ios", "mac"]
+                    | map(
+                        select(. as $lane | ($selected | index($lane)) != null)
+                        | {
+                            lane: .,
+                            reason: "merge queue does not wait on the hosted macOS pool"
+                          }
+                      )
+                  )
               )
             | .requiredGates |= del(.ios, .mac)
           ' "$root/receipt.json" > "$root/receipt.queue.json"
@@ -2391,6 +2404,34 @@ jobs:
 
   ci-fast-remaining:
     name: ci-fast (remaining)
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-fast-remaining-shards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    if: &ci-fast-fanin-gate >-
+      always() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-workspace.result == 'success' &&
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      )
+    steps:
+      - name: Require every remaining shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.ci-fast-remaining-shards.result }}
+        run: &ci-fast-shards-result |
+          set -euo pipefail
+          if [[ "$SHARDS_RESULT" != 'success' ]]; then
+            echo "::error::ci-fast shards failed closed: $SHARDS_RESULT"
+            exit 1
+          fi
+
+  ci-fast-remaining-shards:
+    name: ci-fast (remaining shard ${{ matrix.shard }}/3)
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
     # JOV-5454: live Storybook certification needs Chromium plus bounded
@@ -2413,7 +2454,12 @@ jobs:
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
       )
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
+      CI_FAST_STRUCTURAL_SHARD: ${{ matrix.shard }}/3
       CI_FAST_STRUCTURAL_PYTEST: skip
       CI_FAST_STRUCTURAL_WEB: skip
       CI_FAST_STRUCTURAL_LANES: skip
@@ -2477,6 +2523,7 @@ jobs:
       # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
       # against its sha256 pin before use, so an older key is safe to restore.
       - name: Restore pinned actionlint downloads
+        if: ${{ success() && matrix.shard == 1 }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/jovie-pinned-downloads
@@ -2494,11 +2541,13 @@ jobs:
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
       - name: Set up Go for source-pinned actionlint
+        if: ${{ success() && matrix.shard == 1 }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
+        if: ${{ success() && matrix.shard == 1 }}
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
@@ -2556,6 +2605,7 @@ jobs:
             echo "Pinned origin/${BASE_BRANCH} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
           fi
       - name: Validate CI/release incident prevention contract
+        if: ${{ success() && matrix.shard == 1 }}
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
@@ -2564,7 +2614,7 @@ jobs:
         # JOV-6689: a PR closing an `incident` issue must ship or link a
         # post-mortem. The label lookup is the only non-deterministic piece,
         # so it stays in this step; the check below is pure file/text.
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.shard == 1
         shell: bash
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -2593,6 +2643,7 @@ jobs:
           echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
           echo "Incident-labeled references: ${incident:-none}"
       - name: Post-mortem linkage and frontmatter check
+        if: ${{ success() && matrix.shard == 1 }}
         # Same always-on placement as the incident contract above: every
         # source PR and merge-group head, dependency-free (JOV-6689).
         env:
@@ -2600,6 +2651,7 @@ jobs:
           POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
         run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
+        if: ${{ success() && matrix.shard == 1 }}
         shell: bash
         run: |
           if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
@@ -2613,18 +2665,38 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # JOV-12618: the trusted base classifier's docs-only verdict and the
+          # exact base it classified against (merge groups only).
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: &structural-decision |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Full (non-shallow) base fetch: guardrails needs git merge-base with
+            # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
+            # desktop-release-guard / version-fanout-guard on PRs.
+            AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
+            unset AUTH_HEADER GH_TOKEN
+            DIFF_BASE="origin/${{ github.base_ref }}"
+            DIFF_ARGS=(--name-only)
+          elif [[ "${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true" ]]; then
+            # JOV-12618: a merge group may skip only when the classifier found
+            # every changed path to be documentation AND the source-PR path
+            # decision below, rerun against the group's exact classified base,
+            # selects nothing. Any other file, or an unusable base, runs it.
+            unset GH_TOKEN
+            DIFF_BASE="${STRUCTURAL_DIFF_BASE_SHA:-}"
+            if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "${DIFF_BASE}^{commit}" 2>/dev/null; then
+              echo "::warning::Merge-group structural base '${DIFF_BASE}' is unusable; running the structural lane."
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            DIFF_ARGS=(--no-renames --name-only)
+          else
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Full (non-shallow) base fetch: guardrails needs git merge-base with
-          # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
-          # desktop-release-guard / version-fanout-guard on PRs.
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
-          unset AUTH_HEADER GH_TOKEN
           # Control-lane paths are data, one ERE alternative per line, so
           # concurrent additions do not conflict on this file (JOV-6837).
           STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"
@@ -2641,8 +2713,14 @@ jobs:
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
-          NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
-          if [ -n "$NEW_SCRIPT_TESTS" ] || git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN"; then
+          NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
+          STRUCTURAL_CHANGED_FILES=$(git diff "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD)
+          # Here-string, not a pipe: grep -q exiting early must not turn a
+          # match into a SIGPIPE pipefail "no match" and skip the lane.
+          if [[ "${{ github.event_name }}" == "merge_group" && -z "${STRUCTURAL_CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+            # An empty diff is not proof of a docs-only group.
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$NEW_SCRIPT_TESTS" ] || grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN" <<< "$STRUCTURAL_CHANGED_FILES"; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -2651,6 +2729,7 @@ jobs:
       # dependency/Chromium setup below. The merge-group matrix still runs the
       # complete Storybook surface set on the combined head.
       - name: Select Storybook browser proof
+        if: ${{ success() && matrix.shard == 1 }}
         id: storybook-browser
         shell: bash
         run: |
@@ -2751,6 +2830,7 @@ jobs:
       # installs and the structural lane runs; "Await ci-fast lanes" fails
       # closed on their status after the structural lane.
       - name: Start ci-fast lanes
+        if: ${{ success() && matrix.shard == 1 }}
         id: lanes-start
         shell: bash
         env:
@@ -2907,7 +2987,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ci-fast-lanes-remaining-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/ci-fast-lanes.json
             ${{ runner.temp }}/ci-fast-lanes-structural.json
@@ -3211,6 +3291,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       - *structural-python
       - *structural-pytest
@@ -3252,6 +3334,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       # The web lane group (design conformance + public-profile admission) runs
       # on every head in the background, off remaining's serial cheap-lane
@@ -3295,9 +3379,82 @@ jobs:
 
   ci-fast-structural-lanes:
     name: ci-fast (structural lanes)
-    # The lanes coverage pytest (four shards + per-module coverage floors) set
-    # remaining's whole structural wall (478s of 478s, merge group
-    # 41250311104) while contending for 4 vCPU; it runs alone here.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-fast-structural-lanes-shards]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 5
+    if: *ci-fast-fanin-gate
+    steps:
+      - name: Require every lanes coverage shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.ci-fast-structural-lanes-shards.result }}
+        run: *ci-fast-shards-result
+      - *shallow-checkout
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Download lanes coverage ab
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-ab-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/ab
+      - name: Download lanes coverage cd
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-cd-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/cd
+      - name: Require complete lanes coverage evidence
+        id: coverage
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          import { LANES_COVERAGE_GROUP_SHARDS, lanesReceiptRanSuite } from './scripts/lib/ci-structural-shards.mjs';
+          const ran = Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => {
+            const dir = `${process.env.RUNNER_TEMP}/lanes-coverage/${group}`;
+            const executed = lanesReceiptRanSuite(JSON.parse(readFileSync(`${dir}/receipt.json`, 'utf8')));
+            if (executed && !existsSync(`${dir}/jovie-lanes-${group}.coverage`)) {
+              throw new Error(`Missing lanes coverage data: ${group}`);
+            }
+            return executed;
+          });
+          if (ran.some(value => value !== ran[0])) throw new Error('Inconsistent lanes coverage receipts');
+          appendFileSync(process.env.GITHUB_OUTPUT, `ran=${ran[0]}\n`);
+          NODE
+      - name: Set up Python for combined lanes coverage
+        if: steps.coverage.outputs.ran == 'true'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
+      - name: Install combined lanes coverage reporter
+        if: steps.coverage.outputs.ran == 'true'
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Combine lanes coverage and enforce all module floors
+        if: steps.coverage.outputs.ran == 'true'
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { LANES_COVERAGE_FLOORS, LANES_COVERAGE_GROUP_SHARDS } from './scripts/lib/ci-structural-shards.mjs';
+          const root = process.env.RUNNER_TEMP;
+          const env = { ...process.env, COVERAGE_FILE: `${root}/jovie-lanes.coverage` };
+          const run = args => {
+            const result = spawnSync('python3', ['-m', 'coverage', ...args], { env, stdio: 'inherit' });
+            if (result.status !== 0) process.exit(result.status ?? 1);
+          };
+          run(['combine', ...Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => `${root}/lanes-coverage/${group}/jovie-lanes-${group}.coverage`)]);
+          for (const { include, floor } of LANES_COVERAGE_FLOORS) {
+            run(['report', `--include=${include}`, `--fail-under=${floor}`]);
+          }
+          NODE
+
+  ci-fast-structural-lanes-shards:
+    name: ci-fast (structural lanes shard ${{ matrix.group }})
+    # Each group runs its existing pytest pair; the required fan-in combines
+    # both maps before enforcing every whole-suite coverage floor.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3305,8 +3462,12 @@ jobs:
       contents: read
     timeout-minutes: 20
     if: *ci-fast-gate
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [ab, cd]
     env:
-      CI_FAST_STRUCTURAL_LANES: only
+      CI_FAST_STRUCTURAL_LANES: only:${{ matrix.group }}
     steps:
       - *shallow-checkout
       - name: Start base-branch history fetch
@@ -3326,6 +3487,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       - *structural-python
       - *structural-pytest
@@ -3333,6 +3496,35 @@ jobs:
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: *structural-run-env
         run: node scripts/ci-fast-lanes.mjs
+      - name: Collect lanes coverage evidence
+        env:
+          GROUP: ${{ matrix.group }}
+          DECISION_SKIP: ${{ steps.structural.outputs.skip }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/lanes-coverage-$GROUP"
+          mkdir -p "$evidence"
+          if [[ "$DECISION_SKIP" == 'true' ]]; then
+            printf '%s\n' '{"lanes":[{"id":"structural","status":"skipped"}]}' > "$evidence/receipt.json"
+          else
+            cp "$RUNNER_TEMP/ci-fast-lanes-structural.json" "$evidence/receipt.json"
+          fi
+          node --input-type=module <<'NODE'
+          import { readFileSync, copyFileSync } from 'node:fs';
+          import { lanesReceiptRanSuite } from './scripts/lib/ci-structural-shards.mjs';
+          const { RUNNER_TEMP: root, GROUP: group } = process.env;
+          const dir = `${root}/lanes-coverage-${group}`;
+          if (lanesReceiptRanSuite(JSON.parse(readFileSync(`${dir}/receipt.json`, 'utf8')))) {
+            copyFileSync(`${root}/jovie-lanes-${group}.coverage`, `${dir}/jovie-lanes-${group}.coverage`);
+          }
+          NODE
+      - name: Upload lanes coverage evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lanes-coverage-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage-${{ matrix.group }}/
+          retention-days: 7
+          if-no-files-found: error
 
   ci-knip:
     name: Knip (dead code)
@@ -4129,17 +4321,16 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across runners; the aggregates read the matrix result. Three shards since
-    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
-    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
-    # waiting on the lanes pytest.
+    # across runners; the aggregates read the matrix result. Six browser shards
+    # retain the identical spec list and two workers per runner. The separate
+    # certification member still runs exactly once on merge groups.
     strategy:
       fail-fast: true
       matrix:
         # JOV-12094: the unchanged component gate used to run three times,
         # serially before each browser shard (up to 300s each). Keep it in
         # this required matrix, once and alongside the full browser suite.
-        shard: ${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, "certification"]' || '[1, 2, 3]') }}
+        shard: ${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, 4, 5, 6, "certification"]' || '[1, 2, 3, 4, 5, 6]') }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4230,7 +4421,7 @@ jobs:
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
-                  --workers=2 --shard="$STORYBOOK_SHARD/3"
+                  --workers=2 --shard="$STORYBOOK_SHARD/6"
               exit 0
             fi
             sleep 2
@@ -4268,27 +4459,114 @@ jobs:
           allow-images: 'true'
           retention-days: 7
 
+  # Queue-proven main previously skipped Path Changes, so Apple lanes dropped
+  # from the merge queue never ran. This job re-classifies only ios/mac for the
+  # exact main push without unlocking web duplicate lanes.
+  ci-apple-post-queue:
+    name: Apple Post-Queue Selection
+    needs: [main-queue-provenance]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.main-queue-provenance.result == 'success' &&
+      needs.main-queue-provenance.outputs.is_current == 'true' &&
+      needs.main-queue-provenance.outputs.queue_proven == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}
+      run_macos: ${{ steps.classify.outputs.run_macos || 'false' }}
+      run_macos_native: ${{ steps.classify.outputs.run_macos_native || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Classifier + selection are dependency-free Node scripts; provision the
+      # pinned toolchain in-job (hermetic-ci runner-tools) without a full pnpm install.
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Classify deferred Apple lanes
+        id: classify
+        shell: bash
+        env:
+          EVENT_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          PUSH_BASE_SHA="${EVENT_PUSH_BEFORE_SHA}"
+          if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+            [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "::error::push.before is not a usable exact main base SHA"
+            exit 1
+          fi
+          git cat-file -e "${PUSH_BASE_SHA}^{commit}"
+          root="$RUNNER_TEMP/apple-post-queue"
+          mkdir -p "$root"
+          git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD > "$root/changed-paths.txt"
+          # Policy from the pre-push main tip so a bad landing cannot rewrite
+          # its own Apple selection rules for this deferred evidence pass.
+          git show "${PUSH_BASE_SHA}:scripts/lib/product-lane-classifier.mjs" \
+            > "$root/product-lane-classifier.mjs"
+          git show "${PUSH_BASE_SHA}:scripts/lib/apple-post-queue-selection.mjs" \
+            > "$root/apple-post-queue-selection.mjs" || {
+            # First land of this helper: fall back to the checked-out copy.
+            cp scripts/lib/apple-post-queue-selection.mjs "$root/apple-post-queue-selection.mjs"
+          }
+          node "$root/product-lane-classifier.mjs" \
+            --files-from "$root/changed-paths.txt" \
+            --base-ref "$PUSH_BASE_SHA" \
+            --head-ref HEAD \
+            --json-out "$root/receipt.json"
+          test -s "$root/receipt.json"
+          node "$root/apple-post-queue-selection.mjs" \
+            --receipt "$root/receipt.json" \
+            --github-output "$GITHUB_OUTPUT"
+          {
+            printf '### Apple post-queue selection\n\n'
+            printf -- '- run_ios: `%s`\n' "$(sed -n 's/^run_ios=//p' "$GITHUB_OUTPUT" | tail -n1)"
+            printf -- '- run_macos: `%s`\n' "$(sed -n 's/^run_macos=//p' "$GITHUB_OUTPUT" | tail -n1)"
+            printf -- '- run_macos_native: `%s`\n' "$(sed -n 's/^run_macos_native=//p' "$GITHUB_OUTPUT" | tail -n1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # iOS unit coverage runs on push to main and on workflow_dispatch.
   # It does not run in the merge queue: the hosted macOS pool cannot hold
   # check_response_timeout. Full simulator regression stays a TestFlight gate.
+  # Queue-proven main recovers the deferred Fast Unit lane via
+  # ci-apple-post-queue.
   ci-ios:
     name: iOS Fast Unit + Coverage (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-apple-post-queue]
     if: >-
       always() &&
-      needs.ci-path-changes.result == 'success' &&
+      !cancelled() &&
       (
-        github.event_name != 'merge_group' ||
         (
-          needs.ci-merge-group-admission.result == 'success' &&
-          needs.ci-merge-group-admission.outputs.admitted == 'true'
+          needs.ci-path-changes.result == 'success' &&
+          (
+            github.event_name != 'merge_group' ||
+            (
+              needs.ci-merge-group-admission.result == 'success' &&
+              needs.ci-merge-group-admission.outputs.admitted == 'true'
+            )
+          ) &&
+          needs.ci-path-changes.outputs.run_ios == 'true' &&
+          (
+            github.event_name == 'workflow_dispatch' ||
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-apple-post-queue.result == 'success' &&
+          needs.ci-apple-post-queue.outputs.run_ios == 'true'
         )
-      ) &&
-      needs.ci-path-changes.outputs.run_ios == 'true' &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'merge_group' ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     # actions: write lets mac-lane-route.yml start and cancel the Mac child run.
     permissions:
@@ -4301,25 +4579,37 @@ jobs:
 
   # Mac product evidence stays on the synthetic combined head or direct-main
   # fallback. It covers both the MenuMonitor Swift package and the packaged
-  # Electron desktop application for the exact selected SHA.
+  # Electron desktop application for the exact selected SHA. Queue-proven main
+  # recovers the deferred Mac lane via ci-apple-post-queue.
   ci-macos:
     name: Mac Build + Test (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-apple-post-queue]
     if: >-
       always() &&
-      needs.ci-path-changes.result == 'success' &&
+      !cancelled() &&
       (
-        github.event_name != 'merge_group' ||
         (
-          needs.ci-merge-group-admission.result == 'success' &&
-          needs.ci-merge-group-admission.outputs.admitted == 'true'
+          needs.ci-path-changes.result == 'success' &&
+          (
+            github.event_name != 'merge_group' ||
+            (
+              needs.ci-merge-group-admission.result == 'success' &&
+              needs.ci-merge-group-admission.outputs.admitted == 'true'
+            )
+          ) &&
+          needs.ci-path-changes.outputs.run_macos == 'true' &&
+          (
+            github.event_name == 'workflow_dispatch' ||
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-apple-post-queue.result == 'success' &&
+          needs.ci-apple-post-queue.outputs.run_macos == 'true'
         )
-      ) &&
-      needs.ci-path-changes.outputs.run_macos == 'true' &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'merge_group' ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     concurrency:
       # A regenerated merge-group head supersedes the prior Mac flight for the
@@ -4333,7 +4623,7 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       mac-first: true
-      native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}
+      native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}
       supersede-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   ci-cross-product-integration:
@@ -7648,6 +7938,7 @@ jobs:
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/canonical-artist-site/m2-receipt.json
@@ -7655,16 +7946,19 @@ jobs:
 
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
 
       - name: Verify waitlist admission
         id: canonical_waitlist
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
@@ -7673,6 +7967,7 @@ jobs:
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie
@@ -9490,6 +9785,7 @@ jobs:
       [
         main-queue-provenance,
         ci-path-changes,
+        ci-apple-post-queue,
         ci-risk-classifier,
         ci-fast,
         ci-secret-scan,
@@ -9564,7 +9860,9 @@ jobs:
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
 
           if [ "$QUEUE_PROVEN" = "true" ]; then
-            # A queue-proven main SHA must not duplicate unit/build/fallback work.
+            # A queue-proven main SHA must not duplicate web unit/build/fallback
+            # work. Apple lanes are intentionally absent from the merge queue
+            # (hosted macOS pool), so path-selected ios/mac evidence runs here.
             for lane in \
               "Path Changes:$PATH_RESULT" \
               "CI Risk Classifier:$RISK_RESULT" \
@@ -9576,8 +9874,6 @@ jobs:
               "Ovie Build:$OVIE_BUILD_RESULT" \
               "Ovie Typecheck:$OVIE_TYPECHECK_RESULT" \
               "Storybook Surface Matrix:$STORYBOOK_SURFACES_RESULT" \
-              "iOS Fast Unit + Coverage:$IOS_RESULT" \
-              "Mac Build + Test:$MACOS_RESULT" \
               "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
               "Product Lane Receipt:$LANE_RECEIPT_RESULT" \
               "Promptfoo Evals:$PROMPTFOO_RESULT" \
@@ -9586,6 +9882,29 @@ jobs:
               result="${lane#*:}"
               if [ "$result" != "skipped" ]; then
                 echo "::error::Queue-proven main duplicated $name (result $result)."
+                exit 1
+              fi
+            done
+            APPLE_IOS="${{ needs.ci-apple-post-queue.outputs.run_ios }}"
+            APPLE_MAC="${{ needs.ci-apple-post-queue.outputs.run_macos }}"
+            APPLE_SELECT_RESULT="${{ needs.ci-apple-post-queue.result }}"
+            if [ "$APPLE_SELECT_RESULT" != "success" ]; then
+              echo "::error::Queue-proven main Apple post-queue selection did not pass ($APPLE_SELECT_RESULT)."
+              exit 1
+            fi
+            for selected_gate in \
+              "iOS Fast Unit + Coverage:${APPLE_IOS:-false}:$IOS_RESULT" \
+              "Mac Build + Test:${APPLE_MAC:-false}:$MACOS_RESULT"; do
+              name="${selected_gate%%:*}"
+              selection_and_result="${selected_gate#*:}"
+              selected="${selection_and_result%%:*}"
+              result="${selection_and_result#*:}"
+              if [ "$selected" = "true" ] && [ "$result" != "success" ]; then
+                echo "::error::Queue-proven main deferred $name did not pass (result $result)."
+                exit 1
+              fi
+              if [ "$selected" != "true" ] && [ "$result" != "skipped" ]; then
+                echo "::error::Queue-proven main ran unselected $name (result $result)."
                 exit 1
               fi
             done

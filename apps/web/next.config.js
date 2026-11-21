@@ -9,6 +9,9 @@ const { version: APP_VERSION } = require('../../version.json');
 const {
   legacyProfileAliasRedirects,
 } = require('./lib/routing/legacy-profile-alias-redirects');
+const {
+  writeBuildDeployedAt,
+} = require('./scripts/write-build-deployed-at.cjs');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
@@ -849,15 +852,29 @@ module.exports = exposeBaseStaticConfigForTooling(
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
 const { withSentryConfig } = require('@sentry/nextjs/config');
 
-module.exports = exposeBaseStaticConfigForTooling(
-  shouldUseSentryPlugin
-    ? withSentryConfig(module.exports, {
-        org: 'jovie',
-        project: 'jovie-web',
-        silent: !process.env.CI,
-        widenClientFileUpload: true,
-        sourcemaps: { deleteSourcemapsAfterUpload: true },
-        tunnelRoute: '/monitoring',
-      })
-    : module.exports
+function withBuildDeployedAtStamp(config) {
+  const wrapped = (phase, context) => {
+    // Once, before compilation. Server startup reloads this file under
+    // phase-production-server and must not mint a new stamp (JOV-8658).
+    if (phase === 'phase-production-build') {
+      writeBuildDeployedAt();
+    }
+    return typeof config === 'function' ? config(phase, context) : config;
+  };
+  return exposeBaseStaticConfigForTooling(wrapped);
+}
+
+module.exports = withBuildDeployedAtStamp(
+  exposeBaseStaticConfigForTooling(
+    shouldUseSentryPlugin
+      ? withSentryConfig(module.exports, {
+          org: 'jovie',
+          project: 'jovie-web',
+          silent: !process.env.CI,
+          widenClientFileUpload: true,
+          sourcemaps: { deleteSourcemapsAfterUpload: true },
+          tunnelRoute: '/monitoring',
+        })
+      : module.exports
+  )
 );

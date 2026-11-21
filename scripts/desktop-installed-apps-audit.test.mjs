@@ -702,7 +702,6 @@ test('readDesktopBuildIdentity accepts exact staging prerelease provenance', () 
     rmSync(temp, { recursive: true, force: true });
   }
 });
-
 test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () => {
   const now = new Date('2026-08-29T12:00:00Z');
   const sample = (
