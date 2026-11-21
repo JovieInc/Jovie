@@ -55,6 +55,7 @@ const CONFIRMED_STATE: OnboardingProfileBuilderState = {
     ],
   },
   artistConfirmed: true,
+  handleConfirmed: false,
   handle: 'testartist',
   socialLinks: [],
 };
@@ -202,6 +203,7 @@ describe('OnboardingProfileRail', () => {
         state={{
           artist: null,
           artistConfirmed: false,
+          handleConfirmed: false,
           handle: null,
           socialLinks: [],
         }}
@@ -309,6 +311,7 @@ describe('resolvePreviewArtist', () => {
       resolvePreviewArtist({
         artist: null,
         artistConfirmed: false,
+        handleConfirmed: false,
         handle: 'timwhite',
         socialLinks: [],
       })
@@ -317,6 +320,7 @@ describe('resolvePreviewArtist', () => {
       resolvePreviewArtist({
         artist: null,
         artistConfirmed: false,
+        handleConfirmed: false,
         handle: null,
         socialLinks: [],
       })
@@ -328,6 +332,7 @@ describe('resolvePreviewArtist', () => {
       resolvePreviewArtist({
         artist: null,
         artistConfirmed: false,
+        handleConfirmed: false,
         handle: 'djnova',
         socialLinks: ['https://instagram.com/djnova'],
       })
@@ -342,6 +347,7 @@ describe('resolvePreviewArtist', () => {
         url: 'https://open.spotify.com/artist/sp-1',
       },
       artistConfirmed: true,
+      handleConfirmed: false,
       handle: null,
       socialLinks: [],
     };

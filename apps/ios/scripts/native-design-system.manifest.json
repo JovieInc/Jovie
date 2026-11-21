@@ -26,6 +26,11 @@
     ["imageForeground", "--noir-ion-text-strong"]
   ],
   "motionBindings": [["pressScale", "--scale-press"]],
+  "actionButtonContract": "packages/ui/atoms/button-contract.ts",
+  "actionButtonBindings": [
+    ["height", "ACTION_BUTTON_VISIBLE_HEIGHT_PX"],
+    ["hitTarget", "ACTION_BUTTON_MOBILE_HIT_TARGET_PX"]
+  ],
   "strictSources": ["apps/ios/Jovie/App/RootView.swift"],
   "exceptions": [
     {

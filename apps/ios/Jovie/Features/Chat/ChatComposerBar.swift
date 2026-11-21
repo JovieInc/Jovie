@@ -9,8 +9,9 @@ enum ChatComposerCopy {
 
 enum ChatComposerMetrics {
   static let barHeight: CGFloat = 52
-  static let sendSlotSize = JovieActionButtonMetrics.height
-  static let plusButtonSize = JovieActionButtonMetrics.height
+  static let lockedControlSize: CGFloat = 32 // founder lock; not ActionButton KEEP
+  static let sendSlotSize = lockedControlSize
+  static let plusButtonSize = lockedControlSize
 
   static func isPlusEnabled(isSending: Bool) -> Bool {
     !isSending

@@ -101,6 +101,7 @@ import {
   laneFailureExcerpt,
   structuralFailureExcerpt,
 } from './lib/ci-failure-excerpts.mjs';
+import { parseSkipLaneIds } from './lib/ci-fast-skip-lanes.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -361,9 +362,9 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'native-design-system',
     command:
-      'node apps/ios/scripts/native-design-system.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/ios/scripts/native-design-system.mjs --test-coverage-include=apps/ios/scripts/native-design-system-motion.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 apps/ios/scripts/native-design-system.test.mjs apps/ios/scripts/native-design-system-motion.test.mjs && node scripts/invariants/native-spacing-scale.mjs',
+      'node apps/ios/scripts/native-design-system.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/ios/scripts/native-design-system.mjs --test-coverage-include=apps/ios/scripts/native-design-system-motion.mjs --test-coverage-include=apps/ios/scripts/native-design-system-action-button.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 apps/ios/scripts/native-design-system.test.mjs apps/ios/scripts/native-design-system-motion.test.mjs apps/ios/scripts/native-design-system-action-button.test.mjs && node scripts/invariants/native-spacing-scale.mjs',
     inputs:
-      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/native-spacing-scale)/u,
+      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|packages\/ui\/atoms\/button-contract\.ts$|scripts\/invariants\/native-spacing-scale)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -948,10 +949,9 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
   'TestDrainPrQueueWiring or TestNativeAdmissionReceiptReconciliation';
 
 /** @param {string} shard @param {string} expression */
-// The suite spawns thousands of short-lived jq/gh/node processes, so it is
-// CPU-bound on process startup: pytest-xdist spreads each shard over two
-// workers. Two, not auto: both shards run concurrently on the 4 vCPU
-// structural python job; more workers measured slower (JovieInc/Jovie#18657).
+// The suite spawns thousands of short-lived jq/gh/node processes, so it is CPU-bound on
+// process startup: pytest-xdist spreads each shard over two workers. Two, not auto: both shards
+// run concurrently on the 4 vCPU structural python job; more measured slower (JovieInc/Jovie#18657).
 const structuralPytestShard = (shard, expression) =>
   `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
@@ -1020,6 +1020,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
+  'scripts/dogfood-truth-intake.test.mjs', // JOV-7140 dogfood loop intake.
   'scripts/desktop-stamp-ownership.test.mjs',
   'scripts/summer/pr-no-stall.test.mjs',
   'scripts/hostops/pen-golden-path-sync.test.mjs',
@@ -1028,6 +1029,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/design/pen-data-backed-ship.test.mjs',
+  'scripts/design/bind-golden-path-nodes.test.mjs',
   'scripts/design-write-swarm/design-write-swarm.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
@@ -1296,7 +1298,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/prod-cert-skew.test.mjs',
-  'scripts/lib/__tests__/prod-cone-cases.test.mjs',
+  'scripts/lib/__tests__/prod-cone-cases.test.mjs scripts/lib/__tests__/prod-cone-scoreboard-clobber.test.mjs',
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
@@ -1492,7 +1494,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-unit-selection.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
   'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
-  'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
+  'scripts/lib/__tests__/merge-group-token-budget.test.mjs scripts/lib/__tests__/merge-group-typecheck-lint-reuse.test.mjs',
   'scripts/lib/__tests__/merge-group-dead-run-sweep.test.mjs',
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -1534,7 +1536,7 @@ export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts -
   test => test.replace(/(^| )scripts\//gu, '$1')
 ).join(
   ' '
-)} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/daily-changelog.test.mjs lib/__tests__/daily-changelog-publication.test.mjs --coverage --coverage.include=lib/daily-changelog.mjs --coverage.include=lib/daily-changelog-publication.mjs --coverage.include=lib/daily-changelog-collector.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-changelog-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=85 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82`;
+)} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/daily-changelog.test.mjs lib/__tests__/daily-changelog-publication.test.mjs lib/__tests__/daily-changelog-receipts.test.mjs --coverage --coverage.include=lib/daily-changelog.mjs --coverage.include=lib/daily-changelog-publication.mjs --coverage.include=lib/daily-changelog-receipts.mjs --coverage.include=lib/daily-changelog-collector.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-changelog-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=85 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82`;
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -1688,7 +1690,6 @@ const LANES = [
     run: runStructural,
   },
 ];
-
 const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
 
 /**
@@ -1792,7 +1793,6 @@ export function selectLanes(groupId) {
   }
   return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
 }
-
 function shell(command, opts = {}) {
   const result = spawnSync(command, {
     shell: true,
@@ -3268,7 +3268,6 @@ export async function runStructural(opts = {}) {
   const combined = results.map(result => result.output).join('');
   return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
-
 function annotateFailure(lane, logExcerpt) {
   // GitHub Actions annotation — visible on the PR Checks UI.
   const msg = `${lane.name} failed. Fix: ${lane.nextLocalCommand}`;
@@ -3360,7 +3359,6 @@ export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
-
 async function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
@@ -3372,7 +3370,9 @@ async function main() {
   const failFast = failFastEnabled();
 
   try {
-    let selectedLanes = selectLanes(laneGroup);
+    let selectedLanes = selectLanes(laneGroup).filter(
+      lane => !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id)
+    );
     if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }

@@ -467,6 +467,9 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain(
       "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
     );
+    expect(admission).toContain(
+      "source_head_sha: ${{ steps.admission.outputs.source_head_sha || '' }}"
+    );
     expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
     expect(admission).toContain('node "$policy" --print-contract-version');
@@ -479,6 +482,7 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
     expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain("echo 'source_head_sha='");
     expect(admission).toContain(
       "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
     );
@@ -585,10 +589,25 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
+      // JOV-12618 remainder: same-tree typecheck/lint reuse (JOV-13081).
+      expect(job, jobId).toContain('Decide typecheck/lint reuse');
+      expect(job, jobId).toContain(
+        'node scripts/lib/merge-group-typecheck-lint-reuse.mjs'
+      );
+      expect(job, jobId).toContain(
+        'needs.ci-merge-group-admission.outputs.source_head_sha'
+      );
     }
+
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-fast-typecheck');
+    expect(typecheck).toContain("steps.reuse.outputs.reuse != 'true'");
+    expect(typecheck).toContain(
+      'Validate CI/release incident prevention contract'
+    );
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain('CI_FAST_SKIP_LANE_IDS:');
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
     expect(remaining).toContain('github.event_name }}" == "pull_request"');

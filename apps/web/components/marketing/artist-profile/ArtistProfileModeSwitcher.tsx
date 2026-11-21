@@ -1,9 +1,9 @@
 'use client';
 
 import { Tabs } from '@jovie/ui';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ViewTransition } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -29,9 +29,7 @@ export function ArtistProfileModeSwitcher({
   useEffect(() => {
     setInteractiveReady(true);
   }, []);
-  const [[activeIndex, slideDirection], setActiveMode] = useState<
-    readonly [number, number]
-  >([0, 1]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
   const headlineLines = adaptive.headline.split('\n');
   const compactAccessibleContext = [phoneCaption, phoneSubcaption]
@@ -41,13 +39,15 @@ export function ArtistProfileModeSwitcher({
   const selectMode = (modeId: string) => {
     const nextIndex = adaptive.modes.findIndex(mode => mode.id === modeId);
     if (nextIndex >= 0 && nextIndex !== activeIndex) {
-      setActiveMode([nextIndex, nextIndex > activeIndex ? 1 : -1]);
+      setActiveIndex(nextIndex);
     }
   };
 
   if (!activeMode) {
     return null;
   }
+
+  const transitionClass = reducedMotion ? 'none' : 'auto';
 
   const renderModePanelCopy = (
     mode: ArtistProfileLandingCopy['adaptive']['modes'][number]
@@ -197,13 +197,7 @@ export function ArtistProfileModeSwitcher({
                 value={mode.id}
                 className='col-start-1 row-start-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               >
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: reducedMotion ? 0 : 0.22 }}
-                >
-                  {renderModePanelCopy(mode)}
-                </motion.div>
+                {renderModePanelCopy(mode)}
               </Tabs.Content>
             ))}
           </div>
@@ -232,27 +226,23 @@ export function ArtistProfileModeSwitcher({
                   className='absolute inset-x-0 top-0 z-10 h-10 bg-surface-0'
                 />
               ) : null}
-              <AnimatePresence initial={false} mode='sync'>
-                <motion.div
+              {/* Static fallback: reduced-motion and no-VT browsers swap the
+                  image in place with no enter/exit animation (ASR-039). */}
+              <ViewTransition
+                name='artist-profile-mode-phone'
+                default={transitionClass}
+                update={transitionClass}
+                enter={transitionClass}
+                exit={transitionClass}
+              >
+                <div
                   key={activeMode.id}
                   className={cn(
                     'absolute inset-0',
                     showIntroHeading ? 'top-10' : null
                   )}
-                  initial={{
-                    opacity: 0,
-                    transform: reducedMotion
-                      ? 'translateX(0px)'
-                      : `translateX(${24 * slideDirection}px)`,
-                  }}
-                  animate={{ opacity: 1, transform: 'translateX(0px)' }}
-                  exit={{
-                    opacity: 0,
-                    transform: reducedMotion
-                      ? 'translateX(0px)'
-                      : `translateX(${-24 * slideDirection}px)`,
-                  }}
-                  transition={{ duration: reducedMotion ? 0 : 0.32 }}
+                  data-mode-morph={activeMode.id}
+                  data-reduced-motion={reducedMotion ? 'true' : 'false'}
                 >
                   <Image
                     src={activeMode.screenshotSrc}
@@ -265,8 +255,8 @@ export function ArtistProfileModeSwitcher({
                     }
                     className='object-cover object-top'
                   />
-                </motion.div>
-              </AnimatePresence>
+                </div>
+              </ViewTransition>
             </div>
           </ArtistProfilePhoneFrame>
         </div>

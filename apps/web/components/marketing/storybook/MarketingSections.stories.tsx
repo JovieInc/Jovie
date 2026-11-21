@@ -80,7 +80,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj;
-
 function SectionFrame({
   sectionId,
   children,
@@ -97,7 +96,6 @@ function SectionFrame({
     </div>
   );
 }
-
 function WipSectionPlaceholder({
   sectionId,
 }: Readonly<{ sectionId: MarketingSectionId }>) {
@@ -136,7 +134,6 @@ function WipSectionPlaceholder({
     </SectionFrame>
   );
 }
-
 export const hero: Story = {
   name: 'hero',
   render: () => (
@@ -152,7 +149,10 @@ export const hero: Story = {
         }}
       />
       <div className='border-t border-subtle'>
-        <ArtistProfileHero hero={ARTIST_PROFILE_COPY.hero} />
+        <ArtistProfileHero
+          hero={ARTIST_PROFILE_COPY.hero}
+          adaptive={ARTIST_PROFILE_COPY.adaptive}
+        />
       </div>
     </SectionFrame>
   ),

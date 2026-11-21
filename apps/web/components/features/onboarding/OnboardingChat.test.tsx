@@ -114,6 +114,32 @@ describe('OnboardingChat states', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('shows the mobile profile peek above the composer without replacing it', async () => {
+    // JOV-14243: 390 peek strip sits above the keyboard; inputs stay put.
+    const { container } = render(
+      <OnboardingChat
+        {...verified}
+        profilePeekState={{
+          artistConfirmed: true,
+          handle: 'testartist',
+          handleConfirmed: false,
+          socialLinks: [],
+          artist: {
+            id: 'a1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/a1',
+          },
+        }}
+      />
+    );
+
+    expect(
+      await screen.findByTestId('onboarding-profile-peek-strip')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
   it('restores a real stored intent through the golden path and auto-sends it', async () => {
     // Real intent: created and persisted through the production store — the
     // exact write the homepage performs. Nothing is mocked or injected into

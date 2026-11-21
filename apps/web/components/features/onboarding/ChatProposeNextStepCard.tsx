@@ -1,11 +1,13 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
-import { useEffect, useRef } from 'react';
+import { Button } from '@jovie/ui';
+import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
@@ -27,6 +29,10 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *  - `needs_more_info` → renders nothing visible. The LLM has been told to
  *    ask another sharp question; this card just acknowledges the tool was
  *    called.
+ *
+ * Optional post-Keep enrichment chips (ONB-21 / Keep This Draft Phase 5) sit
+ * under AuthShell as subordinate, local-only controls. They never emit
+ * SOCIAL_ATTACHED or restore required pre-auth social→audience.
  */
 
 export interface NextStepCardPayload {
@@ -45,6 +51,144 @@ interface ChatProposeNextStepCardProps {
    * "Claim @handle" heading never falls back to a stale homepage `?handle=`.
    */
   readonly claimHandle?: string | null;
+}
+
+type EnrichmentPanel = 'social' | 'audience' | null;
+type SocialPlatformNote = 'instagram' | 'tiktok';
+
+const AUDIENCE_BAND_OPTIONS: ReadonlyArray<{
+  readonly band: AudienceBand;
+  readonly caption: string;
+}> = [
+  { band: 'under_500', caption: 'Under 500' },
+  { band: '500_to_5k', caption: '500 To 5k' },
+  { band: '5k_to_50k', caption: '5k To 50k' },
+  { band: '50k_to_500k', caption: '50k To 500k' },
+  { band: 'over_500k', caption: '500k+' },
+];
+
+/**
+ * Subordinate optional chips under Sign up to keep. Local session state only —
+ * never advances the guarded onboarding rail. Kept in this module so Phase 5
+ * does not introduce a new certificate-tracked component surface.
+ */
+function PostKeepEnrichmentChips() {
+  const [openPanel, setOpenPanel] = useState<EnrichmentPanel>(null);
+  const [savedPlatform, setSavedPlatform] = useState<SocialPlatformNote | null>(
+    null
+  );
+  const [savedBand, setSavedBand] = useState<AudienceBand | null>(null);
+
+  return (
+    <div
+      className='mt-4 border-t border-subtle/60 pt-3'
+      data-testid='onboarding-post-keep-enrichment'
+    >
+      <p className='text-2xs leading-5 text-tertiary-token'>
+        Optional — does not change signup
+      </p>
+      <div className='mt-2 flex flex-wrap gap-2'>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          data-testid='onboarding-enrichment-social-chip'
+          aria-expanded={openPanel === 'social'}
+          aria-pressed={savedPlatform !== null}
+          onClick={() =>
+            setOpenPanel(current => (current === 'social' ? null : 'social'))
+          }
+        >
+          {savedPlatform
+            ? 'Instagram / TikTok Noted'
+            : 'Add Instagram / TikTok'}
+        </Button>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          data-testid='onboarding-enrichment-audience-chip'
+          aria-expanded={openPanel === 'audience'}
+          aria-pressed={savedBand !== null}
+          onClick={() =>
+            setOpenPanel(current =>
+              current === 'audience' ? null : 'audience'
+            )
+          }
+        >
+          {savedBand ? 'Audience Noted' : 'Share Audience Size'}
+        </Button>
+      </div>
+
+      {openPanel === 'social' ? (
+        <fieldset
+          className='mt-3 space-y-2 border-0 p-0'
+          data-testid='onboarding-enrichment-social-panel'
+        >
+          <legend className='text-xs leading-5 text-secondary-token'>
+            We will ask for the link after you sign up.
+          </legend>
+          <div className='flex flex-wrap gap-2'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              data-testid='onboarding-enrichment-social-instagram'
+              aria-pressed={savedPlatform === 'instagram'}
+              onClick={() => {
+                setSavedPlatform('instagram');
+                setOpenPanel(null);
+              }}
+            >
+              Instagram
+            </Button>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              data-testid='onboarding-enrichment-social-tiktok'
+              aria-pressed={savedPlatform === 'tiktok'}
+              onClick={() => {
+                setSavedPlatform('tiktok');
+                setOpenPanel(null);
+              }}
+            >
+              TikTok
+            </Button>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {openPanel === 'audience' ? (
+        <fieldset
+          className='mt-3 space-y-2 border-0 p-0'
+          data-testid='onboarding-enrichment-audience-panel'
+        >
+          <legend className='text-xs leading-5 text-secondary-token'>
+            Optional — we will use this after you sign up.
+          </legend>
+          <div className='flex flex-wrap gap-2'>
+            {AUDIENCE_BAND_OPTIONS.map(option => (
+              <Button
+                key={option.band}
+                type='button'
+                variant='ghost'
+                size='sm'
+                data-testid={`onboarding-enrichment-audience-${option.band}`}
+                aria-pressed={savedBand === option.band}
+                onClick={() => {
+                  setSavedBand(option.band);
+                  setOpenPanel(null);
+                }}
+              >
+                {option.caption}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+    </div>
+  );
 }
 
 export function ChatProposeNextStepCard({
@@ -130,6 +274,7 @@ export function ChatProposeNextStepCard({
           claimHandle={claimHandle ?? undefined}
           fallbackRedirectUrl={APP_ROUTES.START}
         />
+        <PostKeepEnrichmentChips />
       </div>
     );
   }
@@ -169,6 +314,7 @@ export function ChatProposeNextStepCard({
         claimHandle={claimHandle ?? undefined}
         fallbackRedirectUrl={APP_ROUTES.START}
       />
+      <PostKeepEnrichmentChips />
     </div>
   );
 }

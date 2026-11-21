@@ -78,4 +78,14 @@ describe('Sparkline', () => {
       expect(value).toMatch(/var\(--/);
     }
   });
+
+  it('pulse variant draws a line without an area fill track', () => {
+    const { container } = render(
+      <Sparkline points={[1, 3, 2]} trend='up' variant='pulse' />
+    );
+    const paths = container.querySelectorAll('path');
+    expect(paths).toHaveLength(1);
+    expect(paths[0]?.getAttribute('data-sparkline-variant')).toBe('pulse');
+    expect(paths[0]?.getAttribute('fill')).toBe('none');
+  });
 });
