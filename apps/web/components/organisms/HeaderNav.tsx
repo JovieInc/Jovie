@@ -308,6 +308,10 @@ function MarketingGlassFlyout({
     <div
       ref={panelRef}
       id={`marketing-header-flyout-${menu.id}`}
+      // Closed panels stay mounted for popover/@starting-style, but must not
+      // steal Tab order on marketing routes (Capture changed UI focus-visible).
+      inert={!open ? true : undefined}
+      aria-hidden={!open}
       {...(nativePopover ? { popover: 'manual' as const } : {})}
       style={
         {
