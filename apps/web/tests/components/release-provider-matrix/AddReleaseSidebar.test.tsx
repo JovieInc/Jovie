@@ -225,6 +225,17 @@ vi.mock('@/components/atoms/Calendar', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  PlainButton: ({
+    children,
+    ...props
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   Button: ({
     children,
     onClick,

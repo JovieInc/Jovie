@@ -18,6 +18,24 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
       "ds-owner",
       "tokens",
@@ -110,6 +128,19 @@
       "empty": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container.",
       "long-content": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container.",
       "rtl-overflow": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar.tsx": {
+      "empty": "The create form opens blank (the Empty state is the initial render) and failures surface as toasts from the create action, covered in AddReleaseSidebar.test.tsx; the fields are single-line controls inside the drawer, which truncates and mirrors long and right-to-left text.",
+      "error": "The create form opens blank (the Empty state is the initial render) and failures surface as toasts from the create action, covered in AddReleaseSidebar.test.tsx; the fields are single-line controls inside the drawer, which truncates and mirrors long and right-to-left text.",
+      "partial": "The create form opens blank (the Empty state is the initial render) and failures surface as toasts from the create action, covered in AddReleaseSidebar.test.tsx; the fields are single-line controls inside the drawer, which truncates and mirrors long and right-to-left text.",
+      "long-content": "The create form opens blank (the Empty state is the initial render) and failures surface as toasts from the create action, covered in AddReleaseSidebar.test.tsx; the fields are single-line controls inside the drawer, which truncates and mirrors long and right-to-left text.",
+      "rtl-overflow": "The create form opens blank (the Empty state is the initial render) and failures surface as toasts from the create action, covered in AddReleaseSidebar.test.tsx; the fields are single-line controls inside the drawer, which truncates and mirrors long and right-to-left text."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx": {
+      "partial": "The dialog searches an external artist index; partial data, long names and permission limits are not separate render states: names truncate in the result row, and claimed artists render as disabled options (covered in SpotifyConnectDialog.test.tsx). Offline is driven by the window offline event and covered there too.",
+      "long-content": "The dialog searches an external artist index; partial data, long names and permission limits are not separate render states: names truncate in the result row, and claimed artists render as disabled options (covered in SpotifyConnectDialog.test.tsx). Offline is driven by the window offline event and covered there too.",
+      "offline": "The dialog searches an external artist index; partial data, long names and permission limits are not separate render states: names truncate in the result row, and claimed artists render as disabled options (covered in SpotifyConnectDialog.test.tsx). Offline is driven by the window offline event and covered there too.",
+      "permission-denied": "The dialog searches an external artist index; partial data, long names and permission limits are not separate render states: names truncate in the result row, and claimed artists render as disabled options (covered in SpotifyConnectDialog.test.tsx). Offline is driven by the window offline event and covered there too."
     },
     "apps/web/components/features/dashboard/organisms/socials-form/SocialsForm.tsx": {
       "loading": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook.",
