@@ -713,18 +713,6 @@ export const SOURCE_GUARDS = Object.freeze([
     inputs: /./u,
     prOnly: true,
   }),
-  Object.freeze({
-    // Smooth surface regression ratchet (SMO-3): committed public baselines +
-    // noise-aware compare. Lighthouse stays non-blocking; this guard feeds
-    // Source Validation / PR Ready when Smooth harness, baselines, or public
-    // Smooth surfaces change. Live measure+compare uses perf:smooth:ratchet.
-    id: 'smooth-surface-ratchet',
-    command:
-      'pnpm --filter @jovie/web exec tsx scripts/performance-smooth-ratchet.ts --check && pnpm --filter @jovie/web exec vitest run scripts/performance-smooth-ratchet.test.ts',
-    inputs:
-      /^(?:docs\/performance\/smooth\/|apps\/web\/scripts\/performance-smooth-|apps\/web\/app\/\(home\)\/|apps\/web\/app\/\[username\]\/|apps\/web\/app\/(?:start|onboarding)\/|apps\/web\/components\/(?:homepage|features\/(?:home|profile)\/)|scripts\/ci-fast-lanes\.mjs$)/u,
-    prOnly: true,
-  }),
 ]);
 
 /**

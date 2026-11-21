@@ -6,11 +6,10 @@ harness under `apps/web/scripts/performance-smooth-*` extends
 
 ## What fails a PR
 
-`smooth-surface-ratchet` (Source Validation / PR Ready) runs when Smooth
-baselines, harness scripts, or public Smooth surfaces change. It:
+Exact-head Coverage (Source Validation → PR Ready) always runs:
 
-1. Validates the six public baseline cells are present (`--check`)
-2. Runs hermetic planted-regression tests for the noise-aware compare
+1. `perf:smooth:ratchet --check` — six public baseline cells must be present
+2. Hermetic planted-regression tests for the noise-aware compare
 
 Live measure + compare (isolated preview or `next start`, **never production**):
 

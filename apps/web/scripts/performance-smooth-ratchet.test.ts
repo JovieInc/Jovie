@@ -64,9 +64,7 @@ function baseline(
   };
 }
 
-function summary(
-  surfaces: SmoothSurfaceBaseline[]
-): SmoothBaselineSummary {
+function summary(surfaces: SmoothSurfaceBaseline[]): SmoothBaselineSummary {
   return {
     schema: 'jovie-smooth-baseline-summary/v1',
     measuredAt: '2026-11-21T00:00:00.000Z',
@@ -268,8 +266,9 @@ describe('performance-smooth-ratchet', () => {
     );
     expect(runSmoothRatchetCli(['--measured', flatPath]).code).toBe(0);
     expect(
-      JSON.parse(readFileSync(join(SMOOTH_BASELINE_DIR, 'summary.json'), 'utf8'))
-        .schema
+      JSON.parse(
+        readFileSync(join(SMOOTH_BASELINE_DIR, 'summary.json'), 'utf8')
+      ).schema
     ).toBe('jovie-smooth-baseline-summary/v1');
   });
 });

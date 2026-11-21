@@ -14,7 +14,6 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  SMOOTH_SURFACES,
   type SmoothPlatform,
   type SmoothSurfaceId,
   smoothBaselineFileName,
@@ -234,9 +233,7 @@ export function compareSurface(options: {
       platform: measured.platform,
       status: 'fail',
       metrics,
-      detail: failed
-        .map(entry => `${entry.metric} ${entry.detail}`)
-        .join('; '),
+      detail: failed.map(entry => `${entry.metric} ${entry.detail}`).join('; '),
     };
   }
   return {
@@ -358,10 +355,7 @@ export function evaluateSmoothRatchet(options: {
 
   const failures = surfaces
     .filter(entry => entry.status === 'fail')
-    .map(
-      entry =>
-        `${entry.surfaceId}/${entry.platform}: ${entry.detail}`
-    );
+    .map(entry => `${entry.surfaceId}/${entry.platform}: ${entry.detail}`);
 
   return {
     schema: 'jovie-smooth-ratchet/v1',

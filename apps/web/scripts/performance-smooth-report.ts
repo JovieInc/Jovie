@@ -10,8 +10,8 @@ import {
 } from './performance-smooth-manifest';
 import { medianNullable, medianNumber } from './performance-smooth-probes';
 import {
-  findBaselineRaises,
   type CheckedInSmoothBaseline,
+  findBaselineRaises,
 } from './performance-smooth-ratchet';
 import {
   SMOOTH_BASELINE_SCHEMA,

@@ -2381,34 +2381,7 @@ describe('source-read guard selection', () => {
         ? ['test-hygiene']
         : []),
       'gate-weakening-detector',
-      ...(/^(?:docs\/performance\/smooth\/|apps\/web\/scripts\/performance-smooth-|apps\/web\/app\/\(home\)\/|apps\/web\/app\/\[username\]\/|apps\/web\/app\/(?:start|onboarding)\/|apps\/web\/components\/(?:homepage|features\/(?:home|profile)\/)|scripts\/ci-fast-lanes\.mjs$)/u.test(
-        path
-      )
-        ? ['smooth-surface-ratchet']
-        : []),
     ]);
-  });
-
-  it('runs Smooth surface ratchet on harness, baseline, and public surface paths', () => {
-    for (const path of [
-      'docs/performance/smooth/baselines/homepage.desktop.json',
-      'apps/web/scripts/performance-smooth-ratchet.ts',
-      'apps/web/app/(home)/page.tsx',
-      'apps/web/app/[username]/page.tsx',
-      'apps/web/app/start/page.tsx',
-      'apps/web/components/homepage/Hero.tsx',
-      'scripts/ci-fast-lanes.mjs',
-    ]) {
-      expect(selected('pull_request', [path])).toContain('smooth-surface-ratchet');
-    }
-    expect(selected('merge_group', ['apps/web/app/(home)/page.tsx'])).not.toContain(
-      'smooth-surface-ratchet'
-    );
-    const guard = SOURCE_GUARDS.find(
-      entry => entry.id === 'smooth-surface-ratchet'
-    );
-    expect(guard.command).toContain('performance-smooth-ratchet.ts --check');
-    expect(guard.command).toContain('performance-smooth-ratchet.test.ts');
   });
 
   it.each([
