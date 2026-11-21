@@ -16,6 +16,16 @@ export const WINDOW_RADIUS = 5;
  */
 export const ROW_HIT_PX = 48;
 /**
+ * Stream Now top offset (`top-20` = 80) and hit height (`min-h-13` = 52).
+ * Row origin is derived so row centers share the CTA center — otherwise a
+ * taller/shorter row box vs the button creates asymmetric neighbor gaps.
+ */
+export const ACTION_TOP_PX = 80;
+export const ACTION_HIT_PX = 52;
+/** Absolute `top` for reel rows so their midlines match Stream Now. */
+export const ROW_ORIGIN_TOP_PX =
+  ACTION_TOP_PX + ACTION_HIT_PX / 2 - ROW_HIT_PX / 2;
+/**
  * Static 1px optical drop for brand marks next to dial labels / Stream Now
  * (DESIGN.md icon+text optical correction — shared geometry, not call-site).
  */

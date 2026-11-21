@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACTION_HIT_PX,
+  ACTION_TOP_PX,
   DIAL_ICON_OPTICAL_CLASS,
   DIAL_ICON_OPTICAL_Y_PX,
   OUTER_STEP_PX,
   ROW_HIT_PX,
+  ROW_ORIGIN_TOP_PX,
   ROW_STEP_PX,
   rowIsTappable,
   rowLayout,
@@ -56,6 +59,16 @@ describe('rowLayout', () => {
     expect(ROW_HIT_PX).toBeLessThanOrEqual(ROW_STEP_PX);
     expect(DIAL_ICON_OPTICAL_Y_PX).toBe(1);
     expect(DIAL_ICON_OPTICAL_CLASS).toBe('translate-y-px');
+  });
+  it('centers reel rows on Stream Now so neighbor gaps stay symmetric', () => {
+    const actionCenter = ACTION_TOP_PX + ACTION_HIT_PX / 2;
+    const rowCenter = ROW_ORIGIN_TOP_PX + ROW_HIT_PX / 2;
+    expect(rowCenter).toBe(actionCenter);
+    const actionTop = ACTION_TOP_PX;
+    const actionBottom = ACTION_TOP_PX + ACTION_HIT_PX;
+    const upperBottom = rowCenter - ROW_STEP_PX + ROW_HIT_PX / 2;
+    const lowerTop = rowCenter + ROW_STEP_PX - ROW_HIT_PX / 2;
+    expect(actionTop - upperBottom).toBe(lowerTop - actionBottom);
   });
 });
 

@@ -18,6 +18,7 @@ import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { DialEngine, type DialState } from '@/lib/dial/dial-engine';
 import {
   DIAL_ICON_OPTICAL_CLASS,
+  ROW_ORIGIN_TOP_PX,
   ROW_STEP_PX,
   rowIsTappable,
   rowLayout,
@@ -486,8 +487,9 @@ export function ActionDial({
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
                   data-preferred={preferredRow ? 'true' : undefined}
-                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-normal tracking-tight text-foreground will-change-transform'
+                  className='absolute inset-x-3 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-normal tracking-tight text-foreground will-change-transform'
                   style={{
+                    top: ROW_ORIGIN_TOP_PX,
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
                     pointerEvents: rowIsTappable(index - position)
