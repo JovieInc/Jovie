@@ -258,4 +258,35 @@ describe('decideFallbackTurn free-text handle keep', () => {
       'handle_confirmed'
     );
   });
+
+  it('keeps multi-role null activeRole in priority adaptive on claim', async () => {
+    // Seer 20814980: activeRole == null treated unset-as-artist and skipped
+    // the priority gate while a handle card was pending.
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('claim'),
+    ];
+    const state = stateFor(messages);
+    state.profileDraft = {
+      version: 1,
+      roles: ['artist', 'founder'],
+      activeRole: null,
+      outcome: null,
+      outcomes: {},
+      sourceCandidates: [],
+      selectedSource: null,
+      sourceSkipped: false,
+      awaiting: 'priority',
+      lastUserMessageId: null,
+    };
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+    expect(turn.line.key).toMatch(/^greet:adaptive-priority/);
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'handle_confirmed'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'open_artist_picker'
+    );
+  });
 });

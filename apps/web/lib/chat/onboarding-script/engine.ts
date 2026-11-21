@@ -572,6 +572,8 @@ export async function decideFallbackTurn(
   // to resolveAwaitingHandleConfirm instead.
   // Artist-only: non-artist drafts must stay in the adaptive block — falling
   // through without spotifyArtistId opens the artist picker (Seer 20813115).
+  // Explicit activeRole === null is multi-role awaiting priority (not "unset");
+  // treating it as artist would skip the priority gate (Seer 20814980).
   const pendingHandleConfirm =
     Boolean(findLatestToolOutput(uiMessages, 'check_handle')) &&
     !hasHandleConfirmed(uiMessages);
@@ -582,7 +584,7 @@ export async function decideFallbackTurn(
   const honorHandleConfirmIntent =
     pendingHandleConfirm &&
     Boolean(state.spotifyArtistId) &&
-    (draft?.activeRole === 'artist' || draft?.activeRole == null) &&
+    (draft?.activeRole === 'artist' || draft?.activeRole === undefined) &&
     isHandleConfirmIntent(latestFreeText);
   if (
     draft &&
