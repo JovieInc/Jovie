@@ -35,6 +35,8 @@ export const WRITE_SWARM_CONTRACT = Object.freeze({
 
 const t = v => (typeof v === 'string' ? v.trim() : '');
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+/** Fail-closed claim flag: boolean true or string "true" both count as yes. */
+const yes = v => v === true || v === 'true';
 
 export function planWriteSwarm(opts = {}) {
   const mode = opts.mode === 'live' ? 'live' : 'dry';
@@ -83,7 +85,7 @@ export function validateWriteSwarmReceipt(receipt) {
   const mode =
     t(doc.mode) === 'live' ? 'live' : t(doc.mode) === 'dry' ? 'dry' : '';
   if (!mode) block('mode_missing', 'dry|live');
-  if (doc.inventAndRubberStamp === true)
+  if (yes(doc.inventAndRubberStamp))
     block('invent_and_rubber_stamp', 'forbidden');
 
   const lease = obj(doc.lease);
@@ -92,11 +94,13 @@ export function validateWriteSwarmReceipt(receipt) {
   const timReady = obj(doc.timReady);
   const codeSyncPresent = doc.codeSync !== undefined && doc.codeSync !== null;
   const codeSync = obj(doc.codeSync);
+  const mutated = yes(mutate?.performed);
+  const renamed = yes(timReady?.renamed);
 
   if (mode === 'dry') {
-    if (doc.mutatesPen === true) block('dry_mutates_pen', 'mutatesPen=false');
-    if (mutate?.performed === true) block('dry_mutate_performed', 'no mutate');
-    if (timReady?.renamed === true) block('dry_tim_ready', 'no rename');
+    if (yes(doc.mutatesPen)) block('dry_mutates_pen', 'mutatesPen=false');
+    if (mutated) block('dry_mutate_performed', 'no mutate');
+    if (renamed) block('dry_tim_ready', 'no rename');
   }
 
   if (mode === 'live') {
@@ -105,12 +109,9 @@ export function validateWriteSwarmReceipt(receipt) {
       if (t(lease.schema) !== LEASE_SCHEMA) block('lease_schema', LEASE_SCHEMA);
       if (!t(lease.holder)) block('lease_holder', 'holder');
       if (!t(lease.token)) block('lease_token', 'token');
-      if (lease.acquired !== true) block('lease_not_acquired', 'acquired');
+      if (!yes(lease.acquired)) block('lease_not_acquired', 'acquired');
     }
-    if (
-      mutate?.performed === true &&
-      (!lease || lease.acquired !== true || !t(lease?.token))
-    )
+    if (mutated && (!lease || !yes(lease?.acquired) || !t(lease?.token)))
       block('mutate_without_lease', 'need lease token');
     if (!system1) block('system1_missing', 'system1 required');
     else {
@@ -123,27 +124,20 @@ export function validateWriteSwarmReceipt(receipt) {
       const writer = t(mutate?.writer);
       const judge = t(system1.judge);
       if (!judge) block('system1_judge', 'judge required');
-      if (mutate?.performed === true && !writer)
-        block('mutate_writer', 'writer required');
-      if (
-        system1.selfApproved === true ||
-        (writer && judge && writer === judge)
-      )
+      if (mutated && !writer) block('mutate_writer', 'writer required');
+      if (yes(system1.selfApproved) || (writer && judge && writer === judge))
         block('invent_and_rubber_stamp', 'writer≠judge');
     }
     if (codeSyncPresent && !codeSync) block('code_sync_type', 'object');
-    const needsPass =
-      mutate?.performed === true ||
-      codeSyncPresent ||
-      timReady?.renamed === true;
+    const needsPass = mutated || codeSyncPresent || renamed;
     if (needsPass && t(system1?.verdict) !== 'pass')
       block('mutate_without_system1_pass', 'need system1 pass');
     if (
-      timReady?.renamed === true &&
+      renamed &&
       (!t(timReady.name) || !/ready for Tim r[0-9a-f]{8}/.test(timReady.name))
     )
       block('tim_ready_name', '· ready for Tim r<8hex>');
-    if (codeSync?.includesPenBlob === true)
+    if (yes(codeSync?.includesPenBlob))
       block('pen_blob_in_code_sync', 'no *.pen');
   }
 

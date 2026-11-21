@@ -117,6 +117,28 @@ describe('design-write-swarm', () => {
     );
   });
 
+  it('treats string "true" claim flags as yes (fail-closed)', () => {
+    const stringy = validateWriteSwarmReceipt({
+      ...live,
+      inventAndRubberStamp: 'true',
+      mutate: { performed: 'true', writer: '' },
+      system1: {
+        ...live.system1,
+        verdict: 'fail',
+        selfApproved: 'true',
+        judge: 'panel',
+      },
+      timReady: { renamed: 'true', name: 'nope' },
+      codeSync: { includesPenBlob: 'true', targets: ['packages/ui'] },
+    });
+    assert.equal(stringy.ok, false);
+    assert.ok(has(stringy, 'invent_and_rubber_stamp'));
+    assert.ok(has(stringy, 'mutate_writer'));
+    assert.ok(has(stringy, 'mutate_without_system1_pass'));
+    assert.ok(has(stringy, 'tim_ready_name'));
+    assert.ok(has(stringy, 'pen_blob_in_code_sync'));
+  });
+
   it('accepts live pass; CLI dry + validate', () => {
     assert.equal(validateWriteSwarmReceipt(live).ok, true);
     const dry = cli('dry-run');
