@@ -3,16 +3,26 @@ import type { ReactNode } from 'react';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { CreatorActionsMenuContent } from './CreatorActionsMenuContent';
 
-const profile = {
+const profile: AdminCreatorProfileRow = {
   id: 'profile-1',
   username: 'alice',
+  usernameNormalized: 'alice',
+  avatarUrl: null,
   displayName: 'Alice',
   isVerified: false,
   isFeatured: false,
   marketingOptOut: false,
   isClaimed: true,
   claimToken: null,
-} as unknown as AdminCreatorProfileRow;
+  claimTokenExpiresAt: null,
+  userId: 'user-1',
+  createdAt: null,
+  ingestionStatus: 'idle',
+  location: null,
+  hometown: null,
+  activeSinceYear: null,
+  lastIngestionError: null,
+};
 
 function renderItem({
   children,
