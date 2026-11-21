@@ -47,9 +47,9 @@ const MEASURED = {
     runId: 39691992741,
   },
   'lib/claim/redirect-origin.ts': {
-    measured: 47.1,
-    valid: 87,
-    runId: 39873145330,
+    measured: 78.8,
+    valid: 104,
+    runId: 21112026004,
   },
   'lib/stripe/dunning.ts': {
     measured: 91.6,
