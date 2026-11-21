@@ -1,25 +1,22 @@
-/** Project web ActionButton KEEP (button-contract 28/44) into JovieActionButtonMetrics. */
+/** Project button-contract ActionButton KEEP (28/44) into JovieActionButtonMetrics. */
 export const ACTION_BUTTON_START = '  // BEGIN GENERATED NATIVE ACTION BUTTON';
 export const ACTION_BUTTON_END = '  // END GENERATED NATIVE ACTION BUTTON';
 
 export function contractNumber(source, name) {
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name))
-    throw new Error(`Invalid ActionButton export: ${name}`);
+  if (!/^[A-Z][A-Z0-9_]*$/.test(name)) throw new Error(`Invalid export: ${name}`);
   const matches = [
     ...source.matchAll(
       new RegExp(`^export const ${name}\\s*=\\s*(\\d+)\\s*;`, 'gm')
     ),
   ];
-  if (matches.length === 0)
-    throw new Error(`Missing ActionButton export: ${name}`);
-  if (matches.length > 1)
-    throw new Error(`Duplicate ActionButton export: ${name}`);
+  if (matches.length === 0) throw new Error(`Missing export: ${name}`);
+  if (matches.length > 1) throw new Error(`Duplicate export: ${name}`);
   return Number(matches[0][1]);
 }
 
 export function projectedActionButton(bindings, contractSource) {
   if (!Array.isArray(bindings) || bindings.length === 0)
-    throw new Error('Native ActionButton bindings required');
+    throw new Error('ActionButton bindings required');
   const names = new Set();
   const lines = [];
   for (const binding of bindings) {
@@ -28,10 +25,10 @@ export function projectedActionButton(bindings, contractSource) {
       binding.length !== 2 ||
       typeof binding[1] !== 'string'
     )
-      throw new Error('Ambiguous ActionButton mapping: [name, export]');
+      throw new Error('Ambiguous ActionButton mapping');
     const [name, source] = binding;
     if (!/^[a-zA-Z]\w*$/.test(name) || names.has(name))
-      throw new Error(`Duplicate/invalid ActionButton mapping: ${name}`);
+      throw new Error(`Bad ActionButton mapping: ${name}`);
     names.add(name);
     lines.push(
       `  /// Source: ${source}`,
@@ -57,7 +54,6 @@ export function replaceActionButtonProjection(source, projection) {
   );
 }
 
-/** Fixture paths native-design-system tests must copy before check/write. */
 export function nativeDesignFixturePaths(manifest, manifestPath) {
   return [
     manifestPath,
