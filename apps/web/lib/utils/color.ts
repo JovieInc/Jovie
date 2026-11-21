@@ -3,6 +3,20 @@
  * Used by link manager components for platform icon theming.
  */
 
+/** Neutral brand colour for platforms that publish no brand hex. */
+const NEUTRAL_BRAND_HEX = '#6b7280';
+
+/** White used to test icon contrast against a platform brand colour. */
+export const ON_BRAND_WHITE = '#ffffff';
+
+/**
+ * Resolve a platform brand hex (as published, without the #) to a usable
+ * colour, falling back to a neutral grey when none is published.
+ */
+export function brandHexOrNeutral(hex?: string | null): string {
+  return hex ? `#${hex}` : NEUTRAL_BRAND_HEX;
+}
+
 /**
  * Convert a hex color string to RGB components.
  * @param hex - Hex color string (with or without #)

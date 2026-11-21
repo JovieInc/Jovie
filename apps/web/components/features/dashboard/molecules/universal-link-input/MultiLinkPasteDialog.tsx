@@ -7,7 +7,7 @@
  * which ones to add. Displays duplicate warnings for links that already exist.
  */
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { cn } from '@/lib/utils';
-import { getContrastTextOnBrand } from '@/lib/utils/color';
+import { brandHexOrNeutral, getContrastTextOnBrand } from '@/lib/utils/color';
 
 import type { ExtractedLinkInfo } from './useMultiLinkPaste';
 
@@ -75,14 +75,13 @@ function LinkItem({
   const { platform, normalizedUrl } = detectedLink;
 
   const iconMeta = getPlatformIconMetadata(platform.icon);
-  const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const iconHex = brandHexOrNeutral(iconMeta?.hex);
 
   const isDisabled = isDuplicate;
   const isChecked = isSelected && !isDuplicate;
 
   return (
-    <button
-      type='button'
+    <PlainButton
       onClick={onToggle}
       disabled={isDisabled}
       className={cn(
@@ -98,7 +97,7 @@ function LinkItem({
         )}
       >
         {isChecked && (
-          <Icon name='Check' className='h-3 w-3 text-white dark:text-white' />
+          <Icon name='Check' className='h-3 w-3 text-accent-foreground' />
         )}
       </div>
 
@@ -120,7 +119,7 @@ function LinkItem({
             {platform.name}
           </span>
           {isDuplicate && (
-            <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-caption text-amber-600 dark:text-amber-400'>
+            <span className='flex items-center gap-1 rounded bg-warning-subtle px-1.5 py-0.5 text-3xs font-caption text-warning-text'>
               <Icon name='AlertTriangle' className='h-3 w-3' />
               Already added
             </span>
@@ -128,7 +127,7 @@ function LinkItem({
         </div>
         <p className='truncate text-app text-tertiary-token'>{normalizedUrl}</p>
       </div>
-    </button>
+    </PlainButton>
   );
 }
 
@@ -158,7 +157,7 @@ export function MultiLinkPasteDialog({
       <DialogDescription>
         Select which links you&apos;d like to add to your profile.
         {duplicateCount > 0 && (
-          <span className='text-amber-600 dark:text-amber-400'>
+          <span className='text-warning-text'>
             {' '}
             {duplicateCount} already added.
           </span>
