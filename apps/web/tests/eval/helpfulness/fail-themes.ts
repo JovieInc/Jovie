@@ -1,15 +1,28 @@
 /**
  * Hermetic detectors for known helpfulness fail themes (ASS-16 / ASS-25).
  *
- * Offline only: no model, Gateway, or network. Used by golden-eval CI to
- * ratchet reply-shape regressions while live ASS-13 scoring waits, without
- * shipping a second production prompt-copy PR (#26336 / #26360).
+ * Offline only: no model, Gateway, or network. Used by golden-eval CI and by
+ * live helpfulness `runHardChecks` so those reply shapes fail closed without
+ * AI spend. Does not ship production prompt copy (#26336 / #26360).
  *
  * Themes:
  * - upcoming-first: planning/greeting replies must name the UPCOMING release early
  * - question-not-a-move: clarifying closers are not a next move when a dated move exists
  * - inventing-stats: never invent / narrate popularity or stream counts to the artist
  */
+
+/** Parse the first UPCOMING title from fixture/judge facts, if any. */
+export function upcomingTitleFromFacts(
+  facts: readonly string[]
+): string | undefined {
+  for (const fact of facts) {
+    const match = fact.match(
+      /UPCOMING:\s*(?:single|album|ep|release)?\s*"([^"]+)"/i
+    );
+    if (match?.[1]) return match[1];
+  }
+  return undefined;
+}
 
 /** Spoken popularity scores are forbidden in artist-facing copy. */
 export const POPULARITY_SCORE_PATTERN =

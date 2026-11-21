@@ -14,6 +14,7 @@ import {
   inventsPopularityOrStreams,
   namesUpcomingFirst,
   runFailThemeChecks,
+  upcomingTitleFromFacts,
 } from './fail-themes';
 
 const baseContext = {
@@ -39,6 +40,20 @@ function calibrationReply(id: string): string {
   if (!example) throw new Error(`missing calibration example: ${id}`);
   return example.reply.text;
 }
+
+describe('fail themes: upcoming title from facts', () => {
+  it('extracts the UPCOMING title and ignores facts without one', () => {
+    expect(
+      upcomingTitleFromFacts([
+        'Released: Neon Reef ~58 days ago.',
+        'UPCOMING: single "Night Swim" releases this Friday (2026-10-30).',
+      ])
+    ).toBe('Night Swim');
+    expect(upcomingTitleFromFacts(['No upcoming release scheduled.'])).toBe(
+      undefined
+    );
+  });
+});
 
 describe('fail themes: upcoming-first', () => {
   it('fails the greeting deliberate-red that never names Night Swim', () => {
