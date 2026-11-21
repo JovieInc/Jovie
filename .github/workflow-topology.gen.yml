@@ -172,6 +172,17 @@ nodes:
       - workflow_call
     terminalReceipt: job:canary-health-gate
     jobCount: 1
+  - name: Chat first-token sample
+    path: .github/workflows/chat-first-token-sample.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:chat-first-token-sample
+    jobCount: 1
   - name: Cheap Fixer
     path: .github/workflows/cheap-fixer.yml
     active: true
