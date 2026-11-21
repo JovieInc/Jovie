@@ -37,7 +37,7 @@ const TITLE_GAP_MAX = 28;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 // Visual Regression always sets the bypass. Fail closed outside that lane
-// instead of test.skip (JOV-INV-045 gate-weakening).
+// (JOV-INV-045: do not add Playwright skip modifiers here).
 test.beforeAll(() => {
   expect(
     process.env.E2E_USE_TEST_AUTH_BYPASS,
