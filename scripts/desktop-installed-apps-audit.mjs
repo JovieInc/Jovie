@@ -22,6 +22,13 @@ import {
   isStagingAssetName,
   validateReleaseEnvelope,
 } from './desktop-release-assets.mjs';
+import {
+  githubHttpErrorMessage,
+  isPublicationObservationError,
+  publishedFeedErrorMessage,
+} from './lib/publication-observation.mjs';
+
+export { isPublicationObservationError } from './lib/publication-observation.mjs';
 
 const APPLICATIONS_DIR = '/Applications';
 export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -32,7 +39,6 @@ const BUILD_IDENTITY_RESOURCE_NAME = 'build-identity.json';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const STAGING_VERSION = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
-
 function versionMatchesChannel(channel, version) {
   return channel === 'staging'
     ? STAGING_VERSION.test(version)
@@ -44,7 +50,6 @@ const BUILD_IDENTITY_KEYS = new Set([
   'sourceRevision',
   'builtAt',
 ]);
-
 /** @type {Readonly<Record<string, { readonly role: string; readonly canonical: boolean }>>} */
 export const KNOWN_DESKTOP_BUNDLE_IDS = {
   'app.jov.ie': {
@@ -60,16 +65,13 @@ export const KNOWN_DESKTOP_BUNDLE_IDS = {
     canonical: false,
   },
 };
-
 /** @type {Readonly<Set<string>>} */
 export const LEGACY_DESKTOP_BUNDLE_IDS = new Set(['ie.jov.Jovie']);
-
 function isIsoTimestamp(value) {
   if (typeof value !== 'string' || value.length === 0) return false;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
 }
-
 // GitHub timestamps omit milliseconds; still reject date-only values and
 // calendar dates that Date.parse silently normalizes (for example February 30).
 function isReleaseTimestamp(value) {
@@ -78,7 +80,6 @@ function isReleaseTimestamp(value) {
     isIsoTimestamp(value.replace(/(T\d{2}:\d{2}:\d{2})Z$/, '$1.000Z'))
   );
 }
-
 function isDesktopBuildIdentityRecord(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -96,7 +97,6 @@ function isDesktopBuildIdentityRecord(value) {
     (value.builtAt === null || isIsoTimestamp(value.builtAt))
   );
 }
-
 export function readDesktopBuildIdentity(appPath) {
   const identityPath = path.join(
     appPath,
@@ -122,7 +122,6 @@ export function readDesktopBuildIdentity(appPath) {
     return { buildIdentity: null, buildIdentityError: 'unavailable' };
   }
 }
-
 function buildIdentityHasReleaseProvenance(identity) {
   return (
     (identity.channel === 'production' || identity.channel === 'staging') &&
@@ -132,7 +131,6 @@ function buildIdentityHasReleaseProvenance(identity) {
     isIsoTimestamp(identity.builtAt)
   );
 }
-
 /**
  * @param {string} applicationsDir
  * @returns {Array<{ readonly name: string; readonly path: string }>}
@@ -141,7 +139,6 @@ export function listJovieApplicationBundles(applicationsDir) {
   if (!existsSync(applicationsDir)) {
     return [];
   }
-
   return readdirSync(applicationsDir, { withFileTypes: true })
     .filter(
       entry =>
@@ -155,7 +152,6 @@ export function listJovieApplicationBundles(applicationsDir) {
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
-
 /**
  * @param {string} appPath
  * @param {{
@@ -184,7 +180,6 @@ export function readCodesignMetadata(
     if (result.status !== 0 || result.error) {
       return { identifier: null, version: null };
     }
-
     // `codesign -d` writes display metadata to stderr even when it succeeds.
     const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     const identifier = output.match(/Identifier=(.+)/)?.[1]?.trim() ?? null;
@@ -193,7 +188,6 @@ export function readCodesignMetadata(
     return { identifier: null, version: null };
   }
 }
-
 /**
  * @param {string} appPath
  * @returns {string | null}
@@ -213,7 +207,6 @@ export function readApplicationBundleVersion(appPath) {
   }
   return null;
 }
-
 /**
  * @param {typeof execFileSync} [runPs]
  * @returns {Array<{ readonly pid: string; readonly command: string }>}
@@ -242,7 +235,6 @@ export function listRunningJovieProcesses(runPs = execFileSync) {
     );
   }
 }
-
 /**
  * Match the primary executable of a Jovie app bundle, excluding Electron
  * helpers and unrelated processes whose working path happens to contain Jovie.
@@ -256,7 +248,6 @@ export function commandRunsJovieDesktopShell(command) {
     /\/(Jovie[^/]*)\.app\/Contents\/MacOS\/\1(?:\s|$)/i.test(command)
   );
 }
-
 /**
  * @param {string} command
  * @returns {boolean}
@@ -264,7 +255,6 @@ export function commandRunsJovieDesktopShell(command) {
 export function commandExposesRemoteDebugging(command) {
   return /--remote-debugging-port=\d+/.test(command);
 }
-
 /** @param {string} appPath */
 export function readBundleShortVersion(appPath) {
   try {
@@ -282,7 +272,6 @@ export function readBundleShortVersion(appPath) {
     return null;
   }
 }
-
 /**
  * @param {{
  *   readonly channel: string;
@@ -372,7 +361,6 @@ export function evaluateDesktopUpdateFreshness(input) {
     reason: `${channel}: installed ${installed} is behind ${input.latestVersion} for more than 24h.`,
   };
 }
-
 function githubHeaders(accept) {
   const headers = {
     Accept: accept,
@@ -382,13 +370,15 @@ function githubHeaders(accept) {
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
-
 async function githubJson(url, fetchImpl = fetch) {
   const response = await fetchImpl(url, {
     headers: githubHeaders('application/vnd.github+json'),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(githubHttpErrorMessage(url, response.status, body));
+  }
   return response.json();
 }
 
@@ -406,6 +396,7 @@ async function shippedVersion(release, channel, fetchImpl) {
     sourceRevision: release?.target_commitish ?? null,
     publicationIdentityVerified: false,
     publicationError: null,
+    publicationObservationError: null,
   };
   try {
     if (
@@ -476,8 +467,10 @@ async function shippedVersion(release, channel, fetchImpl) {
         signal: AbortSignal.timeout(30_000),
       }
     );
-    if (!response.ok)
-      throw new Error(`Published feed returned ${response.status}.`);
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(publishedFeedErrorMessage(response.status, body));
+    }
     const bytes = Buffer.from(await response.arrayBuffer());
     if (
       bytes.length !== feed.size ||
@@ -523,27 +516,37 @@ async function shippedVersion(release, channel, fetchImpl) {
     }
     result.publicationIdentityVerified = true;
   } catch (error) {
-    result.publicationError =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (isPublicationObservationError(error)) {
+      result.publicationObservationError = message;
+    } else {
+      result.publicationError = message;
+    }
   }
   return result;
 }
-
 export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
   const production = await githubJson(
     `${GITHUB_API}/repos/${GITHUB_REPO}/releases/latest`,
     fetchImpl
   );
+  /** @type {string | null} */
+  let stagingObservationError = null;
+  // 404 = release absent (missing). Anything else is incomplete observation.
   const staging = await githubJson(
     `${GITHUB_API}/repos/${GITHUB_REPO}/releases/tags/${STAGING_DESKTOP_RELEASE_TAG}`,
     fetchImpl
-  ).catch(() => null);
+  ).catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/\b404\b/.test(message)) stagingObservationError = message;
+    return null;
+  });
   return {
     production: await shippedVersion(production, 'production', fetchImpl),
     staging: await shippedVersion(staging, 'staging', fetchImpl),
+    stagingObservationError,
   };
 }
-
 /**
  * @param {{
  *   readonly bundles: ReadonlyArray<{
@@ -560,7 +563,6 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
  */
 export function evaluateDesktopInstalledAppsAudit(input) {
   const findings = [];
-
   const canonicalBundles = input.bundles.filter(
     bundle =>
       bundle.identifier &&
@@ -575,41 +577,35 @@ export function evaluateDesktopInstalledAppsAudit(input) {
       `Multiple production shells detected: ${canonicalBundles.map(bundle => bundle.name).join(', ')}.`
     );
   }
-
   for (const bundle of input.bundles) {
     if (!bundle.identifier) {
       findings.push(`${bundle.name}: could not read codesign identifier.`);
       continue;
     }
-
     if (LEGACY_DESKTOP_BUNDLE_IDS.has(bundle.identifier)) {
       findings.push(
         `${bundle.name} uses legacy bundle id ${bundle.identifier}; delete it and use /Applications/Jovie.app (app.jov.ie).`
       );
       continue;
     }
-
     if (!KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]) {
       findings.push(
         `${bundle.name} has unknown bundle id ${bundle.identifier}; verify before keeping it installed.`
       );
       continue;
     }
-
     if (!bundle.buildIdentity) {
       findings.push(
         `${bundle.name}: packaged build identity is ${bundle.buildIdentityError ?? 'unavailable'}; provenance is not verified.`
       );
       continue;
     }
-
     const identity = bundle.buildIdentity;
     if (bundle.version !== identity.version) {
       findings.push(
         `${bundle.name}: bundle version ${bundle.version ?? 'unknown'} does not match build identity ${identity.version}.`
       );
     }
-
     const expectedChannel =
       KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier].role === 'local-dev'
         ? 'local'
@@ -619,7 +615,6 @@ export function evaluateDesktopInstalledAppsAudit(input) {
         `${bundle.name}: bundle role ${expectedChannel} does not match build identity channel ${identity.channel}.`
       );
     }
-
     if (identity.channel === 'local') {
       if (identity.builtAt !== null) {
         findings.push(
@@ -632,13 +627,11 @@ export function evaluateDesktopInstalledAppsAudit(input) {
       );
     }
   }
-
   if (input.processes.length > 1) {
     findings.push(
       `${input.processes.length} Jovie desktop processes are running; keep only the shell you need (typically production OR staging/local for QA).`
     );
   }
-
   for (const processInfo of input.processes) {
     if (commandExposesRemoteDebugging(processInfo.command)) {
       findings.push(
@@ -646,13 +639,10 @@ export function evaluateDesktopInstalledAppsAudit(input) {
       );
     }
   }
-
   return { findings, ok: findings.length === 0 };
 }
-
 function formatReport({ bundles, processes, findings, ok }) {
   const lines = ['Jovie desktop /Applications audit', ''];
-
   if (bundles.length === 0) {
     lines.push('Installed bundles: none matching /Applications/Jovie*.app');
   } else {
@@ -677,7 +667,6 @@ function formatReport({ bundles, processes, findings, ok }) {
       );
     }
   }
-
   lines.push('');
   if (processes.length === 0) {
     lines.push('Running processes: none');
@@ -687,7 +676,6 @@ function formatReport({ bundles, processes, findings, ok }) {
       lines.push(`- pid=${processInfo.pid} ${processInfo.command}`);
     }
   }
-
   lines.push('');
   if (ok) {
     lines.push('Result: PASS — no issues detected.');
@@ -697,10 +685,8 @@ function formatReport({ bundles, processes, findings, ok }) {
       lines.push(`- ${finding}`);
     }
   }
-
   return lines.join('\n');
 }
-
 export function runDesktopInstalledAppsAudit({
   applicationsDir = APPLICATIONS_DIR,
   listBundles = listJovieApplicationBundles,
@@ -718,7 +704,6 @@ export function runDesktopInstalledAppsAudit({
     bundles,
     processes,
   });
-
   return {
     bundles,
     processes,
@@ -727,7 +712,6 @@ export function runDesktopInstalledAppsAudit({
     report: formatReport({ bundles, processes, findings, ok }),
   };
 }
-
 function isMainModule() {
   const invoked = process.argv[1];
   return (
@@ -735,7 +719,6 @@ function isMainModule() {
     invoked?.endsWith('desktop-installed-apps-audit')
   );
 }
-
 async function maybeEvaluateFreshness(result) {
   const shipped = await fetchShippedDesktopVersions();
   const freshness = result.bundles.flatMap(bundle => {
@@ -785,7 +768,6 @@ async function maybeEvaluateFreshness(result) {
     red,
   };
 }
-
 if (isMainModule()) {
   const result = runDesktopInstalledAppsAudit();
   console.log(result.report);

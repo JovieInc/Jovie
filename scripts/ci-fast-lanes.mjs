@@ -801,7 +801,6 @@ export function selectSourceGuards(event, changed) {
     loadSourceGuardHistory()
   );
 }
-
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
   guard => guard.command
 ).join(' && ');
@@ -1010,7 +1009,6 @@ const LANES_COVERAGE_REPORT_COMMANDS = LANES_COVERAGE_FLOORS.map(
     '" --fail-under=' +
     floor
 );
-
 // Run the CPU-heavy coverage shards alone; keep every main-branch floor.
 export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
   [LANES_COVERAGE_RUN, ...LANES_COVERAGE_REPORT_COMMANDS].join(' && ')
@@ -1902,7 +1900,6 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   }
   return result.output.split('\0').filter(Boolean);
 }
-
 export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
   'apps/web/lib/entitlements/**',
   'apps/web/lib/stripe/customer-sync/**',
@@ -2289,12 +2286,15 @@ function runScriptsTypecheck() {
   // resolver changes can alter its diagnostics without touching a path filter.
   return shell('pnpm run typecheck:scripts');
 }
-
-/** Operations-lane node:test files run by Guardrails (single source of truth). */
 export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/cleanup-stale-dev.test.mjs',
   'scripts/desktop-release-guard.test.mjs',
   'scripts/desktop-installed-apps-audit.test.mjs',
+  'scripts/artifact-freshness-reconcile.test.mjs',
+  'scripts/lib/artifact-freshness-certified.test.mjs',
+  'scripts/lib/artifact-freshness-graph.test.mjs',
+  'scripts/lib/artifact-freshness-stamp.test.mjs',
+  'scripts/lib/publication-observation.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
   'scripts/swift-arch/guard.test.mjs',
