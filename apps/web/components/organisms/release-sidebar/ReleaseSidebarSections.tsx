@@ -1,6 +1,10 @@
 'use client';
 
-import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
+import {
+  getAvatarShapeClassName,
+  getAvatarSizePx,
+  PlainButton,
+} from '@jovie/ui';
 import {
   Activity,
   Clock,
@@ -105,13 +109,12 @@ function renderArtistLine(
       renderName={
         onArtistClick
           ? name => (
-              <button
-                type='button'
+              <PlainButton
                 onClick={() => onArtistClick(name)}
                 className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
               >
                 {name}
-              </button>
+              </PlainButton>
             )
           : undefined
       }
@@ -320,27 +323,26 @@ export function ReleaseEntityHeader({
                 )}
               </AlbumArtworkContextMenu>
 
-              <button
-                type='button'
+              <PlainButton
                 onClick={onTogglePreview}
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
                   'absolute inset-0 flex items-center justify-center transition-[background-color,opacity] duration-subtle',
                   RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME,
-                  'bg-black/0 opacity-0',
-                  'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                  'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+                  'bg-ink-on-media/0 opacity-0',
+                  'group-hover/artwork:bg-ink-on-media/40 group-hover/artwork:opacity-100',
+                  'aria-[pressed=true]:bg-ink-on-media/40 aria-[pressed=true]:opacity-100',
                   'disabled:pointer-events-none disabled:hidden'
                 )}
                 aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
               >
                 {isPlaying ? (
-                  <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
+                  <Pause className='h-4 w-4 text-on-media drop-shadow-sm' />
                 ) : (
-                  <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
+                  <Play className='h-4 w-4 translate-x-px text-on-media drop-shadow-sm' />
                 )}
-              </button>
+              </PlainButton>
             </div>
           }
         />

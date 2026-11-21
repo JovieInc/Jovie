@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -43,19 +44,19 @@ export function TaskRowActionMenu({
       trigger='custom'
       align='end'
     >
-      <button
+      <PlainButton
         type='button'
         onClick={event => event.stopPropagation()}
         onPointerDown={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
-        aria-label='Open task actions'
+        aria-label='Open Task Actions'
         className={getTaskRowActionTriggerClassName({
           visibility,
           selected,
         })}
       >
         <MoreHorizontal className='h-3.5 w-3.5' />
-      </button>
+      </PlainButton>
     </TableActionMenu>
   );
 }

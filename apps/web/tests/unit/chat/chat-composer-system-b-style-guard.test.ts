@@ -75,7 +75,7 @@ describe('chat composer System B source contract', () => {
       'utf8'
     );
     expect(paletteSource).toContain(
-      'text-3xs font-semibold uppercase tracking-[0.1em] text-tertiary-token'
+      'text-3xs font-semibold text-tertiary-token'
     );
     expect(paletteSource).not.toContain(
       'text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'

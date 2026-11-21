@@ -1,6 +1,6 @@
 'use client';
 
-import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
+import { PlainButton, Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -67,7 +67,7 @@ const STATUS_LABEL: Record<DspStatus, string> = {
 };
 
 /** Always-light type on a brand-color fill so the glyph stays visible. */
-export const DSP_GLYPH_ON_BRAND_TEXT_CLASS = 'text-white dark:text-white';
+export const DSP_GLYPH_ON_BRAND_TEXT_CLASS = 'text-on-media';
 
 const HOVER_OPEN_DELAY_MS = 400;
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -212,7 +212,7 @@ export function DspAvatarStack({
         )}
       >
         <PopoverAnchor asChild>
-          <button
+          <PlainButton
             ref={triggerRef}
             aria-controls={open ? popoverId : undefined}
             aria-expanded={open}
@@ -233,7 +233,6 @@ export function DspAvatarStack({
             onKeyDown={isolateActivation}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
-            type='button'
           >
             {/* Include the visible overflow count in the name (WCAG 2.5.3,
                 JOV-8781). Explicit whitespace separates inline text nodes. */}
@@ -321,7 +320,7 @@ export function DspAvatarStack({
                 +{others}
               </span>
             )}
-          </button>
+          </PlainButton>
         </PopoverAnchor>
       </div>
       <PopoverContent

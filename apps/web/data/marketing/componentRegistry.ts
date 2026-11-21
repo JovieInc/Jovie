@@ -262,14 +262,14 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
-        variantId: 'centered-phone',
+        variantId: 'left-phone',
         componentPath: 'apps/web/components/marketing/MarketingPosterHero.tsx',
         rootBinding: 'sectionVariant={sectionVariant}',
         delegatedProofs: [
           {
             source:
               'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
-            binding: "sectionVariant='centered-phone'",
+            binding: "sectionVariant='left-phone'",
             occurrences: 1,
             kind: 'source',
           },

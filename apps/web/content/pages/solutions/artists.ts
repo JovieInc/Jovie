@@ -28,17 +28,15 @@ export const solutionsArtistsPage = definePage({
     recipeId: 'artist-lp',
     penContractId: MARKETING_PEN_CONTRACT_IDS.recipe.artistLp,
     shellClassName: 'artist-profiles-home-system',
+    // JOV-14242: six homepage-system sections. One mode-morphing phone lives
+    // in the hero; opinionated / annotated-truth / spec-bento / release-cycle /
+    // FAQ are cut (those repeated the mock or bloated the scroll).
     sections: [
       { renderer: 'artist-hero-adaptive-intro', sectionId: 'hero' },
       { renderer: 'artist-outcomes', sectionId: 'feature-grid' },
       { renderer: 'artist-capture', sectionId: 'capture' },
-      { renderer: 'artist-opinionated', sectionId: 'feature-split' },
-      { renderer: 'artist-annotated-truth', sectionId: 'feature-split' },
-      { renderer: 'shipped-sites-showcase', sectionId: 'product-gallery' },
-      { renderer: 'platform-spec-bento', sectionId: 'spec-wall' },
       { renderer: 'artist-how-it-works', sectionId: 'how-it-works' },
-      { renderer: 'artist-release-cycle', sectionId: 'product-gallery' },
-      { renderer: 'artist-faq', sectionId: 'faq' },
+      { renderer: 'shipped-sites-showcase', sectionId: 'product-gallery' },
       { renderer: 'artist-final-cta', sectionId: 'cta' },
     ],
   },

@@ -67,6 +67,15 @@ export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
 
   'Fail theme: never invent popularity or streams':
     'Low Tide Choir is months old with no follow-up release behind it. One move: pick a Friday four weeks out, create that single in Jovie today, and put a pre-save on your profile link.',
+
+  'One-rec gap: upcoming first sentence with days-left':
+    'Night Swim is out tomorrow. Put the Night Swim pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio link to it.',
+
+  'One-rec gap: collab drafts one target':
+    'Night Swim is out tomorrow, so draft outreach for Fictional Artist A today — shared ambient playlist overlap makes the ask concrete. Holding the draft for your one-tap yes before send.',
+
+  'One-rec gap: do-it calls the pitch tool':
+    'Drafting the Night Swim curator pitch now. I will hold the draft for your one-tap yes before anything sends.',
 };
 
 export function getGoldenMockResponse(caseName: string): string {

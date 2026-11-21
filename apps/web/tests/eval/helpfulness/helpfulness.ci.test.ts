@@ -5,6 +5,7 @@ vi.mock('server-only', () => ({}));
 
 import calibration from './calibration.json';
 import { HELPFULNESS_CASES } from './cases';
+import { deniesVisibleCatalog } from './catalog-deny';
 import { buildFixture, nextFriday } from './fixtures';
 import {
   buildJudgePrompt,
@@ -15,14 +16,14 @@ import {
 } from './scoring';
 import { HELPFULNESS_BEHAVIORS, HELPFULNESS_EVAL_VERSION } from './spec';
 
-const NOW = new Date('2026-10-28T15:00:00Z'); // Wednesday
-const songOutFriday = HELPFULNESS_CASES.find(c => c.id === 'song-out-friday');
-
 function calibrationReply(id: string): string {
   const example = calibration.examples.find(e => e.id === id);
   if (!example) throw new Error(`missing calibration example: ${id}`);
   return example.reply.text;
 }
+
+const NOW = new Date('2026-10-28T15:00:00Z'); // Wednesday
+const songOutFriday = HELPFULNESS_CASES.find(c => c.id === 'song-out-friday');
 
 describe('helpfulness case set', () => {
   it('is versioned, unique and within the per-run cap', () => {
@@ -201,5 +202,39 @@ describe('ASS-36 empty-profile setup', () => {
     });
     expect(bad.find(x => x.id === 'grounding_0')?.ok).toBe(false);
     expect(good.find(x => x.id === 'grounding_0')?.ok).toBe(true);
+  });
+});
+
+describe('ASS-70 catalog deny (deferred ASS-36)', () => {
+  it('hard-fails best-release deliberate red that denies per-release data', () => {
+    const best = HELPFULNESS_CASES.find(c => c.id === 'best-release');
+    if (!best) throw new Error('missing best-release');
+    const text = calibrationReply('best-release');
+    expect(deniesVisibleCatalog(text)).toBe(true);
+    // Grounding alone passes (red still names Tidal Drift) — catalog_deny is required.
+    expect(text.toLowerCase()).toContain('tidal drift');
+    const checks = runHardChecks(best, { text, toolCalls: [] });
+    expect(checks.find(c => c.id === 'grounding_0')?.ok).toBe(true);
+    expect(checks.find(c => c.id === 'catalog_deny')?.ok).toBe(false);
+    expect(scoreCase(best.id, checks, null).passed).toBe(false);
+  });
+
+  it('passes a catalog pick that uses visible Discography rows', () => {
+    const best = HELPFULNESS_CASES.find(c => c.id === 'best-release');
+    if (!best) throw new Error('missing best-release');
+    const text =
+      'Tidal Drift leads your catalog over Neon Reef; Night Swim is not out yet. One move: put Tidal Drift at the top of jov.ie/lunawaves today so Instagram bio traffic hits your strongest cut.';
+    const checks = runHardChecks(best, { text, toolCalls: [] });
+    expect(checks.find(c => c.id === 'catalog_deny')?.ok).toBe(true);
+    expect(checks.every(c => c.ok)).toBe(true);
+  });
+
+  it('skips catalog_deny on empty-profile (new) fixtures', () => {
+    const empty = HELPFULNESS_CASES.find(x => x.id === 'new-where-start')!;
+    const checks = runHardChecks(empty, {
+      text: 'Add a bio on jov.ie/maraquill today.',
+      toolCalls: [],
+    });
+    expect(checks.find(check => check.id === 'catalog_deny')).toBeUndefined();
   });
 });
