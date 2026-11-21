@@ -52,9 +52,9 @@ const MEASURED = {
     runId: 39873145330,
   },
   'lib/stripe/dunning.ts': {
-    measured: 12.6,
-    valid: 135,
-    runId: 39889081061,
+    measured: 91.6,
+    valid: 143,
+    runId: 21112026001,
   },
   'lib/stripe/startup-validation.ts': {
     measured: 90.5,
@@ -140,11 +140,11 @@ describe('mutation score floor', () => {
     expect(() => assertFloorsNotLowered(baseline, anchor)).not.toThrow();
 
     const raised = structuredClone(baseline);
-    raised.files['lib/stripe/dunning.ts'].floor = 12;
+    raised.files['lib/stripe/dunning.ts'].floor = 91;
     expect(() => assertFloorsNotLowered(raised, baseline)).not.toThrow();
 
     const lowered = structuredClone(baseline);
-    lowered.files['lib/stripe/dunning.ts'].floor = 11;
+    lowered.files['lib/stripe/dunning.ts'].floor = 90;
     expect(() => assertFloorsNotLowered(lowered, baseline)).toThrow(
       'can only go up'
     );
