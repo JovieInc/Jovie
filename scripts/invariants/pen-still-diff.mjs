@@ -12,7 +12,10 @@
 */
 import { createHash } from 'node:crypto';
 import { BINDING_SCHEMA, bindingsToStillFrames } from '../design/pen-bindings-lib.mjs';
-import { captureSurfacePng } from './clef-screenshot-capture.mjs';
+import {
+  capturePathMatchesExpected,
+  captureSurfacePng,
+} from './clef-screenshot-capture.mjs';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path'; import { fileURLToPath } from 'node:url'; import {
 composeTriptych, decodePng, diffImage, encodePng, judgePair, measureGeometry, measureImage,
@@ -111,7 +114,11 @@ const captured = await options.capture(frame, url);
 const landedPath = captured.finalUrl
   ? new URL(captured.finalUrl).pathname
   : null;
-if (captured.redirected || (landedPath && landedPath !== new URL(url).pathname)) {
+const expectedPath = new URL(url).pathname;
+if (
+  captured.redirected ||
+  (landedPath && !capturePathMatchesExpected(landedPath, expectedPath))
+) {
   frames.push({ ...frameId(frame), verdict: 'waiting',
     reason: 'capture-redirected-off-route' }); continue; }
 // Pair like with like: the Pen still's text bands and mockup box are
