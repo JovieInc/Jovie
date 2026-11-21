@@ -93,7 +93,7 @@ describe('OpportunityInboxReportCard certificate', () => {
         ...CARD.report!,
         items: [],
         series: [],
-        nextStep: undefined,
+        nextStep: null,
       },
     });
 
