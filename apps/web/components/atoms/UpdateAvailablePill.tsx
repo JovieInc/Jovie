@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Download, Loader2, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
@@ -43,7 +44,7 @@ export function UpdateAvailablePillView({
   }[state];
 
   return (
-    <button
+    <PlainButton
       type='button'
       data-electron-update-pill='true'
       data-electron-no-drag='true'
@@ -71,7 +72,7 @@ export function UpdateAvailablePillView({
         <Download className='h-3 w-3 shrink-0' aria-hidden='true' />
       )}
       <span className='whitespace-nowrap leading-none'>{label}</span>
-    </button>
+    </PlainButton>
   );
 }
 

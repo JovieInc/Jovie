@@ -1,0 +1,57 @@
+{
+  "gates": {
+    "apps/web/components/atoms/GradientText.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/UpdateAvailablePill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CreatorAvatarCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenuContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/CreatorAvatarCell.tsx": {
+      "error": "Upload failures are surfaced inside AvatarUploadable and the notifications toast (onError); the cell itself renders no error UI to show."
+    },
+    "apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenuContent.tsx": {
+      "offline": "The content is a pure render of its props and makes no network request; the in-flight state is shown by the Loading story."
+    }
+  }
+}
