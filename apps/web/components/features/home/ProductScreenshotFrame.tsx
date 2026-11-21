@@ -50,7 +50,7 @@ function renderScreenshotContent({
         className='grid w-full place-items-center px-6 py-10 text-center'
         style={{ aspectRatio }}
       >
-        <div className='max-w-88'>
+        <div className='max-w-sm'>
           <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
             {title}
           </div>

@@ -45,6 +45,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/home/HeroSpotifySearch.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/home/HomeTrustSection.tsx": [
       "ds-owner",
       "tokens",
@@ -109,6 +118,15 @@
       "forced-caps"
     ],
     "apps/web/components/features/onboarding/OnboardingStartStepRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/waitlist/WaitlistIntakeChat.tsx": [
       "ds-owner",
       "tokens",
       "states",

@@ -145,7 +145,12 @@ describe('HeroSpotifySearch', () => {
       // No square ring inside pill geometry: the frame draws the focus ring.
       const input = screen.getByPlaceholderText('Search your name');
       expect(input.className).not.toMatch(/focus-visible:ring-2/);
-      expect(input.className).toContain('focus-visible:outline-none');
+      // The shell box is dropped (display: contents) so the stylesheet's
+      // inset ring on the input is the only focus indicator.
+      expect(input.closest('[data-component="composite-field"]')).toHaveClass(
+        'contents'
+      );
+      expect(input).toHaveClass('homepage-name-search__input');
     });
 
     it('uses the shared editorial aura treatment for homepage pills', () => {
@@ -179,14 +184,11 @@ describe('HeroSpotifySearch', () => {
     it('keeps the homepage search focus indicator visible', () => {
       renderComponent();
 
-      expect(getInput()).toHaveClass(
-        'focus-visible:outline-none',
-        'focus-visible:border-focus',
-        'focus-visible:ring-2',
-        'focus-visible:ring-focus/25',
-        'focus-visible:ring-offset-2',
-        'focus-visible:ring-offset-surface-page'
-      );
+      // The shared field shell draws the ring around the whole field.
+      expect(
+        getInput().closest('[data-component="composite-field"]')
+      ).toHaveAttribute('data-surface', 'field');
+      expect(getInput()).toHaveAttribute('data-host-drawn');
     });
 
     it('namespaces result option ids per instance when rendered twice', async () => {
