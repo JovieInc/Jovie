@@ -11,3 +11,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const SampleSchedule: Story = {};
+
+function RtlFrame({ children }: { readonly children: React.ReactNode }) {
+  return <div dir='rtl'>{children}</div>;
+}
+
+export const Rtl: Story = {
+  decorators: [
+    function WithRtl(StoryComponent) {
+      return (
+        <RtlFrame>
+          <StoryComponent />
+        </RtlFrame>
+      );
+    },
+  ],
+};
