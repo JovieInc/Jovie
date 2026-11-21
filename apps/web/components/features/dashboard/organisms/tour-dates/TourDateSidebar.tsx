@@ -507,7 +507,6 @@ export function TourDateSidebar({
                     status => (
                       <PlainButton
                         key={status}
-                        type='button'
                         onClick={() =>
                           setFormData(prev => ({
                             ...prev,

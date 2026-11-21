@@ -399,7 +399,6 @@ export function MetadataAgentPanel({
       {storageAvailable ? (
         <div className='mt-4 flex flex-wrap gap-2'>
           <PlainButton
-            type='button'
             onClick={() => {
               void handlePrepare();
             }}
@@ -412,7 +411,6 @@ export function MetadataAgentPanel({
           {latestRequest?.status === 'awaiting_approval' &&
           !hasBlockingFields ? (
             <PlainButton
-              type='button'
               onClick={() => {
                 void handleApproveSend();
               }}
@@ -425,7 +423,6 @@ export function MetadataAgentPanel({
 
           {latestRequest && openIssues.length > 0 ? (
             <PlainButton
-              type='button'
               onClick={() => {
                 void handleDraftCorrection();
               }}
