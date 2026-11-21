@@ -134,6 +134,9 @@ describe('Ovie Inbox', () => {
     expect(screen.getByRole('textbox', { name: /Decision notes/ })).toBe(notes);
     expect(notes).toHaveValue('Looks right');
     expect(notes).toHaveFocus();
+    // The canonical Textarea atom owns the surface, not caller classes.
+    expect(notes.className).toContain('border-subtle');
+    expect(notes.className).toContain('min-h-15');
     await expectNoA11yViolations(container);
   });
 

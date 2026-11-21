@@ -7,7 +7,6 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -16,13 +15,17 @@ import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
-import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
-import { fixtureRow } from '@/lib/ovie/certifications/fixtures';
 import type {
   OvieCertificationInventory,
   OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
 import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
+import {
+  items,
+  registryRow,
+} from '@/tests/fixtures/founder-review-registry-items';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { FounderReviewRegistry } from './FounderReviewRegistry';
 
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
@@ -40,78 +43,6 @@ vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
   }),
   getCertificationDecisionErrorMessage: () => 'The evidence changed.',
 }));
-
-const items: readonly FounderReviewItem[] = [
-  founderReviewItemFixture({
-    id: 'feature.ready',
-    title: 'Ready feature',
-    readiness: 'ready',
-    media: [
-      {
-        kind: 'image',
-        src: '/product-screenshots/release-landing-desktop.png',
-        alt: 'Ready feature evidence',
-        label: 'Dedicated product capture',
-        dedicated: true,
-      },
-    ],
-  }),
-  founderReviewItemFixture({
-    id: 'feature.contacts.delete-contact',
-    title: 'Delete a contact',
-    eyebrow: 'Contacts',
-    scope: 'behavior',
-    description: 'Remove an owned contact after confirmation.',
-    status: 'Implemented',
-    access: 'Authenticated creator',
-    source: 'contacts/actions.ts#deleteContact',
-    gate: 'Destructive confirmation',
-    readiness: 'collecting',
-    readinessReason: 'A dedicated end-to-end capture is still required.',
-    media: [
-      {
-        kind: 'image',
-        src: '/product-screenshots/audience-crm.png',
-        alt: 'Contact workspace context',
-        label: 'Contact workspace context',
-        dedicated: false,
-      },
-    ],
-  }),
-];
-
-/** Server-side certification row projection for one registry item. */
-function registryRow(
-  item: FounderReviewItem,
-  overrides: Partial<OvieCertificationRow['decision']> = {}
-): OvieCertificationRow {
-  const reviewReady = item.readiness === 'ready' && !('available' in overrides);
-  return {
-    ...fixtureRow(item.id, {
-      domain: 'feature_registry',
-      surface: 'Feature Capability',
-    }),
-    id: `feature_registry:${item.id}`,
-    domain: 'feature_registry',
-    surface: 'Feature Capability',
-    subject: { id: item.id, kind: 'feature', title: item.title },
-    state: reviewReady ? 'review_ready' : 'working',
-    evidence: [],
-    blockers: [],
-    staleFounderLock: false,
-    updatedAt: '2026-10-02T00:00:00.000Z',
-    links: [],
-    history: [],
-    decision: {
-      available: reviewReady,
-      reason: reviewReady ? null : 'Evidence is incomplete: 1 blocker.',
-      evidenceDigest: item.decisionEvidenceDigest,
-      currentDecision: null,
-      ...overrides,
-    },
-    source: null,
-  };
-}
 
 function mockInventory(rows: readonly OvieCertificationRow[]) {
   mocks.query.mockReturnValue({
@@ -473,5 +404,68 @@ describe('FounderReviewRegistry', () => {
     // The AA success text token is mode-aware (darker on light, full success
     // on dark), replacing the raw emerald palette classes.
     expect(mark.className).toContain('text-success-text');
+  });
+
+  it('keeps the typed founder note and focus across a rerender, with the Textarea atom surface', async () => {
+    const user = userEvent.setup();
+    mockInventory(items.map(item => registryRow(item)));
+    const { rerender } = renderRegistry();
+
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    const note = within(rail).getByPlaceholderText(
+      'What should stay true or change?'
+    );
+    await user.type(note, 'Hero crop is off');
+    mockInventory(items.map(item => registryRow(item)));
+    rerender(
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <MountedHeaderActions />
+          <FounderReviewRegistry kind='feature' items={items} />
+          <MountedRightPanel />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
+    );
+    await user.keyboard('{Escape}');
+
+    expect(note).toHaveValue('Hero crop is off');
+    expect(note).toHaveFocus();
+    expect(note.className).toContain('border-subtle');
+    expect(note.className).toContain('resize-none');
+  });
+
+  it('opens the evidence viewer from the keyboard on the media thumbnail', async () => {
+    const user = userEvent.setup();
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    const open = within(rail).getByRole('button', {
+      name: 'Open Ready feature evidence',
+    });
+    const showModal = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+    open.focus();
+    await user.keyboard('{Enter}');
+    HTMLDialogElement.prototype.showModal = showModal;
+    expect(screen.getByTestId('media-canvas-viewer')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations with items and with an empty registry', async () => {
+    mockInventory(items.map(item => registryRow(item)));
+    const { container, unmount } = renderRegistry();
+    await screen.findByTestId('founder-review-detail-rail');
+    await expectNoA11yViolations(container);
+    unmount();
+    mockInventory([]);
+    const empty = render(
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <FounderReviewRegistry kind='feature' items={[]} />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
+    );
+    await expectNoA11yViolations(empty.container);
   });
 });

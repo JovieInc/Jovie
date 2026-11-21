@@ -1,9 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab/DesignProposalReviewPanel';
 import { toast } from '@/components/feedback';
 import type { DesignProposal } from '@/lib/agent-os/design-lab/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { DesignProposalReviewPanel } from './DesignProposalReviewPanel';
 
 vi.mock('@/components/feedback', () => ({
   toast: {
@@ -259,5 +260,55 @@ describe('DesignProposalReviewPanel', () => {
     expect(
       screen.getByTestId('design-proposal-card-proposal-approve')
     ).toBeInTheDocument();
+  });
+
+  it('keeps typed notes and focus in the notes dialog, drawn by the Textarea atom', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ proposals: [proposal({})], fetchedAt: 'now' })
+        )
+    );
+    render(<DesignProposalReviewPanel />);
+
+    await user.click(await screen.findByRole('button', { name: 'Reject' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Reject taste proposal',
+    });
+    const notes = within(dialog).getByRole('textbox', {
+      name: 'Decision Notes',
+    });
+    await user.type(notes, 'Too busy');
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    await user.click(notes);
+
+    expect(notes).toHaveValue('Too busy');
+    expect(notes).toHaveFocus();
+    expect(notes.className).toContain('border-subtle');
+    expect(dialog.className).toContain('bg-ink-on-media/40');
+    await expectNoA11yViolations(dialog);
+  });
+
+  it('has no accessibility violations with a proposal and with an empty inbox', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ proposals: [proposal({})], fetchedAt: 'now' })
+        )
+    );
+    const { container, unmount } = render(<DesignProposalReviewPanel />);
+    await screen.findByTestId('design-proposal-card-proposal-1');
+    await expectNoA11yViolations(container);
+    unmount();
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jsonResponse({})));
+    const empty = render(<DesignProposalReviewPanel />);
+    await screen.findByText('No pending taste proposals.');
+    await expectNoA11yViolations(empty.container);
   });
 });

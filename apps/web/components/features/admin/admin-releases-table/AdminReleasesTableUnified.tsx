@@ -48,15 +48,15 @@ const columnHelper = createColumnHelper<AdminReleaseRow>();
 
 const RELEASE_TYPE_VARIANTS: Record<string, string> = {
   single: 'bg-secondary-token/10 text-secondary-token',
-  album: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  ep: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-  compilation: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  album: 'bg-secondary-token/10 text-secondary-token',
+  ep: 'bg-secondary-token/10 text-secondary-token',
+  compilation: 'bg-secondary-token/10 text-secondary-token',
 };
 
 const SOURCE_TYPE_VARIANTS: Record<string, string> = {
   manual: 'bg-secondary-token/10 text-secondary-token',
-  admin: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  ingested: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  admin: 'bg-secondary-token/10 text-secondary-token',
+  ingested: 'bg-secondary-token/10 text-secondary-token',
 };
 
 function ReleaseTypeBadge({ type }: { readonly type: string }) {
@@ -146,11 +146,13 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
                 <img
                   src={release.artworkUrl}
                   alt=''
+                  width={36}
+                  height={36}
                   className='block h-9 w-9 max-h-9 max-w-9 object-cover'
                   loading='lazy'
                 />
               ) : (
-                <div className='flex size-full items-center justify-center text-amber-500'>
+                <div className='flex size-full items-center justify-center text-tertiary-token'>
                   <Music className='size-4' />
                 </div>
               )}

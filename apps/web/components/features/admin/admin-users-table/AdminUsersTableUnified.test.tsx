@@ -1,8 +1,8 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
   RightPanelProvider,
@@ -10,6 +10,8 @@ import {
 } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AdminPeopleRightPanelProvider } from '@/features/admin/AdminPeopleRightPanelProvider';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { AdminUsersTableUnified } from './AdminUsersTableUnified';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean
@@ -17,6 +19,9 @@ const mockUseBreakpointDown = vi.fn<
 const mockUseAdminUsersInfiniteQuery = vi.fn();
 const mockUseRowSelection = vi.fn();
 let capturedDesktopColumnIds: string[] = [];
+let capturedActionCallbacks: {
+  onBanUser: (user: typeof userRow) => void;
+} | null = null;
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
@@ -59,6 +64,16 @@ vi.mock('@/features/admin/table/AdminTableShell', () => ({
       {children()}
     </div>
   ),
+}));
+
+vi.mock('./admin-user-actions', () => ({
+  buildAdminUserActions: (
+    _user: unknown,
+    callbacks: { onBanUser: (user: typeof userRow) => void }
+  ) => {
+    capturedActionCallbacks = callbacks;
+    return [];
+  },
 }));
 
 vi.mock('@/hooks/useSearchUrlSync', () => ({
@@ -274,8 +289,90 @@ describe('AdminUsersTableUnified', () => {
   });
 });
 
+describe('AdminUsersTableUnified selection checkbox', () => {
+  const toggleSelect = vi.fn();
+
+  function mockMobile(selected: boolean) {
+    mockUseBreakpointDown.mockReturnValue(true);
+    mockUseAdminUsersInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [userRow], total: 1 }] },
+      fetchNextPage: vi.fn().mockResolvedValue(undefined),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    mockUseRowSelection.mockReturnValue({
+      selectedIds: new Set<string>(selected ? [userRow.id] : []),
+      selectedCount: selected ? 1 : 0,
+      headerCheckboxState: false,
+      toggleSelect,
+      toggleSelectAll: vi.fn(),
+      clearSelection: vi.fn(),
+    });
+  }
+
+  it('toggles selection through the canonical Checkbox atom', async () => {
+    const user = userEvent.setup();
+    toggleSelect.mockClear();
+    mockMobile(false);
+    renderUsersTable();
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Select Ari Lane' });
+    expect(checkbox).toHaveAttribute('data-state', 'unchecked');
+    await user.click(checkbox);
+    expect(toggleSelect).toHaveBeenCalledWith('user_1');
+    await user.keyboard('[Space]');
+    expect(toggleSelect).toHaveBeenCalledTimes(2);
+    expect(checkbox).toHaveFocus();
+  });
+
+  it('shows the checked state and stays axe-clean on mobile and desktop', async () => {
+    mockMobile(true);
+    const mobile = renderUsersTable();
+    expect(
+      screen.getByRole('checkbox', { name: 'Select Ari Lane' })
+    ).toHaveAttribute('data-state', 'checked');
+    await expectNoA11yViolations(mobile.container);
+    mobile.unmount();
+
+    mockUseBreakpointDown.mockReturnValue(false);
+    const desktop = renderUsersTable();
+    await expectNoA11yViolations(desktop.container);
+  });
+});
+
+describe('AdminUsersTableUnified suspend dialog', () => {
+  it('keeps the typed reason and focus while the user types', async () => {
+    const user = userEvent.setup();
+    mockUseBreakpointDown.mockReturnValue(true);
+    mockUseAdminUsersInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [userRow], total: 1 }] },
+      fetchNextPage: vi.fn().mockResolvedValue(undefined),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    mockUseRowSelection.mockReturnValue({
+      selectedIds: new Set<string>(),
+      selectedCount: 0,
+      headerCheckboxState: false,
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      clearSelection: vi.fn(),
+    });
+    renderUsersTable();
+
+    act(() => capturedActionCallbacks?.onBanUser(userRow));
+    const reason = await screen.findByLabelText('Reason (required)');
+    const confirm = screen.getByRole('button', { name: 'Suspend user' });
+    expect(confirm).toBeDisabled();
+    await user.type(reason, 'Spam links');
+    expect(reason).toHaveValue('Spam links');
+    expect(confirm).toBeEnabled();
+    expect(reason).toHaveFocus();
+  });
+});
+
 describe('AdminUsersTableUnified text contrast contract (JOV-8873)', () => {
-  it('tints the selection checkbox with the AA accent text token', async () => {
+  it('uses the Checkbox atom, not a raw checkbox input with its own tint', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const webRoot = process.cwd().endsWith('/apps/web')
@@ -288,7 +385,8 @@ describe('AdminUsersTableUnified text contrast contract (JOV-8873)', () => {
       ),
       'utf8'
     );
-    expect(source).toContain('text-(--color-accent-purple-text)');
+    expect(source).toContain('<Checkbox');
+    expect(source).not.toContain("type='checkbox'");
     expect(source).not.toContain('text-(--linear-accent)');
   });
 });
