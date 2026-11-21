@@ -1,0 +1,147 @@
+# Live helpfulness CI-subset (1–5) via Workers AI relay.
+# Manual dispatch only for now; schedule can land after ASS-13 baselines stabilize.
+#
+# Auth: maps CI secret GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN → WORKERS_AI_TOKEN.
+# Prefers the relay path from Jovie #26344 (no CLOUDFLARE_ACCOUNT_ID on runners).
+# Soft-skips when the secret is missing or the relay rejects the cheap judge
+# (ASS-17 deploy-roll required for @cf/openai/gpt-oss-120b).
+name: Helpfulness live CI-subset
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helpfulness-live-ci-subset-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helpfulness-ci-subset:
+    name: Helpfulness live CI-subset
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      OUT_JSON: ${{ runner.temp }}/helpfulness-ci-subset.json
+      RUN_LOG: ${{ runner.temp }}/helpfulness-ci-subset.log
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run helpfulness CI-subset (Workers AI relay)
+        id: run
+        env:
+          WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${WORKERS_AI_TOKEN:-}" ]; then
+            echo "::notice::GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN missing; soft-skipping live helpfulness CI-subset."
+            echo "outcome=skipped_secret" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          pnpm --filter @jovie/web eval:helpfulness -- \
+            --judge cheap \
+            --subset ci \
+            --out "$OUT_JSON" \
+            >"$RUN_LOG" 2>&1
+          status=$?
+          set -e
+          cat "$RUN_LOG"
+
+          if [ "$status" -eq 0 ] && [ -s "$OUT_JSON" ]; then
+            echo "outcome=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if grep -Eiq 'model[- ]not[- ]allowed|not (on the )?allowlist|model .* not allowed' "$RUN_LOG"; then
+            echo "::notice::Relay returned model-not-allowed for the cheap judge. Soft-skipping until ASS-17 deploys gpt-oss-120b on the Workers AI relay allowlist."
+            echo "outcome=skipped_model_not_allowed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error::Helpfulness CI-subset failed (exit $status). See log above."
+          echo "outcome=failed" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Summarize median / safety / invented / one-rec
+        if: ${{ steps.run.outputs.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import { readFileSync } from 'node:fs';
+
+          const report = JSON.parse(readFileSync(process.env.OUT_JSON, 'utf8'));
+          const cases = Array.isArray(report.cases) ? report.cases : [];
+
+          /** 0|1|2 behavior mean → Assistants 1–5 (ASS-13 mapping). */
+          function caseDim15(row) {
+            const scores = row?.result?.judge?.scores;
+            if (!scores || typeof scores !== 'object') return null;
+            const values = Object.values(scores).filter(
+              (v) => v === 0 || v === 1 || v === 2
+            );
+            if (values.length === 0) return null;
+            const mean = values.reduce((s, v) => s + v, 0) / values.length;
+            return 1 + (mean / 2) * 4;
+          }
+
+          const dims = cases.map(caseDim15).filter((v) => typeof v === 'number');
+          dims.sort((a, b) => a - b);
+          const median =
+            dims.length === 0
+              ? null
+              : dims.length % 2 === 1
+                ? dims[(dims.length - 1) / 2]
+                : (dims[dims.length / 2 - 1] + dims[dims.length / 2]) / 2;
+
+          let safetyOk = 0;
+          let invented = 0;
+          let oneRecOk = 0;
+          let judged = 0;
+          for (const row of cases) {
+            const hardOk = (row?.result?.hardChecks ?? []).every((c) => c?.ok);
+            if (hardOk) safetyOk += 1;
+            const scores = row?.result?.judge?.scores;
+            if (!scores) continue;
+            judged += 1;
+            if (scores.truthful === 0) invented += 1;
+            if (scores.next_action === 2) oneRecOk += 1;
+          }
+
+          const n = cases.length || 1;
+          const pct = (num, den) =>
+            den === 0 ? 'n/a' : `${Math.round((num / den) * 1000) / 10}%`;
+
+          const lines = [
+            'Helpfulness live CI-subset summary (1–5 Assistants mapping)',
+            `  cases: ${cases.length}`,
+            `  median: ${median === null ? 'n/a' : median.toFixed(2)}`,
+            `  safety (hard checks pass): ${pct(safetyOk, n)} (${safetyOk}/${cases.length})`,
+            `  invented account facts (truthful=0): ${invented}`,
+            `  one clear recommendation (next_action=2): ${pct(oneRecOk, judged)} (${oneRecOk}/${judged})`,
+            `  runner score/100: ${report.summary?.score ?? 'n/a'}`,
+            `  model: ${report.model ?? 'n/a'}  judge: ${report.judge ?? 'n/a'}`,
+          ];
+          process.stdout.write(`${lines.join('\n')}\n`);
+          EOF
+
+      - name: Upload helpfulness JSON
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: helpfulness-ci-subset-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/helpfulness-ci-subset.json
+            ${{ runner.temp }}/helpfulness-ci-subset.log
+          if-no-files-found: ignore
+          retention-days: 30
