@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -78,7 +79,7 @@ export function SidebarSection({
 
   return (
     <div className={className}>
-      <button
+      <PlainButton
         type='button'
         onClick={onToggle}
         className={cn(
@@ -98,7 +99,7 @@ export function SidebarSection({
         <span className='text-app font-caption truncate text-primary-token'>
           {name}
         </span>
-      </button>
+      </PlainButton>
       <div
         className='overflow-hidden'
         style={{

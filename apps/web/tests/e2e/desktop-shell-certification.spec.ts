@@ -26,6 +26,7 @@ import {
   installElectronRuntime,
   waitForSettledShell,
 } from './utils/electron-titlebar-runtime';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 const VIEWPORT = { width: 1512, height: 944 } as const;
 const TITLEBAR_HEIGHT = 44;
@@ -157,6 +158,7 @@ test('OV shell expanded at 1512 certifies rail, nav rows, and screenshot', async
   }
 
   const frame = page.locator('[data-app-shell-frame="true"]');
+  await expectCaptureReady(frame);
   await expect(frame).toHaveScreenshot('desktop-shell-ov-expanded.png', {
     animations: 'disabled',
     mask: shellMasks(page),
@@ -224,6 +226,7 @@ test('OV shell collapsed at 1512 certifies rail, title gap, centerline, and scre
   ).toBeLessThanOrEqual(1);
 
   const frame = page.locator('[data-app-shell-frame="true"]');
+  await expectCaptureReady(frame);
   await expect(frame).toHaveScreenshot('desktop-shell-ov-collapsed.png', {
     animations: 'disabled',
     mask: shellMasks(page),
