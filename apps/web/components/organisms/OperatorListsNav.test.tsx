@@ -69,7 +69,8 @@ describe('OperatorListsNav', () => {
       screen.getByRole('link', { name: 'Favorites' })
     );
     expect(screen.getByRole('button', { name: 'New List' })).toHaveClass(
-      'h-(--app-shell-sidebar-row-height)'
+      'h-(--app-shell-sidebar-row-height)',
+      'text-left'
     );
     expect(collab).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');

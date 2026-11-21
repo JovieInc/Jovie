@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Check, Copy, Ellipsis } from 'lucide-react';
@@ -20,7 +21,6 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatHistorySwitcher } from '@/components/jovie/ChatHistorySwitcher';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
@@ -422,12 +422,14 @@ export function ChatPageClient({
       <div className='flex items-center gap-1'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <AppIconButton
+            <IconButton
+              variant='control'
               ariaLabel='Thread options'
               className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
+              size='sm'
             >
               <Ellipsis aria-hidden='true' className='size-4' />
-            </AppIconButton>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end'>
             <DropdownMenuItem onClick={handleCopyConversationId}>

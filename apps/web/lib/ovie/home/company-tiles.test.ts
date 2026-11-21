@@ -82,4 +82,23 @@ describe('buildCompanyTiles', () => {
       expect(tile.tone).toBe('neutral');
     }
   });
+
+  it('measures MRR from Stripe alone while runway stays gated on Mercury', () => {
+    const byKey = Object.fromEntries(
+      buildCompanyTiles({
+        overview: {
+          ...OVERVIEW,
+          financialDataAvailable: false,
+          mrrAvailable: true,
+        },
+        funnel: null,
+        goldenPath: null,
+      }).map(tile => [tile.key, tile])
+    );
+    expect(byKey.mrr).toMatchObject({ value: '$0', measured: true });
+    expect(byKey.runway).toMatchObject({
+      value: 'Not measured',
+      measured: false,
+    });
+  });
 });

@@ -32,10 +32,13 @@ const env = {
   ),
   GIT_CONFIG_GLOBAL: '/dev/null',
   GIT_CONFIG_NOSYSTEM: '1',
+  GIT_NO_LAZY_FETCH: '1',
   GIT_AUTHOR_NAME: 'fixture',
   GIT_AUTHOR_EMAIL: 'fixture@example.com',
+  GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z',
   GIT_COMMITTER_NAME: 'fixture',
   GIT_COMMITTER_EMAIL: 'fixture@example.com',
+  GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z',
 };
 /** @param {string} cwd @param {...string} args */
 const git = (cwd, ...args) =>
@@ -53,7 +56,14 @@ function fixture(t) {
   const seed = join(dir, 'seed');
   git(dir, 'init', '--quiet', '--initial-branch=main', seed);
   writeFileSync(join(seed, 'base.txt'), 'base');
+  writeFileSync(
+    join(seed, 'ancestor-only.txt'),
+    'blob predating the scan base'
+  );
   git(seed, 'add', '.');
+  git(seed, 'commit', '-qm', 'ancestor');
+  const ancestorBlob = git(seed, 'rev-parse', 'HEAD:ancestor-only.txt');
+  git(seed, 'rm', '-q', 'ancestor-only.txt');
   git(seed, 'commit', '-qm', 'base');
   const common = git(seed, 'rev-parse', 'HEAD');
   git(seed, 'checkout', '-qb', 'feature');
@@ -86,6 +96,8 @@ function fixture(t) {
   const work = join(dir, 'work');
   git(dir, 'init', '--quiet', work);
   git(work, 'remote', 'add', 'origin', `file://${origin}`);
+  // Keep these small fixtures loose so corruption tests can remove one blob.
+  git(work, 'config', 'fetch.unpackLimit', '10000');
   // Execute the checkout's configured history policy, including the old wildcard fetch.
   if (checkout.with['fetch-depth'] === 0) {
     git(
@@ -101,7 +113,17 @@ function fixture(t) {
     git(work, 'fetch', '--quiet', '--no-tags', '--depth=1', 'origin', head);
     git(work, 'checkout', '--quiet', '--detach', 'FETCH_HEAD');
   }
-  return { dir, work, origin, head, base, common, removedBlob, unrelated };
+  return {
+    dir,
+    work,
+    origin,
+    head,
+    base,
+    common,
+    removedBlob,
+    ancestorBlob,
+    unrelated,
+  };
 }
 /** @param {ReturnType<typeof fixture>} f @param {Record<string,string>} [overrides] */
 function recover(f, overrides = {}) {
@@ -143,6 +165,90 @@ test('security checkout keeps full-blob head/base ancestry and removed-file obje
   );
   assert.equal(git(f.work, 'tag', '--list'), '');
 });
+test('prepared ancestry can be cloned locally and read offline through the full scan range', t => {
+  const f = fixture(t);
+  const r = recover(f);
+  assert.equal(r.status, 0, r.stderr);
+  // TruffleHog clones file:// before it applies --since-commit/--branch.
+  // The source must serve that clone without relying on the upstream origin.
+  git(
+    f.work,
+    'remote',
+    'set-url',
+    'origin',
+    `file://${join(f.dir, 'absent.git')}`
+  );
+  const scan = join(f.dir, 'scanner-clone');
+  git(f.dir, 'clone', '--quiet', '--no-checkout', `file://${f.work}`, scan);
+  assert.equal(git(scan, 'rev-parse', 'HEAD'), f.head);
+  assert.equal(git(scan, 'rev-parse', '--is-shallow-repository'), 'false');
+  assert.equal(
+    git(scan, 'rev-list', `${f.common}..HEAD`),
+    git(f.work, 'rev-list', `${f.common}..HEAD`)
+  );
+  git(scan, 'rev-list', '--objects', '--missing=error', f.head, f.common);
+  assert.match(
+    git(scan, 'log', '-p', `${f.common}..HEAD`),
+    /history-only blob required by scanners/
+  );
+  assert.equal(
+    git(scan, 'cat-file', 'blob', f.removedBlob),
+    'history-only blob required by scanners'
+  );
+});
+test('missing history-only blob fails preparation even when the current tree is readable', t => {
+  const f = fixture(t);
+  assert.equal(recover(f).status, 0);
+  rmSync(
+    join(
+      f.work,
+      '.git/objects',
+      f.removedBlob.slice(0, 2),
+      f.removedBlob.slice(2)
+    )
+  );
+  // The missing file was added and removed inside the scanned range. Checking
+  // only HEAD's tree would pass and silently lose the commit that introduced it.
+  git(f.work, 'cat-file', 'blob', 'HEAD:base.txt');
+  const r = recover(f);
+  assert.notEqual(r.status, 0, r.stdout);
+  assert.match(r.stderr, /missing|bad object|unable to read/i);
+});
+test('range-only blob completeness is insufficient for the scanner local clone', t => {
+  const f = fixture(t);
+  assert.equal(recover(f).status, 0);
+  // This blob predates base..HEAD, but upload-pack still needs it to serve
+  // TruffleHog's unfiltered clone. A range-only proof would incorrectly pass.
+  rmSync(
+    join(
+      f.work,
+      '.git/objects',
+      f.ancestorBlob.slice(0, 2),
+      f.ancestorBlob.slice(2)
+    )
+  );
+  git(
+    f.work,
+    'rev-list',
+    '--objects',
+    '--missing=error',
+    `${f.common}..${f.head}`
+  );
+  const clone = spawnSync(
+    'git',
+    [
+      'clone',
+      '--quiet',
+      '--no-checkout',
+      `file://${f.work}`,
+      join(f.dir, 'scanner-clone'),
+    ],
+    { env, encoding: 'utf8', timeout: 15000 }
+  );
+  assert.notEqual(clone.status, 0, clone.stdout);
+  assert.match(clone.stderr, /missing|bad object|unable to read|corrupt/i);
+  assert.notEqual(recover(f).status, 0);
+});
 test('already complete unfiltered source history is accepted without moving HEAD', t => {
   const f = fixture(t);
   if (git(f.work, 'rev-parse', '--is-shallow-repository') === 'true')
@@ -178,6 +284,11 @@ test('malformed target ref fails closed', t => {
 test('partial object stores are refused instead of claiming complete scanner history', t => {
   const f = fixture(t);
   git(f.work, 'config', 'remote.origin.promisor', 'true');
+  assert.notEqual(recover(f).status, 0);
+});
+test('legacy partial-clone extension is refused even without the origin promisor flag', t => {
+  const f = fixture(t);
+  git(f.work, 'config', 'extensions.partialClone', 'origin');
   assert.notEqual(recover(f).status, 0);
 });
 test('unavailable origin fails before scanning and preserves source HEAD', t => {
