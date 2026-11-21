@@ -170,16 +170,41 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
   });
 
   it.each([
-    ['upcomingFirst', 'UPCOMING'],
-    ['questionNotAMove', 'do it'],
-    ['inventingStats', 'popularity'],
-  ] as const)('fails when %s coverage is stripped (%s)', (fact, needle) => {
+    // Strip every alternate needle for the fact (ASS-16 #26360 OR-compatible).
+    [
+      'upcomingFirst',
+      [
+        'an upcoming release is the default focus',
+        'first content sentence',
+        'if discography context has any upcoming',
+      ],
+    ],
+    [
+      'questionNotAMove',
+      [
+        'end with exactly one next step',
+        'exactly one next move plus the reason',
+        'clarifying question is allowed only',
+      ],
+    ],
+    [
+      'inventingStats',
+      [
+        'never invent popularity, streams',
+        'never invent the missing figure',
+        'never mention a popularity score',
+        'popularity',
+      ],
+    ],
+  ] as const)('fails when %s coverage is stripped', (fact, needles) => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
       aiWeeklyMessageLimit: 10,
     });
-    // Remove every occurrence so weaker/stronger wording both disappear.
-    const sabotaged = prompt.replaceAll(new RegExp(needle, 'gi'), 'REMOVED');
+    let sabotaged = prompt;
+    for (const needle of needles) {
+      sabotaged = sabotaged.replaceAll(new RegExp(needle, 'gi'), 'REMOVED');
+    }
     expect(checkFailThemePromptContract(sabotaged)[fact]).toBe(false);
   });
 });
