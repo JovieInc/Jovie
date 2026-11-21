@@ -33,6 +33,9 @@ export {
 export { fetchDesktopPublishInFlight } from './lib/artifact-freshness-stamp.mjs';
 
 export const ARTIFACT_FRESHNESS_KEY = 'artifact-freshness';
+/** Title-contains fingerprint: requires the bot-owned `[key]` prefix so a human
+ * issue that merely mentions "artifact-freshness" is not overwritten/closed. */
+export const ARTIFACT_FRESHNESS_TITLE_FINGERPRINT = `[${ARTIFACT_FRESHNESS_KEY}]`;
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
@@ -199,8 +202,10 @@ export async function collectArtifactFreshness(input = {}) {
 }
 
 /**
- * Stable Summer fingerprint. Title always contains ARTIFACT_FRESHNESS_KEY so
- * upsertLinearIssueByTitleFingerprint can dedupe; labelKey matches close path.
+ * Stable Summer fingerprint. Title uses ARTIFACT_FRESHNESS_TITLE_FINGERPRINT
+ * (`[artifact-freshness]`) so title-contains dedupe cannot latch onto a human
+ * issue that merely mentions the bare phrase. labelKey still owns
+ * `remediation:artifact-freshness` for label/footer matching on close/reuse.
  *
  * @param {{
  *   readonly receipt: ReturnType<typeof buildArtifactFreshnessReceipt>;
@@ -220,11 +225,10 @@ export async function pageSummerForFreshness(input) {
     m => `- \`${m.channel}\` \`${m.code}\`: ${m.reason}`
   );
   // Title stays stable across updates: upsertLinearIssueByTitleFingerprint only
-  // refreshes description (not title) on reuse, and fingerprint dedupe keys on
-  // the title containing ARTIFACT_FRESHNESS_KEY. Variable codes live in the body.
+  // refreshes description (not title) on reuse. Variable codes live in the body.
   const result = await upsert({
-    fingerprint: ARTIFACT_FRESHNESS_KEY,
-    title: `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch`,
+    fingerprint: ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
+    title: `${ARTIFACT_FRESHNESS_TITLE_FINGERPRINT} Desktop stage mismatch`,
     description: [
       'Automated artifact freshness graph (JOV-5368).',
       '',
@@ -239,7 +243,7 @@ export async function pageSummerForFreshness(input) {
       '- The mismatched stage closes through the existing desktop publisher or updater path.',
       '- A later reconcile receipt is green (or the exact governed blocker is named).',
       '',
-      `Fingerprint: ${ARTIFACT_FRESHNESS_KEY}`,
+      `Fingerprint: remediation:${ARTIFACT_FRESHNESS_KEY}`,
     ]
       .filter(line => line != null)
       .join('\n'),
@@ -319,7 +323,7 @@ export async function resolveSummerForFreshness(input = {}) {
   const close = input.close ?? closeLinearIssueByFingerprint;
   const apiKey = input.apiKey ?? process.env.LINEAR_API_KEY;
   return close({
-    fingerprint: ARTIFACT_FRESHNESS_KEY,
+    fingerprint: ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
     labelKey: ARTIFACT_FRESHNESS_KEY,
     comment: `Artifact freshness graph is green.${
       input.sourceUrl ? ` Source: ${input.sourceUrl}` : ''

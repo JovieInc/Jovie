@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ARTIFACT_FRESHNESS_KEY,
+  ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
   canResolveSummerForFreshness,
   collectArtifactFreshness,
   desktopRelevantBetween,
@@ -9,6 +10,7 @@ import {
   pageSummerForFreshness,
   resolveSummerForFreshness,
 } from './artifact-freshness-reconcile.mjs';
+import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -151,17 +153,64 @@ test('pageSummerForFreshness puts stable fingerprint in title and labelKey', asy
   });
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
+  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_TITLE_FINGERPRINT);
   assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
   assert.equal(
     calls[0].title,
-    `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch`
+    `${ARTIFACT_FRESHNESS_TITLE_FINGERPRINT} Desktop stage mismatch`
   );
   // Codes stay in the description so reused issues never show a stale title
   // (upsert updates description only).
   assert.doesNotMatch(calls[0].title, /publication-unverified|certified-/);
   assert.match(calls[0].description, /publication-unverified/);
   assert.match(calls[0].description, /feed digest mismatch/);
+  assert.match(
+    calls[0].description,
+    new RegExp(`Fingerprint: remediation:${ARTIFACT_FRESHNESS_KEY}`)
+  );
+});
+
+test('title fingerprint requires bot-owned [artifact-freshness] prefix', () => {
+  const human = {
+    title: 'Human note about artifact-freshness stalls',
+    labels: { nodes: [] },
+    state: { type: 'started' },
+  };
+  const bot = {
+    title: `${ARTIFACT_FRESHNESS_TITLE_FINGERPRINT} Desktop stage mismatch`,
+    labels: { nodes: [] },
+    state: { type: 'started' },
+  };
+  const labeledOnly = {
+    title: 'Human mention of artifact-freshness',
+    labels: { nodes: [{ name: `remediation:${ARTIFACT_FRESHNESS_KEY}` }] },
+    state: { type: 'started' },
+  };
+  assert.equal(
+    resolveLinearIssueByFingerprint(
+      [human],
+      ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
+      ARTIFACT_FRESHNESS_KEY
+    ),
+    null
+  );
+  assert.equal(
+    resolveLinearIssueByFingerprint(
+      [human, bot],
+      ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
+      ARTIFACT_FRESHNESS_KEY
+    ),
+    bot
+  );
+  // remediation label still owns bot issues even without the bracket title.
+  assert.equal(
+    resolveLinearIssueByFingerprint(
+      [labeledOnly],
+      ARTIFACT_FRESHNESS_TITLE_FINGERPRINT,
+      ARTIFACT_FRESHNESS_KEY
+    ),
+    labeledOnly
+  );
 });
 
 test('resolveSummerForFreshness closes by stable fingerprint on green', async () => {
@@ -177,7 +226,7 @@ test('resolveSummerForFreshness closes by stable fingerprint on green', async ()
   });
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
+  assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_TITLE_FINGERPRINT);
   assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
   assert.equal(calls[0].runId, '99');
 });
