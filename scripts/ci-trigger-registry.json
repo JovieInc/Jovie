@@ -121,6 +121,7 @@
     "runner-health-monitor.yml": {"runsPerMergedPr":1.2,"triggers":["repository_dispatch:clock_runner_health_monitor","schedule","workflow_dispatch"]},
     "runner-heartbeat.yml": {"runsPerMergedPr":1.8,"triggers":["push","repository_dispatch:clock_runner_heartbeat","schedule","workflow_dispatch"]},
     "safe-pr-remediation.yml": {"runsPerMergedPr":0,"triggers":["workflow_run:Eve Pilot"]},
+    "screenshots-r2-upload.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "screenshots.yml": {"runsPerMergedPr":0.4,"triggers":["push","workflow_dispatch"]},
     "security-advisory-loop.yml": {"runsPerMergedPr":0.1,"triggers":["push","repository_dispatch:clock_security_advisory_loop","workflow_dispatch"]},
     "security-suppression-audit.yml": {"runsPerMergedPr":0,"triggers":["pull_request_review:dismissed","pull_request_review:edited","workflow_call","workflow_dispatch"]},

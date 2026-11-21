@@ -1421,6 +1421,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:commit
     jobCount: 4
+  - name: Screenshots to R2 upload
+    path: .github/workflows/screenshots-r2-upload.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:upload
+    jobCount: 1
   - name: Product Screenshots
     path: .github/workflows/screenshots.yml
     active: true
