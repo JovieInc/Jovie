@@ -36,7 +36,6 @@
 }
 
 :where(.system-b-scroll-to-bottom:focus-visible) {
-  outline: none;
   box-shadow:
     0 10px 32px -20px
     color-mix(in oklab, var(--system-b-accent-cyan) 35%, black 65%),

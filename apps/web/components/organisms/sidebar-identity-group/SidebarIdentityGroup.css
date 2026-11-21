@@ -1,12 +1,3 @@
-/*
- * Collapsed-rail identity group. Keep these selectors off Tailwind arbitrary
- * values so the footer can hide the URL and keep sibling icon actions without
- * raising the design-system ratchet.
- */
-[data-sidebar="identity-group"]:has(:focus-visible) {
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ring) 35%, transparent);
-}
-
 .group[data-collapsible="icon"] [data-sidebar="user-panel"] {
   padding-inline: 0;
 }

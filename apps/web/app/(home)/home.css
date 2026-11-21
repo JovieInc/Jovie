@@ -2162,11 +2162,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding-right: 7.5rem;
 }
 
-.homepage-name-search__field .homepage-name-search__input:focus-visible {
-  /* Inset: the field clips at the pill edge, so the ring draws inside it. */
-  box-shadow: inset 0 0 0 var(--space-0-5, 2px) var(--color-focus);
-}
-
 .homepage-name-search__icon {
   position: relative;
   z-index: 1;
@@ -2731,11 +2726,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-bg-base);
 }
 
-.homepage-identity__lens:focus-visible {
-  outline: 2px solid var(--color-text-primary-token);
-  outline-offset: 2px;
-}
-
 .homepage-identity__payoff {
   margin: var(--space-6) 0 0;
   color: var(--color-text-tertiary-token);
@@ -2807,12 +2797,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-secondary-token);
   font-size: var(--text-xs);
   line-height: 1;
-}
-
-.homepage-editorial-changelog__all-posts:focus-visible,
-.homepage-editorial-card__link:focus-visible {
-  outline: 2px solid var(--noir-ion-ion);
-  outline-offset: 3px;
 }
 
 .homepage-editorial-changelog__grid {
@@ -3445,8 +3429,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-carousel__rail:focus-visible {
-  outline: 2px solid rgba(5, 6, 8, 0.24);
-  outline-offset: 0.45rem;
   border-radius: 8px;
 }
 
@@ -3535,11 +3517,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border-radius: 8px;
   color: inherit;
   text-decoration: none;
-}
-
-.homepage-artist-profile-card__link:focus-visible {
-  outline: 2px solid rgb(5 6 8 / 0.28);
-  outline-offset: 0.35rem;
 }
 
 .homepage-artist-profile-card--blue {
@@ -5156,11 +5133,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   opacity: 0.4;
 }
 
-.homepage-artist-profiles__carousel-controls button:focus-visible {
-  outline: var(--space-px) solid var(--system-b-text-primary);
-  outline-offset: var(--space-1);
-}
-
 .homepage-artist-profiles__row {
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -5168,11 +5140,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
-}
-
-.homepage-artist-profiles__row:focus-visible {
-  outline: var(--space-px) solid var(--system-b-text-primary);
-  outline-offset: var(--space-1);
 }
 
 .homepage-artist-profiles__row::-webkit-scrollbar {

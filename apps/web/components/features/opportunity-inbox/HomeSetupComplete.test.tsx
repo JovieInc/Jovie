@@ -36,6 +36,10 @@ describe('HomeSetupComplete', () => {
     const links = await screen.findAllByRole('link', { name: /— Complete/ });
     expect(links).toHaveLength(3);
     expect(links[0]).toHaveTextContent('Complete Your Profile');
+    await user.tab();
+    expect(links[0]).toHaveFocus();
+    await user.tab();
+    expect(links[1]).toHaveFocus();
 
     await user.keyboard('{Escape}');
     expect(

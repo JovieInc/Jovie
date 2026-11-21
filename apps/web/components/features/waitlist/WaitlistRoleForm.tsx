@@ -400,6 +400,7 @@ export function WaitlistRoleForm({
                       ) : null}
                       <label
                         className='waitlist-chip'
+                        data-focus-container
                         data-selected={
                           chipKey === chip.key ? 'true' : undefined
                         }

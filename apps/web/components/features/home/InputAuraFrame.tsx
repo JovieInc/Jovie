@@ -20,6 +20,7 @@ export function InputAuraFrame({
 
   return (
     <div
+      data-focus-inset
       className={cn(
         'input-aura-frame',
         isEditorial ? 'input-aura-frame--editorial' : 'group/aura',
