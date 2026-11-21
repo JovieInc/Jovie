@@ -184,8 +184,7 @@ export function DspServiceIcon({
     <svg
       viewBox='0 0 24 24'
       fill='currentColor'
-      className={className}
-      style={{ color: config.color }}
+      className={`system-b-dsp-service-icon ${className}`}
       aria-hidden='true'
       data-dsp-icon={provider}
     >
