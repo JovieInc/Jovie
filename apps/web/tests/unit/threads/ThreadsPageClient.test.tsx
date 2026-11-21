@@ -211,7 +211,9 @@ describe('ChatsPageClient', () => {
 
     const threadLink = screen.getByRole('link', { name: 'Pitch tasks' });
     fireEvent.contextMenu(threadLink);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Session ID' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Copy Session ID' })
+    );
 
     expect(copySessionId).toHaveBeenCalledWith('thread-newer');
 

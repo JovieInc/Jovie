@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { th as MotionTableHeader } from 'motion/react-m';
 import { useContext } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -126,7 +127,7 @@ export function TableHeaderCell<TData extends RowData>({
         if (header.isPlaceholder) return null;
         if (canSort) {
           return (
-            <button
+            <PlainButton
               type='button'
               onClick={onToggleSort}
               aria-label={sortButtonLabel}
@@ -147,7 +148,7 @@ export function TableHeaderCell<TData extends RowData>({
                   size={12}
                 />
               )}
-            </button>
+            </PlainButton>
           );
         }
         return (
