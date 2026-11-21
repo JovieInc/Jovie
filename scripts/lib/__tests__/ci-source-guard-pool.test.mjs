@@ -389,6 +389,8 @@ describe('merged-with-base-invariants pool', () => {
     ).toBe(true);
     for (const related of [
       'apps/web/scripts/design-ci-judge-router.ts',
+      'apps/web/package.json',
+      'apps/web/vitest.config.mts',
       'canon/invariants.jsonl',
       'scripts/invariants/registry.mjs',
       'scripts/invariants/screen-certification.mjs',

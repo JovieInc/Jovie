@@ -40,7 +40,7 @@ export const DESIGN_CI_JUDGE_VITEST_MARKER =
  * Empty/unreadable diffs fail closed (keep the entry).
  */
 export const DESIGN_CI_JUDGE_VITEST_PATHS =
-  /^(?:apps\/web\/(?:scripts\/design-ci-judge|lib\/agent-os\/design-ci-judge|app\/api\/internal\/ovie\/(?:design-ci-judge-evidence|certification-evidence)|data\/(?:appScreens\/|marketing\/))|scripts\/invariants\/(?:design-ci-judge|registry\.mjs$|screen-certification|screen-registry)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
+  /^(?:apps\/web\/(?:scripts\/design-ci-judge|lib\/agent-os\/design-ci-judge|app\/api\/internal\/ovie\/(?:design-ci-judge-evidence|certification-evidence)|data\/(?:appScreens\/|marketing\/)|package\.json$|vitest\.config\.mts$)|scripts\/invariants\/(?:design-ci-judge|registry\.mjs$|screen-certification|screen-registry)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
 
 /**
  * Filter expanded merged-with-base pool entries for PR path-gates.
