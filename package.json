@@ -176,6 +176,7 @@
     "design:pen-pipeline:test": "node --test scripts/design/pen-bindings.test.mjs scripts/design/pen-export.test.mjs scripts/design/design-loop-ledger.test.mjs scripts/design/pen-data-backed-ship.test.mjs",
     "design:write-swarm:dry": "node scripts/design-write-swarm/contract.mjs dry-run",
     "design:write-swarm:test": "node --test scripts/design-write-swarm/design-write-swarm.test.mjs",
+    "design:golden-path:bind": "node scripts/design/bind-golden-path-nodes.mjs",
     "design:tokens:export": "node scripts/generate-design-tokens-export.mjs",
     "design:tokens:export:check": "node scripts/generate-design-tokens-export.mjs --check",
     "lint": "node scripts/run-scoped-turbo-task.mjs lint",
