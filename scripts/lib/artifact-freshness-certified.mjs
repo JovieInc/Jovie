@@ -38,7 +38,10 @@ const CONTROLLER_TITLE =
 
 /**
  * Generation SHA from production-controller display_title (not head_sha).
- * @param {unknown} run
+ * @param {{
+ *   readonly display_title?: unknown;
+ *   readonly head_sha?: unknown;
+ * } | null | undefined} run
  * @returns {string | null}
  */
 export function productionControllerGenerationSha(run) {

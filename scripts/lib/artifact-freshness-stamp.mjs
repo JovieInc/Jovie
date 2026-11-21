@@ -47,7 +47,10 @@ export function nextLinkUrl(link) {
 /**
  * Generation SHA from desktop-release run-name (`Desktop release <sha>`).
  * workflow_run tips at main tip; the certified SHA lives in display_title.
- * @param {unknown} run
+ * @param {{
+ *   readonly display_title?: unknown;
+ *   readonly head_sha?: unknown;
+ * } | null | undefined} run
  * @returns {string | null}
  */
 export function desktopReleaseGenerationSha(run) {
