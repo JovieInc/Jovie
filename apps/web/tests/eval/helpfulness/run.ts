@@ -62,7 +62,7 @@ import {
   type JudgeVerdict,
   judgeScore,
   parseJudgeVerdict,
-  runHardChecks,
+  runHardChecksForFixture,
   scoreCase,
   summarize,
 } from './scoring';
@@ -407,8 +407,8 @@ async function main(): Promise<void> {
   const rows = await mapLimit(cases, args.concurrency, async testCase => {
     try {
       const turn = await askJovie(chat, testCase, now, args.model);
-      const hardChecks = runHardChecks(testCase, turn.reply);
       const fixture = buildFixture(testCase.fixture, now);
+      const hardChecks = runHardChecksForFixture(testCase, turn.reply, fixture);
       const verdict = await judge(
         chat,
         judgeId,
