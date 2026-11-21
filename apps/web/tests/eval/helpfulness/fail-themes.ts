@@ -167,13 +167,13 @@ export function checkFailThemePromptContract(prompt: string): {
       ) &&
       has('"do it"', 'do it') &&
       has('yes'),
+    // Prefer ASS-16 needles after #26360; keep a popularity co-occurrence
+    // fallback so older wording still passes before that lands everywhere.
     inventingStats:
       has(
-        'never invent account stats',
         'never invent popularity, streams',
         'never invent the missing figure',
         'never mention a popularity score'
-      ) ||
-      (has('never invent') && has('popularity')),
+      ) || (has('never invent') && has('popularity')),
   };
 }
