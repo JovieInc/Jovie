@@ -8,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-  PlainButton,
 } from '@jovie/ui';
 import {
   BarChart3,
@@ -41,12 +40,14 @@ import { useDashboardPay } from './useDashboardPay';
 import { formatCount } from './utils';
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+// =============================================================================
 // Sub-components
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-
-const focusOnMount = (el: HTMLInputElement | null) => el?.focus();
 
 interface VenmoConnectedBadgeProps {
   readonly venmoHandle: string;
@@ -65,7 +66,8 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <PlainButton
+        <button
+          type='button'
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-app font-caption text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm'
@@ -77,7 +79,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
           ) : (
             <Check className='h-3.5 w-3.5 text-success sm:h-4 sm:w-4' />
           )}
-        </PlainButton>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={6}>
         <DropdownMenuItem
@@ -129,7 +131,7 @@ const VenmoEditForm = memo(function VenmoEditForm({
           value={venmoHandle}
           onChange={e => onVenmoHandleChange(e.target.value)}
           placeholder='your-username'
-          ref={focusOnMount}
+          autoFocus
           className='h-8 min-w-0 flex-1'
         />
       </div>
@@ -212,7 +214,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
                 value={venmoHandle}
                 onChange={e => onVenmoHandleChange(e.target.value)}
                 placeholder='your-username'
-                ref={focusOnMount}
+                autoFocus
                 className='flex-1'
               />
             </div>
@@ -268,11 +270,9 @@ const TipLinkSection = memo(function TipLinkSection({
           className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'
           aria-hidden='true'
         >
-          <Link2 className='h-3.5 w-3.5 text-info' />
+          <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
         </div>
-        <h2 className='text-balance text-app font-caption text-primary-token'>
-          Pay Link
-        </h2>
+        <h3 className='text-app font-caption text-primary-token'>Pay Link</h3>
       </div>
 
       <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
