@@ -82,7 +82,7 @@ function SearchResults({
                   <p className='truncate text-sm font-semibold text-primary-token'>
                     {artist.name}
                   </p>
-                  <p className='text-xs text-secondary-token'>
+                  <p className='text-xs tabular-nums text-secondary-token'>
                     {followerLabel}
                   </p>
                 </div>

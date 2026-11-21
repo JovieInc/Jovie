@@ -239,7 +239,7 @@ export function OnboardingInterviewModal({
         </div>
 
         <DialogTitle asChild>
-          <h2 className='mb-2 text-mid font-medium text-primary-token'>
+          <h2 className='mb-2 text-mid text-balance font-medium text-primary-token'>
             Quick Question
           </h2>
         </DialogTitle>
