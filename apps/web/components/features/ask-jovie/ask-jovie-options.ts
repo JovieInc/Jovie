@@ -1,5 +1,7 @@
 // @coverage-via apps/web/components/features/ask-jovie/AskJovieWidget.test.tsx
 
+import type { EntityKind } from '@/components/organisms/entity-card/types';
+
 export type FollowIntent = 'new_release_alerts' | 'local_show_alerts';
 
 export type MessageCategory =
@@ -34,3 +36,20 @@ export const INTENT_LABELS: ReadonlyArray<{ id: FollowIntent; label: string }> =
     { id: 'new_release_alerts', label: 'New Music Alerts' },
     { id: 'local_show_alerts', label: 'Local Show Alerts' },
   ];
+
+export type CardOutcome =
+  | 'listen'
+  | 'tickets'
+  | 'shop'
+  | 'watch'
+  | 'view'
+  | 'message'
+  | 'subscribe';
+
+export const CARD_OUTCOMES: Partial<Record<EntityKind, CardOutcome>> = {
+  music: 'listen',
+  show: 'tickets',
+  merch: 'shop',
+  video: 'watch',
+  alerts: 'subscribe',
+};
