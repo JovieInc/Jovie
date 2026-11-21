@@ -31,11 +31,16 @@ export const DESIGN_CI_JUDGE_VITEST_MARKER =
 
 /**
  * Paths that require the design-ci-judge vitest cluster on the PR merged-with-base
- * pool. Merge-group structural still runs the full `invariants:check` chain.
+ * pool. Includes judge sources plus runtime data deps the router test loads
+ * (`canon/invariants.jsonl` via registry.mjs, screen-certification /
+ * screen-registry, appScreens + marketing component registries). Does not list
+ * every unit source path (e.g. page.tsx) — those are metadata strings in the
+ * registries; content edits alone do not change routing assertions.
+ * Merge-group structural still runs the full `invariants:check` chain.
  * Empty/unreadable diffs fail closed (keep the entry).
  */
 export const DESIGN_CI_JUDGE_VITEST_PATHS =
-  /^(?:apps\/web\/(?:scripts\/design-ci-judge|lib\/agent-os\/design-ci-judge|app\/api\/internal\/ovie\/(?:design-ci-judge-evidence|certification-evidence))|scripts\/invariants\/design-ci-judge|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
+  /^(?:apps\/web\/(?:scripts\/design-ci-judge|lib\/agent-os\/design-ci-judge|app\/api\/internal\/ovie\/(?:design-ci-judge-evidence|certification-evidence)|data\/(?:appScreens\/|marketing\/))|scripts\/invariants\/(?:design-ci-judge|registry\.mjs$|screen-certification|screen-registry)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
 
 /**
  * Filter expanded merged-with-base pool entries for PR path-gates.

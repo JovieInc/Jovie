@@ -401,15 +401,32 @@ describe('merged-with-base-invariants pool', () => {
 
   it('keeps design-ci-judge vitest when a related path changes', () => {
     const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
-    const related = 'apps/web/scripts/design-ci-judge-router.ts';
-    expect(DESIGN_CI_JUDGE_VITEST_PATHS.test(related)).toBe(true);
-    const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
-      related,
-    ]);
-    expect(skipped).toEqual([]);
+    const relatedPaths = [
+      'apps/web/scripts/design-ci-judge-router.ts',
+      'canon/invariants.jsonl',
+      'scripts/invariants/registry.mjs',
+      'scripts/invariants/screen-certification.mjs',
+      'scripts/invariants/screen-registry.mjs',
+      'apps/web/data/appScreens/registry.ts',
+      'apps/web/data/marketing/componentRegistry.ts',
+    ];
+    for (const related of relatedPaths) {
+      expect(DESIGN_CI_JUDGE_VITEST_PATHS.test(related), related).toBe(true);
+      const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
+        related,
+      ]);
+      expect(skipped, related).toEqual([]);
+      expect(
+        kept.some(entry =>
+          entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER)
+        ),
+        related
+      ).toBe(true);
+    }
+    // Unit source content paths are registry metadata, not vitest inputs.
     expect(
-      kept.some(entry => entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER))
-    ).toBe(true);
+      DESIGN_CI_JUDGE_VITEST_PATHS.test('apps/web/app/(home)/page.tsx')
+    ).toBe(false);
   });
 
   it('fail-closes the path-gate on empty or unreadable diffs', () => {
