@@ -120,9 +120,9 @@ describe('isMerchProcessingClaimStale properties', () => {
           fc.integer({ min: -10_000, max: -1 })
         ),
         claimIntervalMs => {
-          expect(isMerchProcessingClaimStale(started, now, claimIntervalMs)).toBe(
-            false
-          );
+          expect(
+            isMerchProcessingClaimStale(started, now, claimIntervalMs)
+          ).toBe(false);
         }
       ),
       { numRuns: 40 }
