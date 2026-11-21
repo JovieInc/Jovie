@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
-} from '@/components/molecules/SwipeToReveal';
+} from '@/components/atoms/SwipeToReveal';
 
 vi.mock('@/hooks/useTouchDevice', () => ({
   useTouchDevice: () => false,

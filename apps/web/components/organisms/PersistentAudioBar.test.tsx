@@ -55,7 +55,7 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
     <span>{children}</span>
   ),
 }));
-vi.mock('@/components/molecules/SeekBar', () => ({
+vi.mock('@/components/atoms/SeekBar', () => ({
   SeekBar: () => <input type='range' aria-label='Seek' />,
 }));
 

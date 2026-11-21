@@ -253,7 +253,7 @@ test('mobile seek and play targets stay separate at 320px', async ({
 }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 844 });
   const slider = await page
-    .getByRole('slider', { name: 'Seek Track', exact: true })
+    .getByRole('slider', { name: 'Seek track', exact: true })
     .boundingBox();
   const play = await page
     .getByRole('button', { name: /^(Pause playback|Resume playback)$/ })
@@ -289,13 +289,13 @@ test.describe('touch player', () => {
       exact: true,
     });
     await expect(
-      page.getByRole('slider', { name: 'Seek Track', exact: true })
+      page.getByRole('slider', { name: 'Seek track', exact: true })
     ).toBeEnabled();
     await play.tap();
     await expect
       .poll(() => page.evaluate(() => window.playerAudioInstances[0].paused))
       .toBe(true);
-    await page.getByRole('slider', { name: 'Seek Track', exact: true }).tap();
+    await page.getByRole('slider', { name: 'Seek track', exact: true }).tap();
     expect(await page.evaluate(() => window.playerAudioInstances.length)).toBe(
       1
     );

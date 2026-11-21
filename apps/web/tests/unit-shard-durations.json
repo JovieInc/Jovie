@@ -30,7 +30,7 @@
     "app/r/[slug]/page.test.ts": 1862,
     "components/atoms/Calendar.test.tsx": 2014,
     "components/atoms/CalendarInner.test.tsx": 1036,
-    "components/molecules/SwipeToReveal.test.tsx": 2637,
+    "components/atoms/SwipeToReveal.test.tsx": 2637,
     "components/features/admin/ActivityTableUnified.certificate.test.tsx": 2256,
     "components/features/admin/CapabilityEvidenceMatrix.certificate.test.tsx": 1369,
     "components/features/admin/FunnelMetricsStrip.test.tsx": 1223,

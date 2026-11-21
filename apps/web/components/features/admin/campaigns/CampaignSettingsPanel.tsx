@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, HostDrawnInput, Input } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -146,7 +146,7 @@ export function CampaignSettingsPanel() {
                 Minimum fit score
               </label>
               <div className='flex items-center gap-4'>
-                <input
+                <HostDrawnInput
                   id='settings-fit-score'
                   type='range'
                   min={0}

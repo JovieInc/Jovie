@@ -7,7 +7,7 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
-} from '@/components/molecules/SwipeToReveal';
+} from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   ShellListRowButton,

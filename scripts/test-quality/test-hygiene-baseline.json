@@ -9,7 +9,7 @@
       "apps/web/components/atoms/AnimatedIconSwap.test.tsx": 1,
       "apps/web/components/atoms/CopyToggleIcon.test.tsx": 1,
       "apps/web/components/atoms/InlineIconButton.name.test.tsx": 1,
-      "apps/web/components/molecules/JovieMarkElectric.test.tsx": 1,
+      "apps/web/components/atoms/JovieMarkElectric.test.tsx": 1,
       "apps/web/components/features/admin/fleet-audit/FleetAuditPanel.test.tsx": 1,
       "apps/web/components/features/admin/leads/GoldenPathFunnelPanel.test.tsx": 1,
       "apps/web/components/features/admin/leads/WaitlistRankedQueuePanel.test.tsx": 3,

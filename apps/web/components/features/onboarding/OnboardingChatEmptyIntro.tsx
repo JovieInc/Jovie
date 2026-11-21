@@ -5,8 +5,8 @@
 import { Button } from '@jovie/ui';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { JovieMarkElectric } from '@/components/molecules/JovieMarkElectric';
 import {
   ONBOARDING_ENTRY_SUPPORT,
   ONBOARDING_ENTRY_TITLE,

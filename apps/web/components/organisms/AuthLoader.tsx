@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { JovieMarkElectric } from '@/components/molecules/JovieMarkElectric';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
 // Delay before showing loading message (milliseconds)
 const LOADING_MESSAGE_DELAY_MS = 2000;

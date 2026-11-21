@@ -26,28 +26,6 @@ interface SwipeGroupContextValue {
   setOpenId: (id: string | null) => void;
 }
 
-const ACTIONS_HIDE_DELAY_MS = 350;
-
-/** True while `active`, and for `delayMs` after it turns false (keeps the close animation visible). */
-function useLingeringFlag(active: boolean, delayMs: number): boolean {
-  const [lingering, setLingering] = useState(false);
-
-  useEffect(() => {
-    if (active) {
-      setLingering(true);
-      return;
-    }
-    const timeout = globalThis.setTimeout(() => {
-      setLingering(false);
-    }, delayMs);
-    return () => {
-      globalThis.clearTimeout(timeout);
-    };
-  }, [active, delayMs]);
-
-  return lingering;
-}
-
 const SwipeGroupContext = createContext<SwipeGroupContextValue | null>(null);
 
 /**
@@ -136,6 +114,7 @@ export const SwipeToReveal = memo(function SwipeToReveal({
   const enabled = forceEnabled ?? isTouchDevice;
   const group = useContext(SwipeGroupContext);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   // Group coordination
   const isControlled = Boolean(group && itemId);
@@ -163,10 +142,21 @@ export const SwipeToReveal = memo(function SwipeToReveal({
       onClose: handleClose,
     });
 
-  const actionsVisible = useLingeringFlag(
-    isOpen || isDragging || offsetX !== 0,
-    ACTIONS_HIDE_DELAY_MS
-  );
+  useEffect(() => {
+    const shouldShowActions = isOpen || isDragging || offsetX !== 0;
+    if (shouldShowActions) {
+      setActionsVisible(true);
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      setActionsVisible(false);
+    }, 350);
+
+    return () => {
+      globalThis.clearTimeout(timeout);
+    };
+  }, [isDragging, isOpen, offsetX]);
 
   // Close when another item in the group opens
   useEffect(() => {

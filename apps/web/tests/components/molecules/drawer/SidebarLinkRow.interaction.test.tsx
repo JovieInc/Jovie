@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/components/molecules/SwipeToReveal', () => ({
+vi.mock('@/components/atoms/SwipeToReveal', () => ({
   SwipeToReveal: ({
     actions,
     children,

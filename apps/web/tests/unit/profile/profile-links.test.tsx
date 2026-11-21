@@ -33,7 +33,7 @@ vi.mock('@/components/atoms/VerifiedBadge', () => ({
     React.createElement('span', { 'data-testid': 'verified-badge' }),
 }));
 
-vi.mock('@/components/molecules/SwipeToReveal', () => ({
+vi.mock('@/components/atoms/SwipeToReveal', () => ({
   SwipeToReveal: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'swipe-reveal' }, children),
 }));

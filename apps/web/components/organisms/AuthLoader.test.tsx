@@ -5,7 +5,7 @@ import {
   loadingOwnerIssueCodes,
 } from '@/tests/utils/loading-owner';
 
-vi.mock('@/components/molecules/JovieMarkElectric', () => ({
+vi.mock('@/components/atoms/JovieMarkElectric', () => ({
   JovieMarkElectric: () => <div data-testid='jovie-mark-electric' />,
 }));
 

@@ -1,4 +1,4 @@
-import { JovieMarkElectric } from '@/components/molecules/JovieMarkElectric';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { cn } from '@/lib/utils';
 
 // Cinematic ease — same curve used across the shell for layout-revealing

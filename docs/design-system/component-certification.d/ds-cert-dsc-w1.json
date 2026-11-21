@@ -27,34 +27,52 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/admin-assets-table/AdminAssetsTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-users-table/AdminUsersTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/campaigns/CampaignSettingsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/contacts-table/AdminContactsTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/hud/OvieInbox.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/molecules/JovieMarkElectric.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/molecules/SeekBar.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/molecules/SwipeToReveal.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -69,9 +87,32 @@
       "error": "The feedback post is best-effort and its failure is swallowed by design, so the panel has no error UI; AskJovie.test.tsx and the Offline story cover the rejected request.",
       "permission-denied": "The panel needs no permission or role and renders for every signed-in user."
     },
-    "apps/web/components/molecules/JovieMarkElectric.tsx": {
-      "long-content": "A decorative SVG mark with no text; no user or runtime content reaches it.",
-      "rtl-overflow": "The mark is a fixed-geometry brand glyph with no text or directional layout, so it is identical in right-to-left pages."
+    "apps/web/components/features/admin/admin-assets-table/AdminAssetsTable.tsx": {
+      "loading": "The rows arrive as server-rendered initial data and the table shows rows or the empty state; the only pending state is the infinite-scroll fetch, which AdminDataTable owns and its own stories cover.",
+      "error": "A failed page fetch is handled by the query layer and AdminDataTable; this component renders only the rows it is given.",
+      "offline": "Rows come from server-rendered initial data and a background query; offline just leaves the loaded rows in place, with no distinct UI."
+    },
+    "apps/web/components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx": {
+      "loading": "The rows arrive as server-rendered initial data and the table shows rows or the empty state; the only pending state is the infinite-scroll fetch, which AdminDataTable owns and its own stories cover.",
+      "error": "A failed page fetch is handled by the query layer and AdminDataTable; this component renders only the rows it is given.",
+      "offline": "Rows come from server-rendered initial data and a background query; offline just leaves the loaded rows in place, with no distinct UI."
+    },
+    "apps/web/components/features/admin/admin-users-table/AdminUsersTableUnified.tsx": {
+      "loading": "Rows come from server-rendered data and the infinite query; the only pending state is the next-page fetch, which AdminDataTable owns.",
+      "error": "A failed query is caught by the QueryErrorBoundary and TableErrorFallback, which have their own stories; the table renders only the rows it is given.",
+      "offline": "Rows are server-rendered initial data; offline leaves the loaded rows in place with no distinct UI.",
+      "permission-denied": "The admin route guard blocks non-admins before this table renders, so no permission-denied UI exists here."
+    },
+    "apps/web/components/features/admin/campaigns/CampaignSettingsPanel.tsx": {
+      "loading": "The loading branch shows for one query tick and Storybook has no pending-query hook; CampaignSettingsPanel.test.tsx holds the fetch open and asserts it with an axe run.",
+      "empty": "The panel always shows numeric defaults (DEFAULT_THROTTLING and fixed starting values); there is no collection that can be empty.",
+      "long-content": "Every field is a number input or a fixed label, so no caller text can grow.",
+      "offline": "An offline request fails like any other and shows the load error (the ErrorLoadFailed story); saved values already in the form stay in place."
+    },
+    "apps/web/components/features/admin/contacts-table/AdminContactsTable.tsx": {
+      "loading": "Rows are server-rendered for the current page; the only pending state is the lifecycle detail fetch inside the right panel, which AdminContactsTable.test.tsx holds open and asserts.",
+      "error": "A failed stage change or evidence review shows a toast and restores the actions (covered by the surfaces a failed stage transition test); the table has no standing error screen.",
+      "offline": "Rows are server-rendered and filters are plain GET navigation; offline cannot reach a distinct UI state."
     }
   }
 }

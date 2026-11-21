@@ -3,6 +3,8 @@
 import {
   Badge,
   Button,
+  HostDrawnInput,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -238,12 +240,13 @@ export function EvidenceItemCard({
             if (correction.trim()) void onDecision(item, 'no', correction);
           }}
         >
-          <input
+          <Input
+            inputSize='sm'
             aria-label={`Correct ${item.label}`}
             value={correction}
             onChange={event => setCorrection(event.target.value)}
             placeholder='Correct value'
-            className='h-7 min-w-0 flex-1 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
+            className='min-w-0 flex-1'
           />
           <Button
             size='sm'
@@ -644,17 +647,18 @@ export function AdminContactsTable({
               action=''
               className='ml-auto flex items-center gap-1'
             >
-              <input type='hidden' name='view' value='contacts' />
+              <HostDrawnInput type='hidden' name='view' value='contacts' />
               {stage ? (
-                <input type='hidden' name='stage' value={stage} />
+                <HostDrawnInput type='hidden' name='stage' value={stage} />
               ) : null}
-              <input
+              <Input
+                inputSize='sm'
                 type='search'
                 name='q'
                 defaultValue={search}
                 placeholder='Search name, email, handle'
                 aria-label='Search Contacts'
-                className='h-7 w-48 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                className='w-48'
               />
             </form>
           }

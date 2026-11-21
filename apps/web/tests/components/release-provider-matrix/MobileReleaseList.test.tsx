@@ -17,7 +17,7 @@ function readWebSource(sourcePath: string): string {
   return readFileSync(resolve(webRoot, sourcePath), 'utf8');
 }
 
-vi.mock('@/components/molecules/SwipeToReveal', () => ({
+vi.mock('@/components/atoms/SwipeToReveal', () => ({
   SwipeToReveal: ({
     children,
     actions,

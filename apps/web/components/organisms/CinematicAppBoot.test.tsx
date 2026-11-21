@@ -25,7 +25,7 @@ vi.mock('@/components/organisms/AppShellSkeleton', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/JovieMarkElectric', () => ({
+vi.mock('@/components/atoms/JovieMarkElectric', () => ({
   JovieMarkElectric: () => <div data-testid='jovie-mark-electric' />,
 }));
 

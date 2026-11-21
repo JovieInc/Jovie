@@ -105,7 +105,7 @@
       "tables": 0,
       "rates": 1
     },
-    "components/molecules/SeekBar.tsx": {
+    "components/atoms/SeekBar.tsx": {
       "tables": 0,
       "rates": 1
     },
