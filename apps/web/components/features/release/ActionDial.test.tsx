@@ -133,6 +133,10 @@ describe('ActionDial semantics', () => {
     expect(
       screen.queryByTestId('action-dial-icon-d50')
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-icon-track')).toHaveClass(
+      'h-7',
+      'w-7'
+    );
   });
   it('announces the settled selection politely', async () => {
     mockMotion(true);
@@ -199,7 +203,7 @@ describe('ActionDial touch', () => {
     touch(dial, 'pointerdown', 200, 0);
     touch(dial, 'pointermove', 170, 100);
     touch(dial, 'pointermove', 140, 200);
-    expect(Number(dial.getAttribute('data-position'))).toBeCloseTo(60 / 56, 2);
+    expect(Number(dial.getAttribute('data-position'))).toBeCloseTo(60 / 52, 2);
     touch(dial, 'pointermove', 138, 500);
     touch(dial, 'pointerup', 138, 600);
     expect(onSelect).toHaveBeenCalledWith('apple');
@@ -462,5 +466,30 @@ describe('ActionDial edge cases', () => {
     expect(
       screen.getByTestId('action-dial').getAttribute('data-position')
     ).toBe('2');
+  });
+});
+
+describe('ActionDial preferred state', () => {
+  it('shows Remembered when preferred is centered and keeps row metadata', () => {
+    mockMotion(true);
+    const props = {
+      options: OPTIONS,
+      onSelect: vi.fn(),
+      actionLabel: 'Stream Now',
+      groupLabel: 'G',
+    };
+    const { rerender } = render(
+      <ActionDial {...props} selectedId='apple' preferredId='apple' />
+    );
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Remembered'
+    );
+    rerender(
+      <ActionDial {...props} selectedId='spotify' preferredId='deezer' />
+    );
+    expect(screen.getByRole('option', { name: 'Deezer' })).toHaveAttribute(
+      'data-preferred',
+      'true'
+    );
   });
 });

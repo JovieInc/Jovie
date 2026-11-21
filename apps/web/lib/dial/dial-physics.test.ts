@@ -72,7 +72,7 @@ describe('edge resistance', () => {
 
 describe('projectEnd and snapTarget', () => {
   it('projects the UIScrollView deceleration distance v * d / (1 - d)', () => {
-    // 0.02 items/ms is 1.12 px/ms at a 56px row; 0.998/(0.002) = 499.
+    // 0.02 items/ms is ~1.04 px/ms at a 52px row; 0.998/(0.002) = 499.
     expect(projectEnd(10, 0.02)).toBeCloseTo(10 + 0.02 * 499, 9);
     expect(projectEnd(10, -0.02)).toBeCloseTo(10 - 0.02 * 499, 9);
     expect(projectEnd(10, 0)).toBe(10);

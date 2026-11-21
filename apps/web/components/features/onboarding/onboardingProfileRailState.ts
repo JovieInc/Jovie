@@ -30,6 +30,8 @@ export interface OnboardingProfileBuilderState {
   readonly profileDraft?: OnboardingProfileDraft | null;
   readonly artist: OnboardingProfileArtist | null;
   readonly artistConfirmed: boolean;
+  /** Server-confirmed handle (presentation for the /start step rail). */
+  readonly handleConfirmed: boolean;
   readonly handle: string | null;
   readonly socialLinks: readonly string[];
 }
@@ -38,6 +40,7 @@ export const EMPTY_ONBOARDING_PROFILE_BUILDER_STATE: OnboardingProfileBuilderSta
   {
     artist: null,
     artistConfirmed: false,
+    handleConfirmed: false,
     handle: null,
     socialLinks: [],
   };

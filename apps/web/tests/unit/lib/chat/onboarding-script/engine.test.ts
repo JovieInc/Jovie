@@ -425,7 +425,7 @@ describe('decideFallbackTurn', () => {
     expect(turn.line.stepId).not.toBe('instant_access');
   });
 
-  it('reopens artist search on none-of-these widget event', async () => {
+  it('advances to handle on none-of-these instead of reopening the picker (JOV-14240)', async () => {
     const turn = await decide([
       user('hey'),
       assistant('Pick your artist below.', [
@@ -438,9 +438,21 @@ describe('decideFallbackTurn', () => {
         onboardingEvent: ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE,
       }),
     ]);
-    expect(turn.guardedStep).toBe('artist_search');
-    expect(turn.toolEvents[0]?.toolName).toBe('searchSpotifyArtist');
-    expect(turn.toolEvents[0]?.output.query).toBeNull();
+    expect(turn.guardedStep).toBe('handle');
+    expect(turn.toolEvents.map(event => event.toolName)).toEqual([
+      'searchSpotifyArtist',
+      'checkHandle',
+    ]);
+    expect(turn.toolEvents[0]?.output.action).toBe('spotify_skipped');
+    expect(turn.toolEvents[1]?.output).toMatchObject({
+      action: 'check_handle',
+      handle: 'test',
+    });
+    expect(
+      turn.toolEvents.some(
+        event => event.output.action === 'open_artist_picker'
+      )
+    ).toBe(false);
   });
 
   it('points back at the card once a terminal decision exists', async () => {
