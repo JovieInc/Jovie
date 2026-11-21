@@ -576,8 +576,7 @@ jobs:
     # mapping — not cone-* receipts (postdeploy 44941778256).
     environment: Preview – jovie
     runs-on: ubuntu-24.04
-    # Auth smoke (~1m) + canary claim→TEST checkout→activation (up to 5m).
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
