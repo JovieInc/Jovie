@@ -1,3 +1,8 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Live helpfulness 1–5 scoring needs WORKERS_AI_TOKEN (CI secret GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN) on a hosted runner; agent VMs and PR checks lack that credential and must not spend Gateway. Manual workflow_dispatch runs the CI-subset only and soft-skips when the secret is missing or the relay rejects the cheap judge.
+# removal-trigger: Remove when Source Validation or a scheduled ASS-13 lane runs the same eval:helpfulness --subset ci command with WORKERS_AI_TOKEN and posts the median/safety/invented/one-rec receipt.
+#
 # Live helpfulness CI-subset (1–5) via Workers AI relay.
 # Manual dispatch only for now; schedule can land after ASS-13 baselines stabilize.
 #
