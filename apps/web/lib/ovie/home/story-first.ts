@@ -99,9 +99,11 @@ const STEP_EYEBROW: Readonly<Record<string, string>> = {
 };
 
 function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
-  if (points.length < 2) return 'flat';
-  const first = points[0]!;
-  const last = points[points.length - 1]!;
+  const first = points.at(0);
+  const last = points.at(-1);
+  if (first === undefined || last === undefined || points.length < 2) {
+    return 'flat';
+  }
   if (last > first) return 'up';
   if (last < first) return 'down';
   return 'flat';
@@ -229,7 +231,8 @@ export function buildStoryFirstGlance(input: {
 }
 
 function stepLabel(step: string): string {
-  if (STEP_EYEBROW[step]) return STEP_EYEBROW[step]!;
+  const labeled = STEP_EYEBROW[step];
+  if (labeled) return labeled;
   return step
     .split('_')
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))

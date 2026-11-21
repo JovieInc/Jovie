@@ -124,17 +124,17 @@ export const ErrorUnknown: Story = {
 export const PartialGlance: Story = {
   args: {
     bottleneck: clear,
-    glance: [
-      glance[0]!,
-      {
-        ...glance[1]!,
-        measured: false,
-        value: 'Not measured',
-        delta: null,
-        points: [],
-      },
-      glance[2]!,
-    ],
+    glance: glance.map((pulse, index) =>
+      index === 1
+        ? {
+            ...pulse,
+            measured: false,
+            value: 'Not measured',
+            delta: null,
+            points: [],
+          }
+        : pulse
+    ),
     stages: emptyStages,
   },
 };
