@@ -40,8 +40,12 @@ export function median(values: readonly number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid]!;
-  return Math.round(((sorted[mid - 1]! + sorted[mid]!) / 2) * 100) / 100;
+  const hi = sorted[mid];
+  if (hi === undefined) return 0;
+  if (sorted.length % 2 === 1) return hi;
+  const lo = sorted[mid - 1];
+  if (lo === undefined) return hi;
+  return Math.round(((lo + hi) / 2) * 100) / 100;
 }
 
 export interface HelpfulnessCaseRow {
