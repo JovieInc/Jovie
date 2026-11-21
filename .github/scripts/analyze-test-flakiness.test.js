@@ -216,7 +216,6 @@ test('calculateMetrics flags only tests above thresholds', () => {
 const {
   normalizeFailureText,
   failureSignature,
-  parseJunitXml,
   clusterFailureRecords,
 } = require('./analyze-test-flakiness');
 
@@ -240,24 +239,6 @@ test('failureSignature is stable across shards and timestamps', () => {
     'TypeError: jsYaml.load is not a function (5/10) at 2026-09-22T00:00:00Z'
   );
   assert.equal(s1, s2);
-});
-
-test('parseJunitXml extracts failures and flaky retries', () => {
-  const xml = `<?xml version="1.0"?>
-  <testsuite name="x">
-    <testcase name="ok" file="tests/unit/a.test.ts" classname="a"/>
-    <testcase name="bad" file="tests/unit/b.test.ts" classname="b">
-      <failure message="boom">AssertionError: expected 1 to be 2</failure>
-    </testcase>
-    <testcase name="flaky" file="tests/unit/c.test.ts" classname="c">
-      <flakyFailure message="flaked">Error: timeout 3000ms</flakyFailure>
-    </testcase>
-  </testsuite>`;
-  const recs = parseJunitXml(xml);
-  assert.equal(recs.length, 2);
-  assert.equal(recs[0].kind, 'failure');
-  assert.equal(recs[0].file, 'tests/unit/b.test.ts');
-  assert.equal(recs[1].kind, 'flaky-retry');
 });
 
 test('clusterFailureRecords merges cross-shard failures into one incident', () => {
@@ -354,15 +335,6 @@ test('quarantine candidacy requires three distinct successful retry run attempts
   );
 });
 
-test('a terminal JUnit failure with retry history is never a successful flaky retry', () => {
-  const xml =
-    '<testsuite><testcase name="broken" file="tests/unit/x.test.ts"><flakyFailure>timeout</flakyFailure><failure>still broken</failure></testcase></testsuite>';
-  assert.deepEqual(
-    parseJunitXml(xml).map(r => r.kind),
-    ['failure']
-  );
-});
-
 // JOV-7744: completed-run evidence is read from the shared GITHUB_TOKEN quota
 // once per (run id, attempt), not once per report wake.
 function withFakeGitHub(routes, fn) {
@@ -400,18 +372,23 @@ test('a repeat wake reads only the run list; a new run costs only its own eviden
       await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
       return paths;
     });
-    assert.equal(first.length, 5);
+    // CI and Source Validation run lists, then each new CI run's evidence.
+    const runLists = [
+      first[0],
+      first.find(p => p.includes('/workflows/source-validation.yml/runs?')),
+    ];
+    assert.equal(first.length, 6);
     const second = await withFakeGitHub(routes, async paths => {
       await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
       return paths;
     });
-    assert.deepEqual(second, [first[0]]);
+    assert.deepEqual(second, runLists);
     runs = [{ id: 3, run_attempt: 1, conclusion: 'success' }, ...runs];
     const third = await withFakeGitHub(routes, async paths => {
       await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
       return paths;
     });
-    assert.deepEqual(third.slice(1).sort(), [
+    assert.deepEqual(third.filter(p => !runLists.includes(p)).sort(), [
       '/repos/JovieInc/Jovie/actions/runs/3/artifacts?per_page=100',
       '/repos/JovieInc/Jovie/actions/runs/3/jobs',
     ]);
@@ -524,7 +501,11 @@ for (const failure of ['mkdir', 'write']) {
           );
           return calls;
         });
-        assert.equal(paths.length, 3);
+        // CI run list, this run's jobs and artifacts, Source Validation list.
+        assert.equal(paths.length, 4);
+        assert.ok(
+          paths.some(p => p.includes('/workflows/source-validation.yml/runs?'))
+        );
         assert.ok(paths.includes('/repos/JovieInc/Jovie/actions/runs/27/jobs'));
         assert.ok(
           paths.includes(

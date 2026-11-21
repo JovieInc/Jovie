@@ -8,6 +8,8 @@ import {
   buildStoryFirstBottleneck,
   buildStoryFirstGlance,
   buildStoryFirstStages,
+  issueLabel,
+  stripIssueId,
 } from './story-first';
 
 function count(value: number) {
@@ -95,6 +97,63 @@ describe('buildStoryFirstGlance', () => {
       value: '$0',
       delta: null,
       tone: 'bad',
+      trend: 'flat',
+    });
+  });
+
+  it('keeps flat sparkline when equal MRR has real prior history', () => {
+    const company = buildCompanyTiles({
+      overview: {
+        mrrUsd: 4200,
+        activeSubscribers: 12,
+        balanceUsd: 50_000,
+        burnRateUsd: 5_000,
+        runwayMonths: 10,
+        defaultStatus: 'alive',
+        defaultStatusDetail: '',
+        financialDataAvailable: true,
+        weekAgo: { mrrUsd: 4200, activeSubscribers: 12 },
+      },
+      funnel: null,
+      goldenPath: null,
+    });
+    const glance = buildStoryFirstGlance({
+      delivery: emptyDeliverySummary(),
+      company,
+      shippingPulse: buildPulse(emptyDeliverySummary()),
+    });
+    expect(glance[1]).toMatchObject({
+      delta: 'flat',
+      points: [4200, 4200],
+      trend: 'flat',
+    });
+  });
+
+  it('paints sparkline from tone when MRR has no prior series', () => {
+    const company = buildCompanyTiles({
+      overview: {
+        mrrUsd: 4200,
+        activeSubscribers: 12,
+        balanceUsd: 50_000,
+        burnRateUsd: 5_000,
+        runwayMonths: 10,
+        defaultStatus: 'alive',
+        defaultStatusDetail: '',
+        financialDataAvailable: true,
+      },
+      funnel: null,
+      goldenPath: null,
+    });
+    const glance = buildStoryFirstGlance({
+      delivery: emptyDeliverySummary(),
+      company,
+      shippingPulse: buildPulse(emptyDeliverySummary()),
+    });
+    expect(glance[1]).toMatchObject({
+      delta: 'alive',
+      tone: 'good',
+      points: [4200, 4200],
+      trend: 'up',
     });
   });
 });
@@ -277,5 +336,18 @@ describe('buildStoryFirstStages', () => {
     expect(
       buckets.find(b => b.stage === 'merging')?.highlight?.identifier
     ).toBe('JOV-9');
+  });
+});
+
+describe('issue id de-duplication', () => {
+  it('strips a trailing (ID) that repeats the identifier', () => {
+    expect(
+      issueLabel('JOV-10172', 'feat(lanes): split lanes (JOV-10172)')
+    ).toBe('JOV-10172 · feat(lanes): split lanes');
+  });
+
+  it('strips a leading "ID: " and leaves other titles alone', () => {
+    expect(stripIssueId('JOV-1', 'JOV-1: fix it')).toBe('fix it');
+    expect(stripIssueId('JOV-1', 'fix it (JOV-2)')).toBe('fix it (JOV-2)');
   });
 });

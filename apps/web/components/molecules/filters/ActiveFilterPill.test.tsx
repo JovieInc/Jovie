@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ActiveFilterPill } from './ActiveFilterPill';
@@ -22,9 +23,11 @@ describe('ActiveFilterPill', () => {
     expect(screen.getByText('2 selected')).toHaveClass(
       'text-(--color-accent-purple-text)'
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Clear Status filter' })
-    );
+    const clear = screen.getByRole('button', { name: 'Clear Status filter' });
+    // Contract: size=xs (24px) + fade=visible — no className restyle.
+    expect(clear.className).toMatch(/\bh-6\b/);
+    expect(clear.className).toMatch(/\bopacity-60\b/);
+    fireEvent.click(clear);
     expect(onClear).toHaveBeenCalledOnce();
   });
 });

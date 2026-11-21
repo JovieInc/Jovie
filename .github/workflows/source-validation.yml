@@ -1011,6 +1011,20 @@ jobs:
             --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
             --changed "$BASE_SHA" --passWithNoTests \
             --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+      # Retried-then-passed tests (scripts/lib/vitest-retry-reporter.mjs) for
+      # the Test Flakiness Report, which reads recent Source Validation runs.
+      # vitest.config.fast.mts derives test-report.<shard>.flaky.json from --shard.
+      # Observability only; same artifact identity as the merge-group shards.
+      # A missing sidecar uploads nothing (if-no-files-found: ignore).
+      - name: Preserve retried-then-passed unit tests
+        # !cancelled(): a red shard's successful retries are evidence too.
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true' && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-flaky-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.flaky.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run CI contract tests read from disk
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'
         run: |

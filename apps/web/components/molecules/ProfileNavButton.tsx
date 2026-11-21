@@ -8,12 +8,12 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -54,8 +54,8 @@ export function ProfileNavButton({
     return (
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
-          <CircleIconButton
-            size='md'
+          <IconButton
+            size='lg'
             variant='pearl'
             ariaLabel='Open profile menu'
             className={cn('group', className)}
@@ -68,7 +68,7 @@ export function ProfileNavButton({
                 loading && 'animate-pulse'
               )}
             />
-          </CircleIconButton>
+          </IconButton>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align='start' sideOffset={8}>
@@ -140,9 +140,9 @@ export function ProfileNavButton({
 
   // Sub-page: Back button - use Link for instant navigation (no spinner needed)
   return (
-    <CircleIconButton
+    <IconButton
       asChild
-      size='md'
+      size='lg'
       variant='pearl'
       ariaLabel='Back to profile'
       className={className}
@@ -157,6 +157,6 @@ export function ProfileNavButton({
           aria-hidden='true'
         />
       </Link>
-    </CircleIconButton>
+    </IconButton>
   );
 }

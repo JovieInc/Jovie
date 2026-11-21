@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';

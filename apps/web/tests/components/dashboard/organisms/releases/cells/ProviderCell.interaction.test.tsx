@@ -295,8 +295,12 @@ describe('Ion-token feedback on availability surfaces', () => {
       const copied = screen.getByRole('button', {
         name: 'Copied Spotify link',
       });
-      expect(copied.className).toContain('text-success');
-      expect(copied.className).not.toMatch(/emerald|amber/);
+      // Success color lives on the glyph (IconButton no-restyle: no color on the control).
+      // SVGElement.className is SVGAnimatedString — read the attribute.
+      const glyphClass =
+        copied.querySelector('svg')?.getAttribute('class') ?? '';
+      expect(glyphClass).toContain('text-success');
+      expect(glyphClass).not.toMatch(/emerald|amber/);
     });
   });
 

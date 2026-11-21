@@ -30,7 +30,7 @@ export const PlaceholderImage = forwardRef<
     <div
       ref={ref}
       className={clsx(
-        'flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800',
+        'flex items-center justify-center bg-gradient-to-br from-surface-2 to-surface-3',
         sizeClasses[size],
         shapeClasses[shape],
         className
@@ -38,7 +38,7 @@ export const PlaceholderImage = forwardRef<
     >
       {children || (
         <svg
-          className='h-1/2 w-1/2 text-gray-400 dark:text-gray-500'
+          className='h-1/2 w-1/2 text-tertiary-token'
           fill='currentColor'
           viewBox='0 0 24 24'
           aria-hidden='true'

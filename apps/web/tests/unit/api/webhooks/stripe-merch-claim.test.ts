@@ -7,8 +7,12 @@ const mockSelect = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockHandleCheckout = vi.hoisted(() => vi.fn());
 const mockHandlePaymentFailed = vi.hoisted(() => vi.fn());
+const mockHandleRefund = vi.hoisted(() => vi.fn());
+const mockEnv = vi.hoisted(() => ({
+  STRIPE_WEBHOOK_SECRET_MERCH: 'whsec_test' as string | undefined,
+}));
 vi.mock('@/lib/env-server', () => ({
-  env: { STRIPE_WEBHOOK_SECRET_MERCH: 'whsec_test' },
+  env: mockEnv,
 }));
 vi.mock('@/lib/stripe/client', () => ({
   stripe: { webhooks: { constructEvent: mockConstructEvent } },
@@ -29,7 +33,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 vi.mock('@/lib/merch/orders', () => ({
   handleMerchCheckoutCompleted: mockHandleCheckout,
   handleMerchCheckoutPaymentFailed: mockHandlePaymentFailed,
-  handleMerchChargeRefunded: vi.fn(),
+  handleMerchChargeRefunded: mockHandleRefund,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureCriticalError: vi.fn() }));
 
@@ -41,6 +45,7 @@ vi.mock('@/lib/utils/logger', () => ({
 describe('POST /api/webhooks/stripe-merch claim', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnv.STRIPE_WEBHOOK_SECRET_MERCH = 'whsec_test';
     mockConstructEvent.mockReturnValue({
       id: 'evt_merch',
       type: 'checkout.session.completed',
@@ -63,6 +68,34 @@ describe('POST /api/webhooks/stripe-merch claim', () => {
       set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
     });
   });
+
+  it('returns 500 when the merch webhook secret is not configured', async () => {
+    mockEnv.STRIPE_WEBHOOK_SECRET_MERCH = undefined;
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/webhooks/stripe-merch', {
+        method: 'POST',
+        body: '{}',
+      })
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Webhook not configured' });
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when stripe-signature is missing', async () => {
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/webhooks/stripe-merch', {
+        method: 'POST',
+        body: '{}',
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'No signature' });
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+  });
+
   it('returns 503 when another worker already holds the lease', async () => {
     const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
     const response = await POST(
@@ -78,6 +111,25 @@ describe('POST /api/webhooks/stripe-merch claim', () => {
       error: 'Webhook processing in progress',
     });
     expect(mockHandleCheckout).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges already-processed events without re-running handlers', async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([
+              { id: 'row_1', processedAt: new Date('2026-01-01T00:00:00Z') },
+            ]),
+        }),
+      }),
+    });
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(makeMerchPostRequest());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(mockHandleCheckout).not.toHaveBeenCalled();
+    expect(mockHandleRefund).not.toHaveBeenCalled();
   });
 
   function reconciliationScenario(markerWritten: boolean) {
@@ -215,5 +267,57 @@ describe('POST /api/webhooks/stripe-merch async payment routing (JOV-12769)', ()
     expect(response.status).toBe(200);
     expect(mockHandlePaymentFailed).toHaveBeenCalledTimes(1);
     expect(mockHandleCheckout).not.toHaveBeenCalled();
+  });
+
+  it('routes charge.refunded to the refund handler and marks processed', async () => {
+    const sets: Record<string, unknown>[] = [];
+    mockUpdate.mockReturnValue({
+      set: (values: Record<string, unknown>) => {
+        sets.push(values);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ id: 'row_1' }]),
+          }),
+        };
+      },
+    });
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_refund',
+      type: 'charge.refunded',
+      created: 1_700_000_000,
+      data: { object: { id: 'ch_1', refunded: true } },
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(makeMerchPostRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(mockHandleRefund).toHaveBeenCalledTimes(1);
+    expect(mockHandleCheckout).not.toHaveBeenCalled();
+    expect(sets).toContainEqual(
+      expect.objectContaining({
+        processedAt: expect.any(Date),
+        processingStartedAt: null,
+      })
+    );
+  });
+
+  it('acks unhandled event types without calling merch handlers', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_other',
+      type: 'customer.created',
+      created: 1_700_000_000,
+      data: { object: { id: 'cus_1' } },
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
+    const response = await POST(makeMerchPostRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(mockHandleCheckout).not.toHaveBeenCalled();
+    expect(mockHandlePaymentFailed).not.toHaveBeenCalled();
+    expect(mockHandleRefund).not.toHaveBeenCalled();
   });
 });

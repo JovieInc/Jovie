@@ -1,8 +1,8 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { CalendarDays, DollarSign, House, Mail, UserRound } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
 import { cn } from '@/lib/utils';
 
@@ -46,10 +46,10 @@ export function ProfileQuickActions({
           const disabled = isContact && bookingDisabled;
 
           return (
-            <CircleIconButton
+            <IconButton
               key={item.id}
               ariaLabel={item.label}
-              size='md'
+              size='lg'
               variant={isActive ? 'surface' : 'outline'}
               className={cn(disabled && 'cursor-not-allowed')}
               aria-current={isActive ? 'page' : undefined}
@@ -64,7 +64,7 @@ export function ProfileQuickActions({
               }}
             >
               <Icon className='h-3.5 w-3.5' aria-hidden='true' />
-            </CircleIconButton>
+            </IconButton>
           );
         })}
       </nav>

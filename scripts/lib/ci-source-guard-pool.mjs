@@ -11,6 +11,7 @@ import {
 } from '../ci-fast-lanes.mjs';
 import { commandLabel } from './ci-failure-excerpts.mjs';
 import {
+  filterMergedWithBasePoolEntries,
   MERGED_WITH_BASE_POOL_CONCURRENCY,
   MERGED_WITH_BASE_POOL_LONG_POLES,
 } from './merged-with-base-pool-config.mjs';
@@ -227,7 +228,28 @@ export function mergedWithBasePoolConcurrency(specConcurrency) {
 }
 
 export async function runSourceGuardPool(spec, opts = {}) {
-  const entries = expandSourcePoolEntries(spec);
+  const expanded = expandSourcePoolEntries(spec);
+  // PR path-gates drop expensive invariant segments when unrelated; merge-group
+  // structural still runs the full `pnpm invariants:check` chain. Empty or
+  // unreadable diffs fail closed onto every entry.
+  const changedFiles =
+    opts.changedFileList !== undefined
+      ? opts.changedFileList
+      : listAllChangedFiles();
+  const { kept: entries, skipped } = filterMergedWithBasePoolEntries(
+    expanded,
+    changedFiles
+  );
+  const skipLines = skipped.map(
+    entry =>
+      `[merged-with-base] skip: ${entry.id}; ${entry.reason}; duration_ms=0`
+  );
+  if (entries.length === 0) {
+    return {
+      code: 0,
+      output: `${skipLines.join('\n')}${skipLines.length ? '\n' : ''}[merged-with-base] no pool entries selected\n`,
+    };
+  }
   const commands = entries.map(entry => entry.command);
   const concurrency = mergedWithBasePoolConcurrency(spec.concurrency);
   const results = await runCommandPool(commands, {
@@ -248,7 +270,7 @@ export async function runSourceGuardPool(spec, opts = {}) {
     now: opts.now,
   });
   let code = 0;
-  const output = results
+  const runOutput = results
     .map((result, index) => {
       if (result?.code !== 0 && code === 0) code = result?.code ?? 1;
       const text = String(result?.output ?? '');
@@ -256,6 +278,7 @@ export async function runSourceGuardPool(spec, opts = {}) {
       return `${text}${separator}[merged-with-base] ${entries[index].id}: exit ${result?.code ?? 1}; duration_ms=${Math.round(result?.durationMs ?? 0)}`;
     })
     .join('\n');
+  const output = [...skipLines, runOutput].filter(Boolean).join('\n');
   return { code, output: `${output}\n` };
 }
 
