@@ -29,9 +29,10 @@ export const ExpandButton = memo(function ExpandButton({
   totalTracks,
   onClick,
 }: ExpandButtonProps) {
-  // Don't show expand button for singles (1 track)
+  // Don't show expand button for singles (1 track).
+  // Spacer matches IconButton size=xs (h-6 / 24px) — no className restyle.
   if (totalTracks <= 1) {
-    return <div className='h-4 w-4' aria-hidden='true' />;
+    return <div className='h-6 w-6' aria-hidden='true' />;
   }
 
   return (
@@ -40,22 +41,19 @@ export const ExpandButton = memo(function ExpandButton({
       variant='inline'
       onClick={onClick}
       disabled={isLoading}
-      // Pre-migration DrawerInlineIconButton used h-4 w-4 so album rows
-      // align with the single-track spacer (size=xs alone is h-6/24px).
-      className='h-4 w-4 rounded p-0 text-tertiary-token disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
       {isLoading ? (
         <Icon
           name='Loader2'
-          className='h-3.5 w-3.5 animate-spin'
+          className='h-3.5 w-3.5 animate-spin text-tertiary-token'
           aria-hidden='true'
         />
       ) : (
         <Icon
           name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
-          className='h-3.5 w-3.5'
+          className='h-3.5 w-3.5 text-tertiary-token'
           aria-hidden='true'
         />
       )}
