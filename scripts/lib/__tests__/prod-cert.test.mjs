@@ -109,9 +109,7 @@ describe('runProductionCertification', () => {
       summary: 'ok',
     });
     const steps = [
-      ...EXPECTED_BROWSER_CHECKS.onboarding.map(id =>
-        passed('onboarding', id)
-      ),
+      ...EXPECTED_BROWSER_CHECKS.onboarding.map(id => passed('onboarding', id)),
       {
         surface: 'checkout',
         id: 'checkout-entry-renders',
