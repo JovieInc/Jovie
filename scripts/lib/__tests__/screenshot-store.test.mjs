@@ -352,9 +352,10 @@ test('catalog images imported by app code are served and stay in git', () => {
       "import SHOT from '@/screenshot-catalog/current/test-only.png';\n"
     );
     const served = servedCatalogImages(root);
-    assert.deepEqual([...served], [
-      'apps/web/screenshot-catalog/current/used.png',
-    ]);
+    assert.deepEqual(
+      [...served],
+      ['apps/web/screenshot-catalog/current/used.png']
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
