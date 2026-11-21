@@ -2,18 +2,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getRedis: vi.fn(),
+  selectRedisStore: vi.fn(),
+  warnRedisStoreDecision: vi.fn(),
   logger: { warn: vi.fn() },
 }));
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/redis', () => ({ getRedis: mocks.getRedis }));
+vi.mock('@/lib/redis-store', () => ({
+  selectRedisStore: mocks.selectRedisStore,
+  redisStoreEnvFrom: (env: unknown) => env,
+  warnRedisStoreDecision: mocks.warnRedisStoreDecision,
+}));
+vi.mock('@/lib/env-server', () => ({ env: {} }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: mocks.logger,
 }));
 
 import {
   AUTH_RATE_LIMIT_CONSUME_SCRIPT,
+  authRateLimitMemorySizeForTests,
   authRateLimitStorage,
+  pathFromAuthRateLimitKey,
+  resetAuthRateLimitMemoryForTests,
 } from '@/lib/auth/rate-limit-storage';
 
 const rule = { window: 60, max: 2 };
@@ -53,9 +64,25 @@ function createScriptRedis(expireOk = true) {
   return { redis, keys };
 }
 
-describe('Better Auth Redis rate-limit storage', () => {
+describe('pathFromAuthRateLimitKey', () => {
+  it('reads the pathname after the Better Auth ip|path separator', () => {
+    expect(pathFromAuthRateLimitKey('1.2.3.4|/sign-in/email-otp')).toBe(
+      '/sign-in/email-otp'
+    );
+    expect(
+      pathFromAuthRateLimitKey('no-trusted-ip|/email-otp/send-verification-otp')
+    ).toBe('/email-otp/send-verification-otp');
+  });
+});
+
+describe('Better Auth Redis rate-limit storage (Upstash selected)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAuthRateLimitMemoryForTests();
+    mocks.selectRedisStore.mockReturnValue({
+      kind: 'upstash',
+      blockProductionUpstash: false,
+    });
   });
 
   it('increments a prefixed counter and sets TTL only when the key is created', async () => {
@@ -91,33 +118,116 @@ describe('Better Auth Redis rate-limit storage', () => {
     expect(keys.get('ba:rl:10.0.0.1|/sign-up/email')?.count).toBe(3);
   });
 
-  it('deletes the key and allows the request when expiry fails', async () => {
+  it('denies sensitive paths when expiry fails so an untrusted counter cannot pass', async () => {
     const { redis, keys } = createScriptRedis(false);
     mocks.getRedis.mockReturnValue(redis);
 
     await expect(
-      authRateLimitStorage.consume('9.9.9.9|/sign-in/email', rule)
-    ).resolves.toEqual({ allowed: true, retryAfter: null });
+      authRateLimitStorage.consume(
+        '9.9.9.9|/email-otp/send-verification-otp',
+        rule
+      )
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
     expect(keys.size).toBe(0);
 
-    keys.set('ba:rl:9.9.9.9|/sign-in/email', { count: 9, ttl: null });
+    keys.set('ba:rl:9.9.9.9|/sign-in/email-otp', { count: 9, ttl: null });
     await expect(
-      authRateLimitStorage.consume('9.9.9.9|/sign-in/email', rule)
-    ).resolves.toEqual({ allowed: true, retryAfter: null });
-    expect(keys.has('ba:rl:9.9.9.9|/sign-in/email')).toBe(false);
+      authRateLimitStorage.consume('9.9.9.9|/sign-in/email-otp', rule)
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
+    expect(keys.has('ba:rl:9.9.9.9|/sign-in/email-otp')).toBe(false);
   });
 
-  it('degrades open when Redis is missing or the counter command fails', async () => {
+  it('denies sensitive OTP/passwordless paths when Redis is configured but unavailable', async () => {
     mocks.getRedis.mockReturnValue(null);
     await expect(
       authRateLimitStorage.consume('ip|/email-otp/send-verification-otp', rule)
-    ).resolves.toEqual({ allowed: true, retryAfter: null });
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
+    await expect(
+      authRateLimitStorage.consume('ip|/sign-in/email-otp', rule)
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
+    await expect(
+      authRateLimitStorage.consume('ip|/phone-number/send-otp', rule)
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
+    await expect(
+      authRateLimitStorage.consume('ip|/one-time-token/verify', rule)
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
 
     mocks.getRedis.mockReturnValue({
       eval: vi.fn().mockRejectedValue(new Error('quota')),
     });
     await expect(
       authRateLimitStorage.consume('ip|/email-otp/send-verification-otp', rule)
+    ).resolves.toEqual({ allowed: false, retryAfter: 60 });
+  });
+
+  it('still degrades open for non-sensitive auth paths when Redis is down', async () => {
+    mocks.getRedis.mockReturnValue(null);
+    await expect(authRateLimitStorage.consume('ip|/ok', rule)).resolves.toEqual(
+      { allowed: true, retryAfter: null }
+    );
+    await expect(
+      authRateLimitStorage.consume('ip|/list-accounts', rule)
     ).resolves.toEqual({ allowed: true, retryAfter: null });
+  });
+});
+
+describe('Better Auth rate-limit storage (intentional memory store)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetAuthRateLimitMemoryForTests();
+    mocks.selectRedisStore.mockReturnValue({
+      kind: 'memory',
+      blockProductionUpstash: false,
+    });
+    mocks.getRedis.mockReturnValue(null);
+  });
+
+  it('does not treat intentional memory as a Redis outage for OTP/sign-in', async () => {
+    await expect(
+      authRateLimitStorage.consume('ip|/email-otp/send-verification-otp', rule)
+    ).resolves.toEqual({ allowed: true, retryAfter: null });
+    await expect(
+      authRateLimitStorage.consume('ip|/sign-in/email-otp', rule)
+    ).resolves.toEqual({ allowed: true, retryAfter: null });
+    expect(mocks.getRedis).not.toHaveBeenCalled();
+    expect(mocks.logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('enforces the window with a process-local counter', async () => {
+    const key = 'ip|/email-otp/send-verification-otp';
+    await expect(authRateLimitStorage.consume(key, rule)).resolves.toEqual({
+      allowed: true,
+      retryAfter: null,
+    });
+    await expect(authRateLimitStorage.consume(key, rule)).resolves.toEqual({
+      allowed: true,
+      retryAfter: null,
+    });
+    await expect(authRateLimitStorage.consume(key, rule)).resolves.toEqual({
+      allowed: false,
+      retryAfter: expect.any(Number),
+    });
+  });
+
+  it('evicts expired memory windows so counters do not grow without bound', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // force cleanup path
+    for (let i = 0; i < 5; i += 1) {
+      await authRateLimitStorage.consume(`ip-${i}|/sign-in/email-otp`, {
+        window: 1,
+        max: 100,
+      });
+    }
+    expect(authRateLimitMemorySizeForTests()).toBe(5);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 2_000);
+    await authRateLimitStorage.consume('fresh|/sign-in/email-otp', {
+      window: 60,
+      max: 100,
+    });
+    // Probabilistic sweep dropped the five expired keys; only the fresh one remains.
+    expect(authRateLimitMemorySizeForTests()).toBe(1);
+    vi.useRealTimers();
+    vi.mocked(Math.random).mockRestore();
   });
 });
