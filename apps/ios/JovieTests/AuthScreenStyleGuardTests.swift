@@ -153,7 +153,7 @@ struct AuthScreenStyleGuardTests {
     #expect(JovieActionButtonMetrics.height == 28)
     #expect(JovieActionButtonMetrics.hitTarget == 44)
     #expect(JoviePillButtonStyle.visibleHeight + 2 * JoviePillButtonStyle.hitInset >= JoviePillButtonStyle.minimumHitHeight)
-    // Chat controls keep independent 32pt geometry (not ActionButton KEEP).
+    // Chat face stays 32 (not ActionButton KEEP).
     #expect(ChatComposerMetrics.lockedControlSize == 32)
   }
 

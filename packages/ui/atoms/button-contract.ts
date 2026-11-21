@@ -115,10 +115,9 @@ export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
 
 /**
- * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT;
- * native sync-28 2026-11-20). Visible pill 28px; mobile hit 44px. Not
- * 32-in-44. Native `JovieActionButtonMetrics` projects via
- * `actionButtonBindings`; Chat composer stays locked 32pt.
+ * ActionButton CTA lock (Tim KEEP 2026-09-10; native sync-28). Visible
+ * 28px / hit 44px. Native metrics project via `actionButtonBindings`;
+ * Chat composer stays locked 32pt.
  */
 export const ACTION_BUTTON_VISIBLE_HEIGHT_PX = 28;
 export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;

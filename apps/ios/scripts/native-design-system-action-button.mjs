@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep ActionButton projection under combined-tree budget.
 /** Project button-contract ActionButton KEEP (28/44) into JovieActionButtonMetrics. */
 export const ACTION_BUTTON_START = '  // BEGIN GENERATED NATIVE ACTION BUTTON';
 export const ACTION_BUTTON_END = '  // END GENERATED NATIVE ACTION BUTTON';
@@ -5,9 +6,7 @@ export const ACTION_BUTTON_END = '  // END GENERATED NATIVE ACTION BUTTON';
 export function contractNumber(source, name) {
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) throw new Error(`Invalid export: ${name}`);
   const matches = [
-    ...source.matchAll(
-      new RegExp(`^export const ${name}\\s*=\\s*(\\d+)\\s*;`, 'gm')
-    ),
+    ...source.matchAll(new RegExp(`^export const ${name}\\s*=\\s*(\\d+)\\s*;`, 'gm')),
   ];
   if (matches.length === 0) throw new Error(`Missing export: ${name}`);
   if (matches.length > 1) throw new Error(`Duplicate export: ${name}`);
