@@ -1,6 +1,12 @@
 import { ACTION_BUTTON_FACE_CLASSNAME } from '@jovie/ui/atoms/button-contract';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
+
+/**
+ * Shared chrome for app-shell text/icon controls. Owned here after Drift T2.1
+ * retired AppIconButton; icon-only paths use @jovie/ui IconButton `control`.
+ */
+export const APP_CONTROL_BUTTON_CLASS =
+  'inline-flex h-app-control-sm items-center justify-center gap-1.5 rounded-pill border border-subtle bg-surface-1 px-app-control-x text-xs font-caption tracking-[-0.012em] text-secondary-token shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none';
 
 /** Shared page-toolbar action styling, usable by molecules and organisms. */
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(

@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieCeoOverview.test.tsx
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -157,14 +158,14 @@ export function OvieCeoOverview({
                   'degraded',
                   'unknown',
                 ].includes(metric.state) ? (
-                  <button
+                  <PlainButton
                     type='button'
                     onClick={onRetry}
                     className='inline-flex min-h-11 shrink-0 items-center gap-1 font-medium text-secondary-token transition-colors hover:text-primary-token'
                   >
                     <RefreshCw className='h-3 w-3' aria-hidden='true' />
                     Retry
-                  </button>
+                  </PlainButton>
                 ) : null}
                 <a
                   href={metric.drillDownHref}

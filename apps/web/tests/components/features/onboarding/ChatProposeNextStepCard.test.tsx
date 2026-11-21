@@ -47,6 +47,12 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     expect(screen.getByText(/you are not on the list/i)).toBeInTheDocument();
     expect(screen.getByText(/save your spot/i)).toBeInTheDocument();
     expect(screen.queryByText(/you're on the list/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-post-keep-enrichment')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/optional — does not change signup/i)
+    ).toBeInTheDocument();
   });
 
   it('shows a non-terminal saving state after authentication', () => {

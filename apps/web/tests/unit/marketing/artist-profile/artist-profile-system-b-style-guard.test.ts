@@ -47,11 +47,8 @@ const sectionComponents = [
   'ArtistProfileHeroAdaptiveIntro',
   'ArtistProfileOutcomesCarousel',
   'ArtistProfileCaptureSection',
-  'ArtistProfileOpinionatedSection',
-  'ArtistProfileAnnotatedTruth',
   'ArtistProfileHowItWorks',
-  'ArtistProfileReleaseCycleGallery',
-  'ArtistProfileFaq',
+  'MarketingShippedSitesShowcase',
   'ArtistProfileFinalCta',
 ] as const;
 
@@ -147,9 +144,8 @@ describe('artist profile landing family System B source contract', () => {
     );
     expect(hero).toContain('HomepagePosterHero');
     expect(hero).toContain('trackedLinkComponent={HomepageTrackedLink}');
-    expect(hero).toContain(
-      "getMarketingExportImage('tim-white-profile-live-mobile')"
-    );
+    expect(hero).toContain('ArtistProfileModeSwitcher');
+    expect(hero).toContain("sectionVariant='left-phone'");
     expect(hero).toContain("href: '#adaptive'");
     expect(hero).not.toContain('showSupport');
     expect(hero).not.toContain('hero.eyebrow');

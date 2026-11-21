@@ -574,7 +574,7 @@ function resolveAuthStatePath(authPath?: string) {
   return DEFAULT_AUTH_STATE_PATHS.find(path => existsSync(path));
 }
 
-function loadAuthCookies(_baseUrl: string, authPath?: string) {
+export function loadAuthCookies(_baseUrl: string, authPath?: string) {
   const explicitAuthStatePath = authPath
     ? resolveAuthStatePath(authPath)
     : undefined;
@@ -964,7 +964,7 @@ export function assertAliasPhaseTiming(
   };
 }
 
-async function waitForAnyVisible(
+export async function waitForAnyVisible(
   page: Page,
   selectors: readonly string[] | undefined,
   timeoutMs = READY_TIMEOUT_MS

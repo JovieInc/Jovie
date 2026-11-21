@@ -1,0 +1,36 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: soft-skips without WORKERS_AI_TOKEN; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS.
+# removal-trigger: Remove when Assistants lane records live TTFT for test account.
+name: Chat first-token sample
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: chat-first-token-sample-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  chat-first-token-sample:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Record or soft-skip
+        env:
+          WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
+          OUT_JSON: ${{ runner.temp }}/chat-first-token-sample.json
+          ASSISTANTS_CHAT_TTFT_SAMPLES_MS: ${{ vars.ASSISTANTS_CHAT_TTFT_SAMPLES_MS }}
+        run: |
+          set -uo pipefail
+          pnpm --filter @jovie/web eval:chat-first-token -- --out "$OUT_JSON"
+      - if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chat-first-token-sample-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/chat-first-token-sample.json
+          if-no-files-found: ignore
+          retention-days: 14

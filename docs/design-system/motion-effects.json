@@ -34,6 +34,50 @@
         "fpsCap": null,
         "pausesOffscreen": false
       }
+    },
+    {
+      "id": "onboarding-start-step-panel",
+      "summary": "Motion Primitives Transition Panel for /start step rail hints (Find you → Claim your name → Go live). Opacity-only under prefers-reduced-motion.",
+      "files": [
+        "apps/web/components/ui/transition-panel.tsx",
+        "apps/web/components/features/onboarding/OnboardingStartStepRail.tsx"
+      ],
+      "fallback": "static fallback|REDUCED_MOTION_VARIANTS|opacity",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": ["apps/web/components/ui/transition-panel.tsx"]
+      },
+      "budget": {
+        "gzipBytes": 3072,
+        "perFileGzipBytes": {
+          "apps/web/components/ui/transition-panel.tsx": 2048,
+          "apps/web/components/features/onboarding/OnboardingStartStepRail.tsx": 1024
+        },
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
+    },
+    {
+      "id": "artist-profile-mode-morph",
+      "summary": "Artist LP mode switcher morphs one profile phone between modes via React ViewTransition; static in-place swap when reduced-motion.",
+      "files": [
+        "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx"
+      ],
+      "fallback": "static|data-reduced-motion|ViewTransition|transitionClass",
+      "reducedMotion": {
+        "marker": "useReducedMotion",
+        "requiredIn": [
+          "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx"
+        ]
+      },
+      "budget": {
+        "gzipBytes": 8192,
+        "perFileGzipBytes": {
+          "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx": 8192
+        },
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
     }
   ]
 }

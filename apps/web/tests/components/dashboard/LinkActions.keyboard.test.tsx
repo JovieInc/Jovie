@@ -5,6 +5,10 @@ import { LinkActions } from '@/features/dashboard/atoms/link-actions';
 
 // Mock Tooltip components
 vi.mock('@jovie/ui', () => ({
+  PlainButton: ({
+    type = 'button',
+    ...props
+  }: React.ComponentProps<'button'>) => <button type={type} {...props} />,
   Button: ({
     children,
     className,

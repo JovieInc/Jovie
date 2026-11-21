@@ -3,6 +3,7 @@
 import {
   Button,
   ConfirmDialog,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -161,11 +162,11 @@ function MessageSection({
           <span data-testid='outbound-approval-line'>{approvalLine(row)}</span>
         </p>
         {message.channel === 'email' ? (
-          <input
+          <Input
             aria-label='Subject'
+            inputSize='sm'
             value={subject}
             onChange={event => setSubject(event.target.value)}
-            className='h-7 w-full rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
           />
         ) : null}
         <Textarea

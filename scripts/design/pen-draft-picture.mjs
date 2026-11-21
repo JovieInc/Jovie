@@ -95,14 +95,23 @@ Export([id], 'png', dir, { scale });
 }`;
 }
 
-/** The see-through share a frame may have: its rounded outer corners. */
+/**
+ * The see-through share a frame may have outside the gutters between its
+ * variants: their rounded outer corners.
+ */
 export const MAX_CLEAR_SHARE = 0.02;
+
+/** Past this share the picture is mostly empty, gutters or not. */
+const MAX_GUTTER_SHARE = 0.5;
 
 /**
  * Why a picture must not go to review, or null. A frame or section with no
- * background fill exports see-through, and the viewer draws a checkerboard
- * where the surface or gradient should be (Tim, 2026-11-15: "gradient bgs
- * dont render"; the canonical "Section / What's new" has no fill at all).
+ * background fill reaches review as a checkerboard where the surface or
+ * gradient should be (Tim, 2026-11-15: "gradient bgs dont render"; the
+ * canonical "Section / What's new" has no fill at all). Pen bakes that
+ * checkerboard into the export as opaque pixels, so the alpha channel alone
+ * misses it; the clear gutters Pen leaves between a frame's variants are
+ * fine and are not counted.
  * @param {Buffer} png
  */
 export function pictureProblem(png) {
@@ -112,14 +121,100 @@ export function pictureProblem(png) {
   } catch (error) {
     return `pen exported a picture that is not a readable PNG (${firstLine(error)})`;
   }
-  const pixels = img.width * img.height;
+  const { width, height, data } = img;
+  const pixels = width * height;
   if (!pixels) return 'pen exported an empty picture';
+  const clearAt = (x, y) => data[(y * width + x) * 4 + 3] < 250;
+  const clearRow = new Uint8Array(height);
+  const clearCol = new Uint8Array(width).fill(1);
+  for (let y = 0; y < height; y++) {
+    let all = 1;
+    for (let x = 0; x < width; x++) {
+      if (clearAt(x, y)) continue;
+      all = 0;
+      clearCol[x] = 0;
+    }
+    clearRow[y] = all;
+  }
   let clear = 0;
-  for (let i = 3; i < img.data.length; i += 4) if (img.data[i] < 250) clear++;
-  const share = clear / pixels;
-  return share > MAX_CLEAR_SHARE
-    ? `the frame has no background: ${Math.round(share * 100)}% of the picture is see-through`
+  let loose = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (clearAt(x, y)) {
+        clear++;
+        if (!clearRow[y] && !clearCol[x]) loose++;
+      }
+  const share = Math.max(
+    loose / pixels,
+    clear / pixels > MAX_GUTTER_SHARE ? clear / pixels : 0
+  );
+  if (share > MAX_CLEAR_SHARE)
+    return `the frame has no background: ${Math.round(share * 100)}% of the picture is see-through`;
+  const checker = findCheckerboard(img);
+  return checker
+    ? `the frame shows a see-through checkerboard near x ${checker.x}, y ${checker.y}: a section there has no fill`
     : null;
+}
+
+/** Tiles of a baked transparency checkerboard: a few pixels each. */
+const TILE = { min: 3, max: 16 };
+/** Alternating tiles in one row before it counts as a checkerboard. */
+const MIN_TILES = 6;
+/** Rows that must show it, so one striped line never fails a frame. */
+const MIN_CHECKER_ROWS = 3;
+
+/**
+ * Where a picture shows a transparency checkerboard, or null: a run of
+ * equal tiles alternating between two levels, with the levels swapped one
+ * tile further down.
+ * @param {{width: number, height: number, data: Uint8Array}} img
+ */
+export function findCheckerboard({ width, height, data }) {
+  const level = (x, y) => {
+    const i = (y * width + x) * 4;
+    if (data[i + 3] < 250) return -1;
+    return ((data[i] * 3 + data[i + 1] * 6 + data[i + 2]) / 10) | 0;
+  };
+  const near = (a, b) => a >= 0 && b >= 0 && Math.abs(a - b) <= 2;
+  let first = null;
+  let rows = 0;
+  for (let y = 0; y < height; y += 2) {
+    const runs = [];
+    for (let x = 0; x < width; ) {
+      const v = level(x, y);
+      let end = x + 1;
+      while (end < width && near(level(end, y), v)) end++;
+      runs.push({ x, w: end - x, v });
+      x = end;
+    }
+    let found = false;
+    for (let i = 0; i + MIN_TILES <= runs.length && !found; i++) {
+      const t = runs[i].w;
+      const a = runs[i].v;
+      const b = runs[i + 1].v;
+      if (t < TILE.min || t > TILE.max || a < 0 || b < 0) continue;
+      if (Math.abs(a - b) < 8) continue;
+      let j = i;
+      while (
+        j < runs.length &&
+        Math.abs(runs[j].w - t) <= 1 &&
+        near(runs[j].v, (j - i) % 2 ? b : a)
+      )
+        j++;
+      if (j - i < MIN_TILES || y + t >= height) continue;
+      let swapped = 0;
+      for (let k = i; k < j; k++) {
+        const mid = runs[k].x + (runs[k].w >> 1);
+        if (near(level(mid, y + t), (k - i) % 2 ? a : b)) swapped++;
+      }
+      if (swapped >= j - i - 1) {
+        found = true;
+        first ??= { x: runs[i].x, y };
+      }
+    }
+    if (found && ++rows >= MIN_CHECKER_ROWS) return first;
+  }
+  return null;
 }
 
 /** The node Pen says it drew, from the session's stdout; null when unsaid. */

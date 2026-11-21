@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
@@ -112,5 +113,19 @@ describe('AiCrawlerIntelligenceCard', () => {
       )
     ).toBeInTheDocument();
     expect(screen.getByText('Upgrade to Artist Presence')).toBeInTheDocument();
+  });
+
+  it('opens the detail view from the type=button row on a real click', async () => {
+    const user = userEvent.setup();
+    const onOpenDetail = vi.fn();
+
+    render(<AiCrawlerIntelligenceCard onOpenDetail={onOpenDetail} />);
+
+    const row = screen.getByTestId('ai-crawler-intelligence-card');
+    expect(row).toHaveAttribute('type', 'button');
+
+    await user.click(row);
+
+    expect(onOpenDetail).toHaveBeenCalledTimes(1);
   });
 });

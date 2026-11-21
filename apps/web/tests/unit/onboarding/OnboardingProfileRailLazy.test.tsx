@@ -21,6 +21,7 @@ vi.mock('@/components/features/onboarding/OnboardingProfileRail', () => ({
 const HANDLE_STATE: OnboardingProfileBuilderState = {
   artist: null,
   artistConfirmed: false,
+  handleConfirmed: false,
   handle: 'newartist',
   socialLinks: [],
 };
@@ -61,17 +62,24 @@ describe('OnboardingProfileRail (lazy)', () => {
   });
 
   it('keeps the heavy rail out of the shell and chat entry imports', () => {
-    for (const file of ['OnboardingShell.tsx', 'OnboardingChat.tsx']) {
-      const source = readFileSync(
-        path.resolve(
-          __dirname,
-          '../../../components/features/onboarding',
-          file
-        ),
-        'utf8'
-      );
-      expect(source).not.toMatch(/from '\.\/OnboardingProfileRail'/);
-      expect(source).toMatch(/from '\.\/OnboardingProfileRailLazy'/);
-    }
+    const onboardingDir = path.resolve(
+      __dirname,
+      '../../../components/features/onboarding'
+    );
+    const shell = readFileSync(
+      path.join(onboardingDir, 'OnboardingShell.tsx'),
+      'utf8'
+    );
+    const chat = readFileSync(
+      path.join(onboardingDir, 'OnboardingChat.tsx'),
+      'utf8'
+    );
+    expect(shell).not.toMatch(/from '\.\/OnboardingProfileRail'/);
+    expect(shell).toMatch(/from '\.\/OnboardingProfileRailLazy'/);
+    // JOV-14243: chat uses the peek strip on 390; only the shell lazy-loads
+    // the full side preview.
+    expect(chat).not.toMatch(/from '\.\/OnboardingProfileRail'/);
+    expect(chat).not.toMatch(/from '\.\/OnboardingProfileRailLazy'/);
+    expect(chat).toMatch(/from '\.\/OnboardingProfilePeekStrip'/);
   });
 });

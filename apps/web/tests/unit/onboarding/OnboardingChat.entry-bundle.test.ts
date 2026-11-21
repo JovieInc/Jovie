@@ -54,10 +54,12 @@ describe('OnboardingChat entry bundle', () => {
     expect(staticImportOf('./ChatProposeNextStepCard')).toBeUndefined();
   });
 
-  it('loads the profile preview rail only when there is a preview (perf)', () => {
+  it('keeps the side profile rail out of the chat entry bundle (perf)', () => {
+    // JOV-14243: chat owns the 390 peek strip; lg+ rail stays shell-lazy.
     expect(staticImportOf('./OnboardingProfileRail')).toBeUndefined();
-    expect(staticImportOf('./OnboardingProfileRailLazy')).toMatch(
-      /\bOnboardingProfileRail\b/
+    expect(staticImportOf('./OnboardingProfileRailLazy')).toBeUndefined();
+    expect(staticImportOf('./OnboardingProfilePeekStrip')).toMatch(
+      /\bOnboardingProfilePeekStrip\b/
     );
   });
 

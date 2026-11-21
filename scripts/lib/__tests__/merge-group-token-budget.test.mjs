@@ -66,6 +66,16 @@ const LEDGER = {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
+  // JOV-12618: lists Source Validation runs only when MG tree == source tree
+  // (~3/10 groups per JOV-13081). Typical green groups pay 0 REST here.
+  'ci-fast-typecheck/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining-shards/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
   'ci-fast-remaining-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,

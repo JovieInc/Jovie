@@ -15,6 +15,17 @@ export interface AdminSurfaceDescriptor {
   readonly primaryWorkspace: boolean;
   readonly utilityRoot: boolean;
   readonly includeInFastHealth: boolean;
+  /**
+   * Accordion a deep link opens below the fold. The desktop visual snapshot
+   * captures that section instead of the page top, which every Growth deep
+   * link shares (they were byte-identical baselines until 2026-11-21).
+   */
+  readonly snapshotAccordion?: string;
+  /**
+   * Id of a surface whose desktop baseline this one compares against, for a
+   * deep link that renders the identical state (one baseline, not two).
+   */
+  readonly snapshotSharedWith?: string;
 }
 
 export interface AdminRedirectDescriptor {
@@ -235,6 +246,7 @@ const renderSurfaces = [
     path: buildAdminGrowthHref('outreach'),
     rootTestId: 'admin-growth-page',
     snapshotSlug: 'admin-growth-outreach',
+    snapshotAccordion: 'Outreach & Campaigns',
     utilityRoot: false,
     includeInFastHealth: true,
   },
@@ -244,6 +256,9 @@ const renderSurfaces = [
     path: buildAdminGrowthHref('campaigns'),
     rootTestId: 'admin-growth-page',
     snapshotSlug: 'admin-growth-campaigns',
+    // ?view=campaigns opens the same accordion as ?view=outreach.
+    snapshotAccordion: 'Outreach & Campaigns',
+    snapshotSharedWith: 'growth-outreach',
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -254,6 +269,7 @@ const renderSurfaces = [
     // Ingest is an accordion in Growth, not a separate view root.
     rootTestId: 'admin-growth-page',
     snapshotSlug: 'admin-growth-ingest',
+    snapshotAccordion: 'Intake & Keywords',
     utilityRoot: false,
     includeInFastHealth: false,
   },
@@ -366,6 +382,16 @@ export function getAdminSurfaceSelector(
   surface: AdminSurfaceDescriptor
 ): string {
   return selectorForTestId(surface.rootTestId);
+}
+
+/** Desktop baseline filename, honoring a shared baseline. */
+export function getAdminDesktopSnapshotName(
+  surface: AdminSurfaceDescriptor
+): string {
+  const owner = surface.snapshotSharedWith
+    ? getAdminSurfaceById(surface.snapshotSharedWith)
+    : surface;
+  return `${owner.snapshotSlug}-desktop.png`;
 }
 
 export function getAdminSurfaceById(id: string): AdminSurfaceDescriptor {

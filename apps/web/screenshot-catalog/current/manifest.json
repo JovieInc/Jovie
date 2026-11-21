@@ -410,8 +410,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-11-20T19:53:30.502Z",
-    "gitSha": "9fbb700cae91a0d5baf43de048013eac84884a68",
+    "capturedAt": "2026-11-21T15:04:00.000Z",
+    "gitSha": "jov-14240-public-handle",
     "imagePath": "tim-white-profile-live-mobile.png",
     "publicExportPath": "tim-white-profile-live-phone.png"
   },
