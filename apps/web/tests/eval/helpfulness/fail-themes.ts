@@ -174,6 +174,7 @@ export function checkFailThemePromptContract(prompt: string): {
         'never invent popularity, streams',
         'never invent the missing figure',
         'never mention a popularity score'
-      ) || (has('never invent') && has('popularity')),
+      ) ||
+      (has('never invent') && has('popularity')),
   };
 }
