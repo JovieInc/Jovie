@@ -36,7 +36,6 @@ import {
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
-/** Serialized canonical contact row (dates as ISO strings for the client). */
 export interface AdminContactRow {
   dedupeKey: string;
   stage: ContactLifecycleStage;
@@ -171,7 +170,7 @@ const ADMIN_CONTACT_COLUMNS = [
   }),
 ] as ColumnDef<AdminContactRow, unknown>[];
 
-/** One discovered fact with Yes / No / Unsure; reused by Ovie Outbound. */
+/** One discovered fact with Yes / No / Unsure; `active` is the y / n / u target in Ovie Outbound. */
 export function EvidenceItemCard({
   item,
   pending,
@@ -180,7 +179,6 @@ export function EvidenceItemCard({
 }: Readonly<{
   item: ContactEvidenceItem;
   pending: boolean;
-  /** Keyboard target for y / n / u in Ovie Outbound. */
   active?: boolean;
   onDecision: (
     item: ContactEvidenceItem,
@@ -600,12 +598,6 @@ export function AdminContactsTable({
     [selected]
   );
   useAdminPeopleRightPanel(detailPanel);
-
-  const stageHref = useCallback(
-    (value: string | null) => buildHref({ stage: value, page: null }),
-    [buildHref]
-  );
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = rows.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = rows.length === 0 ? 0 : (page - 1) * pageSize + rows.length;
@@ -622,7 +614,12 @@ export function AdminContactsTable({
               <Select
                 value={stage ?? 'all'}
                 onValueChange={value =>
-                  router.push(stageHref(value === 'all' ? null : value))
+                  router.push(
+                    buildHref({
+                      stage: value === 'all' ? null : value,
+                      page: null,
+                    })
+                  )
                 }
               >
                 <SelectTrigger aria-label='Filter By Lifecycle Stage'>
@@ -704,7 +701,6 @@ export function AdminContactsTable({
               previous === row.dedupeKey ? null : row.dedupeKey
             )
           }
-          // Page-level useAdminTableKeyboardNavigation owns j/k here.
           enableKeyboardNavigation={false}
           emptyState={
             <div className='px-app-header py-10 text-center text-sm text-secondary-token'>

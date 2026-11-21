@@ -24,6 +24,7 @@ function surface(
     overlayPath: 'overlay.png',
     rawDiffRatio: 0.02,
     weightedDriftScore: 0.0412,
+    regionScores: [],
     threshold: 0.01,
     status: 'drift_detected',
     review: null,

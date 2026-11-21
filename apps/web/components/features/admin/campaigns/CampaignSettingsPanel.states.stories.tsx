@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  type CampaignSettingsResponse,
-  DEFAULT_THROTTLING,
-  queryKeys,
-} from '@/lib/queries';
+import { DEFAULT_THROTTLING, queryKeys } from '@/lib/queries';
+import type { CampaignSettingsResponse } from '@/lib/queries/useCampaignInvites';
 import { CampaignSettingsPanel } from './CampaignSettingsPanel';
 
 const settings: CampaignSettingsResponse = {

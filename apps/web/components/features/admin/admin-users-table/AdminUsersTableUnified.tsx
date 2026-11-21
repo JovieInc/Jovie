@@ -474,7 +474,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 56,
       }),
 
-      // Name column
       columnHelper.accessor('name', {
         id: 'name',
         header: 'Name',
@@ -482,7 +481,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 260,
       }),
 
-      // Jovie Username column
       columnHelper.display({
         id: 'username',
         header: 'Jovie Username',
@@ -490,7 +488,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 180,
       }),
 
-      // Sign up (Created) column
       columnHelper.accessor('createdAt', {
         id: 'created',
         header: 'Sign Up',

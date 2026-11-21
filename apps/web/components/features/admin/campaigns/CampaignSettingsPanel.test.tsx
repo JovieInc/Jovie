@@ -2,11 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  type CampaignSettingsResponse,
-  DEFAULT_THROTTLING,
-  queryKeys,
-} from '@/lib/queries';
+import { DEFAULT_THROTTLING, queryKeys } from '@/lib/queries';
+import type { CampaignSettingsResponse } from '@/lib/queries/useCampaignInvites';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CampaignSettingsPanel } from './CampaignSettingsPanel';
 

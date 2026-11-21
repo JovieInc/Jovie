@@ -82,6 +82,7 @@ function MockHudFetch({
 const meta = {
   title: 'Features/Admin/Hud/HudShipperPanels',
   component: HudShipperNeedPanel,
+  args: { source: 'admin-session' },
   parameters: {
     layout: 'centered',
   },
@@ -106,7 +107,6 @@ function renderPanel(mode: Mode, body?: HudShipperStatusPayload) {
 }
 
 export const Default: Story = {
-  args: { source: 'admin-session' },
   render: () => renderPanel('ok'),
 };
 
