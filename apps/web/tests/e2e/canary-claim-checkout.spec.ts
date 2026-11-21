@@ -16,7 +16,11 @@ import {
   materializeTestCheckoutCompletion,
   postStripeWebhook,
 } from './helpers/stripe-helpers';
-import { certStep, certStepBlocked } from './utils/prod-cert-steps';
+import {
+  certStep,
+  certStepBlocked,
+  recordCertCapabilities,
+} from './utils/prod-cert-steps';
 import {
   prepareProductionAuthEmailForm,
   waitForProductionDashboardContent,
@@ -46,6 +50,24 @@ import { waitForProductionAuthOtp } from './utils/production-auth-otp';
  * another account, or a price that is not the $12 fixture. No live charges,
  * no real artist profile is ever touched.
  */
+
+recordCertCapabilities({
+  checkout: [
+    'cone-checkout-success-truthful',
+    'cone-checkout-cancel-truthful',
+    'cone-checkout-failure-truthful',
+    'cone-checkout-payment-is-authority',
+    'cone-checkout-entitlement-agrees',
+    'cone-checkout-retry-idempotent',
+  ],
+  onboarding: [
+    'cone-activation-immediate-value',
+    'cone-activation-visible-path',
+    'cone-activation-no-dead-end',
+    'cone-activation-continue-without-rescue',
+  ],
+});
+
 test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.describe.configure({ mode: 'serial' });
