@@ -15,7 +15,6 @@ import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-
 /** @param {Record<string, unknown>} [prod] @param {Record<string, unknown>} [staging] */
 function shipped(prod = {}, staging = {}) {
   const channel = (defaults, overrides) => ({

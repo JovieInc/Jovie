@@ -192,8 +192,7 @@ export async function collectArtifactFreshness(input = {}) {
         published: publishedStage,
         feed: feedStage,
         desktopRelevantSincePublished: desktopRelevant,
-        publishInFlight:
-          channel === 'production' ? publishInFlight : false,
+        publishInFlight: channel === 'production' ? publishInFlight : false,
       })
     );
   }

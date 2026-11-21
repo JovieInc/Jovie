@@ -300,14 +300,29 @@ test('wrong feed bytes, unavailable feed, and wrong feed target cannot verify pu
   /** @type {Array<[() => Response, boolean]>} */
   const cases = [
     [() => new Response(fixture.feed.replace('26.10.3', '26.10.4')), false],
-    [() => new Response('API rate limit exceeded for installation ID 42', { status: 403 }), true],
+    [
+      () =>
+        new Response('API rate limit exceeded for installation ID 42', {
+          status: 403,
+        }),
+      true,
+    ],
     [() => new Response('denied', { status: 403 }), false],
-    [() => { throw new Error('network unavailable'); }, true],
+    [
+      () => {
+        throw new Error('network unavailable');
+      },
+      true,
+    ],
   ];
   for (const [feedResponse, expectObservation] of cases) {
-    const observed = (await observePublication(fixture, feedResponse)).production;
+    const observed = (await observePublication(fixture, feedResponse))
+      .production;
     assert.equal(observed.publicationIdentityVerified, false);
-    assert.equal(Boolean(observed.publicationObservationError), expectObservation);
+    assert.equal(
+      Boolean(observed.publicationObservationError),
+      expectObservation
+    );
   }
   for (const transform of [
     feed => feed.replace('version: 26.10.3', 'version: 26.10.2'),

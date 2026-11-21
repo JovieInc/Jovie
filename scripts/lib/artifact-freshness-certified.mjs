@@ -47,9 +47,7 @@ export function isProductionVerifiedJobSet(jobs) {
     job =>
       typeof job?.name === 'string' && job.name.endsWith(ROLLBACK_JOB_SUFFIX)
   );
-  return (
-    rollbacks.length === 1 && rollbacks[0]?.conclusion === 'skipped'
-  );
+  return rollbacks.length === 1 && rollbacks[0]?.conclusion === 'skipped';
 }
 
 /**
