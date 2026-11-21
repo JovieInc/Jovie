@@ -1,36 +1,45 @@
-// Off-repo store for screenshot binaries (product screenshot catalog and
-// docs/screenshots evidence).
+// Off-repo store for screenshot binaries (the catalog images that nothing
+// serves, and docs/screenshots evidence).
 //
-// Binaries live in a content-addressed, public-read Cloudflare R2 bucket. The
-// repo keeps one small JSON pointer per image: sha256, size, content type, the
-// content-addressed store URL, viewport and capture time. Content addressing
+// Binaries live in a PRIVATE, content-addressed Cloudflare R2 bucket with no
+// public domain and no public development URL. Every read and write goes through R2's
+// S3-compatible API signed with an access key (SigV4, implemented here with
+// node:crypto, no dependencies). Credentials come only from the environment:
+// R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (bucket name
+// R2_SCREENSHOTS_BUCKET, default jovie-screenshots). CI reads use a read-only
+// key; only a person (or the manual upload workflow) holds the write key.
+//
+// The repo keeps one small JSON pointer per image: sha256, size, content type,
+// the content-addressed key, viewport and capture time. Content addressing
 // makes a pointer immutable: a changed image is a new key, never an overwrite.
-// Consumers hydrate the real bytes at build/CI time over plain HTTPS (no
-// secret) and verify sha256 and size on every download. Only uploads need the
-// Cloudflare token.
-import { spawnSync } from 'node:child_process';
+// Every download is verified against the pointer's sha256 and size.
+//
+// Images the live site serves (the targets of the apps/web/public symlinks into
+// the catalog) are NOT in the store: they stay in git as regular files and have
+// no pointer. See servedCatalogImages().
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, extname, join } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
+import {
+  DEFAULT_BUCKET,
+  MISSING_CREDENTIALS,
+  storeConfig,
+  storeRequest,
+} from './r2-store-client.mjs';
 
 export const POINTER_SCHEMA = 'jovie.screenshot-pointer/v1';
 export const POINTER_SUFFIX = '.pointer.json';
-export const STORE_BUCKET = 'jovie-screenshots';
+export const STORE_BUCKET = DEFAULT_BUCKET;
 export const STORE_URL_PREFIX = `r2://${STORE_BUCKET}/`;
-// Public-read origin of the bucket (R2 custom domain). Content-addressed keys
-// are unguessable without the repo pointers. Override with
-// SCREENSHOT_STORE_PUBLIC_BASE (for example an r2.dev URL).
-export const DEFAULT_PUBLIC_BASE = 'https://screenshots.jov.ie';
-export const publicBase = (env = process.env) =>
-  (env.SCREENSHOT_STORE_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/+$/, '');
-
 export const BINARY_EXTENSIONS = Object.freeze([
   '.png',
   '.jpg',
@@ -76,13 +85,54 @@ export function isBinaryPath(path) {
   return BINARY_EXTENSIONS.includes(extname(path).toLowerCase());
 }
 
-/** True for a binary path that must live in the store, not in git. */
-export function isMovedBinary(path) {
+/**
+ * True for a binary path that must live in the store, not in git. `served` is
+ * the set from servedCatalogImages(): those stay in git.
+ */
+export function isMovedBinary(path, served = new Set()) {
   return (
     isBinaryPath(path) &&
     MOVED_BINARY_ROOTS.some(root => path.startsWith(root)) &&
-    !MOVED_BINARY_ALLOWED.includes(path)
+    !MOVED_BINARY_ALLOWED.includes(path) &&
+    !served.has(path)
   );
+}
+
+/**
+ * Catalog images the live site serves, repo-relative: the targets of symlinks
+ * under apps/web/public that point into the catalog, following dedupe symlinks
+ * inside the catalog to the regular file at the end of each chain. They must
+ * stay in git (never in the private store), with no pointer.
+ */
+export function servedCatalogImages(root) {
+  const served = new Set();
+  const hop = (from, link) =>
+    relative(root, resolve(root, dirname(from), link)).replaceAll('\\', '/');
+  const follow = start => {
+    let path = start;
+    while (path.startsWith(`${CATALOG_BINARY_DIR}/`) && isBinaryPath(path)) {
+      served.add(path);
+      let stat;
+      try {
+        stat = lstatSync(join(root, path));
+      } catch {
+        return;
+      }
+      if (!stat.isSymbolicLink()) return;
+      path = hop(path, readlinkSync(join(root, path)));
+    }
+  };
+  const walk = dir => {
+    if (!existsSync(join(root, dir))) return;
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(path);
+      else if (entry.isSymbolicLink())
+        follow(hop(path, readlinkSync(join(root, path))));
+    }
+  };
+  walk('apps/web/public');
+  return served;
 }
 
 export function objectKey(hash, extension) {
@@ -153,8 +203,6 @@ export function validatePointer(pointer, now = Date.now()) {
 }
 
 export const keyOf = pointer => pointer.url.slice(STORE_URL_PREFIX.length);
-export const publicUrlOf = (pointer, env = process.env) =>
-  `${publicBase(env)}/${keyOf(pointer)}`;
 
 /** Verifies bytes against a pointer's hash and size. */
 export function verifyBytes(pointer, bytes) {
@@ -207,11 +255,11 @@ async function pool(items, limit, work) {
   return results;
 }
 
-async function fetchBytes(url, fetchImpl, attempts = 3) {
+async function fetchBytes(config, key, fetchImpl, attempts = 3) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const response = await fetchImpl(url);
+      const response = await storeRequest(config, 'GET', key, { fetchImpl });
       if (response.status === 404) return { missing: true };
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return { bytes: Buffer.from(await response.arrayBuffer()) };
@@ -221,19 +269,23 @@ async function fetchBytes(url, fetchImpl, attempts = 3) {
         await new Promise(r => setTimeout(r, 250 * attempt));
     }
   }
-  throw new Error(`GET ${url} failed: ${lastError?.message ?? lastError}`);
+  throw new Error(`GET ${key} failed: ${lastError?.message ?? lastError}`);
 }
 
 /**
  * Makes every pointer's binary present on disk with verified bytes. Existing
- * files whose hash matches are left alone. Returns { downloaded, present }.
- * Throws one error listing every failure.
+ * files whose hash matches are left alone. Needs credentials for anything not
+ * already on disk: without them it throws, or with `optional` it skips cleanly
+ * and reports how many files are still absent. Returns
+ * { downloaded, present, skipped, total }. Throws one error listing every failure.
  */
 export async function hydrate({
   root,
   scope = 'all',
   fetchImpl = fetch,
   env = process.env,
+  config = storeConfig(env),
+  optional = false,
   log = (/** @type {string} */ _message) => {},
   concurrency = 8,
 }) {
@@ -241,6 +293,7 @@ export async function hydrate({
   const failures = [];
   let downloaded = 0;
   let present = 0;
+  let skipped = 0;
   await pool(pointers, concurrency, async ({ pointerPath, binaryPath }) => {
     const pointer = readPointer(root, pointerPath);
     const bad = validatePointer(pointer);
@@ -256,12 +309,15 @@ export async function hydrate({
       present += 1;
       return;
     }
-    const url = publicUrlOf(pointer, env);
+    if (!config) {
+      skipped += 1;
+      return;
+    }
     try {
-      const result = await fetchBytes(url, fetchImpl);
+      const result = await fetchBytes(config, keyOf(pointer), fetchImpl);
       if (result.missing) {
         failures.push(
-          `${binaryPath}: not in the store (${url}). The screenshot upload has not been done.`
+          `${binaryPath}: not in the store (${keyOf(pointer)}). The screenshot upload has not been done.`
         );
         return;
       }
@@ -282,22 +338,29 @@ export async function hydrate({
       failures.push(`${binaryPath}: ${error.message}`);
     }
   });
+  if (skipped && !optional) throw new Error(MISSING_CREDENTIALS);
   if (failures.length) {
     throw new Error(
       `Screenshot hydrate failed for ${failures.length} of ${pointers.length} images:\n${failures.sort().join('\n')}`
     );
   }
-  return { downloaded, present, total: pointers.length };
+  return { downloaded, present, skipped, total: pointers.length };
 }
 
-/** HEAD-checks that every pointer's object exists in the store with the right size. */
+/**
+ * HEAD-checks, with credentials, that every pointer's object exists in the
+ * store with the right size. Throws MISSING_CREDENTIALS when there are none, so
+ * an unverified upload can never read as verified.
+ */
 export async function verifyRemote({
   root,
   scope = 'all',
   fetchImpl = fetch,
   env = process.env,
+  config = storeConfig(env),
   concurrency = 8,
 }) {
+  if (!config) throw new Error(MISSING_CREDENTIALS);
   const pointers = listPointers(root, scope);
   const missing = [];
   const bad = [];
@@ -308,10 +371,11 @@ export async function verifyRemote({
       bad.push(`${pointerPath}: ${problems.join(', ')}`);
       return;
     }
-    const url = publicUrlOf(pointer, env);
     let response;
     try {
-      response = await fetchImpl(url, { method: 'HEAD' });
+      response = await storeRequest(config, 'HEAD', keyOf(pointer), {
+        fetchImpl,
+      });
     } catch (error) {
       missing.push(`${pointerPath}: unreachable (${error.message})`);
       return;
@@ -329,36 +393,22 @@ export async function verifyRemote({
   return { total: pointers.length, missing: missing.sort(), bad: bad.sort() };
 }
 
-export function uploadHint(base = publicBase()) {
+export function uploadHint() {
   return (
-    'Screenshot upload not done: run the "Screenshots to R2 upload" workflow ' +
-    '(.github/workflows/screenshots-r2-upload.yml) on this branch, and make sure ' +
-    `the ${STORE_BUCKET} bucket is public at ${base}. Merging before the upload ` +
-    'would break live product screenshots.'
+    'Screenshot upload not verified: these pointers have no matching object in ' +
+    `the private ${STORE_BUCKET} bucket. Someone with write credentials must run ` +
+    '"node scripts/screenshot-store.mjs upload --from <ref>" (see docs/ci/repository-health.md). ' +
+    'Merging before the upload would break screenshot consumers.'
   );
 }
 
-function wrangler(args, env = process.env) {
-  const result = spawnSync(env.WRANGLER_BIN || 'wrangler', args, {
-    encoding: 'utf8',
-    env,
+/** Uploads verified bytes under the pointer's content-addressed key. Idempotent. */
+export async function uploadObject(config, pointer, bytes, fetchImpl = fetch) {
+  const response = await storeRequest(config, 'PUT', keyOf(pointer), {
+    body: bytes,
+    contentType: pointer.contentType,
+    fetchImpl,
   });
-  if (result.status !== 0) {
-    throw new Error(
-      `wrangler ${args.slice(0, 3).join(' ')} failed: ${(result.stderr || result.stdout || String(result.error)).trim()}`
-    );
-  }
-}
-
-/** Uploads a verified file under its content-addressed key. Idempotent. */
-export function uploadObject(pointer, file, run = wrangler) {
-  run([
-    'r2',
-    'object',
-    'put',
-    `${STORE_BUCKET}/${keyOf(pointer)}`,
-    `--file=${file}`,
-    `--content-type=${pointer.contentType}`,
-    '--remote',
-  ]);
+  if (!response.ok)
+    throw new Error(`PUT ${keyOf(pointer)}: HTTP ${response.status}`);
 }

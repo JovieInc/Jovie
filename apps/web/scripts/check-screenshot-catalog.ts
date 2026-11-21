@@ -1,6 +1,13 @@
 #!/usr/bin/env tsx
 
-import { lstat, readdir, readFile, realpath, stat } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  readdir,
+  readFile,
+  realpath,
+  stat,
+} from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
@@ -46,6 +53,12 @@ export interface ScreenshotCatalogBudgets {
 export interface ScreenshotCatalogPaths {
   readonly catalogDirectory: string;
   readonly manifestPath: string;
+  /**
+   * Directory of `<image>.pointer.json` files for images kept in the private
+   * R2 store. A manifest image with a pointer may be absent from disk (builds
+   * and tests never need R2); when present it is checked like any other.
+   */
+  readonly pointerDirectory?: string;
   readonly publicExportDirectory: string;
 }
 
@@ -252,10 +265,21 @@ export async function checkScreenshotCatalog({
 
   compareRegistryAndManifest(scenarios, entries, violations);
 
-  const catalogFiles = new Set([
-    'manifest.json',
-    ...entries.map(entry => entry.imagePath),
-  ]);
+  const offloaded = new Set(
+    paths.pointerDirectory
+      ? (await readdir(paths.pointerDirectory).catch(() => []))
+          .filter(name => name.endsWith('.pointer.json'))
+          .map(name => name.slice(0, -'.pointer.json'.length))
+      : []
+  );
+  const catalogFiles = new Set<string>(['manifest.json']);
+  for (const { imagePath } of entries) {
+    const onDisk = await access(join(paths.catalogDirectory, imagePath)).then(
+      () => true,
+      () => false
+    );
+    if (onDisk || !offloaded.has(imagePath)) catalogFiles.add(imagePath);
+  }
   const publicExportFiles = new Set(
     entries.flatMap(entry =>
       entry.publicExportPath ? [entry.publicExportPath] : []
@@ -349,6 +373,7 @@ async function main() {
     paths: {
       catalogDirectory: join(webRoot, 'screenshot-catalog/current'),
       manifestPath: join(webRoot, 'screenshot-catalog/current/manifest.json'),
+      pointerDirectory: join(webRoot, 'screenshot-catalog/pointers'),
       publicExportDirectory: join(webRoot, 'public/product-screenshots'),
     },
   });

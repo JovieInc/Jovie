@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -25,8 +31,17 @@ test('refuses screenshot binaries under the R2-backed paths and points at the po
       'apps/web/screenshot-catalog/pointers/new-desktop.png.pointer.json',
       'docs/screenshots/jov-9/after.png.pointer.json',
       'docs/screenshots/gem-symphony-hud-430x90.png',
+      // The live site serves this one (symlinked from apps/web/public).
+      'apps/web/screenshot-catalog/current/served-desktop.png',
     ];
     for (const path of [...banned, ...allowed]) fixtureFile(root, path);
+    mkdirSync(join(root, 'apps/web/public/product-screenshots'), {
+      recursive: true,
+    });
+    symlinkSync(
+      '../../screenshot-catalog/current/served-desktop.png',
+      join(root, 'apps/web/public/product-screenshots/served.png')
+    );
     const { errors } = evaluateRepoHygiene({
       addedPaths: [...banned, ...allowed],
       root,
@@ -35,7 +50,8 @@ test('refuses screenshot binaries under the R2-backed paths and points at the po
       assert.equal(
         errors.filter(
           error =>
-            error.startsWith(`${path}:`) && /live in R2, not git/.test(error)
+            error.startsWith(`${path}:`) &&
+            /live in the private R2 store, not git/.test(error)
         ).length,
         1,
         path

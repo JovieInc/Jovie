@@ -11,7 +11,7 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
-import { binaryAdditionError, isMovedBinary } from './lib/moved-binary.mjs';
+import { screenshotBinaryRule } from './lib/moved-binary.mjs';
 import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
@@ -82,6 +82,7 @@ const BINARY_ALLOWLIST = [
   /^apps\/should-i-make\/public\//,
   /^apps\/web\/assets\//,
   /^apps\/web\/public\//,
+  /^apps\/web\/screenshot-catalog\/current\//,
   /^apps\/web\/tests\/(?:[^/]+\/)*__snapshots__\//,
   /^docs\/(?:pen-stills|screenshots)\//,
 ];
@@ -143,7 +144,7 @@ const TEMP_FILE_PATTERN =
 const normalizePath = path => path.replaceAll('\\', '/').replace(/^\.\//, '');
 const isBinary = path => BINARY_EXTENSIONS.has(extname(path).toLowerCase());
 const isAllowedBinary = path =>
-  BINARY_ALLOWLIST.some(p => p.test(path)) && !isMovedBinary(path);
+  BINARY_ALLOWLIST.some(pattern => pattern.test(path));
 const formatBytes = bytes => `${(bytes / MiB).toFixed(2)} MiB`;
 const dateValue = (value, end = false) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
@@ -618,6 +619,7 @@ export function evaluateRepoHygiene({
   rootAllowlist = REPO_ROOT_ALLOWLIST,
   trackedPaths = [],
 }) {
+  const rule = screenshotBinaryRule(root);
   const errors = [
     ...validateRepoHealthBaseline(baseline),
     ...validateRepoHealthRollout(rollout),
@@ -676,8 +678,8 @@ export function evaluateRepoHygiene({
       errors.push(`${path}: binary files are not allowed at repository root`);
     if (TEMP_FILE_PATTERN.test(path))
       errors.push(`${path}: temporary/backup files are not tracked`);
-    if (isBinary(path) && !isAllowedBinary(path))
-      errors.push(binaryAdditionError(path, HYGIENE_POLICY_DOC));
+    if (isBinary(path) && (!isAllowedBinary(path) || rule.isMoved(path)))
+      errors.push(rule.error(path, HYGIENE_POLICY_DOC, isAllowedBinary(path)));
   }
 
   let changedBytes = 0;

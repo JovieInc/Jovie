@@ -999,23 +999,17 @@ jobs:
       - name: Verify screenshot catalog integrity and budgets
         run: pnpm exec tsx scripts/check-screenshot-catalog.ts
 
-      # Catalog PNGs are gitignored (they live in R2); git tracks a pointer per
-      # image. Unchanged bytes keep their pointer, so only real changes diff.
-      - name: Refresh screenshot pointers
-        working-directory: .
-        run: node scripts/screenshot-store.mjs pointers
-
       - name: Check for changes
         id: diff
         working-directory: .
         run: |
-          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/ apps/web/screenshot-catalog/)" ]; then
+          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/)" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No screenshot changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Screenshots changed:"
-            git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/
+            git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           fi
 
       - name: Stage generated screenshot catalog for transfer
@@ -1068,18 +1062,6 @@ jobs:
         working-directory: apps/web
         run: pnpm exec tsx scripts/check-screenshot-catalog.ts
 
-      # The PNGs from the artifact are gitignored; only their pointers are
-      # committed. Objects must be in R2 before the pointer PR exists, because
-      # PR Size Guard fails any pointer whose object is missing.
-      - name: Upload screenshot objects to R2
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_SCREENSHOTS_R2_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-        run: |
-          npm install --global wrangler@4.45.0
-          node scripts/screenshot-store.mjs upload --scope catalog
-          node scripts/screenshot-store.mjs verify --remote --scope catalog
-
       - name: Generate Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -1119,6 +1101,9 @@ jobs:
 
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
+          # Only images the live site serves are committed; the rest of the catalog is
+          # gitignored (private R2 store). `served` lists the committed ones, new included.
+          node scripts/screenshot-store.mjs served | xargs -r git add -f
           git commit -m "chore: update product screenshots [auto]
 
           Triggered by ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID})"

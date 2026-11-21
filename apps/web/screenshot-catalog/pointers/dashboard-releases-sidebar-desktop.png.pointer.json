@@ -1,9 +1,0 @@
-{
-  "schema": "jovie.screenshot-pointer/v1",
-  "sha256": "061ccf05401e17a6d794b32bb637029da8d0297a4df74e50bcfd35a33b0d6a3e",
-  "bytes": 246493,
-  "contentType": "image/png",
-  "url": "r2://jovie-screenshots/sha256/06/061ccf05401e17a6d794b32bb637029da8d0297a4df74e50bcfd35a33b0d6a3e.png",
-  "viewport": "2880x1800",
-  "capturedAt": "2026-11-20T19:54:49.740Z"
-}

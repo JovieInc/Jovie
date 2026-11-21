@@ -306,8 +306,11 @@ scripts/copy-inventory/inventory.gen.json
 # Focused native titlebar regression suite.
 !apps/desktop/scripts/desktop-titlebar-contract.cases.mjs
 
-# Screenshot binaries live in R2 (jovie-screenshots); git tracks only *.pointer.json.
-# Fetch them with: node scripts/screenshot-store.mjs hydrate
+# Screenshot binaries live in the private R2 bucket (jovie-screenshots); git tracks only
+# *.pointer.json. Catalog images the live site serves (apps/web/public symlink targets)
+# stay tracked: already-tracked files are unaffected by these patterns, and
+# `node scripts/screenshot-store.mjs served` lists them for `git add -f`.
+# Optional local fetch (needs R2 read credentials): node scripts/screenshot-store.mjs hydrate --optional
 /apps/web/screenshot-catalog/current/*.png
 /docs/screenshots/**/*.png
 /docs/screenshots/**/*.jpg

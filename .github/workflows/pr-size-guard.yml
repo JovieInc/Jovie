@@ -425,33 +425,18 @@ jobs:
           fi
 
       # Screenshot binaries are not in git. A PR that adds or changes a pointer
-      # must not go green (or merge) until every object is in the public R2
-      # store, otherwise live product screenshots would 404. Fails with an
-      # "upload not done" message until the upload workflow has run. The script
-      # has no dependencies, so it needs no pnpm install.
-      - name: Detect screenshot pointer changes
-        id: screenshot-pointers
+      # must not go green (or merge) until every object is in the PRIVATE R2
+      # store. The check reads the store with a READ-ONLY R2 key; with no key it
+      # fails ("upload not verified"), it never passes. No install needed.
+      - name: Require screenshot objects in R2
         env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_SCREENSHOTS_READ_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SCREENSHOTS_READ_SECRET_ACCESS_KEY }}
           PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
         run: |
-          set -euo pipefail
-          if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
-            apps/web/screenshot-catalog/pointers/ \
-            'docs/screenshots/**/*.pointer.json' \
-            scripts/lib/screenshot-store.mjs \
-            scripts/screenshot-store.mjs; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            status=$?
-            [[ "$status" -eq 1 ]] || exit "$status"
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Require screenshot objects in R2
-        if: steps.screenshot-pointers.outputs.changed == 'true'
-        run: |
           node --test scripts/lib/__tests__/screenshot-store.test.mjs scripts/lib/__tests__/moved-binary.test.mjs
-          node scripts/screenshot-store.mjs verify --remote
+          node scripts/screenshot-store.mjs verify --remote --base "$PR_DIFF_BASE"
 
       - name: Set up Node and pnpm for screenshot integrity
         if: steps.screenshot-integrity.outputs.required == 'true'
