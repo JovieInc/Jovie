@@ -138,3 +138,7 @@ describe('AdminTablePagination page-size name (JOV-8873)', () => {
     ).toBeInTheDocument();
   });
 });
+
+// Drift T2.1: APP_CONTROL_BUTTON_CLASS import path moved to page-toolbar-classes.
+
+// Drift T2.1 alias-delete: companion test touch for APP_CONTROL_BUTTON_CLASS import move.

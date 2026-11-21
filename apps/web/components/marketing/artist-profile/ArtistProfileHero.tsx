@@ -53,7 +53,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           signUp: true,
         }}
         secondaryCta={{
-          label: 'See How It Adapts',
+          label: hero.secondaryCtaLabel,
           href: '#adaptive',
           eventName: 'artist_profiles_adaptive_cta_clicked',
           eventProperties: { source: 'artist-profiles-hero' },
