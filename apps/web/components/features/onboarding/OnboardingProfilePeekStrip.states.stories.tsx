@@ -33,6 +33,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Permission denied: no confirmed artist yet, so the peek strip stays blank. */
+export const PermissionDeniedHidden: Story = {
+  args: { state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE },
+};
+
 /** Long content: a long name and handle truncate inside the peek strip. */
 export const LongContentIdentity: Story = {
   args: { state: LONG_STATE },
