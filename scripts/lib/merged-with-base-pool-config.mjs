@@ -57,7 +57,7 @@ export const SCREEN_CERTIFICATION_TEST_MARKER =
  * split. Merge-group structural still runs full `invariants:check`.
  */
 export const SCREEN_CERTIFICATION_TEST_PATHS =
-  /^(?:scripts\/invariants\/(?:screen-certification|screen-registry|screen-decision-routing|screen-proof-resolver|browser-owned-input|product-reference-coherence|registry\.mjs$)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
+  /^(?:scripts\/invariants\/(?:screen-certification|screen-registry|screen-decision-routing|screen-proof-resolver|screen-proof-emit|browser-owned-input|product-reference-coherence|registry\.mjs$)|apps\/web\/tests\/product-screenshots\/|\.github\/workflows\/screenshots\.yml$|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
 
 /** @type {readonly {marker: string, paths: RegExp, reason: string}[]} */
 const MERGED_WITH_BASE_PATH_GATES = Object.freeze([

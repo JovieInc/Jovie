@@ -52,13 +52,20 @@ describe('merged-with-base path-gates', () => {
       'scripts/invariants/registry.mjs',
       'scripts/invariants/screen-certification.mjs',
       'scripts/invariants/screen-registry.mjs',
+      'scripts/invariants/screen-proof-emit.mjs',
       'scripts/invariants/browser-owned-input.mjs',
       'scripts/invariants/product-reference-coherence.mjs',
+      '.github/workflows/screenshots.yml',
+      'apps/web/tests/product-screenshots/public-screens-proof.spec.ts',
     ]) {
       expect(SCREEN_CERTIFICATION_TEST_PATHS.test(related), related).toBe(true);
       const r = filterMergedWithBasePoolEntries(entries, [related]);
       expect(r.kept.some(isScreen), related).toBe(true);
     }
+    // Shared spawn helper — not screen-cert-specific; merge-group still full.
+    expect(
+      SCREEN_CERTIFICATION_TEST_PATHS.test('scripts/lib/child-process.mjs')
+    ).toBe(false);
     expect(
       DESIGN_CI_JUDGE_VITEST_PATHS.test('apps/web/app/(home)/page.tsx')
     ).toBe(false);
