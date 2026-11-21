@@ -2,12 +2,17 @@
 /**
  * Live agent-path certification for the Jovie agent MCP.
  *
- *   pnpm --filter @jovie/web agent-path:cert -- --base https://jov.ie [--query "Tim White"] [--release-url <url>] [--out receipt.json]
+ *   pnpm --filter @jovie/web agent-path:cert -- --base https://jov.ie \
+ *     [--query <exact-spotify-artist-url>] [--release-url <url>] [--out receipt.json]
  *
- * This RPC probe does not yet exercise claim persistence or fixture cleanup.
- * Exit 1 on any FAIL or incomplete check, 75 on RATE_LIMITED, 2 on a fatal error.
+ * Defaults use an exact artist URL plus matching release_metadata so
+ * prepare_launch can reach launch_draft_ready without ambiguous name search.
+ * Claim persistence + fixture cleanup (JOV-9760) require CRON_SECRET,
+ * SYNTHETIC_PASSAGE_KEY, and DATABASE_URL; without them those checks SKIP.
+ * Exit 1 on any FAIL or incomplete check, 75 on RATE_LIMITED, 2 on fatal.
  */
 import { writeFile } from 'node:fs/promises';
+import { CERT_DEFAULT_ARTIST_URL } from '@/lib/agent-distribution/cert-fixtures';
 import { runCert } from '@/lib/agent-distribution/cert-run';
 
 function arg(name: string, fallback: string): string {
@@ -15,14 +20,18 @@ function arg(name: string, fallback: string): string {
   return index > 0 ? (process.argv[index + 1] ?? fallback) : fallback;
 }
 
+function optionalArg(name: string): string | undefined {
+  const index = process.argv.indexOf(`--${name}`);
+  const value = index > 0 ? process.argv[index + 1] : undefined;
+  return value && value.length > 0 ? value : undefined;
+}
+
 async function main() {
   const { receipt, exitCode } = await runCert({
     base: arg('base', 'https://jov.ie'),
-    query: arg('query', 'Tim White'),
-    releaseUrl: arg(
-      'release-url',
-      'https://open.spotify.com/track/25dMCbj0duxuvx5T8ClCp3'
-    ),
+    query: arg('query', CERT_DEFAULT_ARTIST_URL),
+    // Prefer metadata-only prepare_launch unless the caller forces a URL.
+    releaseUrl: optionalArg('release-url'),
   });
   const out = arg('out', '');
   if (out) await writeFile(out, `${JSON.stringify(receipt, null, 2)}\n`);
