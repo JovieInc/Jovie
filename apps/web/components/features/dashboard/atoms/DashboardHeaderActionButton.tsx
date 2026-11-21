@@ -6,7 +6,7 @@ import {
   ACTION_BUTTON_PRESET,
 } from '@jovie/ui/atoms/button-contract';
 import type { ReactNode } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 // Workspace header actions consume the shared ActionButton geometry preset

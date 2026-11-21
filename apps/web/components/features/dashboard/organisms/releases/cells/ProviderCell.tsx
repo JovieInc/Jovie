@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
