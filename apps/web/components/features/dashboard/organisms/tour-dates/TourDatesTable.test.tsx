@@ -173,4 +173,12 @@ describe('TourDatesTable', () => {
     await user.click(screen.getByRole('link', { name: /Buy Tickets/ }));
     expect(onEdit).not.toHaveBeenCalled();
   });
+
+  it('colors the Admin Import source with the warning text token', () => {
+    renderTable([{ ...baseTourDate, provider: 'admin_import' }]);
+
+    const source = screen.getByText('Admin Import');
+    expect(source).toHaveClass('text-warning-text');
+    expect(source.className).not.toMatch(/amber-\d/);
+  });
 });

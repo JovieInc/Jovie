@@ -242,17 +242,17 @@ process.exit(17);
     );
   });
 
-  it('stays quiet at or below the 90% plan line', () => {
-    expect(trackedBytesBudgetPlanWarning(90, 100)).toBeNull();
-    expect(trackedBytesBudgetWarnings(90, 100)).toEqual([]);
+  it('stays quiet at or below the 80% plan line', () => {
+    expect(trackedBytesBudgetPlanWarning(80, 100)).toBeNull();
+    expect(trackedBytesBudgetWarnings(80, 100)).toEqual([]);
   });
 
-  it('plans the next prune in the 90-95% band without failing', () => {
-    expect(trackedBytesBudgetWarning(93, 100)).toBeNull();
-    const plan = trackedBytesBudgetPlanWarning(93, 100);
-    expect(plan).toMatch(/93\.00% .*headroom/);
-    expect(plan).toMatch(/90% plan line/);
-    expect(trackedBytesBudgetWarnings(93, 100)).toEqual([plan]);
+  it('plans the next prune in the 80-95% band without failing', () => {
+    expect(trackedBytesBudgetWarning(81, 100)).toBeNull();
+    const plan = trackedBytesBudgetPlanWarning(81, 100);
+    expect(plan).toMatch(/81\.00% .*headroom/);
+    expect(plan).toMatch(/80% plan line \(under 20% headroom\)/);
+    expect(trackedBytesBudgetWarnings(81, 100)).toEqual([plan]);
   });
 
   it('keeps the shrink-now warning first and silent plan level above 95%', () => {
@@ -279,7 +279,7 @@ process.exit(17);
     });
     expect(result.bytes).toBe(bytes);
     expect(logs[0]).toMatch(
-      /^::warning::Projected combined tree: .*90% plan line/
+      /^::warning::Projected combined tree: .*80% plan line/
     );
     expect(logs.at(-1)).toMatch(/^Projected combined tree: PASS/);
   });

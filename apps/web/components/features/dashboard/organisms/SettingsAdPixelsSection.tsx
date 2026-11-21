@@ -178,8 +178,8 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
     HealthStatus,
     { dot: string; color: string; label: string }
   > = {
-    healthy: { dot: '\u25CF', color: 'text-success', label: 'Healthy' },
-    degraded: { dot: '\u25CF', color: 'text-warning', label: 'Degraded' },
+    healthy: { dot: '\u25CF', color: 'text-success-text', label: 'Healthy' },
+    degraded: { dot: '\u25CF', color: 'text-warning-text', label: 'Degraded' },
     unhealthy: {
       dot: '\u25CF',
       color: 'text-error',
@@ -255,7 +255,7 @@ function TestEventButton({
         {status === 'loading' ? 'Testing...' : 'Test'}
       </Button>
       {status === 'success' && (
-        <span role='status' className='text-2xs font-caption text-success'>
+        <span role='status' className='text-2xs font-caption text-success-text'>
           Event received
         </span>
       )}

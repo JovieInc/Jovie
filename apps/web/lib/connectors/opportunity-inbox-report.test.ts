@@ -55,6 +55,8 @@ describe('parseReportMeasurement', () => {
       deltaPercent: 5.4,
       deltaDisplay: '+5.4%',
       direction: 'up',
+      polarity: 'higher-is-better',
+      sentiment: 'positive',
       experimentId: 'exp-42',
     });
     expect(report?.series).toEqual([120, 132, 128, 150, 171]);
@@ -81,6 +83,8 @@ describe('parseReportMeasurement', () => {
       deltaPercent: 0,
       deltaDisplay: '0%',
       direction: 'flat',
+      polarity: 'higher-is-better',
+      sentiment: 'neutral',
     });
   });
 
@@ -94,10 +98,26 @@ describe('parseReportMeasurement', () => {
       metricLabel: 'streams',
       deltaDisplay: '−3.2%',
       direction: 'down',
+      polarity: 'higher-is-better',
+      sentiment: 'negative',
       nextStep: null,
       experimentId: null,
     });
     expect(report?.series).toEqual([]);
+  });
+
+  it('reads a falling lower-is-better metric as good news', () => {
+    const report = parseReportMeasurement({
+      metricLabel: 'skip rate',
+      deltaPercent: -4,
+      polarity: 'lower-is-better',
+    });
+
+    expect(report).toMatchObject({
+      direction: 'down',
+      polarity: 'lower-is-better',
+      sentiment: 'positive',
+    });
   });
 
   it('rejects payloads without the minimum viable shape', () => {

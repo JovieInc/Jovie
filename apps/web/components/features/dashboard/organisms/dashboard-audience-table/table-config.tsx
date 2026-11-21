@@ -61,11 +61,11 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
   return [
     memberColumnHelper.display({
       id: 'select',
-      header: () => null,
+      header: 'Select',
       cell: SelectCell,
       size: 40,
       enableSorting: false,
-      meta: { minWidth: AUDIENCE_FIT.select },
+      meta: { minWidth: AUDIENCE_FIT.select, headerVisibility: 'sr-only' },
     }),
     memberColumnHelper.accessor('displayName', {
       id: 'fan',

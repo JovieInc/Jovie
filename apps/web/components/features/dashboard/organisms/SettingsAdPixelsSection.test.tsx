@@ -76,8 +76,8 @@ describe('SettingsAdPixelsSection', () => {
 
   it('colours platform health with status tokens', async () => {
     const { container } = render(wrap(<SettingsAdPixelsSection />));
-    expect(await screen.findByText('Healthy')).toHaveClass('text-success');
-    expect(screen.getByText('Degraded')).toHaveClass('text-warning');
+    expect(await screen.findByText('Healthy')).toHaveClass('text-success-text');
+    expect(screen.getByText('Degraded')).toHaveClass('text-warning-text');
     await expectNoA11yViolations(container);
   });
 

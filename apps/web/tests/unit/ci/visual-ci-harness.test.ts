@@ -208,7 +208,10 @@ describe('visual CI harness', () => {
       'utf8'
     );
     const start = source.indexOf('async function openHomepageForScreenshot(');
-    const end = source.indexOf("test.describe('auth pages dark-mode", start);
+    const end = source.indexOf(
+      "test.describe('pricing visual regression'",
+      start
+    );
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     const legacy = source.slice(start, end);
@@ -269,7 +272,8 @@ describe('visual CI harness', () => {
     expect(
       pricing.match(/await waitForVisualReadiness\(page, 'pricing'\)/g)
     ).toHaveLength(2);
-    expect(pricing.match(/toHaveScreenshot\('pricing-/g)).toHaveLength(2);
+    // Theme switching ships off, so light and dark share one baseline.
+    expect(pricing.match(/toHaveScreenshot\('pricing\.png'/g)).toHaveLength(2);
   });
 
   it('does not gate any homepage viewport navigation on whole-page network idle', () => {

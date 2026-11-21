@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { EntityChip } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
@@ -270,5 +271,55 @@ describe('EntityChipPopover', () => {
       screen.getByRole('heading', { name: 'Unavailable reference' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
+  });
+});
+
+describe('EntityChipPopover states', () => {
+  it('renders the trigger as a plain button and stays axe-clean', async () => {
+    const { container } = renderPopover();
+    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+    expect(trigger).toHaveAttribute('data-slot', 'plain-button');
+    expect(trigger).toHaveAttribute('type', 'button');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps an unavailable reference axe-clean and discloses it on click', async () => {
+    const { container } = fastRender(
+      <EntityChipPopover kind='release' id='rel_missing' label='Gone'>
+        <EntityChip
+          data={{ kind: 'release', id: 'rel_missing', label: 'Gone' }}
+          variant='transcript'
+        />
+      </EntityChipPopover>
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByTestId('entity-chip-popover-trigger'));
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a very long label inside the trigger name', async () => {
+    const label = 'A very long release title '.repeat(12).trim();
+    const { container } = fastRender(
+      <EntityChipPopover
+        kind='release'
+        id='rel_1'
+        label={label}
+        entity={{ kind: 'release', id: 'rel_1', label }}
+      >
+        <EntityChip
+          data={{ kind: 'release', id: 'rel_1', label }}
+          variant='transcript'
+        />
+      </EntityChipPopover>
+    );
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveTextContent(
+      label
+    );
+    await expectNoA11yViolations(container);
   });
 });

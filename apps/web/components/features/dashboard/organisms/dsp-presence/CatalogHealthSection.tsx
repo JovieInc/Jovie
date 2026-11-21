@@ -83,8 +83,10 @@ function CatalogStatusIcon({
   if (isScanning)
     return <Loader2 className='h-3.5 w-3.5 animate-spin text-primary' />;
   if (scanFailed) return <XCircle className='h-3.5 w-3.5 text-destructive' />;
-  if (allClear) return <CheckCircle2 className='h-3.5 w-3.5 text-success' />;
-  if (hasResults) return <AlertTriangle className='h-3.5 w-3.5 text-warning' />;
+  if (allClear)
+    return <CheckCircle2 className='h-3.5 w-3.5 text-success-text' />;
+  if (hasResults)
+    return <AlertTriangle className='h-3.5 w-3.5 text-warning-text' />;
   return <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />;
 }
 
@@ -481,7 +483,7 @@ function CatalogHealthSectionContent({
             scan?.status === 'completed' &&
             confirmedNotMineCount > 0 &&
             unresolvedNotInCatalog.length === 0 && (
-              <div className='mt-3 rounded-md bg-warning/10 p-3'>
+              <div className='mt-3 rounded-md bg-warning-subtle p-3'>
                 <p className='text-xs font-medium text-warning-text'>
                   You flagged {confirmedNotMineCount} track
                   {confirmedNotMineCount === 1 ? '' : 's'} as not yours.

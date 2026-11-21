@@ -9,6 +9,7 @@ import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
@@ -147,6 +148,58 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       screen.queryByRole('columnheader', { name: /\bfans?\b/i })
     ).toBeNull();
+  });
+
+  it('has no accessibility violations in the empty and populated views', async () => {
+    const props = {
+      mode: 'members',
+      view: 'all',
+      sort: 'lastSeen',
+      direction: 'desc',
+      onSortChange: () => undefined,
+      onViewChange: () => undefined,
+      onFiltersChange: () => undefined,
+      filters: DEFAULT_AUDIENCE_FILTERS,
+      subscriberCount: 0,
+    } as const;
+    const empty = renderWithProviders(
+      <DashboardAudienceTableUnified {...props} rows={[]} total={0} />
+    );
+    await expectNoA11yViolations(empty.container);
+    empty.unmount();
+    const populated = renderWithProviders(
+      <DashboardAudienceTableUnified
+        {...props}
+        rows={[
+          {
+            id: 'm-a11y',
+            type: 'email',
+            displayName: 'ليلى الحسن',
+            locationLabel: '',
+            geoCity: null,
+            geoCountry: null,
+            visits: 1,
+            engagementScore: 50,
+            intentLevel: 'medium',
+            latestActions: [],
+            referrerHistory: [],
+            utmParams: {},
+            email: 'layla@example.com',
+            emailVisibleToArtist: true,
+            phone: null,
+            spotifyConnected: false,
+            purchaseCount: 0,
+            tipAmountTotalCents: 0,
+            tipCount: 0,
+            tags: [],
+            deviceType: null,
+            lastSeenAt: null,
+          },
+        ]}
+        total={1}
+      />
+    );
+    await expectNoA11yViolations(populated.container);
   });
 
   it('renders members on the 32px dense people row with a face', () => {
