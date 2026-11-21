@@ -17,6 +17,9 @@ const SETUP_MERGED_BROWSERS = 'Setup merged source browsers';
 const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
 const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
+const TWIN_TSC_HOUR = 'Resolve parity tsc cache hour';
+const TWIN_TSC_RESTORE =
+  'Restore web tsc incremental state for typecheck parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
@@ -215,6 +218,8 @@ export function assertOriginalJobsRetained(current, baseline) {
     MQ_PARITY_TOOLS,
     MQ_PARITY_SCOPE,
     TYPECHECK_TWIN,
+    TWIN_TSC_HOUR,
+    TWIN_TSC_RESTORE,
     UNIT_FLAKY_UPLOAD,
   ]);
   const strip = job => ({
@@ -247,6 +252,8 @@ export function assertOriginalJobsRetained(current, baseline) {
             (name === MQ_PARITY_TOOLS ||
               name === MQ_PARITY_SCOPE ||
               name === TYPECHECK_TWIN ||
+              name === TWIN_TSC_HOUR ||
+              name === TWIN_TSC_RESTORE ||
               name === UNIT_FLAKY_UPLOAD))) &&
         !kept.length &&
         added.length === 1;
@@ -272,6 +279,24 @@ export function assertOriginalJobsRetained(current, baseline) {
     /steps\.mq-parity\.outputs\.typecheck == 'true'/
   );
   assert.match(String(twin?.if), /matrix\.shard == '2\/4'/);
+  // Warm start for the twin's overlapped tsc programs: read-only restore of
+  // the main-scoped buildinfo, gated exactly like the twin, placed before it.
+  const restore = unitSteps.find(step => step.name === TWIN_TSC_RESTORE);
+  if (restore) {
+    const hour = unitSteps.find(step => step.name === TWIN_TSC_HOUR);
+    assert.equal(hour?.id, 'parity-tsc-cache-hour');
+    assert.equal(hour?.if, twin?.if);
+    assert.equal(restore.if, twin?.if);
+    assert.match(String(restore.uses), /^actions\/cache\/restore@[a-f0-9]{40}/);
+    assert.equal(restore.with?.path, 'apps/web/.cache/tsbuildinfo*');
+    assert.match(String(restore.with?.key), /^jovie-web-tsbuildinfo-v2-/);
+    assert.equal(restore['continue-on-error'], undefined);
+    assert.ok(
+      unitSteps.indexOf(hour) < unitSteps.indexOf(restore) &&
+        unitSteps.indexOf(restore) < unitSteps.indexOf(twin),
+      'parity tsc restore must run before the typecheck twin'
+    );
+  }
   // Observability-only artifact upload (JOV-12621): never blocks, never
   // uploads more than the retry sidecar, never fails on a missing file.
   const flaky = unitSteps.find(step => step.name === UNIT_FLAKY_UPLOAD);
