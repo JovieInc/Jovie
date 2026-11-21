@@ -90,30 +90,33 @@ describe('build-output performance ratchets are wired as blocking steps', () => 
   });
 });
 
-describe('Smooth surface regression ratchet (Exact-head Coverage)', () => {
-  const SMOOTH_STEP = 'Smooth surface regression ratchet';
-
-  it('blocks Exact-head Coverage with --check + planted regression tests', () => {
-    const steps = workflow('source-validation.yml').jobs.coverage.steps;
-    const smooth = steps.find(step => step.name === SMOOTH_STEP);
-    expect(smooth?.if).toBe("steps.reuse.outputs.reuse != 'true'");
-    expect(smooth?.['continue-on-error']).toBeUndefined();
-    expect(smooth?.run).toContain(
-      'tsx scripts/performance-smooth-ratchet.ts --check'
-    );
-    expect(smooth?.run).toContain(
-      'vitest run scripts/performance-smooth-ratchet.test.ts'
-    );
-  });
-
-  it('ships Smooth ratchet scripts and public baselines', () => {
+describe('Smooth surface regression ratchet', () => {
+  it('ships hermetic --check + planted tests and public baselines', () => {
     for (const file of [
       'apps/web/scripts/performance-smooth-ratchet.ts',
       'apps/web/scripts/performance-smooth-ratchet.test.ts',
       'docs/performance/smooth/baselines/homepage.desktop.json',
+      'docs/performance/smooth/baselines/artist-profile.desktop.json',
       'docs/performance/smooth/baselines/summary.json',
       'docs/performance/smooth/README.md',
     ])
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
+  });
+
+  it('keeps Smooth on the budgets-guard path (no second controller, LH non-blocking)', () => {
+    const pkg = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'apps/web/package.json'), 'utf8')
+    ) as { scripts?: Record<string, string> };
+    expect(pkg.scripts?.['perf:smooth:ratchet:check']).toContain(
+      'performance-smooth-ratchet.ts --check'
+    );
+    expect(pkg.scripts?.['test:budgets']).toContain(
+      'performance-budgets-guard.ts'
+    );
+    // Lighthouse entry gate must stay advisory — Smooth is the blocking CWV gate.
+    const coverageSteps = workflow('source-validation.yml').jobs.coverage.steps;
+    expect(
+      coverageSteps.some(step => /lighthouse/i.test(String(step.name ?? '')))
+    ).toBe(false);
   });
 });

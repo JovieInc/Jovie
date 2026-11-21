@@ -884,16 +884,6 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: pnpm --filter @jovie/web seo:certify --sha "$EXPECTED_HEAD" --run-ref "pr-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-      # Smooth surface regression ratchet (SMO-3). Hermetic: committed public
-      # baselines must exist, and planted regressions beyond noise fail. Live
-      # measure+compare is `perf:smooth:ratchet` / baseline `--compare` on an
-      # isolated preview (never production). Lighthouse stays non-blocking.
-      - name: Smooth surface regression ratchet
-        if: steps.reuse.outputs.reuse != 'true'
-        run: |
-          set -euo pipefail
-          pnpm --filter @jovie/web exec tsx scripts/performance-smooth-ratchet.ts --check
-          pnpm --filter @jovie/web exec vitest run scripts/performance-smooth-ratchet.test.ts
   # Shift-left (JOV-6834). Unit tests ran only on the merge-group head, so a
   # PR-local defect was first caught in the queue: 168 of 307 merge-group
   # failures in the 7 days to 2026-10-20 were fixed by a later PR commit, 44

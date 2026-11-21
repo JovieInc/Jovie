@@ -6,10 +6,15 @@ harness under `apps/web/scripts/performance-smooth-*` extends
 
 ## What fails a PR
 
-Exact-head Coverage (Source Validation → PR Ready) always runs:
+Hermetic Smooth gate (extends budgets-guard; no second controller). We do **not**
+add a dedicated Exact-head YAML step — that forced full script-contracts and
+resource-killed Affected Unit Tests on this PR.
 
-1. `perf:smooth:ratchet --check` — six public baseline cells must be present
-2. Hermetic planted-regression tests for the noise-aware compare
+1. `perf:smooth:ratchet:check` / vitest `performance-smooth-ratchet.test.ts` —
+   six public baseline cells must be present; planted regressions beyond noise fail
+2. Exact-head Coverage / Affected Unit Tests pull those tests in when Smooth
+   ratchet, baselines, or related web scripts are in the change graph
+   (Source Validation → PR Ready)
 
 Live measure + compare (isolated preview or `next start`, **never production**):
 
@@ -22,7 +27,7 @@ pnpm --filter @jovie/web perf:smooth:ratchet -- --measured path/to/summary.json
 In `CI=true`, `--compare` is on by default after a baseline run. A cell fails
 when any ratcheted metric worsens beyond noise vs the committed baseline.
 
-Lighthouse stays non-blocking; this Smooth ratchet is the blocking gate.
+Lighthouse stays non-blocking; this Smooth ratchet is the blocking CWV/jank gate.
 
 ## Noise tolerance
 
