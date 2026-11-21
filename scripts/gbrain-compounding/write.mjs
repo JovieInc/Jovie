@@ -301,17 +301,21 @@ export function compoundHealthDigest(args) {
 
   const availability = writer.probe();
   if (!availability.available) {
+    // needs-probe / exit 0 only when transport/binary is missing. Probe
+    // timeouts and other command failures are degraded (exit 1).
+    const reason = availability.reason || 'gbrain-unavailable';
+    const unavailable = reason === 'gbrain-unavailable';
     bufferPages(args.bufferDir, pages, buffered);
     return {
       schema: RUN_SCHEMA,
-      status: 'needs-probe',
-      reason: availability.reason || 'gbrain-unavailable',
+      status: unavailable ? 'needs-probe' : 'degraded',
+      reason,
       digest,
       claims,
       writes: pages.map(p => ({
         ok: false,
         slug: p.slug,
-        reason: availability.reason || 'gbrain-unavailable',
+        reason,
       })),
       buffered,
       pages,

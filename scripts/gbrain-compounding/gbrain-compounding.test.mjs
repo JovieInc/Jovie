@@ -217,6 +217,26 @@ test('classifyWriteError treats execFileSync ETIMEDOUT as write failure not unav
   assert.notEqual(result.reason, 'gbrain-unavailable');
 });
 
+test('probe ETIMEDOUT degrades instead of needs-probe', () => {
+  const timeout = Object.assign(new Error('spawnSync gbrain ETIMEDOUT'), {
+    code: 'ETIMEDOUT',
+    signal: 'SIGTERM',
+  });
+  const writer = createGbrainWriter({
+    bin: 'gbrain',
+    execute: () => {
+      throw timeout;
+    },
+  });
+  const result = compoundHealthDigest({
+    digest: healthyDigest(),
+    writer,
+  });
+  assert.equal(result.status, 'degraded');
+  assert.match(String(result.reason), /ETIMEDOUT/i);
+  assert.notEqual(result.reason, 'gbrain-unavailable');
+});
+
 test('putWithReadback rejects stale pages that only share static tails', () => {
   const stale = withCompoundId(
     '---\ntitle: old\n---\n\n# old\n\nNot Linear work acceptance, not an authority change, not a shipping receipt.\n'
