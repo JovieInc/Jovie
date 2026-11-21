@@ -147,6 +147,17 @@ jobs:
           key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linear-sync-cursor-v1-
 
+      # JOV-7887: one shared wall-clock budget for every evaluation invocation
+      # in this job. A sweep that would outlive the 15-minute runner timeout
+      # now stops itself, saves the cursor, and defers the remainder to the
+      # next sweep instead of being killed mid-step (the kill also skipped the
+      # cursor save, so full sweeps never made durable progress and ~60% of
+      # sweep runs ended cancelled). Anchored before the screen-audit step so
+      # its bounded hold is inside the same budget.
+
+      - name: Export the evaluation wall-clock deadline
+        run: echo "LINEAR_SYNC_DEADLINE_AT=$(date -u -d '+10 minutes' '+%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
       # The Production Controller sets run-name, which makes workflow_run.name the
       # run title ("Production Controller <sha> from CI ..."); matching the name
       # kept this step skipped on every release, so no screen-audit receipt was
