@@ -10,21 +10,25 @@ describe('AudienceQuickActionsCell certificate', () => {
     const onRowClick = vi.fn();
     const onRowKeyDown = vi.fn();
     const onExport = vi.fn();
+    // Events that bubble past the component would reach the document body.
+    document.body.addEventListener('click', onRowClick);
+    document.body.addEventListener('keydown', onRowKeyDown);
     const { container } = render(
-      // biome-ignore lint/a11y/noStaticElementInteractions: test row stands in for the table row
-      <div onClick={onRowClick} onKeyDown={onRowKeyDown}>
+      <>
         <AudienceQuickActionsCell
           onExport={onExport}
           onBlock={vi.fn()}
           className='custom'
         />
-      </div>
+      </>
     );
 
     await user.click(screen.getByRole('button', { name: 'Export Contact' }));
     expect(onExport).toHaveBeenCalledOnce();
     screen.getByRole('button', { name: 'Block Member' }).focus();
     await user.keyboard('{Enter}');
+    document.body.removeEventListener('click', onRowClick);
+    document.body.removeEventListener('keydown', onRowKeyDown);
     expect(onRowClick).not.toHaveBeenCalled();
     expect(onRowKeyDown).not.toHaveBeenCalled();
     expect(screen.getByRole('toolbar')).toHaveClass('custom');

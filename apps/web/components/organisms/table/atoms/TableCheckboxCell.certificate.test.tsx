@@ -75,10 +75,10 @@ describe('TableCheckboxCell certificate', () => {
     const onRowClick = vi.fn();
     const table = {} as never;
     const row = {} as never;
+    // Events that bubble past the component would reach the document body.
+    document.body.addEventListener('click', onRowClick);
     const { container } = render(
-      // biome-ignore lint/a11y/noStaticElementInteractions: test row stands in for the table row
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test row stands in for the table row
-      <div onClick={onRowClick}>
+      <>
         <TableCheckboxCell
           table={table}
           headerCheckboxState='indeterminate'
@@ -90,13 +90,14 @@ describe('TableCheckboxCell certificate', () => {
           isChecked={false}
           onToggleSelect={onToggleSelect}
         />
-      </div>
+      </>
     );
 
     await user.click(screen.getByRole('checkbox', { name: 'Select All Rows' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }));
     expect(onToggleSelectAll).toHaveBeenCalledOnce();
     expect(onToggleSelect).toHaveBeenCalledOnce();
+    document.body.removeEventListener('click', onRowClick);
     expect(onRowClick).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
   });

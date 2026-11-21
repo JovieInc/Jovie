@@ -9,21 +9,22 @@ describe('EntityThreadGlyph certificate', () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
     const onRow = vi.fn();
+    // Events that bubble past the component would reach the document body.
+    document.body.addEventListener('click', onRow);
     const { container } = render(
-      // biome-ignore lint/a11y/noStaticElementInteractions: test row stands in for the entity row
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test row stands in for the entity row
-      <div onClick={onRow}>
+      <>
         <EntityThreadGlyph
           threadTitle='Generating lyric video'
           onOpen={onOpen}
         />
-      </div>
+      </>
     );
 
     await user.click(screen.getByRole('button', { name: /Open Running Chat/ }));
     screen.getByRole('button', { name: /Open Running Chat/ }).focus();
     await user.keyboard('{Enter}');
     expect(onOpen).toHaveBeenCalledTimes(2);
+    document.body.removeEventListener('click', onRow);
     expect(onRow).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
   });
