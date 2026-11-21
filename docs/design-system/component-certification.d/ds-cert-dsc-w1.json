@@ -1,0 +1,77 @@
+{
+  "gates": {
+    "apps/web/components/ask-jovie/AskJovie.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/FooterLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CertificationJudgments.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/OvieInbox.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/JovieMarkElectric.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SeekBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SwipeToReveal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/ask-jovie/AskJovie.tsx": {
+      "error": "The feedback post is best-effort and its failure is swallowed by design, so the panel has no error UI; AskJovie.test.tsx and the Offline story cover the rejected request.",
+      "permission-denied": "The panel needs no permission or role and renders for every signed-in user."
+    },
+    "apps/web/components/molecules/JovieMarkElectric.tsx": {
+      "long-content": "A decorative SVG mark with no text; no user or runtime content reaches it.",
+      "rtl-overflow": "The mark is a fixed-geometry brand glyph with no text or directional layout, so it is identical in right-to-left pages."
+    }
+  }
+}

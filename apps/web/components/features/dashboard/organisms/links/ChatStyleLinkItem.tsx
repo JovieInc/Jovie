@@ -27,7 +27,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
-import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import { SwipeToReveal } from '@/components/molecules/SwipeToReveal';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 import { type DetectedLink } from '@/lib/utils/platform-detection';

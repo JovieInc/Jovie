@@ -1,11 +1,11 @@
 'use client';
 
 import { type ReactNode, useEffect, useId, useState } from 'react';
-import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import {
   JOVIE_ICON_PATH,
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
+import { JovieMarkElectric } from '@/components/molecules/JovieMarkElectric';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import type { BrandVariant } from '@/lib/brand/tokens';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';

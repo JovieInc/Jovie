@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SeekBar } from '@/components/atoms/SeekBar';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import {
   mediaCanvasTransport,
   publishMediaCanvasTransport,

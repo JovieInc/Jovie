@@ -5,6 +5,7 @@ import {
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
 import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { JovieMarkElectric } from './JovieMarkElectric';
 
 vi.mock('@/lib/hooks/useReducedMotion', () => ({
@@ -82,5 +83,28 @@ describe('JovieMarkElectric', () => {
     expect(
       container.querySelector('path[stroke-dasharray]')?.getAttribute('filter')
     ).toBe('url(#jve-filter-stable-logo)');
+  });
+
+  it('uses theme-independent media tokens, never raw colour values', () => {
+    const { container } = render(<JovieMarkElectric settledSpark />);
+    const strokes = [...container.querySelectorAll('path')].map(path =>
+      path.getAttribute('stroke')
+    );
+    expect(strokes.length).toBeGreaterThan(2);
+    for (const stroke of strokes) {
+      expect(stroke).toMatch(/^var\(--color-(on-media|accent)\)$/);
+    }
+  });
+
+  it('stays axe-clean in the animated, static and reduced-motion states', async () => {
+    const { container, rerender } = render(<JovieMarkElectric />);
+    await expectNoA11yViolations(container);
+
+    rerender(<JovieMarkElectric spark={false} settledSpark />);
+    await expectNoA11yViolations(container);
+
+    vi.mocked(useReducedMotion).mockReturnValue(true);
+    rerender(<JovieMarkElectric size={32} />);
+    await expectNoA11yViolations(container);
   });
 });

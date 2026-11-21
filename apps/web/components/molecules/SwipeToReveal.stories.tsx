@@ -35,7 +35,7 @@ const Row = ({ label }: { label: string }) => (
  * dragging the row left reveals the action buttons.
  */
 const meta = {
-  title: 'Atoms/SwipeToReveal',
+  title: 'Molecules/SwipeToReveal',
   component: SwipeToReveal,
   parameters: {
     layout: 'centered',

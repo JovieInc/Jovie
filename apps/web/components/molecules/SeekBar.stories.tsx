@@ -3,7 +3,7 @@ import { fn } from 'storybook/test';
 import { SeekBar } from './SeekBar';
 
 const meta = {
-  title: 'Atoms/SeekBar',
+  title: 'Molecules/SeekBar',
   component: SeekBar,
   parameters: {
     layout: 'centered',

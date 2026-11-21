@@ -55,7 +55,7 @@ describe('FooterLink', () => {
   it('applies dark tone classes by default', () => {
     render(<FooterLink href='/test'>Dark</FooterLink>);
     const link = screen.getByRole('link', { name: 'Dark' });
-    expect(link).toHaveClass('text-white/70');
+    expect(link).toHaveClass('text-on-media/70');
   });
 
   it('applies light tone classes', () => {

@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SeekBar } from './SeekBar';
 
-const slider = () => screen.getByRole('slider', { name: 'Seek track' });
+const slider = () => screen.getByRole('slider', { name: 'Seek Track' });
 
 describe('SeekBar', () => {
   it('shows the current position against the track duration', () => {
@@ -58,6 +59,24 @@ describe('SeekBar', () => {
     fireEvent.blur(slider());
     rerender(<SeekBar currentTime={30} duration={180} onSeek={vi.fn()} />);
     expect(slider()).toHaveValue('30');
+  });
+
+  it('keeps its value and focus across a parent rerender and Escape', async () => {
+    const user = userEvent.setup();
+    const onSeek = vi.fn();
+    const { rerender } = render(
+      <SeekBar currentTime={45} duration={180} onSeek={onSeek} />
+    );
+
+    slider().focus();
+    fireEvent.pointerDown(slider());
+    fireEvent.change(slider(), { target: { value: '60' } });
+    rerender(<SeekBar currentTime={45} duration={180} onSeek={onSeek} />);
+    await user.keyboard('{Escape}');
+
+    expect(slider()).toHaveValue('60');
+    expect(slider()).toHaveFocus();
+    expect(slider()).toHaveAttribute('data-host-drawn');
   });
 
   it('is disabled and does not seek until the duration is known', () => {

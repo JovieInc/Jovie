@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import React from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import { SwipeToReveal } from '@/components/molecules/SwipeToReveal';
 import {
   LinkPill,
   type LinkPillMenuItem,

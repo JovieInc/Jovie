@@ -86,7 +86,8 @@ export function JovieMarkElectric({
         <path
           d={JOVIE_ICON_PATH}
           fill='none'
-          stroke='rgba(255,255,255,0.065)'
+          stroke='var(--color-on-media)'
+          strokeOpacity={0.065}
           strokeWidth='1.15'
         />
         {settledSpark && (
@@ -95,7 +96,8 @@ export function JovieMarkElectric({
             pathLength='1000'
             d={JOVIE_ICON_PATH}
             fill='none'
-            stroke='rgba(78,190,255,0.46)'
+            stroke='var(--color-accent)'
+            strokeOpacity={0.46}
             strokeWidth='2.2'
             strokeDasharray='62 938'
             strokeDashoffset='-580'
@@ -108,7 +110,8 @@ export function JovieMarkElectric({
               pathLength='1000'
               d={JOVIE_ICON_PATH}
               fill='none'
-              stroke='rgba(78,190,255,0.82)'
+              stroke='var(--color-accent)'
+              strokeOpacity={0.82}
               strokeWidth='3.2'
               strokeDasharray='86 914'
               strokeLinecap='round'
@@ -126,7 +129,8 @@ export function JovieMarkElectric({
               pathLength='1000'
               d={JOVIE_ICON_PATH}
               fill='none'
-              stroke='rgba(236,250,255,0.88)'
+              stroke='var(--color-on-media)'
+              strokeOpacity={0.88}
               strokeWidth='1.05'
               strokeDasharray='34 966'
               strokeLinecap='round'

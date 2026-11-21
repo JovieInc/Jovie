@@ -60,6 +60,20 @@ describe('SwipeToReveal gestures', () => {
     expect(onOpen).toHaveBeenCalledOnce();
   });
 
+  it('hides the actions from assistive tech again once the row is closed', async () => {
+    render(
+      <SwipeToReveal forceEnabled actions={<Button>Edit</Button>}>
+        <span>Spotify</span>
+      </SwipeToReveal>
+    );
+    const row = screen.getByText('Spotify');
+    swipe(row, -60);
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeVisible();
+    swipe(row, 70);
+    await finishClosing('Edit');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
   it.each([
     { gesture: 'short horizontal drag', dx: -20, dy: 0 },
     { gesture: 'vertical scroll', dx: -10, dy: 60 },

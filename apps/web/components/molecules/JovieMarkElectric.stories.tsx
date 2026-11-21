@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { JovieMarkElectric } from './JovieMarkElectric';
 
 const meta = {
-  title: 'Atoms/JovieMarkElectric',
+  title: 'Molecules/JovieMarkElectric',
   component: JovieMarkElectric,
   parameters: {
     layout: 'centered',
@@ -30,4 +30,18 @@ export const Static: Story = {
     spark: false,
     settledSpark: true,
   },
+};
+
+/** Partial: no pixel size, so the mark fills whatever box its host gives it. */
+export const PartialFillsContainer: Story = {
+  args: { size: undefined, spark: false },
+  decorators: [
+    function FillDecorator(Story) {
+      return (
+        <div className='size-32'>
+          <Story />
+        </div>
+      );
+    },
+  ],
 };

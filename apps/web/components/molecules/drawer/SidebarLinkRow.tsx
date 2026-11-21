@@ -11,7 +11,7 @@ import {
 import { ExternalLink, MoreHorizontal, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
-import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import { SwipeToReveal } from '@/components/molecules/SwipeToReveal';
 import {
   getDSPDeepLinkConfig,
   getSocialDeepLinkConfig,
