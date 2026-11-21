@@ -36,6 +36,7 @@ import {
   lanesCoverageRun,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
+import { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
 
 export {
   LANES_COVERAGE_FLOORS,
@@ -47,6 +48,7 @@ export {
   lanesReceiptRanSuite,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
+export { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
 
 import {
   escapeAnnotationMessage,
@@ -3370,14 +3372,19 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
-    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    // Overlap independent tsc lanes (~5.6 GB each) only when the runner can
+    // hold them. merge_group / workflow_dispatch keep overlap; pull_request
+    // Source Validation twins share a ~7GB ubuntu job with unit tests — three
+    // concurrent tsc processes thrash until the 30m timeout (#26276).
     const started = new Map();
-    for (const lane of selectedLanes.filter(l =>
-      LANE_GROUPS.typecheck.includes(l.id)
-    )) {
-      const run = Promise.resolve().then(() => lane.run());
-      run.catch(() => {});
-      started.set(lane.id, [Date.now(), run]);
+    if (shouldOverlapTypecheckLanes()) {
+      for (const lane of selectedLanes.filter(l =>
+        LANE_GROUPS.typecheck.includes(l.id)
+      )) {
+        const run = Promise.resolve().then(() => lane.run());
+        run.catch(() => {});
+        started.set(lane.id, [Date.now(), run]);
+      }
     }
 
     let failedFast = false;
