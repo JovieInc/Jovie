@@ -34,7 +34,7 @@ test('refuses models outside the allowlist', async () => {
   assert.equal(res.status, 400);
 });
 
-test('admits helpfulness subject and judges (answerer ≠ judge)', async () => {
+test('admits helpfulness subject and cheap judge (answerer ≠ judge)', async () => {
   const seen = [];
   const e = env({
     AI: {
@@ -44,19 +44,21 @@ test('admits helpfulness subject and judges (answerer ≠ judge)', async () => {
       },
     },
   });
-  for (const model of [
-    '@cf/zai-org/glm-5.3',
-    '@cf/openai/gpt-oss-120b',
-    '@cf/deepseek-ai/deepseek-v4-pro-0813',
-  ]) {
+  for (const model of ['@cf/zai-org/glm-5.3', '@cf/openai/gpt-oss-120b']) {
     const res = await call(e, {
       body: { model, messages: [{ role: 'user', content: 'x' }] },
     });
     assert.equal(res.status, 200, model);
   }
-  assert.deepEqual(seen, [
-    '@cf/zai-org/glm-5.3',
-    '@cf/openai/gpt-oss-120b',
-    '@cf/deepseek-ai/deepseek-v4-pro-0813',
-  ]);
+  assert.deepEqual(seen, ['@cf/zai-org/glm-5.3', '@cf/openai/gpt-oss-120b']);
+});
+
+test('refuses the retired strong judge', async () => {
+  const res = await call(env(), {
+    body: {
+      model: '@cf/deepseek-ai/deepseek-v4-pro-0813',
+      messages: [{ role: 'user', content: 'x' }],
+    },
+  });
+  assert.equal(res.status, 400);
 });
