@@ -83,16 +83,12 @@ export const VenmoConnectDialog = memo(function VenmoConnectDialog({
   return (
     <Dialog open={open} onClose={onClose} size='sm'>
       <div className='flex items-start gap-3'>
-        <div
-          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/20 bg-accent/10'
+        <Wallet
+          className='mt-0.5 size-4 shrink-0 text-accent-token'
           aria-hidden='true'
-        >
-          <Wallet className='h-4 w-4 text-accent-token' />
-        </div>
+        />
         <div className='min-w-0 flex-1'>
-          <DialogTitle>
-            Connect Venmo
-          </DialogTitle>
+          <DialogTitle>Connect Venmo</DialogTitle>
           <DialogDescription className='mt-0.5'>
             Link your Venmo to start receiving payments from fans.
           </DialogDescription>
@@ -165,12 +161,10 @@ export const TipLinkSection = memo(function TipLinkSection({
   return (
     <div>
       <div className='mb-3 flex items-center gap-2'>
-        <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'
+        <Link2
+          className='size-3.5 shrink-0 text-tertiary-token'
           aria-hidden='true'
-        >
-          <Link2 className='h-3.5 w-3.5 text-tertiary-token' />
-        </div>
+        />
         <h2 className='text-balance text-app font-caption text-primary-token'>
           Pay Link
         </h2>

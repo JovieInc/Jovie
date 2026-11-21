@@ -85,10 +85,8 @@ export function DashboardFeedbackModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
-          <DialogTitle className='mt-4 text-balance text-base font-semibold text-primary-token'>
-            Feedback Sent
-          </DialogTitle>
-          <DialogDescription className='mt-2 text-app text-secondary-token'>
+          <DialogTitle className='mt-4 text-base'>Feedback Sent</DialogTitle>
+          <DialogDescription className='mt-2'>
             Thanks for telling us.
           </DialogDescription>
         </div>
@@ -96,8 +94,8 @@ export function DashboardFeedbackModal({
         <>
           <div className='flex items-start justify-between gap-4'>
             <div>
-              <DialogTitle className='text-balance'>Send Feedback</DialogTitle>
-              <DialogDescription className='mt-1 text-app text-secondary-token'>
+              <DialogTitle>Send Feedback</DialogTitle>
+              <DialogDescription className='mt-1'>
                 Tell us where the experience feels delightful, where it falls
                 short, or what you&apos;d love us to build next.
               </DialogDescription>
@@ -147,7 +145,6 @@ export function DashboardFeedbackModal({
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
               loading={isSubmitting}
-              className='font-caption'
             >
               Send Feedback
             </Button>

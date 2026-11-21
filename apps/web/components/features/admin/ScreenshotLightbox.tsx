@@ -30,8 +30,10 @@ export function ScreenshotLightbox({
   return (
     <Dialog open={open} onClose={onClose} size='5xl'>
       <div className='flex items-center justify-between gap-4'>
-        <DialogTitle className='truncate'>
-          {selected?.title ?? 'Screenshot'}
+        <DialogTitle className='min-w-0'>
+          <span className='block truncate'>
+            {selected?.title ?? 'Screenshot'}
+          </span>
         </DialogTitle>
         <div className='flex items-center gap-1 shrink-0'>
           <DrawerButton
