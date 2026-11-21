@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import {
   EntityHoverLink,
@@ -80,6 +81,27 @@ describe('EntityHoverLink', () => {
     expect(
       screen.queryByRole('img', { name: 'Verified Jovie Profile' })
     ).toBeNull();
+  });
+
+  it('activates the linked artist from the card and stays axe-clean', async () => {
+    vi.useFakeTimers();
+    const onActivate = vi.fn();
+    fastRender(
+      <EntityHoverLink entity={release} onActivate={onActivate}>
+        Sober
+      </EntityHoverLink>
+    );
+    fireEvent.focus(screen.getByRole('button', { name: 'Sober' }));
+    advanceTimers(200);
+    vi.useRealTimers();
+    await expectNoA11yViolations(screen.getByRole('tooltip'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Jovie' }));
+    expect(onActivate).toHaveBeenCalledWith({
+      kind: 'artist',
+      id: 'artist:Jovie',
+      label: 'Jovie',
+    });
   });
 
   it('opens on hover and closes on mouse leave', () => {
