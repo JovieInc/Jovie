@@ -9,8 +9,7 @@ enum ChatComposerCopy {
 
 enum ChatComposerMetrics {
   static let barHeight: CGFloat = 52
-  /// Founder-locked chat face (independent of ActionButton KEEP 28).
-  static let lockedControlSize: CGFloat = 32
+  static let lockedControlSize: CGFloat = 32 // founder lock; not ActionButton KEEP
   static let sendSlotSize = lockedControlSize
   static let plusButtonSize = lockedControlSize
 

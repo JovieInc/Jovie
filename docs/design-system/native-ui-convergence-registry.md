@@ -258,8 +258,7 @@ merch, composer, and filled/icon geometry variants retain distinct semantics.
 2. **Press token (resolved).** `JovieMotion.pressScale` projects web
    `--scale-press` (`0.98`) via `native-design-system` `motionBindings`;
    `state-matrix.md` documents `active:scale-press`. Do not silently alter
-   locked Chat/Calendar press behavior. ActionButton KEEP 28/44 via
-   `actionButtonBindings`; Chat face stays 32.
+   locked Chat/Calendar press behavior.
 3. **Local token ownership.** iOS hard-codes its `Color(hex:)` values in
    `JovieTheme.swift:L4-L24`; web resolves CSS variables in `tokens.ts:L17-L30`.
    The semantic names overlap, but no cross-platform generated token contract

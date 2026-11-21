@@ -31,7 +31,6 @@ export function projectedActionButton(bindings, contractSource) {
       throw new Error(`Bad ActionButton mapping: ${name}`);
     names.add(name);
     lines.push(
-      `  /// Source: ${source}`,
       `  static let ${name}: CGFloat = ${contractNumber(contractSource, source)}`
     );
   }
