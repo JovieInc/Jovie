@@ -135,14 +135,16 @@ describe('Item 1 & Item 5 — private proof-pending checkout & open-session reco
     ).not.toBeInTheDocument();
   });
 
-  it('suppresses shareUrl and live headline on /billing/success?source=onboarding when proofPending is true (without session_id)', async () => {
+  it('suppresses shareUrl and live headline on a confirmed onboarding return when proof is pending', async () => {
     mocks.searchParams.mockReturnValue(
-      new URLSearchParams('source=onboarding')
+      new URLSearchParams('source=onboarding&session_id=cs_test')
     );
     mocks.fetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        plan: null,
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        plan: 'pro',
         priceId: null,
         needsProfile: false,
         proofPending: true,
@@ -167,5 +169,25 @@ describe('Item 1 & Item 5 — private proof-pending checkout & open-session reco
       screen.queryByRole('heading', { name: /live/i })
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('paid-share-prompt')).not.toBeInTheDocument();
+  });
+
+  it('does not declare paid success on direct navigation even when billing is already pro', () => {
+    mocks.searchParams.mockReturnValue(
+      new URLSearchParams('source=onboarding')
+    );
+    mocks.billing.mockReturnValue({
+      data: { isPro: true, plan: 'pro' },
+      isLoading: false,
+      isFetched: true,
+      error: null,
+    });
+
+    render(<CheckoutSuccessPage />);
+
+    expect(screen.getByTestId('checkout-success-recovery')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Your plan is active' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(PROOF_PENDING_TERMS)).not.toBeInTheDocument();
   });
 });
