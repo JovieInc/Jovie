@@ -6,6 +6,10 @@
 export const ALLOWED_MODELS: ReadonlySet<string> = new Set([
   '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
   '@cf/zai-org/glm-5.3',
+  // Helpfulness eval judges (answerer ≠ judge). Cheap is the default CI
+  // judge; strong is calibrate-only. Both stay off production chat routes.
+  '@cf/openai/gpt-oss-120b',
+  '@cf/deepseek-ai/deepseek-v4-pro-0813',
 ]);
 // Embeddings (gbrain + any OpenAI-compatible /v1/embeddings client). bge-m3:
 // 1024 dims, 8k-token inputs, no query/document prefixes.
