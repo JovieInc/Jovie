@@ -223,9 +223,11 @@ struct AppShellChatFirstTests {
 
   @Test func composerGeometryReservesSendSlotWithoutGrowingTheBar() {
     #expect(ChatComposerMetrics.barHeight == 52)
-    #expect(ChatComposerMetrics.sendSlotSize == JovieActionButtonMetrics.height)
-    #expect(ChatComposerMetrics.plusButtonSize == JovieActionButtonMetrics.height)
-    #expect(JovieActionButtonMetrics.height == 32)
+    #expect(ChatComposerMetrics.sendSlotSize == ChatComposerMetrics.lockedControlSize)
+    #expect(ChatComposerMetrics.plusButtonSize == ChatComposerMetrics.lockedControlSize)
+    #expect(ChatComposerMetrics.lockedControlSize == 32)
+    #expect(JovieActionButtonMetrics.height == 28)
+    #expect(JovieActionButtonMetrics.hitTarget == 44)
     #expect(JovieActionButtonMetrics.radius == 999)
     #expect(JovieActionButtonMetrics.labelWeight == 510)
     #expect(JovieFont.actionLabelWeight == 510)

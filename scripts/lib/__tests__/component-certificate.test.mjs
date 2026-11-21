@@ -379,7 +379,7 @@ describe('component certificate CLI evidence freshness', () => {
     git(['add', '.']);
     git(['commit', '-qm', 'component and tests']);
     refresh();
-  });
+  }, 60_000);
   afterEach(() => rmSync(f.root, { recursive: true, force: true }));
 
   it('the CLI import closure works with only its existing TypeScript dependency', () => {

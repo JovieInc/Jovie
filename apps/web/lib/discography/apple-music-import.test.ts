@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -11,11 +12,12 @@ const h = vi.hoisted(() => ({
   library: vi.fn(),
   links: vi.fn(),
   due: vi.fn(),
+  publish: vi.fn(),
+  execute: vi.fn(),
   selectCalls: 0,
   releaseWhere: undefined as unknown,
 }));
 
-vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn() },
@@ -32,6 +34,9 @@ vi.mock('./queries', () => ({
   upsertProviderLink: h.upsertProviderLink,
 }));
 vi.mock('./slug', () => ({ generateUniqueSlug: h.slug }));
+vi.mock('@/lib/library/approval-status.server', () => ({
+  ensureImportedReleasePublishedByDefault: h.publish,
+}));
 
 // Library reads go through select().from().where(): first the releases,
 // then their Apple provider links. The sweep adds orderBy().limit().
@@ -52,11 +57,13 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: () => selectChain(),
     insert: () => ({ values: h.insertValues }),
+    execute: h.execute,
   },
 }));
 
 import {
   importMissingAppleMusicReleases,
+  publishUnapprovedAppleImports,
   sweepAppleMusicCatalogCompletenessForCron,
 } from './apple-music-import';
 
@@ -158,6 +165,11 @@ describe('importMissingAppleMusicReleases', () => {
         metadata: { providerExternalId: '1031580711' },
       })
     );
+    // Published like a Spotify import, or the public profile filters it out.
+    expect(h.publish).toHaveBeenCalledWith({
+      creatorProfileId: profileId,
+      releaseId: 'rel-all-this-noise',
+    });
     expect(h.insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         creatorProfileId: profileId,
@@ -225,15 +237,40 @@ describe('sweepAppleMusicCatalogCompletenessForCron', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.available.mockReturnValue(true);
+    h.execute.mockResolvedValue({ rowCount: 3 });
   });
 
-  it('skips the whole sweep when Apple Music is unavailable', async () => {
+  it('skips the Apple scan when unavailable but still publishes old imports', async () => {
     h.available.mockReturnValue(false);
     expect(await sweepAppleMusicCatalogCompletenessForCron()).toEqual({
       profilesChecked: 0,
       releasesImported: 0,
+      releasesPublished: 3,
       failed: 0,
     });
     expect(h.due).not.toHaveBeenCalled();
+  });
+});
+
+describe('publishUnapprovedAppleImports', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('publishes only Apple imports with no approval row', async () => {
+    h.execute.mockResolvedValue({ rowCount: 2 });
+    expect(await publishUnapprovedAppleImports()).toBe(2);
+    const { sql: text, params } = new PgDialect().sqlToQuery(
+      h.execute.mock.calls[0][0]
+    );
+    expect(text).toContain("r.metadata ->> 'importedFrom' = $1");
+    expect(params).toEqual(['apple_music']);
+    expect(text).toContain('NOT EXISTS');
+    expect(text).toContain(
+      'ON CONFLICT (creator_profile_id, asset_id) DO NOTHING'
+    );
+  });
+
+  it('reports zero when the driver returns no row count', async () => {
+    h.execute.mockResolvedValue({});
+    expect(await publishUnapprovedAppleImports()).toBe(0);
   });
 });

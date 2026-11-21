@@ -39,6 +39,10 @@ describe('MusicServiceDial', () => {
       name: 'Stream Now with Apple Music',
     });
     expect(action).toHaveAttribute('href', 'https://music.apple.com/song');
+    expect(screen.getByTestId('action-dial')).toHaveAttribute(
+      'data-preferred',
+      'true'
+    );
     fireEvent.click(action);
     expect(onStream).toHaveBeenCalledWith('apple_music');
   });

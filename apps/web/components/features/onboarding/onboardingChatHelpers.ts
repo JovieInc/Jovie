@@ -360,6 +360,7 @@ export function deriveProfileBuilderState({
     profileDraft,
     artist,
     artistConfirmed,
+    handleConfirmed: confirmedHandle !== null,
     // Confirmed server output wins over stale proposal cards and their drafts.
     handle:
       confirmedHandle ??

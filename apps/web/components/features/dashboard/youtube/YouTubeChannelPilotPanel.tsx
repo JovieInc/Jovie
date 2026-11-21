@@ -28,7 +28,7 @@ function isoDate(value: string | null): string {
 
 function AuthRequiredState({ message }: { readonly message: string | null }) {
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <EmptyState
         icon={<Icon name='Youtube' className='h-5 w-5' />}
         heading='Founder Authorization Required'
@@ -89,20 +89,20 @@ export function YouTubeChannelPilotPanel({
         {workspace.state === 'auth-required' ? (
           <AuthRequiredState message={workspace.errorMessage} />
         ) : workspace.state === 'ambiguous-channel' ? (
-          <ContentSurfaceCard className='border-accent-red/30 p-4'>
+          <div className='rounded-xl border border-accent-red/30 bg-surface-1 p-4'>
             <h2 className='text-app font-semibold text-primary-token'>
               Channel Ownership Is Ambiguous
             </h2>
             <p className='mt-1 text-xs text-secondary-token'>
               {workspace.errorMessage}
             </p>
-          </ContentSurfaceCard>
+          </div>
         ) : (
           <>
-            <ContentSurfaceCard className='p-4'>
-              <div className='flex flex-wrap items-start justify-between gap-3'>
+            <ContentSurfaceCard>
+              <div className='flex flex-wrap items-start justify-between gap-3 p-4'>
                 <div>
-                  <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+                  <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
                     Authorized Channel
                   </p>
                   <h1 className='mt-1 font-mono text-app text-primary-token'>
@@ -120,7 +120,7 @@ export function YouTubeChannelPilotPanel({
             </ContentSurfaceCard>
 
             {workspace.videos.length === 0 ? (
-              <ContentSurfaceCard className='overflow-hidden p-0'>
+              <ContentSurfaceCard className='overflow-hidden'>
                 <EmptyState
                   heading='Authorized Channel Is Waiting for Its First Sync'
                   description='No local videos are shown because Jovie has not yet received a complete API-backed uploads ledger for this channel.'
@@ -146,8 +146,8 @@ export function YouTubeChannelPilotPanel({
                 </div>
                 <div className='space-y-2'>
                   {workspace.videos.map(video => (
-                    <ContentSurfaceCard key={video.id} className='p-3'>
-                      <div className='flex flex-col items-start gap-3 sm:flex-row'>
+                    <ContentSurfaceCard key={video.id}>
+                      <div className='flex flex-col items-start gap-3 p-3 sm:flex-row'>
                         {video.thumbnailUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
