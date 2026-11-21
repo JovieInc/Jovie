@@ -612,6 +612,17 @@ nodes:
       - push
     terminalReceipt: job:affected-articles
     jobCount: 1
+  - name: Helpfulness live CI-subset
+    path: .github/workflows/helpfulness-live-ci-subset.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:helpfulness-ci-subset
+    jobCount: 1
   - name: Hermes CLI Worker
     path: .github/workflows/hermes-cli-worker.yml
     active: true
