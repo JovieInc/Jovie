@@ -145,6 +145,7 @@ describe('StoryFirstCanvas', () => {
       'aria-hidden',
       'true'
     );
+    expect(screen.getByTestId('story-first-board')).toHaveAttribute('inert');
     expect(screen.getByTestId('fixture-answer')).toBeVisible();
   });
 

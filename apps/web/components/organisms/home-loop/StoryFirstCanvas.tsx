@@ -312,6 +312,9 @@ export function StoryFirstCanvas({
         )}
         data-testid='story-first-board'
         aria-hidden={melting || undefined}
+        // Drop links from tab order while the board melts (aria-hidden alone
+        // does not).
+        inert={melting || undefined}
       >
         <div className='flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12'>
           <BottleneckHero story={bottleneck} />
