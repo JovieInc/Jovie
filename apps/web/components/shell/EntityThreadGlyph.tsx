@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Sparkles } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -38,24 +39,24 @@ export function EntityThreadGlyph({
 }: EntityThreadGlyphProps) {
   return (
     <Tooltip label={tooltipLabel}>
-      <button
+      <PlainButton
         type='button'
         onClick={e => {
           e.stopPropagation();
           onOpen();
         }}
         aria-label='Open Running Chat'
-        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
+        className='relative before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-accent-text/85 hover:text-accent-text hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
       >
         <span className='relative inline-grid place-items-center h-3 w-3'>
           <span
             aria-hidden='true'
-            className='absolute inset-0 rounded-full bg-cyan-300/30 anim-calm-halo'
+            className='absolute inset-0 rounded-full bg-accent/30 anim-calm-halo'
           />
           <Sparkles className='relative h-3 w-3' strokeWidth={2.25} />
         </span>
         <span className='sr-only'>{threadTitle}</span>
-      </button>
+      </PlainButton>
     </Tooltip>
   );
 }

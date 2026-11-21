@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 /**
  * Visual regression tests for the 5 highest-churn surfaces.
@@ -106,6 +107,7 @@ test.describe('homepage visual regression', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openHomepageForScreenshot(page);
 
+    await expectCaptureReady(page.locator('body'));
     await expect(page).toHaveScreenshot('homepage-desktop.png', {
       fullPage: false,
     });
@@ -116,6 +118,7 @@ test.describe('homepage visual regression', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openHomepageForScreenshot(page);
 
+    await expectCaptureReady(page.locator('body'));
     await expect(page).toHaveScreenshot('homepage-375.png', {
       fullPage: false,
     });
@@ -126,6 +129,7 @@ test.describe('homepage visual regression', () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await openHomepageForScreenshot(page);
 
+    await expectCaptureReady(page.locator('body'));
     await expect(page).toHaveScreenshot('homepage-tablet.png', {
       fullPage: false,
     });
@@ -161,6 +165,7 @@ test.describe('pricing visual regression', () => {
     });
     await waitForVisualReadiness(page, 'pricing');
 
+    await expectCaptureReady(page.locator('body'));
     await expect(page).toHaveScreenshot('pricing.png', {
       fullPage: false,
     });
@@ -185,6 +190,7 @@ test.describe('pricing visual regression', () => {
     });
     await waitForVisualReadiness(page, 'pricing');
 
+    await expectCaptureReady(page.locator('body'));
     await expect(page).toHaveScreenshot('pricing.png', {
       fullPage: false,
     });
@@ -340,6 +346,7 @@ test.describe('JOV-2081: Viewport matrix — homepage', () => {
       }
 
       await expect(page.locator('h1').first()).toBeVisible({ timeout: 15_000 });
+      await expectCaptureReady(page.locator('body'));
       await expect(page).toHaveScreenshot(`homepage-${viewport.label}.png`, {
         fullPage: false,
       });

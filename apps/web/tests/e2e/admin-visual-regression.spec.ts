@@ -12,6 +12,7 @@ import {
   getAdminDesktopSnapshotName,
   getAdminSurfaceSelector,
 } from './utils/admin-surface-manifest';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1100 } as const;
 const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
@@ -330,6 +331,29 @@ async function registerAdminVisualStubs(page: import('@playwright/test').Page) {
     )
   );
 
+  // Ovie Home leads with the revenue blocker read from the cached company
+  // snapshot. CI has no snapshot, so the real route answers 503 and Home shows
+  // "Revenue state unavailable"; pin one fixed blocker instead.
+  await page.route('**/api/ovie/home/blocker', route =>
+    route.fulfill(
+      jsonResponse({
+        blocker: {
+          schema: 'jovie.company-blocker/v1',
+          id: 'funnel:paid',
+          kind: 'funnel',
+          step: 'paid',
+          tone: 'warn',
+          text: 'No artist has paid yet.',
+          detailsHref: '/app/admin/product',
+          since: null,
+          nextAction: null,
+          observedAt: '2099-01-01T12:00:00.000Z',
+        },
+        generatedAt: '2099-01-01T12:00:00.000Z',
+      })
+    )
+  );
+
   await page.route('**/api/admin/investors/settings', route =>
     route.fulfill(
       jsonResponse({
@@ -404,6 +428,7 @@ test.describe('admin visual regression', () => {
         ? await openedAccordion(page, surface.snapshotAccordion)
         : root;
 
+      await expectCaptureReady(locator);
       await expect(locator).toHaveScreenshot(
         getAdminDesktopSnapshotName(surface)
       );
@@ -414,6 +439,7 @@ test.describe('admin visual regression', () => {
     test(`${surface.name} mobile`, async ({ page }) => {
       const locator = await openSurface(page, surface, MOBILE_VIEWPORT);
 
+      await expectCaptureReady(locator);
       await expect(locator).toHaveScreenshot(
         `${surface.snapshotSlug}-mobile.png`
       );

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Play } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { IconBtn } from './IconBtn';
@@ -41,5 +42,17 @@ describe('IconBtn', () => {
   it('forwards testId to the button', () => {
     renderBtn({ testId: 'icon-btn' });
     expect(screen.getByTestId('icon-btn')).toBeInTheDocument();
+  });
+});
+
+describe('IconBtn PlainButton', () => {
+  it('is a type=button that fires onClick on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderBtn({ onClick });
+    const button = screen.getByRole('button', { name: 'Play' });
+    expect(button).toHaveAttribute('type', 'button');
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
