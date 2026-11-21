@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
+import { CompositeField } from './composite-field';
+import {
+  HostDrawnInput,
+  HostDrawnSelect,
+  HostDrawnTextarea,
+} from './host-drawn-field';
 
 // The atoms draw nothing; these token shells stand in for the hosts that
 // compose them in the app (a field shell, a chip label, a host stylesheet).
@@ -104,5 +109,36 @@ export const HostStyledSelect: Story = {
       <option value='free'>Free</option>
       <option value='pro'>Pro</option>
     </HostDrawnSelect>
+  ),
+};
+
+// Inside a CompositeField the controls inherit type and colour from the
+// plain element around the field, and the container draws the surface and
+// the focus ring, so the controls carry layout classes only.
+export const InCompositeField: Story = {
+  render: () => (
+    <div className='flex w-80 flex-col gap-3 text-sm text-primary-token'>
+      <CompositeField shape='pill' size='sm' surface='field'>
+        <HostDrawnInput
+          aria-label='Filter commands'
+          placeholder='Filter commands'
+          className='flex-1'
+        />
+      </CompositeField>
+      <CompositeField shape='md' surface='field'>
+        <HostDrawnTextarea
+          aria-label='Message'
+          placeholder='Ask anything'
+          rows={3}
+          className='flex-1'
+        />
+      </CompositeField>
+      <CompositeField shape='md' size='sm' surface='none'>
+        <HostDrawnSelect aria-label='Heading level' defaultValue='p'>
+          <option value='p'>Paragraph</option>
+          <option value='h2'>Heading</option>
+        </HostDrawnSelect>
+      </CompositeField>
+    </div>
   ),
 };
