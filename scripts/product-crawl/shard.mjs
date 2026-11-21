@@ -1,10 +1,13 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 // Split the product crawl across parallel jobs and put the pieces back
 // together. Each shard discovers and samples exactly as a full crawl does,
 // then loads only the routes that hash to it, so a route's viewports and
 // identities stay in one shard. merge-receipts.mjs combines the shard
 // receipts into the one receipt ready-gate.mjs judges.
 import { overlayWalkSummary } from './overlay-walk.mjs';
-import { rankFindings } from './ready-gate.mjs';
+import { productReady, rankFindings } from './ready-gate.mjs';
+import { mergeProducerScopes } from './receipt-producer.mjs';
 import { mergeTrafficEvidence } from './traffic-evidence.mjs';
 
 /** "2/4" -> { index: 2, count: 4 }. Empty means the whole crawl (1/1). */
@@ -66,6 +69,14 @@ export function mergeReceipts(receipts) {
     at: receipts.map(r => r.at).sort()[0],
     shards: count,
     signedIn: receipts.every(r => r.signedIn),
+    producerScope: mergeProducerScopes(receipts),
+    ...(receipts.some(r => r.publicAdoption?.count)
+      ? {
+          publicAdoption: {
+            count: sum(receipts, r => r.publicAdoption?.count),
+          },
+        }
+      : {}),
     // A shard that lost its sign-in crawled its routes only as a stranger.
     // The gate fails on these, as it fails a whole crawl that never signed in.
     strangerOnlyShards: receipts
@@ -141,4 +152,26 @@ export function summaryLines(receipt, verdict) {
 function trafficSummary(t) {
   const o = t.observed;
   return `Observed request attempts ${o.attempted}: pages ${o.pages}, assets ${o.assets}, other ${o.other}; redirects ${o.redirects}, explicit retries ${t.admission.explicitRetries}, failures ${o.failures}. Available response sizes: body ${o.responseBodyBytes} B, headers ${o.responseHeaderBytes} B (${o.requestsWithSizes} sized, ${o.requestsWithoutSizes} unknown). Includes logical service-worker deliveries; this is not a wire total. Admission: ${t.admission.admitted}/${t.admission.maxInterceptedRequests} page network hops/direct fetches, ${t.admission.blocked} blocked, ${t.admission.visitsNotStarted} visits not started; ${t.admission.pageIntervalMs} ms per-shard page spacing. Worker/browser-process admission is incomplete; automatic service-worker update counts/bytes and browser retries are unknown. Absolute all-network cap: false. Estimated cost and billed usage: unknown.`;
+}
+
+export async function writeCrawlReceipt(receipt, out) {
+  const { pages, overlayWalks = { walks: [] } } = receipt;
+  const verdict = productReady(receipt);
+  await mkdir(out, { recursive: true });
+  await writeFile(join(out, 'receipt.json'), JSON.stringify(receipt, null, 1));
+  await writeFile(join(out, 'verdict.json'), JSON.stringify(verdict, null, 1));
+
+  const lines = summaryLines(receipt, verdict);
+  await writeFile(join(out, 'summary.md'), lines.join('\n'));
+  console.log(lines.join('\n'));
+  for (const f of rankFindings(verdict.findings))
+    console.log(`crawl-finding ${JSON.stringify(f)}`);
+  for (const p of pages.filter(x => !x.error && !x.authGated))
+    console.log(
+      `crawl-page ${JSON.stringify({ route: p.route, url: p.url, identity: p.identity, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+    );
+  for (const w of overlayWalks.walks)
+    console.log(
+      `crawl-walk ${JSON.stringify({ route: w.route, url: w.url, identity: w.identity, rail: w.rail, opened: w.opened, steps: w.steps?.length, orphaned: w.steps?.filter(s => s.orphans).length, error: w.error })}`
+    );
 }

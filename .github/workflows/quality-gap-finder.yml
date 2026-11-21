@@ -83,12 +83,14 @@ jobs:
           node scripts/postmortem-review.mjs "${flags[@]}" \
             --out postmortem-review.json > /dev/null
 
-      # github-token-budget: 3 calls/run - restore successful coverage artifact before scanning it
+      # github-token-budget: 3 calls/run - restore successful coverage artifact before scanning it.
+      # Exit 75 from the shared gh adapter is quota, not a bad artifact (run 44597609057).
+      # Defer and scan the committed bootstrap. Malformed evidence still fails closed.
       - name: Restore coverage evidence
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node --input-type=module -e "import { restoreCoverageBaseline } from './scripts/lib/publish-coverage-report.mjs'; console.log(restoreCoverageBaseline());"
+          node --input-type=module -e "import { restoreCoverageBaseline } from './scripts/lib/publish-coverage-report.mjs'; console.log(restoreCoverageBaseline({ onQuota: 'defer' }));"
 
       - name: Find and file quality gaps
         env:

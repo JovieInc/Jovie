@@ -94,7 +94,7 @@
     },
     "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": {
       "long-content": "Labels are fixed copy ('Listen now', 'Find tickets', 'Shop merch', 'Open in Spotify'); no caller text reaches the buttons.",
-      "offline": "The CTA makes no request; the detector matched loading in the comment about shipping the animated skeleton from `loading.tsx`."
+      "offline": "The CTA never fetches; it reads the stored subscription from context and links out."
     },
     "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": {
       "offline": "The drawer makes no request; the detector matched the comment '// Intentionally do NOT mutate `view` when capability flips false.'",
