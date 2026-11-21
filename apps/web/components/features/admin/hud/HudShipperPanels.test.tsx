@@ -24,7 +24,7 @@ const shipper: HudShipperStatusPayload = {
       repo: 'jovie',
       issue: 42,
       branch: 'claude/example',
-      worktree: '/tmp/wt',
+      worktree: 'worktrees/ship-1',
       pid: 1234,
       startedAt: '2026-09-01T12:00:00.000Z',
     },
