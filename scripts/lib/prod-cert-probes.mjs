@@ -231,7 +231,6 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   onboarding: [
     'dashboard-first-value',
     'fresh-user-onboarding-first-value',
-    // JOV-9826 canary claim-checkout walk (Stripe TEST mode).
     'cone-activation-immediate-value',
     'cone-activation-visible-path',
     'cone-activation-no-dead-end',
@@ -243,10 +242,7 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'profile-edit-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
-  // fresh-user-checkout-entry: an account that signed up through the public
-  // path reaches checkout. Blocked until the browser run walks it (truthful
-  // certification, 2026-11-08); the seeded canary alone proves nothing.
-  // cone-checkout-*: JOV-9826 canary claim-checkout walk (Stripe TEST mode).
+  // fresh-user-checkout-entry blocked until walked; cone-checkout-*=JOV-9826 TEST.
   checkout: [
     'checkout-entry-renders',
     'fresh-user-checkout-entry',

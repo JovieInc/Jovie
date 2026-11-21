@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coneScoreboard } from '../prod-cone-cases.mjs';
 
-/** Minimal surface receipt for scoreboard clobber regressions. */
 const receipt = (surface, checks, status = 'passed', blocker = null) => ({
   surface,
   status,
@@ -10,10 +9,7 @@ const receipt = (surface, checks, status = 'passed', blocker = null) => ({
 });
 
 describe('coneScoreboard clobber guard', () => {
-  // Split from prod-cone-cases.test.mjs to stay under size-500 (JOV-9826).
   it('a blocked surface never clobbers a producer check that already ran', () => {
-    // Regression for discussion_r4650659684: whole-surface blocked fill-in
-    // must only cover absent producers, not overwrite a passed check.
     const scoreboard = coneScoreboard([
       receipt(
         'landing',
