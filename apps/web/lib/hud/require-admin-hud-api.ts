@@ -6,7 +6,6 @@ export async function requireAdminHudApiAccess(options?: {
   privileged?: boolean;
 }) {
   return requireOvieApiAccess({
-    session: options?.session ?? 'cookie',
-    privileged: options?.privileged,
+    privileged: options?.privileged ?? false,
   });
 }
