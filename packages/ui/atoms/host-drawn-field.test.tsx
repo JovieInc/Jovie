@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '../test-utils/a11y';
-import { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
+import {
+  HostDrawnInput,
+  HostDrawnSelect,
+  HostDrawnTextarea,
+} from './host-drawn-field';
 
 function SearchHarness({ note }: { readonly note: string }) {
   const [query, setQuery] = React.useState('');
@@ -28,6 +32,7 @@ describe('HostDrawnInput', () => {
     const input = screen.getByRole('textbox', { name: 'Artist' });
     expect(container.firstChild).toBe(input);
     expect(input.className).toBe('min-w-0 flex-1');
+    expect(input).toHaveAttribute('data-host-drawn', '');
   });
 
   it('adds no class attribute when the host passes none', () => {
@@ -169,6 +174,62 @@ describe('HostDrawnSelect', () => {
         <HostDrawnSelect aria-label='الخطة' defaultValue='pro'>
           <option value='pro'>احترافي</option>
         </HostDrawnSelect>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe('HostDrawnTextarea', () => {
+  it('renders only the native textarea, marked host-drawn, with layout classes', () => {
+    const { container } = render(
+      <HostDrawnTextarea aria-label='Message' className='min-h-0 flex-1' />
+    );
+    const textarea = screen.getByRole('textbox', { name: 'Message' });
+    expect(container.firstChild).toBe(textarea);
+    expect(textarea.tagName).toBe('TEXTAREA');
+    expect(textarea.className).toBe('min-h-0 flex-1');
+    expect(textarea).toHaveAttribute('data-host-drawn', '');
+  });
+
+  it('adds no class attribute when the host passes none', () => {
+    render(<HostDrawnTextarea aria-label='Message' />);
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('class');
+  });
+
+  it('keeps typed text and focus across a rerender and Escape, and forwards the ref', async () => {
+    const user = userEvent.setup();
+    const ref = React.createRef<HTMLTextAreaElement>();
+    function Harness({ note }: { readonly note: string }) {
+      const [value, setValue] = React.useState('');
+      return (
+        <div>
+          <p>{note}</p>
+          <HostDrawnTextarea
+            ref={ref}
+            aria-label='Message'
+            value={value}
+            onChange={event => setValue(event.target.value)}
+          />
+        </div>
+      );
+    }
+    const { rerender } = render(<Harness note='Draft' />);
+    const textarea = screen.getByRole('textbox', { name: 'Message' });
+    expect(ref.current).toBe(textarea);
+    await user.type(textarea, 'Hello{Enter}there');
+    rerender(<Harness note='Still drafting' />);
+    await user.keyboard('{Escape}');
+    expect(textarea).toHaveValue('Hello\nthere');
+    expect(textarea).toHaveFocus();
+  });
+
+  it('has no axe violations, empty, filled and disabled', async () => {
+    const { container } = render(
+      <div>
+        <HostDrawnTextarea aria-label='Message' placeholder='Ask anything' />
+        <HostDrawnTextarea aria-label='Note' defaultValue='Line one' />
+        <HostDrawnTextarea aria-label='Locked note' disabled />
       </div>
     );
     await expectNoA11yViolations(container);
