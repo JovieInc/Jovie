@@ -46,7 +46,6 @@ import { formatCount } from './utils';
 
 // -----------------------------------------------------------------------------
 
-// Focus the handle field when its form or dialog mounts after a user action.
 const focusOnMount = (el: HTMLInputElement | null) => el?.focus();
 
 interface VenmoConnectedBadgeProps {

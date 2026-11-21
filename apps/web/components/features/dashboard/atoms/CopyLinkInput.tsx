@@ -105,7 +105,10 @@ export function CopyLinkInput({
   };
 
   return (
-    <div className={cn('relative', className)} data-testid={testId}>
+    <div
+      className={cn('system-b-copy-link-field relative', className)}
+      data-testid={testId}
+    >
       <Input
         ref={inputRef}
         type='text'
@@ -115,7 +118,7 @@ export function CopyLinkInput({
         aria-label='URL To Copy'
         data-copied={isCopied ? 'true' : undefined}
         data-size={size}
-        className={cn('system-b-copy-link-input', inputClassName)}
+        className={inputClassName}
       />
       <Button
         type='button'

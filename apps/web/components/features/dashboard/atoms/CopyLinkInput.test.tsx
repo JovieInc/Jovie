@@ -21,7 +21,7 @@ describe('CopyLinkInput', () => {
     const input = screen.getByRole('textbox', { name: 'URL To Copy' });
     expect(input).toHaveValue('https://jov.ie/tim');
     expect(input).toHaveAttribute('readonly');
-    expect(input).toHaveClass('system-b-copy-link-input');
+    expect(input.closest('.system-b-copy-link-field')).not.toBeNull();
     expect(input).toHaveAttribute('data-size', 'md');
     await expectNoA11yViolations(container);
   });
