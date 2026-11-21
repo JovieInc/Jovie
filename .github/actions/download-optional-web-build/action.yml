@@ -1,0 +1,44 @@
+name: Download optional web build
+# A literal pattern permits zero matches; transport/digest errors still fail.
+# The download action creates the destination only for an existing artifact.
+# Missing tar/manifest inside a PRESENT artifact is a consumer failure.
+description: Distinguish absence from failed or incompatible artifact downloads.
+inputs:
+  name:
+    description: Exact artifact name (no wildcards).
+    required: true
+  path:
+    description: Fresh runner-temp destination.
+    required: true
+outputs:
+  found:
+    description: Artifact exists and downloaded successfully.
+    value: ${{ steps.presence.outputs.found }}
+runs:
+  using: composite
+  steps:
+    - name: Require a fresh download destination
+      shell: bash
+      env:
+        DESTINATION: ${{ inputs.path }}
+        ARTIFACT_NAME: ${{ inputs.name }}
+      run: |
+        [[ "$ARTIFACT_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]
+        test ! -e "$DESTINATION"
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        pattern: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        merge-multiple: true
+    - name: Record artifact presence
+      id: presence
+      shell: bash
+      env:
+        DESTINATION: ${{ inputs.path }}
+      run: |
+        if [ -d "$DESTINATION" ]; then
+          echo 'found=true' >> "$GITHUB_OUTPUT"
+        else
+          echo '::warning::Web build artifact genuinely absent; consumer may rebuild with its declared build env.'
+          echo 'found=false' >> "$GITHUB_OUTPUT"
+        fi

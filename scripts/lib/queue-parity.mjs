@@ -163,6 +163,44 @@ function triggers(workflow) {
   return Object.keys(on ?? {});
 }
 
+/**
+ * @typedef {{
+ *   name?: string,
+ *   if?: string,
+ *   run?: string,
+ *   uses?: string,
+ *   env?: Record<string, string>,
+ *   with?: { name?: string, pattern?: string, 'merge-multiple'?: boolean },
+ *   'continue-on-error'?: boolean,
+ * }} WorkflowYamlStep
+ * @typedef {{
+ *   if?: string,
+ *   env?: Record<string, string>,
+ *   steps?: WorkflowYamlStep[],
+ *   'continue-on-error'?: boolean,
+ * }} WorkflowYamlJob
+ * @typedef {{
+ *   env?: Record<string, string>,
+ *   jobs?: Record<string, WorkflowYamlJob>,
+ *   runs?: { steps?: WorkflowYamlStep[] },
+ * }} WorkflowYamlDocument
+ */
+
+/**
+ * js-yaml `load()` returns `unknown` under scripts checkJs. Workflow and
+ * action tests read fields through this cast so a new property access does
+ * not grow scripts/typecheck-baseline.json.
+ * @param {string} text
+ * @returns {WorkflowYamlDocument}
+ */
+export function loadWorkflowYaml(text) {
+  const value = yamlLoad(text);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('workflow yaml is not a mapping');
+  }
+  return /** @type {WorkflowYamlDocument} */ (value);
+}
+
 /** @returns {Map<string, object>} file -> parsed workflow */
 export function loadWorkflows(root = process.cwd()) {
   const dir = join(root, '.github/workflows');

@@ -3460,7 +3460,7 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenBuild).toContain(`NEXT_PUBLIC_APP_URL: ${goldenPathOrigin}`);
     const extendedBuild = getStepBlock(
       extendedSmokeJob,
-      'Extract or rebuild for smoke tests'
+      'Rebuild absent public artifact'
     );
     expect(extendedBuild).toContain(
       `NEXT_PUBLIC_BETTER_AUTH_URL: ${extendedSmokeOrigin}`
