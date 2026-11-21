@@ -182,4 +182,20 @@ describe('TableHeaderCell (molecule)', () => {
     const { container } = renderCell();
     expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');
   });
+
+  it('gives an unlabeled column an accessible name', () => {
+    const header = mockHeader('');
+    header.column.id = 'select';
+    renderCell({ header, canSort: false });
+    const cell = screen.getByRole('columnheader');
+    expect(cell).toHaveTextContent('select');
+    expect(cell.querySelector('.sr-only')).not.toBeNull();
+  });
+
+  it('names a placeholder header cell with hidden text', () => {
+    const header = mockHeader('actions', { placeholder: true });
+    header.column.id = 'actions';
+    renderCell({ header, canSort: false });
+    expect(screen.getByRole('columnheader')).toHaveTextContent('actions');
+  });
 });
