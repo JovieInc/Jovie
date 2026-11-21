@@ -24,6 +24,24 @@ describe('Icon', () => {
     expect(icon).toHaveAttribute('height', '32');
   });
 
+  it('defaults to optical chrome stroke and scales feature stroke with size (JOV-14004)', () => {
+    render(<Icon name='Search' data-testid='chrome' size={16} />);
+    expect(screen.getByTestId('chrome')).toHaveAttribute('stroke-width', '1.5');
+
+    render(<Icon name='Search' data-testid='feature' size={24} />);
+    expect(screen.getByTestId('feature')).toHaveAttribute(
+      'stroke-width',
+      '1.75'
+    );
+  });
+
+  it('lets explicit strokeWidth win over the optical default', () => {
+    render(
+      <Icon name='Search' data-testid='override' size={16} strokeWidth={2} />
+    );
+    expect(screen.getByTestId('override')).toHaveAttribute('stroke-width', '2');
+  });
+
   it('normalizes various icon name formats', () => {
     render(<Icon name='alarm-clock' data-testid='kebab' />);
     expect(screen.getByTestId('kebab')).toBeInTheDocument();

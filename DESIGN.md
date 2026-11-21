@@ -86,6 +86,18 @@ Read [the surface classification reference](docs/design-system/DETAILS.md#surfac
 
 Read [the typography reference](docs/design-system/DETAILS.md#typography) when changing this area.
 
+App UI is Inter (book 450 default) at `--text-app` **12px**; Satoshi is display-only.
+Optical features: `"cv01", "ss03"`. Keep Linear-compact density — do not drift
+back to a 13px product default.
+
+## Icons
+
+Read [Icon and Symbol Standards](docs/ICON_STANDARDS.md). UI glyphs are Lucide
+via direct imports or the `Icon` atom. Optical stroke (JOV-14004): **1.5** at
+≤16px (Cursor-clean chrome), **1.65** mid, **1.75** at ≥21px (Linear weight at
+larger scale). Prefer `iconStrokeForSize` / `Icon` defaults over Lucide `2` or
+dense `2.25+` overrides. Custom icon library remains the JOV-7760 north star.
+
 ## Copywriting
 
 Read [the copywriting reference](docs/design-system/DETAILS.md#copywriting) when changing this area.

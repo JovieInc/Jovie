@@ -99,6 +99,7 @@ import {
   RailRightClosed,
   RailRightOpen,
 } from '@/components/atoms/rail-icons';
+import { iconStrokeForSize } from '@/lib/design/icon-stroke';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -234,6 +235,8 @@ export function Icon({
   className,
   ariaLabel,
   ariaHidden,
+  size,
+  strokeWidth,
   ...props
 }: IconProps) {
   const iconName = resolveIconName(String(name));
@@ -255,13 +258,20 @@ export function Icon({
   }
 
   const LucideIcon = iconRegistry[iconName];
+  const resolvedSize = typeof size === 'number' ? size : undefined;
+  // JOV-14004: optical default; explicit strokeWidth always wins.
+  const resolvedStroke =
+    strokeWidth === undefined ? iconStrokeForSize(resolvedSize) : strokeWidth;
+
   return (
     <LucideIcon
+      {...props}
       className={cn(className)}
       aria-hidden={shouldHide}
       role={ariaLabel && !shouldHide ? 'img' : undefined}
       aria-label={ariaLabel}
-      {...props}
+      size={size}
+      strokeWidth={resolvedStroke}
     />
   );
 }

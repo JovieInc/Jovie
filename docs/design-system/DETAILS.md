@@ -152,13 +152,18 @@ primary conversion (#17055 / JOV-5864).
 
 ### Type Scale — App (System B)
 
-| Level | Size | Weight | Usage |
-|-------|------|--------|-------|
-| 2xs | 11px | 450 | Counts, badges, small indicators |
-| App default | 13px | 450 | Linear's primary app text size |
-| Nav item | 12px | 500 | Sidebar navigation |
-| Workspace name | 13px | 500 | Sidebar workspace label |
-| Heading | 13px | 510 | List/view headings |
+Runtime tokens (`--text-app`, `--text-2xs`, `--text-mid`) are authoritative.
+App default consolidated to **12px** (2026-09-27); do not reintroduce 13px as
+the product default. Inter uses OpenType `"cv01", "ss03"` (+ `rlig`/`calt`).
+
+| Level | Size | Weight | Token / usage |
+|-------|------|--------|---------------|
+| 2xs | 12px | 450 | `--text-2xs` — counts, badges, small indicators |
+| App default | 12px | 450 | `--text-app` — product UI body (Linear-compact) |
+| Nav item | 12px | 510 | Sidebar navigation (`--font-weight-nav`) |
+| Workspace name | 12px | 510 | Sidebar workspace label |
+| Mid | 14px | 450 | `--text-mid` — denser secondary copy |
+| Heading | 12–14px | 510 | List/view headings |
 | Body | 15px | 400 | Document body, descriptions |
 
 ### Responsive Typography
@@ -928,8 +933,8 @@ Each focused surface declares its default-state control budget and covers loadin
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `98 104 114` | `107 111 118` |
-| Nav font | 12px / weight 500 | — |
-| Item font | 13px / weight 450 | — |
+| Nav font | 12px / weight 510 | — |
+| Item font | ~12.5px history / 12px app (`--text-app`) / weight 450 | — |
 
 Linear-scale density (founder lock 2026-09-25): 28px nav/history rows, 16px
 sidebar icons, 44px app header everywhere (single token, no separate
