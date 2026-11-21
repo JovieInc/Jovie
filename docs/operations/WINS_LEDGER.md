@@ -45,6 +45,26 @@ Queryable metric shapes for `measure-due` v1:
 - JSON file: `source`/`query` like `docs/metrics/shipping-slo-latest.json#queueEjectionRate` (or source = file, query = dotted path).
 - Gateway: `source: Gateway report feature:<tag>` and `query: node scripts/ai-gateway-report.mjs`.
 
+## Summer improvement loop → ledger
+
+Summer’s 6h loop still writes local memory under
+`/mnt/memory/summer-improvement-loop/` (`runs.jsonl`, `open-fix.json`). When a
+verify measures a numeric `after` for `fixed` / `no-effect` / `regressed` and the
+run names the merged PR, promote that evidence into the **same** wins ledger
+(runtime store only — no second ledger):
+
+```bash
+node scripts/wins-ledger.mjs summer-verify --store --runs /path/to/runs.jsonl
+# or on the measure path:
+node scripts/wins-ledger.mjs measure-due --store --summer-runs /path/to/runs.jsonl
+# host post-verify (pulls memory via ant, then summer-verify --store):
+node ops/agents/summer-improvement-loop/deploy.mjs promote-wins
+```
+
+Matching is by PR number/repo against ingested wins. Summer PRs must include
+`## Win` so ingest creates the record; queryable sources still go through
+ordinary `measure-due` adapters when present.
+
 ## Ranked shipping-SLO intake (improve hop)
 
 `shipping-slo.yml` files **exactly one** Linear child of JOV-6783 for the current

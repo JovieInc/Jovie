@@ -118,6 +118,7 @@ jobs:
       # Persistent Mac runners already retain these packages locally; uploading
       # their multi-GB cache can exhaust the job budget after tests pass.
       - name: Restore Swift package cache
+        id: swiftpm-cache
         if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -133,7 +134,13 @@ jobs:
       - name: Validate app icon
         run: bash apps/ios/scripts/validate-app-icon.sh
 
+      # Full primary-key hit means SourcePackages + org.swift.swiftpm match this
+      # Xcode + Package.resolved + pbxproj. Skip the ~46s measured resolve on
+      # warm hosted Fast Unit. Partial restore-keys hits keep cache-hit=false
+      # so resolve still runs. Self-hosted skips the cache step (empty output)
+      # and therefore always resolves.
       - name: Resolve Swift package dependencies
+        if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}
         timeout-minutes: 5
         run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
 
