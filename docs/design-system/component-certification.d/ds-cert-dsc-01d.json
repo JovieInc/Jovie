@@ -1,0 +1,120 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/outbound/OutboundRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundRailFact.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/DmQueueCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiSearchForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/alerts/AlertGrowthLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/CelebrationCardPreview.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/DspMatchCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/ContactsManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/ScreenshotGallery.tsx": {
+      "loading": "The gallery receives an already-resolved list and has no loading branch. The detector matched loading=lazy on the thumbnail img.",
+      "offline": "The gallery makes no request; images are plain links to already-resolved URLs. The detector matched the loading=lazy attribute."
+    },
+    "apps/web/components/features/admin/outbound/OutboundRailFact.tsx": {
+      "permission-denied": "The fact row takes no role or entitlement; the parent rail decides who reaches it. The detector matched the word role in the group role attribute.",
+      "offline": "The row makes no request itself: it hands decisions to onDecision and shows the parent pending flag (LoadingDecisionPending). The detector matched the pending prop."
+    },
+    "apps/web/components/features/alerts/AlertGrowthLanding.tsx": {
+      "empty": "The landing shows a fixed PROOF_POINTS constant and no data-driven collection that could be empty. The detector matched .map( over that constant.",
+      "permission-denied": "The page is a public fan capture surface with no roles or entitlements. The detector matched the phrase lock it in in the confirmation copy."
+    },
+    "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": {
+      "permission-denied": "The widget is a public profile surface open to every visitor and checks no role or entitlement. The detector matched the role field on chat messages (visitor or jovie)."
+    },
+    "apps/web/components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": {
+      "permission-denied": "The page denies nothing: usePlanGate only passes maxRetentionDays to TimeRangeSelector, which owns how longer ranges are offered. The detector matched the word plan in usePlanGate."
+    },
+    "apps/web/components/features/dashboard/molecules/DspMatchCard.tsx": {
+      "offline": "The card makes no request: confirm and reject are callbacks owned by the parent list, which reports in-flight work through isConfirming and isRejecting (LoadingRejecting). The detector matched the isLoading local."
+    },
+    "apps/web/components/features/dashboard/organisms/ContactsManager.tsx": {
+      "offline": "The manager makes no request itself: saves, deletes and their offline failures belong to useContactsManager and the table. The detector matched the isLoading prop that gates navigation readiness (LoadingContacts)."
+    }
+  }
+}
