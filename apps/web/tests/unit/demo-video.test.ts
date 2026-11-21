@@ -4,10 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ORIGINAL_DEMO_VIDEO_URL = process.env.DEMO_VIDEO_URL;
 const ORIGINAL_DEMO_VIDEO_POSTER_URL = process.env.DEMO_VIDEO_POSTER_URL;
-const DEMO_VIDEO_FILE = join(
-  process.cwd(),
-  'public/demo/jovie-demo.mp4'
-);
+const DEMO_VIDEO_FILE = join(process.cwd(), 'public/demo/jovie-demo.mp4');
 
 async function loadModule() {
   vi.resetModules();
