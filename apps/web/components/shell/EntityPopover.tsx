@@ -13,6 +13,7 @@
 // Touch / coarse pointer is suppressed at the ShellDropdown level — this
 // component just renders what it's given.
 
+import { PlainButton } from '@jovie/ui';
 import { Gauge, Music, Users } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -448,8 +449,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           )}
         </h3>
         {artistLink ? (
-          <button
-            type='button'
+          <PlainButton
             onClick={() => {
               // Synthesize a minimal artist entity to surface the linked entity.
               onActivate?.({
@@ -461,7 +461,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
             className='mb-2 inline-flex items-center text-2xs font-caption text-secondary-token underline decoration-subtle underline-offset-2 transition-colors duration-fast ease-subtle hover:text-primary-token hover:decoration-default'
           >
             {artistLink}
-          </button>
+          </PlainButton>
         ) : null}
         {stats.length > 0 ? (
           <div className='flex flex-wrap items-center gap-x-1 gap-y-0.5 text-2xs leading-normal text-tertiary-token'>
@@ -747,9 +747,8 @@ export function EntityHoverLink({
 
   return (
     <>
-      <button
+      <PlainButton
         ref={setAnchor}
-        type='button'
         onMouseEnter={requestOpen}
         onMouseLeave={requestClose}
         onFocus={requestOpen}
@@ -767,7 +766,7 @@ export function EntityHoverLink({
         )}
       >
         {children}
-      </button>
+      </PlainButton>
       {open && anchor ? (
         <EntityPopover
           entity={entity}
