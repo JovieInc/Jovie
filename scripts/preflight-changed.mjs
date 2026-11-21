@@ -52,6 +52,7 @@ import {
 
 export { failureSummaryLines, failureTestPaths };
 
+import { runPreflightCoverage } from './lib/preflight-coverage.mjs';
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
 import {
   failingItemLines,
@@ -798,42 +799,15 @@ export async function main({
     add(
       'coverage',
       'exact-head coverage on changed lines',
-      async () => {
-        const head = git(cwd, ['rev-parse', 'HEAD']);
-        const plan = await sh(
-          `node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --plan`,
-          { cwd, env: childEnv }
-        );
-        let parsed;
-        try {
-          parsed = JSON.parse(plan.out.trim().split('\n').pop());
-        } catch {
-          return { code: 1, out: plan.out, ms: plan.ms };
-        }
-        if (!parsed.applicable)
-          return {
-            skip: 'no coverable web product source',
-            code: 0,
-            out: '',
-            ms: plan.ms,
-          };
-        const e = {
-          ...childEnv,
-          JOVIE_COVERAGE_INCLUDE: (parsed.coverageInclude ?? []).join('\n'),
-          JOVIE_COVERAGE_RELATED_TESTS: (parsed.relatedTests ?? []).join('\n'),
-        };
-        const run = await sh(
-          hostSlotted(
-            `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`
-          ),
-          { cwd, env: e, timeoutMs: 900_000 }
-        );
-        return {
-          ...run,
-          ms: run.ms + plan.ms,
-          note: 'covers committed lines; commit first',
-        };
-      },
+      () =>
+        runPreflightCoverage({
+          cwd,
+          env: childEnv,
+          base: mergeBase,
+          head: git(cwd, ['rev-parse', 'HEAD']),
+          sh,
+          hostSlotted,
+        }),
       2
     );
   }
