@@ -392,7 +392,7 @@ describe('ArtistProfilesPage', () => {
       FAQ: false,
     });
     expect(
-      screen.getByRole('heading', { name: /The link your\s+music deserves/ })
+      screen.getByRole('heading', { name: /One link\.\s+Everywhere/ })
     ).toBeInTheDocument();
     // Short-circuit hero still mounts the one mode-morphing mock.
     expect(

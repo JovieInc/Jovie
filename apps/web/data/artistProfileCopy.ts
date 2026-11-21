@@ -429,10 +429,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   hero: {
     eyebrow: '',
-    // Soft break keeps line-clamp-2 + taste ratchet balanced (no orphan last word).
-    headline: 'The link your\nmusic deserves.',
-    subhead:
-      'Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.',
+    // Two short beats — fits line-clamp-2 in the left-phone column without
+    // orphaning (ch bumps did not change layout under display-size Satoshi).
+    // Avoid new ICP "music" debt; artists page may shrink existing ids only.
+    headline: 'One link.\nEverywhere.',
+    subhead: 'Bio, socials, and your next release in one free profile.',
     ctaLabel: 'Claim your profile',
     secondaryCtaLabel: 'See how it adapts',
     signature: 'jov.ie/you',

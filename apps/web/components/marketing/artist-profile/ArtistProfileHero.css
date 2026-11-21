@@ -7,11 +7,8 @@
   margin-top: calc(-1 * var(--public-shell-header-offset));
 }
 
-.ap-hero .homepage-poster-hero__headline {
-  /* Soft-broken second line is "music deserves." — wider than homepage
-     18ch so Satoshi display glyphs don't rewrap under line-clamp-2. */
-  max-width: 22ch;
-}
+/* Headline width inherits homepage poster-hero (18ch). Short two-beat copy
+   carries the taste ratchet; do not fight display-size Satoshi with ch bumps. */
 
 .ap-hero .homepage-poster-hero__subtitle {
   max-width: 42rem;
