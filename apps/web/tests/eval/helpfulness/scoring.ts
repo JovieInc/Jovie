@@ -4,6 +4,7 @@
  */
 
 import { lintVoice } from '@/lib/chat/voice-lint';
+import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
 import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
@@ -177,6 +178,20 @@ export function runHardChecks(
       id: theme.id.replaceAll('-', '_'),
       ok: theme.ok,
       detail: theme.detail,
+    });
+  }
+
+  // ASS-70 / deferred ASS-36: never deny per-release data when the fixture
+  // has a Discography catalog (established / lapsed). Empty-profile (`new`)
+  // skips this check.
+  if (fixtureHasCatalog(testCase.fixture)) {
+    const deny = deniesVisibleCatalog(text);
+    checks.push({
+      id: 'catalog_deny',
+      ok: !deny,
+      detail: deny
+        ? 'denies per-release / track-by-track data despite catalog context'
+        : undefined,
     });
   }
 
