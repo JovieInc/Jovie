@@ -277,3 +277,5 @@ they now snapshot the accordion each link opens (`snapshotAccordion` in
 `admin-surface-manifest.ts`), and `?view=campaigns`, which opens the same
 accordion as outreach, shares its baseline (`snapshotSharedWith`). The
 scheduled refresh writes the new outreach and ingest baselines.
+
+2026-11-21 changelog receipts (headroom audit): 1.29 MB of the 1.56 MB `CHANGELOG.md` was the 17 hidden `daily-changelog-receipt/v1` comments, and 1.17 MB of that was each receipt's `audit` array: one row per unpublished candidate PR, re-listed every day (20-130 KB per publish) and never read back (`pending` and `deferred` carry the follow-up ids; the plan's `audit` still feeds the writer-proof attachment). Receipts now persist `auditCounts` (rows per reason), and each daily publish compacts older receipts the same way (`scripts/lib/daily-changelog-receipts.mjs`), so the writer frees about 1.2 MB on its next publish without an implementation PR touching `CHANGELOG.md` (JOV-5378). Full rows remain in git history. Budget unchanged.

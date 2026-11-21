@@ -279,7 +279,7 @@ describe('PageRecordSchema', () => {
         })
       )
     ).toContain(
-      'hero section variant "left-none" does not match hero code binding "split-link-claim" (split-claim-card)'
+      'hero section variant "left-none" does not match hero code binding "split-link-claim" (left-phone)'
     );
   });
 

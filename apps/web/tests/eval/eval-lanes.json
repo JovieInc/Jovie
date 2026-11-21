@@ -41,6 +41,7 @@
       "tests/eval/helpfulness/fail-themes.ci.test.ts",
       "tests/eval/helpfulness/failure-delta.ci.test.ts",
       "tests/eval/helpfulness/helpfulness.ci.test.ts",
+      "tests/eval/helpfulness/one-rec-gaps.ci.test.ts",
       "tests/eval/helpfulness/runner.ci.test.ts",
       "tests/eval/helpfulness/workers-ai.ci.test.ts",
       "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
