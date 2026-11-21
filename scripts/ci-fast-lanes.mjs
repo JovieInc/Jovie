@@ -363,7 +363,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node apps/ios/scripts/native-design-system.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/ios/scripts/native-design-system.mjs --test-coverage-include=apps/ios/scripts/native-design-system-motion.mjs --test-coverage-include=apps/ios/scripts/native-design-system-action-button.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 apps/ios/scripts/native-design-system.test.mjs apps/ios/scripts/native-design-system-motion.test.mjs apps/ios/scripts/native-design-system-action-button.test.mjs && node scripts/invariants/native-spacing-scale.mjs',
     inputs:
-      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/native-spacing-scale)/u,
+      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|packages\/ui\/atoms\/button-contract\.ts$|scripts\/invariants\/native-spacing-scale)/u,
     prOnly: false,
   }),
   Object.freeze({
