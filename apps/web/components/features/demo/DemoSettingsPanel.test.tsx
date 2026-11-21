@@ -92,7 +92,7 @@ describe('DemoSettingsPanel', () => {
       try {
         const { container } = render(<DemoSettingsPanel />);
         const switches = screen.getAllByRole('switch', {
-          name: 'Always in sync',
+          name: 'Always In Sync',
         });
         expect(switches.length).toBeGreaterThan(0);
         await expectNoA11yViolations(container);

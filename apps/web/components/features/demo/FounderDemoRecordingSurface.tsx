@@ -309,7 +309,7 @@ function RecordingChatPanel({
               performance.
             </div>
             <Button variant='primary' size='sm' className='w-full'>
-              Approve drop
+              Approve Drop
             </Button>
           </div>
         ) : null}

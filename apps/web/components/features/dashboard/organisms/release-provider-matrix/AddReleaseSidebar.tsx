@@ -384,7 +384,7 @@ function AddReleaseSidebarForm({
               selected={genres}
               onChange={setGenres}
               trigger={
-                <PlainButton className='flex min-h-8 w-full items-center justify-between gap-2 rounded-lg bg-surface-1 px-3 py-1.5 text-left text-xs text-primary-token transition-[background-color,color] duration-subtle hover:bg-surface-2'>
+                <PlainButton className='flex min-h-8 w-full items-center justify-between gap-2 rounded-lg bg-surface-1 px-3 py-1.5 text-left text-xs text-primary-token transition-colors duration-subtle hover:bg-surface-2'>
                   <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
                     {genres.length > 0 ? (
                       genres.map(genre => (

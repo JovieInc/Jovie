@@ -76,7 +76,7 @@ describe('Founder demo approval step', () => {
     now.mockReturnValue(50_000);
     act(() => tick?.(50_000));
 
-    const approve = screen.getByRole('button', { name: 'Approve drop' });
+    const approve = screen.getByRole('button', { name: 'Approve Drop' });
     await user.click(approve);
     expect(approve).toBeInTheDocument();
     expect(approve.className).not.toContain('--linear-btn');

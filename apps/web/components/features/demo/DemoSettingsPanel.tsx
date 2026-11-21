@@ -277,7 +277,7 @@ function AlwaysInSyncToggle() {
       </span>
       <Switch
         defaultChecked
-        aria-label='Always in sync'
+        aria-label='Always In Sync'
         onCheckedChange={() =>
           runDemoAction({ successMessage: 'Setting updated (demo).' })
         }
