@@ -263,3 +263,17 @@ Budget: **60 runs per merged PR** across all workflows. The registry ceiling sta
 2026-11-21 hygiene pass (RSI win #3 / MQ ejection): main tip measured 207,590,328 of 207,618,048 tracked regular-file bytes (99.99%, ~27 KB headroom). Cancel-cause evidence (`docs/metrics/merge-queue-cancel-causes-2026-11-19.md`) showed 58.8% of merge_group cancels were `other_workflow_eject` from PR Size Guard, almost all the combined-tree byte budget. Reclaim (budget unchanged): (1) convert the four remaining regular-file `public/product-screenshots/*` exports that byte-matched catalog images into tracked symlinks (same pattern as the other 37 exports; ~618 KB off the combined tree); (2) re-encode `public/demo/jovie-demo.mp4` 4037667 → 2118176 bytes (1280p CRF28) with `DEMO_VIDEO_MAX_BYTES` shrink-only ratchet; (3) require every registry public export to be a catalog symlink in `check-screenshot-catalog` so regular-file copies cannot reintroduce double-counted blobs. Working-tree after: ~205,052,999 bytes (~2.45 MiB headroom, 98.76%).
 
 2026-11-21 hygiene pass (headroom audit): main measured 207,079,614 of 207,618,048 tracked regular-file bytes (99.74%) at `8c091d12`. The vendored `actions-cache` bundles are now minified at refresh time (`processing: minify/v1` in `.github/actions/vendor/manifest.json`; esbuild with `keepNames` and inline legal comments, `upstreamFiles` still pins the upstream hashes), cutting 6.75 MB to 2.65 MB. They stay vendored for JOV-8754. Budget unchanged.
+
+2026-11-21 duplicate baselines fixed: the three identical groups the
+2026-10-21 hash audit kept were not route or theme tripwires. Theme switching
+ships off (`lib/theme/route-policy.ts`), so `pricing-dark`/`pricing-light`
+became one shared `pricing.png` that the light test still compares against,
+failing if light mode leaks out uncertified. `signin-dark`/`signup-dark` were
+the retired Clerk "Configuration Error" card, still passing against the real
+Better Auth form inside the dark-on-dark diff tolerance; that block is gone and
+`auth-visual.spec.ts` covers both pages. The Growth deep links
+(`admin-growth-outreach`/`-campaigns`/`-ingest`) photographed the page top, so
+they now snapshot the accordion each link opens (`snapshotAccordion` in
+`admin-surface-manifest.ts`), and `?view=campaigns`, which opens the same
+accordion as outreach, shares its baseline (`snapshotSharedWith`). The
+scheduled refresh writes the new outreach and ingest baselines.
