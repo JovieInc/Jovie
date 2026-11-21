@@ -82,6 +82,7 @@ import {
 import {
   degradeDistributionEventsRead,
   degradeSocialLinksRead,
+  degradeTippingStatsRead,
   isDashboardReadRecoveryAdmitted,
   tolerateMissingTourDatesConfirmationStatus,
 } from './dashboard-read-recovery';
@@ -1123,21 +1124,7 @@ async function fetchTippingStatsWithSession(
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
     };
   } catch (error) {
-    // This supplementary read already degrades safely to empty stats. Expected
-    // Neon cold-start timeouts are infrastructure noise, not actionable Sentry
-    // issues; Drizzle's wrapper otherwise groups them by the aggregate SQL.
-    if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
-      logger.warn(
-        '[tipping-stats] tipping stats query timed out; degrading to empty stats'
-      );
-      return createEmptyTippingStats();
-    }
-
-    Sentry.captureException(error, {
-      level: 'error',
-      tags: { query: 'tipping_stats', context: 'dashboard_data' },
-    });
-    return createEmptyTippingStats();
+    return degradeTippingStatsRead(error);
   }
 }
 
