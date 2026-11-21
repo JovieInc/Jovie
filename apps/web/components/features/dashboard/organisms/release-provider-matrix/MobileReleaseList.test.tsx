@@ -40,6 +40,7 @@ const release: ReleaseViewModel = {
   title: 'Summer Lights',
   artistNames: ['Jovie Artist'],
   slug: 'summer-lights',
+  status: 'released',
   releaseType: 'single',
   isExplicit: false,
   releaseDate: '2026-06-15',

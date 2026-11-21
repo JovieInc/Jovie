@@ -46,7 +46,12 @@ function ProfileIdentityFieldRow({
   className,
 }: Readonly<ProfileIdentityFieldRowProps>) {
   return (
-    <div className={cn('space-y-1.5 px-2.5 py-2.5 sm:px-3', className)}>
+    <div
+      className={cn(
+        'space-y-1.5 border-b border-subtle px-2.5 py-2.5 last:border-b-0 sm:px-3',
+        className
+      )}
+    >
       <p className='text-center text-app font-caption tracking-normal text-secondary-token'>
         {label}
       </p>
@@ -179,7 +184,7 @@ export function ProfileEditorSection({
           showHoverOverlay
         />
 
-        <ContentSurfaceCard className='w-full max-w-md divide-y divide-subtle overflow-hidden'>
+        <ContentSurfaceCard className='w-full max-w-md overflow-hidden'>
           <ProfileIdentityFieldRow
             label='Display Name'
             editing={editingField === 'displayName'}

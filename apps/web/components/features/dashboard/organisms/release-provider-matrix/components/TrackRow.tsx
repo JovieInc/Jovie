@@ -134,7 +134,7 @@ export const TrackRow = memo(function TrackRow({
     <PlainButton
       type='button'
       onClick={handleTogglePlayback}
-      className='focus-ring-transparent-offset flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-secondary-token transition-colors duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+      className='focus-ring-transparent-offset relative flex h-7 w-7 items-center before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 justify-center rounded-full border border-transparent text-secondary-token transition-colors duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
       aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
     >
       {isPlaying ? (

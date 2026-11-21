@@ -11,7 +11,7 @@ const meta = {
     onClose: fn(),
     onVerify: fn(async () => undefined),
     hostname: 'novalane.com',
-    verificationToken: 'jovie-verification=3f9c2a71b8d44e5aa6c0d1e2f3a4b5c6',
+    verificationToken: 'jovie-verification=example',
     verifying: false,
     verificationStatus: 'unverified',
     verificationError: null,
@@ -48,7 +48,7 @@ export const LongContent: Story = {
   args: {
     hostname: 'the-extraordinarily-long-named-artist-website.example.com',
     verificationToken:
-      'jovie-verification=3f9c2a71b8d44e5aa6c0d1e2f3a4b5c63f9c2a71b8d44e5aa6c0d1e2f3a4b5c6',
+      'jovie-verification=example-with-a-much-longer-placeholder-token-value',
   },
 };
 

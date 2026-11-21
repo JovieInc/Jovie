@@ -26,6 +26,7 @@ const providerConfig = {
 const track: TrackViewModel = {
   id: 'track-1',
   releaseId: 'release-1',
+  releaseSlug: 'summer-lights',
   title: 'Open Skies',
   slug: 'open-skies',
   smartLinkPath: '/smart/track-1',
