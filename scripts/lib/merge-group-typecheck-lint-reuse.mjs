@@ -165,9 +165,17 @@ export function gitTreeSha(cwd, rev) {
   return tree;
 }
 
+/** Workflow file used for Source Validation proof lookup (matches SV itself). */
+export const SOURCE_VALIDATION_WORKFLOW_PATH =
+  'source-validation.yml';
+
 /**
  * True when Source Validation already concluded success on the exact source
  * head (PR Ready aggregate). Fail open on transport errors.
+ *
+ * Query the workflow-scoped runs endpoint (not repo-wide `/actions/runs`) so
+ * concurrent PR workflows cannot push the SV proof out of a small page window
+ * (Sentry 20814924). Pattern matches source-validation.yml proof reuse.
  * @param {{
  *   repository: string,
  *   sourceHeadSha: string,
@@ -192,10 +200,10 @@ export async function sourceHeadHasGreenValidationProof({
     event: 'pull_request',
     head_sha: head,
     status: 'completed',
-    per_page: '20',
+    per_page: '100',
   });
   const response = await fetchImpl(
-    `${apiUrl}/repos/${owner}/${repo}/actions/runs?${query}`,
+    `${apiUrl}/repos/${owner}/${repo}/actions/workflows/${SOURCE_VALIDATION_WORKFLOW_PATH}/runs?${query}`,
     {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -210,12 +218,7 @@ export async function sourceHeadHasGreenValidationProof({
     await response.json()
   );
   return (body.workflow_runs ?? []).some(
-    run =>
-      run.head_sha === head &&
-      run.conclusion === 'success' &&
-      (run.path === '.github/workflows/source-validation.yml' ||
-        run.name === 'Source Validation' ||
-        String(run.path ?? '').endsWith('/source-validation.yml'))
+    run => run.head_sha === head && run.conclusion === 'success'
   );
 }
 

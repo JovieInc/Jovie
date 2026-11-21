@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   decideTypecheckLintReuse,
   MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES,
   REUSABLE_TYPECHECK_LINT_LANE_IDS,
   reusableLaneDefinitionHash,
+  SOURCE_VALIDATION_WORKFLOW_PATH,
+  sourceHeadHasGreenValidationProof,
 } from '../merge-group-typecheck-lint-reuse.mjs';
 import { LANE_GROUPS } from '../../ci-fast-lanes.mjs';
 
@@ -101,6 +103,56 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
     expect(MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES).toContain(
       'eslint-server-boundaries'
     );
+  });
+
+  it('proof lookup scopes to source-validation.yml runs (Sentry 20814924)', async () => {
+    /** @type {string[]} */
+    const urls = [];
+    const fetchImpl = vi.fn(async url => {
+      urls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return {
+            workflow_runs: [
+              { head_sha: HEAD, conclusion: 'success' },
+            ],
+          };
+        },
+      };
+    });
+    await expect(
+      sourceHeadHasGreenValidationProof({
+        repository: 'JovieInc/Jovie',
+        sourceHeadSha: HEAD,
+        token: 't',
+        fetchImpl: /** @type {typeof fetch} */ (fetchImpl),
+      })
+    ).resolves.toBe(true);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain(
+      `/actions/workflows/${SOURCE_VALIDATION_WORKFLOW_PATH}/runs?`
+    );
+    expect(urls[0]).not.toMatch(/\/actions\/runs\?/);
+    expect(urls[0]).toContain('per_page=100');
+    expect(urls[0]).toContain(`head_sha=${HEAD}`);
+  });
+
+  it('proof lookup fails open when the workflow-scoped query is empty', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      async json() {
+        return { workflow_runs: [] };
+      },
+    }));
+    await expect(
+      sourceHeadHasGreenValidationProof({
+        repository: 'JovieInc/Jovie',
+        sourceHeadSha: HEAD,
+        token: 't',
+        fetchImpl: /** @type {typeof fetch} */ (fetchImpl),
+      })
+    ).resolves.toBe(false);
   });
 
   it('reusable lanes are a subset of the hosted ci-fast lane table', () => {

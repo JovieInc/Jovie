@@ -106,7 +106,9 @@ proof-inequivalent to Source Validation):
 
 Admission exports `source_head_sha` (already known from the live queue) so the
 reuse step spends no extra GraphQL. REST proof lookup runs only on same-tree
-candidates (~3/10 groups in the Nov 19 sample).
+candidates (~3/10 groups in the Nov 19 sample), against the workflow-scoped
+`actions/workflows/source-validation.yml/runs` endpoint (`per_page=100`) so
+other PR workflows cannot hide the green proof.
 
 ## Queue parity: the queue is a re-check, not a first check
 
