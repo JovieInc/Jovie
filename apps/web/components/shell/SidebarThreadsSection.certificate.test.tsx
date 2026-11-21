@@ -191,7 +191,8 @@ describe('SidebarThreadsSection trailing date', () => {
     );
     const date = container.querySelector('time');
     expect(date).toHaveClass('group-hover/thread:opacity-0');
-    expect(date).toHaveClass('group-focus-within/thread:opacity-0');
+    expect(date).toHaveClass('group-has-focus-visible/thread:opacity-0');
+    expect(date).not.toHaveClass('group-focus-within/thread:opacity-0');
   });
 
   it('keeps the date steady when the row has no actions', () => {
