@@ -24,12 +24,20 @@ import {
 const SCALE_MIN = 1;
 const SCALE_MAX = 5;
 
+function isAssistantId(value: string): value is AssistantId {
+  return value === 'jovie' || value === 'summer';
+}
+
 export function medianOf(scores: readonly number[]): number {
   if (scores.length === 0) return 0;
   const sorted = [...scores].toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid]!;
-  return (sorted[mid - 1]! + sorted[mid]!) / 2;
+  const high = sorted.at(mid);
+  if (typeof high !== 'number') return 0;
+  if (sorted.length % 2 === 1) return high;
+  const low = sorted.at(mid - 1);
+  if (typeof low !== 'number') return high;
+  return (low + high) / 2;
 }
 
 function isFiniteScore(value: number): boolean {
@@ -38,7 +46,7 @@ function isFiniteScore(value: number): boolean {
 
 function validateSample(sample: EvalSample): RatchetFailure[] {
   const failures: RatchetFailure[] = [];
-  if (sample.assistant !== 'jovie' && sample.assistant !== 'summer') {
+  if (!isAssistantId(sample.assistant)) {
     failures.push({
       reason: 'invalid_sample',
       message: `Unknown assistant "${String(sample.assistant)}".`,
@@ -156,8 +164,9 @@ export function evaluateAssistantsRatchet(
 
   failures.push(...validateSample(sample));
 
-  const assistantBaseline =
-    baseline.assistants[sample.assistant as AssistantId];
+  const assistantBaseline = isAssistantId(sample.assistant)
+    ? baseline.assistants[sample.assistant]
+    : undefined;
   if (!assistantBaseline) {
     failures.push({
       reason: 'invalid_sample',
