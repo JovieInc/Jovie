@@ -92,12 +92,10 @@ type PolicyWorkflow = {
   readonly jobs?: Record<string, PolicyJob>;
 };
 const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
-// Commands that make Playwright (or its telemetry normalizers) write the
-// browser-derived files the guard scans before any upload can read them.
+// Playwright/telemetry commands that write browser-derived files the guard scans.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
-// `file:job` to one step name or '*' for the whole job.
+// Unguarded producers: `file:job` → step name or '*' for the whole job.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
@@ -853,10 +851,7 @@ describe('Playwright artifact secret boundary', () => {
   }, 90_000);
 
   it('keeps fixture Playwright configs from fetching into the enclosing checkout', () => {
-    // Fixtures live under apps/web, inside the real checkout. With CI's
-    // GITHUB_ACTIONS and a pull_request event, Playwright's git-commit-info
-    // plugin runs `git fetch origin <base.sha> --depth=1` from the config dir,
-    // which shallows the checkout under concurrent structural commands.
+    // Fixture configs must disable git-commit-info fetch (CI shallows checkout).
     const source = readFileSync(import.meta.filename, 'utf8');
     const fixtureConfigs = source
       .split(['export default', 'defineConfig({'].join(' '))
@@ -1067,9 +1062,7 @@ describe('Playwright artifact secret boundary', () => {
     expect(visualUpload).toContain("public-images: 'true'");
   });
 
-  // JOV-7707: the artifact boundary is enforced as policy over parsed workflow
-  // YAML. New producers, uploads and jobs are held to these rules by default,
-  // so adding one needs no inventory edit; only exemptions are listed.
+  // JOV-7707: policy over parsed YAML; only exemptions are listed.
   it('guards every Playwright producer step outside the reviewed exemptions', () => {
     const violations = workflowJobs().flatMap(({ file, id, job }) =>
       producerSteps(job).flatMap(({ step }) => {
@@ -1326,9 +1319,7 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    // Evidence is data: the nightly report ships as a run artifact, never as
-    // a PR (#23906). The report job must not mint a publication token at all,
-    // so no bot credentials can reach it in any order.
+    // Nightly report is a run artifact only (#23906) — no publication token.
     expect(
       reportJob?.steps?.some(step =>
         /create-github-app-token@/.test(step.uses ?? '')
@@ -1576,7 +1567,9 @@ ${fixtureCheckout}
               step =>
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) && step.includes('tests/e2e/smoke-prod-auth.spec.ts')
+                ) &&
+                (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
+                  step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )
             .map(step => ({
               file,
@@ -1611,6 +1604,19 @@ ${fixtureCheckout}
       expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
         'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
       );
+      // JOV-9826: dogfood Stripe TEST custody (not Doppler price/account).
+      if (producer.includes('canary-claim-checkout.spec.ts')) {
+        for (const s of [
+          'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}',
+          'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}',
+          'STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv',
+          'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp',
+        ])
+          expect(producer).toContain(s);
+        expect(producer).not.toContain(
+          'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,STRIPE_TEST_ACCOUNT_ID'
+        );
+      }
     }
   });
 
@@ -2130,17 +2136,14 @@ ${fixtureCheckout}
     const valid = png();
     expect(validPlaywrightPng(valid)).toBe(true);
     expect(validPlaywrightPng(png([], undefined, 6))).toBe(true);
-    // Exact marketing-route failure mode: 2x desktop (1440 CSS @ 2) full-page
-    // at 7_000 CSS px → 2880×14000 RGB = 120_974_000 decoded bytes. The old
-    // 100MB ceiling rejected these as image-policy even with allow-images.
+    // Marketing-route 2x desktop full-page (2880×14000) must pass pixel budget.
     const marketingRouteDesktop = png([], undefined, 2, 2880, 14_000);
     expect((1 + 2880 * 3) * 14_000).toBeGreaterThan(100_000_000);
     expect((1 + 2880 * 3) * 14_000).toBeLessThan(
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
-    // Regression for the production /changelog desktop capture that exposed
-    // the previous 400MB ceiling: 2880x58814 RGBA plus one filter byte/row.
+    // /changelog desktop capture must stay under the prior 400MB ceiling.
     expect((1 + 2880 * 4) * 58_814).toBe(677_596_094);
     expect((1 + 2880 * 4) * 58_814).toBeLessThan(
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
@@ -2365,11 +2368,7 @@ ${fixtureCheckout}
       chromiumConfig,
       "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
     );
-    // Under runner CPU contention headless Chromium intermittently rejects a
-    // 2880x14000 full-page capture with "Protocol error
-    // (Page.captureScreenshot): Unable to capture screenshot" (merge-queue
-    // structural-web jobs 108805269012 and 108870253303). Retry only that
-    // transient, at most twice; any other error, or a third failure, fails.
+    // Retry captureScreenshot CPU-contention failures ≤2× (MQ structural-web).
     write(
       join(chromiumDir, 'route.spec.ts'),
       "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');for(let attempt=1;;attempt++){try{await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'});break}catch(error){if(attempt>=3||!String(error).includes('Unable to capture screenshot'))throw error}}})"
@@ -2647,10 +2646,7 @@ ${fixtureCheckout}
     const counts =
       'blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1; file-classes=json:1';
 
-    // In Actions the counts-only line is duplicated as a step error annotation
-    // so a fresh failing step is diagnosable from check annotations without
-    // admin job-log access (run 39820205877 class). Content is identical to
-    // the stderr line — never paths, file names, or values.
+    // Duplicate counts-only line as Actions annotation (run 39820205877).
     const annotated = runChild(workspace, runner, leakChild, {
       FLAGS_SECRET: 'annotation-sentinel-secret',
     });

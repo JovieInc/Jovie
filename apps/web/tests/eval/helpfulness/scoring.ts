@@ -5,6 +5,8 @@
 
 import { lintVoice } from '@/lib/chat/voice-lint';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
+import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
+import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
 import {
   type BehaviorId,
@@ -35,6 +37,14 @@ export interface HardCheckResult {
   readonly detail?: string;
 }
 
+/** Optional case context for theme hard checks (UPCOMING-first). */
+export interface HardCheckContext {
+  /** Fixture/judge facts; an UPCOMING row enables upcoming-first. */
+  readonly facts?: readonly string[];
+  /** Explicit upcoming title; wins over facts parsing. */
+  readonly upcomingTitle?: string;
+}
+
 /**
  * Stock creator-economy advice that could be pasted into any artist's chat.
  * A hit is a hard fail: it is the clearest "dumb" signal.
@@ -53,6 +63,14 @@ export const GENERIC_ADVICE_PATTERNS: readonly RegExp[] = [
   /\bgreat question\b/i,
 ];
 
+/** Draft-hold: claiming outbound already went out. Narrow so "when you send…" passes. */
+export const CLAIMED_SENT_PATTERNS: readonly RegExp[] = [
+  /\bi(?:'|’)?ve (?:already )?(?:sent|messaged|posted|replied|emailed)\b/i,
+  /\bi (?:just |already )?(?:sent|messaged|posted|emailed) (?:it|them|the|your|a|him|her)\b/i,
+  /\b(?:dm|message|reply|comment|pitch) (?:has been|was|is) (?:sent|posted|delivered|submitted)\b/i,
+  /\bsent (?:the )?(?:dm|reply|message|comment|pitch) (?:for you|already|to (?:them|the fan))\b/i,
+];
+
 const EMOJI = /\p{Extended_Pictographic}/u;
 
 export function countWords(text: string): number {
@@ -61,7 +79,8 @@ export function countWords(text: string): number {
 
 export function runHardChecks(
   testCase: HelpfulnessCase,
-  reply: EvalReply
+  reply: EvalReply,
+  context?: HardCheckContext
 ): HardCheckResult[] {
   const text = reply.text;
   const toolText = reply.toolCalls
@@ -114,6 +133,27 @@ export function runHardChecks(
     });
   }
 
+  for (const [index, forbidden] of (testCase.mustNotSay ?? []).entries()) {
+    const hit = haystack.includes(forbidden.toLowerCase());
+    checks.push({
+      id: `must_not_say_${index}`,
+      ok: !hit,
+      detail: hit ? `contained "${forbidden}"` : undefined,
+    });
+  }
+
+  const draftHold =
+    testCase.draftHold === true ||
+    (testCase.draftHold !== false && testCase.id.startsWith('fan-reply-'));
+  if (draftHold) {
+    const claimed = CLAIMED_SENT_PATTERNS.find(pattern => pattern.test(text));
+    checks.push({
+      id: 'draft_hold',
+      ok: !claimed,
+      detail: claimed ? `matched ${claimed.source}` : undefined,
+    });
+  }
+
   if (testCase.expectToolsAny && testCase.expectToolsAny.length > 0) {
     const called = reply.toolCalls.map(call => call.name);
     const ok = testCase.expectToolsAny.some(name => called.includes(name));
@@ -126,7 +166,45 @@ export function runHardChecks(
     });
   }
 
+  // ASS-25/ASS-29 fail themes: inventing-stats + question-not-a-move always;
+  // upcoming-first only when case context has an UPCOMING title.
+  const upcomingTitle =
+    context?.upcomingTitle ??
+    (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);
+  for (const theme of runFailThemeChecks(text, {
+    upcoming: upcomingTitle ? { upcomingTitle } : undefined,
+  })) {
+    checks.push({
+      id: theme.id.replaceAll('-', '_'),
+      ok: theme.ok,
+      detail: theme.detail,
+    });
+  }
+
+  // ASS-70 / deferred ASS-36: never deny per-release data when the fixture
+  // has a Discography catalog (established / lapsed). Empty-profile (`new`)
+  // skips this check.
+  if (fixtureHasCatalog(testCase.fixture)) {
+    const deny = deniesVisibleCatalog(text);
+    checks.push({
+      id: 'catalog_deny',
+      ok: !deny,
+      detail: deny
+        ? 'denies per-release / track-by-track data despite catalog context'
+        : undefined,
+    });
+  }
+
   return checks;
+}
+
+/** Live-runner helper: UPCOMING title comes from fixture facts. */
+export function runHardChecksForFixture(
+  testCase: HelpfulnessCase,
+  reply: EvalReply,
+  fixture: Pick<EvalFixture, 'facts'>
+): HardCheckResult[] {
+  return runHardChecks(testCase, reply, { facts: fixture.facts });
 }
 
 export type JudgeScores = Partial<Record<BehaviorId, 0 | 1 | 2 | null>>;

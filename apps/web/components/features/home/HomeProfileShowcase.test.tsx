@@ -27,7 +27,7 @@ it('keeps the real mock-home subject in an inert preview instead of enabling fan
       presentation: 'embedded',
       artist: expect.objectContaining({
         name: 'Tim White',
-        handle: 'timwhite',
+        handle: 'tim',
       }),
       latestRelease: expect.objectContaining({ title: 'Take Me Over' }),
     })

@@ -61,7 +61,7 @@ export const Tall: Story = {
   },
 };
 
-export const UnmappedProvider: Story = {
+export const EmptyUnmappedProvider: Story = {
   args: {
     provider: 'amazon',
   },

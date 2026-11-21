@@ -642,9 +642,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   // JOV-9758 guard: value before paywall. The preview shows a real release,
   // a painted portrait and artwork, and no forced caps, before any pricing.
   const previewRail = page
-    .locator(
-      '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
-    )
+    .locator('[data-testid="onboarding-profile-rail"]')
     .filter({ visible: true })
     .first();
   await expect

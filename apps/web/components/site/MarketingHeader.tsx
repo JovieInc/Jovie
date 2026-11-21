@@ -44,16 +44,13 @@ export type MarketingHeaderCta = HeaderNavCta;
 // the same declared order; only the desktop shell adds visual treatment.
 // The Customers flyout renders between the wordmark and these links, so the
 // desktop order is Customers, Product, Pricing (Pen header, 2026-09-26).
-const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  ...MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link })),
-];
+// LogoLink is the home control. Do not add a separate "Jovie" text nav link
+// beside the mark on inner marketing pages (JOV-14240).
+const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] =
+  MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link }));
 const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [
   MARKETING_CUSTOMERS_FLYOUT,
 ];
-// Icon-only pages drop the desktop wordmark; the logo reveals it on hover.
-const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[] =
-  MARKETING_GLASS_DESKTOP_LINKS.filter(link => link.treatment !== 'wordmark');
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
@@ -117,7 +114,6 @@ function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
   simpleNavLinks: readonly MarketingHeaderNavLink[],
-  iconOnly: boolean,
   chromeNav?: MarketingHeaderChromeNav
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
@@ -132,18 +128,6 @@ function resolveNavConfig(
   }
   if (chromeNav) {
     const primary = plainLinks(chromeNav.primary);
-    const desktop: readonly MarketingHeaderNavLink[] = [
-      ...(iconOnly
-        ? []
-        : [
-            {
-              href: APP_ROUTES.HOME,
-              label: 'Jovie',
-              treatment: 'wordmark' as const,
-            },
-          ]),
-      ...primary,
-    ];
     return {
       flyoutMenus: [
         {
@@ -152,15 +136,13 @@ function resolveNavConfig(
         },
       ],
       mobileNavLinks: primary,
-      desktopNavLinks: desktop,
+      desktopNavLinks: primary,
     };
   }
   return {
     flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
-    desktopNavLinks: iconOnly
-      ? MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY
-      : MARKETING_GLASS_DESKTOP_LINKS,
+    desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
   };
 }
 
@@ -233,7 +215,6 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly || leftWordmark,
     chromeNav
   );
   const resolvedPrimaryCta =
