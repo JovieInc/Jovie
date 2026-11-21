@@ -885,7 +885,9 @@ jobs:
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
-    timeout-minutes: 30
+    # Shard 2/4 may run mq-parity `turbo typecheck --affected --force`, which
+    # has been observed past 30m on TS-graph PRs (JOV-12621). Keep headroom.
+    timeout-minutes: 60
     permissions:
       actions: read
       contents: read
