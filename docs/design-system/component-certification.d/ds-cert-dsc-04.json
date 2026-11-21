@@ -35,10 +35,6 @@
     },
     "apps/web/components/shell/MetaPill.tsx": {
       "empty": "children is a required node and the pill is only rendered around content; there is no collection. The detector matched the word items in the items-center class."
-    },
-    "apps/web/components/shell/PriorityGlyph.tsx": {
-      "long-content": "The glyph renders a fixed bang or three bars and takes no caller text, so nothing can overflow. The detector matched the word text in text-3xs and text-error-text.",
-      "rtl-overflow": "The glyph holds no inline text beyond a bang; its bars are fixed-size flex items. The detector matched text in text-3xs; the Rtl story still demonstrates the mirrored row."
     }
   },
   "gates": {
