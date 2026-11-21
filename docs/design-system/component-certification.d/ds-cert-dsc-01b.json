@@ -44,6 +44,69 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/OvieListsIndex.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/TriageDeck.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminDataTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/agent-room/AgentRoster.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/AudienceWorkspaceSwitch.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
@@ -52,6 +115,19 @@
     },
     "apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenuContent.tsx": {
       "offline": "The content is a pure render of its props and makes no network request; the in-flight state is shown by the Loading story."
+    },
+    "apps/web/components/features/admin/lists/OvieListsIndex.tsx": {
+      "permission-denied": "Access is enforced by the admin route before this component mounts; it renders no denied state."
+    },
+    "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": {
+      "offline": "The page only reads a query; a failed request is the Error state, and the component has no separate offline UI.",
+      "permission-denied": "Access is enforced by the admin route before this component mounts; it renders no denied state."
+    },
+    "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": {
+      "offline": "The panel renders the readiness prop and makes no request; a failed fetch is the isError state shown by ErrorLoadFailed."
+    },
+    "apps/web/components/features/agent-room/AgentRoster.tsx": {
+      "permission-denied": "The roster is presentational over an already-projected agents array; it has no access check and renders no denied state."
     }
   }
 }
