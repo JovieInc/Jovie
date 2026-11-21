@@ -13,7 +13,8 @@ const meta = {
 } satisfies Meta<typeof LazyDashboardAudienceClient>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// Render-only stories: they draw the loading shell, so they take no args.
+type Story = StoryObj;
 
 function LoadingFallback() {
   return <AudienceTableLoadingShell />;
