@@ -28,8 +28,8 @@ describe('AudienceQuickActionsCell', () => {
   });
 });
 
-describe('AudienceQuickActionsCell PlainButton', () => {
-  it('renders both actions as type=button so they never submit a form', async () => {
+describe('AudienceQuickActionsCell form safety', () => {
+  it('renders both IconButton actions as type=button so they never submit a form', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn((e: FormEvent) => e.preventDefault());
     render(

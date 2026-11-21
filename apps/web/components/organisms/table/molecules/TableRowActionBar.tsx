@@ -132,7 +132,10 @@ export function TableRowActionBar({
   const menuItems = toMenuItems(overflow);
 
   return (
-    <div className={cn('flex items-center justify-end gap-0.5', className)}>
+    <div
+      role='toolbar'
+      className={cn('flex items-center justify-end gap-0.5', className)}
+    >
       {primary.map(action => {
         const Icon =
           action.isActive && action.activeIcon
@@ -152,6 +155,7 @@ export function TableRowActionBar({
               <Link
                 href={action.href}
                 onClick={event => event.stopPropagation()}
+                onKeyDown={event => event.stopPropagation()}
               >
                 <Icon aria-hidden='true' className='h-3.5 w-3.5' />
               </Link>
@@ -170,6 +174,7 @@ export function TableRowActionBar({
               event.stopPropagation();
               action.onClick?.();
             }}
+            onKeyDown={event => event.stopPropagation()}
             data-active={action.isActive ? 'true' : undefined}
           >
             <Icon aria-hidden='true' className='h-3.5 w-3.5' />
