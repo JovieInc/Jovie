@@ -1,7 +1,15 @@
 // @coverage-via apps/web/components/onboarding/OnboardingInterviewModal.test.tsx
 'use client';
 
-import { Button, Textarea } from '@jovie/ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  PlainButton,
+  Textarea,
+} from '@jovie/ui';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -53,7 +61,6 @@ export function OnboardingInterviewModal({
   const router = useRouter();
   const pathname = usePathname();
 
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const submissionInFlightRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftEntry[]>(initDraft);
@@ -82,12 +89,6 @@ export function OnboardingInterviewModal({
     setOpen(true);
     router.replace(pathname);
   }, [initialRequested, pathname, router]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-  }, [open]);
 
   const submit = useCallback(
     async (transcript: ReturnType<typeof toTranscript>) => {
@@ -199,103 +200,111 @@ export function OnboardingInterviewModal({
         : 'Next';
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-label='Quick Interview'
-      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-120 overflow-auto rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-primary-token shadow-card-elevated backdrop:bg-(--linear-bg-page) backdrop:backdrop-blur-sm'
+    <Dialog
+      open
+      onOpenChange={next => {
+        if (!next) endInterview();
+      }}
     >
-      <div className='mb-4 flex min-h-7 items-center justify-between gap-4 text-2xs text-secondary-token'>
-        <span
-          aria-label={progressLabel}
-          className='flex items-center gap-1.5'
-          role='status'
-        >
-          {draft.map((entryItem, idx) => (
-            <span
-              aria-hidden='true'
-              className='h-1.5 w-1.5 rounded-full bg-tertiary-token transition-colors duration-subtle data-[state=active]:bg-primary-token'
-              data-state={idx <= current ? 'active' : 'idle'}
-              key={entryItem.question.id}
-            />
-          ))}
-        </span>
-        <button
-          type='button'
-          onClick={endInterview}
-          aria-disabled={submitting}
-          className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
-        >
-          {submitError ? 'Exit without sending' : 'End Interview'}
-        </button>
-      </div>
-
-      <h2 className='mb-2 text-mid font-medium text-primary-token'>
-        Quick Question
-      </h2>
-      <p className='mb-4 text-app leading-5 text-secondary-token'>
-        Takes about 30 seconds. Your answers go straight to the founders.
-      </p>
-
-      <div className='mb-3 text-app font-medium leading-5 text-primary-token'>
-        {entry.question.prompt}
-      </div>
-
-      <Textarea
-        value={entry.answer}
-        onChange={e =>
-          setDraft(prev =>
-            prev.map((x, idx) =>
-              idx === current ? { ...x, answer: e.target.value } : x
-            )
-          )
-        }
-        placeholder={entry.question.placeholder ?? ''}
-        rows={4}
-        disabled={submitting || submitError}
-        resizable={false}
-        textareaSize='lg'
-      />
-
-      <div
-        aria-atomic='true'
-        aria-live='assertive'
-        className='mt-3 min-h-10 text-2xs text-secondary-token'
-        role={submitError ? 'alert' : undefined}
+      <DialogContent
+        aria-label='Quick Interview'
+        aria-labelledby={undefined}
+        hideClose
+        className='max-w-120'
+        onInteractOutside={event => event.preventDefault()}
+        testId='onboarding-interview-dialog'
       >
-        {submitError
-          ? "We couldn't send your answers. They're still here. Retry or exit."
-          : null}
-      </div>
+        <div className='mb-4 flex min-h-7 items-center justify-between gap-4 text-2xs text-secondary-token'>
+          <span
+            aria-label={progressLabel}
+            className='flex items-center gap-1.5'
+            role='status'
+          >
+            {draft.map((entryItem, idx) => (
+              <span
+                aria-hidden='true'
+                className='h-1.5 w-1.5 rounded-full bg-tertiary-token transition-colors duration-subtle data-[state=active]:bg-primary-token'
+                data-state={idx <= current ? 'active' : 'idle'}
+                key={entryItem.question.id}
+              />
+            ))}
+          </span>
+          <PlainButton
+            onClick={endInterview}
+            aria-disabled={submitting}
+            className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
+          >
+            {submitError ? 'Exit without sending' : 'End Interview'}
+          </PlainButton>
+        </div>
 
-      <div className='mt-4 flex items-center justify-between gap-3'>
-        <button
-          type='button'
-          onClick={() => {
-            if (canAdvance) advance(true);
-          }}
-          aria-disabled={!canAdvance}
-          className='text-app text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
+        <DialogTitle className='mb-2 text-mid font-medium text-primary-token'>
+          Quick Question
+        </DialogTitle>
+        <DialogDescription className='mb-4 text-app leading-5 text-secondary-token'>
+          Takes about 30 seconds. Your answers go straight to the founders.
+        </DialogDescription>
+
+        <div className='mb-3 text-app font-medium leading-5 text-primary-token'>
+          {entry.question.prompt}
+        </div>
+
+        <Textarea
+          value={entry.answer}
+          onChange={e =>
+            setDraft(prev =>
+              prev.map((x, idx) =>
+                idx === current ? { ...x, answer: e.target.value } : x
+              )
+            )
+          }
+          placeholder={entry.question.placeholder ?? ''}
+          rows={4}
+          disabled={submitting || submitError}
+          resizable={false}
+          textareaSize='lg'
+        />
+
+        <div
+          aria-atomic='true'
+          aria-live='assertive'
+          className='mt-3 min-h-10 text-2xs text-secondary-token'
+          role={submitError ? 'alert' : undefined}
         >
-          Skip
-        </button>
-        <Button
-          variant='primary'
-          onClick={() => {
-            if (submitting || submissionInFlightRef.current) return;
-            if (submitError) {
-              if (retryTranscript) void submit(retryTranscript);
-              return;
-            }
-            advance(false);
-          }}
-          aria-label={submitError ? 'Retry interview submission' : undefined}
-          aria-disabled={!canSubmit || submitting}
-          disabled={!canSubmit && !submitting}
-          className='px-4 py-2 text-sm'
-        >
-          {submitLabel}
-        </Button>
-      </div>
-    </dialog>
+          {submitError
+            ? "We couldn't send your answers. They're still here. Retry or exit."
+            : null}
+        </div>
+
+        <div className='mt-4 flex items-center justify-between gap-3'>
+          <PlainButton
+            onClick={() => {
+              if (canAdvance) advance(true);
+            }}
+            aria-disabled={!canAdvance}
+            className='text-app text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
+          >
+            Skip
+          </PlainButton>
+          <Button
+            variant='primary'
+            onClick={() => {
+              if (submitting || submissionInFlightRef.current) return;
+              if (submitError) {
+                if (retryTranscript) void submit(retryTranscript);
+                return;
+              }
+              advance(false);
+            }}
+            aria-label={submitError ? 'Retry interview submission' : undefined}
+            aria-disabled={!canSubmit || submitting}
+            disabled={!canSubmit && !submitting}
+            className='px-4 py-2 text-sm'
+          >
+            {submitLabel}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

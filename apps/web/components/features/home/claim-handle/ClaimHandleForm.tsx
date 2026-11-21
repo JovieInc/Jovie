@@ -1,7 +1,7 @@
 // @coverage-via apps/web/tests/unit/ClaimHandleForm.test.tsx
 'use client';
 
-import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
+import { Button, HostDrawnInput, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -178,7 +178,7 @@ export function ClaimHandleForm({
             {displayDomain}/
           </span>
 
-          <input
+          <HostDrawnInput
             ref={inputRef}
             id='handle-input'
             type='text'
@@ -199,10 +199,7 @@ export function ClaimHandleForm({
               // tailwind-merge and the global input reset paints over them.
               // The locked route-quality focus check reads this input's own
               // computed styles, so the ring must live on the input itself.
-              'min-w-0 flex-1 bg-transparent focus-ring-themed',
-              isHeroLike
-                ? 'placeholder:text-quaternary-token'
-                : 'placeholder:text-tertiary-token'
+              'min-w-0 flex-1 focus-ring-themed'
             )}
             data-size={size}
             data-available={isAvailable ? 'true' : 'false'}

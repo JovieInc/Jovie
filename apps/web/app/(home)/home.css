@@ -6591,11 +6591,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-claim-handle-input {
+  background: transparent;
   color: var(--color-text-primary-token);
   caret-color: var(--color-text-primary-token);
   font-size: var(--text-app);
   font-weight: 450;
   letter-spacing: 0;
+}
+
+.system-b-claim-handle-input::placeholder {
+  color: var(--color-text-tertiary-token);
+}
+
+.system-b-claim-handle-input[data-size="hero"]::placeholder,
+.system-b-claim-handle-input[data-size="display"]::placeholder {
+  color: var(--color-text-quaternary-token);
 }
 
 .system-b-claim-handle-input[data-size="hero"] {
