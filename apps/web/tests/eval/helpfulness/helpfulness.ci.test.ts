@@ -205,6 +205,43 @@ describe('ASS-36 empty-profile setup', () => {
   });
 });
 
+describe('ASS-75 one-rec gaps in live hard checks', () => {
+  it('fail-closes greeting red on upcoming_sentence_days when facts have UPCOMING', () => {
+    const greeting = HELPFULNESS_CASES.find(c => c.id === 'greeting');
+    if (!greeting) throw new Error('missing greeting');
+    const facts = buildFixture('established', NOW).facts;
+    const checks = runHardChecks(
+      greeting,
+      { text: calibrationReply('greeting'), toolCalls: [] },
+      { facts }
+    );
+    expect(checks.find(c => c.id === 'upcoming_sentence_days')?.ok).toBe(false);
+    expect(scoreCase(greeting.id, checks, null).passed).toBe(false);
+  });
+
+  it('fail-closes planning_menu_not_a_move even on non-allowlisted cases', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: calibrationReply('whats-next-release'),
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'planning_menu_not_a_move')?.ok).toBe(
+      false
+    );
+  });
+
+  it('keeps do-it coverage on expected_tool (no duplicate do_it_calls_tool id)', () => {
+    const followup = HELPFULNESS_CASES.find(c => c.id === 'followup-do-it');
+    if (!followup) throw new Error('missing followup-do-it');
+    const checks = runHardChecks(followup, {
+      text: calibrationReply('followup-do-it'),
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'expected_tool')?.ok).toBe(false);
+    expect(checks.find(c => c.id === 'do_it_calls_tool')).toBeUndefined();
+  });
+});
+
 describe('ASS-70 catalog deny (deferred ASS-36)', () => {
   it('hard-fails best-release deliberate red that denies per-release data', () => {
     const best = HELPFULNESS_CASES.find(c => c.id === 'best-release');

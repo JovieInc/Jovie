@@ -9,6 +9,7 @@ vi.mock('server-only', () => ({}));
 
 import calibration from './calibration.json';
 import { HELPFULNESS_CASES } from './cases';
+import { buildFixture } from './fixtures';
 import {
   draftsOneCollabTarget,
   firstContentSentence,
@@ -59,6 +60,16 @@ describe('one-rec gaps: upcoming first sentence + days-left', () => {
     expect(upcomingInFirstSentenceWithDays(text, 'Night Swim')).toBe(true);
     expect(
       runOneRecGapChecks(text, { upcomingTitle: 'Night Swim' }).every(c => c.ok)
+    ).toBe(true);
+  });
+
+  it('passes bare Friday as a days-left cue when the title is in the first sentence', () => {
+    // Quality-bar openers often say "out Friday" without the word "this".
+    expect(
+      upcomingInFirstSentenceWithDays(
+        'Night Swim is out Friday. Put the pre-save at the top of jov.ie/lunawaves today.',
+        'Night Swim'
+      )
     ).toBe(true);
   });
 
@@ -176,5 +187,63 @@ describe('one-rec gaps: calibration coverage map', () => {
         example.id === 'collab' && !draftsOneCollabTarget(example.reply.text)
     );
     expect(collabReds.map(e => e.id)).toEqual(['collab']);
+  });
+});
+
+describe('one-rec gaps: live runHardChecks wiring (ASS-75)', () => {
+  const NOW = new Date('2026-10-28T15:00:00Z');
+
+  it('hard-fails upcoming_sentence_days + planning_menu on whats-next-release red', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'whats-next-release');
+    if (!c) throw new Error('missing whats-next-release');
+    const facts = buildFixture('established', NOW).facts;
+    const checks = runHardChecks(
+      c,
+      { text: calibrationReply('whats-next-release'), toolCalls: [] },
+      { facts }
+    );
+    expect(checks.find(x => x.id === 'upcoming_sentence_days')?.ok).toBe(false);
+    expect(checks.find(x => x.id === 'planning_menu_not_a_move')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(c.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails collab_draft_one on the collab pick-menu red', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'collab');
+    if (!c) throw new Error('missing collab');
+    const checks = runHardChecks(c, {
+      text: calibrationReply('collab'),
+      toolCalls: [],
+    });
+    expect(checks.find(x => x.id === 'collab_draft_one')?.ok).toBe(false);
+    expect(scoreCase(c.id, checks, null).passed).toBe(false);
+  });
+
+  it('does not apply upcoming_sentence_days to best-release (catalog ask)', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'best-release');
+    if (!c) throw new Error('missing best-release');
+    const facts = buildFixture('established', NOW).facts;
+    const text =
+      'Tidal Drift leads your catalog over Neon Reef; Night Swim is not out yet. One move: put Tidal Drift at the top of jov.ie/lunawaves today so Instagram bio traffic hits your strongest cut.';
+    const checks = runHardChecks(c, { text, toolCalls: [] }, { facts });
+    expect(checks.find(x => x.id === 'upcoming_sentence_days')).toBeUndefined();
+    expect(checks.find(x => x.id === 'planning_menu_not_a_move')?.ok).toBe(
+      true
+    );
+  });
+
+  it('passes allowlisted planning opener with title + Friday through live hard checks', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'greeting');
+    if (!c) throw new Error('missing greeting');
+    const facts = buildFixture('established', NOW).facts;
+    const text =
+      'Night Swim is out Friday. Put the Night Swim pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio link to it.';
+    const checks = runHardChecks(c, { text, toolCalls: [] }, { facts });
+    expect(checks.find(x => x.id === 'upcoming_sentence_days')?.ok).toBe(true);
+    expect(checks.find(x => x.id === 'planning_menu_not_a_move')?.ok).toBe(
+      true
+    );
+    expect(scoreCase(c.id, checks, null).passed).toBe(true);
   });
 });
