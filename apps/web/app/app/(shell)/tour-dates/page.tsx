@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { captureError } from '@/lib/error-tracking';
-import { queryKeys } from '@/lib/queries';
+import { tourDateToEventRecord } from '@/lib/events/event-record';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { queryKeys } from '@/lib/queries/keys';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
-import { tourDateToEventRecord } from '@/lib/queries/useEventsQuery';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import {
   checkBandsintownConnection,

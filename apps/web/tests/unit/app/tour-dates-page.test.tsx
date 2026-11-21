@@ -1,19 +1,22 @@
+import {
+  dehydrate,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 const {
   captureErrorMock,
   checkConnectionMock,
   loadRouteContextMock,
   loadTourDatesMock,
-  setQueryDataMock,
 } = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
   checkConnectionMock: vi.fn(),
   loadRouteContextMock: vi.fn(),
   loadTourDatesMock: vi.fn(),
-  setQueryDataMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -29,35 +32,16 @@ vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
 
-vi.mock('@/lib/queries', () => ({
-  queryKeys: {
-    tourDates: {
-      connection: (profileId: string) => [
-        'tour-dates',
-        'connection',
-        profileId,
-      ],
-      list: (profileId: string) => ['tour-dates', 'list', profileId],
-    },
-    events: {
-      list: (profileId: string) => ['events', 'list', profileId],
-    },
-  },
-}));
-
 vi.mock('@/lib/queries/server', () => ({
-  getQueryClient: () => ({ setQueryData: setQueryDataMock }),
-  getDehydratedState: () => ({ queries: [] }),
+  getQueryClient: () => serverQueryClient,
+  getDehydratedState: () => dehydrate(serverQueryClient),
 }));
 
-vi.mock('@/lib/queries/HydrateClient', () => ({
-  HydrateClient: ({ children }: { readonly children: ReactNode }) => children,
-}));
-
+// In the RSC graph, a client module's ordinary exports are client references.
 vi.mock('@/lib/queries/useEventsQuery', () => ({
-  tourDateToEventRecord: (tourDate: { readonly id: string }) => ({
-    id: tourDate.id,
-  }),
+  tourDateToEventRecord: () => {
+    throw new Error('Cannot call a client export from a Server Component');
+  },
 }));
 
 vi.mock('@/features/feedback/PageErrorState', () => ({
@@ -82,16 +66,61 @@ vi.mock('@/app/app/(shell)/tour-dates/TourDatesPageClient', () => ({
 
 import TourDatesPage from '@/app/app/(shell)/tour-dates/page';
 
+const legacyTour: TourDateViewModel = {
+  id: 'tour-1',
+  profileId: 'profile-1',
+  externalId: 'bandsintown-1',
+  provider: 'bandsintown',
+  eventType: 'tour',
+  confirmationStatus: 'confirmed',
+  reviewedAt: '2026-11-18T12:00:00.000Z',
+  title: null,
+  startDate: '2026-12-13T04:00:00.000Z',
+  startTime: '20:00',
+  timezone: 'America/Los_Angeles',
+  venueName: 'The Hall',
+  city: 'Los Angeles',
+  region: 'CA',
+  country: 'US',
+  latitude: null,
+  longitude: null,
+  ticketUrl: 'https://example.com/tickets',
+  ticketStatus: 'sold_out',
+  lastSyncedAt: '2026-11-18T10:00:00.000Z',
+  createdAt: '2026-11-18T10:00:00.000Z',
+  updatedAt: '2026-11-18T12:00:00.000Z',
+};
+
+const importedLivestream: TourDateViewModel = {
+  ...legacyTour,
+  id: 'livestream-1',
+  externalId: 'import-1',
+  provider: 'admin_import',
+  eventType: 'livestream',
+  confirmationStatus: 'pending',
+  reviewedAt: null,
+  timezone: null,
+  venueName: '',
+  city: '',
+  region: null,
+  country: '',
+  ticketUrl: null,
+  ticketStatus: 'available',
+};
+
+let serverQueryClient: QueryClient;
+
 describe('canonical tour dates page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverQueryClient = new QueryClient();
     loadRouteContextMock.mockResolvedValue({
       ok: true,
       userId: 'user-1',
       profileId: 'profile-1',
       dashboardData: {},
     });
-    loadTourDatesMock.mockResolvedValue([{ id: 'tour-1' }]);
+    loadTourDatesMock.mockResolvedValue([legacyTour, importedLivestream]);
     checkConnectionMock.mockResolvedValue({
       connected: true,
       hasApiKey: true,
@@ -100,11 +129,16 @@ describe('canonical tour dates page', () => {
     });
   });
 
-  it('renders the normal entity surface and primes tour-date rail data', async () => {
-    render(await TourDatesPage());
+  it('hydrates populated profile-scoped Events and legacy tour-date caches', async () => {
+    const clientQueryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={clientQueryClient}>
+        {await TourDatesPage()}
+      </QueryClientProvider>
+    );
 
     expect(screen.getByTestId('tour-dates-page-client')).toHaveTextContent(
-      'profile-1:tour-1'
+      'profile-1:tour-1,livestream-1'
     );
     expect(loadRouteContextMock).toHaveBeenCalledWith({
       route: '/app/tour-dates',
@@ -112,10 +146,56 @@ describe('canonical tour dates page', () => {
       dashboardErrorMessage:
         'Failed to load tour dates. Please refresh the page.',
     });
-    expect(setQueryDataMock).toHaveBeenCalledWith(
-      ['events', 'list', 'profile-1'],
-      [{ id: 'tour-1' }]
-    );
+    expect(loadTourDatesMock).toHaveBeenCalledWith('profile-1');
+
+    expect(
+      clientQueryClient.getQueryData(['tour-dates', 'list', 'profile-1'])
+    ).toEqual([legacyTour, importedLivestream]);
+    expect(
+      clientQueryClient.getQueryData(['tour-dates', 'connection', 'profile-1'])
+    ).toEqual({
+      connected: true,
+      hasApiKey: true,
+      artistName: 'Test Artist',
+      lastSyncedAt: null,
+    });
+    expect(
+      clientQueryClient.getQueryData(['events', 'list', 'profile-1'])
+    ).toEqual([
+      {
+        id: 'tour-1',
+        title: 'The Hall',
+        subtitle: 'Los Angeles, CA · Bandsintown',
+        eventDate: legacyTour.startDate,
+        timezone: 'America/Los_Angeles',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        providerKey: 'bandsintown',
+        reviewedAt: legacyTour.reviewedAt,
+        lastSyncedAt: legacyTour.lastSyncedAt,
+        venue: 'The Hall',
+        city: 'Los Angeles, CA',
+        provider: 'Bandsintown',
+        status: 'Sold out',
+        ticketUrl: legacyTour.ticketUrl,
+      },
+      {
+        id: 'livestream-1',
+        title: 'Event',
+        subtitle: 'Admin Import',
+        eventDate: importedLivestream.startDate,
+        timezone: null,
+        eventType: 'livestream',
+        confirmationStatus: 'pending',
+        providerKey: 'admin_import',
+        reviewedAt: null,
+        lastSyncedAt: importedLivestream.lastSyncedAt,
+        provider: 'Admin Import',
+      },
+    ]);
+    expect(
+      clientQueryClient.getQueryData(['events', 'list', 'profile-2'])
+    ).toBeUndefined();
   });
 
   it('renders an explicit profile error instead of detouring to Settings', async () => {

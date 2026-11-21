@@ -2,13 +2,13 @@ import type { QueryClient } from '@tanstack/react-query';
 import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import { tourDateToEventRecord } from '@/lib/events/event-record';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import type { DashboardContact } from '@/types/contacts';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
-import { tourDateToEventRecord } from './useEventsQuery';
 
 const fetchEarnings = createQueryFn('/api/dashboard/earnings');
 
