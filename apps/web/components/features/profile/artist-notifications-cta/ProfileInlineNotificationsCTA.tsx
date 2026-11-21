@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/profile/inline-notifications-cta.test.tsx
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Bell, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
@@ -14,7 +15,10 @@ import {
   getCaptureDismissalStatus,
   handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
-import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
+import {
+  DEFAULT_PROFILE_ACCENT_HEX,
+  readProfileAccentTheme,
+} from '@/lib/profile/profile-theme';
 import {
   useUpdateContentPreferencesMutation,
   useUpdateSubscriberBirthdayMutation,
@@ -111,13 +115,7 @@ function isValidBirthdayDigits(digits: string): boolean {
   const day = Number.parseInt(digits.slice(2, 4), 10);
   const year = Number.parseInt(digits.slice(4, 8), 10);
 
-  if (
-    !Number.isFinite(month) ||
-    !Number.isFinite(day) ||
-    !Number.isFinite(year)
-  ) {
-    return false;
-  }
+  if (!Number.isFinite(month + day + year)) return false;
 
   if (month < 1 || month > 12) return false;
   if (day < 1 || day > 31) return false;
@@ -273,7 +271,8 @@ export function ProfileInlineNotificationsCTA({
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const accentHex =
-    readProfileAccentTheme(artist.theme)?.primaryHex ?? '#ed9962';
+    readProfileAccentTheme(artist.theme)?.primaryHex ??
+    DEFAULT_PROFILE_ACCENT_HEX;
   const hasEmailContact = Boolean(
     subscriptionDetails.email || emailInput.trim()
   );
@@ -869,8 +868,7 @@ export function ProfileInlineNotificationsCTA({
   const triggerClassName = triggerClassNameProp ?? getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (
-      <button
-        type='button'
+      <PlainButton
         onClick={openFlow}
         className={triggerClassName}
         style={noFontSynthesisStyle}
@@ -882,7 +880,7 @@ export function ProfileInlineNotificationsCTA({
           <Bell className='size-4.5' />
         )}
         <span>{triggerLabel}</span>
-      </button>
+      </PlainButton>
     );
 
   return (

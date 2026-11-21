@@ -179,6 +179,9 @@ export function mergeProfileTheme(
   return merged;
 }
 
+/** Accent used when an artist has not picked a profile accent. */
+export const DEFAULT_PROFILE_ACCENT_HEX = '#ed9962';
+
 export function normalizeProfileAccentHex(hex: string): string {
   const normalizedHex = normalizeHexColor(hex);
   if (!normalizedHex) {

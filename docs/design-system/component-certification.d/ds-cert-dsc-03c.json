@@ -1,0 +1,21 @@
+{
+  "gates": {
+    "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx": {
+      "loading": "Loading is the InlineNotificationsFlowSkeleton, chosen by hydrationStatus from useSubscriptionForm; it has its own stories and the unit test covers it.",
+      "empty": "The CTA takes no collection; the detector matched an empty-looking default. The no-alerts case renders null and is covered by the unit test.",
+      "error": "Submission errors are rendered by ProfileMobileNotificationsFlow, which has its own Error stories; this component only passes the error string down.",
+      "offline": "The CTA makes no network request itself; submissions and offline handling live in useSubscriptionForm."
+    }
+  }
+}
