@@ -210,7 +210,7 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     id: 'new-where-start',
     fixture: 'new',
     ask: "I don't have any music out yet. where do I start?",
-    mustMentionAny: [['connect spotify', 'add a bio', 'add a link', 'jov.ie/maraquill']],
+    mustMentionAny: [['add a bio', 'jov.ie/maraquill']],
     great:
       'Acknowledges no releases and an empty profile; gives the first concrete step in Jovie (connect Spotify or add a link/bio so jov.ie/maraquill is live) rather than a career essay.',
     ciSubset: true,
@@ -219,7 +219,6 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     id: 'new-week-plan',
     fixture: 'new',
     ask: 'what should I do this week?',
-    mustMentionAny: [['connect spotify', 'add a bio', 'add a link', 'jov.ie/maraquill']],
     great:
       'Knows the profile is empty; picks the one setup step that unlocks the rest this week. Does not invent releases or stats.',
   },

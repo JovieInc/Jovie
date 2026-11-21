@@ -138,10 +138,18 @@ describe('judge contract', () => {
   });
 });
 
-describe('ASS-36 empty-profile setup grounding', () => {
-  it('requires a today setup step', () => {
+describe('ASS-36 empty-profile setup', () => {
+  it('requires today setup step', () => {
     const c = HELPFULNESS_CASES.find(x => x.id === 'new-where-start')!;
-    expect(runHardChecks(c, { text: 'Finish a song first then launch.', toolCalls: [] }).find(x => x.id === 'grounding_0')?.ok).toBe(false);
-    expect(runHardChecks(c, { text: 'Add a bio on jov.ie/maraquill today.', toolCalls: [] }).find(x => x.id === 'grounding_0')?.ok).toBe(true);
+    const bad = runHardChecks(c, {
+      text: 'Finish a song first.',
+      toolCalls: [],
+    });
+    const good = runHardChecks(c, {
+      text: 'Add a bio on jov.ie/maraquill today.',
+      toolCalls: [],
+    });
+    expect(bad.find(x => x.id === 'grounding_0')?.ok).toBe(false);
+    expect(good.find(x => x.id === 'grounding_0')?.ok).toBe(true);
   });
 });
