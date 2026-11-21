@@ -8,6 +8,7 @@ import {
   ALLOWLIST_PATH,
   ALLOWLIST_SCHEMA,
   collectAddedLines,
+  diffBase,
   evaluateViolations,
   main,
 } from './schedule-trigger-guard.mjs';
@@ -283,66 +284,195 @@ test('collectAddedLines only returns + lines of the changed files', async () => 
   }
 });
 
-test('detects a rogue cron from a depth-1 merge-ref checkout via the event payload', async () => {
+const pushOnly = 'on: push\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
+const withCron = cron =>
+  `on:\n  schedule:\n    - cron: "${cron}"\njobs:\n  j:\n    steps:\n      - run: echo hi\n`;
+
+async function shallowFixture() {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
     'node:fs'
   );
   const { tmpdir } = await import('node:os');
   const root = mkdtempSync(join(tmpdir(), 'schedule-guard-shallow-'));
-  try {
-    const origin = join(root, 'origin');
-    mkdirSync(origin, { recursive: true });
-    const run = (cwd, ...args) =>
-      execFileSync('git', args, { cwd, encoding: 'utf8' });
-    const base = 'on: push\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
-    const rogue =
-      'on:\n  schedule:\n    - cron: "*/2 * * * *"\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
-    run(origin, 'init', '-q', '-b', 'main');
-    run(origin, 'config', 'user.email', 't@jov.ie');
-    run(origin, 'config', 'user.name', 'T');
-    mkdirSync(join(origin, '.github', 'workflows'), { recursive: true });
-    writeFileSync(join(origin, '.github/workflows/base.yml'), base);
-    writeFileSync(join(origin, '.github/workflows/rogue.yml'), rogue);
+  const origin = join(root, 'origin');
+  mkdirSync(join(origin, '.github', 'workflows'), { recursive: true });
+  const run = (cwd, ...args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8' });
+  run(origin, 'init', '-q', '-b', 'main');
+  run(origin, 'config', 'user.email', 't@jov.ie');
+  run(origin, 'config', 'user.name', 'T');
+  run(origin, 'config', 'uploadpack.allowReachableSHA1InWant', 'true');
+  const write = (file, body) => writeFileSync(join(origin, file), body);
+  const commit = message => {
     run(origin, 'add', '-A');
-    run(origin, 'commit', '-qm', 'main base with a rogue cron in history');
-    // The PR deletes the rogue cron, so the head alone is clean but the
-    // range diff against the base must still see it being re-added... no:
-    // deleting on the branch means the merged tree is clean. Instead the
-    // branch ADDS it, like a real violating PR.
-    writeFileSync(join(origin, '.github/workflows/rogue.yml'), base);
-    run(origin, 'add', '-A');
-    run(origin, 'commit', '-qm', 'base removes the rogue cron (branch point)');
-    const baseSha = run(origin, 'rev-parse', 'HEAD').trim();
-    run(origin, 'checkout', '-qb', 'pr-branch');
-    writeFileSync(join(origin, '.github/workflows/rogue.yml'), rogue);
-    run(origin, 'add', '-A');
-    run(origin, 'commit', '-qm', 'PR re-adds the rogue cron');
-    run(origin, 'checkout', '-qb', 'pr-merge', 'main');
-    run(origin, 'merge', '-q', '--no-ff', '-m', 'merge PR', 'pr-branch');
-    const clone = join(root, 'clone');
+    run(origin, 'commit', '-qm', message);
+    return run(origin, 'rev-parse', 'HEAD').trim();
+  };
+  const cloneBranch = branch => {
+    const clone = join(root, `clone-${branch}`);
     execFileSync('git', [
       'clone',
       '-q',
       '--depth',
       '1',
       '--branch',
-      'pr-merge',
+      branch,
       `file://${origin}`,
       clone,
     ]);
-    const event = join(root, 'event.json');
+    return clone;
+  };
+  const eventFor = sha => {
+    const event = join(root, `event-${sha.slice(0, 8)}.json`);
     writeFileSync(
       event,
-      `${JSON.stringify({ pull_request: { base: { sha: baseSha } } })}\n`
+      `${JSON.stringify({ pull_request: { base: { sha } } })}\n`
     );
-    // Without the payload the shallow checkout cannot resolve a base (skip).
-    const skipped = main(clone, {});
-    assert.equal(skipped, 0);
-    // With the runner's event payload the rogue cron is caught.
-    const caught = main(clone, { GITHUB_EVENT_PATH: event });
-    assert.equal(caught, 1);
+    return event;
+  };
+  return {
+    origin,
+    run,
+    write,
+    commit,
+    cloneBranch,
+    eventFor,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+test('a depth-1 merge checkout catches a PR cron without the event payload', async () => {
+  const fixture = await shallowFixture();
+  try {
+    fixture.write('.github/workflows/rogue.yml', withCron('*/2 * * * *'));
+    fixture.commit('history once had the cron');
+    fixture.write('.github/workflows/rogue.yml', pushOnly);
+    const baseSha = fixture.commit('main removes the cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-branch');
+    fixture.write('.github/workflows/rogue.yml', withCron('*/2 * * * *'));
+    fixture.commit('PR re-adds the cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-merge', 'main');
+    fixture.run(
+      fixture.origin,
+      'merge',
+      '-q',
+      '--no-ff',
+      '-m',
+      'merge PR',
+      'pr-branch'
+    );
+    const clone = fixture.cloneBranch('pr-merge');
+    const event = fixture.eventFor(baseSha);
+    assert.equal(diffBase(clone, {}), baseSha);
+    assert.equal(main(clone, {}), 1);
+    assert.equal(main(clone, { GITHUB_EVENT_PATH: event }), 1);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    fixture.cleanup();
+  }
+});
+
+test('a stale event base does not flag a cron main already has', async () => {
+  const fixture = await shallowFixture();
+  try {
+    fixture.write('.github/workflows/clock.yml', pushOnly);
+    const staleSha = fixture.commit('before the daily cron');
+    fixture.write('.github/workflows/clock.yml', withCron('7 14 * * *'));
+    const mainSha = fixture.commit('main adds the daily cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-branch');
+    fixture.write('README.md', 'docs only\n');
+    fixture.commit('PR touches a readme');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-merge', 'main');
+    fixture.run(
+      fixture.origin,
+      'merge',
+      '-q',
+      '--no-ff',
+      '-m',
+      'merge PR',
+      'pr-branch'
+    );
+    const clone = fixture.cloneBranch('pr-merge');
+    const event = fixture.eventFor(staleSha);
+    assert.equal(diffBase(clone, { GITHUB_EVENT_PATH: event }), mainSha);
+    assert.equal(main(clone, { GITHUB_EVENT_PATH: event }), 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('a PR that adds a cron still fails when the event base is stale', async () => {
+  const fixture = await shallowFixture();
+  try {
+    fixture.write('.github/workflows/clock.yml', pushOnly);
+    const staleSha = fixture.commit('older main');
+    fixture.write('README.md', 'main moved\n');
+    const mainSha = fixture.commit('main has no new cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-branch');
+    fixture.write('.github/workflows/rogue.yml', withCron('*/9 * * * *'));
+    fixture.commit('PR adds a cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-merge', 'main');
+    fixture.run(
+      fixture.origin,
+      'merge',
+      '-q',
+      '--no-ff',
+      '-m',
+      'merge PR',
+      'pr-branch'
+    );
+    const clone = fixture.cloneBranch('pr-merge');
+    const event = fixture.eventFor(staleSha);
+    assert.equal(diffBase(clone, { GITHUB_EVENT_PATH: event }), mainSha);
+    assert.equal(main(clone, { GITHUB_EVENT_PATH: event }), 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('a local merge of main does not treat main cron as a PR addition', async () => {
+  const fixture = await shallowFixture();
+  try {
+    fixture.write('.github/workflows/clock.yml', pushOnly);
+    const staleSha = fixture.commit('feature point');
+    fixture.write('.github/workflows/clock.yml', withCron('7 14 * * *'));
+    const mainSha = fixture.commit('main adds the daily cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'feature', staleSha);
+    fixture.write('README.md', 'feature note\n');
+    fixture.commit('feature note');
+    fixture.run(
+      fixture.origin,
+      'merge',
+      '-q',
+      '--no-ff',
+      '-m',
+      'merge main into feature',
+      'main'
+    );
+    const clone = fixture.cloneBranch('feature');
+    const event = fixture.eventFor(staleSha);
+    assert.equal(diffBase(clone, { GITHUB_EVENT_PATH: event }), mainSha);
+    assert.equal(main(clone, { GITHUB_EVENT_PATH: event }), 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('a one-parent shallow checkout still uses the event base', async () => {
+  const fixture = await shallowFixture();
+  try {
+    fixture.write('.github/workflows/clock.yml', pushOnly);
+    const baseSha = fixture.commit('main without a cron');
+    fixture.run(fixture.origin, 'checkout', '-qb', 'pr-branch');
+    fixture.write('.github/workflows/rogue.yml', withCron('*/3 * * * *'));
+    fixture.commit('PR adds a cron');
+    const clone = fixture.cloneBranch('pr-branch');
+    const event = fixture.eventFor(baseSha);
+    assert.equal(diffBase(clone, {}), null);
+    assert.equal(main(clone, {}), 0);
+    assert.equal(diffBase(clone, { GITHUB_EVENT_PATH: event }), baseSha);
+    assert.equal(main(clone, { GITHUB_EVENT_PATH: event }), 1);
+  } finally {
+    fixture.cleanup();
   }
 });

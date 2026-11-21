@@ -11,8 +11,9 @@
  * canon/automation-registry.jsonl id (automation-liveness keeps observing it).
  *
  * Deterministic, dependency-free, additive to the workflow-token-budget and
- * api-budget guards; loosens nothing. Diff base: origin/main (same trusted
- * base as the biome lane); no base = documented skip, like external-api-guard.
+ * api-budget guards; loosens nothing. Diff base: the merge parent contained in
+ * origin/main, else the merge-base with origin/main, else the event payload's
+ * base SHA. A missing base is a documented skip, like external-api-guard.
  *
  * Polling detection is narrow: ADDED, non-comment lines must contain BOTH a
  * loop construct (while/until/setInterval) and a GitHub API construct (gh
@@ -79,22 +80,74 @@ export function eventBaseSha(env = process.env) {
   }
 }
 
+/** Parent SHAs recorded on `rev`. The objects themselves may be absent. */
+export function commitParents(root, rev = 'HEAD') {
+  const raw = git(root, 'cat-file', '-p', rev);
+  if (!raw) return [];
+  return [...raw.matchAll(/^parent ([0-9a-f]{40})$/gm)].map(match => match[1]);
+}
+
+function ensureCommit(root, sha) {
+  if (git(root, 'cat-file', '-e', `${sha}^{commit}`) !== null) return true;
+  return (
+    git(root, 'fetch', '--quiet', '--depth=1', 'origin', sha) !== null &&
+    git(root, 'cat-file', '-e', `${sha}^{commit}`) !== null
+  );
+}
+
+function fetchOriginMain(root) {
+  if (git(root, 'rev-parse', '--verify', 'refs/remotes/origin/main') !== null) {
+    return;
+  }
+  if (git(root, 'fetch', '--quiet', '--depth=250', 'origin', 'main') === null) {
+    return;
+  }
+  if (git(root, 'rev-parse', '--verify', 'refs/remotes/origin/main') !== null) {
+    return;
+  }
+  // A single-branch clone (depth-1 PR checkout) records the fetch in
+  // FETCH_HEAD and does not create refs/remotes/origin/main.
+  const fetched = git(root, 'rev-parse', '--verify', 'FETCH_HEAD');
+  if (!fetched) return;
+  git(root, 'update-ref', 'refs/remotes/origin/main', fetched.trim());
+}
+
 /**
- * Diff base: explicit env override, else the merge-base with origin/main.
- * A depth-1 merge-ref checkout (PR Fleet Rules) stays shallow at the grafted
- * commit, so the merge-base cannot traverse it even after fetching main; the
- * event payload's base SHA is then fetched directly and diffed as a range,
- * which works on the grafted commit (verified against the PR Fleet Rules
- * checkout shape). A missing base degrades to the documented skip, like
- * external-api-guard.
+ * Base for a merge checkout. GitHub's pull merge ref lists the base first and
+ * the PR head second. A local `git merge origin/main` lists them the other
+ * way around. Prefer the parent that is contained in origin/main so main's
+ * own cron lines are not reported as additions. A stale
+ * `pull_request.base.sha` is not consulted here.
+ * @returns {string | null}
+ */
+export function mergeRefBase(root) {
+  const parents = commitParents(root);
+  if (parents.length < 2) return null;
+  fetchOriginMain(root);
+  if (git(root, 'rev-parse', '--verify', 'refs/remotes/origin/main') === null) {
+    return null;
+  }
+  for (const parent of parents) {
+    if (!ensureCommit(root, parent)) continue;
+    const onMain =
+      git(root, 'merge-base', '--is-ancestor', parent, 'origin/main') !== null;
+    if (onMain) return parent;
+  }
+  return null;
+}
+
+/**
+ * Diff base: explicit env override, else the merge parent contained in
+ * origin/main, else the merge-base with origin/main. A depth-1 one-parent
+ * checkout cannot walk to main, so the event payload's base SHA is fetched
+ * and used. A missing base degrades to the documented skip.
  */
 export function diffBase(root, env = process.env) {
   if (env.TURBO_SCM_BASE) return env.TURBO_SCM_BASE;
-  let merged = git(root, 'merge-base', 'HEAD', 'origin/main');
-  if (!merged) {
-    git(root, 'fetch', '--quiet', '--depth=250', 'origin', 'main');
-    merged = git(root, 'merge-base', 'HEAD', 'origin/main');
-  }
+  const fromMerge = mergeRefBase(root);
+  if (fromMerge) return fromMerge;
+  fetchOriginMain(root);
+  const merged = git(root, 'merge-base', 'HEAD', 'origin/main');
   if (merged) return merged.trim();
   const base = eventBaseSha(env);
   if (
@@ -245,7 +298,7 @@ export function main(root = process.cwd(), env = process.env) {
   for (const error of errors)
     process.stderr.write(`schedule-trigger-guard: ${error}\n`);
   process.stdout.write(
-    `schedule-trigger-guard: ${errors.length ? 'FAIL' : 'ok'} (${added.size} changed file(s) with additions, ${
+    `schedule-trigger-guard: ${errors.length ? 'FAIL' : 'ok'} base ${String(base).slice(0, 10)} (${added.size} changed file(s) with additions, ${
       Array.isArray(allowlist) ? allowlist.length : 0
     } allowlist entries)\n`
   );
