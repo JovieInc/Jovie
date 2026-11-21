@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { DEFAULT_AUDIENCE_FILTERS } from './dashboard-audience-table/types';
 import { LazyDashboardAudienceClient } from './LazyDashboardAudienceClient';
 
 const onPick = vi.fn();
@@ -14,7 +16,7 @@ vi.mock('./DashboardAudienceClient', () => ({
   ),
 }));
 
-const props = {
+const props: ComponentProps<typeof LazyDashboardAudienceClient> = {
   mode: 'members',
   view: 'all',
   initialRows: [],
@@ -25,7 +27,8 @@ const props = {
   direction: 'desc',
   subscriberCount: 0,
   totalAudienceCount: 0,
-} as const;
+  filters: DEFAULT_AUDIENCE_FILTERS,
+};
 
 describe('LazyDashboardAudienceClient', () => {
   it('loads the audience client and forwards props and interaction', async () => {
