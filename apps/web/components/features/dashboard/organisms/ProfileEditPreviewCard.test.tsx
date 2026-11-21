@@ -167,4 +167,25 @@ describe('ProfileEditPreviewCard', () => {
     expect(mockMutate).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
   });
+
+  it('names the Jovie bio as the apply destination for bio edits (regression)', () => {
+    renderCard({
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: 'New bio about the artist',
+    });
+
+    // The apply affordance must name Jovie explicitly: a Spotify drafting
+    // request must not read as if Apply pushes the bio to Spotify.
+    expect(
+      screen.getByRole('button', { name: 'Apply to Jovie Bio' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic Apply label for non-bio fields', () => {
+    renderCard();
+
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
 });
