@@ -126,14 +126,16 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     await screen.findByTestId('checkout-success-paid');
-    expect(trackMock).toHaveBeenCalledWith(
-      'subscription_success',
-      expect.any(Object)
-    );
-    expect(pageMock).toHaveBeenCalledWith(
-      'checkout_success',
-      expect.objectContaining({ conversion: true })
-    );
+    await waitFor(() => {
+      expect(trackMock).toHaveBeenCalledWith(
+        'subscription_success',
+        expect.any(Object)
+      );
+      expect(pageMock).toHaveBeenCalledWith(
+        'checkout_success',
+        expect.objectContaining({ conversion: true })
+      );
+    });
   });
 
   it('does not emit conversion analytics for a session plan that is not confirmed', async () => {
