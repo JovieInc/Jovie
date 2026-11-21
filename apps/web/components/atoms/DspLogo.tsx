@@ -179,7 +179,10 @@ interface DspServiceIconProps {
   readonly className?: string;
 }
 
-/** Tokenized text classes for DSP_LOGO_CONFIG colors (avoids inline style growth). */
+/**
+ * Tokenized text classes for every DSP_LOGO_CONFIG / VIDEO_LOGO_CONFIG color
+ * (avoids inline style growth). Keep in sync with Tailwind brand-* tokens.
+ */
 const DSP_BRAND_TEXT_CLASS: Readonly<Record<string, string>> = {
   'var(--color-brand-spotify)': 'text-brand-spotify',
   'var(--color-brand-apple)': 'text-brand-apple',
@@ -188,8 +191,18 @@ const DSP_BRAND_TEXT_CLASS: Readonly<Record<string, string>> = {
   'var(--color-brand-deezer)': 'text-brand-deezer',
   'var(--color-brand-tidal)': 'text-brand-tidal',
   'var(--color-brand-amazon)': 'text-brand-amazon',
+  'var(--color-brand-bandcamp)': 'text-brand-bandcamp',
+  'var(--color-brand-qq-music)': 'text-brand-qq-music',
+  'var(--color-brand-netease)': 'text-brand-netease',
+  'var(--color-brand-beatport)': 'text-brand-beatport',
   'var(--color-brand-pandora)': 'text-brand-pandora',
+  'var(--color-brand-napster)': 'text-brand-napster',
   'var(--color-brand-audiomack)': 'text-brand-audiomack',
+  'var(--color-brand-qobuz)': 'text-brand-qobuz',
+  'var(--color-brand-anghami)': 'text-brand-anghami',
+  'var(--color-brand-boomplay)': 'text-brand-boomplay',
+  'var(--color-brand-iheartradio)': 'text-brand-iheartradio',
+  'var(--color-brand-instagram)': 'text-brand-instagram',
   'var(--color-text-primary-token)': 'text-primary-token',
 };
 

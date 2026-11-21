@@ -63,6 +63,23 @@ describe('DspServiceIcon', () => {
     expect(svg).toHaveClass('text-brand-spotify');
   });
 
+  it('keeps every DSP_LOGO_CONFIG color on a brand text token', () => {
+    const missing: string[] = [];
+    for (const [provider, config] of Object.entries(DSP_LOGO_CONFIG)) {
+      const { container } = render(<DspServiceIcon provider={provider} />);
+      const svg = container.querySelector(`svg[data-dsp-icon="${provider}"]`);
+      const className = svg?.getAttribute('class') ?? '';
+      if (config.color === 'var(--color-text-primary-token)') {
+        expect(className).toContain('text-primary-token');
+        continue;
+      }
+      if (!/text-brand-[\w-]+/.test(className)) {
+        missing.push(`${provider} (${config.color})`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it('renders nothing for an unmapped provider', () => {
     const { container } = render(<DspServiceIcon provider='not-a-dsp' />);
     expect(container).toBeEmptyDOMElement();
