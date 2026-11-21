@@ -23,9 +23,10 @@ describe('ActiveFilterPill', () => {
     expect(screen.getByText('2 selected')).toHaveClass(
       'text-(--color-accent-purple-text)'
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Clear Status filter' })
-    );
+    const clear = screen.getByRole('button', { name: 'Clear Status filter' });
+    // Compact pill: lg size for hit target, h-full so h-10 does not stretch.
+    expect(clear.className).toMatch(/\bh-full\b/);
+    fireEvent.click(clear);
     expect(onClear).toHaveBeenCalledOnce();
   });
 });

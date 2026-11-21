@@ -43,6 +43,9 @@ export function ActiveFilterPill({
         size='lg'
         variant='inline'
         onClick={onClear}
+        // Pre-migration DrawerInlineIconButton kept lg hit target but
+        // stretched to the compact text-2xs pill via h-full + tight pad.
+        className='h-full rounded-r-full px-1 py-1 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <Icon name='X' className='h-3 w-3' />
