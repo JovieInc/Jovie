@@ -27,7 +27,7 @@ describe('onboarding widget events', () => {
   });
 
   it('uses Title Case CTAs', () => {
-    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Confirm Handle');
+    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Keep');
     expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach Account');
     expect(NONE_OF_THESE_CTA_LABEL).toBe('None of These');
   });
@@ -72,7 +72,7 @@ describe('onboarding widget events', () => {
     expect(isIncompleteAdvanceMessage('planning a single')).toBe(false);
   });
 
-  it('recognizes free-text claim/confirm intent for Confirm Handle', () => {
+  it('recognizes free-text claim/confirm/keep intent for Keep', () => {
     for (const text of [
       'claim',
       'Claim!',
@@ -82,6 +82,9 @@ describe('onboarding widget events', () => {
       'sign up',
       'confirm',
       'confirm handle',
+      'keep',
+      'keep it',
+      'keep this draft',
       'lock it in',
       'I want to claim my profile',
     ]) {

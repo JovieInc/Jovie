@@ -879,7 +879,7 @@ export function OnboardingHandleCheckCard({
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
-              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+              {confirmed ? 'Kept' : CONFIRM_HANDLE_CTA_LABEL}
             </Button>
           )}
           {showEditor || confirmed ? null : (

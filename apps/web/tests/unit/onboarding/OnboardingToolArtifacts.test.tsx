@@ -343,7 +343,7 @@ describe('onboarding tool artifacts', () => {
     expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
-  it('emits Confirm Handle widget event when the CTA is pressed', () => {
+  it('emits Keep widget event when the CTA is pressed', () => {
     mocks.handleAvailability.data = { available: true };
     const onConfirmHandle = vi.fn();
 
@@ -355,11 +355,9 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Handle' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }));
     expect(onConfirmHandle).toHaveBeenCalledWith('validartist');
-    expect(
-      screen.getByRole('button', { name: 'Handle Confirmed' })
-    ).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Kept' })).toBeDefined();
   });
 
   it('collapses a handle_confirmed output to a non-interactive status', () => {
@@ -374,7 +372,7 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByText('Handle confirmed')).toBeDefined();
     expect(screen.getByText('@validartist')).toBeDefined();
     expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Confirm Handle' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep' })).toBeNull();
     expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
   });
 

@@ -5,8 +5,8 @@ vi.mock('server-only', () => ({}));
 
 import { decideFallbackTurn } from '@/lib/chat/onboarding-script/engine';
 import {
+  keepAuthTurnAfterHandleConfirmed,
   resolveAwaitingHandleConfirm,
-  socialTurnAfterHandleConfirmed,
 } from '@/lib/chat/onboarding-script/handle-confirm-turn';
 import { pickLine } from '@/lib/chat/onboarding-script/script';
 import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
@@ -74,15 +74,56 @@ function baseThroughArtist(): UIMessage[] {
   ];
 }
 
-describe('socialTurnAfterHandleConfirmed', () => {
-  it('opens social with handle_confirmed', () => {
-    const turn = socialTurnAfterHandleConfirmed('testartist', stepId =>
-      pickLine(stepId, SESSION)
+function stateFor(messages: UIMessage[]) {
+  return createOnboardingTurnState({
+    sessionId: SESSION,
+    turnCount: messages.filter(m => m.role === 'user').length,
+    accessControlled: false,
+    messages,
+  });
+}
+
+describe('keepAuthTurnAfterHandleConfirmed', () => {
+  it('opens auth handoff with handle_confirmed (no social card)', () => {
+    const messages = baseThroughArtist();
+    const turn = keepAuthTurnAfterHandleConfirmed(
+      'testartist',
+      stateFor(messages),
+      stepId => pickLine(stepId, SESSION)
     );
-    expect(turn.guardedStep).toBe('social');
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
     expect(turn.toolEvents.map(e => e.output.action)).toEqual([
       'handle_confirmed',
-      'propose_social_link',
+      'propose_next_step',
+      'propose_checkout',
+    ]);
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'propose_social_link'
+    );
+    expect(turn.line.stepId).toBe('instant_access');
+  });
+
+  it('waitlists weak signal without asking social/audience', () => {
+    const lowSignal = {
+      ...CONFIRMED_OUTPUT,
+      artist: { ...CONFIRMED_OUTPUT.artist, followers: 40 },
+    };
+    const messages = [
+      user('hey'),
+      assistant('Who are you?', [
+        { toolName: 'confirmSpotifyArtist', output: lowSignal },
+      ]),
+    ];
+    const turn = keepAuthTurnAfterHandleConfirmed(
+      'testartist',
+      stateFor(messages),
+      stepId => pickLine(stepId, SESSION)
+    );
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
+    expect(turn.line.stepId).toBe('waitlist');
+    expect(turn.toolEvents.map(e => e.output.action)).toEqual([
+      'handle_confirmed',
+      'propose_next_step',
     ]);
   });
 });
@@ -91,26 +132,64 @@ describe('resolveAwaitingHandleConfirm', () => {
   const pick = (stepId: Parameters<typeof pickLine>[0]) =>
     pickLine(stepId, SESSION);
 
-  it('locks shown handle on claim free-text', () => {
+  it('locks shown handle on claim free-text and skips social', () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('claim'),
+    ];
     const turn = resolveAwaitingHandleConfirm({
       shownHandle: 'testartist',
       latest: user('claim'),
       latestIsWidgetEvent: false,
       typedHandle: null,
+      state: stateFor(messages),
       pick,
     });
-    expect(turn.guardedStep).toBe('social');
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
+    expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'handle_confirmed'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'propose_next_step'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'propose_social_link'
+    );
+  });
+
+  it('locks shown handle on keep free-text', () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('keep'),
+    ];
+    const turn = resolveAwaitingHandleConfirm({
+      shownHandle: 'testartist',
+      latest: user('keep this draft'),
+      latestIsWidgetEvent: false,
+      typedHandle: null,
+      state: stateFor(messages),
+      pick,
+    });
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
       'handle_confirmed'
     );
   });
 
   it('does not advance on ok', () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('ok'),
+    ];
     const turn = resolveAwaitingHandleConfirm({
       shownHandle: 'testartist',
       latest: user('ok'),
       latestIsWidgetEvent: false,
       typedHandle: null,
+      state: stateFor(messages),
       pick,
     });
     expect(turn.guardedStep).toBe('handle');
@@ -119,22 +198,28 @@ describe('resolveAwaitingHandleConfirm', () => {
     );
   });
 
-  it('nudges toward Confirm Handle for non-handle free-text', () => {
+  it('nudges toward Keep for non-handle free-text', () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('what does a handle do here?'),
+    ];
     const turn = resolveAwaitingHandleConfirm({
       shownHandle: 'testartist',
       latest: user('what does a handle do here?'),
       latestIsWidgetEvent: false,
       typedHandle: null,
+      state: stateFor(messages),
       pick,
     });
     expect(turn.guardedStep).toBe('handle');
-    expect(turn.text).toContain('Confirm Handle');
+    expect(turn.text).toContain('Keep');
   });
 });
 
-describe('decideFallbackTurn free-text handle confirm', () => {
-  it('advances past handle on claim / sign me up', async () => {
-    for (const text of ['claim', 'sign me up', 'confirm handle']) {
+describe('decideFallbackTurn free-text handle keep', () => {
+  it('advances past handle to auth on claim / sign me up / keep', async () => {
+    for (const text of ['claim', 'sign me up', 'confirm handle', 'keep']) {
       const messages = [
         ...baseThroughArtist(),
         assistant('Claiming @testartist.', [HANDLE_CHECKED]),
@@ -149,11 +234,17 @@ describe('decideFallbackTurn free-text handle confirm', () => {
           messages,
         }),
       });
-      expect(turn.guardedStep).toBe('social');
-      expect(turn.line.stepId).toBe('attach_social');
+      expect(turn.guardedStep).toBe('waitlist_or_complete');
       expect(turn.toolEvents.map(e => e.output.action)).toContain(
         'handle_confirmed'
       );
+      expect(turn.toolEvents.map(e => e.output.action)).toContain(
+        'propose_next_step'
+      );
+      expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+        'propose_social_link'
+      );
+      expect(turn.line.stepId).not.toBe('attach_social');
     }
   });
 });

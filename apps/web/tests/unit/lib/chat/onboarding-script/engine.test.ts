@@ -336,7 +336,7 @@ describe('decideFallbackTurn', () => {
     expect(turn.text).toContain('@testartist');
   });
 
-  it('advances on structured handle_confirmed widget event', async () => {
+  it('advances on structured handle_confirmed widget event to auth', async () => {
     const turn = await decide([
       ...baseThroughArtist(),
       assistant('Claiming @testartist.', [HANDLE_CHECKED]),
@@ -345,16 +345,18 @@ describe('decideFallbackTurn', () => {
         handle: 'testartist',
       }),
     ]);
-    // Metadata event satisfies the handle guard; next step opens social.
-    expect(turn.guardedStep).toBe('social');
+    // Keep → auth: skip social/audience after accepting the match handle.
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
       'handle_confirmed'
     );
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'propose_next_step'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
       'propose_social_link'
     );
-    // One ask per turn: the line asks for the link the card collects.
-    expect(turn.line.stepId).toBe('attach_social');
+    expect(turn.line.stepId).not.toBe('attach_social');
   });
 
   it('advances social on Attach Account widget event', async () => {
