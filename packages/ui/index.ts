@@ -411,6 +411,7 @@ export { TooltipShortcut } from './atoms/tooltip-shortcut';
 // Confirm Dialog
 export type { ConfirmDialogProps } from './confirm-dialog';
 export { ConfirmDialog } from './confirm-dialog';
+export * from './lib/action-ranking';
 export {
   CHECKBOX_RADIO_ITEM_BASE,
   contextMenuContentClasses,

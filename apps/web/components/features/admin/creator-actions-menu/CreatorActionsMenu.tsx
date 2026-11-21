@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  IconButton,
-} from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import {
   Check,
   ExternalLink,
@@ -21,25 +13,13 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import Link from 'next/link';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import { TableRowOverflowTrigger } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { CreatorActionsMenuProps } from './types';
 
-interface MenuItemsProps {
-  readonly profile: CreatorActionsMenuProps['profile'];
-  readonly isLoading: boolean;
-  readonly onRefreshIngest?: () => void;
-  readonly onToggleVerification: () => void;
-  readonly onToggleFeatured: () => void;
-  readonly onToggleMarketing: () => void;
-  readonly onSendInvite?: () => void;
-  readonly onDelete: () => void;
-}
-
-/**
- * Shared menu items for both desktop and mobile views
- */
-function MenuItems({
+function buildCreatorActionMenuItems({
   profile,
   isLoading,
   onRefreshIngest,
@@ -48,99 +28,95 @@ function MenuItems({
   onToggleMarketing,
   onSendInvite,
   onDelete,
-}: Readonly<MenuItemsProps>) {
-  return (
-    <>
-      {onRefreshIngest && (
-        <>
-          <DropdownMenuItem onClick={onRefreshIngest} disabled={isLoading}>
-            <RefreshCw className='h-3.5 w-3.5' />
-            Refresh ingest
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-        </>
-      )}
+}: Readonly<{
+  profile: CreatorActionsMenuProps['profile'];
+  isLoading: boolean;
+  onRefreshIngest?: () => void | Promise<void>;
+  onToggleVerification: () => void | Promise<void>;
+  onToggleFeatured: () => void | Promise<void>;
+  onToggleMarketing: () => void | Promise<void>;
+  onSendInvite?: () => void;
+  onDelete: () => void | Promise<void>;
+}>): TableActionMenuItem[] {
+  const items: TableActionMenuItem[] = [];
 
-      <DropdownMenuItem onClick={onToggleVerification}>
-        {profile.isVerified ? (
-          <>
-            <X className='h-3.5 w-3.5' />
-            Unverify creator
-          </>
-        ) : (
-          <>
-            <Check className='h-3.5 w-3.5' />
-            Verify creator
-          </>
-        )}
-      </DropdownMenuItem>
+  if (onRefreshIngest) {
+    items.push({
+      id: 'refresh-ingest',
+      label: 'Refresh Ingest',
+      icon: RefreshCw,
+      disabled: isLoading,
+      onClick: () => {
+        void onRefreshIngest();
+      },
+    });
+    items.push({ id: 'separator-refresh', label: '' });
+  }
 
-      <DropdownMenuItem onClick={onToggleFeatured}>
-        <Star
-          className={cn(
-            'h-3.5 w-3.5',
-            profile.isFeatured && 'fill-warning text-warning'
-          )}
-        />
-        {profile.isFeatured ? 'Unfeature' : 'Feature'}
-      </DropdownMenuItem>
+  items.push({
+    id: 'toggle-verification',
+    label: profile.isVerified ? 'Unverify Creator' : 'Verify Creator',
+    icon: profile.isVerified ? X : Check,
+    onClick: () => {
+      void onToggleVerification();
+    },
+  });
 
-      <DropdownMenuSeparator />
+  items.push({
+    id: 'toggle-featured',
+    label: profile.isFeatured ? 'Unfeature' : 'Feature',
+    icon: Star,
+    onClick: () => {
+      void onToggleFeatured();
+    },
+  });
 
-      <DropdownMenuItem onClick={onToggleMarketing}>
-        {profile.marketingOptOut ? (
-          <>
-            <Mail className='h-3.5 w-3.5' />
-            Enable marketing emails
-          </>
-        ) : (
-          <>
-            <MailX className='h-3.5 w-3.5' />
-            Disable marketing emails
-          </>
-        )}
-      </DropdownMenuItem>
+  items.push({ id: 'separator-marketing', label: '' });
 
-      <DropdownMenuItem asChild>
-        <Link
-          href={`/${profile.username}`}
-          target='_blank'
-          rel='noopener noreferrer'
-          onClick={e => e.stopPropagation()}
-        >
-          <ExternalLink className='h-3.5 w-3.5' />
-          View profile
-        </Link>
-      </DropdownMenuItem>
+  items.push({
+    id: 'toggle-marketing',
+    label: profile.marketingOptOut
+      ? 'Enable Marketing Emails'
+      : 'Disable Marketing Emails',
+    icon: profile.marketingOptOut ? Mail : MailX,
+    onClick: () => {
+      void onToggleMarketing();
+    },
+  });
 
-      {!profile.isClaimed && profile.claimToken && onSendInvite && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onSendInvite}>
-            <Send className='h-3.5 w-3.5' />
-            Send invite
-          </DropdownMenuItem>
-        </>
-      )}
+  items.push({
+    id: 'view-profile',
+    label: 'View Profile',
+    icon: ExternalLink,
+    onClick: () => {
+      globalThis.open(`/${profile.username}`, '_blank', 'noopener,noreferrer');
+    },
+  });
 
-      {!profile.isFeatured && (
-        <>
-          <DropdownMenuSeparator />
+  if (!profile.isClaimed && profile.claimToken && onSendInvite) {
+    items.push({ id: 'separator-invite', label: '' });
+    items.push({
+      id: 'send-invite',
+      label: 'Send Invite',
+      icon: Send,
+      onClick: onSendInvite,
+    });
+  }
 
-          <DropdownMenuItem
-            onClick={onDelete}
-            variant='destructive'
-            style={{
-              color: 'var(--color-error-text)',
-            }}
-          >
-            <Trash2 className='h-3.5 w-3.5' />
-            {profile.isClaimed ? 'Delete user' : 'Delete creator'}
-          </DropdownMenuItem>
-        </>
-      )}
-    </>
-  );
+  if (!profile.isFeatured) {
+    items.push({ id: 'separator-delete', label: '' });
+    items.push({
+      id: 'delete',
+      label: profile.isClaimed ? 'Delete User' : 'Delete Creator',
+      icon: Trash2,
+      variant: 'destructive',
+      onClick: () => {
+        void onDelete();
+      },
+    });
+  }
+
+  return items;
 }
 
 export function CreatorActionsMenu({
@@ -160,6 +136,16 @@ export function CreatorActionsMenu({
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
   const isSuccess = status === 'success';
   const isError = status === 'error';
+  const items = buildCreatorActionMenuItems({
+    profile,
+    isLoading,
+    onRefreshIngest,
+    onToggleVerification,
+    onToggleFeatured,
+    onToggleMarketing,
+    onSendInvite,
+    onDelete,
+  });
 
   const stateClass = cn(
     'transition duration-subtle ease-out transform',
@@ -171,64 +157,40 @@ export function CreatorActionsMenu({
 
   if (!isMobile) {
     return (
-      <div className='flex w-full items-center justify-end gap-1'>
-        <DropdownMenu open={open} onOpenChange={onOpenChange}>
-          <DropdownMenuTrigger asChild>
-            <IconButton
-              variant='control'
-              inert={open}
-              ariaLabel='Open creator actions'
-              className='h-8 w-8 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
-              disabled={isLoading}
-              size='sm'
-            >
-              <MoreVertical className='h-3.5 w-3.5' />
-            </IconButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' sideOffset={8}>
-            <MenuItems
-              profile={profile}
-              isLoading={isLoading}
-              onRefreshIngest={onRefreshIngest}
-              onToggleVerification={onToggleVerification}
-              onToggleFeatured={onToggleFeatured}
-              onToggleMarketing={onToggleMarketing}
-              onSendInvite={onSendInvite}
-              onDelete={onDelete}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <TableActionMenu
+        items={items}
+        trigger='custom'
+        align='end'
+        open={open}
+        onOpenChange={onOpenChange}
+      >
+        <TableRowOverflowTrigger
+          ariaLabel='Open Creator Actions'
+          disabled={isLoading}
+        />
+      </TableActionMenu>
     );
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          inert={open}
-          type='button'
-          size='sm'
-          variant='ghost'
-          className={stateClass}
-          disabled={isLoading}
-        >
-          Actions
-          <MoreVertical className='h-3.5 w-3.5 ml-1' />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' sideOffset={8} className='w-56'>
-        <MenuItems
-          profile={profile}
-          isLoading={isLoading}
-          onRefreshIngest={onRefreshIngest}
-          onToggleVerification={onToggleVerification}
-          onToggleFeatured={onToggleFeatured}
-          onToggleMarketing={onToggleMarketing}
-          onSendInvite={onSendInvite}
-          onDelete={onDelete}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <TableActionMenu
+      items={items}
+      trigger='custom'
+      align='end'
+      open={open}
+      onOpenChange={onOpenChange}
+    >
+      <Button
+        type='button'
+        size='sm'
+        variant='ghost'
+        className={stateClass}
+        disabled={isLoading}
+        aria-label='Open Creator Actions'
+      >
+        Actions
+        <MoreVertical className='ml-1 h-3.5 w-3.5' />
+      </Button>
+    </TableActionMenu>
   );
 }
