@@ -9,6 +9,7 @@ import {
   ADMIN_MOBILE_SNAPSHOT_SURFACES,
   ADMIN_RENDER_SURFACES,
   type AdminSurfaceDescriptor,
+  getAdminDesktopSnapshotName,
   getAdminSurfaceSelector,
 } from './utils/admin-surface-manifest';
 
@@ -368,6 +369,20 @@ async function openSurface(
   return locator;
 }
 
+/** The section a deep link expanded, scrolled into view for the snapshot. */
+async function openedAccordion(
+  page: import('@playwright/test').Page,
+  title: string
+) {
+  const toggle = page.getByRole('button', { name: title, exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true', {
+    timeout: 30_000,
+  });
+  const section = toggle.locator('xpath=..');
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
 test.describe('admin visual regression', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
@@ -384,10 +399,13 @@ test.describe('admin visual regression', () => {
 
   for (const surface of ADMIN_RENDER_SURFACES) {
     test(`${surface.name} desktop`, async ({ page }) => {
-      const locator = await openSurface(page, surface, DESKTOP_VIEWPORT);
+      const root = await openSurface(page, surface, DESKTOP_VIEWPORT);
+      const locator = surface.snapshotAccordion
+        ? await openedAccordion(page, surface.snapshotAccordion)
+        : root;
 
       await expect(locator).toHaveScreenshot(
-        `${surface.snapshotSlug}-desktop.png`
+        getAdminDesktopSnapshotName(surface)
       );
     });
   }
