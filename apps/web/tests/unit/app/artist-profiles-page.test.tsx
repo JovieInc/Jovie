@@ -83,13 +83,24 @@ vi.mock('@/components/marketing/MarketingPageShell', () => ({
 vi.mock('@/components/marketing/artist-profile/ArtistProfileHero', () => ({
   ArtistProfileHero: ({
     hero,
+    adaptive,
   }: {
     readonly hero: typeof ARTIST_PROFILE_COPY.hero;
+    readonly adaptive: typeof ARTIST_PROFILE_COPY.adaptive;
   }) => (
     <section className='homepage-hero--artist-profile'>
       <h1>{hero.headline}</h1>
       <p>{hero.subhead}</p>
       <div data-testid='homepage-claim-form'>{hero.ctaLabel}</div>
+      <div data-testid='artist-profile-section-adaptive'>
+        <div role='tablist' aria-label='Profile Modes'>
+          {adaptive.modes.map(mode => (
+            <button key={mode.id} type='button' role='tab'>
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </section>
   ),
 }));
@@ -104,27 +115,33 @@ vi.mock(
       readonly hero: typeof ARTIST_PROFILE_COPY.hero;
       readonly adaptive: typeof ARTIST_PROFILE_COPY.adaptive;
     }) => (
-      <>
-        <section data-testid='artist-profile-section-hero'>
-          <h1>{hero.headline}</h1>
-          <div data-testid='homepage-claim-form'>{hero.ctaLabel}</div>
-        </section>
-        <section data-testid='artist-profile-section-adaptive'>
+      <section data-testid='artist-profile-section-hero'>
+        <h1>{hero.headline}</h1>
+        <div data-testid='homepage-claim-form'>{hero.ctaLabel}</div>
+        <div data-testid='artist-profile-section-adaptive'>
           <div data-testid='artist-profile-adaptive-sequence'>
-            <h2>{adaptive.headline}</h2>
-            <p>{adaptive.body}</p>
+            <div role='tablist' aria-label='Profile Modes'>
+              {adaptive.modes.map(mode => (
+                <button key={mode.id} type='button' role='tab'>
+                  {mode.label}
+                </button>
+              ))}
+            </div>
             <img alt={adaptive.restingScreenshotAlt} src='/test-shot.png' />
-            {adaptive.modes.map(mode => (
-              <button key={mode.id} type='button'>
-                {mode.label}
-              </button>
-            ))}
           </div>
-        </section>
-      </>
+        </div>
+      </section>
     ),
   })
 );
+
+vi.mock('@/components/marketing/MarketingShippedSitesShowcase', () => ({
+  MarketingShippedSitesShowcase: () => (
+    <section data-testid='artist-profile-shipped-sites-showcase'>
+      Live artist sites
+    </section>
+  ),
+}));
 
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel',
@@ -165,22 +182,6 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection',
-  () => ({
-    ArtistProfileOpinionatedSection: ({
-      opinionated,
-    }: {
-      readonly opinionated: typeof ARTIST_PROFILE_COPY.opinionated;
-    }) => (
-      <section>
-        <h2>{opinionated.headline}</h2>
-        <p>{opinionated.principle}</p>
-      </section>
-    ),
-  })
-);
-
-vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileHowItWorks',
   () => ({
     ArtistProfileHowItWorks: ({
@@ -198,42 +199,6 @@ vi.mock(
     ),
   })
 );
-
-vi.mock(
-  '@/components/marketing/artist-profile/ArtistProfileSocialProof',
-  () => ({
-    ArtistProfileReleaseCycleGallery: ({
-      releaseCycle,
-      id,
-    }: {
-      readonly releaseCycle: typeof ARTIST_PROFILE_COPY.releaseCycle;
-      readonly id?: string;
-    }) => (
-      <section id={id}>
-        <h2>{releaseCycle.headline}</h2>
-        <p>{releaseCycle.intro}</p>
-      </section>
-    ),
-  })
-);
-
-vi.mock('@/components/marketing/artist-profile/ArtistProfileFaq', () => ({
-  ArtistProfileFaq: ({
-    faq,
-  }: {
-    readonly faq: typeof ARTIST_PROFILE_COPY.faq;
-  }) => (
-    <section>
-      <h2>{faq.headline}</h2>
-      {faq.items.map(item => (
-        <article key={item.question}>
-          <h3>{item.question}</h3>
-          <p>{item.answer}</p>
-        </article>
-      ))}
-    </section>
-  ),
-}));
 
 vi.mock('@/components/marketing/artist-profile/ArtistProfileFinalCta', () => ({
   ArtistProfileFinalCta: ({
@@ -332,7 +297,7 @@ describe('ArtistProfilesPage', () => {
     );
   });
 
-  it('renders full-page sections in the canonical data order', async () => {
+  it('renders full-page sections in the six-section homepage-system order', async () => {
     await renderArtistProfileLandingPage({
       FULL_PAGE: true,
       SOCIAL_PROOF: true,
@@ -344,47 +309,34 @@ describe('ArtistProfilesPage', () => {
       SOCIAL_PROOF: true,
       FAQ: true,
     });
-    // Footer "Audience reactivation" lands on the release-alert section.
     expect(
-      document.getElementById('bring-them-back-automatically')
-    ).not.toBeNull();
-    expect(
-      screen.getByRole('heading', {
-        name: ARTIST_PROFILE_COPY.adaptive.headline,
-      })
+      screen.getByRole('tablist', { name: 'Profile Modes' })
     ).toBeInTheDocument();
     for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
-      expect(
-        screen.getByRole('button', { name: mode.label })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: mode.label })).toBeInTheDocument();
     }
     expect(ARTIST_PROFILE_COPY.adaptive.modes).toHaveLength(4);
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
       4
     );
-    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(4);
     expect(
-      screen.getByAltText("Demo of Tim White's Jovie artist profile.")
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.showcase)
     ).toBeInTheDocument();
     expect(
-      screen.getAllByTestId('artist-profile-related-feature')
-    ).toHaveLength(4);
-    expect(
-      screen.getByRole('link', { name: /See audience notifications/i })
-    ).toHaveAttribute('href', '/artist-notifications');
-    expect(
-      screen.getByRole('link', { name: /See Instant Merch/i })
-    ).toHaveAttribute('href', '/instant-merch');
-    expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
-    expect(
-      screen.getByRole('heading', { name: 'The profile in action.' })
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'The Artist Platform' })
-    ).toBeInTheDocument();
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.opinionated)
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
-    ).toBeInTheDocument();
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.specWall)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.faq)
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('artist-profile-section-trust')
     ).not.toBeInTheDocument();
@@ -396,7 +348,7 @@ describe('ArtistProfilesPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps product evidence while omitting the optional FAQ when its flag is off', async () => {
+  it('keeps the six-section page when the legacy FAQ flag is off', async () => {
     await renderArtistProfileLandingPage({
       FULL_PAGE: true,
       SOCIAL_PROOF: false,
@@ -404,7 +356,7 @@ describe('ArtistProfilesPage', () => {
     });
 
     expect(
-      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.showcase)
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.faq)
@@ -442,9 +394,10 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getByText(ARTIST_PROFILE_COPY.hero.headline)
     ).toBeInTheDocument();
+    // Short-circuit hero still mounts the one mode-morphing mock.
     expect(
-      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
-    ).not.toBeInTheDocument();
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.outcomes)
     ).not.toBeInTheDocument();

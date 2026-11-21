@@ -28,7 +28,7 @@ describe('ArtistProfileAdaptiveSection', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(4);
   });
 
-  it('is mounted exactly once by the route intro composition', () => {
+  it('route intro embeds one mode switcher inside the hero', () => {
     render(
       <ArtistProfileHeroAdaptiveIntro
         hero={ARTIST_PROFILE_COPY.hero}
@@ -38,7 +38,7 @@ describe('ArtistProfileAdaptiveSection', () => {
     );
 
     expect(
-      screen.getAllByTestId('artist-profile-adaptive-sequence')
+      screen.getAllByTestId('artist-profile-section-adaptive')
     ).toHaveLength(1);
     expect(screen.getAllByRole('tab', { name: 'Pre-save' })).toHaveLength(1);
   });
