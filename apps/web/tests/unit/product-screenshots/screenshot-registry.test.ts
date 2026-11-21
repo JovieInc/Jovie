@@ -217,11 +217,9 @@ describe('screenshot registry', () => {
       'utf8'
     );
 
-    expect(cardSource).toContain(
-      "dataTestId='profile-primary-tab-events-empty'"
-    );
+    expect(cardSource).toContain('return null');
     expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
-      '[data-testid="profile-primary-tab-events-empty"]'
+      '[data-testid="demo-showcase-tim-white-profile"]'
     );
   });
 

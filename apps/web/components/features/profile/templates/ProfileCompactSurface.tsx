@@ -381,10 +381,16 @@ export function ProfileCompactSurface({
       ? 'profile'
       : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
-  const activeVisiblePrimaryTab =
-    !allowFanCapture && activePrimaryTab === 'subscribe'
-      ? 'profile'
-      : activePrimaryTab;
+  const activeVisiblePrimaryTab = (() => {
+    if (!allowFanCapture && activePrimaryTab === 'subscribe') {
+      return 'profile';
+    }
+    // JOV-14241: Events destination is gone when empty; fall home.
+    if (activePrimaryTab === 'tour' && !hasTourDates) {
+      return 'profile';
+    }
+    return activePrimaryTab;
+  })();
   const currentAnalyticsTab = mapPrimaryTabToAnalyticsTab(
     activeVisiblePrimaryTab
   );

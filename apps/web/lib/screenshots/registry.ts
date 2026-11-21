@@ -373,13 +373,13 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },
     {
-      // With no dates, ProfileEventsCard renders its empty branch; the tour
-      // list (tour-drawer-content) is only mounted when events exist.
+      // JOV-14241: empty Events is hidden on the live profile. The demo
+      // showcase still opens the tour drawer empty branch for catalog stills.
       id: 'tim-white-profile-events-empty-mobile',
       title: 'Tim White Profile — Events Empty',
       route: '/demo/showcase/tim-white-profile?state=events-empty',
       viewport: 'mobile',
-      waitFor: '[data-testid="profile-primary-tab-events-empty"]',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       publicExportPath: 'tim-white-profile-events-empty-phone.png',
     },
     {

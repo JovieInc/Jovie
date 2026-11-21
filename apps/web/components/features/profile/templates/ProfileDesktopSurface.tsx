@@ -34,7 +34,6 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
-  PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
@@ -342,7 +341,9 @@ export function ProfileDesktopSurface({
   const activePrimaryTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
   });
-  const visiblePrimaryTabs = getPermittedPublicProfileNavigation();
+  const visiblePrimaryTabs = getPermittedPublicProfileNavigation().filter(
+    tab => tab.id !== 'tour' || hasEventsDestination
+  );
   const canGetUpdates =
     getPermittedPublicProfileActions({
       fanCaptureEnabled: allowFanCapture,
@@ -392,6 +393,10 @@ export function ProfileDesktopSurface({
     hasReleases,
     emptyState,
   } = surfaceState;
+  // One Get Updates entry: hero primary when that is the action; otherwise the
+  // side-rail card. Never both (JOV-14241).
+  const showUpdatesSideRailCard =
+    canGetUpdates && primaryAction.kind !== 'subscribe';
   const musicSurface = resolvePublicMusicSurface({
     releases: visibleReleases,
     hasPlayableDestinations: mergedDSPs.length > 0,
@@ -520,6 +525,11 @@ export function ProfileDesktopSurface({
           </div>
           <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,8,0.14)_0%,rgba(7,8,10,0.38)_42%,rgba(7,8,10,0.98)_100%)]' />
           <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%)]' />
+          <div
+            className='pointer-events-none absolute inset-x-7 bottom-0 h-px bg-(--profile-cover-accent-line)'
+            aria-hidden='true'
+            data-testid='profile-desktop-cover-accent-line'
+          />
           <div className='@container relative z-10 flex h-full flex-col justify-between p-7'>
             <div aria-hidden='true' />
             <div className='space-y-5'>
@@ -650,16 +660,14 @@ export function ProfileDesktopSurface({
             </div>
           </DesktopSurfaceCard>
 
-          <DesktopSurfaceCard
-            title='Events'
-            actionLabel={hasEventsDestination ? 'View Events' : undefined}
-            onAction={
-              hasEventsDestination ? () => onModeSelect('tour') : undefined
-            }
-          >
-            <div className='space-y-2'>
-              {upcomingTourDates.length > 0 ? (
-                upcomingTourDates.slice(0, 2).map(tourDate => (
+          {hasEventsDestination ? (
+            <DesktopSurfaceCard
+              title='Events'
+              actionLabel='View Events'
+              onAction={() => onModeSelect('tour')}
+            >
+              <div className='space-y-2'>
+                {upcomingTourDates.slice(0, 2).map(tourDate => (
                   <div
                     key={tourDate.id}
                     className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2'
@@ -692,14 +700,10 @@ export function ProfileDesktopSurface({
                       </a>
                     ) : null}
                   </div>
-                ))
-              ) : (
-                <EmptySurfaceBlock>
-                  {PUBLIC_EVENTS_NO_SURFACE}
-                </EmptySurfaceBlock>
-              )}
-            </div>
-          </DesktopSurfaceCard>
+                ))}
+              </div>
+            </DesktopSurfaceCard>
+          ) : null}
         </div>
       </div>
 
@@ -715,7 +719,7 @@ export function ProfileDesktopSurface({
         <DesktopSurfaceCard
           title='Get updates'
           testId='profile-desktop-alerts-card'
-          className={canGetUpdates ? undefined : 'hidden'}
+          className={showUpdatesSideRailCard ? undefined : 'hidden'}
         >
           <div className='space-y-4'>
             <button
