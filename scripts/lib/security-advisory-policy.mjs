@@ -165,7 +165,7 @@ export function issueTitle(g) {
 
 export function issueDescription(g) {
   const lines = [
-    `Automated security-advisory intake (${g.ghsa}). Owned work, not a dashboard number.`,
+    `Automated security-advisory intake (${g.ghsa}). Summer-owned security work (labels: security, Bug, area:security); Gem lanes implement. Not a dashboard number.`,
     '',
     `- Severity: **${g.severity}**; SLA due **${g.dueAt}** (${SLA_HOURS[g.severity]}h from detection ${g.detectedAt})`,
     `- Exposure: **${g.exposure}** (${g.scopes.join(', ')}); manifests: ${g.manifests.join(', ')}`,

@@ -1,6 +1,6 @@
 {
   "schema": "jovie.feedback-guards/v1",
-  "reviewedOn": "2026-10-21",
+  "reviewedOn": "2026-11-21",
   "lessons": [
     {
       "fingerprint": "`captureWarning(message, context)` files Linear as `Error: {json}`",
@@ -185,6 +185,18 @@
           "path": ".claude/rules/ui.md",
           "anchor": "- Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`",
           "reason": "Separates signup conversion from the artist claim route."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/signup-cta-route-guard.test.ts",
+          "anchor": "keeps the front-door claim-profile intent off bare /claim, /register, and /waitlist",
+          "reason": "Locks the shared claim-profile intent to /start instead of bare claim/register/waitlist routes."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/claim-cta-copy-truth.test.ts",
+          "anchor": "never sends a bare claim label to the paid /claim page",
+          "reason": "Requires paid /claim CTAs to carry the public Pro price in the label (JOV-9692)."
         }
       ]
     },
@@ -197,6 +209,12 @@
           "path": ".claude/rules/ui.md",
           "anchor": "- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims.",
           "reason": "Requires current verified numbers or qualitative copy."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
+          "anchor": "bans invented traction counts and artists-already-on-jovie claims",
+          "reason": "Scans marketing copy for invented artist-count traction claims and ratchets the warn baseline."
         }
       ]
     },
@@ -239,6 +257,12 @@
           "path": ".claude/rules/ui.md",
           "anchor": "- Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit.",
           "reason": "Forbids the specific founder/Calvin identity collision across fixtures."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/calvin-demo-identity-guard.test.ts",
+          "anchor": "keeps the internal DJ persona free of Blessings, Clementine, and Tim White credits",
+          "reason": "Asserts the Calvin Harris demo persona never reintroduces the founder-collision titles or credits."
         }
       ]
     },
@@ -335,6 +359,12 @@
           "path": ".claude/rules/ui.md",
           "anchor": "- Borders are a supporting tool, not the main design language;",
           "reason": "Keeps hierarchy in spacing, typography and surface contrast."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/marketing-eyebrow-caps-ratchet.test.ts",
+          "anchor": "matches the recorded count for marketing eyebrows",
+          "reason": "Ratchets all-caps eyebrow/tracked-caps count on marketing routes so the default cannot grow."
         }
       ]
     },
@@ -347,6 +377,12 @@
           "path": ".claude/rules/ui.md",
           "anchor": "### No Decorative Hover Motion",
           "reason": "Explicitly forbids decorative translate/scale while preserving intentional spatial interaction."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/marketing-route-source-invariants.test.ts",
+          "anchor": "detects each rule on a known-bad sample",
+          "reason": "Fails closed on decorative hover:-translate/scale samples and keeps the live marketing source rule armed."
         }
       ]
     },
@@ -401,6 +437,12 @@
           "path": ".claude/rules/environment.md",
           "anchor": "ALL commands that need secrets MUST be prefixed with Doppler.",
           "reason": "Specifies the explicit jovie-web/dev wrapper rather than ambient scope."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/lessons-policy-executable-guards.test.ts",
+          "anchor": "pins local Doppler commands to jovie-web/dev in setup and environment rule",
+          "reason": "Asserts setup.sh and environment.md pin doppler run to jovie-web/dev."
         }
       ]
     },
@@ -413,6 +455,12 @@
           "path": ".claude/rules/db.md",
           "anchor": "- **ALLOW** generated append-only migration artifacts for a new migration:",
           "reason": "Permits new SQL, snapshot and journal append while existing migrations remain immutable."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/lessons-policy-executable-guards.test.ts",
+          "anchor": "allows _journal.json updates while blocking existing migration SQL/snapshots",
+          "reason": "Proves the file-protection hook allows journal appends while freezing existing SQL/snapshots."
         }
       ]
     },
@@ -425,6 +473,12 @@
           "path": ".claude/rules/testing.md",
           "anchor": "- Zero executed tests are not a pass receipt. For executable changes run the",
           "reason": "Requires executed test counts and actual CI selectors, correcting the old false-pass claim."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/lessons-policy-executable-guards.test.ts",
+          "anchor": "keeps merge-group web shards rejecting zero executed tests",
+          "reason": "Locks CI and integration configs to passWithNoTests=false so zero tests are not a pass receipt."
         }
       ]
     },
@@ -549,8 +603,8 @@
         {
           "kind": "test",
           "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
-          "anchor": "locks the homepage H1 to the identity copy module",
-          "reason": "Asserts the live homepage H1 stays sourced from the identity copy module."
+          "anchor": "locks the homepage H1 to the homepage copy module",
+          "reason": "Asserts the live homepage H1 stays sourced from the homepage copy module."
         }
       ]
     },

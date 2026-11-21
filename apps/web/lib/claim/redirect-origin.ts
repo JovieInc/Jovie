@@ -15,6 +15,13 @@
 const LOOPBACK_HOSTNAME =
   /^(?:localhost|127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}|::1)$/i;
 
+/** Host ports must be decimal 0–65535 so `new URL` never throws on the origin. */
+function isValidHostPort(port: string): boolean {
+  if (!/^\d{1,5}$/.test(port)) return false;
+  const value = Number(port);
+  return value >= 0 && value <= 65_535;
+}
+
 export function buildClaimRedirectUrl(
   request: { readonly url: string; readonly headers: Headers },
   pathname: string
@@ -41,13 +48,18 @@ function loopbackOriginFromHost(
     if (end <= 1) return null;
     hostname = host.slice(1, end);
     const rest = host.slice(end + 1);
-    if (rest !== '' && !/^:\d{1,5}$/.test(rest)) return null;
+    if (
+      rest !== '' &&
+      (!rest.startsWith(':') || !isValidHostPort(rest.slice(1)))
+    ) {
+      return null;
+    }
   } else {
     const colon = host.lastIndexOf(':');
     if (colon !== -1) {
       if (host.indexOf(':') !== colon) return null;
       hostname = host.slice(0, colon);
-      if (!/^\d{1,5}$/.test(host.slice(colon + 1))) return null;
+      if (!isValidHostPort(host.slice(colon + 1))) return null;
     }
   }
 

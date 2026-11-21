@@ -1,8 +1,7 @@
-import { Badge } from '@jovie/ui';
+import { Badge, IconButton } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { toast } from '@/components/feedback';
@@ -43,10 +42,11 @@ export function renderNameCell({
       trailing={
         profileUrl ? (
           <span className='flex shrink-0 items-center gap-0.5'>
-            <InlineIconButton
+            <IconButton
+              fade='parent'
+              size='xs'
+              variant='inline'
               aria-label={`Copy link for @${user.profileUsername}`}
-              fadeOnParentHover
-              className='[&_svg]:h-3 [&_svg]:w-3'
               onClick={e => {
                 e.stopPropagation();
                 copyToClipboard(profileUrl).then(ok => {
@@ -59,18 +59,19 @@ export function renderNameCell({
               }}
             >
               <Copy className='h-3 w-3' />
-            </InlineIconButton>
-            <InlineIconButton
-              href={profileUrl}
-              target='_blank'
-              rel='noopener noreferrer'
+            </IconButton>
+            <IconButton
+              fade='parent'
+              asChild
+              size='xs'
+              variant='inline'
               aria-label={`Open profile for @${user.profileUsername}`}
-              fadeOnParentHover
-              className='[&_svg]:h-3 [&_svg]:w-3'
               onClick={e => e.stopPropagation()}
             >
-              <ExternalLink className='h-3 w-3' />
-            </InlineIconButton>
+              <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
+                <ExternalLink className='h-3 w-3' />
+              </a>
+            </IconButton>
           </span>
         ) : null
       }
@@ -98,10 +99,11 @@ export function renderUsernameCell({
         {`@${username}`}
       </TruncatedText>
       <span className='flex shrink-0 items-center gap-0.5'>
-        <InlineIconButton
+        <IconButton
+          fade='parent'
+          size='xs'
+          variant='inline'
           aria-label={`Copy link for @${username}`}
-          fadeOnParentHover
-          className='[&_svg]:h-3 [&_svg]:w-3'
           onClick={e => {
             e.stopPropagation();
             copyToClipboard(profileUrl).then(ok => {
@@ -114,18 +116,19 @@ export function renderUsernameCell({
           }}
         >
           <Copy className='h-3 w-3' />
-        </InlineIconButton>
-        <InlineIconButton
-          href={profileUrl}
-          target='_blank'
-          rel='noopener noreferrer'
+        </IconButton>
+        <IconButton
+          fade='parent'
+          asChild
+          size='xs'
+          variant='inline'
           aria-label={`Open profile for @${username}`}
-          fadeOnParentHover
-          className='[&_svg]:h-3 [&_svg]:w-3'
           onClick={e => e.stopPropagation()}
         >
-          <ExternalLink className='h-3 w-3' />
-        </InlineIconButton>
+          <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
+            <ExternalLink className='h-3 w-3' />
+          </a>
+        </IconButton>
       </span>
     </div>
   );

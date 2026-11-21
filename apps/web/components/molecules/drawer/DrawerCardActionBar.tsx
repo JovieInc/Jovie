@@ -1,10 +1,9 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import { MoreHorizontal, MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -144,7 +143,9 @@ export function DrawerCardActionBar({
   const overflowTrigger =
     resolvedMenuItems.length > 0 ? (
       <TableActionMenu items={resolvedMenuItems} trigger='custom' align='end'>
-        <AppIconButton
+        <IconButton
+          size='sm'
+          variant='control'
           ariaLabel='More actions'
           className={cn(
             DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
@@ -153,13 +154,15 @@ export function DrawerCardActionBar({
           data-testid='drawer-card-overflow-trigger'
         >
           <TriggerIcon className='h-3.5 w-3.5' aria-hidden='true' />
-        </AppIconButton>
+        </IconButton>
       </TableActionMenu>
     ) : null;
 
   const floatingCloseButton =
     hasFloatingCloseButton && onClose ? (
-      <AppIconButton
+      <IconButton
+        size='sm'
+        variant='control'
         ariaLabel='Close'
         className={cn(
           DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
@@ -169,7 +172,7 @@ export function DrawerCardActionBar({
         onClick={onClose}
       >
         <X className='h-3.5 w-3.5' aria-hidden='true' />
-      </AppIconButton>
+      </IconButton>
     ) : null;
 
   return (

@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   expandSourcePoolEntries,
+  MERGED_WITH_BASE_POOL_CONCURRENCY,
+  MERGED_WITH_BASE_POOL_LONG_POLES,
   MERGED_WITH_BASE_POOL_SPEC,
+  mergedWithBasePoolConcurrency,
   PR_CHEAP_SCAN_COMMANDS,
   runSourceGuardPool,
   runSourceGuards,
@@ -240,6 +243,8 @@ describe('source guard pool', () => {
 });
 
 describe('merged-with-base-invariants pool', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('still contains every PR_CHEAP_SCAN_COMMANDS entry plus the design scans', () => {
     const commands = MERGED_WITH_BASE_POOL_SPEC.commands.map(
       entry => entry.command
@@ -280,6 +285,86 @@ describe('merged-with-base-invariants pool', () => {
     expect(entries.filter(entry => entry.id === 'invariants-check')).toEqual([
       { id: 'invariants-check', command: 'pnpm invariants:check' },
     ]);
+  });
+
+  it('pins measured long poles so the 70s/61s work starts first', () => {
+    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
+    const matched = entries.filter(entry =>
+      MERGED_WITH_BASE_POOL_LONG_POLES.some(pole =>
+        entry.command.includes(pole)
+      )
+    );
+    // Every pole substring must hit a real expanded command (no stale paths).
+    for (const pole of MERGED_WITH_BASE_POOL_LONG_POLES) {
+      expect(
+        entries.some(entry => entry.command.includes(pole)),
+        pole
+      ).toBe(true);
+    }
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'design-ci-judge-router'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'screen-certification.test.mjs'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'gem-priority-gate.test.py'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'lint:seo'
+    );
+  });
+
+  it('does not let SOURCE_GUARD_CONCURRENCY=3 cap the nested pool at 3', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '3');
+    // Unset nested override so the documented pool width applies.
+    vi.stubEnv('MERGED_WITH_BASE_POOL_CONCURRENCY', undefined);
+    const nested = mergedWithBasePoolConcurrency(
+      MERGED_WITH_BASE_POOL_CONCURRENCY
+    );
+    // Old code: Math.min(4, sourceGuardConcurrency()) → 3 under the workflow
+    // default. Nested may still be capped by availableParallelism(), but must
+    // not inherit the top-level default of 3.
+    expect(MERGED_WITH_BASE_POOL_CONCURRENCY).toBe(4);
+    expect(nested).toBeGreaterThan(3);
+  });
+
+  it('honors SOURCE_GUARD_CONCURRENCY=1 as the serial Validate debug switch', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '1');
+    expect(mergedWithBasePoolConcurrency(4)).toBe(1);
+  });
+
+  it('honors MERGED_WITH_BASE_POOL_CONCURRENCY over the workflow default', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '3');
+    vi.stubEnv('MERGED_WITH_BASE_POOL_CONCURRENCY', '5');
+    expect(mergedWithBasePoolConcurrency(4)).toBe(5);
+  });
+
+  it('starts measured long-pole subcommands before short scans', async () => {
+    const started = [];
+    const { code } = await runSourceGuardPool(
+      {
+        concurrency: 2,
+        commands: [
+          { id: 'cheap', command: 'node -e "process.exit(0)" /* cheap */' },
+          {
+            id: 'pole',
+            command:
+              'node -e "process.exit(0)" /* design-ci-judge-router pole */',
+          },
+          { id: 'also-cheap', command: 'node -e "process.exit(0)" /* also */' },
+        ],
+      },
+      {
+        execute: async command => {
+          started.push(command);
+          await new Promise(resolveDone => setTimeout(resolveDone, 5));
+          return { code: 0, output: '' };
+        },
+      }
+    );
+    expect(code).toBe(0);
+    expect(started[0]).toContain('design-ci-judge-router');
   });
 
   it('runs every sub-command and fails on any one failure', async () => {

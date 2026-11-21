@@ -112,7 +112,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     expect(input.closest('[data-component="composite-field"]')).not.toBeNull();
   });
 
-  it('keeps invalid handles local instead of navigating', () => {
+  it('routes a display-name prior to Spotify search without handle=', () => {
     render(<ProductLanding />);
 
     const input = within(screen.getByTestId('product-claim-card')).getByRole(
@@ -122,9 +122,24 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     fireEvent.change(input, { target: { value: 'bad handle' } });
     fireEvent.submit(screen.getByTestId('product-claim-form'));
 
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/start?starter_prompt=I+want+to+claim+my+profile.+Find+bad+handle+on+Spotify.'
+    );
+  });
+
+  it('keeps too-short handles local instead of navigating', () => {
+    render(<ProductLanding />);
+
+    const input = within(screen.getByTestId('product-claim-card')).getByRole(
+      'textbox',
+      { name: 'Choose Your Handle' }
+    );
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.submit(screen.getByTestId('product-claim-form'));
+
     expect(mocks.push).not.toHaveBeenCalled();
     expect(screen.getByTestId('product-handle-status')).toHaveTextContent(
-      'Handle can only contain lowercase letters, numbers, and hyphens'
+      'Handle must be at least 3 characters'
     );
   });
 

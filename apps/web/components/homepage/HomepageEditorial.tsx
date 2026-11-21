@@ -330,6 +330,12 @@ function ClaimCloseBody() {
         <h2 className='hv3-statement text-balance'>{lines(claim.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{claim.subhead}</p>
         <div className='hv3-form'>
+          {/*
+            Native GET: valid handles keep handle=. Display names fail the
+            pattern (reject) so handle=Taylor+Swift never lands. /start also
+            rewrites any poisoned claim+display-name URL to a Spotify search
+            prior (JOV-10127 entry hygiene).
+          */}
           <form
             method='get'
             action={intent.href}
@@ -356,6 +362,11 @@ function ClaimCloseBody() {
               maxLength={30}
               placeholder={claim.handlePlaceholder}
               aria-label={claim.handleLabel}
+              // Escape hyphen for HTML pattern unicodeSets(v) mode — unescaped
+              // `-` fails compilation and browsers drop the constraint (Seer).
+              // Use a JS expression: JSX string attributes keep `\\` as two
+              // literal backslashes, which then fails under `v` as well.
+              pattern={'[A-Za-z0-9._\\-]{3,30}'}
             />
             <Button type='submit' data-testid='homepage-close-cta'>
               {intent.label}
