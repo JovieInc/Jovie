@@ -8,8 +8,9 @@
 }
 
 .ap-hero .homepage-poster-hero__headline {
-  /* Fits "music deserves." on one line after the forced soft break. */
-  max-width: 16ch;
+  /* Soft-broken second line is "music deserves." — wider than homepage
+     18ch so Satoshi display glyphs don't rewrap under line-clamp-2. */
+  max-width: 22ch;
 }
 
 .ap-hero .homepage-poster-hero__subtitle {
@@ -114,10 +115,6 @@
 @media (max-width: 47.99rem) {
   .ap-hero .homepage-poster-hero {
     padding-top: calc(var(--homepage-header-height) + var(--space-8));
-  }
-
-  .ap-hero .homepage-poster-hero__headline {
-    max-width: 16ch;
   }
 
   .ap-hero__mode-switcher {
