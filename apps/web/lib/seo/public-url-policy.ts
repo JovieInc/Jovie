@@ -131,7 +131,7 @@ export const PUBLIC_URL_POLICY = [
     path: '/you',
     action: 'hold',
     owner: 'summer',
-    note: 'Locked claim-card target for /product hero proof. Keep claimable — never reserve or 410. Seed via Tim claim + `pnpm --filter @jovie/web you-proof:seed` (lib/synthetic/you-proof-fixture.ts). Live may 404 until claimed.',
+    note: 'Locked claim-card target for /product hero proof. Keep 404 until the profile is seeded. Do not reserve the handle.',
   },
 ] as const satisfies readonly PublicUrlPolicyEntry[];
 

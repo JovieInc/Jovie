@@ -1,10 +1,4 @@
-/**
- * DB adapter for you-proof seed.
- *
- * Reads use an injectable query client (unit-tested). Writes go through
- * registered domain functions (`updateProfileById`, `createLink`) plus cache
- * invalidation so domain-write-guard stays green.
- */
+/** Domain-routed DB adapter for you-proof seed. */
 
 import { and, eq } from 'drizzle-orm';
 import {
@@ -21,7 +15,6 @@ import { createLink } from '@/lib/services/social-links/mutations';
 import { YOU_PROOF_HANDLE } from './you-proof-fixture';
 import type { YouProofSeedStore, YouProofSeedValue } from './you-proof-seed';
 
-/** Real Drizzle client (or a test double shaped like one). */
 export type YouProofDb = DbType;
 
 export function profileSetToUpdateData(
@@ -38,6 +31,29 @@ export function profileSetToUpdateData(
   if (set.bio !== undefined) updates.bio = set.bio as string | undefined;
   if (set.is_public !== undefined) updates.isPublic = Boolean(set.is_public);
   return updates;
+}
+
+function mapRow(
+  row: Record<string, unknown>,
+  ownerEmailFallback?: string
+): {
+  profileId: string;
+  ownerEmail: string | null;
+  username: string | null;
+  displayName: string | null;
+  bio: string | null;
+  isPublic: boolean | null;
+  isClaimed: boolean | null;
+} {
+  return {
+    profileId: String(row.profileId),
+    ownerEmail: (row.ownerEmail as string | null) ?? ownerEmailFallback ?? null,
+    username: (row.username as string | null) ?? null,
+    displayName: (row.displayName as string | null) ?? null,
+    bio: (row.bio as string | null) ?? null,
+    isPublic: (row.isPublic as boolean | null) ?? null,
+    isClaimed: (row.isClaimed as boolean | null) ?? null,
+  };
 }
 
 export function createYouProofDbStore(database: YouProofDb): YouProofSeedStore {
@@ -57,16 +73,7 @@ export function createYouProofDbStore(database: YouProofDb): YouProofSeedStore {
         .leftJoin(users, eq(users.id, creatorProfiles.userId))
         .where(eq(creatorProfiles.usernameNormalized, YOU_PROOF_HANDLE))
         .limit(1);
-      if (!row) return null;
-      return {
-        profileId: String(row.profileId),
-        username: (row.username as string | null) ?? null,
-        displayName: (row.displayName as string | null) ?? null,
-        bio: (row.bio as string | null) ?? null,
-        isPublic: (row.isPublic as boolean | null) ?? null,
-        isClaimed: (row.isClaimed as boolean | null) ?? null,
-        ownerEmail: (row.ownerEmail as string | null) ?? null,
-      };
+      return row ? mapRow(row) : null;
     },
     async loadOwnerProfile(ownerEmail) {
       const [row] = await database
@@ -84,14 +91,14 @@ export function createYouProofDbStore(database: YouProofDb): YouProofSeedStore {
         .where(eq(users.email, ownerEmail))
         .limit(1);
       if (!row?.profileId) return null;
-      return {
-        profileId: String(row.profileId),
-        ownerEmail: (row.ownerEmail as string | null) ?? ownerEmail,
-        username: (row.username as string | null) ?? null,
-        displayName: (row.displayName as string | null) ?? null,
-        bio: (row.bio as string | null) ?? null,
-        isPublic: (row.isPublic as boolean | null) ?? null,
-        isClaimed: (row.isClaimed as boolean | null) ?? null,
+      return mapRow(row, ownerEmail) as {
+        profileId: string;
+        ownerEmail: string;
+        username: string | null;
+        displayName: string | null;
+        bio: string | null;
+        isPublic: boolean | null;
+        isClaimed: boolean | null;
       };
     },
     async loadSocialPlatforms(profileId) {

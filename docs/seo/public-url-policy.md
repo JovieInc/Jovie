@@ -19,7 +19,7 @@ untouched.
 | `/product` | shipping | — | DESIGN_READY 2026-09-17 ~12:10 PT. Drive is shipping the real marketing route (`bc-3b4d93ba`). Hero lock: Be found. Be understood. + `jov.ie/you` claim card. Do not 410 or reserve. |
 | `/music` | 410 | — | Root only. Profile mode is `/{username}/music`. |
 | `/shows` | 410 | — | Root only. Profile shows/events stay at `/{username}/shows` (#17942). |
-| `/you` | hold | — | Locked claim-card target. Keep claimable. Not reserved. Not 410. Seed after Tim claims: `pnpm --filter @jovie/web you-proof:seed` (`lib/synthetic/you-proof-fixture.ts`). |
+| `/you` | hold | — | Locked claim-card target. Keep claimable. Not reserved. Not 410. |
 
 Robots stay unchanged: Google must recrawl aliases and 410s. Do not Disallow
 these roots.
@@ -30,7 +30,7 @@ These are out of this PR. Track each class in Linear before closing.
 
 | Class | Evidence | Decision needed |
 | --- | --- | --- |
-| `/you` claim-card profile | Live `https://jov.ie/you` is 404 until claimed. Marketing copy uses `jov.ie/you` as the locked proof handle. Fixture + seed: `apps/web/lib/synthetic/you-proof-fixture.ts`, `pnpm --filter @jovie/web you-proof:seed`. | Tim claims the handle via product path, then runs seed with Doppler. Or later 410 if abandoned. Do not reserve it as a system username. |
+| `/you` claim-card profile | Live `https://jov.ie/you` is 404. Marketing copy uses `jov.ie/you` as the locked proof handle. | Seed/claim the profile, or later 410 if the handle is abandoned. Do not reserve it as a system username. |
 | Reserved-username 404s | Live `/features`, `/help`, `/contact`, `/listen` already 404 at the edge (JOV-3054). This class can explain most of the ~208 GSC 404s. | Per-slug 410 vs real page vs leave as reserved 404. |
 | Username collisions | Next treats unknown single segments as profiles. `/solutions` is a current 404 of this shape. | Inventory GSC 404s that are missing handles vs retired marketing roots. |
 | Legacy blog / editorial | Sitemap lists current posts only. Older slugs may still be indexed. | 301 to a live post, 410, or restore. |

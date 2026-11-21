@@ -1,9 +1,4 @@
-/**
- * Runnable seed for live `jov.ie/you` marketing proof.
- *
- * CLI: `scripts/seed-you-proof.ts`. Prod apply needs Tim + Doppler; this
- * module stays injectable so unit tests cover the write paths without DB.
- */
+/** Injectable you-proof seed runner (CLI: scripts/seed-you-proof.ts). */
 
 import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import { isReservedUsername } from '@/lib/validation/username-core';
@@ -62,14 +57,10 @@ export interface YouProofSeedResult {
 
 function assertHandlePolicy(): void {
   if (isReservedUsername(YOU_PROOF_HANDLE)) {
-    throw new Error(
-      'Refusing: "you" is reserved as a system username. Policy forbids this.'
-    );
+    throw new Error('Refusing: "you" is a reserved system username.');
   }
   if (isReservedPublicProfileIdentity(YOU_PROOF_HANDLE)) {
-    throw new Error(
-      'Refusing: "you" is a reserved public-profile identity. Policy forbids this.'
-    );
+    throw new Error('Refusing: "you" is a reserved public-profile identity.');
   }
 }
 
@@ -80,11 +71,9 @@ export async function runYouProofSeed(input: {
   readonly log?: (step: string, detail: unknown) => void;
 }): Promise<YouProofSeedResult> {
   assertHandlePolicy();
-
   const ownerEmail = input.ownerEmail.trim().toLowerCase();
   const log = input.log ?? (() => undefined);
   const messages: string[] = [];
-
   const handleRow = await input.store.loadHandleRow();
   const ownerProfile = ownerEmail
     ? await input.store.loadOwnerProfile(ownerEmail)
@@ -92,21 +81,18 @@ export async function runYouProofSeed(input: {
   const existingSocialPlatforms = handleRow
     ? await input.store.loadSocialPlatforms(handleRow.profileId)
     : new Set<string>();
-
   const plan = planYouProofSeed({
     ownerEmail,
     handleRow,
     ownerProfile,
     existingSocialPlatforms,
   });
-
   log('plan', {
     version: YOU_PROOF_FIXTURE_VERSION,
     mode: input.apply ? 'apply' : 'dry-run',
     ownerEmail: ownerEmail || null,
     handle: YOU_PROOF_HANDLE,
     plan,
-    releaseNote: 'first-light-release-manual',
   });
 
   if (plan.blockers.length > 0) {
@@ -119,7 +105,6 @@ export async function runYouProofSeed(input: {
       applied: { profileUpdates: 0, socialInserts: 0 },
     };
   }
-
   if (!input.apply) {
     messages.push('status=dry-run');
     return {
@@ -130,7 +115,6 @@ export async function runYouProofSeed(input: {
       applied: { profileUpdates: 0, socialInserts: 0 },
     };
   }
-
   if (!handleRow) {
     messages.push('status=blocked;handle-row-missing');
     return {
@@ -142,14 +126,11 @@ export async function runYouProofSeed(input: {
     };
   }
 
-  const profileId = handleRow.profileId;
   let profileUpdates = 0;
   for (const update of plan.profileUpdates) {
-    await input.store.updateProfile(profileId, update.set);
+    await input.store.updateProfile(handleRow.profileId, update.set);
     profileUpdates += 1;
-    log('profile-updated', { profileId, set: update.set });
   }
-
   let socialInserts = 0;
   for (const link of plan.socialLinks) {
     if (link.action !== 'insert') continue;
@@ -158,7 +139,7 @@ export async function runYouProofSeed(input: {
     );
     if (!fixtureLink) continue;
     await input.store.insertSocialLink({
-      profileId,
+      profileId: handleRow.profileId,
       platform: fixtureLink.platform,
       platformType: fixtureLink.platformType,
       url: fixtureLink.url,
@@ -166,9 +147,7 @@ export async function runYouProofSeed(input: {
       sortOrder: fixtureLink.sortOrder,
     });
     socialInserts += 1;
-    log('social-inserted', { platform: link.platform, url: link.url });
   }
-
   messages.push('status=applied');
   return {
     mode: 'apply',

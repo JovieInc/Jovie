@@ -1,15 +1,4 @@
-/**
- * Marketing proof fixture for live `jov.ie/you`.
- *
- * Policy: `/you` stays a claimable claim-card target — never add `you` to
- * `RESERVED_USERNAMES` or `PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES`. This
- * fixture is content for a Tim-owned (or Tim-designated) claimed profile after
- * the normal claim path has taken the handle. See
- * `scripts/seed-you-proof.ts` and docs/seo/public-url-policy.md.
- *
- * Identity mirrors the homepage hero template
- * (`HOMEPAGE_TEMPLATE_PROFILE_ARTIST`) so the live URL matches marketing.
- */
+/** Marketing proof for live jov.ie/you — claimable, never reserved. */
 
 export const YOU_PROOF_FIXTURE_SCHEMA = 'jovie.you-proof-fixture/v1' as const;
 export const YOU_PROOF_FIXTURE_VERSION = 'you-proof/2026-11-20.1' as const;
@@ -31,7 +20,6 @@ export interface YouProofFixture {
   readonly bio: string;
   readonly tagline: string;
   readonly socialLinks: readonly YouProofSocialLink[];
-  /** Public asset path used by the homepage hero release card. */
   readonly release: {
     readonly title: string;
     readonly slug: string;
@@ -39,39 +27,35 @@ export interface YouProofFixture {
   };
 }
 
-/**
- * Locked marketing thesis copy: one page for streams, drops, tips, bookings,
- * and fan capture — the homepage hero promise.
- */
-export const YOU_PROOF_FIXTURE: YouProofFixture = Object.freeze({
+export const YOU_PROOF_FIXTURE: YouProofFixture = {
   schema: YOU_PROOF_FIXTURE_SCHEMA,
   version: YOU_PROOF_FIXTURE_VERSION,
   handle: YOU_PROOF_HANDLE,
   displayName: 'Your Name',
   bio: 'The link your music deserves. Streams, drops, tips, bookings, and fan capture in a single page.',
   tagline: 'Built for artists',
-  socialLinks: Object.freeze([
-    Object.freeze({
+  socialLinks: [
+    {
       platform: 'instagram',
       platformType: 'social',
       url: 'https://instagram.com/',
       displayText: 'Instagram',
       sortOrder: 0,
-    }),
-    Object.freeze({
+    },
+    {
       platform: 'youtube',
       platformType: 'social',
       url: 'https://www.youtube.com/',
       displayText: 'YouTube',
       sortOrder: 1,
-    }),
-  ]),
-  release: Object.freeze({
+    },
+  ],
+  release: {
     title: 'First Light',
     slug: 'first-light',
     artworkPath: '/img/releases/first-light.jpg',
-  }),
-});
+  },
+};
 
 export interface YouProofProfileSnapshot {
   readonly profileId: string;
@@ -96,7 +80,6 @@ export interface YouProofSocialLinkPlan {
   readonly url: string;
   readonly displayText: string;
   readonly sortOrder: number;
-  /** `unchanged` = platform row already present; `insert` = add fixture row. */
   readonly action: 'insert' | 'unchanged';
 }
 
@@ -106,11 +89,7 @@ export interface YouProofPlan {
   readonly blockers: readonly string[];
 }
 
-/**
- * Pure planner. Never invents a profile row — the claim path must already own
- * `you` for `ownerEmail`. Returns blockers instead of throwing when the handle
- * is free or owned by someone else so dry-runs stay readable.
- */
+/** Pure planner. Never invents rows; claim path must already own `you`. */
 export function planYouProofSeed(params: {
   readonly fixture?: YouProofFixture;
   readonly ownerEmail: string;
@@ -133,26 +112,24 @@ export function planYouProofSeed(params: {
   if (!ownerEmail || !ownerEmail.includes('@')) {
     blockers.push('owner-email is required (Tim-designated account).');
   }
-
   if (!params.handleRow) {
     blockers.push(
-      `Handle "${fixture.handle}" is free. Claim it first via the product claim path (homepage /start), then re-run with --apply.`
+      `Handle "${fixture.handle}" is free. Claim via /start, then re-run --apply.`
     );
   } else if (
     (params.handleRow.ownerEmail ?? '').trim().toLowerCase() !== ownerEmail
   ) {
     blockers.push(
-      `Handle "${fixture.handle}" is owned by ${params.handleRow.ownerEmail ?? 'unknown'}, not ${ownerEmail}. Do not delete or reassign without Tim.`
+      `Handle "${fixture.handle}" owned by ${params.handleRow.ownerEmail ?? 'unknown'}, not ${ownerEmail}.`
     );
   }
-
   if (
     params.ownerProfile &&
     params.handleRow &&
     params.ownerProfile.profileId !== params.handleRow.profileId
   ) {
     blockers.push(
-      `Owner ${ownerEmail} already has a different profile (${params.ownerProfile.username ?? params.ownerProfile.profileId}). Claim/rename to "${fixture.handle}" in-product before seeding content.`
+      `Owner ${ownerEmail} has a different profile (${params.ownerProfile.username ?? params.ownerProfile.profileId}).`
     );
   }
 
@@ -161,8 +138,6 @@ export function planYouProofSeed(params: {
     return { profileUpdates: [], socialLinks: [], blockers };
   }
 
-  // is_claimed is set by the product claim path; ProfileUpdateData cannot
-  // write it. Seed only converges public identity fields.
   const desired: Record<string, YouProofSeedValue> = {
     username: fixture.handle,
     username_normalized: fixture.handle,
@@ -178,9 +153,7 @@ export function planYouProofSeed(params: {
     is_public: current.isPublic,
   };
   const changed = Object.fromEntries(
-    Object.entries(desired).filter(
-      ([key, value]) => currentByColumn[key] !== value
-    )
+    Object.entries(desired).filter(([k, v]) => currentByColumn[k] !== v)
   );
   const profileUpdates: YouProofProfileUpdate[] =
     Object.keys(changed).length === 0
