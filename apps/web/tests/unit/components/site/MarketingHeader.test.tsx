@@ -223,7 +223,8 @@ describe('MarketingHeader', () => {
     render(<MarketingHeader />);
 
     const trigger = screen.getByRole('button', { name: /Customers/ });
-    fireEvent.focus(trigger);
+    // Bare Focus must not open; hover / Enter / Space / ArrowDown do.
+    fireEvent.pointerEnter(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
     const flyout = document.getElementById('marketing-header-flyout-customers');

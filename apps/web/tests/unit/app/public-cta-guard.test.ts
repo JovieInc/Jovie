@@ -151,7 +151,7 @@ describe('public CTA guard', () => {
         ],
       })
     );
-    fireEvent.focus(screen.getByRole('button', { name: /Customers/ }));
+    fireEvent.pointerEnter(screen.getByRole('button', { name: /Customers/ }));
     const flyout = document.getElementById('marketing-header-flyout-customers');
     expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
     expect(flyout?.querySelectorAll('[data-variant]')).toHaveLength(0);
