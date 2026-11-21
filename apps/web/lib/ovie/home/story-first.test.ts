@@ -95,6 +95,35 @@ describe('buildStoryFirstGlance', () => {
       value: '$0',
       delta: null,
       tone: 'bad',
+      trend: 'flat',
+    });
+  });
+
+  it('keeps flat sparkline when equal MRR has real prior history', () => {
+    const company = buildCompanyTiles({
+      overview: {
+        mrrUsd: 4200,
+        activeSubscribers: 12,
+        balanceUsd: 50_000,
+        burnRateUsd: 5_000,
+        runwayMonths: 10,
+        defaultStatus: 'alive',
+        defaultStatusDetail: '',
+        financialDataAvailable: true,
+        weekAgo: { mrrUsd: 4200, activeSubscribers: 12 },
+      },
+      funnel: null,
+      goldenPath: null,
+    });
+    const glance = buildStoryFirstGlance({
+      delivery: emptyDeliverySummary(),
+      company,
+      shippingPulse: buildPulse(emptyDeliverySummary()),
+    });
+    expect(glance[1]).toMatchObject({
+      delta: 'flat',
+      points: [4200, 4200],
+      trend: 'flat',
     });
   });
 
