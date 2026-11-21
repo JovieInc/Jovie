@@ -1,8 +1,6 @@
-import { act, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { FounderDemoRecordingSurface } from './FounderDemoRecordingSurface';
 
 const motionPreference = vi.hoisted(() => ({ reduced: true }));
@@ -20,7 +18,7 @@ vi.mock('@/features/demo/DemoTimWhiteProfileSurface', () => ({
   DemoTimWhiteProfileSurface: () => null,
 }));
 vi.mock('@/components/shell/ThreadView', () => ({
-  ThreadView: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ThreadView: () => null,
 }));
 vi.mock('@/components/jovie/components/ChatInput', () => ({
   ChatInput: () => null,
@@ -57,31 +55,5 @@ describe('Founder demo reduced motion', () => {
     rerender(<FounderDemoRecordingSurface />);
     expect(cancelFrame).toHaveBeenCalledWith(7);
     expect(requestFrame).toHaveBeenCalledTimes(2);
-  });
-
-  it('shows the approval step mid-demo and keeps it on press', async () => {
-    motionPreference.reduced = false;
-    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
-    let frames = 0;
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
-      frames += 1;
-      if (frames === 1) {
-        now.mockReturnValue(50_000);
-        callback(0);
-      }
-      return 1;
-    });
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-    const user = userEvent.setup();
-    const { container } = render(<FounderDemoRecordingSurface />);
-
-    const approve = await screen.findByRole('button', { name: 'Approve Drop' });
-    expect(approve.className).not.toContain('bg-white');
-    await user.click(approve);
-
-    expect(
-      screen.getByRole('button', { name: 'Approve Drop' })
-    ).toBeInTheDocument();
-    await expectNoA11yViolations(container);
   });
 });

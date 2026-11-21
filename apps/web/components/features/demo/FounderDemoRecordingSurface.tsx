@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { Check, MousePointer2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
@@ -150,7 +149,7 @@ function ProductCursor({
       {isClicking ? (
         <span className='absolute -left-3 -top-3 size-8 animate-ping rounded-full border border-primary-token/80' />
       ) : null}
-      <MousePointer2 className='size-7 fill-on-media text-on-media drop-shadow-[0_4px_10px_color-mix(in_oklab,var(--color-ink-on-media)_75%,transparent)]' />
+      <MousePointer2 className='size-7 fill-white text-white dark:text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]' />
     </div>
   );
 }
@@ -308,14 +307,12 @@ function RecordingChatPanel({
               Link, draft the fan notification, schedule the drop, and monitor
               performance.
             </div>
-            <Button
-              variant='primary'
-              size='sm'
-              className='w-full'
+            <button
+              className='h-8 w-full rounded-md border border-(--linear-btn-primary-border) bg-btn-primary text-xs font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
               type='button'
             >
-              Approve Drop
-            </Button>
+              Approve drop
+            </button>
           </div>
         ) : null}
         {monitoringResponse ? (
@@ -369,7 +366,7 @@ export function FounderDemoRecordingSurface() {
         <ApprovalStatus activeScene={activeScene} />
         <RecordingChatPanel elapsedSeconds={elapsedSeconds} />
         <ProductCursor elapsedSeconds={elapsedSeconds} />
-        <div className='absolute bottom-0 left-0 right-0 z-40 h-1 bg-ink-on-media/20'>
+        <div className='absolute bottom-0 left-0 right-0 z-40 h-1 bg-black/20'>
           <div
             className='h-full bg-primary-token transition-[width] duration-subtle'
             style={{ width: `${progress}%` }}
