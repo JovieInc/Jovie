@@ -68,6 +68,12 @@
     "apps/web/components/features/admin/table/TableRowActions.tsx": {
       "long-content": "The component renders three icon buttons and no text content; labels are fixed strings from props that cannot grow. The detector matched the words label and title in aria and title attributes.",
       "offline": "The component never fetches: it only calls the onRefreshIngest and onToggleVerification callbacks its parent owns, and shows the parent's loading status. Offline handling belongs to the parent row."
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/AddPlatformDialog.tsx": {
+      "loading": "Pending is only entered through the addManualDspMatch server action, which Storybook does not run; the pending label and disabled submit are asserted in AddPlatformDialog.test.tsx by awaiting the action.",
+      "error": "The inline error appears only after the addManualDspMatch server action resolves with a failure or throws, which Storybook does not run; both paths are asserted in AddPlatformDialog.test.tsx.",
+      "offline": "Offline is the same thrown-action path as error: addManualDspMatch rejects and the dialog shows its fixed could-not-be-added message, asserted in AddPlatformDialog.test.tsx.",
+      "permission-denied": "The dialog has no gated action: any signed-in artist can link a platform, and authorization lives in the addManualDspMatch server action. The detector matched role='alert' on the inline error, which is the error state."
     }
   }
 }
