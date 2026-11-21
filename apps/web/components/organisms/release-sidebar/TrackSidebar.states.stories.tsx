@@ -7,7 +7,7 @@ const baseTrack: TrackSidebarData = {
   id: 'track-1',
   title: 'Midnight Echo',
   slug: 'midnight-echo',
-  smartLinkPath: '/r/midnight-echo/track-1',
+  smartLinkPath: '/r/echo/1',
   trackNumber: 1,
   discNumber: 1,
   durationMs: 181000,

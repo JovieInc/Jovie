@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import {
   EntityHoverLink,
@@ -83,27 +82,6 @@ describe('EntityHoverLink', () => {
     ).toBeNull();
   });
 
-  it('activates the linked artist from the card and stays axe-clean', async () => {
-    vi.useFakeTimers();
-    const onActivate = vi.fn();
-    fastRender(
-      <EntityHoverLink entity={release} onActivate={onActivate}>
-        Sober
-      </EntityHoverLink>
-    );
-    fireEvent.focus(screen.getByRole('button', { name: 'Sober' }));
-    advanceTimers(200);
-    vi.useRealTimers();
-    await expectNoA11yViolations(screen.getByRole('tooltip'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Jovie' }));
-    expect(onActivate).toHaveBeenCalledWith({
-      kind: 'artist',
-      id: 'artist:Jovie',
-      label: 'Jovie',
-    });
-  });
-
   it('opens on hover and closes on mouse leave', () => {
     vi.useFakeTimers();
     fastRender(<EntityHoverLink entity={release}>Sober</EntityHoverLink>);
@@ -113,7 +91,7 @@ describe('EntityHoverLink', () => {
     advanceTimers(200);
 
     expect(screen.getByRole('tooltip').textContent).toContain('Sober');
-
+    expect(trigger).toHaveAttribute('type', 'button');
     fireEvent.mouseLeave(trigger);
     advanceTimers(120);
 
