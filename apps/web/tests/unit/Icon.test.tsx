@@ -42,6 +42,16 @@ describe('Icon', () => {
     expect(screen.getByTestId('override')).toHaveAttribute('stroke-width', '2');
   });
 
+  it('infers optical stroke from Tailwind className when size is omitted', () => {
+    render(
+      <Icon name='AlertTriangle' data-testid='tall' className='h-6 w-6' />
+    );
+    expect(screen.getByTestId('tall')).toHaveAttribute('stroke-width', '1.75');
+
+    render(<Icon name='User' data-testid='mid' className='size-5' />);
+    expect(screen.getByTestId('mid')).toHaveAttribute('stroke-width', '1.65');
+  });
+
   it('normalizes various icon name formats', () => {
     render(<Icon name='alarm-clock' data-testid='kebab' />);
     expect(screen.getByTestId('kebab')).toBeInTheDocument();

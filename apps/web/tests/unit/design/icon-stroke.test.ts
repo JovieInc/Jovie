@@ -3,6 +3,7 @@ import {
   ICON_STROKE,
   ICON_STROKE_DEFAULT_SIZE,
   iconStrokeForSize,
+  opticalSizeFromClassName,
 } from '@/lib/design/icon-stroke';
 
 describe('iconStrokeForSize (JOV-14004)', () => {
@@ -32,5 +33,19 @@ describe('iconStrokeForSize (JOV-14004)', () => {
     expect(ICON_STROKE.chrome).toBeLessThan(2);
     expect(ICON_STROKE.mid).toBeLessThan(2);
     expect(ICON_STROKE.feature).toBeLessThan(2);
+  });
+});
+
+describe('opticalSizeFromClassName (JOV-14004)', () => {
+  it('reads Tailwind size/h/w spacing into CSS px', () => {
+    expect(opticalSizeFromClassName('h-4 w-4')).toBe(16);
+    expect(opticalSizeFromClassName('size-5 text-accent')).toBe(20);
+    expect(opticalSizeFromClassName('mr-2 h-6 w-6 text-destructive')).toBe(24);
+    expect(opticalSizeFromClassName('h-3.5 w-3.5')).toBe(14);
+  });
+
+  it('returns undefined when no size utility is present', () => {
+    expect(opticalSizeFromClassName(undefined)).toBeUndefined();
+    expect(opticalSizeFromClassName('text-accent shrink-0')).toBeUndefined();
   });
 });

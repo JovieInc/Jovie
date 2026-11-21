@@ -40,3 +40,42 @@ export function iconStrokeForSize(
   if (size <= 20) return ICON_STROKE.mid;
   return ICON_STROKE.feature;
 }
+
+/** Tailwind spacing scale → CSS px (default theme). */
+const TAILWIND_SPACING_PX: Readonly<Record<string, number>> = {
+  '2.5': 10,
+  '3': 12,
+  '3.5': 14,
+  '4': 16,
+  '5': 20,
+  '6': 24,
+  '7': 28,
+  '8': 32,
+  '9': 36,
+  '10': 40,
+  '11': 44,
+  '12': 48,
+};
+
+const CLASS_SIZE_RE =
+  /(?:^|\s)(?:!)?(?:size|h|w)-(\d+(?:\.\d+)?)(?=\s|$)/g;
+
+/**
+ * Infer painted optical size from Tailwind `size-*` / `h-*` / `w-*` classes
+ * when callers omit the Lucide `size` prop (common Icon pattern).
+ * Returns the largest matched spacing so `h-6 w-6` → 24.
+ */
+export function opticalSizeFromClassName(
+  className: string | undefined
+): number | undefined {
+  if (!className) return undefined;
+
+  let maxPx: number | undefined;
+  for (const match of className.matchAll(CLASS_SIZE_RE)) {
+    const token = match[1];
+    const px = TAILWIND_SPACING_PX[token];
+    if (px === undefined) continue;
+    maxPx = maxPx === undefined ? px : Math.max(maxPx, px);
+  }
+  return maxPx;
+}

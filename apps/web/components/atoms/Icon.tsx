@@ -99,7 +99,10 @@ import {
   RailRightClosed,
   RailRightOpen,
 } from '@/components/atoms/rail-icons';
-import { iconStrokeForSize } from '@/lib/design/icon-stroke';
+import {
+  iconStrokeForSize,
+  opticalSizeFromClassName,
+} from '@/lib/design/icon-stroke';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -258,7 +261,10 @@ export function Icon({
   }
 
   const LucideIcon = iconRegistry[iconName];
-  const resolvedSize = typeof size === 'number' ? size : undefined;
+  // Prefer explicit `size`; else infer from Tailwind size/h/w classes so
+  // `className='h-6 w-6'` still climbs the optical ladder (Sentry 20808840).
+  const resolvedSize =
+    typeof size === 'number' ? size : opticalSizeFromClassName(className);
   // JOV-14004: optical default; explicit strokeWidth always wins.
   const resolvedStroke =
     strokeWidth === undefined ? iconStrokeForSize(resolvedSize) : strokeWidth;
