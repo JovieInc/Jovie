@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, Send } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -51,7 +51,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   if (feedbackMutation.isSuccess) {
     return (
       <div className='mx-auto max-w-md rounded-xl border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) p-6 text-center'>
-        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
+        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-success/20 bg-success-subtle text-success'>
           <CheckCircle2 className='h-5 w-5' />
         </div>
         <div className='mt-4 space-y-1'>
@@ -72,7 +72,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           onClick={onClose}
           className='mt-5 rounded-lg px-4 text-2xs font-medium'
         >
-          Back to chat
+          Back To Chat
         </Button>
       </div>
     );
@@ -85,14 +85,16 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           Share feedback
         </p>
         <h3 className='text-sm font-semibold text-primary-token'>
-          Help shape this workspace
+          Help Shape This Workspace
         </h3>
         <p className='text-xs text-secondary-token'>
           Tell us what feels off, what should exist, or what slowed you down.
         </p>
       </div>
 
-      <textarea
+      <Textarea
+        aria-label='Your Feedback'
+        resizable={false}
         ref={textareaRef}
         value={feedbackText}
         onChange={e => setFeedbackText(e.target.value)}
@@ -101,7 +103,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         maxLength={2000}
         disabled={feedbackMutation.isPending}
         className={cn(
-          'mt-4 w-full resize-none rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3.5 py-3',
+          'mt-4 w-full rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3.5 py-3',
           'text-sm text-primary-token placeholder:text-tertiary-token',
           'focus:border-default focus:outline-none',
           'disabled:opacity-50'

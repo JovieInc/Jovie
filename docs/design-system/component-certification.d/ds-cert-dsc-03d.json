@@ -1,0 +1,71 @@
+{
+  "gates": {
+    "apps/web/components/jovie/components/ChatLinkRemovalCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatMerchActionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/EntityChipPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/FeedbackForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/jovie/components/ChatLinkRemovalCard.tsx": {
+      "empty": "The card renders one link from its platform and url props; it owns no collection that could be empty.",
+      "offline": "The card never fetches on render; a failed removal while offline surfaces through the same mutation error state shown by ErrorRemovalFails."
+    },
+    "apps/web/components/jovie/components/ChatMerchActionCard.tsx": {
+      "empty": "The card renders one merch action from its props; it owns no collection that could be empty.",
+      "offline": "The card never fetches on render; a failed confirm while offline surfaces through the same mutation error state shown by ErrorConfirmFails.",
+      "loading": "The confirming state lasts only between the confirm press and the server response, driven by the mutation, so a story cannot hold it on screen."
+    },
+    "apps/web/components/jovie/components/EntityChipPopover.tsx": {
+      "loading": "The pending state lasts one tick: useProjectedSourceFact awaits a dynamic import of a local module and no network request, so a story cannot hold it on screen.",
+      "offline": "The popover never fetches; it only reads props and a local dynamic import, so connectivity changes nothing it renders."
+    },
+    "apps/web/components/jovie/components/FeedbackForm.tsx": {
+      "loading": "The pending state exists only between Submit and the server response, driven by the mutation, and cannot be held on screen by a story.",
+      "offline": "The form never fetches on render; an offline submit fails into the same error message shown by ErrorSubmitFails."
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx": {
+      "empty": "The section renders a fixed four-card earning loop from required copy; it owns no collection that could be empty."
+    }
+  }
+}
