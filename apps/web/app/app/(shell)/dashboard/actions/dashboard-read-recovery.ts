@@ -5,6 +5,7 @@ import {
   isPostgresTimeoutError,
   isQueryTimeoutError,
 } from '@/lib/db/query-timeout';
+import { createEmptyTippingStats, type TippingStats } from '@/lib/db/server';
 import { isMissingCreatorDistributionEventsTableError } from '@/lib/distribution/instagram-activation';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
@@ -36,6 +37,26 @@ function isIdleTransactionTermination(error: unknown): boolean {
     : /terminating connection due to idle-in-transaction timeout/i.test(
         getDeepErrorMessage(error)
       );
+}
+
+/** Keep the existing tipping fallback while reporting only unexpected errors. */
+export function degradeTippingStatsRead(error: unknown): TippingStats {
+  if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+    logger.warn(
+      '[tipping-stats] tipping stats query timed out; degrading to empty stats'
+    );
+  } else if (isDashboardReadRecoveryAdmitted(error)) {
+    logger.warn(
+      '[tipping-stats] transient DB condition; degrading to empty stats',
+      { error: getDeepErrorMessage(error) }
+    );
+  } else {
+    Sentry.captureException(error, {
+      level: 'error',
+      tags: { query: 'tipping_stats', context: 'dashboard_data' },
+    });
+  }
+  return createEmptyTippingStats();
 }
 
 export type SocialLinksExistence = {

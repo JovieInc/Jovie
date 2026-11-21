@@ -225,6 +225,72 @@ vi.mock('@/lib/utils/logger', () => ({
 const commitFetchFailed = () =>
   new Error('Failed query: commit', { cause: new Error('fetch failed') });
 
+describe('tipping read degradation (JOV-8845)', () => {
+  beforeEach(() => {
+    resetTxHarness();
+    captureExceptionMock.mockReset();
+    loggerWarnMock.mockReset();
+    loggerErrorMock.mockReset();
+  });
+
+  it.each([
+    ['tip totals', 7],
+    ['click totals', 8],
+  ] as const)(
+    'degrades a transport failure in %s without reporting a data error',
+    async (_read, index) => {
+      const error = new Error('Failed query: SELECT set_config', {
+        cause: new Error('server conn crashed?'),
+      });
+      queueDashboardReads();
+      txHarness.outcomes[index] = fail(error);
+
+      const result = await getDashboardData();
+
+      expect(result.tippingStats).toEqual({
+        tipClicks: 0,
+        qrTipClicks: 0,
+        linkTipClicks: 0,
+        tipsSubmitted: 0,
+        totalReceivedCents: 0,
+        monthReceivedCents: 0,
+      });
+      expect(result.hasSocialLinks).toBe(true);
+      expect(result.avatarQuality?.status).toBe('ok');
+      expect(result.dashboardLoadError).toBeUndefined();
+      expect(txHarness.txStates.every(state => state.closed)).toBe(true);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        expect.stringContaining('[tipping-stats] transient'),
+        expect.objectContaining({
+          error: expect.stringContaining('server conn crashed?'),
+        })
+      );
+    }
+  );
+
+  it.each(['42501', '40001', undefined])(
+    'keeps genuine database errors visible (SQLSTATE %s)',
+    async code => {
+      const cause = Object.assign(
+        new Error(code ? 'server conn crashed?' : 'unexpected data failure'),
+        { code }
+      );
+      const error = new Error('Failed query: SELECT tipping totals', { cause });
+      queueDashboardReads();
+      txHarness.outcomes[7] = fail(error);
+
+      const result = await getDashboardData();
+
+      expect(result.tippingStats.totalReceivedCents).toBe(0);
+      expect(captureExceptionMock).toHaveBeenCalledWith(error, {
+        level: 'error',
+        tags: { query: 'tipping_stats', context: 'dashboard_data' },
+      });
+    }
+  );
+});
+
 describe('avatar commit-wrapped transport recovery (JOV-12096)', () => {
   beforeEach(() => {
     resetTxHarness();
