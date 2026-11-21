@@ -63,6 +63,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/shell/ContextMenuOverlay.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/shell/PriorityGlyph.tsx": [
       "ds-owner",
       "tokens",
@@ -79,6 +88,10 @@
     },
     "apps/web/components/providers/ErrorBoundary.tsx": {
       "permission-denied": "The boundary only catches render errors and has no permission check; a denial is the child's concern and arrives as an ordinary error."
+    },
+    "apps/web/components/shell/ContextMenuOverlay.tsx": {
+      "error": "The menu only lists caller-supplied actions and has no data, request or failure path.",
+      "permission-denied": "A caller omits or disables actions the person may not use; the overlay itself has no permission check (see the disabled item in the Partial story)."
     },
     "apps/web/components/shell/PriorityGlyph.tsx": {
       "error": "A pure presentational glyph with no data, request or failure path; the urgent level already shows the alarm styling."
