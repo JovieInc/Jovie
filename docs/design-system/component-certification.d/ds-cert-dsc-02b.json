@@ -18,6 +18,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx": [
       "ds-owner",
       "tokens",
@@ -81,7 +90,25 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/socials-form/VerificationModal.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -99,7 +126,25 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/release-tasks/MetadataAgentPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskBoard.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -110,6 +155,13 @@
     ]
   },
   "waivers": {
+    "apps/web/components/apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx": {
+      "loading": "Pixel settings and health come from react-query data seeded by the page; no loading skeleton, error view, offline or long-content branch is rendered by this section",
+      "error": "Pixel settings and health come from react-query data seeded by the page; no loading skeleton, error view, offline or long-content branch is rendered by this section",
+      "offline": "Pixel settings and health come from react-query data seeded by the page; no loading skeleton, error view, offline or long-content branch is rendered by this section",
+      "long-content": "Pixel settings and health come from react-query data seeded by the page; no loading skeleton, error view, offline or long-content branch is rendered by this section",
+      "rtl-overflow": "Pixel settings and health come from react-query data seeded by the page; no loading skeleton, error view, offline or long-content branch is rendered by this section"
+    },
     "apps/web/components/features/dashboard/organisms/InlineChatArea.tsx": {
       "loading": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
       "empty": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
@@ -122,6 +174,13 @@
     },
     "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx": {
       "error": "Inline editors have no validation or error state; save failures are owned by the parent hook"
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx": {
+      "loading": "Pixel settings and health come from react-query data seeded by the page; this section renders no loading skeleton, error view, offline or long-content branch",
+      "error": "Pixel settings and health come from react-query data seeded by the page; this section renders no loading skeleton, error view, offline or long-content branch",
+      "offline": "Pixel settings and health come from react-query data seeded by the page; this section renders no loading skeleton, error view, offline or long-content branch",
+      "long-content": "Pixel settings and health come from react-query data seeded by the page; this section renders no loading skeleton, error view, offline or long-content branch",
+      "rtl-overflow": "Pixel settings and health come from react-query data seeded by the page; this section renders no loading skeleton, error view, offline or long-content branch"
     },
     "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkItem.tsx": {
       "empty": "A row always renders one link; the empty list is rendered by ChatStyleLinkList",
@@ -144,6 +203,13 @@
       "empty": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent",
       "error": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent",
       "offline": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent"
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow.tsx": {
+      "error": "A track row is static catalog data; a missing preview is the Partial story and audio playback errors are swallowed by the shared player"
+    },
+    "apps/web/components/features/dashboard/organisms/socials-form/VerificationModal.tsx": {
+      "offline": "Presentational dialog; network failures arrive as verificationError props (ErrorDnsNotFound story) and ownership conflicts as domain_already_claimed",
+      "permission-denied": "Presentational dialog; network failures arrive as verificationError props (ErrorDnsNotFound story) and ownership conflicts as domain_already_claimed"
     },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": {
       "empty": "A row always renders exactly one task; an empty list is rendered by the parent checklist"
