@@ -6,11 +6,7 @@ export function isProfileSearchable(settings: unknown): boolean {
   return (settings as Record<string, unknown>).searchable === true;
 }
 
-/**
- * Owner marks the profile as primarily for a young audience (TRK-6).
- * Missing/malformed settings fail closed to "not young" so existing profiles
- * keep current pixel behavior until the creator opts in.
- */
+/** TRK-6: explicit `youngAudience: true` only; missing/malformed → not young. */
 export function isYoungAudienceProfile(settings: unknown): boolean {
   if (settings === undefined || settings === null) return false;
   if (typeof settings !== 'object' || Array.isArray(settings)) return false;
@@ -22,11 +18,7 @@ export function isPublicProfilePublished(value: unknown): boolean {
   return value === true || value === 1 || value === 't';
 }
 
-/**
- * Profile updates that must hard-expire the public snapshot (`expire: 0`)
- * instead of soft revalidation — visibility, searchability, and young-audience
- * pixel suppress (TRK-6) all change what visitors may see/load.
- */
+/** Hard-expire public cache when visibility, search, or young-audience changes. */
 export function isPrivacyAffectingProfileUpdate(updates: {
   readonly isPublic?: unknown;
   readonly settings?: {

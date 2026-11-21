@@ -234,7 +234,7 @@
       "product": "jovie",
       "url": "https://jov.ie/tim",
       "inputs": [],
-      "note": "Fan-subscribe form opens in a drawer on this page, so the load-state crawl sees no input. Pixel vs drawer is counsel brief Q3. TRK-6: add a dedicated surface with young_audience:true once a seeded young-audience fixture handle exists; until then minors-pixels-off warns and settings.youngAudience is the suppress gate."
+      "note": "Fan-subscribe form opens in a drawer on this page, so the load-state crawl sees no input. Pixel vs drawer is counsel brief Q3."
     },
     {
       "id": "jovie-profile-alerts",

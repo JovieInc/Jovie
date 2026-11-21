@@ -41,6 +41,9 @@ describe('SettingsSearchabilitySection certificate', () => {
     );
 
     expect(control()).toBeChecked();
+    expect(
+      screen.getByRole('switch', { name: 'Young audience' })
+    ).not.toBeChecked();
     await user.click(control());
 
     expect(await screen.findByText('Saved')).toBeInTheDocument();

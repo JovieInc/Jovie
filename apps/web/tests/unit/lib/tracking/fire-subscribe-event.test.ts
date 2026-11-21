@@ -24,10 +24,6 @@ vi.mock('@/lib/utils/pii-encryption', () => ({
   decryptPII: vi.fn((val: string) => val),
 }));
 
-// Mock db with configurable query result.
-// Supports both:
-// - select().from().where().limit() (young-audience gate)
-// - select().from().innerJoin().innerJoin().where().limit() (creator pixels)
 let mockDbResult: unknown[] = [];
 const mockLimit = vi.fn(() => Promise.resolve(mockDbResult));
 const mockWhere = vi.fn(() => ({ limit: mockLimit }));

@@ -37,6 +37,9 @@ function artist(id = 'profile-a', searchable?: boolean): Artist {
 
 beforeEach(() => vi.clearAllMocks());
 
+const discovery = () =>
+  screen.getByRole('switch', { name: 'Show in Jovie discovery' });
+
 function PrivacyPageFixture() {
   const { selectedProfile } = useDashboardData();
   return selectedProfile ? (
@@ -69,15 +72,12 @@ describe('owner discovery choice', () => {
         </DashboardDataProvider>
       );
       const { rerender } = render(page(true));
-      fireEvent.click(screen.getByRole('switch'));
+      fireEvent.click(discovery());
       await screen.findByText('Saved');
       rerender(page(false));
       rerender(page(true));
-      expect(screen.getByRole('switch')).toHaveAttribute(
-        'aria-checked',
-        String(!initial)
-      );
-      fireEvent.click(screen.getByRole('switch'));
+      expect(discovery()).toHaveAttribute('aria-checked', String(!initial));
+      fireEvent.click(discovery());
       expect(save).toHaveBeenLastCalledWith({
         updates: { settings: { searchable: initial } },
       });
@@ -172,7 +172,7 @@ describe('owner discovery choice', () => {
     save.mockResolvedValue({});
     const user = userEvent.setup();
     render(<SettingsSearchabilitySection artist={artist('keyboard', false)} />);
-    const control = screen.getByRole('switch');
+    const control = discovery();
     await user.tab();
     expect(control).toHaveFocus();
     await user.keyboard(' ');
@@ -196,16 +196,16 @@ describe('owner discovery choice', () => {
     const { rerender } = render(
       <SettingsSearchabilitySection artist={artist()} onArtistUpdate={update} />
     );
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(discovery());
     rerender(
       <SettingsSearchabilitySection
         artist={artist('profile-b', false)}
         onArtistUpdate={update}
       />
     );
-    expect(screen.getByRole('switch')).not.toBeChecked();
+    expect(discovery()).not.toBeChecked();
     await act(async () => reject(new Error('late failure')));
-    expect(screen.getByRole('switch')).not.toBeChecked();
+    expect(discovery()).not.toBeChecked();
     expect(update).toHaveBeenCalledTimes(1);
     expect(hook).toHaveBeenLastCalledWith({
       profileId: 'profile-b',

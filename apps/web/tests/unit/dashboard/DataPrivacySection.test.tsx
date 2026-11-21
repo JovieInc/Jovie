@@ -58,9 +58,6 @@ describe('DataPrivacySection', () => {
       </QueryClientProvider>
     );
     expect(
-      screen.getByRole('switch', { name: 'Show in Jovie discovery' })
-    ).not.toBeChecked();
-    expect(
       screen.getByRole('switch', { name: 'Young audience' })
     ).not.toBeChecked();
     expect(

@@ -8,7 +8,6 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isYoungAudienceProfile } from '@/lib/profile/public-profile-access';
 import { logger } from '@/lib/utils/logger';
 
-/** TRK-6: true when the profile owner opted into young-audience pixel suppress. */
 export async function profileHasYoungAudienceSuppress(
   profileId: string
 ): Promise<boolean> {
@@ -37,10 +36,6 @@ export async function markEventSkipped(
     .where(eq(pixelEvents.id, eventId));
 }
 
-/**
- * Skip ad-platform forwarding when the profile is young-audience.
- * Returns true when the caller should return without forwarding.
- */
 export async function skipForwardingForYoungAudience(
   eventId: string,
   profileId: string
