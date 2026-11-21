@@ -137,7 +137,13 @@ export function createGbrainWriter(options = {}) {
 
   /**
    * Cheap probe: is the CLI present and callable?
-   * @returns {{ available: boolean, reason?: string }}
+   * `transportUnavailable` is true only for missing binary / connect refusal —
+   * never for command timeouts (those are degraded, not needs-probe).
+   * @returns {{
+   *   available: boolean,
+   *   reason?: string,
+   *   transportUnavailable?: boolean,
+   * }}
    */
   function probe() {
     try {
@@ -148,7 +154,11 @@ export function createGbrainWriter(options = {}) {
       });
       return { available: true };
     } catch (err) {
-      return { available: false, reason: classifyWriteError(err) };
+      return {
+        available: false,
+        reason: classifyWriteError(err),
+        transportUnavailable: isTransportUnavailable(err),
+      };
     }
   }
 
@@ -195,14 +205,14 @@ export function compoundIdMarker(body) {
  * needs-probe / exit 0).
  * @param {unknown} err
  */
-function isTransportUnavailable(err) {
+export function isTransportUnavailable(err) {
   const code =
     err && typeof err === 'object' && 'code' in err
       ? String(/** @type {{ code?: unknown }} */ (err).code)
       : '';
   const message = err instanceof Error ? err.message : String(err);
   const blob = `${code} ${message}`;
-  // Command / our timeout — hang after probe succeeded is degraded, not unavailable.
+  // Command / our timeout — hang is degraded, not unavailable.
   if (code === 'ETIMEDOUT') return false;
   if (/\btimed out\b/i.test(message)) return false;
   if (code === 'ENOENT') return true;
@@ -301,10 +311,12 @@ export function compoundHealthDigest(args) {
 
   const availability = writer.probe();
   if (!availability.available) {
-    // needs-probe / exit 0 only when transport/binary is missing. Probe
-    // timeouts and other command failures are degraded (exit 1).
+    // Sentry discussion_r4651107054: only true transport-missing → needs-probe.
+    // Probe timeout / generic command failure → degraded (exit 1).
     const reason = availability.reason || 'gbrain-unavailable';
-    const unavailable = reason === 'gbrain-unavailable';
+    const unavailable =
+      availability.transportUnavailable === true ||
+      reason === 'gbrain-unavailable';
     bufferPages(args.bufferDir, pages, buffered);
     return {
       schema: RUN_SCHEMA,

@@ -235,6 +235,21 @@ test('probe ETIMEDOUT degrades instead of needs-probe', () => {
   assert.equal(result.status, 'degraded');
   assert.match(String(result.reason), /ETIMEDOUT/i);
   assert.notEqual(result.reason, 'gbrain-unavailable');
+
+  // Full CLI path must exit 1 — never mask hung probe as needs-probe exit 0.
+  const dir = mkdtempSync(join(tmpdir(), 'gbrain-compound-probe-timeout-'));
+  try {
+    const digestPath = join(dir, 'digest.json');
+    writeFileSync(digestPath, JSON.stringify(healthyDigest()));
+    const { exitCode, result: runResult } = runCompounding(
+      ['--digest-file', digestPath],
+      { writer }
+    );
+    assert.equal(runResult.status, 'degraded');
+    assert.equal(exitCode, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('putWithReadback rejects stale pages that only share static tails', () => {

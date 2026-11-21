@@ -28,6 +28,7 @@ export {
   compoundIdForBody,
   compoundIdMarker,
   createGbrainWriter,
+  isTransportUnavailable,
   RUN_SCHEMA,
   resolveGbrainBin,
   withCompoundId,
