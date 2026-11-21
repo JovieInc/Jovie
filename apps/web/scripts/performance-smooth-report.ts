@@ -146,6 +146,12 @@ export function pickWorstSurface(
   };
 }
 
+/** Checked-in baselines keep medians/flags only — raw samples stay out of PR size. */
+export function toCheckedInBaseline(baseline: SmoothSurfaceBaseline) {
+  const { samples: _samples, ...rest } = baseline;
+  return rest;
+}
+
 export function writeSmoothBaselines(
   summary: SmoothBaselineSummary,
   outDir: string
@@ -156,10 +162,23 @@ export function writeSmoothBaselines(
       outDir,
       smoothBaselineFileName(baseline.surfaceId, baseline.platform)
     );
-    writeFileSync(path, `${JSON.stringify(baseline, null, 2)}\n`);
+    writeFileSync(
+      path,
+      `${JSON.stringify(toCheckedInBaseline(baseline), null, 2)}\n`
+    );
   }
   const summaryPath = resolve(outDir, 'summary.json');
-  writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  const compactSummary = {
+    ...summary,
+    surfaces: summary.surfaces.map(baseline => ({
+      surfaceId: baseline.surfaceId,
+      platform: baseline.platform,
+      resolvedPath: baseline.resolvedPath,
+      median: baseline.median,
+      flags: baseline.flags,
+    })),
+  };
+  writeFileSync(summaryPath, `${JSON.stringify(compactSummary, null, 2)}\n`);
   return summaryPath;
 }
 

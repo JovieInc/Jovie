@@ -187,6 +187,22 @@ export function buildSmoothRouteDefinition(
   const targets = smoothTargetsFor(platform);
   const viewport = smoothViewportFor(platform);
 
+  // Desktop Smooth viewport uses ProfileDesktopSurface; mobile keeps the
+  // compact rail. Accept either ready marker so cold-load waits succeed.
+  const readySelectors =
+    surface.routeId === 'public-profile-main'
+      ? {
+          shell: [
+            '[data-testid="profile-header"]',
+            '[data-testid="profile-desktop-shell"]',
+          ],
+          content: [
+            '[data-testid="profile-home-rail"]',
+            '[data-testid="profile-desktop-home-overview"]',
+          ],
+        }
+      : source.readySelectors;
+
   return {
     ...source,
     id: `smooth-${surface.id}-${platform}`,
@@ -198,6 +214,7 @@ export function buildSmoothRouteDefinition(
     navigationItemId: undefined,
     interactionStartPath: undefined,
     warmNavigationStartPath: undefined,
+    readySelectors,
     viewport,
     timings: [
       { metric: 'first-contentful-paint', budget: targets.lcpMs },

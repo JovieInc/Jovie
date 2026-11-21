@@ -70,6 +70,8 @@ const DEFAULT_BASE_URL =
 interface CliOptions {
   readonly authPath?: string;
   readonly baseUrl: string;
+  /** Optional Vercel share URL (`?_vercel_share=`) when automation bypass is unavailable. */
+  readonly shareUrl?: string;
   readonly outDir: string;
   readonly platforms: readonly SmoothPlatform[];
   readonly runs: number;
@@ -92,6 +94,7 @@ export function parseSmoothBaselineCliArgs(
 ): CliOptions {
   let authPath = defaults.authPath;
   let baseUrl = defaults.baseUrl ?? DEFAULT_BASE_URL;
+  let shareUrl = defaults.shareUrl;
   let outDir = defaults.outDir ?? DEFAULT_BASELINE_DIR;
   let runs = defaults.runs ?? SMOOTH_RUNS;
   let write = defaults.write ?? false;
@@ -117,6 +120,14 @@ export function parseSmoothBaselineCliArgs(
       const value = args[index + 1];
       if (!value) throw new TypeError('Missing value for --base-url');
       baseUrl = value;
+      index += 1;
+      continue;
+    }
+    if (arg === '--share-url') {
+      const value = args[index + 1];
+      if (!value) throw new TypeError('Missing value for --share-url');
+      shareUrl = value;
+      baseUrl = new URL(value).origin;
       index += 1;
       continue;
     }
@@ -165,6 +176,7 @@ export function parseSmoothBaselineCliArgs(
   return {
     authPath,
     baseUrl,
+    shareUrl,
     outDir: isAbsolute(outDir) ? outDir : resolve(repoRoot, outDir),
     platforms: [...platforms],
     runs,
@@ -172,6 +184,39 @@ export function parseSmoothBaselineCliArgs(
     write,
     json,
   };
+}
+
+async function bootstrapShareOriginCookies(
+  browser: Awaited<ReturnType<typeof chromium.launch>>,
+  shareUrl: string,
+  baseUrl: string
+) {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(shareUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    const cookies = await context.cookies(baseUrl);
+    if (!cookies.some(cookie => cookie.name === '_vercel_jwt')) {
+      throw new Error(
+        'Share URL bootstrap did not produce a `_vercel_jwt` cookie.'
+      );
+    }
+    return cookies.map(cookie => ({
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      expires: cookie.expires,
+      httpOnly: cookie.httpOnly,
+      secure: cookie.secure,
+      sameSite: cookie.sameSite as 'Lax' | 'None' | 'Strict',
+    }));
+  } finally {
+    await context.close();
+  }
 }
 
 export async function runSmoothBaseline(
@@ -185,10 +230,13 @@ export async function runSmoothBaseline(
 
   try {
     const authCookies = loadAuthCookies(options.baseUrl, options.authPath);
-    const protectedOriginCookies = await loadPerformanceProtectedOriginCookies(
-      browser,
-      options.baseUrl
-    );
+    const protectedOriginCookies = options.shareUrl
+      ? await bootstrapShareOriginCookies(
+          browser,
+          options.shareUrl,
+          options.baseUrl
+        )
+      : await loadPerformanceProtectedOriginCookies(browser, options.baseUrl);
 
     for (const platform of options.platforms) {
       for (const surface of surfaces) {

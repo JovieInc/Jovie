@@ -14,13 +14,18 @@ Desktop `1512×944`. Mobile `390×844` with `4×` CPU throttle. Median of 3 runs
 ## Commands
 
 ```bash
-# Auth storage for creator surfaces (isolated build / PR preview only)
+# Auth storage for creator surfaces (isolated build only — test-auth is off on Vercel preview)
 pnpm --filter @jovie/web run perf:auth -- --base-url "$BASE_URL"
 
 # Capture + write checked-in baselines
 pnpm --filter @jovie/web run perf:smooth:baseline:write -- \
   --base-url "$BASE_URL" \
   --auth-path .context/perf/auth/user.json
+
+# Public surfaces against a SSO-protected vercel.app deploy (share link)
+pnpm --filter @jovie/web run perf:smooth:baseline:write -- \
+  --share-url "$SMOOTH_SHARE_URL" \
+  --surface homepage --surface artist-profile --surface onboarding-start
 ```
 
 Baselines land in `docs/performance/smooth/baselines/*.json` with

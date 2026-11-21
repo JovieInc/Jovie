@@ -50,6 +50,18 @@ describe('performance-smooth-baseline helpers', () => {
     expect(options.runs).toBe(3);
   });
 
+  it('derives baseUrl from --share-url', () => {
+    const options = parseSmoothBaselineCliArgs([
+      '--share-url',
+      'https://jovie-example-jovie.vercel.app/?_vercel_share=abc',
+      '--surface',
+      'homepage',
+    ]);
+    expect(options.shareUrl).toContain('_vercel_share=abc');
+    expect(options.baseUrl).toBe('https://jovie-example-jovie.vercel.app');
+    expect(options.surfaceIds).toEqual(['homepage']);
+  });
+
   it('builds median baselines and flags', () => {
     const surface = SMOOTH_SURFACES.find(entry => entry.id === 'homepage')!;
     const baseline = buildSurfaceBaseline({

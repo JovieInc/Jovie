@@ -58,6 +58,19 @@ describe('performance-smooth-manifest', () => {
     ).toBe(smoothTargetsFor('mobile').lcpMs);
   });
 
+  it('accepts desktop or compact profile ready selectors for artist-profile', () => {
+    const route = buildSmoothRouteDefinition(
+      SMOOTH_SURFACES.find(surface => surface.id === 'artist-profile')!,
+      'desktop'
+    );
+    expect(route.readySelectors.content).toEqual(
+      expect.arrayContaining([
+        '[data-testid="profile-home-rail"]',
+        '[data-testid="profile-desktop-home-overview"]',
+      ])
+    );
+  });
+
   it('emits one route per surface for a platform manifest', () => {
     const manifest = buildSmoothRouteManifest('desktop');
     expect(manifest.map(route => route.id)).toEqual(
