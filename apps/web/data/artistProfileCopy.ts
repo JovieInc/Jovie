@@ -1153,7 +1153,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       deepLinksLabel: 'Deep links',
       deepLinks: (['', '/pay', '/listen', '/contact'] as const).map(
         suffix => `${TIM_WHITE_PROFILE.publicProfileDisplay}${suffix}`
-      ),
+      ) as unknown as readonly [string, string, string, string],
     },
   },
   socialProof: {

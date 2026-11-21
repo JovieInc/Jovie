@@ -171,10 +171,13 @@ function findWidgetEventInHistory(
   return null;
 }
 
-function skippedSpotifyInHistory(messages: UIMessage[]): boolean {
+function skippedSpotifyInHistory(messages: readonly UIMessage[]): boolean {
   return historyShowsSpotifySkip(
     findLatestToolOutput(messages, WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED),
-    findWidgetEventInHistory(messages, ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE)
+    findWidgetEventInHistory(
+      messages,
+      ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
+    )
   );
 }
 
@@ -352,9 +355,7 @@ export function resolveGuardedStep(input: {
   }
 
   if (!state.spotifyArtistId && !selectedArtistId) {
-    if (
-      skippedSpotifyInHistory(uiMessages)
-    ) {
+    if (skippedSpotifyInHistory(uiMessages)) {
       return hasHandleConfirmed(uiMessages) ? 'contact' : 'handle';
     }
     if (
@@ -755,10 +756,7 @@ export async function decideFallbackTurn(
   }
 
   // No artist yet: greet on the very first turn, otherwise open the picker.
-  if (
-    !state.spotifyArtistId &&
-    !skippedSpotifyInHistory(uiMessages)
-  ) {
+  if (!state.spotifyArtistId && !skippedSpotifyInHistory(uiMessages)) {
     if (state.turnCount <= 1 && input.openPickerQuery === undefined) {
       const line = pick('greet');
       return {
