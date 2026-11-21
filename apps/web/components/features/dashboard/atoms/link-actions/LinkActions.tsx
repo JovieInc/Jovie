@@ -1,6 +1,6 @@
 'use client';
 
-import { ConfirmDialog } from '@jovie/ui';
+import { ConfirmDialog, PlainButton } from '@jovie/ui';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableContextMenu } from '@/components/organisms/table';
@@ -76,7 +76,7 @@ export const LinkActions = memo(function LinkActions({
     <TableContextMenu items={contextMenuItems}>
       <div className={cn('flex items-center gap-1', className)}>
         {showDragHandle ? (
-          <button
+          <PlainButton
             type='button'
             onPointerDown={onDragHandlePointerDown}
             className='opacity-0 transition-opacity duration-subtle ease-out hover:opacity-100 group-hover:opacity-70 group-focus-within:opacity-100'
@@ -85,11 +85,11 @@ export const LinkActions = memo(function LinkActions({
             <span className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-default bg-surface-2 text-secondary-token shadow-xs'>
               <Icon name='GripVertical' className='h-3.5 w-3.5' />
             </span>
-          </button>
+          </PlainButton>
         ) : null}
 
         <div className='relative'>
-          <button
+          <PlainButton
             ref={triggerRef}
             type='button'
             aria-label='Link Actions'
@@ -101,7 +101,7 @@ export const LinkActions = memo(function LinkActions({
             className='inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-subtle ease-out hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
           >
             <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
-          </button>
+          </PlainButton>
           <div className='sr-only'>Actions: edit, hide/show, delete</div>
 
           {open ? (
@@ -115,7 +115,7 @@ export const LinkActions = memo(function LinkActions({
               onKeyDown={handleKeyDown}
             >
               {menuItems.map((item, index) => (
-                <button
+                <PlainButton
                   key={item.id}
                   ref={el => {
                     itemRefs.current[index] = el;
@@ -148,7 +148,7 @@ export const LinkActions = memo(function LinkActions({
                     className='h-4 w-4'
                   />
                   {item.label}
-                </button>
+                </PlainButton>
               ))}
             </div>
           ) : null}

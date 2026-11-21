@@ -17,6 +17,7 @@ import {
   dropdownMenuContentClasses,
   MENU_ITEM_BASE,
   MENU_ITEM_DESTRUCTIVE,
+  PlainButton,
 } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
@@ -147,7 +148,7 @@ export function LinkPill({
               {...getFloatingProps()}
             >
               {menuItems.map((item, index) => (
-                <button
+                <PlainButton
                   key={item.id}
                   type='button'
                   ref={index === 0 ? firstItemRef : undefined}
@@ -157,7 +158,8 @@ export function LinkPill({
                   }}
                   className={cn(
                     MENU_ITEM_BASE,
-                    'w-full text-left',
+                    // Menu items own their highlight; no extra focus ring.
+                    'w-full text-left focus-visible:outline-none',
                     item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                   )}
                   {...getItemProps()}
@@ -169,7 +171,7 @@ export function LinkPill({
                     />
                   ) : null}
                   <span className='min-w-0 flex-1 truncate'>{item.label}</span>
-                </button>
+                </PlainButton>
               ))}
             </div>
           </FloatingFocusManager>

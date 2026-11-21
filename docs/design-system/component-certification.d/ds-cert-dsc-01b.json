@@ -126,6 +126,33 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/atoms/DspConnectionPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/LinkPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/link-actions/LinkActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/dashboard-nav/CustomerNavMoreMenu.tsx": [
       "ds-owner",
       "tokens",
@@ -136,6 +163,15 @@
       "forced-caps"
     ],
     "apps/web/components/features/dashboard/molecules/AudienceWorkspaceSwitch.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberReferrers.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -168,6 +204,17 @@
     },
     "apps/web/components/features/agent-room/AgentRoster.tsx": {
       "permission-denied": "The roster is presentational over an already-projected agents array; it has no access check and renders no denied state."
+    },
+    "apps/web/components/features/dashboard/atoms/LinkPill.tsx": {
+      "offline": "The pill is presentational over props and makes no request; link verification failures are its error state.",
+      "permission-denied": "The component has no access check; callers decide whether to render it."
+    },
+    "apps/web/components/features/dashboard/atoms/link-actions/LinkActions.tsx": {
+      "long-content": "The component renders only icons and fixed menu labels (Edit, Hide or Show, Delete); no caller text can overflow.",
+      "permission-denied": "The component has no access check; callers decide whether to render it."
+    },
+    "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberReferrers.tsx": {
+      "error": "The list renders already-loaded member data; copy and QR failures surface only as toasts (tested), with no in-component error UI to show."
     }
   }
 }

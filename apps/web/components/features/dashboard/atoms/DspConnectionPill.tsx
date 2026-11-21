@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import {
   CheckCircle2,
@@ -91,7 +92,7 @@ export function DspConnectionPill({
     return (
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
-          <button
+          <PlainButton
             type='button'
             disabled={disabled}
             onMouseEnter={() => setHovered(true)}
@@ -125,7 +126,7 @@ export function DspConnectionPill({
                 style={{ color: accent }}
               />
             )}
-          </button>
+          </PlainButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' sideOffset={4}>
           {onSyncNow && (
@@ -147,7 +148,7 @@ export function DspConnectionPill({
   }
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onClick}
       disabled={disabled}
@@ -162,6 +163,6 @@ export function DspConnectionPill({
       <span className='sr-only'>Connect {label}:</span>{' '}
       <span>Not Connected</span>
       <Plus className='h-4 w-4 shrink-0' />
-    </button>
+    </PlainButton>
   );
 }
