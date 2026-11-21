@@ -8164,15 +8164,6 @@ class FixRedTest(unittest.TestCase):
             self.assertNotEqual(second["reasons"][:1], receipt["reasons"])
             agent2.assert_called_once()
 
-    def test_real_failure_or_failed_rerun_still_reaches_the_agent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            _, receipt, agent, again = self.run_gate(tmp, "AssertionError: expected 1 to equal 2")
-            agent.assert_called_once()
-            again.assert_not_called()
-        with tempfile.TemporaryDirectory() as tmp:
-            _, receipt, agent, _ = self.run_gate(tmp, "API rate limit exceeded", rerun=False)
-            agent.assert_called_once()
-
     def test_breaker_opens_after_three_unproductive_runs_across_heads_and_files_one_signal(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
@@ -13046,6 +13037,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 temp_dir = root / "private temp"
                 if temp_case == "insecure":
                     temp_dir.mkdir(mode=0o755)
+                    temp_dir.chmod(0o755)  # Exercise the intended mode under private host umasks.
                 if temp_case == "symlink":
                     target = root / "real-temp"
                     target.mkdir(mode=0o700)

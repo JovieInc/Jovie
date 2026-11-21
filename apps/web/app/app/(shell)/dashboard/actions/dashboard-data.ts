@@ -779,29 +779,29 @@ async function fetchDashboardBaseWithSession(
     return createEmptyCoreData();
   }
 
-  const creatorData = await dashboardQuery(
-    () =>
-      tx
-        .select()
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, userData.id))
-        .orderBy(asc(creatorProfiles.createdAt)),
-    'Creator profiles query'
-  ).catch((error: unknown) => {
-    const migrationResult = handleMigrationErrors(error, {
-      userId: userData.id,
-      operation: 'creator_profiles',
-    });
+  await setStatementTimeout(tx, QUERY_TIMEOUTS.api);
+  const creatorData = await tx
+    .select()
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, userData.id))
+    .orderBy(asc(creatorProfiles.createdAt))
+    .catch((error: unknown) => {
+      const migrationResult = handleMigrationErrors(error, {
+        userId: userData.id,
+        operation: 'creator_profiles',
+      });
 
-    if (!migrationResult.shouldRetry) {
-      return migrationResult.fallbackData as CreatorProfile[];
-    }
+      if (!migrationResult.shouldRetry) {
+        return migrationResult.fallbackData as CreatorProfile[];
+      }
 
-    Sentry.captureException(error, {
-      tags: { query: 'creator_profiles', context: 'dashboard_data' },
+      if (!isPostgresTimeoutError(error)) {
+        Sentry.captureException(error, {
+          tags: { query: 'creator_profiles', context: 'dashboard_data' },
+        });
+      }
+      throw error;
     });
-    throw error;
-  });
 
   if (!creatorData || creatorData.length === 0) {
     return createEmptyCoreData({ user: userData });

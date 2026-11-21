@@ -28,6 +28,15 @@ class ComposeRouteTest(unittest.TestCase):
         self.assertEqual(composed_route([classes.SYNC_MAIN, classes.WIRE_CI_FAST], classes.COMPOSE, classes.AGENT),
                          ("mixed", classes.AGENT, []))
 
+    def test_baseline_citation_composes_before_checkout_repairs(self):
+        lock = ("locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> "
+                "in Locked areas for apps/web/typecheck-tests-baseline.json.")
+        unwired = "Unwired: scripts/a.test.mjs. Wire each file into a ci-fast lane"
+        got = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
+            "Fleet Rules Evidence": lock, "Source Validation": unwired})
+        self.assertEqual((got["cls"], got["action"]), ("composed", classes.COMPOSE))
+        self.assertEqual(got["actions"], [classes.CITE_BASELINE_LOCK, classes.WIRE_CI_FAST])
+
     def test_a_mixed_agent_head_has_no_leaf_actions(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
@@ -75,6 +84,52 @@ class ComposeRouteTest(unittest.TestCase):
 
 
 class ComposeExecutionTest(unittest.TestCase):
+    def test_composed_baseline_citation_keeps_its_once_per_head_claim_and_owner(self):
+        import fix_red_mixed_repairs
+        order, claimed = [], set()
+        route = {"actions": [classes.WIRE_CI_FAST, classes.CITE_BASELINE_LOCK]}
+        source = {"number": 22490, "headRefOid": "source-head", "body": "## Summary\nrepair"}
+        def claim(host, current, action):
+            key = (current["headRefOid"], action)
+            if key in claimed:
+                return False
+            claimed.add(key)
+            return True
+        def cite(*args):
+            order.append("cite")
+            return True
+        def wire(*args):
+            order.append("wire")
+            return SimpleNamespace(returncode=0)
+        other = Mock()
+        with patch.dict(sys.modules, {"lane_runner": other}), \
+                patch.object(lane, "claim_route", side_effect=claim), \
+                patch.object(fix_red_mixed_repairs, "cite_baseline_lock", side_effect=cite), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire), \
+                patch.object(lane, "run_agent") as agent:
+            receipt = {}
+            done = lane.compose_deterministic_fix(None, source, route, Path("."), None, receipt)
+            self.assertEqual(done.returncode, 0)
+            self.assertIsNone(lane.compose_deterministic_fix(None, source, route, Path("."), None, {}))
+        self.assertEqual(order, ["cite", "wire"])
+        self.assertEqual(receipt["composedActions"], [classes.CITE_BASELINE_LOCK, classes.WIRE_CI_FAST])
+        self.assertEqual(claimed, {("source-head", classes.CITE_BASELINE_LOCK)})
+        self.assertEqual(other.mock_calls, [])
+        agent.assert_not_called()
+
+    def test_failed_or_existing_baseline_citation_stops_later_composed_mutations(self):
+        import fix_red_mixed_repairs
+        for body, expected_claims in (("## Summary\nrepair", 1), ("## Locked areas\nLocking PR: #16597", 0)):
+            with self.subTest(body=body), \
+                    patch.object(lane, "claim_route", return_value=True) as claim, \
+                    patch.object(fix_red_mixed_repairs, "cite_baseline_lock", return_value=False), \
+                    patch.object(lane, "wire_ci_fast_fix") as wire:
+                done = lane.compose_deterministic_fix(None, {"body": body},
+                    {"actions": [classes.CITE_BASELINE_LOCK, classes.WIRE_CI_FAST]}, Path("."), None, {})
+                self.assertIsNone(done)
+                self.assertEqual(claim.call_count, expected_claims)
+                wire.assert_not_called()
+
     def test_fleet_evidence_is_stamped_before_checkout_repairs_and_failure_stops_them(self):
         order = []
         route = {"actions": ["wire-ci-fast", "stamp-repair-evidence"], "files": []}

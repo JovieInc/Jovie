@@ -125,3 +125,56 @@ def apply_mixed_body_repairs(host, pr, route, claim_route):
         **({} if win_section is None else {"win_section": win_section}),
         **({} if previous_win is None else {"previous_win_section": previous_win}))
     return "infra-rerun:mixed-body-repairs" if edited else None
+
+
+def cite_baseline_lock(lane, host, pr: dict) -> bool:
+    """Cite Locking PR #16597 for a sole web test typecheck baseline failure.
+
+    False when the live body already has Locked areas or GitHub rejects the edit
+    (the model then gets the head). The same excerpt can also complete Red-before-green.
+    """
+    logs = lane.failed_logs(host, pr) or {}
+    excerpt = "\n".join(logs.values())
+    try:
+        return lane.pr_events.ensure_red_before_green(
+            pr, excerpt, locking_pr=lane.fix_red_classes.BASELINE_LOCKING_PR)
+    except (OSError, lane.subprocess.SubprocessError, ValueError):
+        return False
+
+
+def deterministic_route_taken(lane, host, pr: dict, route: dict | None) -> str | None:
+    """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
+    if reason := lane.fix_red_classes.first_route_reason(host, pr, route, lane.claim_route):
+        return reason
+    if not route or route["action"] not in {
+            lane.fix_red_classes.RERUN, lane.fix_red_classes.SYNC_MAIN, lane.fix_red_classes.STAMP_CHANGELOG,
+            lane.fix_red_classes.STAMP_REPAIR, lane.fix_red_classes.CITE_BASELINE_LOCK}:
+        return None
+    if route["action"] == lane.fix_red_classes.CITE_BASELINE_LOCK:
+        # An existing citation is a different defect; preserve the claim.
+        visible = lane.re.sub(r"<!--[\s\S]*?-->", "", str(pr.get("body") or ""))
+        if lane.re.search(r"^#{1,6}\s+Locked areas\s*$", visible, lane.re.I | lane.re.M):
+            return None
+        if not lane.claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:baseline-lock" if cite_baseline_lock(lane, host, pr) else None
+    if route["action"] == lane.fix_red_classes.STAMP_REPAIR:
+        return lane.stamp_fleet_body(host, pr)
+    if route["action"] == lane.fix_red_classes.STAMP_CHANGELOG:
+        # No body, or a note already present: do not spend the once-per-head claim. An invalid
+        # note is a different defect and still belongs to the model.
+        if lane.fix_red_classes.stamp_internal_changelog(pr.get("body")) is None:
+            return None
+        if not lane.claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:changelog-metadata" if lane.stamp_changelog_decision(host, pr) else None
+    # A named quota reset gets one rerun after that instant (quota_rerun).
+    if route["action"] == lane.fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
+        import quota_rerun
+        return quota_rerun.deferred_rerun(host, pr, lane.failed_logs, lane.update_json, lane._rerun_failed)
+    # One rerun per head. Sync once per head against the current base tip.
+    if not (lane.claim_infra_rerun(host, pr) if route["action"] == lane.fix_red_classes.RERUN else lane.claim_route(host, pr, lane.sync_claim(pr, route["action"]))):
+        return None
+    if route["action"] == lane.fix_red_classes.RERUN:
+        return f"infra-rerun:{route['cls']}" if lane._rerun_failed(pr) else None
+    return f"infra-rerun:{route['cls']}" if lane.pr_events.sync_main(host, lane.THIS, pr, lane.time.time(), terminal_ok=True) == "synced" else None

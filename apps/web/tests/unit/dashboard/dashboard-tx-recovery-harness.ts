@@ -126,6 +126,8 @@ export async function withDbSessionTx(
           }
           return settled.then(onFulfilled, onRejected);
         };
+        builder.catch = (onRejected: (reason: unknown) => unknown) =>
+          Promise.resolve(builder).catch(onRejected);
         return builder;
       },
     };

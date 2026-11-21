@@ -1,418 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-
-/**
- * Regression tests for the statement_timeout 25P02 cascade (JOV-4189,
- * JOV-4190, JOV-4241, JOV-4242).
- *
- * The dashboard full fetch runs supplementary reads that tolerate failure
- * (social-links existence, avatar quality, tipping stats, bio-link
- * activation). In Postgres, any statement error aborts the surrounding
- * transaction (25P02 "current transaction is aborted"). When those reads
- * shared one transaction and swallowed their errors, the NEXT statement on
- * the poisoned transaction — typically set_config('statement_timeout', ...)
- * inside dashboardQuery — failed and Drizzle named THAT query in the error,
- * hiding the real first error.
- *
- * These tests simulate Postgres transaction poisoning: once a query on a
- * transaction rejects, every later statement on that same transaction
- * rejects with a 25P02-style error. Each withDbSessionTx call gets a fresh
- * transaction state, so per-read isolation is directly observable.
- */
-
-type QueryOutcome = () => { rows?: unknown[]; error?: unknown };
-
-type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
+import {
+  getDashboardData,
+  getDashboardDataEssential,
+  getDashboardShellData,
+} from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import type { QueryResult } from './dashboard-data-tx-fixture';
 
 const {
+  capturedCascadeErrors,
+  capturedErrors,
   captureExceptionMock,
   cleanupGates,
   commitFailures,
-  loggerErrorMock,
+  dashboardProfile,
+  fail,
+  idleDistributionError,
   loggerWarnMock,
+  ok,
   outcomes,
+  queueReadsBeforeDistribution,
   setupFailures,
   txStates,
+  userRow,
   withDbSessionTxMock,
-} = vi.hoisted(() => {
-  const cleanupGates = new Map<number, () => Promise<void>>();
-  const commitFailures = new Map<number, QueryOutcome>();
-  const outcomes: QueryOutcome[] = [];
-  const setupFailures = new Map<number, QueryOutcome>();
-  const txStates: TxState[] = [];
-
-  function createAbortedTxError(): Error & { code?: string } {
-    const error = new Error(
-      "Failed query: SELECT set_config('statement_timeout', $1, false)\n" +
-        'cause: current transaction is aborted, commands ignored until end of transaction block'
-    ) as Error & { code?: string };
-    error.code = '25P02';
-    return error;
-  }
-
-  function createTx(state: TxState) {
-    const tx = {
-      __isPoisoned: () => state.poisoned,
-      execute: vi.fn(async () => {
-        if (state.poisoned) throw createAbortedTxError();
-        return { rows: [] };
-      }),
-      select: vi.fn(() => {
-        const outcome = outcomes.shift() ?? (() => ({ rows: [] }));
-        const builder: Record<string, unknown> = {};
-        const chain = () => builder;
-        builder.from = chain;
-        builder.where = chain;
-        builder.limit = chain;
-        builder.orderBy = chain;
-        // Thenable: drizzle query builders are awaited directly. Once the
-        // transaction is poisoned, every later statement rejects with a
-        // 25P02-style error — that is the real Postgres behavior.
-        builder.then = (
-          onFulfilled?: (value: unknown) => unknown,
-          onRejected?: (reason: unknown) => unknown
-        ) => {
-          let settled: Promise<unknown>;
-          if (state.poisoned) {
-            settled = Promise.reject(createAbortedTxError());
-          } else {
-            try {
-              const result = outcome();
-              if (result.error) {
-                state.poisoned = true;
-                settled = Promise.reject(result.error);
-              } else {
-                settled = Promise.resolve(result.rows ?? []);
-              }
-            } catch (error) {
-              state.poisoned = true;
-              settled = Promise.reject(error);
-            }
-          }
-          return settled.then(onFulfilled, onRejected);
-        };
-        return builder;
-      }),
-    };
-    return tx;
-  }
-
-  const withDbSessionTxMock = vi.fn(
-    async (handler: (tx: unknown, userId: string) => Promise<unknown>) => {
-      const state: TxState = {
-        poisoned: false,
-        closed: false,
-        rolledBack: false,
-      };
-      const transactionIndex = txStates.length;
-      txStates.push(state);
-      try {
-        const setupError = setupFailures.get(transactionIndex)?.().error;
-        if (setupError) {
-          state.poisoned = true;
-          throw setupError;
-        }
-        const result = await handler(createTx(state), 'user_123');
-        const commitError = commitFailures.get(transactionIndex)?.().error;
-        if (commitError) {
-          // The callback already finished; Drizzle's post-callback COMMIT
-          // failed on the wire and the wrapper discarded the client (JOV-8641
-          // preserves this original error instead of letting ROLLBACK mask
-          // it). Nothing the callback wrote can be acknowledged.
-          throw commitError;
-        }
-        return result;
-      } catch (error) {
-        state.rolledBack = true;
-        throw error;
-      } finally {
-        const cleanup = cleanupGates.get(transactionIndex);
-        if (cleanup) await cleanup();
-        state.closed = true;
-      }
-    }
-  );
-
-  return {
-    captureExceptionMock: vi.fn(),
-    cleanupGates,
-    commitFailures,
-    loggerErrorMock: vi.fn(),
-    loggerWarnMock: vi.fn(),
-    outcomes,
-    setupFailures,
-    txStates,
-    withDbSessionTxMock,
-  };
-});
-
-const ok =
-  (rows: unknown[]): QueryOutcome =>
-  () => ({ rows });
-const fail =
-  (error: unknown): QueryOutcome =>
-  () => ({ error });
-
-const dashboardProfile = {
-  id: 'profile_1',
-  userId: 'user_db_1',
-  username: 'tim',
-  usernameNormalized: 'tim',
-  displayName: 'Tim White',
-  avatarUrl: 'https://example.com/avatar.jpg',
-  isPublic: true,
-  onboardingCompletedAt: new Date('2026-07-20T00:00:00.000Z'),
-  createdAt: new Date('2026-07-20T00:00:00.000Z'),
-  updatedAt: new Date('2026-07-20T00:00:00.000Z'),
-};
-
-const userRow = {
-  id: 'user_db_1',
-  email: 'user@example.com',
-  activeProfileId: 'profile_1',
-};
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
-  };
-});
-
-vi.mock('@sentry/nextjs', () => {
-  return {
-    getClient: vi.fn(() => undefined),
-    captureException: captureExceptionMock,
-    captureMessage: vi.fn(),
-    addBreadcrumb: vi.fn(),
-    logger: {
-      error: loggerErrorMock,
-      warn: loggerWarnMock,
-    },
-    startSpan: vi.fn(
-      async (_options: unknown, callback: () => Promise<unknown>) => callback()
-    ),
-  };
-});
-
-vi.mock('next/cache', async () => {
-  const actual =
-    await vi.importActual<typeof import('next/cache')>('next/cache');
-  return {
-    ...actual,
-    // Identity: every call re-runs the fetch so tests are deterministic.
-    unstable_cache: vi.fn(
-      <T extends (...args: never[]) => unknown>(fn: T) => fn
-    ),
-    unstable_noStore: vi.fn(),
-    revalidateTag: vi.fn(),
-    updateTag: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: vi.fn(async () => false),
-}));
-
-vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: vi.fn(async () => ({ userId: 'user_123' })),
-  getOptionalAuth: vi.fn(async () => ({ userId: 'user_123' })),
-  getCachedSessionTokenAuth: vi.fn(async () => ({ userId: 'user_123' })),
-  getCachedCurrentUser: vi.fn(),
-}));
-
-vi.mock('@/lib/auth/gate', () => ({
-  resolveUserState: vi.fn(),
-}));
-
-vi.mock('@/lib/auth/session', () => ({
-  withDbSessionTx: withDbSessionTxMock,
-}));
-
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: vi.fn(async () => ({
-    userId: 'user_123',
-    email: 'user@example.com',
-    isAuthenticated: true,
-    isAdmin: false,
-    isPro: false,
-    hasAdvancedFeatures: false,
-    canRemoveBranding: false,
-  })),
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    execute: vi.fn(async () => ({ rows: [] })),
-  },
-  doesTableExist: vi.fn(async () => false),
-}));
-
-vi.mock('@/lib/db/query-timeout', () => ({
-  QUERY_TIMEOUTS: { dashboard: 8000, api: 5000, default: 5000 },
-  setStatementTimeout: vi.fn(async () => {}),
-  // Mirrors the real wrapper: statement_timeout is applied on the target
-  // client before the query — on a poisoned transaction that set_config is
-  // the statement that fails, which is exactly the production fingerprint.
-  dashboardQuery: vi.fn(
-    async (
-      fn: () => Promise<unknown>,
-      _context?: string,
-      options?: { db?: { __isPoisoned?: () => boolean } }
-    ) => {
-      if (options?.db?.__isPoisoned?.()) {
-        const error = new Error(
-          "Failed query: SELECT set_config('statement_timeout', $1, false)\n" +
-            'cause: current transaction is aborted, commands ignored until end of transaction block'
-        ) as Error & { code?: string };
-        error.code = '25P02';
-        throw error;
-      }
-      return fn();
-    }
-  ),
-  isQueryTimeoutError: (error: unknown) =>
-    error instanceof Error && error.name === 'QueryTimeoutError',
-  // Mirrors the real helper, which recurses into error.cause — Drizzle wraps
-  // PG errors so the timeout text lives on the cause, not the outer message.
-  isPostgresTimeoutError: function isPostgresTimeoutErrorMock(
-    error: unknown
-  ): boolean {
-    if (!(error instanceof Error)) return false;
-    return (
-      error.message.includes('canceling statement due to statement timeout') ||
-      error.message.includes('idle-in-transaction timeout') ||
-      (error.cause instanceof Error && isPostgresTimeoutErrorMock(error.cause))
-    );
-  },
-}));
-
-vi.mock('@/lib/db/schema/analytics', () => ({
-  clickEvents: {
-    creatorProfileId: 'creatorProfileId',
-    linkType: 'linkType',
-    metadata: 'metadata',
-    createdAt: 'createdAt',
-  },
-  tips: {
-    creatorProfileId: 'creatorProfileId',
-    amountCents: 'amountCents',
-    id: 'id',
-    createdAt: 'createdAt',
-  },
-}));
-
-vi.mock('@/lib/db/schema/auth', () => ({
-  userSettings: { userId: 'userId', sidebarCollapsed: 'sidebarCollapsed' },
-  users: {
-    id: 'id',
-    clerkId: 'clerkId',
-    email: 'email',
-    activeProfileId: 'activeProfileId',
-  },
-}));
-
-vi.mock('@/lib/db/schema/links', () => ({
-  socialLinks: {
-    creatorProfileId: 'creatorProfileId',
-    isActive: 'isActive',
-    state: 'state',
-    platformType: 'platformType',
-    platform: 'platform',
-  },
-}));
-
-vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorDistributionEvents: {
-    createdAt: 'createdAt',
-    creatorProfileId: 'creatorProfileId',
-    eventType: 'eventType',
-    platform: 'platform',
-  },
-  creatorProfiles: { userId: 'userId', id: 'id', createdAt: 'createdAt' },
-  profilePhotos: {
-    width: 'width',
-    height: 'height',
-    creatorProfileId: 'creatorProfileId',
-    photoType: 'photoType',
-    status: 'status',
-    createdAt: 'createdAt',
-  },
-}));
-
-vi.mock('@/lib/db/server', () => ({
-  createEmptyTippingStats: vi.fn(() => ({
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  })),
-  profileIsPublishable: vi.fn(() => true),
-  selectDashboardProfile: vi.fn(profiles => profiles[0] ?? null),
-}));
-
-vi.mock('@/lib/db/sql-helpers', () => ({
-  sqlAny: vi.fn(() => 'mock-sql'),
-}));
-
-vi.mock('@/lib/services/social-links/types', () => ({
-  DSP_PLATFORMS: ['spotify', 'apple-music'],
-}));
-
-vi.mock('@/lib/error-tracking', () => ({
-  captureWarning: vi.fn(async () => {}),
-  captureError: vi.fn(async () => {}),
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}));
-
-function capturedErrors(): unknown[] {
-  return captureExceptionMock.mock.calls.map(call => call[0]);
-}
-
-function capturedCascadeErrors(): unknown[] {
-  return capturedErrors().filter(
-    error =>
-      error instanceof Error &&
-      /25P02|current transaction is aborted|set_config\('statement_timeout'/.test(
-        error.message
-      )
-  );
-}
-
-function queueReadsBeforeDistribution(): void {
-  outcomes.push(
-    ok([userRow]),
-    ok([dashboardProfile]),
-    ok([{ sidebarCollapsed: false }]),
-    ok([{ count: 0 }]),
-    ok([{ count: 0 }]),
-    ok([{ hasLinks: true, hasMusicLinks: true }]),
-    ok([{ width: 1024, height: 1024 }]),
-    ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
-    ok([{ total: 3, qr: 1, link: 2 }])
-  );
-}
-
-function idleDistributionError(code?: string): Error {
-  const cause = new Error(
-    'terminating connection due to idle-in-transaction timeout'
-  );
-  if (code) Object.assign(cause, { code });
-  return new Error(
-    "Failed query: SELECT set_config('statement_timeout', $1, true)",
-    { cause }
-  );
-}
+} = await vi.hoisted(() => import('./dashboard-data-tx-fixture'));
 
 describe('dashboard data transaction isolation (JOV-4189)', () => {
   beforeEach(async () => {
@@ -429,6 +40,173 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     setupFailures.clear();
     txStates.length = 0;
   });
+
+  it.each(['essential', 'full', 'shell'] as const)(
+    'JOV-8651: recovers a cancelled profile read through the existing %s refresh',
+    async path => {
+      const timeout = new Error('Failed query: select creator_profiles', {
+        cause: Object.assign(
+          new Error('canceling statement due to statement timeout'),
+          { code: '57014' }
+        ),
+      });
+      const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+      outcomes.push(
+        ok([userRow]),
+        fail(timeout),
+        () => {
+          expect(txStates[0]).toMatchObject({ closed: true, rolledBack: true });
+          return { rows: [userRow] };
+        },
+        ok([dashboardProfile])
+      );
+      if (path !== 'shell') outcomes.push(ok([{ sidebarCollapsed: true }]));
+      outcomes.push(ok([{ count: 0 }]), ok([{ count: 0 }]));
+
+      const result = await (path === 'shell'
+        ? getDashboardShellData('user_123')
+        : path === 'full'
+          ? getDashboardData()
+          : getDashboardDataEssential());
+
+      expect(result.selectedProfile?.id).toBe('profile_1');
+      expect(result.needsOnboarding).toBe(false);
+      expect(result.dashboardLoadError).toBeUndefined();
+      expect(setStatementTimeout).toHaveBeenCalledWith(expect.anything(), 5000);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+      expect(txStates.every(state => state.closed)).toBe(true);
+    }
+  );
+
+  it('JOV-8651: waits for SQL cancellation and rollback before refreshing profiles', async () => {
+    vi.useFakeTimers();
+    let cancelSql!: (result: QueryResult) => void;
+    let signalSql!: () => void;
+    let releaseCleanup!: () => void;
+    const sqlStarted = new Promise<void>(resolve => {
+      signalSql = resolve;
+    });
+    const pendingSql = new Promise<QueryResult>(resolve => {
+      cancelSql = resolve;
+    });
+    const cleanupReleased = new Promise<void>(resolve => {
+      releaseCleanup = resolve;
+    });
+    let signalCleanup!: () => void;
+    const cleanupStarted = new Promise<void>(resolve => {
+      signalCleanup = resolve;
+    });
+    cleanupGates.set(0, () => {
+      signalCleanup();
+      return cleanupReleased;
+    });
+    outcomes.push(
+      ok([userRow]),
+      () => {
+        signalSql();
+        return pendingSql;
+      },
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: true }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }])
+    );
+    const loading = getDashboardDataEssential();
+    try {
+      await sqlStarted;
+      // Model a delayed cancellation response: the JS clock cannot prove SQL stopped.
+      await vi.advanceTimersByTimeAsync(8001);
+      expect(txStates).toEqual([
+        { poisoned: false, closed: false, rolledBack: false },
+      ]);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+      cancelSql({
+        error: Object.assign(
+          new Error('canceling statement due to statement timeout'),
+          { code: '57014' }
+        ),
+      });
+      await cleanupStarted;
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(1);
+      expect(txStates[0]).toMatchObject({ closed: false, rolledBack: true });
+    } finally {
+      cancelSql({ rows: [dashboardProfile] });
+      releaseCleanup();
+      await loading;
+      vi.useRealTimers();
+    }
+    const result = await loading;
+    expect(result.selectedProfile?.id).toBe('profile_1');
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('JOV-8651: waits for the database deadline before dispatching profile SQL', async () => {
+    let releaseSetup!: () => void;
+    let signalSetup!: () => void;
+    const setupStarted = new Promise<void>(resolve => {
+      signalSetup = resolve;
+    });
+    const pendingSetup = new Promise<void>(resolve => {
+      releaseSetup = resolve;
+    });
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
+      signalSetup();
+      return pendingSetup;
+    });
+    let profileStarted = false;
+    outcomes.push(
+      ok([userRow]),
+      () => {
+        profileStarted = true;
+        return { rows: [dashboardProfile] };
+      },
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }])
+    );
+    const loading = getDashboardDataEssential();
+    try {
+      await setupStarted;
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      expect(profileStarted).toBe(false);
+    } finally {
+      releaseSetup();
+      await loading;
+    }
+    expect((await loading).selectedProfile?.id).toBe('profile_1');
+  });
+
+  it.each([
+    ['57014', 'canceling statement due to statement timeout'],
+    ['42501', 'permission denied for table creator_profiles'],
+  ])(
+    'JOV-8651: preserves the load error after repeated SQLSTATE %s failures',
+    async (code, message) => {
+      const error = Object.assign(new Error(message), { code });
+      outcomes.push(ok([userRow]), fail(error), ok([userRow]), fail(error));
+
+      const result = await getDashboardDataEssential();
+
+      expect(result.selectedProfile).toBeNull();
+      expect(result.dashboardLoadError).toMatchObject({ code, message });
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+      expect(txStates.every(state => state.closed && state.rolledBack)).toBe(
+        true
+      );
+      if (code === '42501') {
+        expect(captureExceptionMock).toHaveBeenCalledWith(
+          error,
+          expect.objectContaining({
+            tags: expect.objectContaining({ query: 'creator_profiles' }),
+          })
+        );
+      }
+    }
+  );
 
   it('confines a failing supplementary read to its own transaction — no 25P02 cascade', async () => {
     const realLinksError = new Error('boom: social_links read failed');
@@ -617,9 +395,14 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     });
     void pendingSetup.catch(() => {});
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
-    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
-      signalSetup();
-      return pendingSetup;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      // Profile setup uses the 5000ms API deadline (JOV-8651) and must resolve.
+      // Stall the social-link setup this case proves (JOV-8834): 8000ms on the
+      // second transaction, before that read or its fallback.
+      if (ms === 8000 && txStates.length === 2) {
+        signalSetup();
+        await pendingSetup;
+      }
     });
     queueReadsBeforeDistribution();
     outcomes.splice(5, 1);
@@ -836,7 +619,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       );
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 5000) throw idleSetConfigFingerprint();
+      // The new profile deadline is the core transaction; target both avatar attempts.
+      if (ms === 5000 && txStates.length >= 3) throw idleSetConfigFingerprint();
     });
     queueReadsBeforeDistribution();
     // Neither avatar attempt reaches its SELECT (set_config dies first), so
@@ -857,10 +641,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.tippingStats.tipClicks).toBe(3);
 
-    // The read was attempted once and retried once after cleanup.
+    // The profile setup precedes the avatar's two independent attempts.
     expect(
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
     expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
     expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
@@ -1270,12 +1054,13 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect(result.bioLinkActivation?.activatedAt).toBeNull();
       expect(result.dashboardLoadError).toBeUndefined();
       expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      // Social-link existence plus this one distribution attempt. The profile
+      // read's 5000ms deadline is a different call and must not hide a retry.
       expect(
         vi
           .mocked(setStatementTimeout)
-          .mock.calls.slice(1)
-          .filter(([, ms]) => ms === 8000)
-      ).toHaveLength(1);
+          .mock.calls.filter(([, ms]) => ms === 8000)
+      ).toHaveLength(2);
       expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
       expect(captureExceptionMock).toHaveBeenCalledWith(
         error,
@@ -1299,12 +1084,11 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       activatedAt.toISOString()
     );
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    // The failed setup throws before its callback. One 8000ms call is the
+    // social-link read; the other is the single distribution retry.
     expect(
-      vi
-        .mocked(setStatementTimeout)
-        .mock.calls.slice(1)
-        .filter(([, ms]) => ms === 8000)
-    ).toHaveLength(1);
+      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 8000)
+    ).toHaveLength(2);
     expect(txStates.every(state => state.closed)).toBe(true);
     expect(captureExceptionMock).not.toHaveBeenCalled();
   });
@@ -1447,7 +1231,11 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     void pendingSetup.catch(() => {});
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 5000) {
+      // Profile reads also take the 5000ms API deadline (JOV-8651). Stall only
+      // the avatar transaction this case proves (JOV-8580): it is the open
+      // transaction once three sessions exist, and earlier 5000ms setup must
+      // resolve so the avatar read is the one still awaiting cancellation.
+      if (ms === 5000 && txStates.length === 3) {
         signalSetup();
         await pendingSetup;
       }
@@ -1494,7 +1282,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(loggerClosedProbe).toHaveBeenCalled();

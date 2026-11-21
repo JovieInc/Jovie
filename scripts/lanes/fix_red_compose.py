@@ -18,7 +18,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     import fix_red_render_modes
 
     order = (
-        classes.SYNC_MAIN, classes.STAMP_REPAIR, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.DROP_MISSING_CONTRACT, classes.RENUMBER,
+        classes.SYNC_MAIN, classes.STAMP_REPAIR, classes.CITE_BASELINE_LOCK, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.DROP_MISSING_CONTRACT, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
         fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
@@ -79,6 +79,9 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     for action in actions:
         if action == classes.STAMP_REPAIR:
             if lane.stamp_fleet_body(host, pr) is None:
+                return None
+        elif action == classes.CITE_BASELINE_LOCK:
+            if lane.deterministic_route_taken(host, pr, {"action": action}) != "infra-rerun:baseline-lock":
                 return None
         elif action == classes.STAMP_CHANGELOG:
             if not lane.pr_events.ensure_red_before_green(

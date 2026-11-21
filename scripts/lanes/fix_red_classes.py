@@ -36,6 +36,10 @@ from fix_red_conflict_resolvers import merge_additive_quoted_entries
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, RENDER_MODE_SNAPSHOT, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
+from pr_repair_evidence import (
+    BASELINE_LOCKING_PR, BASELINE_LOCK_TEXT, CITE_BASELINE_LOCK,
+    INTERNAL_CHANGELOG_NOTE, baseline_locking_pr, stamp_internal_changelog,
+)  # noqa: F401 (legacy public names remain available to the existing runner/tests)
 from fix_red_biome import BIOME_FORMAT_TEXT
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -54,7 +58,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SP
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win", "split-size-500")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR, DROP_MISSING_CONTRACT})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR, DROP_MISSING_CONTRACT, CITE_BASELINE_LOCK})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -82,7 +86,6 @@ COMPONENT_TEST_TEXT = re.compile(
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
-INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
 CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
 CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit GitHub")
 # Design-surface census throws this when a canonical digest no longer matches the
@@ -179,6 +182,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("baseline-lock", BASELINE_LOCK_TEXT, CITE_BASELINE_LOCK),
     ("fleet-body", FLEET_BODY_ERROR, STAMP_REPAIR),
     ("measured-win", re.compile(r"needs a measured win \(metric, before, after, method, evidence\)"), REPAIR_WIN),
     ("pr-body", BODY_TEXT, AGENT),
@@ -193,15 +197,6 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 def real_failures(pr: dict) -> list[dict]:
     return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
-
-def stamp_internal_changelog(body) -> str | None:
-    """Append the internal customer-changelog note. None when `body` is not a string or already
-    contains a note (a second note is an ambiguous contract, not a stamp)."""
-    if not isinstance(body, str) or re.search(r"<!--\s*customer-changelog/v1\b", body):
-        return None
-    if body and not body.endswith("\n"):
-        body += "\n"
-    return body + INTERNAL_CHANGELOG_NOTE + "\n"
 
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:

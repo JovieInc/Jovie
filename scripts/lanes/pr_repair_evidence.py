@@ -32,3 +32,56 @@ def with_locking_pr(body: str, locking_pr: int) -> str:
                     break
             updated = "\n".join(lines[:start + 1] + "".join(parts).split("\n") + lines[end:])
     return updated
+
+
+# Only this baseline has a verified locking-PR mapping; other paths stay explicit.
+CITE_BASELINE_LOCK = "cite-baseline-lock"
+TYPECHECK_TESTS_BASELINE = "apps/web/typecheck-tests-baseline.json"
+BASELINE_LOCKING_PR = 16597
+_BASELINE_LOCK_LINE = re.compile(
+    r"locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for "
+    + re.escape(TYPECHECK_TESTS_BASELINE) + r"\.(?: Add to the PR body:.*)?\s*")
+
+
+class BaselineLockSignature:
+    """Only actual error lines for the sole known path can authorize its citation."""
+
+    def search(self, text):
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
+        matches = []
+        for line in clean.splitlines():
+            line = re.sub(r"^[^\t]+\t[^\t]+\t(?=\d{4}-\d\d-\d\dT|##\[error\])", "", line)
+            line = re.sub(r"^\d{4}-\d\d-\d\dT[\d:.]+Z\s+", "", line)
+            line = re.sub(r"^(?:##\[error\]|::error::)", "", line)
+            if not line.startswith("locked-areas:"):
+                continue
+            match = _BASELINE_LOCK_LINE.fullmatch(line)
+            if not match:
+                return None
+            matches.append(match)
+        return matches[0] if matches else None
+
+
+BASELINE_LOCK_TEXT = BaselineLockSignature()
+
+def baseline_locking_pr(text: str) -> int | None:
+    """Locking PR when the locked-areas sentence names only the web test typecheck baseline.
+
+    The path must sit immediately before the sentence period. A comma-separated
+    extra path is a different lock and returns None.
+    """
+    if BASELINE_LOCK_TEXT.search(str(text or "")):
+        return BASELINE_LOCKING_PR
+    return None
+
+
+INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+
+def stamp_internal_changelog(body) -> str | None:
+    """Append the internal customer-changelog note. None when `body` is not a string or already
+    contains a note (a second note is an ambiguous contract, not a stamp)."""
+    if not isinstance(body, str) or re.search(r"<!--\s*customer-changelog/v1\b", body):
+        return None
+    if body and not body.endswith("\n"):
+        body += "\n"
+    return body + INTERNAL_CHANGELOG_NOTE + "\n"
