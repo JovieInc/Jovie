@@ -76,7 +76,8 @@ describe('MarketingShippedSitesShowcase', () => {
     expect(homePage).not.toContain('MarketingShippedSitesShowcase');
     expect(homePage).not.toContain('MarketingPlatformSpecBento');
     expect(artistProfiles).toContain('MarketingShippedSitesShowcase');
-    expect(artistProfiles).toContain('MarketingPlatformSpecBento');
+    // JOV-14242 cut Platform Spec bento from the six-section artist LP.
+    expect(artistProfiles).not.toContain('MarketingPlatformSpecBento');
   });
 
   it('keeps the shipped kit on Jovie accents and off default green', () => {

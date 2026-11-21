@@ -63,13 +63,25 @@ test('merged guards occupy only the existing fourth unit shard after exact-head 
   assert.ok(workflow.jobs.ready.needs.includes('unit'));
 });
 
-/** @param {{ name: string, shard: string, reuse: string, web: string, typecheck: string }} input */
-function unitStepEnabledOnReuse({ name, shard, reuse, web, typecheck }) {
+/** @param {{ name: string, shard: string, reuse: string, web: string, typecheck: string, remaining: string }} input */
+function unitStepEnabledOnReuse({
+  name,
+  shard,
+  reuse,
+  web,
+  typecheck,
+  remaining,
+}) {
   if (reuse === 'true') return false;
   if (name === guardName || name === 'Prepare merged source guard generation')
     return shard === '4/4';
   if (name === 'Setup Node.js and pnpm')
-    return shard === '4/4' || web === 'true' || typecheck === 'true';
+    return (
+      shard === '4/4' ||
+      web === 'true' ||
+      typecheck === 'true' ||
+      remaining === 'true'
+    );
   if (name === 'Setup Playwright warm path')
     return shard === '4/4' || web === 'true';
   return true;
@@ -89,39 +101,56 @@ test('metadata reuse skips every unit shard including merged guards on 4/4', () 
     for (const reuse of ['true', 'false']) {
       for (const web of ['true', 'false']) {
         for (const typecheck of ['true', 'false']) {
-          const context = {
-            matrix: { shard },
-            steps: {
-              reuse: { outputs: { reuse } },
-              scope: { outputs: { web, ui: 'false', ovie: 'false' } },
-              'mq-parity': { outputs: { typecheck } },
-            },
-          };
-          for (const name of names) {
-            const step = steps.find(item => item.name === name);
-            assert.ok(step, name);
+          for (const remaining of ['true', 'false']) {
+            const context = {
+              matrix: { shard },
+              steps: {
+                reuse: { outputs: { reuse } },
+                scope: { outputs: { web, ui: 'false', ovie: 'false' } },
+                'mq-parity': { outputs: { typecheck, remaining } },
+              },
+            };
+            for (const name of names) {
+              const step = steps.find(item => item.name === name);
+              assert.ok(step, name);
+              assert.equal(
+                expression(step.if, context),
+                unitStepEnabledOnReuse({
+                  name,
+                  shard,
+                  reuse,
+                  web,
+                  typecheck,
+                  remaining,
+                }),
+                `${name}: ${shard}/${reuse}/${web}/${typecheck}/${remaining}`
+              );
+            }
+            const unit = steps.find(
+              item =>
+                item.name === 'Run web unit tests related to the exact PR diff'
+            );
             assert.equal(
-              expression(step.if, context),
-              unitStepEnabledOnReuse({ name, shard, reuse, web, typecheck }),
-              `${name}: ${shard}/${reuse}/${web}/${typecheck}`
+              expression(unit.if, context),
+              reuse !== 'true' && web === 'true'
+            );
+            const twin = steps.find(
+              item => item.name === 'Run typecheck lane parity'
+            );
+            assert.equal(
+              expression(twin.if, context),
+              reuse !== 'true' && typecheck === 'true' && shard === '2/4',
+              `typecheck twin: ${shard}/${reuse}/${typecheck}`
+            );
+            const remainingTwin = steps.find(
+              item => item.name === 'Run remaining lane parity'
+            );
+            assert.equal(
+              expression(remainingTwin.if, context),
+              reuse !== 'true' && remaining === 'true' && shard === '1/4',
+              `remaining twin: ${shard}/${reuse}/${remaining}`
             );
           }
-          const unit = steps.find(
-            item =>
-              item.name === 'Run web unit tests related to the exact PR diff'
-          );
-          assert.equal(
-            expression(unit.if, context),
-            reuse !== 'true' && web === 'true'
-          );
-          const twin = steps.find(
-            item => item.name === 'Run typecheck lane parity'
-          );
-          assert.equal(
-            expression(twin.if, context),
-            reuse !== 'true' && typecheck === 'true' && shard === '2/4',
-            `typecheck twin: ${shard}/${reuse}/${typecheck}`
-          );
         }
       }
     }

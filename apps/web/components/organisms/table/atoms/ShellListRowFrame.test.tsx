@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { KeyboardEvent } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   getShellListRowFrameClassName,
   ShellListRowButton,
@@ -126,5 +128,33 @@ describe('ShellListRowFrame', () => {
     expect(disclosureClassName).toContain('rotate-90');
     expect(disclosureClassName).not.toContain('rounded');
     expect(disclosureClassName).not.toContain('bg-');
+  });
+
+  it('fires the click handler of a row button and stays axe-clean', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const { container } = render(
+      <ShellListRowButton onClick={onClick} isSelected>
+        Open release
+      </ShellListRowButton>
+    );
+
+    const row = screen.getByRole('button', { name: 'Open release' });
+    expect(row).toHaveAttribute('data-selected', 'true');
+    await user.click(row);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a list of frame rows axe-clean', async () => {
+    const { container } = render(
+      <ul>
+        <ShellListRowFrame as='li'>First row</ShellListRowFrame>
+        <ShellListRowFrame as='li'>Second row</ShellListRowFrame>
+      </ul>
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    await expectNoA11yViolations(container);
   });
 });

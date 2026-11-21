@@ -37,6 +37,10 @@
     "ci.yml#ci-fast-typecheck": {
       "pr": "source-validation.yml#unit",
       "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-remaining-shards": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
     }
   },
   "exemptions": [
@@ -91,15 +95,8 @@
     },
     {
       "job": "ci.yml#ci-fast-remaining",
-      "kind": "gap",
-      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-remaining-shards",
-      "kind": "gap",
-      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
+      "kind": "combined-head",
+      "reason": "Aggregates the remaining ci-fast shards of the combined head; shard lanes run on Source Validation via parity, so only this fan-in is combined-head-only.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
