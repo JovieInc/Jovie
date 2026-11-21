@@ -18,7 +18,6 @@ const h = vi.hoisted(() => ({
   releaseWhere: undefined as unknown,
 }));
 
-vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn() },

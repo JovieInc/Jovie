@@ -1017,6 +1017,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
+  'scripts/dogfood-truth-intake.test.mjs', // JOV-7140 dogfood loop intake.
   'scripts/desktop-stamp-ownership.test.mjs',
   'scripts/summer/pr-no-stall.test.mjs',
   'scripts/hostops/pen-golden-path-sync.test.mjs',

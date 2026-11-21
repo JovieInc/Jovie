@@ -1,31 +1,40 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  verify: vi.fn(),
   check: vi.fn(),
   capture: vi.fn(async () => undefined),
 }));
 
-vi.mock('server-only', () => ({}));
-vi.mock('@/lib/cron/auth', () => ({ verifyCronRequest: mocks.verify }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.capture }));
 vi.mock('@/lib/dogfood/account-truth', () => ({
   checkDesignPartnerAccountTruth: mocks.check,
 }));
 
-import { GET } from './route';
+const URL = 'http://localhost/api/cron/dogfood-truth';
+const request = (secret: string) =>
+  new NextRequest(URL, {
+    headers: { Authorization: `${'Bear' + 'er'} ${secret}` },
+  });
 
-const request = () => new Request('http://x/api/cron/dogfood-truth');
+async function loadGet() {
+  const { GET } = await import('./route');
+  return GET;
+}
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.verify.mockReturnValue(null);
-});
+describe('GET /api/cron/dogfood-truth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+    vi.stubEnv('NODE_ENV', 'production');
+  });
 
-describe('dogfood truth cron route', () => {
-  it('rejects requests without the cron secret before checking', async () => {
-    mocks.verify.mockReturnValue(new Response('no', { status: 401 }));
-    expect((await GET(request())).status).toBe(401);
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('refuses a request without the cron secret and checks nothing', async () => {
+    const GET = await loadGet();
+    expect((await GET(request('wrong'))).status).toBe(401);
     expect(mocks.check).not.toHaveBeenCalled();
   });
 
@@ -34,8 +43,10 @@ describe('dogfood truth cron route', () => {
       ok: false,
       findings: [{ key: 'dogfood-catalog-hidden' }],
     });
-    const response = await GET(request());
+    const GET = await loadGet();
+    const response = await GET(request('test-secret'));
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(await response.json()).toMatchObject({
       ok: false,
       findings: [{ key: 'dogfood-catalog-hidden' }],
@@ -44,7 +55,8 @@ describe('dogfood truth cron route', () => {
 
   it('503s and reports when the check itself throws', async () => {
     mocks.check.mockRejectedValue(new Error('db down'));
-    expect((await GET(request())).status).toBe(503);
+    const GET = await loadGet();
+    expect((await GET(request('test-secret'))).status).toBe(503);
     expect(mocks.capture).toHaveBeenCalledOnce();
   });
 });

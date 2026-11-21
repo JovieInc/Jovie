@@ -10,7 +10,6 @@ const h = vi.hoisted(() => ({
   results: [] as unknown[][],
 }));
 
-vi.mock('server-only', () => ({}));
 vi.mock('@/lib/release-to-revenue/design-partner-config', () => ({
   resolveDesignPartnerConfig: h.partner,
 }));
